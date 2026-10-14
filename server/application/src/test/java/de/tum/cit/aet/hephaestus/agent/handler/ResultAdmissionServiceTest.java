@@ -56,18 +56,18 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
     @BeforeEach
     void setup() {
         when(manager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        service = new ResultAdmissionService(
-                jobs,
-                output,
-                proof,
-                assignments,
-                publicEligibility,
-                files,
-                feedback,
-                mock(ReviewHistoryContentSource.class),
-                mapper,
-                manager,
-                mock(ReviewCompositionBasisRepository.class));
+        service = new ResultAdmissionService(jobs,
+output,
+proof,
+assignments,
+publicEligibility,
+files,
+feedback,
+mock(ReviewHistoryContentSource.class),
+mapper,
+manager,
+mock(ReviewCompositionBasisRepository.class),
+org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.handler.FeedbackCompositionContextReader.class));
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker");
         job.setCapture(mapper.createObjectNode());

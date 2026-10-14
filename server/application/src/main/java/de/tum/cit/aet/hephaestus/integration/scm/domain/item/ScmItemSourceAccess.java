@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
@@ -19,8 +19,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Reads current access and consent only; historical content remains in retained custody. */
 @Component
@@ -34,7 +36,7 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
     private final ScmRepositoryAccess access;
     private final ScmPersonSourceIdentityContributor contributors;
     private final PersonProcessingSuppression suppression;
-    private final AccountIdentityQuery identities;
+    private final PersonIdentityResolver identities;
     private final AccountDirectory accounts;
 
     @Override
@@ -93,10 +95,10 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
                     item.workspaceId(), item.kind().value(), source)) {
                 if (suppression.isSuppressed(identity.providerId(), identity.subject(), identity.teamId()))
                     return false;
-                var account = identities
-                        .resolveAccountId(identity.providerId(), identity.subject(), identity.teamId())
-                        .flatMap(accounts::find);
-                if (account.isPresent()) {
+                var accountId = identities.accountFor(identity);
+                if (accountId.isPresent()) {
+                    var account = accounts.find(accountId.orElseThrow());
+                    if (account.isEmpty()) return false;
                     var person = account.orElseThrow();
                     if (suppression.isAccountSuppressed(person.id())
                             || person.aiChoice() == AiChoice.NO_AI
@@ -107,6 +109,9 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
             return true;
         } catch (ItemCaptureException unavailable) {
             return false;
+        } catch (ResponseStatusException conflict) {
+            if (conflict.getStatusCode().value() == HttpStatus.CONFLICT.value()) return false;
+            throw conflict;
         }
     }
 }

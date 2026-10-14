@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -87,5 +88,23 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
                                 .filter(need -> need.need() == ReadNeed.COMPLETE)
                                 .map(need -> need.source()))
                         .containsExactly(new SourceKind("scm.pull-request.diff")));
+    }
+
+    @Test
+    void shouldCaptureCompleteFileEvidenceForEveryBundledScan() {
+        var scans = loader.catalog().practices().stream()
+                .map(entry -> entry.definition().definition().scan())
+                .filter(Objects::nonNull)
+                .map(Objects::requireNonNull)
+                .toList();
+        assertThat(scans).hasSize(13).allSatisfy(scan -> {
+            assertThat(scan.reads().contract()).isEqualTo("2.0.0");
+            assertThat(scan.reads().sources())
+                    .extracting(source -> source.source().value())
+                    .containsExactly("scm.repository.tree");
+            assertThat(scan.reads().sources())
+                    .extracting(source -> source.need())
+                    .containsExactly(ReadNeed.COMPLETE);
+        });
     }
 }

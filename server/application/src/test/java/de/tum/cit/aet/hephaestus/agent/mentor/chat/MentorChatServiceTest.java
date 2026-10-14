@@ -415,29 +415,29 @@ class MentorChatServiceTest extends BaseUnitTest {
     private MentorChatService serviceWithExecutor(ExecutorService executor, ScheduledExecutorService runnerTimeouts) {
         var turnExecutorBean = new MentorChatExecutorConfig.MentorTurnExecutor(executor);
         var schedulerBean = new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(runnerTimeouts);
-        return new MentorChatService(
-                userRepository,
-                chatThreadRepository,
-                workspaceContextBuilder,
-                mentorPiAdapter,
-                sandboxServiceProvider(interactiveSandboxService),
-                translator,
-                turnLock,
-                persistence,
-                mapper,
-                turnExecutorBean,
-                schedulerBean,
-                new MentorChatMetrics(meterRegistry),
-                llmBudgetService,
-                llmAdmissionService,
-                proxyCredentialRegistry,
-                memberAiRouting,
-                personSuppression,
-                (workspaceId, developerId) -> aiDecision,
-                mergeReadiness,
-                practiceResultHistory,
-                reviewAttempts,
-                resultsHistory);
+        return new MentorChatService(userRepository,
+chatThreadRepository,
+workspaceContextBuilder,
+mentorPiAdapter,
+sandboxServiceProvider(interactiveSandboxService),
+translator,
+turnLock,
+persistence,
+mapper,
+turnExecutorBean,
+schedulerBean,
+new MentorChatMetrics(meterRegistry),
+llmBudgetService,
+llmAdmissionService,
+proxyCredentialRegistry,
+memberAiRouting,
+personSuppression,
+(workspaceId, developerId) -> aiDecision,
+mergeReadiness,
+practiceResultHistory,
+reviewAttempts,
+resultsHistory,
+feedbackReceiptsProvider());
     }
 
     @Test
@@ -2198,7 +2198,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         var result = mock(ResultHistoryEntry.class);
         lenient().when(result.resultId()).thenReturn(PRACTICE_RESULT_ID);
         lenient().when(result.developerAccountId()).thenReturn(USER_ID);
-        when(resultsHistory.find(WORKSPACE_ID, PRACTICE_RESULT_ID, USER_ID)).thenReturn(Optional.of(result));
+        when(resultsHistory.find(WORKSPACE_ID, PRACTICE_RESULT_ID, USER_ID, de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(Optional.of(result));
         lenient()
                 .when(resultsHistory.forDeveloper(eq(WORKSPACE_ID), eq(USER_ID), any(), eq(90)))
                 .thenReturn(List.of(result));
@@ -2399,4 +2399,11 @@ class MentorChatServiceTest extends BaseUnitTest {
             throw new AssertionError("No sent frame with id " + id);
         }
     }
+    private static ObjectProvider<ConversationFeedbackReceipts> feedbackReceiptsProvider() {
+        var receipts = org.mockito.Mockito.mock(ConversationFeedbackReceipts.class);
+        return new ObjectProvider<>() {
+            @Override public ConversationFeedbackReceipts getObject() { return receipts; }
+        };
+    }
+
 }

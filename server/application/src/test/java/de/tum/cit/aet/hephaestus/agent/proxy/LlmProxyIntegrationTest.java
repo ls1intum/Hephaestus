@@ -609,12 +609,11 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private LlmProxyService proxyService(long maxTokensPerAttempt, long maxSearchUnitsPerAttempt, WebClient client) {
         ProxyRequestPolicy policy = mock(ProxyRequestPolicy.class);
         when(policy.allows(any())).thenReturn(true);
-        return new LlmProxyService(
-                Tracer.NOOP,
-                client,
-                modelResolver,
-                objectMapper,
-                new ProxyAccounting(
+        return new LlmProxyService(Tracer.NOOP,
+client,
+modelResolver,
+objectMapper,
+new ProxyAccounting(
                         new ProxyBudgetGate(
                                 mock(LlmBudgetService.class),
                                 new PracticeReviewProperties(
@@ -623,7 +622,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         mock(MentorTurnUsageAccumulator.class),
                         meterRegistry,
                         objectMapper),
-                policy);
+policy,
+org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.class));
     }
 
     private ProxyUsageAccumulator accumulator() {

@@ -63,7 +63,9 @@ public record FrozenModel(
     /** Whether admission still resolves to the catalog row and upstream model frozen here. */
     public boolean isAdmittedAs(AdmittedLlmModel admitted) {
         return admitted.connection().equals(connectionRef())
-                && admitted.resolved().upstreamModelId().equals(upstreamModelId);
+                && admitted.resolved().upstreamModelId().equals(upstreamModelId)
+                && admitted.resolved().apiProtocol().equals(apiProtocol)
+                && Objects.equals(admitted.resolved().reasoningEffort(), reasoningEffort);
     }
 
     public FrozenModel withPriceSnapshot(LlmPriceSnapshot price) {

@@ -48,9 +48,7 @@ public class PracticeDefinitionOptionsService {
                         .toList(),
                 item.roles().stream().sorted().toList(),
                 sources.current().sources().stream()
-                        .filter(source -> source.appliesTo(item.kind().value())
-                                || capabilities.scanItemKinds().stream()
-                                        .anyMatch(kind -> source.appliesTo(kind.value())))
+                        .filter(source -> source.appliesTo(item.kind().value()))
                         .map(source -> new ReadSourceOptionDTO(
                                 source.kind().value(),
                                 source.displayName(),

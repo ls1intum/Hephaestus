@@ -81,13 +81,19 @@ public class ScanReportTestData {
                 original.reviewOn(),
                 null,
                 original.about(),
-                new PracticeReads(
-                        "2.0.0",
-                        List.of(new PracticeReadSource(new SourceKind("scm.repository.tree"), ReadNeed.REQUIRED))),
+                original.reads(),
                 original.reviewedBy(),
                 original.criteria(),
                 null,
-                new ScanDefinition(new ItemKind("scm.file"), List.of("**/*"), List.of(), List.of("**/*")),
+                new ScanDefinition(
+                        new ItemKind("scm.file"),
+                        List.of("**/*"),
+                        List.of(),
+                        List.of("**/*"),
+                        new PracticeReads(
+                                "2.0.0",
+                                List.of(new PracticeReadSource(
+                                        new SourceKind("scm.repository.tree"), ReadNeed.COMPLETE)))),
                 false,
                 original.guidance());
         var owner = data.scenario(definition);

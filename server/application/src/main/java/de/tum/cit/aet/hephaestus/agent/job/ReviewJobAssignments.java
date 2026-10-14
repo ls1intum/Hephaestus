@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.util.HashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -55,6 +55,10 @@ public class ReviewJobAssignments {
                     return assignment;
                 })
                 .toList();
+    }
+
+    public boolean publicReviewed(ReviewJob job) {
+        return reviews.publicReviewedAt(job.getWorkspaceId(), job.getReviewId()).isPresent();
     }
 
     /** Practices refused at capture do not become missing result submissions. */

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
@@ -85,7 +86,7 @@ public class ResultHistoryContentSource implements ContentSource {
     @Transactional(readOnly = true)
     public ObjectNode inspect(long workspaceId, long developerId, UUID resultId) {
         var root = objectMapper.createObjectNode().put("readAt", Instant.now().toString());
-        var selected = results.find(workspaceId, resultId, developerId, de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose.CONVERSATIONAL_MENTORING)
+        var selected = results.find(workspaceId, resultId, developerId, SourceUsePurpose.CONVERSATIONAL_MENTORING)
                 .filter(entry -> Long.valueOf(developerId).equals(entry.developerAccountId()));
         if (selected.isEmpty()) return root.put("status", "NOT_FOUND");
         consentGate.writeUntrustedEnvelope(root);

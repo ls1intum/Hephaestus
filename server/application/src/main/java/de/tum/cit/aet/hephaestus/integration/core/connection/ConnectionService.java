@@ -81,6 +81,13 @@ public class ConnectionService {
     }
 
     @Transactional(readOnly = true)
+    public List<Connection> findActiveConnections(long workspaceId, IntegrationKind kind) {
+        return connectionRepository.findByWorkspaceIdAndState(workspaceId, IntegrationState.ACTIVE).stream()
+                .filter(connection -> connection.getKind() == kind)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Long> findUniqueActiveWorkspaceId(IntegrationKind kind, String instanceKey) {
         if (instanceKey.isBlank()) return Optional.empty();
         var matches = connectionRepository.findWorkspaceIdsByKindAndInstanceKeyAndState(

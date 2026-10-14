@@ -80,4 +80,29 @@ class PracticeVersionServiceTest extends BaseUnitTest {
         assertThat(recorded.path("reads").path("contract").isNull()).isTrue();
         assertThat(recorded.path("reads").path("sources").isArray()).isTrue();
     }
+
+    @Test
+    void shouldKeepHistoricalScansWithoutReadRequirementsUnavailable() {
+        var recorded = (ObjectNode) mapper.valueToTree(DefinitionTestFixtures.definition());
+        var scan = recorded.putObject("scan");
+        scan.put("itemKind", "scm.file");
+        scan.putArray("include").add("**/*.ts");
+        scan.putArray("exclude");
+        scan.putArray("context").add("**/*");
+        var version = mock(PracticeVersion.class);
+        when(version.getId()).thenReturn(8L);
+        when(version.getNumber()).thenReturn(2);
+        when(version.getName()).thenReturn("Recorded scan");
+        when(version.getDefinition()).thenReturn(recorded);
+        when(version.getReviewDigest()).thenReturn("v6:" + "b".repeat(64));
+        when(version.getCreatedAt()).thenReturn(Instant.EPOCH);
+        var view = service.view(version, null, null);
+        assertThat(view.definitionAvailable()).isFalse();
+        var historical = Objects.requireNonNull(view.historicalDefinition());
+        assertThat(historical.knownFields()).doesNotContain(PracticeDefinitionField.SCAN);
+        assertThat(historical.scan()).isNull();
+        assertThat(scan.has("reads")).isFalse();
+        assertThat(Objects.requireNonNull(scan.path("include").get(0)).asString())
+                .isEqualTo("**/*.ts");
+    }
 }

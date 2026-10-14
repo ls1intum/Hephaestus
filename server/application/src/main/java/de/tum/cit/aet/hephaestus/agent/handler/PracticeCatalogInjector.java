@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
-import java.util.Objects;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -32,7 +32,9 @@ public class PracticeCatalogInjector {
                     .put("reviewDigest", practice.reviewDigest());
             entry.set("definition", mapper.valueToTree(definition));
             var sources = entry.putArray("readsSources");
-            (scope == ReviewKind.SCAN ? Objects.requireNonNull(definition.scan()).reads() : definition.reads())
+            (scope == ReviewKind.SCAN
+                            ? Objects.requireNonNull(definition.scan()).reads()
+                            : definition.reads())
                     .sources()
                     .forEach(read -> sources.add(read.source().value()));
             files.put(

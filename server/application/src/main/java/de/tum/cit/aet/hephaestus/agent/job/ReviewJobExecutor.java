@@ -61,6 +61,7 @@ import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -165,6 +166,7 @@ public class ReviewJobExecutor {
     private final AgentProperties agentProperties;
     private final ReviewJobRepository jobRepository;
     private final ReviewMemberAiPolicy memberAiPolicy;
+    private final ReviewMethodVerifier methods;
     private final ReviewExecutionHandler handler;
     private final ReviewJobAssignments assignments;
     private final PracticePiAdapter practiceAgent;
@@ -231,10 +233,12 @@ public class ReviewJobExecutor {
             LlmBudgetService llmBudgetService,
             @Nullable LlmAdmissionService llmAdmissionService,
             Optional<WorkerCapacityState> capacityState,
-            Optional<WorkerProperties> workerProperties) {
+            Optional<WorkerProperties> workerProperties,
+            ReviewMethodVerifier methods) {
         this.agentProperties = agentProperties;
         this.jobRepository = jobRepository;
         this.memberAiPolicy = memberAiPolicy;
+        this.methods = methods;
         this.handler = handler;
         this.assignments = assignments;
         this.practiceAgent = practiceAgent;
@@ -1360,14 +1364,14 @@ public class ReviewJobExecutor {
             // stays frozen; only availability/grants and the price are refreshed, and a changed binding
             // is refused rather than silently switching the queued job to another model.
             AgentPurpose purpose = AgentPurpose.PRACTICE_REVIEW;
-            WorkspaceAgentBinding binding =
-                    purpose == null ? null : memberAiPolicy.binding(job).orElse(null);
+            WorkspaceAgentBinding binding = memberAiPolicy.binding(job).orElse(null);
             if (binding == null) {
                 return refuseUnavailableModel(job);
             }
             ConfigSnapshot snapshot;
             try {
                 ConfigSnapshot submitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+                methods.require(assignments.load(job).getFirst().practice().method(), "review", binding);
                 if (Objects.requireNonNullElse(submitted.dataHandlingTier(), DataHandlingTier.UNDECLARED)
                         != binding.getDataHandlingTier()) return refuseUnavailableModel(job);
                 if (llmAdmissionService != null) {
@@ -1376,13 +1380,14 @@ public class ReviewJobExecutor {
                         return refuseUnavailableModel(job);
                     }
                     snapshot = submitted
-                            .withPriceSnapshot(admitted.price())
+                            .withPriceSnapshot(
+                                    submitted.priceSnapshot() == null ? admitted.price() : submitted.priceSnapshot())
                             .withPracticeScript(
                                     admitPracticeScript(job, submitted.practiceScript(), llmAdmissionService));
                 } else {
                     snapshot = submitted;
                 }
-            } catch (IllegalStateException e) {
+            } catch (IllegalStateException | ReviewJobStateConflictException e) {
                 return refuseUnavailableModel(job);
             }
 
@@ -1444,16 +1449,21 @@ public class ReviewJobExecutor {
             Optional<FrozenModel> priced = memberAiPolicy
                     .practiceScriptBinding(job, purpose)
                     .filter(binding -> binding.getDataHandlingTier() == tier)
+                    .map(binding -> {
+                        methods.require(
+                                assignments.load(job).getFirst().practice().method(),
+                                purpose.kind().name().toLowerCase(Locale.ROOT),
+                                binding);
+                        return binding;
+                    })
                     .flatMap(admission::admitIfAvailable)
                     .filter(slot::isAdmittedAs)
-                    .map(model -> slot.withPriceSnapshot(model.price()));
+                    .map(model -> slot.withPriceSnapshot(
+                            slot.priceSnapshot() == null ? model.price() : slot.priceSnapshot()));
             if (priced.isPresent()) {
                 admitted.put(purpose.kind(), priced.get());
             } else {
-                log.info(
-                        "Dropping a model for practice scripts that is no longer available: jobId={}, kind={}",
-                        job.getId(),
-                        purpose.kind());
+                throw new IllegalStateException("A frozen direct model is no longer available");
             }
         }
         return admitted.isEmpty() ? null : admitted;

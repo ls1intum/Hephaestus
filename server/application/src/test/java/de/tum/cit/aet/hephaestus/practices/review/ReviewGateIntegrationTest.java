@@ -1,11 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
@@ -13,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.util.List;
@@ -22,7 +19,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @Import(ReviewIntegrationData.class)
@@ -58,30 +54,22 @@ class ReviewGateIntegrationTest extends BaseIntegrationTest {
     @Autowired
     PracticeRepository practices;
 
-    @MockitoBean
-    PracticeReviewReadiness readiness;
-
     @Test
     void storedOffModeStillAllowsAResultReview() {
         scenario.practice().setFeedbackMode(FeedbackMode.OFF);
         practices.saveAndFlush(scenario.practice());
-        when(readiness.hasRunnableAgent(scenario.workspace().getId())).thenReturn(true);
         assertThat(gate.evaluate(scenario.workspace(), snapshot(), ReviewOrigin.REQUEST, null, List.of()))
                 .isInstanceOf(GateDecision.Run.class);
     }
 
     @Test
-    void unavailableBindingRecordsItsOwnReason() {
-        when(readiness.hasRunnableAgent(scenario.workspace().getId())).thenReturn(false);
+    void shouldSelectStoredPracticesBeforeRecipientSpecificModelBinding() {
         assertThat(gate.evaluate(scenario.workspace(), snapshot(), ReviewOrigin.REQUEST, null, List.of()))
-                .isInstanceOfSatisfying(
-                        GateDecision.Skip.class,
-                        s -> assertThat(s.eventReason()).isEqualTo(ItemEventReason.REVIEW_MODEL_UNBOUND));
+                .isInstanceOf(GateDecision.Run.class);
     }
 
     @Test
     void anExplicitReviewDoesNotInventAnEvent() {
-        when(readiness.hasRunnableAgent(scenario.workspace().getId())).thenReturn(true);
         assertThat(gate.evaluate(scenario.workspace(), snapshot(), ReviewOrigin.BACKFILL, null, List.of()))
                 .isInstanceOfSatisfying(
                         GateDecision.Run.class, r -> assertThat(r.origin()).isEqualTo(ReviewOrigin.BACKFILL));

@@ -62,15 +62,28 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
         IdentityProviderType type = IdentityProviderType.valueOf(providerTypeName);
         String origin = ScmOrigin.of(baseUrl)
                 .orElseThrow(() -> new IllegalStateException("login provider baseUrl has no origin: " + baseUrl));
-        // Rows recorded before origins were canonical may spell this one differently; reuse them.
-        return Objects.requireNonNull(gitProviderRepository
+        return Objects.requireNonNull(existingProvider(type, origin)
+                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
+                .getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Long> findProviderId(String providerTypeName, String baseUrl) {
+        var type = IdentityProviderType.valueOf(providerTypeName);
+        return ScmOrigin.of(baseUrl)
+                .flatMap(origin -> existingProvider(type, origin))
+                .map(provider -> Objects.requireNonNull(provider.getId()));
+    }
+
+    private Optional<IdentityProvider> existingProvider(IdentityProviderType type, String origin) {
+        // Retained provider namespaces may spell the same exact origin differently.
+        return gitProviderRepository
                 .findByTypeAndServerUrl(type, origin)
                 .or(() -> gitProviderRepository.findAllByType(type).stream()
                         .filter(provider ->
                                 ScmOrigin.of(provider.getServerUrl()).equals(Optional.of(origin)))
-                        .findFirst())
-                .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, origin)))
-                .getId());
+                        .findFirst());
     }
 
     @Override

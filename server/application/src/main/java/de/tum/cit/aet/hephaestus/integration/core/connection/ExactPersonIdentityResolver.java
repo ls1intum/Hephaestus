@@ -5,16 +5,18 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProviderPersonLookup;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -26,20 +28,23 @@ import org.springframework.web.server.ResponseStatusException;
  * Exact provider-key closure, including disabled links. Cached actor ids are never ownership proof.
  */
 @Component
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 @WorkspaceAgnostic("Verified person requests intentionally span all workspaces")
 public class ExactPersonIdentityResolver implements PersonIdentityResolver {
 
     private final JdbcTemplate jdbc;
     private final List<ProviderPersonLookup> mirrors;
 
-    private final List<PersonSourceIdentityContributor> sourceOwners;
+    // Source attribution can consult this resolver for current account controls.
+    private final ObjectProvider<PersonSourceIdentityContributor> sourceOwners;
 
     public ExactPersonIdentityResolver(
-            JdbcTemplate jdbc, List<PersonSourceIdentityContributor> sourceOwners, List<ProviderPersonLookup> mirrors) {
+            JdbcTemplate jdbc,
+            ObjectProvider<PersonSourceIdentityContributor> sourceOwners,
+            List<ProviderPersonLookup> mirrors) {
         this.jdbc = jdbc;
         this.mirrors = List.copyOf(mirrors);
-        this.sourceOwners = List.copyOf(sourceOwners);
+        this.sourceOwners = sourceOwners;
     }
 
     @Override
@@ -55,6 +60,17 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
                         rs.getLong(1),
                         Objects.requireNonNull(rs.getString(2)),
                         Objects.requireNonNull(rs.getString(3))));
+    }
+
+    @Override
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    public Optional<Long> accountFor(PersonIdentity identity) {
+        Set<PersonIdentity> identities = new LinkedHashSet<>(List.of(identity));
+        includeEquivalentProviders(identities);
+        Set<Long> owners = new LinkedHashSet<>();
+        for (var exact : identities) owners.addAll(linkedOwners(exact));
+        if (owners.size() > 1) throw conflict("The exact provider identity is linked to different accounts.");
+        return owners.stream().findFirst();
     }
 
     @Override
@@ -123,7 +139,7 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
         Set<Long> conversations = new LinkedHashSet<>();
         Set<Long> documents = new LinkedHashSet<>();
         Set<Long> scmSources = new LinkedHashSet<>();
-        for (var owner : sourceOwners) {
+        for (var owner : sourceOwners.orderedStream().toList()) {
             var ids = owner.sourceIds(primary);
             if (owner.itemKinds().contains("chat.thread")) conversations.addAll(ids);
             if (owner.itemKinds().contains("docs.document")) documents.addAll(ids);

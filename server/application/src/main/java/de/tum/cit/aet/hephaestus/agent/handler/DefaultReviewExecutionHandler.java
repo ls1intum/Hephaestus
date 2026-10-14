@@ -41,6 +41,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** Captures one pinned item through its domain source and stages the same contract for every kind. */
@@ -70,13 +71,23 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
         if (matching.size() != 1) throw new IllegalStateException("The item needs exactly one capture source");
         var source = matching.getFirst();
         var contracts = pinned.stream()
-                .map(a -> (review.kind() == ReviewKind.SCAN ? Objects.requireNonNull(a.practice().definition().scan()).reads() : a.practice().definition().reads()).contract())
+                .map(a -> (review.kind() == ReviewKind.SCAN
+                                ? Objects.requireNonNull(
+                                                a.practice().definition().scan())
+                                        .reads()
+                                : a.practice().definition().reads())
+                        .contract())
                 .distinct()
                 .toList();
         if (!contracts.equals(List.of("2.0.0")))
             throw new IllegalArgumentException("The assigned source contract is not executable");
         var required = pinned.stream()
-                .flatMap(a -> (review.kind() == ReviewKind.SCAN ? Objects.requireNonNull(a.practice().definition().scan()).reads() : a.practice().definition().reads()).sources().stream())
+                .flatMap(a -> (review.kind() == ReviewKind.SCAN
+                                ? Objects.requireNonNull(
+                                                a.practice().definition().scan())
+                                        .reads()
+                                : a.practice().definition().reads())
+                        .sources().stream())
                 .map(read -> read.source())
                 .collect(Collectors.toSet());
         var snapshot = source.pin(item, pinned.getFirst().version());
@@ -88,8 +99,9 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
             try {
                 var manifest = Objects.requireNonNull(evidence.manifest());
                 var now = clock.instant();
-                var decisions =
-                        pinned.stream().map(a -> readiness(a, manifest, now, review.kind())).toList();
+                var decisions = pinned.stream()
+                        .map(a -> readiness(a, manifest, now, review.kind()))
+                        .toList();
                 var report = new AutomatedReviewReadinessReport(
                         manifest.contractVersion(),
                         manifest.catalogDigest(),
@@ -126,9 +138,21 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
                 if (!ready.isEmpty()) {
                     var record = source.record(snapshot, evidence.files());
                     for (var assignment : ready) {
-                        var previous = review.kind() == ReviewKind.ITEM
-                                ? mapper.valueToTree(history.previousResults(assignment))
-                                : mapper.nullNode();
+                        JsonNode previous = mapper.nullNode();
+                        if (review.kind() == ReviewKind.ITEM) {
+                            var retained = history.previousResults(assignment);
+                            if (!retained.isEmpty()) {
+                                var prior = retained.getFirst();
+                                var coordinates = mapper.createObjectNode()
+                                        .put("resultId", prior.resultId().toString())
+                                        .put("reviewedAt", prior.recordedAt().toString())
+                                        .put("origin", prior.origin().name())
+                                        .put("itemVersion", prior.itemVersion())
+                                        .put("outcome", prior.outcome().name());
+                                coordinates.putArray("citations");
+                                previous = coordinates;
+                            }
+                        }
                         staged.putAll(inputs.stage(
                                 review,
                                 assignment,
@@ -178,7 +202,9 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
         var reasons = new ArrayList<AutomatedReviewReadinessReason>();
         if (definition.reviewedBy().by() != ReviewedByKind.HEPHAESTUS)
             reasons.add(AutomatedReviewReadinessReason.NO_AUTOMATED_REVIEW);
-        var reads = scope == ReviewKind.SCAN ? Objects.requireNonNull(definition.scan()).reads() : definition.reads();
+        var reads = scope == ReviewKind.SCAN
+                ? Objects.requireNonNull(definition.scan()).reads()
+                : definition.reads();
         var checks = reads.sources().stream()
                 .map(read -> {
                     var state = manifest.sources().stream()

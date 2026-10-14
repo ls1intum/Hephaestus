@@ -33,6 +33,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -175,12 +176,13 @@ public class ReviewServiceImpl implements ReviewService {
                         .toList()
                         .equals(List.of("chat", "decision", "embedding", "reranking", "review")))
             throw new IllegalStateException("The review method must contain the five frozen slots.");
-        if (models.stream()
-                        .filter(slot -> slot.slot().equals("review"))
-                        .findFirst()
-                        .orElseThrow()
-                        .model()
-                == null)
+        if (!developers.isEmpty()
+                && models.stream()
+                                .filter(slot -> slot.slot().equals("review"))
+                                .findFirst()
+                                .orElseThrow()
+                                .model()
+                        == null)
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The review model is unavailable.");
         var digest = jdbc.sql("SELECT review_model_digest(CAST(:models AS jsonb))")
                 .param("models", json.writeValueAsString(models))
@@ -316,6 +318,12 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional(readOnly = true)
     public Optional<Instant> publicReviewedAt(long workspaceId, UUID reviewId) {
         return snapshots.publicReviewedAt(workspaceId, reviewId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BigDecimal> budgetUsd(long workspaceId, UUID reviewId) {
+        return snapshots.budgetUsd(workspaceId, reviewId);
     }
 
     @Override

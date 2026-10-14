@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRequest.State;
@@ -13,6 +14,9 @@ import de.tum.cit.aet.hephaestus.core.privacy.PersonDataStoreReceipt;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmCaptureConsent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -53,6 +57,9 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ExactPersonIdentityResolver resolver;
+
+    @Autowired
+    private ScmCaptureConsent captureConsent;
 
     @Autowired
     private PersonDataService personData;
@@ -115,10 +122,19 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var target = user(canonical, 42);
         var aliasTarget = user(alias, 42);
         var unrelated = user(alias, 84);
-        var account = accounts.saveAndFlush(new Account("not-a-resolution-key"));
+        var denied = new Account("not-a-resolution-key");
+        denied.setAiChoice(AiChoice.NO_AI);
+        denied.setAiChoiceAt(Instant.now());
+        var account = accounts.saveAndFlush(denied);
         link(account, canonical, "42", null, target.getId());
 
         var expected = List.of(identity(canonical, "42", null), identity(alias, "42", null));
+        assertThat(resolver.accountFor(identity(alias, "42", null))).contains(Objects.requireNonNull(account.getId()));
+        assertThat(resolver.accountFor(identity(alias, "84", null))).isEmpty();
+        assertThatThrownBy(() -> captureConsent.require(List.of(aliasTarget)))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
         var providerScope = resolver.resolve(null, List.of(identity(alias, "42", null)));
         assertThat(providerScope.accountId()).isEqualTo(account.getId());
         assertThat(providerScope.identities()).containsExactlyInAnyOrderElementsOf(expected);
@@ -139,6 +155,9 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var second = accounts.saveAndFlush(new Account("second"));
         link(first, canonical, "42", null, null);
         link(second, alias, "42", null, null);
+        assertThatThrownBy(() -> resolver.accountFor(identity(canonical, "42", null)))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
         assertThatThrownBy(() -> resolver.resolve(null, List.of(identity(canonical, "42", null))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
@@ -343,6 +362,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var disabled = link(account, gitlab, "84", null, null);
         disabled.setDisabledAt(Instant.now());
         links.saveAndFlush(disabled);
+        assertThat(resolver.accountFor(identity(gitlab, "84", null))).contains(Objects.requireNonNull(account.getId()));
 
         var scope = resolver.resolve(null, List.of(identity(github, "42", null)));
 
@@ -359,6 +379,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var other = user(github, 84);
         var account = accounts.saveAndFlush(new Account("Selected account"));
         link(account, github, "42", null, other.getId());
+        assertThat(resolver.accountFor(identity(github, "42", null))).contains(Objects.requireNonNull(account.getId()));
 
         assertThatThrownBy(() -> resolver.resolve(account.getId(), List.of()))
                 .isInstanceOf(ResponseStatusException.class)

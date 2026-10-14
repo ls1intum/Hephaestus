@@ -207,6 +207,12 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull.setBaseRefOid("b".repeat(40));
         pull.setHeadRefName("topic");
         pull.setBaseRefName("main");
+        var secondAssignee = users.saveAndFlush(TestUserFactory.createUser(
+                Math.abs(UUID.randomUUID().getMostSignificantBits()),
+                "assignee-" + UUID.randomUUID(),
+                fixture.provider()));
+        pull.getAssignees().add(fixture.author());
+        pull.getAssignees().add(secondAssignee);
         pull = pulls.saveAndFlush(pull);
         ItemRef holder = writer.upsert(new ItemRegistration(
                 fixture.workspace().getId(),
@@ -232,6 +238,12 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
             assertThat(role.identity().subject())
                     .isEqualTo(Long.toString(fixture.author().getNativeId()));
         });
+        assertThat(pullSnapshot.roles().stream()
+                        .filter(role -> role.role() == AboutRole.ASSIGNEE)
+                        .map(role -> role.identity().subject())
+                        .toList())
+                .containsExactlyInAnyOrder(
+                        Long.toString(fixture.author().getNativeId()), Long.toString(secondAssignee.getNativeId()));
         var named = sources.labels(holder.workspaceId(), List.of(issueRef, pullRef));
         assertThat(named.get(issueRef.itemId())).isEqualTo(issueSnapshot.label());
         assertThat(named.get(pullRef.itemId())).isEqualTo(pullSnapshot.label());

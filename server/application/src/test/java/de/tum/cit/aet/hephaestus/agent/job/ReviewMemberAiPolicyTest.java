@@ -22,14 +22,12 @@ class ReviewMemberAiPolicyTest extends BaseUnitTest {
         var suppression = mock(PersonProcessingSuppression.class);
         var job = RuntimeReviewTestData.job();
         when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(5L, null)));
-        when(preferences.forDeveloper(1, 5L)).thenReturn(new MemberAiPreferences.Decision(true, null));
-        var policy = new ReviewMemberAiPolicy(
-                mock(MemberAiRoutingAdapter.class),
-                new JsonMapper(),
-                preferences,
-                suppression,
-                assignments,
-                mock(LlmModelResolver.class));
+        when(preferences.forDeveloper(1, 5L)).thenReturn(new MemberAiPreferences.Decision(true, de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice.IN_HOUSE));
+        var policy = new ReviewMemberAiPolicy(mock(MemberAiRoutingAdapter.class),
+new JsonMapper(),
+preferences,
+suppression,
+assignments);
         assertThat(policy.permitsReview(job)).isTrue();
         when(suppression.isAccountSuppressed(5)).thenReturn(true);
         assertThat(policy.permitsReview(job)).isFalse();
@@ -42,13 +40,11 @@ class ReviewMemberAiPolicyTest extends BaseUnitTest {
         var job = RuntimeReviewTestData.job();
         when(assignments.load(job)).thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)));
         when(suppression.isSourceSuppressed(1, "docs.document", 20)).thenReturn(true);
-        var policy = new ReviewMemberAiPolicy(
-                mock(MemberAiRoutingAdapter.class),
-                new JsonMapper(),
-                mock(MemberAiPreferences.class),
-                suppression,
-                assignments,
-                mock(LlmModelResolver.class));
+        var policy = new ReviewMemberAiPolicy(mock(MemberAiRoutingAdapter.class),
+new JsonMapper(),
+mock(MemberAiPreferences.class),
+suppression,
+assignments);
         assertThat(policy.permitsReview(job)).isFalse();
     }
 }

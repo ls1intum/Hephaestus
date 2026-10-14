@@ -144,7 +144,10 @@ public class PracticesPersonDataCatalog implements PersonDataCatalog, PersonConv
                                 mapper,
                                 "review_item_result_reference",
                                 "review_item",
-                                "t.result_id IN(" + RESULT_IDS + ")",
+                                "t.result_id IN(" + RESULT_IDS
+                                        + ") OR t.job_id=ANY(:derivedJobs) OR EXISTS(SELECT 1 FROM"
+                                        + " jsonb_array_elements_text(COALESCE(t.detail->'custody'->'sourceJobIds','[]'::jsonb))"
+                                        + " source(value) WHERE source.value::uuid=ANY(:derivedJobs))",
                                 "workspace_id,review_id,practice_id,item_id,item_version,state,result_id,job_id,attempted_at,reason,detail",
                                 "workspace_id,review_id,practice_id,item_id",
                                 "",

@@ -108,6 +108,9 @@ public class ScanDriver {
         boolean permits;
         try {
             permits = budget.permits(state, selected);
+        } catch (ReviewJobStateConflictException changed) {
+            close(state, ReviewStatus.PARTIAL, ReviewStopReason.MODEL_CHANGED);
+            return;
         } catch (IllegalStateException unavailable) {
             close(state, ReviewStatus.PARTIAL, ReviewStopReason.MODEL_UNAVAILABLE);
             return;

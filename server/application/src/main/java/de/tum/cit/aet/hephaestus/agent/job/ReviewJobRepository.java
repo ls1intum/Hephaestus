@@ -59,9 +59,11 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             nativeQuery = true)
     List<UUID> findTerminalForProcessing(@Param("limit") int limit);
 
-    @Query(value = "SELECT EXISTS(SELECT 1 FROM review_job WHERE workspace_id=:ws AND review_id=:review AND status NOT IN ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING'))", nativeQuery = true)
-    boolean hasUnsettledInvocation(@Param("ws") long workspaceId,@Param("review") UUID reviewId);
-
+    @Query(
+            value = "SELECT EXISTS(SELECT 1 FROM review_job WHERE workspace_id=:ws AND review_id=:review AND status"
+                    + " NOT IN ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING'))",
+            nativeQuery = true)
+    boolean hasUnsettledInvocation(@Param("ws") long workspaceId, @Param("review") UUID reviewId);
 
     List<ReviewJob> findByStatus(ReviewJobStatus status);
 

@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -22,7 +21,6 @@ import de.tum.cit.aet.hephaestus.practices.ReviewOn;
 import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -30,7 +28,6 @@ import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -38,14 +35,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Tag("unit")
 class ReviewGateTest {
     private final PracticeRepository practices = mock(PracticeRepository.class);
-    private final PracticeReviewReadiness readiness = mock(PracticeReviewReadiness.class);
-    private final ReviewGate gate = new ReviewGate(practices, new JsonMapper(), readiness);
+    private final ReviewGate gate = new ReviewGate(practices, new JsonMapper());
     private final Workspace workspace = workspace();
-
-    @BeforeEach
-    void ready() {
-        when(readiness.hasRunnableAgent(1L)).thenReturn(true);
-    }
 
     @Test
     void feedbackModeOffStillAdmitsTheReview() {
@@ -146,12 +137,12 @@ class ReviewGateTest {
     }
 
     @Test
-    void recordsTheUnavailableModelReason() {
-        when(readiness.hasRunnableAgent(1L)).thenReturn(false);
+    void shouldSelectPracticesBeforeRecipientSpecificModelBinding() {
+        var practice = practice(1, DefinitionTestFixtures.definition());
+        when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                .thenReturn(List.of(practice));
         assertThat(gate.evaluate(workspace, snapshot(Map.of()), ReviewOrigin.REQUEST, null, List.of()))
-                .isInstanceOfSatisfying(
-                        GateDecision.Skip.class,
-                        r -> assertThat(r.eventReason()).isEqualTo(ItemEventReason.REVIEW_MODEL_UNBOUND));
+                .isInstanceOf(GateDecision.Run.class);
     }
 
     @Test

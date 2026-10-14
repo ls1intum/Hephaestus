@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
@@ -13,10 +15,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 @WorkspaceAgnostic("Instance person scope and explicitly workspace-bound Outline attribution")
 public class OutlinePersonSourceIdentityContributor implements PersonSourceIdentityContributor {
     private final OutlineDocumentRepository repository;
+    private final OutlineDocumentPermission permission;
 
     @Override
     public Set<String> itemKinds() {
@@ -34,8 +38,6 @@ public class OutlinePersonSourceIdentityContributor implements PersonSourceIdent
 
     @Override
     public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
-        return repository.findPersonSourceIdentities(workspaceId, sourceId).stream()
-                .map(row -> new PersonIdentity(row.getProviderId(), row.getSubject(), row.getTeamId()))
-                .toList();
+        return permission.identities(workspaceId, sourceId);
     }
 }

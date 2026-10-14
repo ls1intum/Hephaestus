@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -62,6 +63,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Captor
     private ArgumentCaptor<Set<String>> refsCaptor;
 
+    @Mock
+    private OutlineDocumentPermission permission;
+
     private OutlineDocumentProjector projector;
 
     @BeforeEach
@@ -72,13 +76,11 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 connectionService,
                 identityResolver,
                 documentSelector,
-                new OutlineOriginPolicy(Set.of(SERVER_URL)),
-                Mockito.mock(PersonDataCopyRecorder.class));
+                Mockito.mock(PersonDataCopyRecorder.class), permission);
+        lenient().when(permission.workspaceReadable(WORKSPACE_ID)).thenReturn(true);
+        lenient().when(permission.permits(eq(WORKSPACE_ID), anyLong())).thenReturn(true);
         lenient()
-                .when(connectionService.findActiveOutlineConfig(WORKSPACE_ID))
-                .thenReturn(Optional.of(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())));
-        lenient()
-                .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
+                .when(connectionService.findInWorkspace(WORKSPACE_ID, 7L))
                 .thenReturn(Optional.of(activeConnection()));
         lenient()
                 .when(identityResolver.resolveAccountId(anyLong(), anyString(), any(), anyString()))
@@ -103,6 +105,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
     private static OutlineDocument liveDocument() {
         OutlineDocument doc = new OutlineDocument();
+        doc.setId(11L);
         doc.setWorkspaceId(WORKSPACE_ID);
         doc.setConnectionId(7L);
         doc.setDocumentId("doc-uuid-1");
@@ -128,6 +131,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
     private static OutlineDocument tombstonedDocument() {
         OutlineDocument doc = new OutlineDocument();
+        doc.setId(11L);
         doc.setWorkspaceId(WORKSPACE_ID);
         doc.setConnectionId(7L);
         doc.setDocumentId("doc-uuid-2");
@@ -309,7 +313,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("without an ACTIVE Outline connection authors degrade to name-only and the resolver is never called")
     void noActiveConnection_skipsResolution() {
-        when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
+        when(connectionService.findInWorkspace(WORKSPACE_ID, 7L))
                 .thenReturn(Optional.empty());
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
         when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
@@ -437,19 +441,19 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         when(documentSelector.select(WORKSPACE_ID, "nothing", 5)).thenReturn(List.of());
 
         assertThat(projector.searchDocuments(WORKSPACE_ID, "nothing", 5)).isEmpty();
-        verify(connectionService, never()).findActive(anyLong(), any());
+        verify(connectionService, never()).findInWorkspace(anyLong(), anyLong());
     }
 
     @Test
     void documentsForWorkspace_withholdsMirrorAfterOriginApprovalIsRemoved() {
+        var deniedPermission = Mockito.mock(OutlineDocumentPermission.class);
         OutlineDocumentProjector denied = new OutlineDocumentProjector(
                 documentRepository,
                 collectionRepository,
                 connectionService,
                 identityResolver,
                 documentSelector,
-                new OutlineOriginPolicy(Set.of()),
-                Mockito.mock(PersonDataCopyRecorder.class));
+                Mockito.mock(PersonDataCopyRecorder.class), deniedPermission);
 
         assertThat(denied.documentsForWorkspace(WORKSPACE_ID)).isEmpty();
         verify(documentRepository, never()).findForProjection(anyLong(), any());

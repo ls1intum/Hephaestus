@@ -5,8 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 
+import de.tum.cit.aet.hephaestus.evidence.CompletenessPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
@@ -15,22 +17,28 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventDefinition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewCapabilities;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class PracticeDefinitionValidatorTest extends BaseUnitTest {
     private PracticeDefinitionValidator validator;
+    private SourceCatalogRegistry sources;
+    private SourceCatalog catalog;
+    private ItemDescriptor descriptor;
 
     @BeforeEach
     void setUp() {
-        var sources = mock(SourceCatalogRegistry.class);
-        var catalog = mock(SourceCatalog.class);
+        sources = mock(SourceCatalogRegistry.class);
+        catalog = mock(SourceCatalog.class);
         var options = mock(PracticeItemOptions.class);
-        var descriptor = mock(ItemDescriptor.class);
+        descriptor = mock(ItemDescriptor.class);
         var event = mock(ItemEventDefinition.class);
         lenient().when(sources.current()).thenReturn(catalog);
         lenient().when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));
@@ -113,5 +121,87 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
                 original.guidance());
         assertThatThrownBy(() -> validator.validate(new ItemKind("scm.pull_request"), people))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldValidateTheScanSourcesSeparatelyFromTheItemSources() {
+        enableScan(true);
+        var definition = withScan(scanReads("2.0.0", ReadNeed.COMPLETE));
+        validator.validate(new ItemKind("scm.pull_request"), definition);
+        assertThat(definition.reads().sources())
+                .extracting(PracticeReadSource::source)
+                .containsExactly(new SourceKind("scm.pull-request.core"));
+        assertThat(Objects.requireNonNull(definition.scan()).reads().sources())
+                .extracting(PracticeReadSource::source)
+                .containsExactly(new SourceKind("scm.repository.tree"));
+    }
+
+    @Test
+    void shouldRejectARequiredItemSourceInTheScanReadRequirements() {
+        enableScan(true);
+        var definition = withScan(DefinitionTestFixtures.definition().reads());
+        assertThatThrownBy(() -> validator.validate(new ItemKind("scm.pull_request"), definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("item kind");
+    }
+
+    @Test
+    void shouldRequireTheCurrentContractForTheScanSources() {
+        enableScan(true);
+        var definition = withScan(scanReads("1.3.0", ReadNeed.COMPLETE));
+        assertThatThrownBy(() -> validator.validate(new ItemKind("scm.pull_request"), definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("current source contract");
+    }
+
+    @Test
+    void shouldRejectCompleteScanReadsWhenTheSourceSupportsOnlyPartialCapture() {
+        enableScan(false);
+        var definition = withScan(scanReads("2.0.0", ReadNeed.COMPLETE));
+        assertThatThrownBy(() -> validator.validate(new ItemKind("scm.pull_request"), definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("complete capture");
+    }
+
+    @Test
+    void shouldRejectAnAutomatedScanWithOnlyOptionalContext() {
+        enableScan(true);
+        var definition = withScan(scanReads("2.0.0", ReadNeed.OPTIONAL));
+        assertThatThrownBy(() -> validator.validate(new ItemKind("scm.pull_request"), definition))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("required read source");
+    }
+
+    private void enableScan(boolean supportsComplete) {
+        when(descriptor.reviewCapabilities())
+                .thenReturn(new ReviewCapabilities(
+                        List.of(), List.of(), Set.of(), Set.of(), Set.of(new ItemKind("scm.file"))));
+        lenient().when(catalog.sourcesFor("scm.file")).thenReturn(Set.of(new SourceKind("scm.repository.tree")));
+        var source = mock(SourceContract.class);
+        lenient()
+                .when(sources.requireSource(new SourceContractVersion("2.0.0"), new SourceKind("scm.repository.tree")))
+                .thenReturn(source);
+        lenient().when(source.completenessPolicy()).thenReturn(new CompletenessPolicy(supportsComplete, true, true));
+    }
+
+    private static PracticeReads scanReads(String contract, ReadNeed need) {
+        return new PracticeReads(
+                contract, List.of(new PracticeReadSource(new SourceKind("scm.repository.tree"), need)));
+    }
+
+    private static PracticeDefinition withScan(PracticeReads reads) {
+        var original = DefinitionTestFixtures.definition();
+        return new PracticeDefinition(
+                original.name(),
+                new ReviewOn(List.of(), Map.of()),
+                original.appliesWhen(),
+                original.about(),
+                original.reads(),
+                original.reviewedBy(),
+                original.criteria(),
+                original.script(),
+                new ScanDefinition(new ItemKind("scm.file"), List.of("**/*.ts"), List.of(), List.of("**/*"), reads),
+                original.lineNotes(),
+                original.guidance());
     }
 }

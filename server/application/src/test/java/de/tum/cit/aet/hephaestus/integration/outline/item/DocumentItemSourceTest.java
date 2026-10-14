@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.item;
 
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -52,6 +53,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
     private final OutlineDocumentRepository documents = mock(OutlineDocumentRepository.class);
     private final OutlineDocumentProjector projection = mock(OutlineDocumentProjector.class);
     private final ConnectionService connections = mock(ConnectionService.class);
+    private final OutlineDocumentPermission permission = mock(OutlineDocumentPermission.class);
     private final ItemRef item = new ItemRef(7L, 41L, DocumentEvents.DOCUMENT, 19L, null, null);
     private final OutlineDocument document = new OutlineDocument();
     private DocumentItemSource source;
@@ -63,7 +65,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
                 projection,
                 new DocumentContentSource(JsonMapper.builder().build()),
                 JsonMapper.builder().build(),
-                connections);
+                connections, permission);
     }
 
     private void readyDocument() {
@@ -84,8 +86,8 @@ class DocumentItemSourceTest extends BaseUnitTest {
         document.setTitle("Document");
         document.setBodyMarkdown("Full body");
         when(documents.findByWorkspaceIdAndIdForProjection(7L, 19L)).thenReturn(Optional.of(document));
-        when(documents.findPersonSourceIdentities(7L, 19L)).thenReturn(List.of());
-        when(projection.workspaceReadable(7L)).thenReturn(true);
+        when(permission.identities(7L, 19L)).thenReturn(List.of());
+        when(permission.permits(7L, 19L)).thenReturn(true);
     }
 
     @Test
@@ -157,8 +159,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
     @ParameterizedTest
     @EnumSource(SourceUsePurpose.class)
     void shouldCheckDocumentPermissionWithoutLoadingOrCopyingItsBody(SourceUsePurpose purpose) {
-        when(projection.workspaceReadable(7L)).thenReturn(true);
-        when(documents.isDocumentReadable(7L, 19L)).thenReturn(true);
+        when(permission.permits(7L, 19L)).thenReturn(true);
         assertThat(source.kinds()).containsExactly(DocumentEvents.DOCUMENT);
         assertThat(source.permits(item, purpose)).isTrue();
         verify(documents, never()).findByWorkspaceIdAndIdForProjection(anyLong(), anyLong());
@@ -167,14 +168,14 @@ class DocumentItemSourceTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseDocumentPermissionAfterConsentOrOriginAccessIsRemoved() {
-        when(projection.workspaceReadable(7L)).thenReturn(true);
-        when(documents.isDocumentReadable(7L, 19L)).thenReturn(false);
+        when(permission.permits(7L, 19L)).thenReturn(true);
+        when(permission.permits(7L, 19L)).thenReturn(false);
         assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isFalse();
-        when(documents.isDocumentReadable(7L, 19L)).thenReturn(true);
+        when(permission.permits(7L, 19L)).thenReturn(true);
         assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isTrue();
-        when(projection.workspaceReadable(7L)).thenReturn(false);
+        when(permission.permits(7L, 19L)).thenReturn(false);
         assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isFalse();
         assertThat(source.permits(
@@ -201,7 +202,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
         var pinned = source.pin(item, null);
         var captured = source.capture(pinned, request());
         document.setTitle("New title after capture");
-        clearInvocations(documents, projection, connections);
+        clearInvocations(documents, projection, connections, permission);
         var record = source.record(pinned, captured.files());
         assertThat(record.path("title").asString()).isEqualTo("Document");
         assertThat(record.has("createdAt")).isTrue();
@@ -212,7 +213,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
                 .isEqualTo(JsonMapper.builder()
                         .build()
                         .readTree(Objects.requireNonNull(captured.files().get(DocumentContentSource.METADATA_KEY))));
-        verifyNoInteractions(documents, projection, connections);
+        verifyNoInteractions(documents, projection, connections, permission);
         assertThatThrownBy(() -> source.record(pinned, Map.of()))
                 .isInstanceOfSatisfying(
                         ItemCaptureException.class,

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -35,6 +37,8 @@ public class ReviewAssignmentStoreService implements ReviewAssignmentStore {
     private final ReviewInvocationFence fence;
     private final Clock clock;
     private final ReviewRuntimeQuery runtime;
+    private final HistoryCustodyQuery custody;
+    private final JsonMapper json;
 
     @Override
     @Transactional
@@ -81,6 +85,7 @@ public class ReviewAssignmentStoreService implements ReviewAssignmentStore {
     public void capture(
             long workspaceId, UUID reviewId, UUID jobId, int attempt, List<ReviewCaptureDecision> decisions) {
         var review = fence.lock(workspaceId, reviewId, jobId, attempt);
+        var copied = custody.find(workspaceId, List.of(jobId));
         var assignments = practices.lockAssignments(workspaceId, reviewId).stream()
                 .collect(Collectors.toMap(p -> p.getPracticeId(), p -> p));
         if (decisions.stream().map(ReviewCaptureDecision::practiceId).distinct().count() != decisions.size())
@@ -114,13 +119,12 @@ public class ReviewAssignmentStoreService implements ReviewAssignmentStore {
             for (var member : members) {
                 var locked = items.lockAssignment(workspaceId, reviewId, decision.practiceId(), member.getItemId())
                         .orElseThrow();
-                if (review.getKind() == ReviewKind.SCAN) {
-                    var detail = locked.getDetail() == null
-                            ? JsonNodeFactory.instance.objectNode()
-                            : (ObjectNode) locked.getDetail().deepCopy();
-                    detail.set("captureDecision", decision.facts());
-                    locked.setDetail(detail);
-                }
+                var detail = locked.getDetail() == null
+                        ? JsonNodeFactory.instance.objectNode()
+                        : (ObjectNode) locked.getDetail().deepCopy();
+                detail.set("custody", json.valueToTree(copied));
+                if (review.getKind() == ReviewKind.SCAN) detail.set("captureDecision", decision.facts());
+                locked.setDetail(detail);
                 if (refused) {
                     locked.setState(ReviewItemState.WITHHELD);
                     locked.setReason(decision.reason());

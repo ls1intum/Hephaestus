@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
@@ -37,6 +37,7 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
 import org.springframework.http.HttpStatus;
@@ -50,7 +51,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @Service
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ResultStoreService implements ResultStore {
     private final ReviewRepository reviews;
@@ -61,7 +62,7 @@ public class ResultStoreService implements ResultStore {
     private final ResultRepository results;
     private final ProblemRepository problems;
     private final ResultMarkRepository marks;
-    private final ResultMarkService marking;
+    private final ObjectProvider<ResultMarkService> marking;
     private final ResultProofMapper proof;
     private final JdbcClient jdbc;
     private final JsonMapper json;
@@ -287,7 +288,9 @@ public class ResultStoreService implements ResultStore {
 
     @Override
     public UUID mark(long workspaceId, UUID resultId, ResultMarkKind kind, long actorId, String reason) {
-        return marking.create(workspaceId, resultId, kind, actorId, reason).getId();
+        return marking.getObject()
+                .create(workspaceId, resultId, kind, actorId, reason)
+                .getId();
     }
 
     @Override
@@ -297,7 +300,7 @@ public class ResultStoreService implements ResultStore {
                     .filter(m -> m.getWorkspaceId() == workspaceId)
                     .orElseThrow();
             var active = mark.getRemovedAt() == null;
-            marking.remove(workspaceId, mark.getResultId(), markId, actorId, reason);
+            marking.getObject().remove(workspaceId, mark.getResultId(), markId, actorId, reason);
             return active;
         }));
     }

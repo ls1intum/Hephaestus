@@ -6,7 +6,10 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
@@ -15,10 +18,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventDefinition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewCapabilities;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 class PracticeDefinitionOptionsServiceTest extends BaseUnitTest {
     @Test
@@ -52,5 +58,37 @@ class PracticeDefinitionOptionsServiceTest extends BaseUnitTest {
                     assertThat(option.connected()).isTrue();
                     assertThat(option.raisedBy()).containsExactly(IntegrationKind.GITHUB);
                 }));
+    }
+
+    @Test
+    void shouldKeepScanOnlySourcesOutOfTheParentItemReadOptions() {
+        var registry = new ClasspathSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
+        var tree = registry.requireSource(registry.current().version(), new SourceKind("scm.repository.tree"));
+        var fileOnly = new SourceContract(
+                new SourceKind("custom.file.content"),
+                tree.displayName(),
+                tree.description(),
+                tree.selectionScope(),
+                Set.of("scm.file"),
+                tree.defaultRequirement(),
+                tree.authority(),
+                tree.identityPolicy(),
+                tree.completenessPolicy(),
+                tree.requiredQuality(),
+                tree.privacyClass(),
+                tree.supportedAbsenceStates(),
+                tree.retentionPolicy(),
+                tree.erasurePolicy(),
+                tree.useDecisionIds(),
+                tree.citation());
+        var sources = mock(SourceCatalogRegistry.class);
+        when(sources.current()).thenReturn(new SourceCatalog(registry.current().version(), List.of(fileOnly)));
+        var items = mock(PracticeItemOptions.class);
+        when(items.all()).thenReturn(List.of(new PullRequestItemDescriptor()));
+        var result = new PracticeDefinitionOptionsService(items, sources, mock(ItemEventCoverage.class)).options(null);
+        assertThat(result.itemTypes()).singleElement().satisfies(type -> {
+            assertThat(type.scanItemKinds()).contains("scm.file");
+            assertThat(type.readSources()).isEmpty();
+        });
     }
 }

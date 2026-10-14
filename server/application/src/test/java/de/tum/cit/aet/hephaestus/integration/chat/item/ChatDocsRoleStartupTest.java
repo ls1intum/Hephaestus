@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.chat.item;
 
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -37,7 +38,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                         ThreadCaptureSource.class,
                         SlackConversationProjector.class,
                         OutlineDocumentProjector.class,
-                        OutlineDocumentSelector.class,
+                        OutlineDocumentSelector.class, OutlineDocumentPermission.class,
                         ConversationCaptureSource.class,
                         SlackPersonErasureService.class)
                 .withPropertyValues(
@@ -57,7 +58,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                             .doesNotHaveBean(ThreadCaptureSource.class)
                             .doesNotHaveBean(SlackConversationProjector.class)
                             .doesNotHaveBean(OutlineDocumentProjector.class)
-                            .doesNotHaveBean(OutlineDocumentSelector.class)
+                            .doesNotHaveBean(OutlineDocumentSelector.class).doesNotHaveBean(OutlineDocumentPermission.class)
                             .doesNotHaveBean(ConversationCaptureSource.class)
                             .doesNotHaveBean(SlackPersonErasureService.class);
                 });
@@ -94,6 +95,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                 .withBean(SlackConversationProjector.class, () -> mock(SlackConversationProjector.class))
                 .withBean(OutlineDocumentRepository.class, () -> mock(OutlineDocumentRepository.class))
                 .withBean(OutlineDocumentProjector.class, () -> mock(OutlineDocumentProjector.class))
+                .withBean(OutlineDocumentPermission.class, () -> mock(OutlineDocumentPermission.class))
                 .withBean(ConnectionService.class, () -> mock(ConnectionService.class))
                 .withBean(GitProviderRegistry.class, () -> mock(GitProviderRegistry.class))
                 .withBean(ObjectMapper.class, JsonMapper::new)

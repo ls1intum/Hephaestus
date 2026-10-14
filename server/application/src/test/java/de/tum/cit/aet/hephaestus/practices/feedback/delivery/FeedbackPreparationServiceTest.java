@@ -31,8 +31,8 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -50,7 +50,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Tag("unit")
 class FeedbackPreparationServiceTest {
-    final ReviewService reviews = mock(ReviewService.class);
+    final ReviewSnapshotQuery reviews = mock(ReviewSnapshotQuery.class);
     final ResultRepository results = mock(ResultRepository.class);
     final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
     final ItemCatalog catalog = mock(ItemCatalog.class);

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueueJob;
@@ -22,9 +23,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,9 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
     private final ReviewJobRepository jobs;
-    private final de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery assignments;
+    private final ReviewAssignmentQuery assignments;
     private final JdbcClient jdbc;
-    private final org.springframework.beans.factory.ObjectProvider<ReviewTimingFactsQuery> timingFacts;
+    private final ObjectProvider<ReviewTimingFactsQuery> timingFacts;
 
     @Override
     public Optional<ReviewRuntimeSnapshot> runtime(long workspaceId, UUID reviewId) {
@@ -61,10 +65,22 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
     }
 
     @Override
-    public java.util.Set<UUID> activeJobIds(long workspaceId, UUID reviewId) {
-        return jobs.findByReviewIdAndWorkspaceIdAndStatusIn(reviewId, workspaceId,
-                java.util.Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING))
-                .map(job -> java.util.Set.of(job.getId())).orElseGet(java.util.Set::of);
+    public Set<UUID> activeJobIds(long workspaceId, UUID reviewId) {
+        return jobs.findByReviewIdAndWorkspaceIdAndStatusIn(
+                        reviewId, workspaceId, Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING))
+                .map(job -> Set.of(job.getId()))
+                .orElseGet(Set::of);
+    }
+
+    @Override
+    public Set<UUID> unsettledJobIds(long workspaceId, UUID reviewId) {
+        return Set.copyOf(
+                jdbc.sql("SELECT id FROM review_job WHERE workspace_id=:ws AND review_id=:review AND status NOT IN"
+                                + " ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING')")
+                        .param("ws", workspaceId)
+                        .param("review", reviewId)
+                        .query(UUID.class)
+                        .list());
     }
 
     @Override
@@ -150,7 +166,8 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
                 .stream()
                 .map(id -> {
                     var job = jobs.findByIdAndWorkspaceId(id, workspaceId).orElseThrow();
-                    var people = job.getInput().assignments().stream().flatMap(id -> assignments.find(workspaceId, id).stream())
+                    var people = job.getInput().assignments().stream()
+                            .flatMap(assignmentId -> assignments.find(workspaceId, assignmentId).stream())
                             .map(a -> a.developerId())
                             .distinct()
                             .toList();
@@ -180,10 +197,12 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
     @Override
     public ReviewTimingSnapshot timing(long workspaceId, Instant from, Instant to, Instant longWaitThreshold) {
         if (!from.isBefore(to)) throw new IllegalArgumentException("The timing window is empty");
-        var rows =
-                jobs.findByWorkspaceIdAndAvailableAtGreaterThanEqualOrderByAvailableAtDesc(workspaceId, from, org.springframework.data.domain.Pageable.unpaged()).stream()
-                        .filter(j -> j.getAvailableAt().isBefore(to))
-                        .toList();
+        var rows = jobs
+                .findByWorkspaceIdAndAvailableAtGreaterThanEqualOrderByAvailableAtDesc(
+                        workspaceId, from, Pageable.unpaged())
+                .stream()
+                .filter(j -> j.getAvailableAt().isBefore(to))
+                .toList();
         var samples = new HashMap<String, List<Double>>();
         double queue = 0,
                 preparation = 0,
@@ -227,9 +246,11 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
             stages.put(
                     entry.getKey(), new ReviewTimingStage(sorted.size(), quantile(sorted, 0.5), quantile(sorted, 0.9)));
         }
-        var facts = timingFacts.getObject().facts(
-                workspaceId,
-                rows.stream().map(ReviewJob::getReviewId).distinct().toList());
+        var facts = timingFacts
+                .getObject()
+                .facts(
+                        workspaceId,
+                        rows.stream().map(ReviewJob::getReviewId).distinct().toList(), from, to);
         return new ReviewTimingSnapshot(
                 stages,
                 new ReviewTimingSums(facts.asked(), queue, preparation, model, unsplit, null),

@@ -16,7 +16,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         var mapper = new JsonMapper();
         var files = new LinkedHashMap<String, byte[]>();
         var pinned = RuntimeReviewTestData.assignment(5L, "export default {};");
-        new PracticeCatalogInjector(mapper).inject(files, List.of(pinned));
+        new PracticeCatalogInjector(mapper).inject(files,
+List.of(pinned),
+de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
         assertThat(files)
                 .containsOnlyKeys(
                         SandboxLayout.PRACTICES_PREFIX + "index.json",
@@ -36,7 +38,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     void shouldStageNoAuthoredScriptForTheBuiltInProgram() {
         var files = new LinkedHashMap<String, byte[]>();
         new PracticeCatalogInjector(new JsonMapper())
-                .inject(files, List.of(RuntimeReviewTestData.assignment(null, null)));
+                .inject(files,
+List.of(RuntimeReviewTestData.assignment(null, null)),
+de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
         assertThat(files).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "clear-names.ts");
     }
 }

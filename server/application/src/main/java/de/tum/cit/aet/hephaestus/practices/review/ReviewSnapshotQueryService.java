@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Optional;
@@ -34,6 +35,13 @@ public class ReviewSnapshotQueryService implements ReviewSnapshotQuery {
     public Optional<Instant> publicReviewedAt(long workspaceId, UUID reviewId) {
         return reviews.findByIdAndWorkspaceId(reviewId, workspaceId)
                 .flatMap(review -> Optional.ofNullable(review.getPublicReviewAt()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BigDecimal> budgetUsd(long workspaceId, UUID reviewId) {
+        return reviews.findByIdAndWorkspaceId(reviewId, workspaceId)
+                .flatMap(review -> Optional.ofNullable(review.getBudgetUsd()));
     }
 
     @Override

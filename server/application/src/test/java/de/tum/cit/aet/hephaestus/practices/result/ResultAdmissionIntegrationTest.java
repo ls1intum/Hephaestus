@@ -4,11 +4,20 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
@@ -16,24 +25,30 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAttemptGuard;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
@@ -43,6 +58,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -50,6 +66,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.node.JsonNodeFactory;
 
@@ -87,6 +104,12 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ReviewSnapshotQuery snapshots;
+
+    @Autowired
+    ReviewAssignmentQuery executable;
+
+    @MockitoSpyBean
+    ProductItemQuery productItems;
 
     @MockitoBean
     ReviewAttemptGuard ownership;
@@ -235,11 +258,21 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                 pending.review().getId(),
                 scenario.practice().getId(),
                 scenario.item().getId());
+        assertThat(executable.executable(
+                        scenario.workspace().getId(),
+                        pending.review().getId(),
+                        scenario.item().getId()))
+                .containsExactly(assignment);
         assignments.withhold(
                 scenario.workspace().getId(),
                 assignment,
                 CandidateRefusal.QUOTE_UNVERIFIED,
                 "The captured text cannot verify this quote.");
+        assertThat(executable.executable(
+                        scenario.workspace().getId(),
+                        pending.review().getId(),
+                        scenario.item().getId()))
+                .isEmpty();
         var receipt = admit(pending, ResultOutcome.NOT_MET);
         assertThat(receipt.resultIds()).isEmpty();
         assertThat(receipt.withheldItems())
@@ -279,6 +312,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                         1,
                         acceptedAt.plusSeconds(60)))
                 .isFalse();
+        admissions.removeRuntime(pending);
         assertThat(snapshots.publicReviewedAt(
                         scenario.workspace().getId(), pending.review().getId()))
                 .contains(recorded);
@@ -321,6 +355,53 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         assertThat(capture.path("status").asString()).isEqualTo("FAILED");
         assertThat(results.findByWorkspaceIdAndReviewIdOrderByRecordedAtAscIdAsc(
                         scenario.workspace().getId(), pending.review().getId()))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldRetainMissingRoleWithholdingWithoutGrantingAnonymousModelAuthority() {
+        var workspace = scenario.workspace().getId();
+        var ref = productItems.require(workspace, scenario.item().getId());
+        var pinned = new ItemSnapshot(
+                ref,
+                new ItemVersion("selected-version", null),
+                new IntegrationRef(IntegrationKind.GITHUB, workspace, "https://github.com", null),
+                Map.of("state", "OPEN", "draft", "false"),
+                List.of(),
+                new ItemLabel(
+                        ref.itemId(), "Selected pull request", "pull request", 1, null, null, IntegrationKind.GITHUB));
+        doReturn(pinned).when(productItems).pin(eq(ref), isNull());
+        when(budget.canRequest(workspace, ReviewKind.ITEM, null)).thenReturn(true);
+        when(models.models(workspace, List.of()))
+                .thenReturn(List.of(
+                        new BoundModelSlot("chat", ModelKind.CHAT, null),
+                        new BoundModelSlot("decision", ModelKind.DECISION, null),
+                        new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
+                        new BoundModelSlot("reranking", ModelKind.RERANKING, null),
+                        new BoundModelSlot("review", ModelKind.CHAT, null)));
+        var id = service.request(new ReviewRequest(
+                workspace,
+                ref.itemId(),
+                ReviewKind.ITEM,
+                null,
+                ReviewOrigin.REQUEST,
+                null,
+                scenario.account().getId(),
+                null,
+                null,
+                null,
+                null,
+                List.of(scenario.practice().getId()),
+                false));
+        assertThat(reviews.findById(id).orElseThrow().getStatus()).isEqualTo(ReviewStatus.PARTIAL);
+        var held = pinnedPractices
+                .findByWorkspaceIdAndReviewIdAndPracticeId(
+                        workspace, id, scenario.practice().getId())
+                .orElseThrow();
+        assertThat(held.getStatus()).isEqualTo(ReviewPracticeStatus.WITHHELD);
+        assertThat(held.getReason()).isEqualTo("ROLE_UNAVAILABLE");
+        assertThat(executable.executable(workspace, id, ref.itemId())).isEmpty();
+        assertThat(results.findByWorkspaceIdAndReviewIdOrderByRecordedAtAscIdAsc(workspace, id))
                 .isEmpty();
     }
 

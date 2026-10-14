@@ -416,7 +416,9 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         var assigned = reviewAssignments.load(job);
         var frozenReview = reviewAssignments.review(job);
         var staged = new LinkedHashMap<String, byte[]>();
-        catalogInputs.inject(staged, assigned);
+        catalogInputs.inject(staged,
+assigned,
+de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
         for (var assignment : assigned)
             staged.putAll(scriptInputs.stage(
                     frozenReview,

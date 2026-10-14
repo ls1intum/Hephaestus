@@ -25,9 +25,6 @@ public class PracticeDefinitionValidator {
         text(definition.criteria(), 1, 50_000, "criteria");
         if (definition.script() != null)
             text(definition.script(), 1, PracticeDefinition.MAX_PRACTICE_SCRIPT_LENGTH, "practice script");
-        if (!definition.reads().contract().equals(sources.current().version().value())) {
-            throw new IllegalArgumentException("Choose the current source contract for a new definition.");
-        }
         if (definition.reviewOn().events().size() > 100) {
             throw new IllegalArgumentException("Choose at most 100 review events.");
         }
@@ -58,30 +55,14 @@ public class PracticeDefinitionValidator {
         if (definition.reviewedBy().by() != ReviewedByKind.HEPHAESTUS && definition.script() != null) {
             throw new IllegalArgumentException("A practice script needs Hephaestus as the reviewer.");
         }
-        var contract = new SourceContractVersion(definition.reads().contract());
-        var applicable = sources.current().sourcesFor(kind.value());
+        boolean automated = definition.reviewedBy().by() == ReviewedByKind.HEPHAESTUS;
+        validateReads(kind, definition.reads(), automated);
         var scan = definition.scan();
-        if (scan != null && !capabilities.scanItemKinds().contains(scan.itemKind())) {
-            throw new IllegalArgumentException("This item kind does not support the selected scan item kind.");
-        }
-        for (var source : definition.reads().sources()) {
-            if (!applicable.contains(source.source())
-                    && (scan == null
-                            || !sources.current()
-                                    .sourcesFor(scan.itemKind().value())
-                                    .contains(source.source()))) {
-                throw new IllegalArgumentException("Choose read sources offered for this item kind.");
+        if (scan != null) {
+            if (!capabilities.scanItemKinds().contains(scan.itemKind())) {
+                throw new IllegalArgumentException("This item kind does not support the selected scan item kind.");
             }
-            if (source.need() == ReadNeed.COMPLETE
-                    && !sources.requireSource(contract, source.source())
-                            .completenessPolicy()
-                            .supportsComplete()) {
-                throw new IllegalArgumentException("This source cannot provide a complete capture.");
-            }
-        }
-        if (definition.reviewedBy().by() == ReviewedByKind.HEPHAESTUS
-                && definition.reads().sources().stream().noneMatch(source -> source.need() != ReadNeed.OPTIONAL)) {
-            throw new IllegalArgumentException("Hephaestus needs at least one required read source.");
+            validateReads(scan.itemKind(), scan.reads(), automated);
         }
         if (definition.appliesWhen() != null) {
             for (var clause : definition.appliesWhen().anyOf()) {
@@ -108,6 +89,28 @@ public class PracticeDefinitionValidator {
         if (guidance.guide() != null) {
             PracticeGuidanceRules.validate(guidance.guide());
             guidance(guidance.guide().markdown());
+        }
+    }
+
+    private void validateReads(ItemKind kind, PracticeReads reads, boolean automated) {
+        if (!reads.contract().equals(sources.current().version().value())) {
+            throw new IllegalArgumentException("Choose the current source contract for a new definition.");
+        }
+        var contract = new SourceContractVersion(reads.contract());
+        var applicable = sources.current().sourcesFor(kind.value());
+        for (var source : reads.sources()) {
+            if (!applicable.contains(source.source())) {
+                throw new IllegalArgumentException("Choose read sources offered for this item kind.");
+            }
+            if (source.need() == ReadNeed.COMPLETE
+                    && !sources.requireSource(contract, source.source())
+                            .completenessPolicy()
+                            .supportsComplete()) {
+                throw new IllegalArgumentException("This source cannot provide a complete capture.");
+            }
+        }
+        if (automated && reads.sources().stream().noneMatch(source -> source.need() != ReadNeed.OPTIONAL)) {
+            throw new IllegalArgumentException("Hephaestus needs at least one required read source.");
         }
     }
 

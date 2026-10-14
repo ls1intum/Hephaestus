@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.item;
 
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -52,18 +53,20 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
     private final DocumentContentSource content;
     private final ObjectMapper mapper;
     private final ConnectionService connections;
+    private final OutlineDocumentPermission permission;
 
     public DocumentItemSource(
             OutlineDocumentRepository documents,
             OutlineDocumentProjector projection,
             DocumentContentSource content,
             ObjectMapper mapper,
-            ConnectionService connections) {
+            ConnectionService connections, OutlineDocumentPermission permission) {
         this.documents = documents;
         this.projection = projection;
         this.content = content;
         this.mapper = mapper;
         this.connections = connections;
+        this.permission = permission;
     }
 
     @Override
@@ -79,9 +82,9 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
     @Override
     @Transactional(readOnly = true)
     public boolean permits(ItemRef item, SourceUsePurpose purpose) {
-        if (!supports(item) || !projection.workspaceReadable(item.workspaceId())) return false;
+        if (!supports(item)) return false;
         Long sourceId = item.sourceId();
-        return sourceId != null && documents.isDocumentReadable(item.workspaceId(), sourceId);
+        return sourceId != null && permission.permits(item.workspaceId(), sourceId);
     }
 
     @Override
@@ -117,9 +120,9 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
     @Override
     @Transactional(readOnly = true)
     public Optional<ItemSnapshot> current(ItemRef item) {
-        if (!supports(item) || !projection.workspaceReadable(item.workspaceId())) return Optional.empty();
+        if (!supports(item)) return Optional.empty();
         Long sourceId = item.sourceId();
-        if (sourceId == null) return Optional.empty();
+        if (sourceId == null || !permission.permits(item.workspaceId(), sourceId)) return Optional.empty();
         return documents
                 .findByWorkspaceIdAndIdForProjection(item.workspaceId(), sourceId)
                 .filter(doc -> !doc.isDeleted() && doc.getContentHash() != null)
@@ -135,11 +138,11 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
                 .filter(row -> row.getKind() == IntegrationKind.OUTLINE && row.getState() == IntegrationState.ACTIVE)
                 .orElseThrow(() -> new ItemCaptureException(
                         ItemCaptureCode.ITEM_NOT_VISIBLE, "Outline is not connected for this document"));
-        var roles = documents.findPersonSourceIdentities(item.workspaceId(), doc.getId()).stream()
-                .filter(identity -> identity.getSubject().equals(doc.getCreatedBySubject()))
+        var roles = permission.identities(item.workspaceId(), doc.getId()).stream()
+                .filter(identity -> identity.subject().equals(doc.getCreatedBySubject()))
                 .map(identity -> new RoleHolder(
                         AboutRole.AUTHOR,
-                        new PersonIdentity(identity.getProviderId(), identity.getSubject(), identity.getTeamId()),
+                        identity,
                         true))
                 .distinct()
                 .toList();
@@ -212,11 +215,11 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
                     ItemCaptureCode.ITEM_NOT_VISIBLE, "Document source does not match the pinned item");
         if (!request.sources().contains(DocumentContentSource.SOURCE))
             return content.capture(request, pinned.version(), null, new byte[0], null, SourceAbsenceReason.NOT_FOUND);
-        if (!projection.workspaceReadable(pinned.item().workspaceId()))
-            return withheld(SourceAbsenceReason.ACCESS_NOT_PERMITTED);
         Long sourceId = pinned.item().sourceId();
         if (sourceId == null)
             throw new ItemCaptureException(ItemCaptureCode.SOURCE_NOT_READY, "Document source id is required");
+        if (!permission.permits(pinned.item().workspaceId(), sourceId))
+            return withheld(SourceAbsenceReason.ACCESS_NOT_PERMITTED);
         var readable =
                 documents.findByWorkspaceIdAndIdForProjection(pinned.item().workspaceId(), sourceId);
         if (readable.isEmpty()) {

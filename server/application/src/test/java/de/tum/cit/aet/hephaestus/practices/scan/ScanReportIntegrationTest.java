@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.when;
 
@@ -133,6 +134,8 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
     void setup() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        when(custody.find(anyLong(), anyList()))
+                .thenAnswer(call -> new HistoryCustody(false, List.of(), List.of(), call.getArgument(1)));
         when(authorization.permitsAll(anyLong(), anyCollection(), any())).thenAnswer(call -> {
             long workspace = call.getArgument(0);
             Collection<Result> rows = call.getArgument(1);
@@ -291,6 +294,9 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                         null,
                         job.toString())))));
         when(runtime.activeJobIds(scan.getWorkspaceId(), scan.getId())).thenReturn(Set.of(job));
+        var copiedPerson = new PersonCopyIdentity("GITHUB", "https://github.com", "copied-from-refused-file", null);
+        when(custody.find(scan.getWorkspaceId(), List.of(job)))
+                .thenReturn(new HistoryCustody(false, List.of(copiedPerson), List.of(), List.of(job)));
         assignments.capture(
                 scan.getWorkspaceId(),
                 scan.getId(),
@@ -311,10 +317,34 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         var detail = refused.getDetail();
         assertThat(detail).isNotNull();
         assertThat(detail.path("captureDecision").path("status").asString()).isEqualTo("FAILED");
+        assertThat(detail.path("custody").path("complete").asBoolean()).isFalse();
+        assertThat(detail.path("custody").path("sourceJobIds").get(0).asString())
+                .isEqualTo(job.toString());
         assertThat(refused.getResultId()).isNull();
         assertThat(store.pending(scan.getWorkspaceId(), scan.getId(), 10))
                 .extracting(s -> s.id().itemId())
                 .containsExactly(other.getId());
+        when(people.providers())
+                .thenReturn(List.of(new PersonIdentityResolver.Provider(8, "GITHUB", "https://github.com")));
+        jdbc.sql("UPDATE review_item SET job_id=NULL WHERE workspace_id=:ws AND job_id=:job")
+                .param("ws", scan.getWorkspaceId())
+                .param("job", job)
+                .update();
+        jdbc.sql("DELETE FROM review_job WHERE workspace_id=:ws AND id=:job")
+                .param("ws", scan.getWorkspaceId())
+                .param("job", job)
+                .update();
+        var capturedStore = personData.contributors().stream()
+                .filter(c -> c.store().equals("review_item_result_reference"))
+                .findFirst()
+                .orElseThrow();
+        var capturedRows = capturedStore
+                .select(new PersonScope(
+                        null, List.of(new PersonIdentity(8, "copied-from-refused-file", null)), List.of()))
+                .rows();
+        assertThat(capturedRows)
+                .anySatisfy(key -> assertThat(key.columns().get("item_id"))
+                        .isEqualTo(Long.toString(scenario.file().getId())));
         new TransactionTemplate(transactions).executeWithoutResult(tx -> {
             var snapshot = store.lock(scan.getWorkspaceId(), scan.getId());
             assertThat(snapshot.review().practices()).hasSize(1);

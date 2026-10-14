@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.identity.connect;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -36,7 +38,21 @@ class RegistrationToGitProviderResolverTest {
         gitProviderRepository = mock(IdentityProviderRepository.class);
         userRepository = mock(UserRepository.class);
         resolver = new RegistrationToGitProviderResolver(
-                gitProviderRepository, userRepository, org.mockito.Mockito.mock(ConnectionRepository.class));
+                gitProviderRepository, userRepository, mock(ConnectionRepository.class));
+    }
+
+    @Test
+    void shouldReadOnlyExistingEquivalentProviderOriginsWithoutRegisteringOne() {
+        when(gitProviderRepository.findAllByType(IdentityProviderType.OUTLINE))
+                .thenReturn(List.of(stamped(IdentityProviderType.OUTLINE, "HTTPS://Outline.Example.test:443/", 4)));
+        assertThat(resolver.findProviderId("OUTLINE", "https://outline.example.test/path"))
+                .contains(4L);
+        assertThat(resolver.findProviderId("OUTLINE", "https://another.example.test"))
+                .isEmpty();
+        assertThat(resolver.findProviderId("OUTLINE", "not a URL")).isEmpty();
+        assertThat(resolver.findProviderId("GITLAB", "https://outline.example.test"))
+                .isEmpty();
+        verify(gitProviderRepository, never()).save(any(IdentityProvider.class));
     }
 
     @Test

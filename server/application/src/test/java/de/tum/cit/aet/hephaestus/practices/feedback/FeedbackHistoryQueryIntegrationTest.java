@@ -128,11 +128,7 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
         var publicHistory = Objects.requireNonNull(entry.publicHistory());
         assertThat(publicHistory.path("body").isNull()).isTrue();
         assertThat(publicHistory.path("copies").size()).isEqualTo(1);
-        assertThat(entry.publicHistory()
-                        .path("copies")
-                        .get(0)
-                        .path("externalRef")
-                        .asString())
+        assertThat(publicHistory.path("copies").get(0).path("externalRef").asString())
                 .isEqualTo("confirmed-note");
     }
 

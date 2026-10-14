@@ -227,7 +227,8 @@ public class ResultAdmissionService {
                 results,
                 withheld,
                 privateRead == null ? null : FeedbackCompositionContextReader.page(privateRead),
-                privateRead == null ? null : FeedbackCompositionContextReader.conversation(privateRead));
+                privateRead == null ? null : FeedbackCompositionContextReader.conversation(privateRead),
+                assignments.publicReviewed(job));
     }
 
     public PrepareFeedbackResponseDTO prepareFeedback(AdmissionIdentity identity, PrepareFeedbackRequestDTO request) {

@@ -10,10 +10,12 @@ public record ScanDefinition(
         @JsonProperty(required = true) ItemKind itemKind,
         @JsonProperty(required = true) List<String> include,
         @JsonProperty(required = true) List<String> exclude,
-        @JsonProperty(required = true) List<String> context)
+        @JsonProperty(required = true) List<String> context,
+        @JsonProperty(required = true) PracticeReads reads)
         implements ClosedPracticeInput {
     public ScanDefinition {
         Objects.requireNonNull(itemKind);
+        Objects.requireNonNull(reads);
         include = canonical(include);
         exclude = canonical(exclude);
         context = canonical(context);

@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -26,7 +25,6 @@ import tools.jackson.databind.json.JsonMapper;
 public class ReviewGate {
     private final PracticeRepository practices;
     private final JsonMapper json;
-    private final PracticeReviewReadiness readiness;
 
     @Transactional(readOnly = true)
     public GateDecision evaluate(
@@ -39,8 +37,6 @@ public class ReviewGate {
             throw new IllegalArgumentException("The item belongs to another workspace.");
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
             return new GateDecision.Skip("The workspace is inactive.", ItemEventReason.WORKSPACE_INACTIVE);
-        if (!readiness.hasRunnableAgent(workspace.getId()))
-            return new GateDecision.Skip("The review model is unavailable.", ItemEventReason.REVIEW_MODEL_UNBOUND);
         var matched = practices
                 .findByWorkspaceIdAndKind(workspace.getId(), item.item().kind())
                 .stream()

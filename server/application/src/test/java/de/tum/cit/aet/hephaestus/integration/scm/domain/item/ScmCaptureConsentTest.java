@@ -9,8 +9,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -22,11 +23,13 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 class ScmCaptureConsentTest extends BaseUnitTest {
     @Test
     void shouldWithholdWhenAnotherContributorDeclinesRegardlessOfTheAboutHolder() {
-        var identities = mock(AccountIdentityQuery.class);
+        var identities = mock(PersonIdentityResolver.class);
         var accounts = mock(AccountDirectory.class);
         var suppression = mock(PersonProcessingSuppression.class);
         var copies = mock(PersonDataCopyRecorder.class);
@@ -34,8 +37,8 @@ class ScmCaptureConsentTest extends BaseUnitTest {
         provider.setId(1L);
         var author = person(provider, 11);
         var reviewer = person(provider, 22);
-        when(identities.resolveAccountId(1L, "11", null)).thenReturn(Optional.of(101L));
-        when(identities.resolveAccountId(1L, "22", null)).thenReturn(Optional.of(102L));
+        when(identities.accountFor(new PersonIdentity(1L, "11", null))).thenReturn(Optional.of(101L));
+        when(identities.accountFor(new PersonIdentity(1L, "22", null))).thenReturn(Optional.of(102L));
         when(accounts.find(101))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         101, Account.Status.ACTIVE, "Author", AiChoice.CLOUD, Instant.now(), true)));
@@ -53,7 +56,7 @@ class ScmCaptureConsentTest extends BaseUnitTest {
     void shouldFailCaptureWhenContributorProviderIdentityIsUnavailable() {
         var provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
         var consent = new ScmCaptureConsent(
-                mock(AccountIdentityQuery.class),
+                mock(PersonIdentityResolver.class),
                 mock(AccountDirectory.class),
                 mock(PersonProcessingSuppression.class),
                 mock(PersonDataCopyRecorder.class));
@@ -65,14 +68,14 @@ class ScmCaptureConsentTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldWithholdAnErasingAccountBeforeCopyingItsContributorIdentity() {
-        var identities = mock(AccountIdentityQuery.class);
+    void shouldWithholdAnUnavailableAccountBeforeCopyingItsContributorIdentity() {
+        var identities = mock(PersonIdentityResolver.class);
         var accounts = mock(AccountDirectory.class);
         var suppression = mock(PersonProcessingSuppression.class);
         var copies = mock(PersonDataCopyRecorder.class);
         var provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
         provider.setId(1L);
-        when(identities.resolveAccountId(1L, "11", null)).thenReturn(Optional.of(101L));
+        when(identities.accountFor(new PersonIdentity(1L, "11", null))).thenReturn(Optional.of(101L));
         when(accounts.find(101))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         101, Account.Status.DELETING, "Author", AiChoice.CLOUD, Instant.now(), true)));
@@ -81,18 +84,29 @@ class ScmCaptureConsentTest extends BaseUnitTest {
                 .isInstanceOfSatisfying(
                         ItemCaptureException.class,
                         e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
+        when(accounts.find(101)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> consent.require(List.of(person(provider, 11))))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
+        when(identities.accountFor(new PersonIdentity(1, "11", null)))
+                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT));
+        assertThatThrownBy(() -> consent.require(List.of(person(provider, 11))))
+                .isInstanceOfSatisfying(
+                        ItemCaptureException.class,
+                        refusal -> assertThat(refusal.code()).isEqualTo(ItemCaptureCode.CONSENT_WITHHELD));
         verifyNoInteractions(copies);
     }
 
     @Test
     void shouldWithholdAnAccountWhoseOtherExactIdentityIsSuppressed() {
-        var identities = mock(AccountIdentityQuery.class);
+        var identities = mock(PersonIdentityResolver.class);
         var accounts = mock(AccountDirectory.class);
         var suppression = mock(PersonProcessingSuppression.class);
         var copies = mock(PersonDataCopyRecorder.class);
         var provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
         provider.setId(1L);
-        when(identities.resolveAccountId(1L, "11", null)).thenReturn(Optional.of(101L));
+        when(identities.accountFor(new PersonIdentity(1L, "11", null))).thenReturn(Optional.of(101L));
         when(accounts.find(101))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         101, Account.Status.ACTIVE, "Author", AiChoice.CLOUD, Instant.now(), true)));

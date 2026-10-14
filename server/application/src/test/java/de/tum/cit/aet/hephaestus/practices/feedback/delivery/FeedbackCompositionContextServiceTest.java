@@ -39,8 +39,8 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -56,7 +56,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
 class FeedbackCompositionContextServiceTest {
-    final ReviewService reviews = mock(ReviewService.class);
+    final ReviewSnapshotQuery reviews = mock(ReviewSnapshotQuery.class);
     final ResultRepository results = mock(ResultRepository.class);
     final PracticeRepository practices = mock(PracticeRepository.class);
     final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);

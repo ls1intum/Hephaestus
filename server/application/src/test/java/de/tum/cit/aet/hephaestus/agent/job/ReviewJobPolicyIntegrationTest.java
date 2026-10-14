@@ -114,27 +114,27 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
         when(budgets.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
         var metrics = new SimpleMeterRegistry();
         // Hold dispatched sandbox work outside this test: admission, locks and RUNNING rows are real.
-        executor = new ReviewJobExecutor(
-                properties,
-                jobs,
-                policy,
-                mock(ReviewExecutionHandler.class),
-                mock(ReviewJobAssignments.class),
-                mock(PracticePiAdapter.class),
-                mock(WorkerJwtIssuer.class),
-                mock(SandboxManager.class),
-                mock(AsyncTaskExecutor.class),
-                transactions,
-                mapper,
-                metrics,
-                new PracticeReviewRefusalMetrics(metrics),
-                new ReviewJobTelemetry(metrics, Tracer.NOOP),
-                mock(LlmUsageRecorder.class),
-                mock(PracticeScriptRunRecorder.class),
-                budgets,
-                admission,
-                Optional.empty(),
-                Optional.empty());
+        executor = new ReviewJobExecutor(properties,
+jobs,
+policy,
+mock(ReviewExecutionHandler.class),
+mock(ReviewJobAssignments.class),
+mock(PracticePiAdapter.class),
+mock(WorkerJwtIssuer.class),
+mock(SandboxManager.class),
+mock(AsyncTaskExecutor.class),
+transactions,
+mapper,
+metrics,
+new PracticeReviewRefusalMetrics(metrics),
+new ReviewJobTelemetry(metrics, Tracer.NOOP),
+mock(LlmUsageRecorder.class),
+mock(PracticeScriptRunRecorder.class),
+budgets,
+admission,
+Optional.empty(),
+Optional.empty(),
+org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier.class));
     }
 
     @Test

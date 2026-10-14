@@ -70,10 +70,12 @@ public class ReviewJobCompletionService {
                         && job.getProcessingStatus() != ProcessingStatus.PENDING)) return;
         var review = assignments.review(job);
         boolean admitted = ResultAdmissionService.isAdmitted(job);
-        var reason = job.getExecutionStartedAt() == null
-                ? ReviewStopReason.PREPARATION_FAILED
-                : ReviewStopReason.EXECUTION_FAILED;
-        if (!admitted)
+        var reason = job.getStatus() == ReviewJobStatus.CANCELLED
+                ? ReviewStopReason.CANCELLED
+                : job.getExecutionStartedAt() == null
+                        ? ReviewStopReason.PREPARATION_FAILED
+                        : ReviewStopReason.EXECUTION_FAILED;
+        if (!admitted && (job.getStatus() != ReviewJobStatus.CANCELLED || job.getStartedAt() != null))
             for (var assignment : assignments.admissible(job))
                 members.fail(
                         job.getWorkspaceId(),

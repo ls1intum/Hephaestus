@@ -64,13 +64,15 @@ class LlmProxyService {
             LlmModelResolver llmModelResolver,
             ObjectMapper objectMapper,
             ProxyAccounting accounting,
-            ProxyRequestPolicy requestPolicy) {
+            ProxyRequestPolicy requestPolicy,
+            ScanCallGuard scanCalls) {
         this.tracer = tracer;
         this.webClient = llmProxyWebClient;
         this.resolver = llmModelResolver;
         this.objectMapper = objectMapper;
         this.accounting = accounting;
         this.requestPolicy = requestPolicy;
+        this.scanCalls = scanCalls;
     }
 
     public @Nullable ResponseEntity<?> proxy(
@@ -239,8 +241,13 @@ class LlmProxyService {
     }
 
     private @Nullable ResponseEntity<?> forwardWithinScanBudget(
-            ProxyRouting routing, LlmApiProtocol protocol, @Nullable PracticeScriptCall practiceScript,
-            HttpServletResponse response, HttpHeaders incomingHeaders, byte[] body, Span span) {
+            ProxyRouting routing,
+            LlmApiProtocol protocol,
+            @Nullable PracticeScriptCall practiceScript,
+            HttpServletResponse response,
+            HttpHeaders incomingHeaders,
+            byte[] body,
+            Span span) {
         // With no attempt there is no row to accumulate onto, so a served call's tokens would reach
         // neither the ledger nor the cap that reads it.
         ProxyRouting.BilledAttempt attempt = routing.attempt();
