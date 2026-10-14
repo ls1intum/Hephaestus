@@ -141,7 +141,10 @@ export const Loading: Story = {
 		isLoading: true,
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Loading members…")).toBeVisible();
+		await expect(canvas.getByRole("table", { name: "Workspace members" })).toHaveAttribute(
+			"aria-busy",
+			"true",
+		);
 		await expect(canvas.queryByText("No members found")).not.toBeInTheDocument();
 	},
 };
