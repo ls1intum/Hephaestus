@@ -5,20 +5,23 @@ import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it, vi } from "vitest";
 
 import {
-	getPracticeReviewOverviewQueryKey,
-	listPracticeReviewResultsQueryKey,
-	listPracticeReviewsQueryKey,
+	getReviewOverviewQueryKey,
+	listReviewResultsQueryKey,
+	listReviewsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
+import type { FeedbackDecision, ReviewFeedback } from "@/api/types.gen";
 import {
 	awaitingApprovalFeedback,
+	awaitingApprovalFeedbackDetail,
 	feedbackDetail,
-	reviewFeedbackDetail,
+	reviewAccounts,
 } from "@/components/admin/practice-reviews/fixtures";
 import {
 	reviewHandlers,
 	feedbackCountHandlers,
 } from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
+import { hasText } from "@/lib/text";
 import { server } from "@/mocks/server";
 import { deferred, sleep } from "@/test/async";
 import { levelsOpenedBy } from "@/test/detail-stack";
@@ -26,28 +29,36 @@ import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/t
 
 vi.setConfig({ testTimeout: 20_000 });
 
-const FEEDBACK_ID = reviewFeedbackDetail.id;
+const FEEDBACK_ID = awaitingApprovalFeedbackDetail.id;
+const CONTENT_DIGEST = awaitingApprovalFeedbackDetail.contentDigest;
 
 /** The level opened by its URL over the list it belongs to, as a shared link opens it. */
 const FEEDBACK_LEVEL = `/w/acme/admin/practices/reviews/feedback?detail=feedback:${FEEDBACK_ID}`;
 
-function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
-	const body = "Please keep the cache scoped to one workspace so membership changes cannot leak.";
+type ProposalState = Extract<ReviewFeedback["state"], "AWAITING_APPROVAL" | "READY">;
+
+/** A proposal with its planned copies, or the same feedback once approved and ready to send. */
+function proposalWire(state: ProposalState, id = FEEDBACK_ID) {
 	return {
-		...reviewFeedbackDetail,
-		deliveryState,
-		body,
-		proposedPlacements:
-			reviewFeedbackDetail.proposedPlacements.length === 0
-				? [{ type: "SUMMARY" as const, body }]
-				: reviewFeedbackDetail.proposedPlacements.map((placement) =>
-						placement.type === "SUMMARY" ? { ...placement, body } : placement,
-					),
-		createdAt: reviewFeedbackDetail.createdAt.toISOString(),
-		practiceResults: reviewFeedbackDetail.practiceResults.map((result) => ({
-			...result,
-			observedAt: result.observedAt.toISOString(),
-		})),
+		...awaitingApprovalFeedbackDetail,
+		id,
+		state,
+		stopReason: state === "AWAITING_APPROVAL" ? "PRACTICE_REQUIRES_APPROVAL" : null,
+		body: "Please keep the cache scoped to one workspace so membership changes cannot leak.",
+	};
+}
+
+/** The decision the server records, as `createFeedbackDecision` answers. */
+function decisionWire(feedbackId: string, action: FeedbackDecision["action"]) {
+	return {
+		id: `${feedbackId.slice(0, -3)}d99`,
+		feedbackId,
+		action,
+		actor: reviewAccounts.grace,
+		reasonCode: null,
+		note: null,
+		contentDigest: CONTENT_DIGEST,
+		decidedAt: new Date().toISOString(),
 	};
 }
 
@@ -58,12 +69,12 @@ function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
 function seedCountingReads(queryClient: QueryClient, workspaceSlug: string) {
 	const path = { workspaceSlug };
 	const keys = [
-		getPracticeReviewOverviewQueryKey({
+		getReviewOverviewQueryKey({
 			path,
 			query: { from: new Date("2026-01-01T00:00:00Z"), zone: "UTC" },
 		}),
-		listPracticeReviewsQueryKey({ path, query: { status: ["COMPLETED"] } }),
-		listPracticeReviewResultsQueryKey({ path, query: { agentJobId: "cached-review" } }),
+		listReviewsQueryKey({ path, query: { status: ["COMPLETE"] } }),
+		listReviewResultsQueryKey({ path, query: { reviewId: "cached-review" } }),
 	];
 	for (const key of keys) {
 		queryClient.setQueryData(key, {});
@@ -85,22 +96,19 @@ async function queueSteps(position: string) {
 
 describe("feedback approval level", () => {
 	it("shows the exact proposal, approves it, and refreshes this workspace's counts of it", async () => {
-		let deliveryState: "AWAITING_APPROVAL" | "PREPARED" = "AWAITING_APPROVAL";
+		let state: ProposalState = "AWAITING_APPROVAL";
 		let requestBody: unknown;
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-			),
 			...feedbackCountHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
-				HttpResponse.json(proposalWire(deliveryState)),
+				HttpResponse.json(proposalWire(state)),
 			),
-			http.put(
-				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/approval",
+			http.post(
+				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions",
 				async ({ request }) => {
 					requestBody = await request.json();
-					deliveryState = "PREPARED";
-					return HttpResponse.json({ feedbackId: FEEDBACK_ID, decision: "APPROVED" });
+					state = "READY";
+					return HttpResponse.json(decisionWire(FEEDBACK_ID, "APPROVE"), { status: 201 });
 				},
 			),
 			...reviewHandlers(),
@@ -123,8 +131,9 @@ describe("feedback approval level", () => {
 
 		await userEvent.click(screen.getByRole("button", { name: "Approve for delivery" }));
 		await screen.findByText("Feedback approved. Delivery is being checked.");
-		expect(requestBody).toStrictEqual({ decision: "APPROVED" });
-		// The level reads the decision back rather than assuming it: once prepared, there is nothing
+		// Approval names the copies the admin read, so a package composed again since is refused.
+		expect(requestBody).toStrictEqual({ action: "APPROVE", contentDigest: CONTENT_DIGEST });
+		// The level reads the decision back rather than assuming it: once ready, there is nothing
 		// left to approve.
 		await waitFor(() =>
 			expect(screen.queryByRole("button", { name: "Approve for delivery" })).toBeNull(),
@@ -140,18 +149,15 @@ describe("feedback approval level", () => {
 	it("sends the selected rejection category and reviewer context", async () => {
 		let requestBody: unknown;
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-			),
 			...feedbackCountHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
 				HttpResponse.json(proposalWire("AWAITING_APPROVAL")),
 			),
-			http.put(
-				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/approval",
+			http.post(
+				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions",
 				async ({ request }) => {
 					requestBody = await request.json();
-					return HttpResponse.json({ feedbackId: FEEDBACK_ID, decision: "REJECTED" });
+					return HttpResponse.json(decisionWire(FEEDBACK_ID, "REJECT"), { status: 201 });
 				},
 			),
 			...reviewHandlers(),
@@ -174,28 +180,26 @@ describe("feedback approval level", () => {
 
 		await screen.findByText("Feedback rejected");
 		expect(requestBody).toStrictEqual({
-			decision: "REJECTED",
-			rejectionReason: "MISSING_CONTEXT",
-			rejectionNote: "The fallback path was not considered.",
+			action: "REJECT",
+			reasonCode: "MISSING_CONTEXT",
+			note: "The fallback path was not considered.",
+			contentDigest: CONTENT_DIGEST,
 		});
 	});
 
 	it("reloads the winning decision after a concurrent approval conflict", async () => {
-		let deliveryState: "AWAITING_APPROVAL" | "PREPARED" = "AWAITING_APPROVAL";
+		let state: ProposalState = "AWAITING_APPROVAL";
 		let detailReads = 0;
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-			),
 			...feedbackCountHandlers(),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () => {
 				detailReads += 1;
-				return HttpResponse.json(proposalWire(deliveryState));
+				return HttpResponse.json(proposalWire(state));
 			}),
-			http.put(
-				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/approval",
+			http.post(
+				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions",
 				() => {
-					deliveryState = "PREPARED";
+					state = "READY";
 					return HttpResponse.json(
 						{ status: 409, title: "This review was already decided" },
 						{ status: 409 },
@@ -226,7 +230,8 @@ describe("feedback approval level", () => {
 		const [oldest, second, newest] = queue;
 		assert(oldest && second && newest, "The fixtures hold three pieces of feedback to approve");
 
-		const APPROVAL = "*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/approval";
+		const DECISIONS =
+			"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions";
 
 		/**
 		 * Serves the queue as the server would: a decided proposal leaves it. A `refusal` answers every
@@ -238,24 +243,20 @@ describe("feedback approval level", () => {
 			refusal?: { title: string; decidedElsewhere: boolean },
 		) {
 			const rows = awaitingApprovalFeedback.map((item) =>
-				approved.includes(item.id) ? { ...item, deliveryState: "PREPARED" as const } : item,
+				approved.includes(item.id) ? { ...item, state: "READY" as const, stopReason: null } : item,
 			);
 			server.use(
-				http.get("*/workspaces/:workspaceSlug/members/me", () =>
-					HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-				),
 				...feedbackCountHandlers(),
 				http.get(
 					"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId",
 					({ params }) => {
 						const id = String(params.feedbackId);
-						return HttpResponse.json({
-							...proposalWire(approved.includes(id) ? "PREPARED" : "AWAITING_APPROVAL"),
-							id,
-						});
+						return HttpResponse.json(
+							proposalWire(approved.includes(id) ? "READY" : "AWAITING_APPROVAL", id),
+						);
 					},
 				),
-				http.put(APPROVAL, ({ params }) => {
+				http.post(DECISIONS, ({ params }) => {
 					const conflict = () =>
 						HttpResponse.json({ status: 409, title: refusal?.title }, { status: 409 });
 					if (refusal?.decidedElsewhere === false) {
@@ -266,9 +267,11 @@ describe("feedback approval level", () => {
 					const index = rows.findIndex((item) => item.id === id);
 					const row = rows[index];
 					if (row) {
-						rows[index] = { ...row, deliveryState: "PREPARED" };
+						rows[index] = { ...row, state: "READY", stopReason: null };
 					}
-					return refusal ? conflict() : HttpResponse.json({ feedbackId: id, decision: "APPROVED" });
+					return refusal
+						? conflict()
+						: HttpResponse.json(decisionWire(id, "APPROVE"), { status: 201 });
 				}),
 				...reviewHandlers({ feedback: rows }),
 			);
@@ -411,7 +414,7 @@ describe("feedback approval level", () => {
 			const decision = deferred();
 			server.use(
 				// Held, then answered by the queue's own handler.
-				http.put(APPROVAL, async () => {
+				http.post(DECISIONS, async () => {
 					await decision.promise;
 				}),
 			);
@@ -454,13 +457,15 @@ describe("feedback approval level", () => {
 		/** A record opened from the queue while a decision is in flight is still there once it lands. */
 		it("keeps a record opened from the queue while a decision is in flight", async () => {
 			// Another record, opened while the decision on the oldest in the queue is in flight.
-			const [source] = feedbackDetail(oldest.id).practiceResults;
-			assert(source);
+			const [source] = feedbackDetail(oldest.id).basis;
+			assert(source, "The feedback is based on a result");
+			const { summary } = source.result;
+			assert(hasText(summary), "The result has a summary to name its level");
 			const approved: string[] = [];
 			serveQueue(approved);
 			const decision = deferred();
 			server.use(
-				http.put(APPROVAL, async () => {
+				http.post(DECISIONS, async () => {
 					await decision.promise;
 				}),
 			);
@@ -471,7 +476,7 @@ describe("feedback approval level", () => {
 			await queueSteps("1 of 3");
 			await userEvent.click(screen.getByRole("button", { name: "Approve and open next" }));
 			// A sheet links to no other record: the reader opens the result from its address.
-			const opened = [`result:${source.practiceResultId}`];
+			const opened = [`result:${source.resultId}`];
 			await router.navigate({
 				to: ".",
 				search: (previous: Record<string, unknown>) => ({ ...previous, detail: opened }),
@@ -483,7 +488,7 @@ describe("feedback approval level", () => {
 			decision.resolve();
 
 			await screen.findByText("Feedback approved. Delivery is being checked.");
-			// Once decided, the level reads it back as prepared and drops its footer; the move on would
+			// Once decided, the level reads it back as ready and drops its footer; the move on would
 			// run right after.
 			await waitFor(() =>
 				expect(
@@ -492,7 +497,7 @@ describe("feedback approval level", () => {
 			);
 			await sleep(100);
 			expect(stackInSearch(router.state.location.search.detail)).toStrictEqual(opened);
-			screen.getByRole("dialog", { name: source.summary });
+			screen.getByRole("dialog", { name: summary });
 		});
 
 		/** A decision taken before the queue has been read still moves on once it has. */

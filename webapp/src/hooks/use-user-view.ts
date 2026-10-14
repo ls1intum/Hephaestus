@@ -23,7 +23,7 @@ export function useUserViewUsers(workspaceSlug: string, page: number): UserViewU
 	);
 	return panelState(query, (data) => ({
 		status: "ready",
-		users: data.content ?? [],
-		totalPages: data.totalPages ?? 0,
+		users: data.content,
+		totalPages: data.totalPages,
 	}));
 }

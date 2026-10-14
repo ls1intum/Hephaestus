@@ -23,7 +23,7 @@ import { hasText } from "@/lib/text";
 export const MEMBER_PAGE_SIZE = 100;
 
 export interface PersonOption {
-	userId: number;
+	accountId: string;
 	label: string;
 	secondary?: string;
 }
@@ -35,8 +35,8 @@ export interface ReviewPeople extends FacetSource<PersonOption> {
 export interface ReviewPersonFacetProps {
 	title: string;
 	people: ReviewPeople;
-	selected: number | undefined;
-	onChange: (userId: number | undefined) => void;
+	selected: string | undefined;
+	onChange: (accountId: string | undefined) => void;
 	fallbackName?: string;
 }
 
@@ -50,8 +50,8 @@ export function ReviewPersonFacet({
 	const { contains } = useComboboxFilter({ sensitivity: "base" });
 	const { options, capped } = people;
 	const selectedOption =
-		options.find((option) => option.userId === selected) ??
-		(selected == null ? null : { userId: selected, label: fallbackName ?? `#${selected}` });
+		options.find((option) => option.accountId === selected) ??
+		(selected == null ? null : { accountId: selected, label: fallbackName ?? `#${selected}` });
 	let emptyText = "No matches. Try a different search.";
 	if (people.isError) {
 		emptyText = "We could not load people";
@@ -64,9 +64,9 @@ export function ReviewPersonFacet({
 			items={options}
 			value={selectedOption}
 			isItemEqualToValue={(option: PersonOption, value: PersonOption) =>
-				option.userId === value.userId
+				option.accountId === value.accountId
 			}
-			onValueChange={(next: PersonOption | null) => onChange(next?.userId)}
+			onValueChange={(next: PersonOption | null) => onChange(next?.accountId)}
 			filter={(option: PersonOption, query) =>
 				contains(option, query, (o) =>
 					hasText(o.secondary) ? `${o.label} ${o.secondary}` : o.label,
@@ -101,7 +101,7 @@ export function ReviewPersonFacet({
 				<ComboboxEmpty>{emptyText}</ComboboxEmpty>
 				<ComboboxList aria-label={`${title} options`}>
 					{(option: PersonOption) => (
-						<ComboboxItem key={option.userId} value={option}>
+						<ComboboxItem key={option.accountId} value={option}>
 							<ComboboxItemIndicator />
 							<Avatar className="size-5 shrink-0">
 								<AvatarFallback className="text-2xs">{getInitials(option.label)}</AvatarFallback>

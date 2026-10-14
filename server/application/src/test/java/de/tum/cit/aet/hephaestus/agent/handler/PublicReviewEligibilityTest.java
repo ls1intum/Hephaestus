@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
@@ -19,8 +18,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -33,13 +33,13 @@ import org.junit.jupiter.api.Test;
 class PublicReviewEligibilityTest {
     @Test
     void shouldPublishOnlyPinnedAuthorResultsWithProviderCopySupport() {
-        var reviews = mock(ReviewService.class);
+        var reviews = mock(ReviewSnapshotQuery.class);
         var catalog = mock(ItemCatalog.class);
         var descriptor = mock(ItemDescriptor.class);
-        var job = mock(ReviewJob.class);
+        var job = TestEntities.reviewJob();
         UUID reviewId = UUID.randomUUID();
-        when(job.getReviewId()).thenReturn(reviewId);
-        when(job.getWorkspaceId()).thenReturn(1L);
+        job.setReviewId(reviewId);
+        job.setWorkspaceId(1L);
         var item = new ItemRef(1, 2, new ItemKind("scm.pull_request"), 3L, null, null);
         var authorDefinition = mock(PracticeDefinition.class);
         var reviewerDefinition = mock(PracticeDefinition.class);

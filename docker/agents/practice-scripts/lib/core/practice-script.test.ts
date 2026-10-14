@@ -164,12 +164,11 @@ void describe("the context helpers", () => {
 		assert.equal(
 			requireChange({
 				head,
-				base: null,
 				change: { base: "", head: "", files: change, cite: refused },
 			}),
 			change,
 		);
-		for (const missing of [null, { head, base: null, change: null }]) {
+		for (const missing of [null, { head, change: null }]) {
 			assert.throws(() => requireChange(missing), { name: "UnratedError", reason: "unavailable" });
 		}
 	});

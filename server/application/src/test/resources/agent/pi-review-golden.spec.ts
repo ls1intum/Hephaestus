@@ -9,6 +9,7 @@ import {
 	rmSync,
 	symlinkSync,
 	writeFileSync,
+	unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
@@ -26,10 +27,14 @@ import {
 	stageGoldenWorkspace,
 } from "./golden-review-workspace.ts";
 
-// Each child captures the full v3 prompts and tools for one frozen workspace.
+// Each child captures the complete prompts and tools for one frozen workspace.
 // A separate process keeps the runner's module-level paths and state local to that scenario.
 
+import { codingAgentExports } from "./program-host-runner.ts";
+
 const GOLDEN = nodePath.join(import.meta.dirname, "golden-prompts");
+const UPDATE_GOLDEN = process.env.UPDATE_GOLDEN_PROMPTS === "1";
+const SHARED_GOLDENS = ["tools.json", "system-prompt.md"] as const;
 const LIB = nodePath.resolve(
 	import.meta.dirname,
 	"../../../../../../docker/agents/practice-scripts/lib",
@@ -45,7 +50,7 @@ const recordCitation = {
 	quote: JSON.stringify(GOLDEN_RECORD),
 };
 
-/** The program that prepares the same input as the retired leads script, and asks one review with it. */
+/** The program asks one review using the prepared inputs. */
 function preparingProgram(many: boolean): string {
 	const leads = goldenLeads(many).map(({ kind, ...lead }) => ({
 		...lead,
@@ -254,29 +259,9 @@ if (scenario !== undefined && scenario !== "") {
 	}
 	mock.module("@earendil-works/pi-coding-agent", {
 		namedExports: {
-			defineTool: (tool: unknown) => tool,
-			estimateTokens: (message: { content: string }) => Math.ceil(message.content.length / 4),
-			createCodemodeExtension: () => () => undefined,
-			getAgentDir: () => cwd,
-			DefaultResourceLoader: class {
-				constructor(options: { systemPrompt: string }) {
-					capture("system-prompt.md", options.systemPrompt);
-				}
-				readonly loaded = Promise.resolve();
-				async reload() {
-					await this.loaded;
-				}
-			},
-			SettingsManager: { create: () => ({}) },
-			SessionManager: { create: () => manager, inMemory: () => manager, open: () => manager },
-			ModelRuntime: {
-				async create() {
-					return {
-						registerProvider: () => undefined,
-						getModel: () => ({ id: "test-model", contextWindow: 128_000, maxTokens: 16_384 }),
-					};
-				},
-			},
+			...codingAgentExports(cwd, manager, (options) =>
+				capture("system-prompt.md", options.systemPrompt),
+			),
 			async createAgentSession(options: { tools: string[]; customTools: CustomTool[] }) {
 				const handlers = new Set<(event: unknown) => void>();
 				const emit = (event: unknown) => {
@@ -536,13 +521,30 @@ if (scenario !== undefined && scenario !== "") {
 	});
 
 	for (const name of SCENARIOS) {
-		void test(`the v3 ${name} prompts and tools match the frozen contract`, () => {
+		void test(`the ${name} prompts and tools match the captured inputs`, () => {
 			const captured = captures.get(name);
 			assert.ok(captured !== undefined);
-			for (const file of readdirSync(nodePath.join(GOLDEN, name))) {
+			if (UPDATE_GOLDEN) {
+				for (const file of readdirSync(nodePath.join(GOLDEN, name))) {
+					if (!captured.has(file)) unlinkSync(nodePath.join(GOLDEN, name, file));
+				}
+				for (const [file, text] of captured) {
+					const shared = SHARED_GOLDENS.some((entry) => entry === file);
+					if (!shared || name === SCENARIOS[0]) {
+						writeFileSync(nodePath.join(GOLDEN, ...(shared ? [file] : [name, file])), text);
+					}
+				}
+			}
+			const scenarioFiles = readdirSync(nodePath.join(GOLDEN, name));
+			assert.deepEqual([...captured.keys()].sort(), [...SHARED_GOLDENS, ...scenarioFiles].sort());
+			for (const file of captured.keys()) {
 				const actual = captured.get(file);
 				assert.ok(actual !== undefined);
-				const expected = readFileSync(nodePath.join(GOLDEN, name, file), "utf8");
+				const shared = SHARED_GOLDENS.some((entry) => entry === file);
+				const expected = readFileSync(
+					nodePath.join(GOLDEN, ...(shared ? [file] : [name, file])),
+					"utf8",
+				);
 				if (file.endsWith(".json")) {
 					const actualValue: unknown = JSON.parse(actual);
 					const expectedValue: unknown = JSON.parse(expected);

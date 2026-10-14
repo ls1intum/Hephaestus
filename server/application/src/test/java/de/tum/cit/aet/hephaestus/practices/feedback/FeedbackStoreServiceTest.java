@@ -84,7 +84,8 @@ class FeedbackStoreServiceTest {
             preparation,
             new FeedbackLedgerRecorder(feedback, basis, copies),
             digests,
-            mock(FeedbackCompositionContextService.class));
+            mock(FeedbackCompositionContextService.class),
+            new FeedbackSendQueue(sends, Clock.fixed(Instant.EPOCH, ZoneOffset.UTC)));
     final UUID reviewId = UUID.randomUUID(), resultId = UUID.randomUUID();
     final Review review = Review.builder()
             .id(reviewId)
@@ -298,7 +299,8 @@ class FeedbackStoreServiceTest {
         when(copies.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(1, draft.id()))
                 .thenReturn(List.of(FeedbackCopy.builder()
                         .state(FeedbackCopyState.FAILED)
-                        .lastError("ABSENT: exact readback")
+                        .readback(FeedbackCopyReadback.ABSENT)
+                        .lastError("Exact readback")
                         .build()));
         store.withhold(row, FeedbackStopReason.NO_AI);
         verify(feedback).updateDelivery(1, draft.id(), FeedbackState.FAILED, null, null);
@@ -317,7 +319,8 @@ class FeedbackStoreServiceTest {
                 .thenReturn(List.of(FeedbackCopy.builder()
                         .state(FeedbackCopyState.FAILED)
                         .writeStartedAt(Instant.EPOCH)
-                        .lastError("ABSENT: exact readback")
+                        .readback(FeedbackCopyReadback.ABSENT)
+                        .lastError("Exact readback")
                         .build()));
         when(gate.evaluate(row, FeedbackCheckStage.EGRESS, true))
                 .thenReturn(new FeedbackCheck(
@@ -327,7 +330,7 @@ class FeedbackStoreServiceTest {
                         Instant.EPOCH,
                         new FeedbackCheckFacts(0, 0, true, true, true, true, false, true, true, true)));
         when(copies.retryAbsent(1, draft.id())).thenReturn(1);
-        assertThat(store.retry(1, draft.id(), 4)).isTrue();
+        store.retry(1, draft.id(), 4);
         verify(feedback).updateDelivery(1, draft.id(), FeedbackState.READY, null, null);
         verify(sends).saveAndFlush(any(FeedbackSend.class));
     }

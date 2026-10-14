@@ -12,19 +12,16 @@ import { useReviewTabCounts } from "./use-review-tab-counts";
 const MINUTE = 60_000;
 const initial = { reviews: 10, results: 20, problems: 25, feedback: 30 };
 
+const paged = (total: number) => ({ content: [], totalElements: total });
+
 function countReads(status = 200) {
 	let totals = initial;
 	const reads: URL[] = [];
-	const paged = (total: number) => ({
-		content: [],
-		page: { size: 1, number: 0, totalElements: total, totalPages: 1 },
-	});
 	const endpoints = [
 		["reviews", "", paged],
 		["results", "/results", paged],
 		["problems", "/problems", paged],
-		// The feedback list answers with a flat page.
-		["feedback", "/feedback", (total: number) => ({ content: [], totalElements: total })],
+		["feedback", "/feedback", paged],
 	] as const;
 	server.use(
 		...endpoints.map(([kind, suffix, body]) =>

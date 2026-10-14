@@ -24,7 +24,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub organization webhook events. */
+/**
+ * Handles GitHub organization webhook events.
+ */
 @Component
 public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessageHandler<GitHubOrganizationEventDTO> {
 
@@ -89,7 +91,7 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
                     OrganizationMemberRole role = parseRole(event.membership().role());
                     membershipRepository.upsertMembership(organizationId, Objects.requireNonNull(user.getId()), role);
                     log.info(
-                            "Added member to organization: orgId={}, orgLogin={}, userLogin={}," + " role={}",
+                            "Added member to organization: orgId={}, orgLogin={}, userLogin={}, role={}",
                             orgDto.id(),
                             sanitizeForLog(orgDto.login()),
                             sanitizeForLog(userDto.login()),

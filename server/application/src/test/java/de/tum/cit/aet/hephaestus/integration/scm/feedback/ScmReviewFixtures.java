@@ -56,8 +56,8 @@ public final class ScmReviewFixtures {
                     author.getName() == null ? author.getLogin() : author.getName());
             jdbc.update(
                     "INSERT INTO"
-                        + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
-                        + " VALUES (?,?,'MEMBER',false,false,false,?) ON CONFLICT DO NOTHING",
+                            + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
+                            + " VALUES (?,?,'MEMBER',false,false,false,?) ON CONFLICT DO NOTHING",
                     workspaceId,
                     developer,
                     Timestamp.from(at));
@@ -112,8 +112,8 @@ public final class ScmReviewFixtures {
             UUID problem = UUID.randomUUID();
             jdbc.update(
                     "INSERT INTO"
-                        + " review(id,workspace_id,item_id,kind,item_version,origin,requested_by_id,status,rollout_revision,ordered_at,created_at,admitted_at,completed_at,checks)"
-                        + " VALUES (?,?,?,'ITEM',?,'REQUEST',?,'COMPLETE',0,?,?,?,?, '{}'::jsonb)",
+                            + " review(id,workspace_id,item_id,kind,item_version,origin,requested_by_id,status,rollout_revision,ordered_at,created_at,admitted_at,completed_at,checks)"
+                            + " VALUES (?,?,?,'ITEM',?,'REQUEST',?,'COMPLETE',0,?,?,?,?, '{}'::jsonb)",
                     review,
                     workspaceId,
                     item.itemId(),
@@ -144,9 +144,9 @@ public final class ScmReviewFixtures {
             var evidence = mapper.createObjectNode().set("citations", citations);
             jdbc.update(
                     "INSERT INTO"
-                        + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,severity,summary,explanation,evidence,evidence_version,recorded_at)"
-                        + " VALUES (?,?,?,?,?,?,?,?,'NOT_MET','MAJOR','Work needs trackable steps','The fixture work"
-                        + " contains no trackable steps.',?::jsonb,1,?)",
+                            + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,severity,summary,explanation,evidence,evidence_version,recorded_at)"
+                            + " VALUES (?,?,?,?,?,?,?,?,'NOT_MET','MAJOR','Work needs trackable steps','The fixture work"
+                            + " contains no trackable steps.',?::jsonb,1,?)",
                     result,
                     workspaceId,
                     review,
@@ -159,9 +159,9 @@ public final class ScmReviewFixtures {
                     Timestamp.from(at));
             jdbc.update(
                     "INSERT INTO"
-                        + " problem(id,workspace_id,result_id,position,severity,summary,explanation,citations,basis)"
-                        + " VALUES (?,?,?,0,'MAJOR','Work needs trackable steps','The fixture work contains no"
-                        + " trackable steps.',?::jsonb,?::jsonb)",
+                            + " problem(id,workspace_id,result_id,position,severity,summary,explanation,citations,basis)"
+                            + " VALUES (?,?,?,0,'MAJOR','Work needs trackable steps','The fixture work contains no"
+                            + " trackable steps.',?::jsonb,?::jsonb)",
                     problem,
                     workspaceId,
                     result,
@@ -178,8 +178,8 @@ public final class ScmReviewFixtures {
             UUID copy = FeedbackIds.copy(feedback, FeedbackCopyKind.SUMMARY, 0);
             jdbc.update(
                     "INSERT INTO"
-                        + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,checks,created_at,delivered_at)"
-                        + " VALUES (?,?,?,?,?,'ON_WORK','DELIVERED','Fixture feedback','{}'::jsonb,?,?)",
+                            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,checks,created_at,delivered_at)"
+                            + " VALUES (?,?,?,?,?,'ON_WORK','DELIVERED','Fixture feedback','{}'::jsonb,?,?)",
                     feedback,
                     workspaceId,
                     recorded.reviewId(),
@@ -199,8 +199,8 @@ public final class ScmReviewFixtures {
                     recorded.developerId());
             jdbc.update(
                     "INSERT INTO"
-                        + " feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_started_at,write_key,write_marker,external_ref,external_url,created_at,posted_at)"
-                        + " VALUES (?,?,?,'SUMMARY',0,'POSTED',?,?,?,?,?,?,?)",
+                            + " feedback_copy(id,workspace_id,feedback_id,kind,position,state,write_started_at,write_key,write_marker,external_ref,external_url,created_at,posted_at)"
+                            + " VALUES (?,?,?,'SUMMARY',0,'POSTED',?,?,?,?,?,?,?)",
                     copy,
                     workspaceId,
                     feedback,

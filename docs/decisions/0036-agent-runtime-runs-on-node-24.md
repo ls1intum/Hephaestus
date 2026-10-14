@@ -97,5 +97,5 @@ calls models and how its results are admitted.
 
 [Workspace ABI § Practice script validation and limits](../contributor/agent/workspace-abi.mdx#practice-script-validation-and-limits)
 owns the current grants and limits.
-[What a script can reach](../contributor/practice-script-runner.mdx#what-a-script-can-reach) owns the
+[Context and trust](../contributor/practice-script-runner.mdx#context-and-trust) owns the
 threat model.

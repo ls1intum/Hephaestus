@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventCoverage;
 import de.tum.cit.aet.hephaestus.practices.dto.ItemEventOptionDTO;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class PracticeDefinitionOptionsService {
     private final PracticeItemOptions items;
-    private final SourceCatalogRegistry sources;
+    private final ClasspathSourceCatalogRegistry sources;
     private final ItemEventCoverage coverage;
 
     public PracticeDefinitionOptionsDTO options(@Nullable Long workspaceId) {

@@ -1,22 +1,23 @@
 import { type ReactNode, useState } from "react";
 
-import type { AgentJob, ReviewLineage, TracedArtifact } from "@/api/types.gen";
+import type { ItemEvent, ItemRef, ReviewDetail, ReviewLineage } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import {
-	DISCOVERED_VIA_LABELS,
-	SIGNAL_STATE_LABELS,
-} from "@/components/practice-trace/trace-format";
-import type { ResultOrigin } from "@/components/practice-vocabulary/result-origin-defs";
+	ITEM_EVENT_FOUND_BY,
+	ITEM_EVENT_STATE_DEFS,
+} from "@/components/practice-vocabulary/item-event-defs";
+import type { ReviewOrigin } from "@/components/practice-vocabulary/review-origin-defs";
 import { DrawerBody } from "@/components/ui/drawer";
 import { hasText } from "@/lib/text";
 
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
+import { TRACE_STAGE_LABELS } from "./lineage-story";
 import { Step } from "./LineageStep";
 import type { RecordRef } from "./review-layers";
 import type { TraceNode } from "./review-trace";
-import { ReviewArtifactLabel } from "./ReviewArtifact";
+import { ReviewItemLabel } from "./ReviewItem";
 import { ReviewLevelHeader } from "./ReviewLevelHeader";
 import { ReviewLineageGraph } from "./ReviewLineageGraph";
 import type { TraceDisplay } from "./trace-display";
@@ -25,12 +26,18 @@ import { TRACE_END_TONES, unreviewedVerdict } from "./trace-verdict";
 import { TraceLegend } from "./TraceLegend";
 
 /**
- * What a trace tells: the chain of the record, or, for work none of whose moments started a review,
- * the work and its latest moment, which is all there is.
+ * What a trace tells: the graph of the record, or, for an item none of whose events started a
+ * review, the item and its latest event, which is all there is.
  */
 export type TraceChainState =
 	| PanelState<{ lineage: ReviewLineage }>
-	| { status: "unreviewed"; work: TracedArtifact }
+	| {
+			status: "unreviewed";
+			item: ItemRef;
+			event: ItemEvent;
+			/** The event's name, from the practice definition options. */
+			eventLabel: string;
+	  }
 	| { status: "none" };
 
 export interface TraceLevelProps {
@@ -49,21 +56,20 @@ export interface TraceLevelProps {
 	onDisplayChange: (display: TraceDisplay) => void;
 	filter: TraceFilter;
 	onFilterChange: (filter: TraceFilter) => void;
-	reviewOutcome?: AgentJob["reviewOutcome"];
 	/**
-	 * The review the trace tells, as its sheet reads it: its times, model, outcome and first read
-	 * come from it, so the trace and the review's sheet say the same.
+	 * The review the trace tells, as its sheet reads it: its times, model, stop reason and runtime
+	 * jobs come from it, so the trace and the review's sheet say the same.
 	 */
-	job?: AgentJob;
-	/** How the review came to run, from its row: live, by hand or backfilled. */
-	origin?: ResultOrigin;
+	review?: ReviewDetail;
+	/** How the review came to run, from its row: an event, a request, a schedule or a backfill. */
+	origin?: ReviewOrigin;
 	/** Where the review stands among the reviews of its work, from its row. */
 	position?: { index: number; total: number };
-	/** The work's record, which the latest moment of work without a review opens. */
+	/** The item's record, which the latest event of an item without a review opens. */
 	workRecord?: RecordRef;
 	/**
-	 * Whether Practice reviews are on for the workspace now, so the trace of work without a review
-	 * never says they are off while they are on.
+	 * Whether Practice reviews are on for the workspace now, so the trace of an item without a
+	 * review never says they are off while they are on.
 	 */
 	practicesEnabled?: boolean;
 }
@@ -129,7 +135,9 @@ function TraceBody({
 		case "unreviewed": {
 			return (
 				<UnreviewedTrace
-					work={chain.work}
+					item={chain.item}
+					event={chain.event}
+					eventLabel={chain.eventLabel}
 					practicesEnabled={practicesEnabled}
 					onOpen={workRecord === undefined ? undefined : () => onOpen(workRecord)}
 				/>
@@ -142,23 +150,34 @@ function TraceBody({
 }
 
 /**
- * Work none of whose moments started a review: its latest moment, and the end of the path, with
- * whether it still waits or why no review started. The moment opens the work's sheet, which has the
+ * An item none of whose events started a review: its latest event, and the end of the path, with
+ * whether it still waits or why no review started. The event opens the item's sheet, which has the
  * setting that would let it through.
  */
 function UnreviewedTrace({
-	work,
+	item,
+	event,
+	eventLabel,
 	practicesEnabled,
 	onOpen,
 }: {
-	work: TracedArtifact;
+	item: ItemRef;
+	event: ItemEvent;
+	eventLabel: string;
 	practicesEnabled: boolean | undefined;
-	/** Opens the work's sheet; absent where the trace has no work to open, so the moment is text. */
+	/** Opens the item's sheet; absent where the trace has no item to open, so the event is text. */
 	onOpen?: () => void;
 }) {
 	const [legendOpen, setLegendOpen] = useState(false);
-	const moment = work.lastSignal;
-	const verdict = unreviewedVerdict(moment, practicesEnabled);
+	const verdict = unreviewedVerdict(event, practicesEnabled);
+	const eventLine = (
+		<>
+			<span className="block font-medium">{eventLabel}</span>
+			<span className="block text-muted-foreground">
+				{ITEM_EVENT_FOUND_BY[event.foundBy].label} · {ITEM_EVENT_STATE_DEFS[event.state].label}
+			</span>
+		</>
+	);
 	return (
 		<div role="group" aria-label="How this came about" className="min-w-0 space-y-3">
 			<p data-trace-verdict className="text-sm font-medium text-balance">
@@ -171,26 +190,21 @@ function UnreviewedTrace({
 				<li className="grid grid-cols-[0.6875rem_minmax(0,1fr)] gap-x-2.5 pb-1.5">
 					<span aria-hidden />
 					<span className="px-1.5 text-2xs font-semibold tracking-wide text-muted-foreground uppercase">
-						Trigger
+						{TRACE_STAGE_LABELS.start}
 					</span>
 				</li>
 				<Step dot={{ tone: "outline" }} data-step="work">
 					<span className="block px-1.5 py-1">
-						<ReviewArtifactLabel reviewedWork={work.reviewedWork} className="font-medium" />
-						{hasText(work.reviewedWork.title) && (
-							<span className="block break-words text-muted-foreground">
-								{work.reviewedWork.title}
-							</span>
+						<ReviewItemLabel item={item} className="font-medium" />
+						{hasText(item.title) && (
+							<span className="block break-words text-muted-foreground">{item.title}</span>
 						)}
 					</span>
 				</Step>
-				<Step dot={{ tone: "outline", hollow: true }} at={moment.occurredAt} data-step="moment">
+				<Step dot={{ tone: "outline", hollow: true }} at={event.occurredAt} data-step="moment">
 					{onOpen === undefined ? (
 						<span data-step-key="moment" className="block px-1.5 py-1">
-							<span className="block font-medium">{moment.displayName}</span>
-							<span className="block text-muted-foreground">
-								{DISCOVERED_VIA_LABELS[moment.discoveredVia]} · {SIGNAL_STATE_LABELS[moment.state]}
-							</span>
+							{eventLine}
 						</span>
 					) : (
 						<button
@@ -200,10 +214,7 @@ function UnreviewedTrace({
 							onClick={onOpen}
 							className="block w-full rounded-md px-1.5 py-1 text-left outline-none hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring"
 						>
-							<span className="block font-medium">{moment.displayName}</span>
-							<span className="block text-muted-foreground">
-								{DISCOVERED_VIA_LABELS[moment.discoveredVia]} · {SIGNAL_STATE_LABELS[moment.state]}
-							</span>
+							{eventLine}
 						</button>
 					)}
 				</Step>

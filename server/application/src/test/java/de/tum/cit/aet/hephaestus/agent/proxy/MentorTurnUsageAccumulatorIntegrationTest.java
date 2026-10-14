@@ -166,7 +166,12 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
 
         accumulate(inFlight, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
 
-        assertThat(credentials.validate(token).orElseThrow().inFlightSpendUsd()).isEqualByComparingTo("1.00");
+        assertThat(credentials
+                        .authenticate(token)
+                        .flatMap(credentials::resolve)
+                        .orElseThrow()
+                        .inFlightSpendUsd())
+                .isEqualByComparingTo("1.00");
 
         transactionTemplate.executeWithoutResult(tx -> {
             ChatMessage message = chatMessageRepository.findById(inFlight).orElseThrow();
@@ -175,7 +180,12 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
         });
         accumulate(inFlight, new ProxyTokenUsage(100_000, 0, 0, 0, 0));
 
-        assertThat(credentials.validate(token).orElseThrow().inFlightSpendUsd()).isEqualByComparingTo("1.00");
+        assertThat(credentials
+                        .authenticate(token)
+                        .flatMap(credentials::resolve)
+                        .orElseThrow()
+                        .inFlightSpendUsd())
+                .isEqualByComparingTo("1.00");
         assertThat(usageOf(inFlight).inputTokens()).isEqualTo(100_000);
     }
 

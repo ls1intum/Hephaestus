@@ -28,9 +28,9 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Connection lookups + state transitions. Transitions are guarded by {@link
- * IntegrationState#canTransitionTo}; same-state calls are no-ops. The audit row's correlation_id
- * uniqueness silences webhook redelivery.
+ * Connection lookups + state transitions. Transitions are guarded by
+ * {@link IntegrationState#canTransitionTo}; same-state calls are no-ops. The audit
+ * row's correlation_id uniqueness silences webhook redelivery.
  */
 @Service
 public class ConnectionService {
@@ -90,9 +90,8 @@ public class ConnectionService {
     }
 
     /**
-     * Ids of every workspace with an ACTIVE Connection of the given kind — the fan-out a periodic
-     * sync scheduler iterates so a freshly connected workspace is picked up even before it has
-     * mirrored any data.
+     * Ids of every workspace with an ACTIVE Connection of the given kind — the fan-out a periodic sync
+     * scheduler iterates so a freshly connected workspace is picked up even before it has mirrored any data.
      */
     @Transactional(readOnly = true)
     public List<Long> findWorkspaceIdsWithActiveConnection(IntegrationKind kind) {
@@ -100,8 +99,8 @@ public class ConnectionService {
     }
 
     /**
-     * Kind of the workspace's SCM Connection. The invariant is "one workspace, one SCM provider" —
-     * if both ACTIVE rows exist that's corrupt data and we fail loud.
+     * Kind of the workspace's SCM Connection. The invariant is "one workspace, one
+     * SCM provider" — if both ACTIVE rows exist that's corrupt data and we fail loud.
      */
     @Transactional(readOnly = true)
     public Optional<IntegrationKind> findActiveProviderKind(long workspaceId) {
@@ -113,8 +112,7 @@ public class ConnectionService {
                 .isPresent();
         if (github && gitlab) {
             throw new IllegalStateException(
-                    "This workspace has active GitHub and GitLab connections, which Hephaestus does"
-                            + " not support. Ask your instance operator to fix it.");
+                    "This workspace has active GitHub and GitLab connections, which Hephaestus does not support. Ask your instance operator to fix it.");
         }
         if (github) return Optional.of(IntegrationKind.GITHUB);
         if (gitlab) return Optional.of(IntegrationKind.GITLAB);
@@ -178,9 +176,9 @@ public class ConnectionService {
      * the connected fleet. {@link ConnectionRepository#findOutlineSubscriptionsBySubscriptionId}
      * supplies exactly that.
      *
-     * <p>Fail-closed on ambiguity: a subscription id is globally unique at Outline, so more than
-     * one ACTIVE match means corrupt data. We reject the delivery rather than pick a row — guessing
-     * would let a hostile/duplicated row decide which workspace's secret verifies a delivery.
+     * <p>Fail-closed on ambiguity: a subscription id is globally unique at Outline, so more than one
+     * ACTIVE match means corrupt data. We reject the delivery rather than pick a row — guessing would
+     * let a hostile/duplicated row decide which workspace's secret verifies a delivery.
      */
     @Transactional(readOnly = true)
     public Optional<OutlineSubscription> findOutlineSubscription(@Nullable String subscriptionId) {
@@ -195,8 +193,7 @@ public class ConnectionService {
         if (matches.size() > 1) {
             // Never log the (attacker-supplied) subscription id itself.
             log.error(
-                    "Outline webhook subscription id matches {} ACTIVE connections — rejecting"
-                            + " delivery; out-of-band fix required",
+                    "Outline webhook subscription id matches {} ACTIVE connections — rejecting delivery; out-of-band fix required",
                     matches.size());
             return Optional.empty();
         }
@@ -216,10 +213,10 @@ public class ConnectionService {
     public record OutlineSubscription(long workspaceId, String serverUrl, String signingSecret) {}
 
     /**
-     * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection, if any. A
-     * credential the configured keys cannot read surfaces as {@link CredentialUnreadableException}.
-     * That exception leaves a joined transaction committable, so a batch over every workspace can
-     * skip the unreadable one and still return the others.
+     * Decrypts the stored {@link BearerToken} for the workspace's ACTIVE Connection,
+     * if any. A credential the configured keys cannot read surfaces as {@link CredentialUnreadableException}.
+     * That exception leaves a joined transaction committable, so a batch over every workspace can skip
+     * the unreadable one and still return the others.
      */
     @Transactional(readOnly = true, noRollbackFor = CredentialUnreadableException.class)
     public Optional<BearerToken> findActiveBearerToken(long workspaceId, IntegrationKind kind) {
@@ -276,9 +273,9 @@ public class ConnectionService {
     }
 
     /**
-     * Mutate the {@link ConnectionConfig} on the workspace's ACTIVE Connection. Empty when no
-     * ACTIVE row exists — callers MUST NOT auto-create. The mutator must return the same
-     * sealed-subtype variant; cross-variant returns throw.
+     * Mutate the {@link ConnectionConfig} on the workspace's ACTIVE Connection.
+     * Empty when no ACTIVE row exists — callers MUST NOT auto-create. The mutator
+     * must return the same sealed-subtype variant; cross-variant returns throw.
      */
     @Transactional
     public Optional<Connection> updateConfig(
@@ -308,9 +305,9 @@ public class ConnectionService {
 
     /**
      * Replace the credential blob on the workspace's ACTIVE Connection. Empty when no ACTIVE row
-     * exists. A GitHub App connection runs on its installation, not on a stored token, so it
-     * refuses one here, inside the write, rather than in a caller's earlier look at a row that may
-     * since have changed mode.
+     * exists. A GitHub App connection runs on its installation, not on a stored token, so it refuses
+     * one here, inside the write, rather than in a caller's earlier look at a row that may since have
+     * changed mode.
      */
     @Transactional
     public Optional<BearerTokenReplacement> rotateBearerToken(
@@ -319,8 +316,7 @@ public class ConnectionService {
             if (c.getConfig() instanceof ConnectionConfig.GitHubAppConfig) {
                 throw new ConnectionModeConflictException("The GitHub connection of workspace "
                         + workspaceId
-                        + " is an App installation. It uses no stored"
-                        + " token, so there is nothing to replace.");
+                        + " is an App installation. It uses no stored token, so there is nothing to replace.");
             }
             connectionRepository.acquireLifecycleLock(c.getId(), workspaceId);
             Objects.requireNonNull(entityManager).refresh(c);
@@ -338,10 +334,11 @@ public class ConnectionService {
     }
 
     /**
-     * Upsert the workspace's GitHub App binding to {@code installationId}. Retires any non-matching
-     * SCM-side row first (clearing its credentials via the {@link IntegrationState#UNINSTALLED}
-     * transition), then activates the {@code (workspace, GITHUB, installationId)} row. Idempotent
-     * on {@code correlationId}.
+     * Upsert the workspace's GitHub App binding to {@code installationId}. Retires
+     * any non-matching SCM-side row first (clearing its credentials via the
+     * {@link IntegrationState#UNINSTALLED} transition), then activates the
+     * {@code (workspace, GITHUB, installationId)} row. Idempotent on
+     * {@code correlationId}.
      */
     @Transactional
     public Connection upsertGitHubAppConnection(
@@ -407,8 +404,8 @@ public class ConnectionService {
     }
 
     /**
-     * Upsert + activate the workspace's PAT Connection row. Idempotent on {@code (workspace, kind,
-     * instanceKey)}.
+     * Upsert + activate the workspace's PAT Connection row. Idempotent on
+     * {@code (workspace, kind, instanceKey)}.
      */
     @Transactional
     public void provisionPatConnection(
@@ -446,16 +443,16 @@ public class ConnectionService {
     }
 
     /**
-     * Transition the Connection to {@code req.next()}. Idempotent on same-state and on duplicate
-     * {@code correlationId}; invalid transitions throw. Transitioning to {@link
-     * IntegrationState#UNINSTALLED} clears credentials atomically.
+     * Transition the Connection to {@code req.next()}. Idempotent on same-state and on
+     * duplicate {@code correlationId}; invalid transitions throw. Transitioning to
+     * {@link IntegrationState#UNINSTALLED} clears credentials atomically.
      *
-     * <p>Authoritative: a sync job in flight does NOT block this. Every caller here is the system
-     * or the vendor stating a fact — workspace PURGE erasing credentials, Slack telling us the app
-     * was uninstalled, a GitHub install replacing its predecessor. None of them can be retried by a
-     * human and none may be preempted by a background reconcile, so they win over the job and let
-     * it fail on its own. Only the interactive admin door ({@link #disconnect}) fences, because
-     * only it has someone to hand a 409 to.
+     * <p>Authoritative: a sync job in flight does NOT block this. Every caller here is the system or
+     * the vendor stating a fact — workspace PURGE erasing credentials, Slack telling us the app was
+     * uninstalled, a GitHub install replacing its predecessor. None of them can be retried by a human
+     * and none may be preempted by a background reconcile, so they win over the job and let it fail on
+     * its own. Only the interactive admin door ({@link #disconnect}) fences, because only it has
+     * someone to hand a 409 to.
      */
     @Transactional
     public Connection transition(Connection connection, TransitionRequest req) {
@@ -463,30 +460,28 @@ public class ConnectionService {
     }
 
     /**
-     * Admin-initiated disconnect: the one door that refuses to uninstall out from under a running
-     * sync.
+     * Admin-initiated disconnect: the one door that refuses to uninstall out from under a running sync.
      *
-     * <p>The fence is here rather than in {@link #applyTransition} because it trades availability
-     * for tidiness — acceptable when an admin clicked a button and can be told "retry", never
-     * acceptable for erasure or a vendor-driven uninstall.
+     * <p>The fence is here rather than in {@link #applyTransition} because it trades availability for
+     * tidiness — acceptable when an admin clicked a button and can be told "retry", never acceptable
+     * for erasure or a vendor-driven uninstall.
      *
-     * <p>It cannot wedge. Under the connection's lifecycle lock we first reap leases the hourly
-     * sweep hasn't reached (so a job stranded by a pod crash frees the connection in minutes, not
-     * an hour — the same inline reap "Sync now" already does), then request the surviving job's
-     * cancellation and report it as a 409 naming that job id. The cancel request is durable even
-     * though we throw ({@code noRollbackFor}), so this is a "retry in a moment", not a dead end:
-     * the runner aborts and the admin's next click succeeds.
+     * <p>It cannot wedge. Under the connection's lifecycle lock we first reap leases the hourly sweep
+     * hasn't reached (so a job stranded by a pod crash frees the connection in minutes, not an hour —
+     * the same inline reap "Sync now" already does), then request the surviving job's cancellation and
+     * report it as a 409 naming that job id. The cancel request is durable even though we throw
+     * ({@code noRollbackFor}), so this is a "retry in a moment", not a dead end: the runner aborts and
+     * the admin's next click succeeds.
      *
-     * <p>Once the fence and the state-machine check have passed, and while the row lock is still
-     * held, the strategy erases the integration's local data in this transaction. An erase failure
-     * propagates and rolls everything back, leaving the connection ACTIVE with its credentials so
-     * the admin can retry. Provider teardown is prepared from the stored credentials before they
-     * are cleared, but runs only after the transition commits, so a rolled-back disconnect never
-     * touches the provider. It is best effort: an unreachable provider must not keep an erased
-     * workspace connected.
+     * <p>Once the fence and the state-machine check have passed, and while the row lock is still held,
+     * the strategy erases the integration's local data in this transaction. An erase failure propagates
+     * and rolls everything back, leaving the connection ACTIVE with its credentials so the admin can
+     * retry. Provider teardown is prepared from the stored credentials before they are cleared, but runs
+     * only after the transition commits, so a rolled-back disconnect never touches the provider. It is
+     * best effort: an unreachable provider must not keep an erased workspace connected.
      *
-     * @throws ConnectionBusyException 409 — a sync job still holds the connection; its cancellation
-     *     has been requested, so retrying shortly will succeed
+     * @throws ConnectionBusyException 409 — a sync job still holds the connection; its cancellation has
+     *                                 been requested, so retrying shortly will succeed
      */
     @Transactional(noRollbackFor = ConnectionBusyException.class)
     public Connection disconnect(Connection connection, TransitionRequest req, ConnectionStrategy strategy) {
@@ -501,11 +496,10 @@ public class ConnectionService {
     }
 
     /**
-     * Disconnects for mandatory erasure without allowing a sync job to delay credential removal.
-     * {@code revoke} runs with this transaction suspended, so its provider calls hold no
-     * transaction open; its failure still propagates and rolls the transition back. Local data is
-     * then erased under the lifecycle lock before the connection loses its source authority or
-     * credentials.
+     * Disconnects for mandatory erasure without allowing a sync job to delay credential removal. {@code
+     * revoke} runs with this transaction suspended, so its provider calls hold no transaction open; its
+     * failure still propagates and rolls the transition back. Local data is then erased under the
+     * lifecycle lock before the connection loses its source authority or credentials.
      */
     @Transactional
     public Connection disconnectForErasure(
@@ -604,8 +598,8 @@ public class ConnectionService {
     }
 
     /**
-     * Guarded revival of a terminal UNINSTALLED row — the kind-specific reconnect flows the {@link
-     * IntegrationState} javadoc reserves. Two doors only: a completed Slack or GitHub OAuth
+     * Guarded revival of a terminal UNINSTALLED row — the kind-specific reconnect flows the
+     * {@link IntegrationState} javadoc reserves. Two doors only: a completed Slack or GitHub OAuth
      * round-trip, whose strategy just proved the team or installation belongs to the person
      * connecting, and an admin-driven inline re-connect ({@code INITIATE}) whose strategy just
      * re-validated fresh credentials against the vendor. Both preserve the vendor natural key

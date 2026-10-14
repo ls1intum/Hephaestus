@@ -106,7 +106,7 @@ function ConfigAuditView({
 }) {
 	const dateRange = toDateRange(search);
 	const entries: ConfigAuditEntryView[] = dedupeById(
-		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
+		listQuery.data?.pages.flatMap((p) => p.content) ?? [],
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
 	const query = toQuery(search);

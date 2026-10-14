@@ -7,7 +7,7 @@ import type {
 	DeliveredWorkFeedback,
 	ItemRef,
 	OwnItemTrace,
-	PagedModelProfileReview,
+	PageResponseDtoProfileReview,
 	ReviewRef,
 	ReviewRequestOutcome,
 	WorkspaceMembership,
@@ -110,8 +110,22 @@ function ownTrace(review: ReviewRef, item = review.item): OwnItemTrace {
 	return { item, review, events: [], results: [] };
 }
 
-function ownReviews(...reviews: ReviewRef[]): PagedModelProfileReview {
-	return { content: reviews.map((review) => ({ review, results: [], feedback: [] })) };
+function ownReviews(...reviews: ReviewRef[]): PageResponseDtoProfileReview {
+	const content = reviews.map((review) => ({ review, results: [], feedback: [] }));
+	const sort = { empty: false, sorted: true, unsorted: false };
+	return {
+		content,
+		totalElements: content.length,
+		totalPages: content.length === 0 ? 0 : 1,
+		number: 0,
+		size: 10,
+		numberOfElements: content.length,
+		first: true,
+		last: true,
+		empty: content.length === 0,
+		sort,
+		pageable: { offset: 0, pageNumber: 0, pageSize: 10, paged: true, unpaged: false, sort },
+	};
 }
 
 /** The reader's own reviews of the item, then the trace of the one named. */

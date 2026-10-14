@@ -119,8 +119,3 @@ export function isPracticeScriptPurpose(purpose: AgentPurpose): boolean {
 export function assignModelLabel(purpose: AgentPurpose): string {
 	return `Assign ${AGENT_PURPOSE_DEFS[purpose].withArticle}`;
 }
-
-/** The link text that opens a bound but failing model's purpose on AI models. */
-export function checkModelLabel(purpose: AgentPurpose): string {
-	return `Check the ${AGENT_PURPOSE_DEFS[purpose].noun}`;
-}

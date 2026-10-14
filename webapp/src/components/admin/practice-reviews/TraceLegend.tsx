@@ -3,9 +3,9 @@ import { type ReactNode, useId, useRef } from "react";
 
 import { cn } from "cn";
 import { type BadgeVariant, type StatusDef, statusValues } from "@/components/common/status-def";
-import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-state-defs";
 import { DEVELOPER_ANSWER_DEFS } from "@/components/practice-vocabulary/developer-answer-defs";
+import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -45,20 +45,19 @@ const DOTS: readonly { dot: Dot; label: string; text: string }[] = [
 		text: "a practice not met, a delivery failed",
 	},
 	{ dot: { tone: "warning" }, label: "Lost or late", text: "withheld, not arrived, a long wait" },
-	{ dot: { tone: "default" }, label: "Answered or disputed", text: "the answer stays private" },
+	{ dot: { tone: "default" }, label: "Answered or disagreed", text: "the answer stays private" },
 	{ dot: { tone: "secondary" }, label: "Open", text: "no outcome yet" },
 	{
 		dot: { tone: "outline", hollow: true },
 		label: "Hollow",
-		text: "nothing to judge, as a moment",
+		text: "nothing to judge, as an event",
 	},
 ];
 
 const ENDS: readonly { kind: TraceEndKind; text: string }[] = [
-	{ kind: "worked", text: "resolved by the work" },
+	{ kind: "delivered", text: "delivered to the developer" },
 	{ kind: "lost", text: "withheld, rejected, replaced or failed" },
 	{ kind: "open", text: "on its way, or no answer yet" },
-	{ kind: "answered", text: "answered privately, or disputed" },
 	{ kind: "none", text: "nothing had to be sent" },
 ];
 
@@ -70,24 +69,20 @@ const MARKS: readonly { kind: keyof typeof STAGE_MARKS; tone: BadgeVariant }[] =
 	{ kind: "waiting", tone: "outline" },
 ];
 
-const PLACES: readonly StatusDef[] = [
-	DELIVERY_PLACE_DEFS.IN_CONTEXT,
-	DELIVERY_PLACE_DEFS.IN_APP,
-	DELIVERY_PLACE_DEFS.IN_CHAT,
-];
+const DESTINATIONS: readonly StatusDef[] = statusValues(FEEDBACK_DESTINATION_DEFS).map(
+	(destination) => FEEDBACK_DESTINATION_DEFS[destination],
+);
 
 // Every state the rail can draw, from the registry it draws them with.
 const DELIVERY: readonly StatusDef[] = statusValues(DELIVERY_STATE_DEFS).map(
 	(state) => DELIVERY_STATE_DEFS[state],
 );
 
-const ANSWERS: readonly StatusDef[] = [
-	DEVELOPER_ANSWER_DEFS.ANSWERED,
-	DEVELOPER_ANSWER_DEFS.DISPUTED,
-	DEVELOPER_ANSWER_DEFS.RESOLVED_BY_WORK,
-];
+const ANSWERS: readonly StatusDef[] = statusValues(DEVELOPER_ANSWER_DEFS).map(
+	(answer) => DEVELOPER_ANSWER_DEFS[answer],
+);
 
-const TERMS: readonly TraceTerm[] = ["moment", "result", "withheld", "coalesced"];
+const TERMS: readonly TraceTerm[] = ["event", "result", "withheld", "coalesced"];
 
 const SLOW_MINUTES = Math.round(SLOW_GAP_SECONDS / 60);
 
@@ -174,18 +169,9 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 									<Name>Result</Name> by number, in its outcome’s colour
 								</Entry>
 								<Entry
-									mark={<Chip className={resultChipClass({ outcome: "NOT_APPLICABLE" })}>4</Chip>}
+									mark={<Chip className={resultChipClass({ outcome: "DOES_NOT_APPLY" })}>4</Chip>}
 								>
-									<Name>Not applicable</Name> hollow, unlike undetermined
-								</Entry>
-								<Entry
-									mark={
-										<Chip className={resultChipClass({ outcome: "MET", invalidated: true })}>
-											5
-										</Chip>
-									}
-								>
-									<Name>Marked incorrect</Name> dashed edge, number struck
+									<Name>Does not apply</Name> hollow, unlike could not determine
 								</Entry>
 								<Entry
 									mark={
@@ -225,7 +211,7 @@ export function TraceLegend({ open, onOpenChange }: TraceLegendProps) {
 							</LegendGroup>
 							<LegendGroup title="Icons">
 								<IconRow label="Where it went">
-									{PLACES.map((def) => (
+									{DESTINATIONS.map((def) => (
 										<StepTag key={def.label} def={def} />
 									))}
 								</IconRow>

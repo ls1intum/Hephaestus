@@ -6,9 +6,9 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.CompletenessPolicy;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -30,13 +30,13 @@ import org.junit.jupiter.api.Test;
 
 class PracticeDefinitionValidatorTest extends BaseUnitTest {
     private PracticeDefinitionValidator validator;
-    private SourceCatalogRegistry sources;
+    private ClasspathSourceCatalogRegistry sources;
     private SourceCatalog catalog;
     private ItemDescriptor descriptor;
 
     @BeforeEach
     void setUp() {
-        sources = mock(SourceCatalogRegistry.class);
+        sources = mock(ClasspathSourceCatalogRegistry.class);
         catalog = mock(SourceCatalog.class);
         var options = mock(PracticeItemOptions.class);
         descriptor = mock(ItemDescriptor.class);
@@ -180,7 +180,7 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         lenient().when(catalog.sourcesFor("scm.file")).thenReturn(Set.of(new SourceKind("scm.repository.tree")));
         var source = mock(SourceContract.class);
         lenient()
-                .when(sources.requireSource(new SourceContractVersion("2.0.0"), new SourceKind("scm.repository.tree")))
+                .when(sources.requireSource(new SourceKind("scm.repository.tree")))
                 .thenReturn(source);
         lenient().when(source.completenessPolicy()).thenReturn(new CompletenessPolicy(supportsComplete, true, true));
     }

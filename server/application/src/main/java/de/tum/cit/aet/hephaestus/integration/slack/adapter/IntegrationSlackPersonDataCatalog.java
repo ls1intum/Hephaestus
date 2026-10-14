@@ -35,11 +35,7 @@ public class IntegrationSlackPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "slack_message",
                         "slack_message",
-                        "t.author_account_id = :account OR EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities"
-                                + " AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN"
-                                + " identity_provider p ON p.id=i.\"providerId\" WHERE p.type='SLACK' AND"
-                                + " p.server_url='https://slack.com' AND i.subject=t.author_slack_user_id AND"
-                                + " i.\"teamId\"=t.slack_team_id)",
+                        "t.author_account_id = :account OR EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\" WHERE p.type='SLACK' AND p.server_url='https://slack.com' AND i.subject=t.author_slack_user_id AND i.\"teamId\"=t.slack_team_id)",
                         "id,workspace_id,slack_team_id,slack_channel_id,slack_ts,slack_thread_ts,author_slack_user_id,text,edited_at,deleted_at,ingested_at,author_account_id",
                         "id",
                         "",
@@ -49,11 +45,7 @@ public class IntegrationSlackPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "mentor_slack_thread",
                         "mentor_slack_thread",
-                        "t.chat_thread_id IN (SELECT id FROM chat_thread WHERE account_id = :account) OR EXISTS"
-                            + " (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\""
-                            + " bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\""
-                            + " WHERE p.type='SLACK' AND p.server_url='https://slack.com' AND"
-                            + " i.subject=t.slack_user_id AND i.\"teamId\"=t.slack_team_id)",
+                        "t.chat_thread_id IN (SELECT id FROM chat_thread WHERE account_id = :account) OR EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\" WHERE p.type='SLACK' AND p.server_url='https://slack.com' AND i.subject=t.slack_user_id AND i.\"teamId\"=t.slack_team_id)",
                         "id,workspace_id,chat_thread_id,slack_team_id,slack_channel_id,slack_thread_ts,slack_user_id,created_at",
                         "id",
                         "",
@@ -63,11 +55,7 @@ public class IntegrationSlackPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "slack_participant_consent",
                         "slack_participant_consent",
-                        "EXISTS(SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\""
-                            + " bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\""
-                            + " AND p.type='SLACK' AND p.server_url='https://slack.com' JOIN connection c ON"
-                            + " c.workspace_id=t.workspace_id AND c.config->>'teamId'=i.\"teamId\" WHERE"
-                            + " i.subject=t.slack_user_id)",
+                        "EXISTS(SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\" AND p.type='SLACK' AND p.server_url='https://slack.com' JOIN connection c ON c.workspace_id=t.workspace_id AND c.config->>'teamId'=i.\"teamId\" WHERE i.subject=t.slack_user_id)",
                         "workspace_id,slack_user_id,ingestion_opted_out,decided_at",
                         "workspace_id,slack_user_id",
                         "",

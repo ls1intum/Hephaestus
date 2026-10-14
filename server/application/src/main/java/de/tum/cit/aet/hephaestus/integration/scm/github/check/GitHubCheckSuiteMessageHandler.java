@@ -84,7 +84,7 @@ public class GitHubCheckSuiteMessageHandler extends AbstractIntegrationMessageHa
         CheckState state = GitHubHeadCheckProcessor.fromCheckSuite(suite.status(), suite.conclusion());
         if (state == null) {
             log.debug(
-                    "Skipped check_suite event: reason=saysNothingAboutTheHead, action={}," + " conclusion={}",
+                    "Skipped check_suite event: reason=saysNothingAboutTheHead, action={}, conclusion={}",
                     event.action(),
                     suite.conclusion());
             return null;

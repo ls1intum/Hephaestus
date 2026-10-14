@@ -88,7 +88,7 @@ For issues and merge requests, two operations have distinct triggers and deliber
 
 | | Issue and merge request drift tombstone | Mirror erasure |
 | --- | --- | --- |
-| Trigger | A reconcile pass observes an artifact missing upstream | Admin disconnect, or workspace purge |
+| Cause | A reconcile pass observes an item missing upstream | Admin disconnect, or workspace purge |
 | Effect | `deleted_at` marker. Content-bearing fields cleared | Hard `DELETE`, including of tombstoned rows |
 | Reversible | Yes — `upsertCore` clears `deleted_at` on the next sync | No |
 | Basis | Sync fidelity | The lawful basis for holding the mirror is gone |
@@ -132,8 +132,8 @@ The org tier (`team`, `team_membership`, `organization_membership`) has its own 
 No repository cascade reaches it.
 Erasure occurs only when no other non-purged workspace binds to the same `Organization`. The `Organization` row itself is global: unlinked, never deleted.
 
-Derived rows go first, while the artifacts they reference still exist: the eraser publishes a
-synchronous in-transaction `ScmMirrorErasedEvent`, and `practices` (SCM-artifact results and
+Derived rows go first, while the items they reference still exist: the eraser publishes a
+synchronous in-transaction `ScmMirrorErasedEvent`, and `practices` (SCM item results and
 feedback) and `activity` (`activity_event`) listen.
 
 Disconnect and purge call the same eraser, so they reach the same end state by construction.

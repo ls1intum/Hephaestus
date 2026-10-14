@@ -19,44 +19,36 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Reads the address of a provider page into the piece of reviewed work it shows — and nothing more.
- * The address is never dereferenced: no request, no redirect, no DNS lookup, so what it names is
- * decided by its text alone and then proven against what Hephaestus already mirrored.
+ * Reads the address of a provider page into the piece of reviewed work it shows — and nothing more. The
+ * address is never dereferenced: no request, no redirect, no DNS lookup, so what it names is decided by
+ * its text alone and then proven against what Hephaestus already mirrored.
  *
- * <p>Two steps rather than one because the path grammar belongs to the provider, and the provider
- * is the workspace's connection, never a guess from the hostname: {@link #page} checks structure
- * and yields the origin the caller compares with the connected one, and only then {@link
- * #workAddress} reads the path in that provider's grammar.
+ * <p>Two steps rather than one because the path grammar belongs to the provider, and the provider is the
+ * workspace's connection, never a guess from the hostname: {@link #page} checks structure and yields the
+ * origin the caller compares with the connected one, and only then {@link #workAddress} reads the path in
+ * that provider's grammar.
  *
- * <p>The grammar is deliberately tight. A page that merely begins like a pull request's address is
- * not that pull request: only the known tabs of one are accepted, and anything else is unsupported
- * rather than stripped down to something that resolves.
+ * <p>The grammar is deliberately tight. A page that merely begins like a pull request's address is not
+ * that pull request: only the known tabs of one are accepted, and anything else is unsupported rather than
+ * stripped down to something that resolves.
  */
 public final class ReviewedWorkUrls {
 
-    /**
-     * A structurally sound HTTPS address: its normalized origin and its path segments, each decoded
-     * once.
-     */
+    /** A structurally sound HTTPS address: its normalized origin and its path segments, each decoded once. */
     public record Page(String origin, List<String> segments) {
         public Page {
             segments = List.copyOf(segments);
         }
     }
 
-    /**
-     * The work a supported page shows, named as inside its provider: repository path, kind and
-     * number.
-     */
+    /** The work a supported page shows, named as inside its provider: repository path, kind and number. */
     public record WorkAddress(String repositoryName, ItemKind kind, int number) {}
 
     private static final String HTTPS = "https";
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final int MAX_PORT = 65_535;
 
-    /**
-     * Positive, no leading zero, and short enough that it cannot overflow an {@code int} unnoticed.
-     */
+    /** Positive, no leading zero, and short enough that it cannot overflow an {@code int} unnoticed. */
     private static final Pattern NUMBER = Pattern.compile("[1-9][0-9]{0,9}");
 
     /** Abbreviated or full SHA-1, or a SHA-256 object name. */
@@ -65,10 +57,7 @@ public final class ReviewedWorkUrls {
     private static final Set<String> GITHUB_PULL_REQUEST_TABS = Set.of("files", "changes", "commits", "checks");
     private static final Set<String> GITLAB_MERGE_REQUEST_TABS = Set.of("diffs", "commits", "pipelines", "reports");
 
-    /**
-     * GitLab separates a project's path from its own routes with this segment; no project may be
-     * named it.
-     */
+    /** GitLab separates a project's path from its own routes with this segment; no project may be named it. */
     private static final String GITLAB_ROUTE_MARKER = "-";
 
     /** A reserved top-level GitLab path: what follows is a group, never a project. */
@@ -95,9 +84,9 @@ public final class ReviewedWorkUrls {
     }
 
     /**
-     * Empty when {@code url} is not an absolute HTTPS address with a clean path. Query and fragment
-     * are cut before parsing: they never take part in identity, and a browser leaves characters in
-     * them that a strict URI parser would otherwise reject.
+     * Empty when {@code url} is not an absolute HTTPS address with a clean path. Query and fragment are cut
+     * before parsing: they never take part in identity, and a browser leaves characters in them that a
+     * strict URI parser would otherwise reject.
      */
     public static Optional<Page> page(String url) {
         if (url.chars().anyMatch(c -> isControl(c) || c == '\\')) {
@@ -125,9 +114,8 @@ public final class ReviewedWorkUrls {
     }
 
     /**
-     * The origin of a configured provider server, normalized the way {@link #page} normalizes a
-     * page's. Empty when the configured value is not a bare HTTPS origin, in which case no page can
-     * match it.
+     * The origin of a configured provider server, normalized the way {@link #page} normalizes a page's.
+     * Empty when the configured value is not a bare HTTPS origin, in which case no page can match it.
      */
     public static Optional<String> configuredOrigin(String serverUrl) {
         URI uri;
@@ -150,10 +138,7 @@ public final class ReviewedWorkUrls {
         return origin(uri);
     }
 
-    /**
-     * Empty when the page is not a pull request, merge request or issue in {@code provider}'s
-     * grammar.
-     */
+    /** Empty when the page is not a pull request, merge request or issue in {@code provider}'s grammar. */
     public static Optional<WorkAddress> workAddress(IntegrationKind provider, Page page) {
         return switch (provider) {
             case GITHUB -> gitHub(page.segments());
@@ -198,10 +183,10 @@ public final class ReviewedWorkUrls {
     }
 
     /**
-     * {@code /namespace/[subgroups/]project/-/merge_requests|issues|work_items/N}. Split on the
-     * route marker, not on fixed positions, so nested groups work. A project work item names an
-     * issue only if one is mirrored under that number, which the caller's issue lookup decides; a
-     * group-level work item or epic has no project and is unsupported rather than guessed at.
+     * {@code /namespace/[subgroups/]project/-/merge_requests|issues|work_items/N}. Split on the route
+     * marker, not on fixed positions, so nested groups work. A project work item names an issue only if
+     * one is mirrored under that number, which the caller's issue lookup decides; a group-level work item
+     * or epic has no project and is unsupported rather than guessed at.
      */
     private static Optional<WorkAddress> gitLab(List<String> segments) {
         int marker = segments.indexOf(GITLAB_ROUTE_MARKER);
@@ -236,9 +221,8 @@ public final class ReviewedWorkUrls {
     }
 
     /**
-     * Lowercase scheme and host, the default HTTPS port dropped and any other kept. Hosts are
-     * compared whole, never by suffix. A registry-based authority (no parseable host) has no
-     * origin.
+     * Lowercase scheme and host, the default HTTPS port dropped and any other kept. Hosts are compared
+     * whole, never by suffix. A registry-based authority (no parseable host) has no origin.
      */
     private static Optional<String> origin(URI uri) {
         String scheme = uri.getScheme();
@@ -257,10 +241,7 @@ public final class ReviewedWorkUrls {
                         : HTTPS + "://" + normalizedHost + ":" + port);
     }
 
-    /**
-     * One trailing slash is tolerated; an empty segment anywhere else is not a path any provider
-     * serves.
-     */
+    /** One trailing slash is tolerated; an empty segment anywhere else is not a path any provider serves. */
     private static Optional<List<String>> segments(String rawPath) {
         String path = rawPath.substring(1);
         if (path.endsWith("/")) {
@@ -281,10 +262,10 @@ public final class ReviewedWorkUrls {
     }
 
     /**
-     * Percent-decodes one raw segment exactly once, as path decoding does ({@code +} stays {@code
-     * +}), and strictly as UTF-8. A segment that decodes to a delimiter, a percent sign (a second
-     * layer of encoding), a control character or a dot segment is refused rather than normalized:
-     * normalizing it could walk into another project.
+     * Percent-decodes one raw segment exactly once, as path decoding does ({@code +} stays {@code +}),
+     * and strictly as UTF-8. A segment that decodes to a delimiter, a percent sign (a second layer of
+     * encoding), a control character or a dot segment is refused rather than normalized: normalizing it
+     * could walk into another project.
      */
     private static Optional<String> decodeSegment(String raw) {
         if (raw.isEmpty()) {

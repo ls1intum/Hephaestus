@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.result;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -31,7 +30,7 @@ public class ResultVisibilityPolicy {
     private final EvidenceAuthorization evidenceAuthorization;
     private final ResultMarkRepository marks;
     private final PracticeRepository practices;
-    private final PracticeVersionRepository versions;
+    private final ResultPracticeVersionRepository versions;
 
     public Set<UUID> permitsAll(long workspaceId, Collection<Result> results, SourceUsePurpose purpose) {
         return permitted(workspaceId, results, purpose, false);
@@ -84,29 +83,32 @@ public class ResultVisibilityPolicy {
                         && (r.getEndedAt() == null || r.getEndedAt().isAfter(at)))
                 .toList();
         var pinned = pinnedVersions(workspaceId, owned);
-        var current = practices.findByWorkspaceId(workspaceId).stream()
+        var current = practices
+                .findByWorkspaceIdAndIdIn(
+                        workspaceId,
+                        owned.stream().map(Result::getPracticeId).distinct().toList())
+                .stream()
                 .collect(Collectors.toMap(Practice::getId, Function.identity()));
-        var incorrect = owned.stream()
-                .filter(r ->
-                        marks.findByWorkspaceIdAndResultIdOrderByCreatedAtDescIdDesc(workspaceId, r.getId()).stream()
-                                .anyMatch(m -> m.getKind() == ResultMarkKind.INCORRECT
-                                        && !m.getCreatedAt().isAfter(at)
-                                        && (m.getRemovedAt() == null
-                                                || m.getRemovedAt().isAfter(at))))
-                .map(Result::getId)
-                .collect(Collectors.toSet());
+        var incorrect =
+                marks
+                        .findByWorkspaceIdAndResultIdIn(
+                                workspaceId, owned.stream().map(Result::getId).toList())
+                        .stream()
+                        .filter(m -> m.getKind() == ResultMarkKind.INCORRECT
+                                && !m.getCreatedAt().isAfter(at)
+                                && (m.getRemovedAt() == null || m.getRemovedAt().isAfter(at)))
+                        .map(m -> m.getResultId())
+                        .collect(Collectors.toSet());
         return evidenceAuthorization.permitsAll(
                 workspaceId,
                 owned.stream()
                         .filter(r -> !incorrect.contains(r.getId())
-                                && r.getEvidenceVersion() == 1
-                                && pinned.containsKey(r.getPracticeVersionId())
                                 && current.containsKey(r.getPracticeId())
-                                && pinned.get(r.getPracticeVersionId())
-                                        .getReviewDigest()
-                                        .equals(current.get(r.getPracticeId())
-                                                .getCurrentVersion()
-                                                .getReviewDigest()))
+                                && currentness(
+                                                r,
+                                                pinned.get(r.getPracticeVersionId()),
+                                                current.get(r.getPracticeId()).getCurrentVersion())
+                                        == Currentness.CURRENT)
                         .toList(),
                 purpose);
     }
@@ -120,7 +122,11 @@ public class ResultVisibilityPolicy {
             return Set.of();
         }
         Map<Long, PracticeVersion> pinned = pinnedVersions(workspaceId, owned);
-        Map<Long, Practice> current = practices.findByWorkspaceId(workspaceId).stream()
+        Map<Long, Practice> current = practices
+                .findByWorkspaceIdAndIdIn(
+                        workspaceId,
+                        owned.stream().map(Result::getPracticeId).distinct().toList())
+                .stream()
                 .collect(Collectors.toMap(practice -> Objects.requireNonNull(practice.getId()), Function.identity()));
         List<Result> eligible = owned.stream()
                 .filter(result -> {
@@ -144,8 +150,7 @@ public class ResultVisibilityPolicy {
                 .map(Result::getPracticeVersionId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
-        return versions.findAllById(ids).stream()
-                .filter(version -> version.getWorkspaceId() == workspaceId)
+        return versions.findByWorkspaceIdAndIdIn(workspaceId, ids).stream()
                 .collect(Collectors.toMap(version -> Objects.requireNonNull(version.getId()), Function.identity()));
     }
 

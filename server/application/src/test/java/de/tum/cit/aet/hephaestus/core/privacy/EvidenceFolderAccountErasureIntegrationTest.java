@@ -1141,12 +1141,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(selected.rows()).hasSize(1);
         store.prepareErasure(selected);
         assertThat(store.erase(selected)).isEqualTo(1);
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind)"
-                        + " VALUES (?,?,?,'','ERASED')",
-                UUID.randomUUID(),
-                provider.getId(),
-                "42");
+        databaseTestUtils.erase(Objects.requireNonNull(provider.getId()), "42", "");
         var blocked = job("folder-origin-blocked");
         assertThatThrownBy(() -> copy(root, owner, recorder, blocked, identity))
                 .isInstanceOf(IllegalStateException.class)

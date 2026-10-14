@@ -17,7 +17,7 @@ public class ConfigAuditEntityTypeConverter implements AttributeConverter<Config
     public ConfigAuditEntityType convertToEntityAttribute(String value) {
         return switch (value) {
             case "PRACTICE_AREA" -> ConfigAuditEntityType.PRACTICE_GROUP;
-            case "CURATED_PRACTICE_AREA" -> ConfigAuditEntityType.CURATED_PRACTICE_GROUP;
+            case "CATALOG_PRACTICE_AREA" -> ConfigAuditEntityType.CATALOG_GROUP;
             default -> ConfigAuditEntityType.valueOf(value);
         };
     }

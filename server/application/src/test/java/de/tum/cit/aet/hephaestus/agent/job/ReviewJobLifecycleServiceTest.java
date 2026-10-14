@@ -10,7 +10,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -61,7 +63,6 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
     private Workspace workspace;
 
     @BeforeEach
-    @SuppressWarnings("unchecked")
     void setUp() {
         service = new ReviewJobLifecycleService(
                 agentJobRepository,
@@ -92,26 +93,26 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
     private ReviewJob createJobWithStatus(ReviewJobStatus status) {
         ReviewJob job = new ReviewJob();
-        job.prePersist();
         RuntimeJobTestData.initialize(job, workspace.getId());
         job.setStatus(status);
 
         ConfigSnapshot snapshot = new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-completions",
-                        "https://api.openai.com/v1",
-                        "test-model",
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://api.openai.com/v1",
+                                "test-model",
+                                UsageFundingSource.INSTANCE,
+                                1L,
+                                1L,
+                                null,
+                                null,
+                                null,
+                                null),
                         null,
-                        null,
-                        null,
-                        UsageFundingSource.INSTANCE,
-                        1L,
-                        1L,
                         null,
                         600,
                         false,
-                        null,
-                        null,
                         null)
                 .withPriceSnapshot(new LlmPriceSnapshot(
                         UsageFundingSource.INSTANCE,
@@ -134,12 +135,13 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.QUEUED);
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(eq(jobId), eq(ReviewJobStatus.CANCELLED), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(eq(jobId), any(), any(), any(), any()))
                     .thenReturn(1);
 
             ReviewJob cancelledJob = createJobWithStatus(ReviewJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            cancelledJob.setId(jobId);
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
@@ -153,12 +155,13 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.RUNNING);
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(eq(jobId), eq(ReviewJobStatus.CANCELLED), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(eq(jobId), any(), any(), any(), any()))
                     .thenReturn(1);
 
             ReviewJob cancelledJob = createJobWithStatus(ReviewJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            cancelledJob.setId(jobId);
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
@@ -173,12 +176,12 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.CANCELLED);
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
 
             ReviewJob result = service.cancel(1L, jobId);
 
             assertThat(result.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
-            verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
+            verify(agentJobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
         }
 
         @ParameterizedTest
@@ -189,7 +192,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             ReviewJob job = createJobWithStatus(terminalStatus);
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
 
             assertThatThrownBy(() -> service.cancel(1L, jobId))
                     .isInstanceOf(ReviewJobStateConflictException.class)
@@ -199,7 +202,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
         @Test
         void shouldThrow404ForNonExistentJob() {
             UUID jobId = UUID.randomUUID();
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.empty());
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.cancel(1L, jobId)).isInstanceOf(EntityNotFoundException.class);
         }
@@ -209,12 +212,12 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.RUNNING);
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(any(), any(), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(any(), any(), any(), any(), any()))
                     .thenReturn(0);
 
             ReviewJob completedJob = createJobWithStatus(ReviewJobStatus.COMPLETED);
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(completedJob));
 
@@ -237,14 +240,14 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             job.setExecutionStartedAt(Instant.now());
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(eq(jobId), eq(ReviewJobStatus.CANCELLED), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(eq(jobId), any(), any(), any(), any()))
                     .thenReturn(1);
             ReviewJob cancelledJob = createJobWithStatus(ReviewJobStatus.CANCELLED);
             cancelledJob.setId(jobId);
             cancelledJob.setWorkerId("worker-1");
             cancelledJob.setExecutionStartedAt(job.getExecutionStartedAt());
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
@@ -259,24 +262,24 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void cancellingALegacyClaimedJobWithoutAdmissionPrice_preservesCancellationAndRecordsUnpricedUsage() {
+        void shouldPreserveCancellationWhenTheFrozenModelHasNoAdmissionPrice() {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.RUNNING);
             job.setWorkerId("worker-1");
             job.setExecutionStartedAt(Instant.now());
-            ConfigSnapshot legacySnapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper)
+            ConfigSnapshot unpricedSnapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper)
                     .withPriceSnapshot(null);
-            job.setConfigSnapshot(legacySnapshot.toJson(objectMapper));
+            job.setConfigSnapshot(unpricedSnapshot.toJson(objectMapper));
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(eq(jobId), eq(ReviewJobStatus.CANCELLED), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(eq(jobId), any(), any(), any(), any()))
                     .thenReturn(1);
             ReviewJob cancelledJob = createJobWithStatus(ReviewJobStatus.CANCELLED);
             cancelledJob.setId(jobId);
             cancelledJob.setWorkerId("worker-1");
             cancelledJob.setExecutionStartedAt(job.getExecutionStartedAt());
-            cancelledJob.setConfigSnapshot(legacySnapshot.toJson(objectMapper));
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            cancelledJob.setConfigSnapshot(unpricedSnapshot.toJson(objectMapper));
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
@@ -295,11 +298,12 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             ReviewJob job = createJobWithStatus(ReviewJobStatus.QUEUED);
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(eq(jobId), eq(ReviewJobStatus.CANCELLED), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(eq(jobId), any(), any(), any(), any()))
                     .thenReturn(1);
             ReviewJob cancelledJob = createJobWithStatus(ReviewJobStatus.CANCELLED);
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            cancelledJob.setId(jobId);
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
@@ -314,13 +318,13 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             job.setWorkerId("worker-1");
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
-            when(agentJobRepository.transitionStatus(eq(jobId), eq(ReviewJobStatus.CANCELLED), any(), any(), any()))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.transitionToCancelled(eq(jobId), any(), any(), any(), any()))
                     .thenReturn(1);
             ReviewJob cancelledJob = createJobWithStatus(ReviewJobStatus.CANCELLED);
             cancelledJob.setId(jobId);
             cancelledJob.setWorkerId("worker-1");
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L))
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L))
                     .thenReturn(Optional.of(job))
                     .thenReturn(Optional.of(cancelledJob));
 
@@ -335,12 +339,37 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             job.setWorkerId("worker-1");
             UUID jobId = job.getId();
 
-            when(agentJobRepository.findByIdAndWorkspaceIdForUpdate(jobId, 1L)).thenReturn(Optional.of(job));
+            when(agentJobRepository.findByIdAndWorkspaceId(jobId, 1L)).thenReturn(Optional.of(job));
 
             service.cancel(1L, jobId);
 
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
-            verify(agentJobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
+            verify(agentJobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
         }
+    }
+
+    @Test
+    void shouldRecordProxySpendWhenCancellingARunningAttempt() {
+        ReviewJob running = createJobWithStatus(ReviewJobStatus.RUNNING);
+        running.setExecutionStartedAt(Instant.now());
+        ReviewJob cancelled = createJobWithStatus(ReviewJobStatus.CANCELLED);
+        cancelled.setId(running.getId());
+        cancelled.setExecutionStartedAt(running.getExecutionStartedAt());
+        when(agentJobRepository.findByIdAndWorkspaceId(running.getId(), 1L))
+                .thenReturn(Optional.of(running))
+                .thenReturn(Optional.of(cancelled));
+        when(agentJobRepository.transitionToCancelled(eq(running.getId()), any(), any(), any(), any()))
+                .thenReturn(1);
+        when(agentJobRepository.findLlmUsageById(running.getId()))
+                .thenReturn(Optional.of(new ReviewJobLlmUsage(2, 120, 30, 4, 10, 5)));
+
+        assertThat(service.cancel(1L, running.getId()).getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
+
+        ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
+                ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
+        verify(usageRecorder).record(eq(1L), sample.capture());
+        assertThat(sample.getValue().inputTokens()).isEqualTo(120);
+        assertThat(sample.getValue().outputTokens()).isEqualTo(30);
+        assertThat(sample.getValue().sourceId()).isEqualTo(running.getId());
     }
 }

@@ -63,7 +63,7 @@ GitHub and GitLab scans pin monitored default-branch inventory.
 Only one scan per workspace and one execution job per review can be active.
 Reuse needs the same practice version, composed item version and complete frozen model method.
 
-Incomplete inventory removes nothing. Exactly 20 percent removal is suspect.
+Incomplete or [suspect](../contributor/practice-review-pipeline.mdx#scans) inventory removes nothing.
 File removal, marks and missed reads never prove repair or absence.
 Slack and Outline support their own item evidence but have no scan driver or on-work feedback writer.
 
@@ -80,11 +80,11 @@ It preserves retained identifiers, independent feedback pieces, unknown proof an
 Earlier queued runtime contracts are cancelled, not decoded by a compatibility path.
 A digest does not reassess historical work.
 
-The [migration procedure](../contributor/database-migration.mdx#practice-model-cutover-before-10) owns upgrade verification.
+The [migration procedure](../contributor/database-migration.mdx#prove-the-released-state-upgrade) owns upgrade verification.
 Rollback restores a verified backup with the previous release.
-Preview developer databases reset. Released installations migrate forward.
 
-This ADR supersedes model details in ADRs 0019, 0020, 0021, 0022, 0029, 0050 and 0055.
+This ADR supersedes model details in ADRs 0019, 0020, 0021, 0022, 0029 and 0050.
+[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the script contract.
 Their surviving identity, evidence and runtime constraints remain in their owning records.
 
 ## Revisit trigger

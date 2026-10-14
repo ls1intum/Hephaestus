@@ -34,7 +34,6 @@ import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.testconfig.StubMentorChatStarter;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.TestMentorWorker;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -101,9 +100,6 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
 
     @Autowired
     SlackMessageService slack;
-
-    @MockitoBean
-    StubMentorChatStarter starter;
 
     @MockitoBean
     MemberAiRoutingAdapter routing;

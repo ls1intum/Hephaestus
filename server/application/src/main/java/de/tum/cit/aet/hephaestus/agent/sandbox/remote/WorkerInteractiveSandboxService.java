@@ -56,7 +56,7 @@ public final class WorkerInteractiveSandboxService implements InteractiveSandbox
         String token =
                 spec.networkPolicy() == null ? null : spec.networkPolicy().llmProxyToken();
         return InteractiveSandboxRuntimeKey.of(
-                spec, token == null ? null : credentials.validate(token).orElse(null));
+                spec, token == null ? null : credentials.authenticate(token).flatMap(credentials::resolve).orElse(null));
     }
 
     @Override

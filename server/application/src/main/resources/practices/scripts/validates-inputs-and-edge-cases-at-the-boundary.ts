@@ -1,3 +1,9 @@
+// Finds the selected lines of source code with a construct that can fail or mislead on an edge value: a
+// subscript or slice, a division by a name, a parse that the language does not force the author to
+// handle, an extreme sentinel, a payload decode, or the input of a request. A lead is a place where a
+// value can be used, never a problem. The scan skips string literals and comments, a lookup or
+// parse whose result the language makes optional, and a crash operator that the author wrote, such as
+// `!`, `try!` or `unwrap()`, which the crash practice reads. Each language adds rows to the table.
 import { scm } from "../kits/scm/index.ts";
 import { isTestPath } from "../kits/scm/languages.ts";
 import {
@@ -7,12 +13,6 @@ import {
 	occurrenceLead,
 	sortOccurrenceLeads,
 } from "../kits/scm/occurrences.ts";
-// Finds the selected lines of source code with a construct that can fail or mislead on an edge value: a
-// subscript or slice, a division by a name, a parse that the language does not force the author to
-// handle, an extreme sentinel, a payload decode, or the input of a request. A lead is a place where a
-// value can be used, never a problem. The scan skips string literals and comments, a lookup or
-// parse whose result the language makes optional, and a crash operator that the author wrote, such as
-// `!`, `try!` or `unwrap()`, which the crash practice reads. Each language adds rows to the table.
 import { DIRECTION_CHARS, factsOf, listWithin } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type Facts, type ReviewLead } from "../lib/core/practice-script.ts";
 

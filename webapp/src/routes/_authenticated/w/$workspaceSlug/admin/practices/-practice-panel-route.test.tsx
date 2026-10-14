@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
@@ -60,12 +61,13 @@ describe("a practice's script needs on practice setup", () => {
 
 	beforeEach(() => {
 		needsRequested.mockReset();
+		// Before the practice handlers: their `practices/:practiceSlug` would answer this path too.
 		server.use(
-			...practicesHandlers([scripted]),
 			http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", ({ params }) => {
 				needsRequested(String(params.workspaceSlug));
 				return HttpResponse.json(summaries);
 			}),
+			...practicesHandlers([scripted]),
 		);
 	});
 
@@ -163,8 +165,9 @@ describe("resetting a practice to the catalog after declining its update", () =>
 
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith('"reset-basis"'));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull(), ROUTE_RENDER_WAIT);
-		await screen.findByText("Version 4", {}, ROUTE_RENDER_WAIT);
-		await screen.findByText("Same as the catalog");
+		const panel = await screen.findByRole("dialog", { name: /Explain the change/u });
+		await within(panel).findByText("Version 4", {}, ROUTE_RENDER_WAIT);
+		await within(panel).findByText("Same as the catalog");
 		expect(screen.queryByRole("button", { name: "Reset to catalog" })).toBeNull();
 	});
 
@@ -239,7 +242,7 @@ describe("editing a workspace practice", () => {
 			}),
 			http.put("*/workspaces/:workspaceSlug/practices/:practiceSlug/group", async ({ request }) => {
 				moved(await request.json());
-				return HttpResponse.json([{ ...practice, groupSlug: "testing" }]);
+				return HttpResponse.json({ ...practice, groupSlug: "testing" });
 			}),
 		);
 
@@ -247,8 +250,8 @@ describe("editing a workspace practice", () => {
 		fireEvent.change(await screen.findByRole("textbox", { name: /Name/u }, ROUTE_RENDER_WAIT), {
 			target: { value: "Keep each change reviewable" },
 		});
-		fireEvent.click(screen.getByRole("combobox", { name: /Group/u }));
-		fireEvent.click(await screen.findByRole("option", { name: "Testing what changed" }));
+		await userEvent.click(screen.getByRole("combobox", { name: "Practice group" }));
+		await userEvent.click(await screen.findByRole("option", { name: "Testing what changed" }));
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(

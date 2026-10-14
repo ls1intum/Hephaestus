@@ -25,7 +25,6 @@ class PracticeTrendCalculatorTest {
         // that piece of reviewed work — but "these comparisons span N days" must not count it, or a quiet stretch would
         // stretch the provenance without adding a comparison.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(
                         noVerdict(7L, "2026-03-01T09:00:00Z"),
                         judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
@@ -46,7 +45,6 @@ class PracticeTrendCalculatorTest {
         // reaches the client — which is why the support factory has two entry points rather than one with
         // optional arguments.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
@@ -66,7 +64,7 @@ class PracticeTrendCalculatorTest {
         observations.add(noVerdict(99L, "2026-05-20T09:00:00Z"));
 
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
-                "testing", observations, Instant.parse("2026-01-01T00:00:00Z"), properties);
+                observations, Instant.parse("2026-01-01T00:00:00Z"), properties);
 
         assertThat(trend.support().reviewedWork()).isEqualTo(16);
         assertThat(trend.support().standingWork()).isEqualTo(4);
@@ -78,7 +76,6 @@ class PracticeTrendCalculatorTest {
     @Test
     void shouldCountAPieceOfWorkReviewedTwiceOnceAndNameNoKindForMixedWork() {
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(
                         judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
                         judged(40L, "2026-05-02T09:00:00Z", ResultOutcome.MET),
@@ -93,10 +90,7 @@ class PracticeTrendCalculatorTest {
     @Test
     void shouldCountNothingWhereNoReviewReachedAVerdict() {
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
-                "testing",
-                List.of(noVerdict(7L, "2026-03-01T09:00:00Z")),
-                Instant.parse("2026-01-01T00:00:00Z"),
-                properties);
+                List.of(noVerdict(7L, "2026-03-01T09:00:00Z")), Instant.parse("2026-01-01T00:00:00Z"), properties);
 
         assertThat(trend.support().reviewedWork()).isZero();
         assertThat(trend.support().standingWork()).isZero();

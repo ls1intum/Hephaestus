@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
@@ -24,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.review.feedbackmode.FeedbackModeResol
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.ItemTraceDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.OwnItemEventDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.OwnItemTraceDTO;
@@ -139,9 +139,7 @@ public class ItemTraceQueryService {
                 events(ws, itemId, PageRequest.ofSize(100)).stream()
                         .map(e -> new OwnItemEventDTO(e.name(), e.occurredAt()))
                         .toList(),
-                views.views(ws, visible).stream()
-                        .map(v -> presentation.list(v, true))
-                        .toList());
+                presentation.lists(ws, views.views(ws, visible), permitted));
     }
 
     public ItemRefDTO requireItem(long ws, long itemId) {
@@ -183,7 +181,7 @@ public class ItemTraceQueryService {
                         rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
                         FoundBy.valueOf(rs.getString("found_by")),
                         ItemEventState.valueOf(rs.getString("state")),
-                        rs.getString("reason") == null ? null : ItemEventReason.valueOf(rs.getString("reason")),
+                        rs.getString("reason") == null ? null : ReviewRequestReason.valueOf(rs.getString("reason")),
                         instant(rs.getObject("decided_at", OffsetDateTime.class)),
                         rs.getObject("review_id", UUID.class)))
                 .list();

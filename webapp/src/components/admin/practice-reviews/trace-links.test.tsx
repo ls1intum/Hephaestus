@@ -35,7 +35,6 @@ function renderTrace(
 			lineage={{ status: "ready", lineage: entry.lineage }}
 			here={here ?? { kind: "review" }}
 			defaultDisplay={display}
-			reviewOutcome={entry.reviewOutcome}
 			onOpen={onOpen}
 		/>,
 	);
@@ -141,7 +140,7 @@ describe("links out of the trace", () => {
 	);
 
 	it("leads to the work on its provider from the work's facts", () => {
-		const { container } = renderTrace(stateCase("completed"), FULL_TRACE_DISPLAY, true);
+		const { container } = renderTrace(stateCase("complete"), FULL_TRACE_DISPLAY, true);
 		const links = [...container.querySelectorAll<HTMLAnchorElement>("a[href]")];
 		expect(links.map((link) => link.href)).toStrictEqual([
 			"https://github.com/ls1intum/Hephaestus/pull/1423",

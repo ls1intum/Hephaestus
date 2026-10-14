@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationThreadCandidate;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
@@ -28,18 +29,22 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class SlackThreadEventSchedulerTest extends BaseUnitTest {
+    private static final Instant NOW = Instant.parse("2026-10-14T12:00:00Z");
     private final SlackConversationCandidateSource candidates = mock(SlackConversationCandidateSource.class);
     private final ThreadItemSource source = mock(ThreadItemSource.class);
     private final ItemWriter items = mock(ItemWriter.class);
@@ -49,9 +54,15 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
     private final ItemRef item = new ItemRef(7L, 41L, ThreadEvents.THREAD, 19L, null, null);
     private final ItemVersion version = new ItemVersion("frozen-version", null);
 
-    private SlackThreadEventScheduler scheduler(boolean enabled) {
+    private SlackThreadEventScheduler scheduler() {
         return new SlackThreadEventScheduler(
-                candidates, source, items, threads, reviews, new TransactionTemplate(manager), enabled);
+                candidates,
+                source,
+                items,
+                threads,
+                reviews,
+                new TransactionTemplate(manager),
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private ItemSnapshot snapshot(ItemVersion frozen) {
@@ -66,7 +77,7 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
 
     @Test
     void settledThreadRecordsOneFrozenEventWithoutMovingItsWatermarkOrCloningParticipantReviews() {
-        String last = (Instant.now().getEpochSecond() - 1200) + ".000000";
+        String last = (NOW.getEpochSecond() - 1200) + ".000000";
         var candidate = new ConversationThreadCandidate(
                 7L, 19L, "C1", "Channel", "1690000000.000000", last, null, List.of(55L, 56L));
         when(candidates.settledCandidates(4)).thenReturn(List.of(candidate));
@@ -76,9 +87,10 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
         when(manager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
         when(items.upsert(any())).thenReturn(item);
         when(source.current(item)).thenReturn(Optional.of(snapshot(version)));
-        assertThat(scheduler(true).sweepNow()).isEqualTo(1);
+        assertThat(scheduler().sweepNow()).isEqualTo(1);
         var captured = ArgumentCaptor.forClass(ItemEventInput.class);
         verify(items).record(captured.capture());
+        assertThat(captured.getValue().occurredAt()).isEqualTo(NOW);
         assertThat(captured.getValue().workspaceId()).isEqualTo(7L);
         assertThat(captured.getValue().itemId()).isEqualTo(41L);
         assertThat(captured.getValue().itemVersion()).isEqualTo("frozen-version");
@@ -92,7 +104,6 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
     @Test
     void watermarkMovesOnlyAfterAReviewOfTheSameFrozenVersionWasAccepted() {
         UUID reviewId = UUID.randomUUID();
-        when(manager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
         when(reviews.find(7L, reviewId))
                 .thenReturn(Optional.of(new ReviewSnapshot(
                         reviewId, 7L, item, ReviewKind.ITEM, version, ReviewOrigin.EVENT, 1L, List.of())));
@@ -100,26 +111,32 @@ class SlackThreadEventSchedulerTest extends BaseUnitTest {
         var thread = new SlackThread();
         thread.setLastTs("1700000001.000000");
         when(threads.findByWorkspaceIdAndId(7L, 19L)).thenReturn(Optional.of(thread));
-        scheduler(true).onReviewRequested(new ReviewRequested(reviewId, 7L));
+        scheduler().onReviewRequested(new ReviewRequested(reviewId, 7L));
         verify(candidates).markReviewed(7L, 19L, "1700000001.000000");
     }
 
     @Test
     void aNewProviderVersionCannotAdvanceTheWatermarkForAnOlderAcceptedReview() {
         UUID reviewId = UUID.randomUUID();
-        when(manager.getTransaction(any())).thenReturn(mock(TransactionStatus.class));
         when(reviews.find(7L, reviewId))
                 .thenReturn(Optional.of(new ReviewSnapshot(
                         reviewId, 7L, item, ReviewKind.ITEM, version, ReviewOrigin.EVENT, 1L, List.of())));
         when(source.current(item)).thenReturn(Optional.of(snapshot(new ItemVersion("new-version", null))));
-        scheduler(true).onReviewRequested(new ReviewRequested(reviewId, 7L));
+        scheduler().onReviewRequested(new ReviewRequested(reviewId, 7L));
         verify(candidates, never()).markReviewed(anyLong(), anyLong(), any());
     }
 
     @Test
-    void aPausedFleetDoesNotDiscoverOrRecordThreads() {
-        assertThat(scheduler(false).sweepNow()).isZero();
-        verify(candidates, never()).settledCandidates(4);
-        verify(items, never()).record(any());
+    void shouldNotCreateASchedulerWhenConversationIngestIsDisabled() {
+        new ApplicationContextRunner()
+                .withUserConfiguration(SlackThreadEventScheduler.class)
+                .withPropertyValues(
+                        RuntimeRole.SERVER_PROPERTY + "=true",
+                        "hephaestus.integration.slack.enabled=true",
+                        "hephaestus.integration.slack.conversation-ingest.enabled=false")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context).doesNotHaveBean(SlackThreadEventScheduler.class);
+                });
     }
 }

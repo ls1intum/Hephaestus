@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionSer
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackCompositionContextService;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackPreparationService;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.FeedbackSendStateMachine;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
@@ -92,6 +93,7 @@ public class FeedbackStoreService implements FeedbackStore {
     private final FeedbackLedgerRecorder ledger;
     private final FeedbackContentDigest digests;
     private final FeedbackCompositionContextService composition;
+    private final FeedbackSendQueue sendQueue;
 
     @Override
     @Transactional(readOnly = true)
@@ -118,8 +120,9 @@ public class FeedbackStoreService implements FeedbackStore {
                         .anyMatch(draft -> feedback.findByIdAndWorkspaceId(draft.id(), workspaceId)
                                 .isEmpty())) throw conflict("This review is no longer running.");
         Instant acceptedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
-        var pieces =
-                drafts.stream().map(draft -> preparePiece(draft, acceptedAt)).toList();
+        var pieces = drafts.stream()
+                .map(draft -> preparePiece(review, draft, acceptedAt))
+                .toList();
         String packageDigest = digests.orderedPackageDigest(
                 pieces.stream().map(PreparedFeedback::packageDigest).toList());
         Instant preparedAt = preparationReceipt(review, packageDigest, acceptedAt);
@@ -154,14 +157,8 @@ public class FeedbackStoreService implements FeedbackStore {
         return acceptedAt;
     }
 
-    private PreparedFeedback preparePiece(FeedbackDraft proposal, Instant preparedAt) {
-        var review = reviews.lockByIdAndWorkspaceId(proposal.reviewId(), proposal.workspaceId())
-                .orElseThrow(() -> new EntityNotFoundException(
-                        "Review", proposal.reviewId().toString()));
+    private PreparedFeedback preparePiece(Review review, FeedbackDraft proposal, Instant preparedAt) {
         var existing = feedback.findByIdAndWorkspaceId(proposal.id(), proposal.workspaceId());
-        if (review.getKind() != ReviewKind.ITEM) throw conflict("A scan cannot prepare developer feedback.");
-        if (existing.isEmpty() && review.getStatus() != ReviewStatus.RUNNING)
-            throw conflict("This review is no longer running.");
         if (proposal.developerId() <= 0 || proposal.workspaceId() <= 0)
             throw new IllegalArgumentException("Feedback needs positive workspace and developer ids.");
         if (proposal.destination() == FeedbackDestination.ON_WORK
@@ -261,7 +258,7 @@ public class FeedbackStoreService implements FeedbackStore {
                 feedback.updateDelivery(row.getWorkspaceId(), row.getId(), FeedbackState.AWAITING_APPROVAL, null, null);
             } else if (row.getDestination() == FeedbackDestination.ON_WORK) {
                 var automatic = recordCheck(row, FeedbackCheckStage.AUTOMATIC, true);
-                if (automatic.allowed()) queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
+                if (automatic.allowed()) sendQueue.queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
                 else withhold(row, Objects.requireNonNull(automatic.reason()));
             }
         }
@@ -356,12 +353,8 @@ public class FeedbackStoreService implements FeedbackStore {
                                 fence.chatMessageId(),
                                 unknown ? "WRITE_STARTED" : "FAILED",
                                 unknown ? "DELIVERY_UNCONFIRMED" : null,
-                                unknown
-                                        ? receipt.reason()
-                                        : "ABSENT: "
-                                                + (receipt.reason() == null
-                                                        ? "The conversation was not delivered."
-                                                        : receipt.reason()))
+                                unknown ? FeedbackCopyReadback.UNKNOWN.name() : FeedbackCopyReadback.ABSENT.name(),
+                                receipt.reason() == null ? "The conversation was not delivered." : receipt.reason())
                         != 1) throw conflict("The conversation receipt could not be recorded.");
                 feedback.updateDelivery(
                         workspaceId,
@@ -442,7 +435,7 @@ public class FeedbackStoreService implements FeedbackStore {
     }
 
     @Override
-    public boolean retry(long workspaceId, UUID feedbackId, long actorId) {
+    public void retry(long workspaceId, UUID feedbackId, long actorId) {
         if (actorId <= 0) throw new IllegalArgumentException("A retry requires an authenticated account.");
         var row = lock(workspaceId, feedbackId);
         var send = sends.lockByFeedbackId(workspaceId, feedbackId);
@@ -455,8 +448,7 @@ public class FeedbackStoreService implements FeedbackStore {
                         .anyMatch(c -> c.getState() == FeedbackCopyState.WRITE_STARTED
                                 || (c.getState() == FeedbackCopyState.FAILED
                                         && c.getWriteStartedAt() != null
-                                        && (c.getLastError() == null
-                                                || !c.getLastError().startsWith("ABSENT:")))))
+                                        && c.getReadback() != FeedbackCopyReadback.ABSENT)))
             throw conflict("This feedback cannot be retried safely.");
         var check = check(row, true);
         if (!check.allowed()) throw conflict("Current delivery policy does not permit this retry.");
@@ -467,8 +459,7 @@ public class FeedbackStoreService implements FeedbackStore {
                 row.getDeliveredAt() == null ? FeedbackState.READY : FeedbackState.DELIVERED,
                 null,
                 row.getDeliveredAt());
-        queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
-        return true;
+        sendQueue.queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
     }
 
     public FeedbackCheck check(Feedback row, boolean approval) {
@@ -503,7 +494,7 @@ public class FeedbackStoreService implements FeedbackStore {
                 if (row.getDestination() == FeedbackDestination.ON_WORK
                         && children.stream().anyMatch(c -> c.getState() == FeedbackCopyState.POSTED)) {
                     if (send.isEmpty() || send.get().getState() == FeedbackSendState.DONE)
-                        queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
+                        sendQueue.queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
                 } else if (children.stream().noneMatch(c -> c.getState() == FeedbackCopyState.WRITE_STARTED))
                     withhold(row, FeedbackStopReason.RESULT_MARKED_INCORRECT);
             } else if (row.getDestination() == FeedbackDestination.ON_WORK
@@ -513,11 +504,18 @@ public class FeedbackStoreService implements FeedbackStore {
                                     || c.getState() == FeedbackCopyState.RETRACTED)) {
                 if ((send.isEmpty() || send.get().getState() == FeedbackSendState.DONE)
                         && check(row, true).allowed())
-                    queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
+                    sendQueue.queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
             } else if (row.getState() == FeedbackState.WITHHELD
                     && row.getStopReason() == FeedbackStopReason.RESULT_MARKED_INCORRECT
                     && !visibility.withdrawn(row.getWorkspaceId(), id)
-                    && !copies.hasWriteFence(row.getWorkspaceId(), id)) {
+                    && children.stream()
+                            .allMatch(copy -> copy.getPostedAt() == null
+                                    && copy.getExternalRef() == null
+                                    && copy.getChatMessageId() == null
+                                    && copy.getState() != FeedbackCopyState.WRITE_STARTED
+                                    && (copy.getWriteStartedAt() == null
+                                            || (row.getDestination() == FeedbackDestination.ON_WORK
+                                                    && copy.getReadback() == FeedbackCopyReadback.ABSENT)))) {
                 var check = check(row, false);
                 if (!check.allowed()) {
                     withhold(row, Objects.requireNonNull(check.reason()));
@@ -535,7 +533,7 @@ public class FeedbackStoreService implements FeedbackStore {
                 copies.restoreUnsent(row.getWorkspaceId(), id);
                 feedback.updateDelivery(row.getWorkspaceId(), id, state, null, row.getDeliveredAt());
                 if (state == FeedbackState.READY && row.getDestination() == FeedbackDestination.ON_WORK)
-                    queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
+                    sendQueue.queue(row, FeedbackSendAction.POST, FeedbackSendState.PENDING);
             }
         }
     }
@@ -548,45 +546,13 @@ public class FeedbackStoreService implements FeedbackStore {
     public void withhold(Feedback row, FeedbackStopReason reason) {
         copies.withholdPlanned(row.getWorkspaceId(), row.getId(), reason.name());
         var children = copies.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(row.getWorkspaceId(), row.getId());
-        @Nullable Instant shown = row.getDeliveredAt();
-        for (var child : children) {
-            var posted = child.getPostedAt();
-            if (posted != null && (shown == null || posted.isBefore(shown))) shown = posted;
-        }
-        if (children.stream().anyMatch(c -> c.getState() == FeedbackCopyState.WRITE_STARTED)) {
-            feedback.updateDelivery(
-                    row.getWorkspaceId(),
-                    row.getId(),
-                    FeedbackState.UNCONFIRMED,
-                    FeedbackStopReason.DELIVERY_UNCONFIRMED,
-                    shown);
-        } else if (shown != null) {
-            feedback.updateDelivery(row.getWorkspaceId(), row.getId(), FeedbackState.DELIVERED, null, shown);
-        } else if (children.stream().anyMatch(c -> c.getState() == FeedbackCopyState.FAILED)) {
-            feedback.updateDelivery(row.getWorkspaceId(), row.getId(), FeedbackState.FAILED, null, null);
-        } else {
-            feedback.updateDelivery(row.getWorkspaceId(), row.getId(), FeedbackState.WITHHELD, reason, null);
-        }
-    }
-
-    public void queue(Feedback row, FeedbackSendAction action, FeedbackSendState state) {
-        var prior = sends.findByFeedbackIdAndWorkspaceId(row.getId(), row.getWorkspaceId());
-        if (prior.filter(send -> send.getState() == FeedbackSendState.SENDING
-                        || (action == FeedbackSendAction.RETRACT
-                                && send.getAction() == FeedbackSendAction.POST
-                                && send.getState() != FeedbackSendState.DONE))
-                .isPresent()) throw conflict("The existing send must settle first.");
-        Instant now = clock.instant();
-        sends.saveAndFlush(FeedbackSend.builder()
-                .feedbackId(row.getId())
-                .workspaceId(row.getWorkspaceId())
-                .action(action)
-                .state(state)
-                .attempts(prior.map(FeedbackSend::getAttempts).orElse(0))
-                .nextAttemptAt(now)
-                .createdAt(prior.map(FeedbackSend::getCreatedAt).orElse(now))
-                .updatedAt(now)
-                .build());
+        var projection = FeedbackSendStateMachine.project(row, children, reason);
+        feedback.updateDelivery(
+                row.getWorkspaceId(),
+                row.getId(),
+                projection.state(),
+                projection.stopReason(),
+                projection.deliveredAt());
     }
 
     private static ResponseStatusException conflict(String detail) {

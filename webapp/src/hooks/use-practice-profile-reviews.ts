@@ -99,7 +99,7 @@ export function usePracticeProfileReviews({
 				queryKey: listOwnReviewsInfiniteQueryKey({ path: { workspaceSlug } }),
 			});
 		}
-	});
+	}, [queryClient, workspaceSlug, reviewId, active]);
 
 	// The open review's head explains a refusal about its own item; a row anywhere else gets a toast.
 	const openItemId = reviewQuery.data?.review.item.id;

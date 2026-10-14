@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
 import de.tum.cit.aet.hephaestus.evidence.CitationRequirement;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
@@ -27,6 +27,7 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.UncheckedIOException;
 import java.io.Writer;
+import java.nio.ByteBuffer;
 import java.nio.charset.CharsetDecoder;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
@@ -296,7 +297,10 @@ public class JobEvidenceFiles implements SandboxResultListener {
 
     /** Adds host reads only when both their source witness and staged content digest still match. */
     public JobFolderIndex registerReadReceipts(
-            ReviewJob job, JobFolderIndex manifest, List<ReadReceipt> receipts, SourceCatalogRegistry catalogs) {
+            ReviewJob job,
+            JobFolderIndex manifest,
+            List<ReadReceipt> receipts,
+            ClasspathSourceCatalogRegistry catalogs) {
         var texts = new ArrayList<>(manifest.citableTexts());
         for (var receipt : receipts) {
             String digest = receipt.contentDigest();
@@ -310,7 +314,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                             job, receipt.sourcePath(), witness.getFirst().file().sha256())) {
                 throw new IllegalArgumentException("The host read has no authenticated source witness");
             }
-            var contract = catalogs.requireSource(manifest.contractVersion(), receipt.sourceKind());
+            var contract = catalogs.requireSource(receipt.sourceKind());
             String revision =
                     contract.citation().revision() == CitationRequirement.FORBIDDEN ? null : receipt.version();
             var existing = texts.stream()
@@ -354,12 +358,27 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 texts);
     }
 
-    public <T> Optional<T> inspect(ReviewJob job, String artifactPath, String sha, TextInspection<T> inspection) {
+    public Optional<String> readText(ReviewJob job, String path, String sha) {
+        try {
+            Path file = sourceFile(job, path);
+            if (Files.size(file) > 32 * 1024 * 1024L)
+                throw new IllegalArgumentException("Captured text exceeds its read bound");
+            byte[] bytes = Files.readAllBytes(file);
+            requireDigest(sha, ProvenanceDigest.sha256Hex(bytes));
+            return Optional.of(decoder().decode(ByteBuffer.wrap(bytes)).toString());
+        } catch (NoSuchFileException missing) {
+            return Optional.empty();
+        } catch (IOException failure) {
+            throw new UncheckedIOException(failure);
+        }
+    }
+
+    public <T> Optional<T> inspect(ReviewJob job, String filePath, String sha, TextInspection<T> inspection) {
         try {
             MessageDigest digest = ProvenanceDigest.sha256();
             T result;
             try (var reader = new InputStreamReader(
-                    new DigestInputStream(Files.newInputStream(artifact(job, artifactPath)), digest), decoder())) {
+                    new DigestInputStream(Files.newInputStream(sourceFile(job, filePath)), digest), decoder())) {
                 result = inspection.inspect(reader);
                 reader.transferTo(Writer.nullWriter());
             }
@@ -373,10 +392,10 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     public Optional<Boolean> containsUtf8AtLines(
-            ReviewJob job, String artifactPath, String sha, String text, int startLine, int endLine) {
+            ReviewJob job, String filePath, String sha, String text, int startLine, int endLine) {
         try {
-            QuoteMatch match = verifyUtf8AtLines(artifact(job, artifactPath), text, startLine, endLine);
-            requireDigest(sha, Objects.requireNonNull(match.artifactSha256()));
+            QuoteMatch match = verifyUtf8AtLines(sourceFile(job, filePath), text, startLine, endLine);
+            requireDigest(sha, Objects.requireNonNull(match.fileSha256()));
             return Optional.of(match.matches());
         } catch (NoSuchFileException exception) {
             return Optional.empty();
@@ -385,13 +404,13 @@ public class JobEvidenceFiles implements SandboxResultListener {
         }
     }
 
-    /** False when the artifact is absent; a present artifact whose bytes differ from {@code sha} throws. */
-    private boolean existsWithDigest(ReviewJob job, String artifactPath, String sha) {
-        return inspect(job, artifactPath, sha, reader -> Boolean.TRUE).isPresent();
+    /** False when the file is absent; a present file whose bytes differ from {@code sha} throws. */
+    private boolean existsWithDigest(ReviewJob job, String filePath, String sha) {
+        return inspect(job, filePath, sha, reader -> Boolean.TRUE).isPresent();
     }
 
-    /** @param artifactSha256 digest of the raw bytes read, or null when the cited artifact does not exist */
-    public record QuoteMatch(boolean matches, @Nullable String artifactSha256) {
+    /** @param fileSha256 digest of the raw bytes read, or null when the cited file does not exist */
+    public record QuoteMatch(boolean matches, @Nullable String fileSha256) {
         public static QuoteMatch absent() {
             return new QuoteMatch(false, null);
         }
@@ -500,7 +519,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 }
             }
             var listed = new HashMap<String, CapturedSource>();
-            manifest.files().forEach(artifact -> listed.put(artifact.file().path(), artifact.file()));
+            manifest.files().forEach(sourceFile -> listed.put(sourceFile.file().path(), sourceFile.file()));
             for (var text : manifest.citableTexts()) {
                 byte[] bytes = Files.readAllBytes(regularFile(root, text.stagedPath()));
                 requireDigest(text.sha256(), ProvenanceDigest.sha256Hex(bytes));
@@ -510,14 +529,14 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 boolean recorded = file.getKey().startsWith(SandboxLayout.CONTEXT_PREFIX)
                         || file.getKey().startsWith(SandboxLayout.REPO_MOUNT_RELATIVE);
                 if (!recorded) continue;
-                CapturedSource artifact = listed.get(file.getKey());
-                if (artifact == null
+                CapturedSource sourceFile = listed.get(file.getKey());
+                if (sourceFile == null
                         && manifest.citableTexts().stream()
                                 .anyMatch(text -> text.stagedPath().equals(file.getKey())
                                         && text.sha256().equals(ProvenanceDigest.sha256Hex(file.getValue())))) continue;
-                if (artifact == null
-                        || artifact.bytes() != file.getValue().length
-                        || !artifact.sha256().equals(ProvenanceDigest.sha256Hex(file.getValue()))) {
+                if (sourceFile == null
+                        || sourceFile.bytes() != file.getValue().length
+                        || !sourceFile.sha256().equals(ProvenanceDigest.sha256Hex(file.getValue()))) {
                     return Optional.empty();
                 }
             }
@@ -920,14 +939,14 @@ public class JobEvidenceFiles implements SandboxResultListener {
         Files.deleteIfExists(root.resolveSibling(root.getFileName() + ".ended"));
     }
 
-    private Path artifact(ReviewJob job, String artifactPath) throws IOException {
+    private Path sourceFile(ReviewJob job, String filePath) throws IOException {
         Path root = directory(job);
-        Path artifact = safePath(root, artifactPath);
-        if (!artifact.toRealPath().startsWith(root.toRealPath())
-                || !Files.isRegularFile(artifact, LinkOption.NOFOLLOW_LINKS)) {
+        Path sourceFile = safePath(root, filePath);
+        if (!sourceFile.toRealPath().startsWith(root.toRealPath())
+                || !Files.isRegularFile(sourceFile, LinkOption.NOFOLLOW_LINKS)) {
             throw new IllegalArgumentException("Evidence path is not a regular captured file");
         }
-        return artifact;
+        return sourceFile;
     }
 
     private Path directory(ReviewJob job) {

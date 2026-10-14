@@ -28,7 +28,7 @@ export const Route = createFileRoute(
 			to: "/w/$workspaceSlug/admin/practices/reviews/runs",
 			params: { workspaceSlug: params.workspaceSlug },
 			search: {
-				...carriedScope("runs", search),
+				...carriedScope(search),
 				...parseSelectionSearch(search),
 				detail: [detailStackKey(traceLevel(record))],
 			},

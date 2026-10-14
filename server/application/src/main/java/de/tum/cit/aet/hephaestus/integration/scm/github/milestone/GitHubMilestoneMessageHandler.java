@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub milestone webhook events. */
+/**
+ * Handles GitHub milestone webhook events.
+ */
 @Component
 public class GitHubMilestoneMessageHandler extends AbstractIntegrationMessageHandler<GitHubMilestoneEventDTO> {
 

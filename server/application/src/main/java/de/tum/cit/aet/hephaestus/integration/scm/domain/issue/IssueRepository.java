@@ -15,23 +15,24 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * All queries filter by repository ID, which inherently carries scope through the repository ->
- * workspace relationship chain.
+ * All queries filter by repository ID, which inherently carries scope
+ * through the repository -> workspace relationship chain.
  */
 @WorkspaceAgnostic("Issues scoped through repository_id -> repository.workspace_id")
 public interface IssueRepository extends JpaRepository<Issue, Long> {
     @Query(value = "SELECT id FROM issue WHERE id = :id FOR SHARE", nativeQuery = true)
     Optional<Long> lockForReview(@Param("id") long id);
 
-    @Query("SELECT i FROM Issue i WHERE i.repository.id = :repositoryId AND i.deletedAt IS NULL"
-            + " AND i.id > :after ORDER BY i.id")
+    @Query(
+            "SELECT i FROM Issue i WHERE i.repository.id = :repositoryId AND i.deletedAt IS NULL AND i.id > :after ORDER BY i.id")
     List<Issue> findLiveNoteParents(
             @Param("repositoryId") long repositoryId, @Param("after") long after, Pageable pageable);
 
     /**
-     * Finds an issue (not a pull request) by repository ID and number. Uses {@code TYPE(i) = Issue}
-     * to exclude PullRequest subclass rows, which is necessary for GitLab where issues and merge
-     * requests have separate IID namespaces (Issue #5 and MR !5 can coexist in the same project).
+     * Finds an issue (not a pull request) by repository ID and number.
+     * Uses {@code TYPE(i) = Issue} to exclude PullRequest subclass rows, which is
+     * necessary for GitLab where issues and merge requests have separate IID
+     * namespaces (Issue #5 and MR !5 can coexist in the same project).
      *
      * @param repositoryId the repository ID
      * @param number the issue number within the repository
@@ -50,14 +51,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Optional<Issue> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
 
     /**
-     * How many issues name {@code parentIssueId} as their parent, and how many of those are closed,
-     * as one {@code [total, completed]} row: the rollup a provider that syncs only the parent link
-     * never supplies. {@code TYPE(i) = Issue} keeps a pull request out of the count even if one
-     * ever carried a parent.
+     * How many issues name {@code parentIssueId} as their parent, and how many of those are closed, as one
+     * {@code [total, completed]} row: the rollup a provider that syncs only the parent link never supplies.
+     * {@code TYPE(i) = Issue} keeps a pull request out of the count even if one ever carried a parent.
      */
-    @Query("SELECT COUNT(i) AS total, COALESCE(SUM(CASE WHEN i.state = :closed THEN 1 ELSE 0 END),"
-            + " 0) AS completed FROM Issue i WHERE TYPE(i) = Issue AND i.parentIssue.id ="
-            + " :parentIssueId AND i.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(i) AS total, COALESCE(SUM(CASE WHEN i.state = :closed THEN 1 ELSE 0 END), 0) AS completed FROM Issue i WHERE TYPE(i) = Issue AND i.parentIssue.id = :parentIssueId AND i.deletedAt IS NULL")
     ChildRollup countChildrenByParentIssueId(
             @Param("parentIssueId") long parentIssueId, @Param("closed") Issue.State closed);
 
@@ -67,37 +66,37 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         long getCompleted();
     }
 
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id =" + " :id")
+    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepository(@Param("id") long id);
 
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository "
-            + "WHERE TYPE(i) = Issue AND i.id = :id")
+    @Query(
+            "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.repository WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithAuthorAndRepository(@Param("id") long id);
 
     /**
-     * Fetches an issue with the associations {@code ReviewGate.evaluateIssue} needs: repository
-     * (workspace resolution) and assignees (role check). Restricted to {@code TYPE(i) = Issue} so a
-     * pull-request row never enters the issue review path.
+     * Fetches an issue with the associations {@code ReviewGate.evaluateIssue} needs:
+     * repository (workspace resolution) and assignees (role check). Restricted to {@code TYPE(i) = Issue}
+     * so a pull-request row never enters the issue review path.
      *
-     * <p>The author comes along because the same load feeds {@code ReviewRequestAuthority}, which
-     * asks whether the requester is the person the review is <em>about</em>. Author is a lazy
-     * {@code @ManyToOne} and this graph is read outside a session, so without the fetch that
-     * question is answered by a {@code LazyInitializationException} — or, worse under a future
-     * session, by a null that refuses an issue's own author a review of their own work.
+     * <p>The author comes along because the same load feeds
+     * {@code ReviewRequestAuthority}, which asks whether the requester is the person the review is
+     * <em>about</em>. Author is a lazy {@code @ManyToOne} and this graph is read outside a session, so
+     * without the fetch that question is answered by a {@code LazyInitializationException} — or, worse
+     * under a future session, by a null that refuses an issue's own author a review of their own work.
      */
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN"
-            + " FETCH i.assignees WHERE TYPE(i) = Issue AND i.id = :id")
+    @Query(
+            "SELECT i FROM Issue i LEFT JOIN FETCH i.repository LEFT JOIN FETCH i.author LEFT JOIN FETCH i.assignees WHERE TYPE(i) = Issue AND i.id = :id")
     Optional<Issue> findByIdWithRepositoryAndAssignees(@Param("id") long id);
 
     /**
-     * Repository-wide list of pure issues — {@code TYPE(i) = Issue} excludes the {@code
-     * PullRequest} subclass rows that share this table under single-table inheritance.
+     * Repository-wide list of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
+     * subclass rows that share this table under single-table inheritance.
      *
      * <p>Not cosmetic: for GitLab, issue IIDs and merge-request IIDs occupy <em>separate</em>
-     * per-project namespaces (issue #5 and MR !5 routinely coexist), so a type-blind list keyed by
-     * IID would collide the two — mistaking a merge request for the issue of the same number.
-     * Callers here key issues by {@code getNumber()} (the IID) for issue-only concepts (sub-issue
-     * parenting, issue-dependency links), so they must never see {@code PullRequest} rows.
+     * per-project namespaces (issue #5 and MR !5 routinely coexist), so a type-blind list keyed by IID
+     * would collide the two — mistaking a merge request for the issue of the same number. Callers here
+     * key issues by {@code getNumber()} (the IID) for issue-only concepts (sub-issue parenting,
+     * issue-dependency links), so they must never see {@code PullRequest} rows.
      *
      * @param repositoryId the repository ID
      * @return every pure issue of the repository (pull/merge requests excluded)
@@ -106,16 +105,16 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     List<Issue> findAllIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
     /**
-     * Per-repository count of pure issues — {@code TYPE(i) = Issue} excludes the {@code
-     * PullRequest} subclass rows that share this table under single-table inheritance.
+     * Per-repository count of pure issues — {@code TYPE(i) = Issue} excludes the {@code PullRequest}
+     * subclass rows that share this table under single-table inheritance.
      *
-     * <p>Split from its pull-request counterpart, rather than one combined count, because the
-     * combined number is exactly what makes a stalled entity class invisible: issues and pull
-     * requests sync on separate code paths, and one of them stopping keeps the sum rising.
+     * <p>Split from its pull-request counterpart, rather than one combined count, because the combined
+     * number is exactly what makes a stalled entity class invisible: issues and pull requests sync on
+     * separate code paths, and one of them stopping keeps the sum rising.
      *
      * <p>Batched over a collection of repository ids: the sync-observability read model this backs
-     * renders every repository of a connection on one page load, so a per-repository call would be
-     * an N+1 by construction.
+     * renders every repository of a connection on one page load, so a per-repository call would be an
+     * N+1 by construction.
      *
      * <p>Tombstoned rows ({@code deletedAt IS NOT NULL} — deleted upstream, kept only so
      * feedback/observation rows referencing them still resolve) are excluded: this number is the
@@ -125,19 +124,14 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param repositoryIds the repository IDs to count for
      * @return one projection row per repository that has at least one live issue
      */
-    @Query("SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i WHERE"
-            + " TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds"
-            + " GROUP BY i.repository.id")
+    @Query(
+            "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds GROUP BY i.repository.id")
     List<RepositoryItemCountProjection> countIssuesGroupedByRepositoryIds(
             @Param("repositoryIds") Collection<Long> repositoryIds);
 
-    /**
-     * Per-repository count of live pull/merge requests. Counterpart to {@link
-     * #countIssuesGroupedByRepositoryIds}.
-     */
-    @Query("SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i WHERE"
-            + " TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN"
-            + " :repositoryIds GROUP BY i.repository.id")
+    /** Per-repository count of live pull/merge requests. Counterpart to {@link #countIssuesGroupedByRepositoryIds}. */
+    @Query(
+            "SELECT i.repository.id AS repositoryId, COUNT(i) AS itemCount FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id IN :repositoryIds GROUP BY i.repository.id")
     List<RepositoryItemCountProjection> countPullRequestsGroupedByRepositoryIds(
             @Param("repositoryIds") Collection<Long> repositoryIds);
 
@@ -149,16 +143,13 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * <p>Returns bare numbers rather than entities: the sweep only needs the key set, and a repo
      * with 50k issues would otherwise hydrate 50k entity graphs to compare integers.
      */
-    @Query("SELECT i.number FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND"
-            + " i.repository.id = :repositoryId")
+    @Query(
+            "SELECT i.number FROM Issue i WHERE TYPE(i) = Issue AND i.deletedAt IS NULL AND i.repository.id = :repositoryId")
     List<Integer> findLiveIssueNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
 
-    /**
-     * Live pull-request numbers for one repository. Counterpart to {@link
-     * #findLiveIssueNumbersByRepositoryId}.
-     */
-    @Query("SELECT i.number FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND"
-            + " i.repository.id = :repositoryId")
+    /** Live pull-request numbers for one repository. Counterpart to {@link #findLiveIssueNumbersByRepositoryId}. */
+    @Query(
+            "SELECT i.number FROM Issue i WHERE TYPE(i) = PullRequest AND i.deletedAt IS NULL AND i.repository.id = :repositoryId")
     List<Integer> findLivePullRequestNumbersByRepositoryId(@Param("repositoryId") Long repositoryId);
 
     /**
@@ -167,9 +158,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * <p>{@code TYPE(i) = Issue} excludes the {@code PullRequest} subclass rows sharing this table
      * under single-table inheritance. Not cosmetic: for GitLab, issue and merge-request IIDs occupy
      * <em>separate</em> per-project namespaces (issue #5 and MR !5 coexist), so a type-blind UPDATE
-     * keyed only on {@code (repository.id, number)} would tombstone a live merge request whenever
-     * an issue of the same number is swept — hiding it from counts, mentor and review until the
-     * next reconciliation upsert revives it.
+     * keyed only on {@code (repository.id, number)} would tombstone a live merge request whenever an
+     * issue of the same number is swept — hiding it from counts, mentor and review until the next
+     * reconciliation upsert revives it.
      *
      * <p>{@code deletedAt IS NULL} in the predicate makes this idempotent and preserves the
      * <em>first</em> observation time: a re-sweep of an already-tombstoned row must not push its
@@ -179,26 +170,24 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id"
-            + " = :repositoryId AND i.number IN :numbers AND i.deletedAt IS NULL")
+    @Query(
+            "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.number IN :numbers AND i.deletedAt IS NULL")
     int tombstoneIssuesByRepositoryIdAndNumbers(
             @Param("repositoryId") Long repositoryId,
             @Param("numbers") Collection<Integer> numbers,
             @Param("deletedAt") Instant deletedAt);
 
     /**
-     * Tombstones the given <em>pull-request / merge-request</em> numbers of one repository in a
-     * single statement. Counterpart to {@link #tombstoneIssuesByRepositoryIdAndNumbers}; {@code
-     * TYPE(i) = PullRequest} keeps the pure-issue rows out of the write for the same
-     * separate-namespace reason.
+     * Tombstones the given <em>pull-request / merge-request</em> numbers of one repository in a single
+     * statement. Counterpart to {@link #tombstoneIssuesByRepositoryIdAndNumbers}; {@code TYPE(i) =
+     * PullRequest} keeps the pure-issue rows out of the write for the same separate-namespace reason.
      *
      * @return the number of rows newly tombstoned
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
-    @Query("UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND"
-            + " i.repository.id = :repositoryId AND i.number IN :numbers AND i.deletedAt IS"
-            + " NULL")
+    @Query(
+            "UPDATE Issue i SET i.deletedAt = :deletedAt WHERE TYPE(i) = PullRequest AND i.repository.id = :repositoryId AND i.number IN :numbers AND i.deletedAt IS NULL")
     int tombstonePullRequestsByRepositoryIdAndNumbers(
             @Param("repositoryId") Long repositoryId,
             @Param("numbers") Collection<Integer> numbers,
@@ -206,7 +195,7 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     /**
      * Repository-wide issue inventory (pure issues, PullRequest subclass rows excluded) ordered
-     * newest-first by number, for the cross-artifact project-context telescope. The author is
+     * newest-first by number, for the cross-item project-context telescope. The author is
      * fetched up front to avoid a per-row lazy load; labels/comments/bodies are intentionally NOT
      * fetched — the inventory is a compact "what else exists in this project" index, not a full
      * body. Tombstones are excluded: something deleted upstream is no longer in the project.
@@ -215,37 +204,36 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @param pageable the cap (newest N) — caller supplies {@code PageRequest.of(0, cap)}
      * @return newest-first issues for the repository
      */
-    @Query("SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone WHERE"
-            + " TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL"
-            + " ORDER BY i.number DESC")
+    @Query(
+            "SELECT i FROM Issue i LEFT JOIN FETCH i.author LEFT JOIN FETCH i.milestone WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY i.number DESC")
     List<Issue> findIssueInventoryByRepositoryId(@Param("repositoryId") long repositoryId, Pageable pageable);
 
     /**
-     * How many of a repository's issues carry at least one label, and which label names are in use
-     * — the two facts that say whether the project has a labelling convention at all, without
-     * fetching the label collection of every inventory row.
+     * How many of a repository's issues carry at least one label, and which label names are in use — the
+     * two facts that say whether the project has a labelling convention at all, without fetching the label
+     * collection of every inventory row.
      */
-    @Query("SELECT COUNT(DISTINCT i.id) FROM Issue i JOIN i.labels l WHERE TYPE(i) = Issue AND"
-            + " i.repository.id = :repositoryId AND i.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(DISTINCT i.id) FROM Issue i JOIN i.labels l WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL")
     long countLabelledIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
-    @Query("SELECT COUNT(i) FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId"
-            + " AND i.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(i) FROM Issue i WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL")
     long countIssuesByRepositoryId(@Param("repositoryId") long repositoryId);
 
-    @Query("SELECT DISTINCT l.name FROM Issue i JOIN i.labels l WHERE TYPE(i) = Issue AND"
-            + " i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY l.name")
+    @Query(
+            "SELECT DISTINCT l.name FROM Issue i JOIN i.labels l WHERE TYPE(i) = Issue AND i.repository.id = :repositoryId AND i.deletedAt IS NULL ORDER BY l.name")
     List<String> findLabelNamesInUseByRepositoryId(@Param("repositoryId") long repositoryId);
 
     /**
      * Nullifies milestone references on all issues that reference the given milestone.
-     *
-     * <p>This is a direct database update that doesn't rely on Hibernate's collection state. MUST
-     * be called before deleting a milestone to avoid foreign key constraint violations.
-     *
-     * <p>Unlike {@code milestone.removeAllIssues()} which operates on the in-memory collection
-     * (which may be stale or not fully loaded), this method updates ALL issues in the database that
-     * reference the milestone.
+     * <p>
+     * This is a direct database update that doesn't rely on Hibernate's collection state.
+     * MUST be called before deleting a milestone to avoid foreign key constraint violations.
+     * <p>
+     * Unlike {@code milestone.removeAllIssues()} which operates on the in-memory collection
+     * (which may be stale or not fully loaded), this method updates ALL issues in the
+     * database that reference the milestone.
      *
      * @param milestoneId the milestone ID to detach from issues
      * @return the number of issues updated
@@ -256,10 +244,10 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     /**
      * Finds an issue by ID with its blockedBy collection eagerly loaded.
-     *
-     * <p>This is needed by dependency sync because the persistence context may have been cleared by
-     * prior {@code upsertCore()} calls (via {@code clearAutomatically = true}), which detaches
-     * entities and invalidates lazy proxies.
+     * <p>
+     * This is needed by dependency sync because the persistence context may have been
+     * cleared by prior {@code upsertCore()} calls (via {@code clearAutomatically = true}),
+     * which detaches entities and invalidates lazy proxies.
      *
      * @param id the issue ID
      * @return the issue with blockedBy eagerly loaded, if found
@@ -273,19 +261,16 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
     Optional<Issue> findByIdWithBlockedBy(@Param("id") Long id);
 
     /**
-     * Promotes a stub {@code ISSUE} row to {@code PULL_REQUEST} ahead of the upsert. The {@code
-     * COALESCE}s seed PR-specific NOT-NULL primitives so the discriminator flip survives the
-     * single-table-inheritance CHECK constraint; {@code upsertCore} overwrites them with real
-     * values immediately after.
+     * Promotes a stub {@code ISSUE} row to {@code PULL_REQUEST} ahead of the upsert. The
+     * {@code COALESCE}s seed PR-specific NOT-NULL primitives so the discriminator flip survives
+     * the single-table-inheritance CHECK constraint; {@code upsertCore} overwrites them with
+     * real values immediately after.
      */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Transactional
     @Query(
-            value = "UPDATE issue SET issue_type = :newType, is_draft = COALESCE(is_draft, false),"
-                    + " is_merged = COALESCE(is_merged, false), commits = COALESCE(commits, 0),"
-                    + " additions = COALESCE(additions, 0), deletions = COALESCE(deletions, 0),"
-                    + " changed_files = COALESCE(changed_files, 0) WHERE repository_id ="
-                    + " :repositoryId AND number = :number AND issue_type = :currentType",
+            value =
+                    "UPDATE issue SET issue_type = :newType, is_draft = COALESCE(is_draft, false), is_merged = COALESCE(is_merged, false), commits = COALESCE(commits, 0), additions = COALESCE(additions, 0), deletions = COALESCE(deletions, 0), changed_files = COALESCE(changed_files, 0) WHERE repository_id = :repositoryId AND number = :number AND issue_type = :currentType",
             nativeQuery = true)
     int correctDiscriminator(
             @Param("repositoryId") long repositoryId,
@@ -295,12 +280,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
 
     /**
      * Atomically inserts or updates an issue's core fields (race-condition safe).
-     *
-     * <p>Uses PostgreSQL's ON CONFLICT to handle concurrent inserts on the unique constraint
+     * <p>
+     * Uses PostgreSQL's ON CONFLICT to handle concurrent inserts on the unique constraint
      * (repository_id, issue_type, number). This eliminates the race condition where two threads
      * both pass the findById check and try to insert the same issue.
-     *
-     * <p><b>Note:</b> This only handles scalar fields and FK references. ManyToMany relationships
+     * <p>
+     * <b>Note:</b> This only handles scalar fields and FK references. ManyToMany relationships
      * (labels, assignees) must be handled separately after calling this method.
      *
      * @return 1 if inserted, 1 if updated (always 1 on success due to DO UPDATE)

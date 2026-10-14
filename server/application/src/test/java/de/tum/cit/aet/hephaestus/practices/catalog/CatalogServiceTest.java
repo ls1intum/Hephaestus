@@ -19,15 +19,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeReleaseChoice;
 import de.tum.cit.aet.hephaestus.practices.PracticeReviewDigest;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalogLoader;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogChangeKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogConflictException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
@@ -97,23 +96,22 @@ class CatalogServiceTest extends BaseUnitTest {
     }
 
     private CatalogOffer<CatalogPracticeDocument> customize(PracticeDefinition definition) {
-        return service.putPractice(
+        return service.updatePractice(
                 "description",
                 new CatalogPracticeInputDTO("description", "scm.pull_request", "review", definition, 4),
-                false,
                 tag(service.practice("description").etag()));
     }
 
     @Test
     void shouldRecordNoInventedUpstreamForALocalPractice() {
-        var offered = service.putPractice(
-                "local", new CatalogPracticeInputDTO("local", "scm.pull_request", null, original, null), true, null);
+        var offered =
+                service.createPractice(new CatalogPracticeInputDTO("local", "scm.pull_request", null, original, null));
         assertThat(offered.state()).isEqualTo(CatalogEntryState.YOURS);
         assertThat(offered.shipped()).isNull();
         assertThat(offered.base()).isNull();
         assertThat(Objects.requireNonNull(rows.get(new CatalogEntry.Id(CatalogEntryType.PRACTICE, "local")))
                         .getBase())
-                .isEqualTo(mapper.createObjectNode());
+                .isNull();
         verify(audit).record(any());
     }
 
@@ -176,32 +174,27 @@ class CatalogServiceTest extends BaseUnitTest {
     @Test
     void shouldRejectStaleAndMissingPreconditionsWithoutWriting() {
         assertThatThrownBy(() -> service.setExcluded(CatalogEntryType.PRACTICE, "description", true, null))
-                .isInstanceOf(CuratedPreconditionRequiredException.class);
+                .isInstanceOf(CatalogPreconditionRequiredException.class);
         assertThatThrownBy(() -> service.setExcluded(CatalogEntryType.PRACTICE, "description", true, tag("stale")))
-                .isInstanceOf(StaleCuratedEntryException.class);
+                .isInstanceOf(StaleCatalogEntryException.class);
         assertThat(rows).isEmpty();
         verifyNoInteractions(audit);
     }
 
     @Test
     void shouldKeepKindImmutableEvenWhenTheDefinitionHasNoEvents() {
-        assertThatThrownBy(() -> service.putPractice(
+        assertThatThrownBy(() -> service.updatePractice(
                         "description",
                         new CatalogPracticeInputDTO("description", "scm.issue", null, original, 0),
-                        false,
                         tag(service.practice("description").etag())))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(rows).isEmpty();
     }
 
     @Test
-    void shouldResequencePlacementAndRestoreTheBundledOrder() {
-        service.putPractice(
-                "local",
-                new CatalogPracticeInputDTO("local", "scm.pull_request", "review", original, null),
-                true,
-                null);
-        service.place("local", "review", 0, tag(service.effectiveCatalog().etag()));
+    void shouldResequenceMovedPracticesAndRestoreTheBundledOrder() {
+        service.createPractice(new CatalogPracticeInputDTO("local", "scm.pull_request", "review", original, null));
+        service.move("local", "review", 0, tag(service.effectiveCatalog().etag()));
         assertThat(service.effectiveCatalog().practices())
                 .extracting(CatalogOffer::slug)
                 .containsExactly("local", "description");
@@ -221,7 +214,9 @@ class CatalogServiceTest extends BaseUnitTest {
         var offered = DefinitionTestFixtures.rename(original, "New name");
         ship(new CatalogPracticeDocument(document.kind(), document.groupSlug(), offered));
         var result = service.applyRelease(
-                "description", offered, tag(service.practice("description").etag()));
+                "description",
+                Map.of(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED),
+                tag(service.practice("description").etag()));
         assertThat(Objects.requireNonNull(result.base()).definition()).isEqualTo(offered);
         assertThat(result.effective().definition()).isEqualTo(offered);
         var entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
@@ -240,9 +235,21 @@ class CatalogServiceTest extends BaseUnitTest {
         ship(new CatalogPracticeDocument(new ItemKind("scm.issue"), document.groupSlug(), original));
         var current = service.practice("description");
         assertThatThrownBy(() -> service.reset(CatalogEntryType.PRACTICE, "description", tag(current.etag())))
-                .isInstanceOf(CuratedCatalogConflictException.class);
+                .isInstanceOf(CatalogConflictException.class);
         assertThat(service.practice("description").effective().kind()).isEqualTo(document.kind());
         assertThat(service.practice("description").effective().definition().name())
                 .isEqualTo("Local name");
+    }
+
+    @Test
+    void shouldReadEachCatalogTypeOnceWhenRenderingTheCatalog() {
+        clearInvocations(repository);
+        var view = service.view();
+        assertThat(view.practices())
+                .extracting(entry -> entry.definition().name())
+                .containsExactly(original.name());
+        assertThat(view.groups()).extracting(entry -> entry.name()).containsExactly("Review");
+        verify(repository).findByIdTypeOrderByIdSlugAsc(CatalogEntryType.PRACTICE);
+        verify(repository).findByIdTypeOrderByIdSlugAsc(CatalogEntryType.GROUP);
     }
 }

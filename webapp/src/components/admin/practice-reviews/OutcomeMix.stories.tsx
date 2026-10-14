@@ -14,7 +14,7 @@ const resultNoun = (total: number): string => (total === 1 ? "result" : "results
 const feedbackNoun = (total: number): string =>
 	total === 1 ? "piece of feedback" : "pieces of feedback";
 
-const RESULTS = resultSlots(practiceReviewOverview.practiceResults, reviewOverviewScope);
+const RESULTS = resultSlots(practiceReviewOverview.results, reviewOverviewScope);
 const FEEDBACK = feedbackSlots(practiceReviewOverview.feedback, reviewOverviewScope);
 
 /**
@@ -43,7 +43,7 @@ const meta = {
 		flags: {
 			label: "Results checked by an admin",
 			slots: [
-				markedIncorrectSlot(practiceReviewOverview.practiceResultsInvalidated, reviewOverviewScope),
+				markedIncorrectSlot(practiceReviewOverview.resultsMarkedIncorrect, reviewOverviewScope),
 			],
 		},
 		noun: resultNoun,
@@ -93,8 +93,9 @@ export const Feedback: Story = {
 		const legend = within(canvas.getByRole("list", { name: "Feedback by delivery" }));
 		await expect(legend.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
 			"3 awaiting approval",
-			"1 prepared",
+			"1 ready",
 			"14 delivered",
+			"1 delivery unconfirmed",
 			"5 withheld",
 			"1 failed to deliver",
 		]);
@@ -144,7 +145,7 @@ export const WordsOnly: Story = {
 	},
 	play: async ({ canvas }) => {
 		const legend = within(canvas.getByRole("list", { name: "Feedback by delivery" }));
-		await expect(legend.getAllByRole("listitem")).toHaveLength(5);
+		await expect(legend.getAllByRole("listitem")).toHaveLength(6);
 		await expect(legend.queryAllByRole("link")).toHaveLength(0);
 	},
 };
@@ -153,7 +154,7 @@ export const WordsOnly: Story = {
 export const NothingCounted: Story = {
 	args: {
 		total: 0,
-		slots: resultSlots({ met: 0, notMet: 0, notApplicable: 0, undetermined: 0 }),
+		slots: resultSlots({ met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 }),
 		flags: { label: "Results checked by an admin", slots: [markedIncorrectSlot(0)] },
 		delta: "Same as the previous 30 days",
 		children: undefined,

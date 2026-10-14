@@ -5,16 +5,13 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.core.annotation.Order;
 
+@Order(30)
 @Component
 @RequiredArgsConstructor
 public class MentorAccountAbsorptionContributor implements AccountAbsorptionContributor {
     private final NamedParameterJdbcTemplate jdbc;
-
-    @Override
-    public int order() {
-        return 30;
-    }
 
     @Override
     public void absorb(long claimedAccountId, long unclaimedAccountId) {

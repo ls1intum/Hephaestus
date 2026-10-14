@@ -24,7 +24,6 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                         assignment,
                         mapper.createObjectNode().put("title", "A document"),
                         Instant.EPOCH,
-                        null,
                         null);
         var input = mapper.readTree(files.values().iterator().next());
         assertThat(input.path("contractVersion").asInt()).isEqualTo(3);
@@ -44,7 +43,6 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                         assignment,
                         mapper.createObjectNode(),
                         Instant.EPOCH,
-                        null,
                         null);
         var input = mapper.readTree(files.values().iterator().next());
         assertThat(input.path("about").isNull()).isTrue();
@@ -68,7 +66,6 @@ class PracticeScriptInputsTest extends BaseUnitTest {
                                 foreign,
                                 mapper.createObjectNode(),
                                 Instant.EPOCH,
-                                null,
                                 null))
                 .isInstanceOf(IllegalArgumentException.class);
     }

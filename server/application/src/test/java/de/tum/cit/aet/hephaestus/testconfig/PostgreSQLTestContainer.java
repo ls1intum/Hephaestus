@@ -5,9 +5,13 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import liquibase.Contexts;
+import liquibase.LabelExpression;
 import liquibase.Liquibase;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -32,6 +36,7 @@ public final class PostgreSQLTestContainer {
 
     private static @Nullable PostgreSQLContainer container;
     private static boolean migratedTemplateReady;
+    private static final Set<String> RELEASED_TEMPLATES = new HashSet<>();
 
     private PostgreSQLTestContainer() {}
 
@@ -67,6 +72,13 @@ public final class PostgreSQLTestContainer {
         return cloneDatabase(name, MIGRATED_TEMPLATE_DATABASE);
     }
 
+    public static synchronized TestDatabase copyDatabase(String name, TestDatabase source) {
+        validateDatabaseName(name);
+        String templateName = source.jdbcUrl().substring(source.jdbcUrl().lastIndexOf('/') + 1);
+        validateDatabaseName(templateName);
+        return cloneDatabase(name, templateName);
+    }
+
     private static TestDatabase cloneDatabase(String name, String templateName) {
         PostgreSQLContainer postgres = getInstance();
         try (Connection connection = DriverManager.getConnection(
@@ -79,17 +91,44 @@ public final class PostgreSQLTestContainer {
         return database(postgres, name);
     }
 
+    public static synchronized TestDatabase createReleasedDatabase(String name, String contexts) {
+        validateDatabaseName(name);
+        String templateName = "hephaestus_released_" + contexts;
+        validateDatabaseName(templateName);
+        if (!RELEASED_TEMPLATES.contains(templateName)) {
+            migrateReleasedDatabase(createDatabase(templateName), contexts);
+            RELEASED_TEMPLATES.add(templateName);
+        }
+        return cloneDatabase(name, templateName);
+    }
+
+    public static void migrateReleasedDatabase(TestDatabase testDatabase, String contexts) {
+        try (Connection connection =
+                DriverManager.getConnection(testDatabase.jdbcUrl(), testDatabase.username(), testDatabase.password())) {
+            Database database =
+                    DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+            try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
+                var selectedContexts = new Contexts(contexts);
+                var labels = new LabelExpression();
+                var pending = liquibase.listUnrunChangeSets(selectedContexts, labels);
+                int releasedChanges = IntStream.range(0, pending.size())
+                        .filter(index -> pending.get(index).getId().equals("1791486276211-v1-cutover"))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Production changelog has no practice migration"));
+                liquibase.update(releasedChanges, selectedContexts, labels);
+            }
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to prepare the production released prefix", exception);
+        }
+    }
+
     public static void migrateDatabase(TestDatabase testDatabase, String contexts) {
-        try {
-            for (String changelog : new String[] {"db/practice-cutover/released-main.xml", "db/master.xml"}) {
-                try (Connection connection = DriverManager.getConnection(
-                        testDatabase.jdbcUrl(), testDatabase.username(), testDatabase.password())) {
-                    Database database = DatabaseFactory.getInstance()
-                            .findCorrectDatabaseImplementation(new JdbcConnection(connection));
-                    try (Liquibase liquibase = new Liquibase(changelog, new ClassLoaderResourceAccessor(), database)) {
-                        liquibase.update(new Contexts(contexts));
-                    }
-                }
+        try (Connection connection =
+                DriverManager.getConnection(testDatabase.jdbcUrl(), testDatabase.username(), testDatabase.password())) {
+            Database database =
+                    DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
+            try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
+                liquibase.update(new Contexts(contexts));
             }
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to prepare migrated test database template", exception);
@@ -127,16 +166,6 @@ public final class PostgreSQLTestContainer {
                 .withTmpFs(Map.of("/var/lib/postgresql", "rw"));
 
         newContainer.start();
-        ensureExtensions(
-                database(newContainer, "template1").jdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
-        ensureExtensions(newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
-        try (var connection = DriverManager.getConnection(
-                newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword())) {
-            TestReviewSchemaFunctions.install(connection, "review_model_digest", "practice_review_digest");
-        } catch (SQLException exception) {
-            throw new IllegalStateException("Failed to initialize Hibernate's generated review functions", exception);
-        }
-
         LOGGER.info(
                 "Started PostgreSQL Testcontainer: jdbcUrl={}, username={}, database={}",
                 newContainer.getJdbcUrl(),
@@ -144,17 +173,5 @@ public final class PostgreSQLTestContainer {
                 newContainer.getDatabaseName());
 
         return newContainer;
-    }
-
-    // Hibernate-created schemas need citext without relying on Liquibase.
-    private static void ensureExtensions(String jdbcUrl, String username, String password) {
-        try (Connection connection = DriverManager.getConnection(jdbcUrl, username, password)) {
-            connection.createStatement().execute("CREATE EXTENSION IF NOT EXISTS citext");
-        } catch (SQLException exception) {
-            throw new IllegalStateException(
-                    "Failed to enable required PostgreSQL extension 'citext' on the test database: "
-                            + exception.getMessage(),
-                    exception);
-        }
     }
 }

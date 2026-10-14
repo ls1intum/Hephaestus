@@ -25,7 +25,6 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
-import org.springframework.web.server.ResponseStatusException;
 
 /**
  * nOAuth defence against a REAL Postgres: the mock-based {@link AccountProvisioningServiceTest}
@@ -183,8 +182,7 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
                         "new-native-subject",
                         principal("new-native-subject", "contact@example.test", true, "display"),
                         AuthIntentCookie.Intent.link(accountId, null)))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("409 CONFLICT");
+                .isInstanceOf(OAuth2AuthenticationException.class);
         Assertions.assertThatThrownBy(() -> service.resolveOrProvision(
                         "github-deleting",
                         "original-native-subject",

@@ -27,7 +27,6 @@ import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeCatalogInjector;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptRunRecorderFixtures;
@@ -64,6 +63,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -392,11 +392,11 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 job.getAttempt(),
                 Instant.now().plus(Duration.ofSeconds(LiveRunnerWorkspace.TIMEOUT_SECONDS + 300L)));
         PracticeSandboxSpec spec = practiceAdapter.buildSandboxSpec(new PracticeAgentRequest(
-                snapshot.apiProtocol(),
-                snapshot.upstreamModelId(),
+                snapshot.model().apiProtocol().wire(),
+                snapshot.model().upstreamModelId(),
                 snapshot.contextWindow(),
                 snapshot.maxOutputTokens(),
-                snapshot.reasoningEffort(),
+                snapshot.model().reasoningEffort(),
                 jobToken,
                 LiveRunnerWorkspace.TIMEOUT_SECONDS,
                 frozen));
@@ -416,7 +416,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                     objectMapper.readTree(workDir.resolve(SandboxLayout.CONTEXT_PREFIX + "metadata.json")
                             .toFile()),
                     Objects.requireNonNull(job.getStartedAt()),
-                    null,
                     null));
         for (var entry : staged.entrySet()) {
             Path target = workDir.resolve(entry.getKey());
@@ -593,7 +592,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 workspace,
                 SLUG,
                 new ItemKind("scm.pull_request"),
-                RuntimePracticeTestData.definition(new ItemKind("scm.pull_request"), "Every slot", CRITERIA, program),
+                DefinitionTestFixtures.definition(new ItemKind("scm.pull_request"), "Every slot", CRITERIA, program),
                 null,
                 0,
                 null));
@@ -742,7 +741,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         var item = itemWriter.upsert(new ItemRegistration(
                 job.getWorkspaceId(), new ItemKind("scm.pull_request"), pullRequestId, null, null));
         var source = itemSources.stream()
-                .filter(candidate -> candidate.kind().equals(item.kind()))
+                .filter(candidate -> candidate.supports(item))
                 .findFirst()
                 .orElseThrow();
         var pinned = source.current(item).orElseThrow();

@@ -264,8 +264,7 @@ public class SlackChannelConsentService {
                 }
                 case PENDING ->
                     throw new SlackChannelConsentViolationException(
-                            "A consent transition cannot set the state PENDING. Only discovery or registration sets"
-                                    + " it.");
+                            "A consent transition cannot set the state PENDING. Only discovery or registration sets it.");
             }
 
             recordAudit(workspaceId, slackChannelId, from, target, reason);

@@ -1,7 +1,7 @@
 import { Link, useParams } from "@tanstack/react-router";
 
 import { cn } from "cn";
-import type { Practice, ReviewPracticeGroup } from "@/api/types.gen";
+import type { GroupRef, Practice } from "@/api/types.gen";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-editor/PracticeDetailHoverCard";
 import { InlineLink } from "@/components/common/InlineLink";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
@@ -9,7 +9,7 @@ import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
 export interface ReviewPracticeLinkProps {
 	practiceSlug: string;
 	practiceName: string;
-	group: ReviewPracticeGroup | undefined;
+	group: GroupRef | null;
 	practice?: Practice;
 	className?: string;
 }
@@ -54,7 +54,7 @@ export function ReviewPracticeLink({
 
 export interface ReviewPracticeNameProps {
 	practiceName: string;
-	group: ReviewPracticeGroup | undefined;
+	group: GroupRef | null;
 	className?: string;
 }
 
@@ -71,7 +71,7 @@ export function ReviewPracticeName({ practiceName, group, className }: ReviewPra
 	);
 }
 
-function PracticeGroupMark({ group }: { group: ReviewPracticeGroup | undefined }) {
+function PracticeGroupMark({ group }: { group: GroupRef | null }) {
 	if (!group) {
 		return null;
 	}

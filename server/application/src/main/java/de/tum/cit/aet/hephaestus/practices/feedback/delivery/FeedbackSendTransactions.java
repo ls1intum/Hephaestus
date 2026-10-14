@@ -7,8 +7,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackStoreService;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
@@ -43,6 +45,7 @@ public class FeedbackSendTransactions {
     private final FeedbackVisibilityService visibility;
     private final Clock clock;
     private final PersonDataWriteFence privacy;
+    private final FeedbackSendQueue sendQueue;
 
     public record Attempt(Feedback feedback, FeedbackSendAction action, List<FeedbackCopy> copies, int attempts) {
         public Attempt {
@@ -69,11 +72,11 @@ public class FeedbackSendTransactions {
         if (!owns(workspaceId, feedbackId, owner)) return false;
         record(workspaceId, feedbackId, completed);
         var check = store.check(row, true);
-        if (!check.allowed() || visibility.withdrawn(workspaceId, feedbackId)) {
-            store.withhold(
-                    row, check.reason() == null ? FeedbackStopReason.APPROVAL_NO_LONGER_ELIGIBLE : check.reason());
+        if (!check.allowed()) {
+            store.withhold(row, Objects.requireNonNull(check.reason()));
             return false;
         }
+        if (visibility.withdrawn(workspaceId, feedbackId)) return false;
         for (UUID id : attempting) {
             if (copies.beginWrite(workspaceId, feedbackId, id, clock.instant()) != 1)
                 throw new IllegalStateException("A copy is no longer eligible for a write.");
@@ -135,14 +138,14 @@ public class FeedbackSendTransactions {
                         receipt.externalUrl(),
                         kind.name());
             } else if (Boolean.FALSE.equals(receipt.writeMayHaveStarted())) {
-                copies.recordAbsent(
-                        workspaceId, feedbackId, copy.getId(), "ABSENT: Provider proved the copy was not created.");
+                copies.recordAbsent(workspaceId, feedbackId, copy.getId(), "Provider proved the copy was not created.");
             } else
                 copies.recordError(
                         workspaceId,
                         feedbackId,
                         copy.getId(),
                         FeedbackStopReason.DELIVERY_UNCONFIRMED.name(),
+                        FeedbackCopyReadback.UNKNOWN.name(),
                         "Provider visibility is unknown.");
         }
     }
@@ -159,8 +162,7 @@ public class FeedbackSendTransactions {
     public void absent(long workspaceId, UUID feedbackId, String owner, UUID copyId) {
         store.lock(workspaceId, feedbackId);
         if (owns(workspaceId, feedbackId, owner))
-            copies.recordAbsent(
-                    workspaceId, feedbackId, copyId, "ABSENT: Provider readback proved the copy is absent.");
+            copies.recordAbsent(workspaceId, feedbackId, copyId, "Provider readback proved the copy is absent.");
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -173,8 +175,7 @@ public class FeedbackSendTransactions {
         boolean unresolved = children.stream()
                 .anyMatch(c -> c.getState() == FeedbackCopyState.WRITE_STARTED
                         || (active.getAction() == FeedbackSendAction.RETRACT
-                                && c.getLastError() != null
-                                && c.getLastError().startsWith("TRANSIENT:")));
+                                && c.getReadback() == FeedbackCopyReadback.TRANSIENT));
         Instant now = clock.instant();
         if (sends.settle(
                         workspaceId,
@@ -192,7 +193,7 @@ public class FeedbackSendTransactions {
                 && children.stream().anyMatch(c -> c.getState() == FeedbackCopyState.POSTED)
                 && (visibility.withdrawn(workspaceId, feedbackId)
                         || store.check(row, true).reason() == FeedbackStopReason.RESULT_MARKED_INCORRECT))
-            store.queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
+            sendQueue.queue(row, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -208,7 +209,8 @@ public class FeedbackSendTransactions {
                             feedbackId,
                             copy.getId(),
                             null,
-                            "TRANSIENT: Provider correction call did not produce an" + " acknowledgement.");
+                            FeedbackCopyReadback.TRANSIENT.name(),
+                            "Provider correction call did not produce an" + " acknowledgement.");
             }
             return;
         }
@@ -220,6 +222,7 @@ public class FeedbackSendTransactions {
                         feedbackId,
                         copy.getId(),
                         FeedbackStopReason.DELIVERY_UNCONFIRMED.name(),
+                        FeedbackCopyReadback.UNKNOWN.name(),
                         "Provider call did not produce a confirmed receipt.");
     }
 
@@ -245,9 +248,16 @@ public class FeedbackSendTransactions {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void correctionError(long workspaceId, UUID feedbackId, String owner, UUID copyId, String error) {
+    public void correctionError(
+            long workspaceId,
+            UUID feedbackId,
+            String owner,
+            UUID copyId,
+            @Nullable FeedbackCopyReadback readback,
+            String error) {
         store.lock(workspaceId, feedbackId);
-        if (owns(workspaceId, feedbackId, owner)) copies.recordError(workspaceId, feedbackId, copyId, null, error);
+        if (owns(workspaceId, feedbackId, owner))
+            copies.recordError(workspaceId, feedbackId, copyId, null, readback == null ? null : readback.name(), error);
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)

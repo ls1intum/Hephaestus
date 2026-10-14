@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { getAllTeamsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { TeamInfo } from "@/api/types.gen";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
@@ -51,7 +51,7 @@ function member() {
 			HttpResponse.json([workspaceListItem("acme"), workspaceListItem("globex", { id: 2 })]),
 		),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 42, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("MEMBER")),
 		),
 	);
 	vi.stubGlobal("IntersectionObserver", ObserverStub);

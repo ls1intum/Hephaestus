@@ -1,8 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 
 import {
-	listPracticeGroupStandingsOptions,
-	listPracticeStandingsOptions,
+	getOwnGroupStandingsOptions,
+	getOwnPracticeStandingsOptions,
 	listReviewedPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type {
@@ -89,10 +89,8 @@ export function partitionGroupsByPractices(
 export function usePracticeStandings(workspaceSlug: string): PracticeStandings {
 	// The member's view of the catalog: the practices Hephaestus reviews, each with its group.
 	const reviewedQuery = useQuery(listReviewedPracticesOptions({ path: { workspaceSlug } }));
-	const groupStandingsQuery = useQuery(
-		listPracticeGroupStandingsOptions({ path: { workspaceSlug } }),
-	);
-	const standingsQuery = useQuery(listPracticeStandingsOptions({ path: { workspaceSlug } }));
+	const groupStandingsQuery = useQuery(getOwnGroupStandingsOptions({ path: { workspaceSlug } }));
+	const standingsQuery = useQuery(getOwnPracticeStandingsOptions({ path: { workspaceSlug } }));
 	const practiceStandings = standingsQuery.data ?? [];
 	const practicesByGroup = groupPracticeStandings(practiceStandings);
 	const reviewedPractices = reviewedQuery.data ?? [];

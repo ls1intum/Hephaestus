@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { RESULT_WORDS_UNAVAILABLE } from "./result-words";
 
-import type { ReviewResultDetail } from "@/api/types.gen";
+import type { AccountRef, ResultMark, ReviewResultDetail } from "@/api/types.gen";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -18,37 +18,73 @@ import { resultLevel } from "./review-levels";
 
 const ready = (result: ReviewResultDetail) => ({ status: "ready" as const, result });
 
-/** Marked incorrect two hours ago, after an earlier correction that was taken back. */
+const ADA_ADMIN: AccountRef = {
+	id: "3",
+	displayName: "Ada Admin",
+	avatarUrl: null,
+	status: "ACTIVE",
+	identities: [],
+};
+
+function mark(
+	overrides: Partial<ResultMark> & Pick<ResultMark, "id" | "kind" | "reason">,
+): ResultMark {
+	return {
+		resultId: reviewResultDetail.id,
+		createdAt: hoursBefore(2),
+		createdBy: ADA_ADMIN,
+		removedAt: null,
+		removedBy: null,
+		removalReason: null,
+		...overrides,
+	};
+}
+
+/** Marked incorrect two hours ago, after an earlier mark that was removed. */
 const markedIncorrect: ReviewResultDetail = {
 	...reviewResultDetail,
-	invalidations: [
-		{
-			id: "inv-2",
+	disagreements: [],
+	markedIncorrectAt: hoursBefore(2),
+	marks: [
+		mark({
+			id: "mark-2",
+			kind: "INCORRECT",
 			reason: "The 404 comes from the router, not the cache.",
-			invalidatedAt: hoursBefore(2),
-			invalidatedBy: "Ada Admin",
-			providerCopy: "INLINE_REMAINS",
-		},
-		{
-			id: "inv-1",
+		}),
+		mark({
+			id: "mark-1",
+			kind: "INCORRECT",
 			reason: "Looked like a false positive at first.",
-			invalidatedAt: daysBefore(3),
-			invalidatedBy: "Ada Admin",
-			restorationReason: "The diff does conflate the two after all.",
-			restoredAt: daysBefore(2),
-			providerCopy: "UPDATED",
-		},
+			createdAt: daysBefore(3),
+			removedAt: daysBefore(2),
+			removalReason: "The diff does conflate the two after all.",
+		}),
+	],
+};
+
+/** Accepted yesterday: the result is right, and nothing about its feedback changed. */
+const markedAccepted: ReviewResultDetail = {
+	...reviewResultDetail,
+	disagreements: [],
+	acceptedAt: daysBefore(1),
+	marks: [
+		mark({
+			id: "mark-3",
+			kind: "ACCEPTED",
+			reason: "The two cases do need different answers.",
+			createdAt: daysBefore(1),
+		}),
 	],
 };
 
 /**
  * One result's sheet, over the list it was opened from or over a trace, in the order every
- * record sheet has: a status line, What it is, State and history (recorded, disputed, marked
- * incorrect, restored, no longer current), the rationale, the problems it located, the questions it
- * left open and the evidence, Technical (closed) and the actions. It links to no other record; its trace tells where it came from and what it led to.
- * Its one decision — mark it incorrect, or restore it — is the footer, behind a popover that will
- * not submit without a reason, because an invalidation without one is not something the developer
- * could read.
+ * record sheet has: a status line, What it is, State and history (recorded, disagreed with, marked,
+ * mark removed, no longer current), the explanation, the problems it located, the questions it
+ * left open and the evidence, Technical and the actions. It links to no other record; its trace
+ * tells where it came from and what it led to. Its decisions — mark it incorrect or accepted, or
+ * remove a mark — are the footer, behind a popover that will not submit without a reason, because
+ * a mark without one is not something the developer could read.
  */
 const meta = {
 	component: ResultLevel,
@@ -58,8 +94,9 @@ const meta = {
 	args: {
 		path: { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() },
 		result: ready(reviewResultDetail),
-		onChangeValidity: fn(async () => undefined),
-		isChangingValidity: false,
+		onMark: fn(async () => undefined),
+		onRemoveMark: fn(async () => undefined),
+		isMarking: false,
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
@@ -105,32 +142,33 @@ export const Default: Story = {
 		await expect(panel.getAllByText("Major")).toHaveLength(2);
 		// The evidence is read as passages, never as the stored record it came from.
 		await expect(panel.queryByText(/citations/u)).not.toBeInTheDocument();
-		// Standing, it offers the one decision there is, and not its reverse.
-		await expect(panel.getByRole("button", { name: "Mark as incorrect" })).toBeEnabled();
-		await expect(panel.queryByRole("button", { name: "Restore result" })).not.toBeInTheDocument();
+		// Unmarked, it offers both marks, and no removal.
+		await expect(panel.getByRole("button", { name: "Mark incorrect" })).toBeEnabled();
+		await expect(panel.getByRole("button", { name: "Mark accepted" })).toBeEnabled();
+		await expect(panel.queryByRole("button", { name: "Remove mark" })).not.toBeInTheDocument();
 	},
 };
 
 /** A result from a review someone requested says so among what it is. */
 export const ByHand: Story = {
-	args: { result: ready({ ...reviewResultDetail, origin: "MANUAL" }) },
+	args: { result: ready({ ...reviewResultDetail, origin: "REQUEST" }) },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByText("Origin");
+		panel.getByText("Started by");
 		await expect(panel.getByText("Requested")).toBeVisible();
 		panel.getByText("Someone asked for this review.");
 	},
 };
 
 /**
- * The rationale renders as Markdown, as on the developer's own row: a file or a value the review
+ * The explanation renders as Markdown, as on the developer's own row: a file or a value the review
  * quotes is code, not text between backticks.
  */
-export const MarkdownRationale: Story = {
+export const MarkdownExplanation: Story = {
 	args: {
 		result: ready({
 			...reviewResultDetail,
-			evidenceRationale:
+			explanation:
 				"`CacheService.find` returns 404 for a cache miss and for a caller who may not read the entry. The second case is a `403`.",
 		}),
 	},
@@ -244,32 +282,32 @@ export const Reflow: Story = {
 };
 
 /**
- * The developer disputes feedback written from the result. The dispute answers this
+ * The developer disagrees with feedback written from the result. The disagreement answers this
  * result, so it is in its history in full, in their words, naming the feedback by where it
  * went without linking it. Their ratings and private notes are theirs and are not shown.
  */
-export const Disputed: Story = {
+export const Disagreed: Story = {
 	args: {
 		result: ready({
 			...reviewResultDetail,
-			disputes: [
+			disagreements: [
 				{
 					feedbackId: "dddddddd-2222-2222-2222-222222222222",
-					channel: "IN_APP",
-					explanation: "The retry is the caller's job here; this service only reports the failure.",
-					disputedAt: hoursBefore(3),
+					destination: "PRACTICE_PAGE",
+					comment: "The retry is the caller's job here; this service only reports the failure.",
+					respondedAt: hoursBefore(3),
 				},
 			],
 		}),
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getAllByText("Disputed");
-		panel.getByText("Disputed by the developer, on feedback on their practice pages");
+		panel.getAllByText("Disagreed");
+		panel.getByText("The developer disagreed with feedback on their practice pages");
 		panel.getByText("The retry is the caller's job here; this service only reports the failure.");
 		await expect(panel.queryByRole("alert")).toBeNull();
 		await expect(panel.queryByRole("link", { name: /practice pages/u })).not.toBeInTheDocument();
-		panel.getByRole("button", { name: "Mark as incorrect" });
+		panel.getByRole("button", { name: "Mark incorrect" });
 	},
 };
 
@@ -278,13 +316,15 @@ export const NoLongerCurrent: Story = {
 	args: {
 		result: ready({
 			...resultDetail("bbbbbbbb-2222-2222-2222-222222222222"),
-			supersededAt: hoursBefore(5),
+			endedAt: hoursBefore(5),
+			endReason: "WORK_CHANGED",
 		}),
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		panel.getByText("Historical result");
 		panel.getByText("No longer current");
+		panel.getByText("The work changed after this result.");
 		await expect(panel.queryByRole("alert")).toBeNull();
 	},
 };
@@ -295,8 +335,8 @@ export const EvidenceHidden: Story = {
 		result: ready({
 			...reviewResultDetail,
 			evidenceHidden: true,
-			evidence: undefined,
-			observations: [],
+			evidence: null,
+			problems: [],
 		}),
 	},
 	play: async () => {
@@ -306,23 +346,23 @@ export const EvidenceHidden: Story = {
 	},
 };
 
-/** The reason is required: an invalidation without one is not something the developer could read. */
-export const MarkAsIncorrect: Story = {
+/** The reason is required: a mark without one is not something the developer could read. */
+export const MarkIncorrect: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
-		await userEvent.click(panel.getByRole("button", { name: "Mark as incorrect" }));
+		await userEvent.click(panel.getByRole("button", { name: "Mark incorrect" }));
 		const popover = await screen.findByRole("dialog", {
-			name: "Mark this result as incorrect",
+			name: "Mark this result incorrect",
 		});
 		const reason = within(popover).getByRole("textbox", { name: "Reason" });
 		await expectSettledVisible(reason);
-		const submit = within(popover).getByRole("button", { name: "Mark as incorrect" });
+		const submit = within(popover).getByRole("button", { name: "Mark incorrect" });
 		await expectGenuinelyDisabled(submit);
 		await userEvent.type(reason, "  The 404 comes from the router, not the cache.  ");
 		await userEvent.click(submit);
-		await expect(args.onChangeValidity).toHaveBeenCalledWith(
-			false,
+		await expect(args.onMark).toHaveBeenCalledWith(
+			"INCORRECT",
 			"The 404 comes from the router, not the cache.",
 		);
 		await waitFor(async () => expect(screen.queryByRole("textbox", { name: "Reason" })).toBeNull());
@@ -330,24 +370,24 @@ export const MarkAsIncorrect: Story = {
 };
 
 /** A refused change keeps the form open with the reason the admin wrote, ready for another try. */
-export const MarkAsIncorrectFails: Story = {
+export const MarkIncorrectFails: Story = {
 	args: {
-		onChangeValidity: fn(async () => {
+		onMark: fn(async () => {
 			throw new Error("409");
 		}),
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
-		await userEvent.click(panel.getByRole("button", { name: "Mark as incorrect" }));
+		await userEvent.click(panel.getByRole("button", { name: "Mark incorrect" }));
 		const popover = await screen.findByRole("dialog", {
-			name: "Mark this result as incorrect",
+			name: "Mark this result incorrect",
 		});
 		const reason = within(popover).getByRole("textbox", { name: "Reason" });
 		await expectSettledVisible(reason);
 		await userEvent.type(reason, "The 404 comes from the router.");
-		await userEvent.click(within(popover).getByRole("button", { name: "Mark as incorrect" }));
-		await expect(args.onChangeValidity).toHaveBeenCalledOnce();
+		await userEvent.click(within(popover).getByRole("button", { name: "Mark incorrect" }));
+		await expect(args.onMark).toHaveBeenCalledOnce();
 		await expect(within(popover).getByRole("textbox", { name: "Reason" })).toHaveValue(
 			"The 404 comes from the router.",
 		);
@@ -355,8 +395,8 @@ export const MarkAsIncorrectFails: Story = {
 };
 
 /**
- * A comment already on the work could not be changed, so the level says so rather than implying the
- * correction reached it. The footer offers the reverse instead — restore — and nothing else.
+ * Marked incorrect, the level says what the mark stopped. The footer offers the reverse instead —
+ * remove the mark — and nothing else: an incorrect result cannot be accepted.
  */
 export const MarkedIncorrect: Story = {
 	args: { result: ready(markedIncorrect) },
@@ -373,55 +413,70 @@ export const MarkedIncorrect: Story = {
 		await expect(others).toHaveLength(0);
 		await expect(precedes(panel.getByRole("heading", { level: 2 }), chip)).toBe(true);
 		await expect(
-			panel.getByText(
-				/Comments Hephaestus posted about specific lines, whether on the lines or linking to them, are still on the work unchanged/u,
-			),
+			panel.getByText(/Its pending feedback stops and posted comments on the work are retracted/u),
 		).toBeVisible();
-		await expect(
-			panel.getByText("The correction notice was removed from posted comments."),
-		).toBeVisible();
-		await expect(panel.getByRole("button", { name: "Restore result" })).toBeEnabled();
-		await expect(
-			panel.queryByRole("button", { name: "Mark as incorrect" }),
-		).not.toBeInTheDocument();
-		// Oldest first: recorded, the earlier correction and its restore, then the one in force.
+		await expect(panel.getByRole("button", { name: "Remove mark" })).toBeEnabled();
+		await expect(panel.queryByRole("button", { name: "Mark incorrect" })).not.toBeInTheDocument();
+		await expect(panel.queryByRole("button", { name: "Mark accepted" })).not.toBeInTheDocument();
+		// Oldest first: recorded, the earlier mark and its removal, then the one in force.
 		const history = within(panel.getByRole("list", { name: "History" }));
 		await expect(history.getAllByRole("listitem").map((entry) => entry.textContent)).toEqual([
 			expect.stringMatching(/^Recorded/u),
 			expect.stringMatching(/^Marked incorrect.*by Ada Admin/u),
-			expect.stringMatching(/^Restored.*by an account that no longer exists/u),
+			expect.stringMatching(/^Mark removed.*by an account that no longer exists/u),
 			expect.stringMatching(/^Marked incorrect.*by Ada Admin/u),
 		]);
 	},
 };
 
-/** Restoring is the same popover the other way round, and reports `true` with its reason. */
-export const RestoreAResult: Story = {
+/** Removing the mark is the same popover the other way round, and names the mark it removes. */
+export const RemoveIncorrectMark: Story = {
 	args: { result: ready(markedIncorrect) },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, userEvent }) => {
 		const panel = within(await settledDrawerPanel());
-		await userEvent.click(panel.getByRole("button", { name: "Restore result" }));
-		const popover = await screen.findByRole("dialog", { name: "Restore this result" });
+		await userEvent.click(panel.getByRole("button", { name: "Remove mark" }));
+		const popover = await screen.findByRole("dialog", { name: "Remove the incorrect mark" });
 		await expectSettledVisible(
-			within(popover).getByText(/Feedback that was stopped stays stopped, and nothing is re-sent/u),
+			within(popover).getByText(
+				/Feedback that was stopped stays stopped, and nothing is sent again/u,
+			),
 		);
 		const reason = within(popover).getByRole("textbox", { name: "Reason" });
 		await userEvent.type(reason, "The router does return the cache's 404.");
-		await userEvent.click(within(popover).getByRole("button", { name: "Restore result" }));
-		await expect(args.onChangeValidity).toHaveBeenCalledWith(
-			true,
+		await userEvent.click(within(popover).getByRole("button", { name: "Remove mark" }));
+		await expect(args.onRemoveMark).toHaveBeenCalledWith(
+			"mark-2",
 			"The router does return the cache's 404.",
 		);
 	},
 };
 
-/** While the server decides, the footer's control shows it is working and takes no second press. */
-export const ChangingValidity: Story = {
-	args: { isChangingValidity: true },
+/** Accepted, the result can still be marked incorrect, and the acceptance can be removed. */
+export const MarkedAccepted: Story = {
+	args: { result: ready(markedAccepted) },
+	play: async ({ args, userEvent }) => {
+		const panel = within(await settledDrawerPanel());
+		within(panel.getByRole("list", { name: "History" })).getByText("Marked accepted");
+		await expect(panel.getByRole("button", { name: "Mark incorrect" })).toBeEnabled();
+		await expect(panel.queryByRole("button", { name: "Mark accepted" })).not.toBeInTheDocument();
+		await userEvent.click(panel.getByRole("button", { name: "Remove mark" }));
+		const popover = await screen.findByRole("dialog", { name: "Remove the accepted mark" });
+		const reason = within(popover).getByRole("textbox", { name: "Reason" });
+		await expectSettledVisible(reason);
+		await userEvent.type(reason, "Accepted by mistake.");
+		await userEvent.click(within(popover).getByRole("button", { name: "Remove mark" }));
+		await expect(args.onRemoveMark).toHaveBeenCalledWith("mark-3", "Accepted by mistake.");
+	},
+};
+
+/** While the server decides, the footer's controls show it is working and take no second press. */
+export const Marking: Story = {
+	args: { isMarking: true },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Mark as incorrect" }));
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Mark incorrect" }));
+		await expectGenuinelyDisabled(panel.getByRole("button", { name: "Mark accepted" }));
 	},
 };
 
@@ -436,9 +491,7 @@ export const Loading: Story = {
 		await expect(panel.getByRole("heading", { level: 2 })).toHaveAccessibleName("Loading result");
 		panel.getByRole("button", { name: "Practice reviews" });
 		await expect(panel.queryByText("We could not load this result")).not.toBeInTheDocument();
-		await expect(
-			panel.queryByRole("button", { name: "Mark as incorrect" }),
-		).not.toBeInTheDocument();
+		await expect(panel.queryByRole("button", { name: "Mark incorrect" })).not.toBeInTheDocument();
 	},
 };
 
@@ -459,9 +512,7 @@ export const LoadFailed: Story = {
 		await expect(panel.getByText("We could not load this result")).toBeVisible();
 		// With no record to name it, the level is named for what it is.
 		await expect(screen.getByRole("dialog")).toHaveAccessibleName("Result");
-		await expect(
-			panel.queryByRole("button", { name: "Mark as incorrect" }),
-		).not.toBeInTheDocument();
+		await expect(panel.queryByRole("button", { name: "Mark incorrect" })).not.toBeInTheDocument();
 		await expect(panel.getByRole("button", { name: "Retry" })).toBeEnabled();
 	},
 };
@@ -471,10 +522,10 @@ export const TextUnavailable: Story = {
 	args: {
 		result: ready({
 			...reviewResultDetail,
-			summary: undefined,
-			evidenceRationale: undefined,
-			evidence: undefined,
-			observations: [],
+			summary: null,
+			explanation: null,
+			evidence: null,
+			problems: [],
 			evidenceHidden: true,
 		}),
 	},

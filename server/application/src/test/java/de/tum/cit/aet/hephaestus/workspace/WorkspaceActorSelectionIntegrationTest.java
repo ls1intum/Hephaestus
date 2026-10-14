@@ -73,14 +73,14 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractWorkspaceIntegratio
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-github/members/me")
-                .jsonPath("$.accountId")
+                .jsonPath("$.account.id")
                 .isEqualTo(Objects.requireNonNull(account.getId()).toString())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
         // Slack and Outline attribute through the same account view.
         assertThat(memberships.membershipsForAccount(Objects.requireNonNull(account.getId())))
-                .extracting(MembershipView::accountId)
-                .containsExactly(account.getId());
+                .extracting(MembershipView::workspaceId)
+                .containsExactly(workspace.getId());
     }
 
     @Test
@@ -164,13 +164,13 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractWorkspaceIntegratio
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-lrz/members/me")
-                .jsonPath("$.accountId")
+                .jsonPath("$.account.id")
                 .isEqualTo(Objects.requireNonNull(account.getId()).toString())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
         assertThat(memberships.membershipsForAccount(Objects.requireNonNull(account.getId())))
-                .extracting(MembershipView::accountId)
-                .containsExactly(account.getId());
+                .extracting(MembershipView::workspaceId)
+                .containsExactly(workspace.getId());
     }
 
     private WebTestClient.BodyContentSpec read(String token, String uri) {

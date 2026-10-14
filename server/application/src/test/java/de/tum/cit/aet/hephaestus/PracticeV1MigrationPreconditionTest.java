@@ -16,6 +16,13 @@ class PracticeV1MigrationPreconditionTest {
     void shouldHaltAtomicallyAndPermitTheCorrectedSourceToMigrate(String context) throws Exception {
         var cases = new Corruption[] {
             new Corruption(
+                    "UPDATE feedback_dispatch SET"
+                        + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
+                        + " WHERE id='00000000-0000-0000-0000-000000992241'",
+                    "SQL Precondition failed",
+                    "UPDATE feedback_dispatch SET state='PENDING',lease_owner=NULL,lease_expires_at=NULL WHERE"
+                            + " id='00000000-0000-0000-0000-000000992241'"),
+            new Corruption(
                     "UPDATE agent_job SET metadata=jsonb_set(metadata,'{about_user_id}','123456789'::jsonb) WHERE"
                             + " id='00000000-0000-0000-0000-000000992113'",
                     "person reference has no SCM user",

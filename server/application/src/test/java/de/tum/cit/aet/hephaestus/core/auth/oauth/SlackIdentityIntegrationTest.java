@@ -57,7 +57,6 @@ class SlackIdentityIntegrationTest extends RealAuthIntegrationTest {
                         githubPrincipal("gh-1", "dev@example.com", "octocat"),
                         AuthIntentCookie.Intent.login(null, null))
                 .account();
-        long accountsAfterLogin = accountRepository.count();
 
         // While authenticated, they link "Sign in with Slack" (simulated id_token: sub=U1,
         // team_id=T1).
@@ -70,7 +69,7 @@ class SlackIdentityIntegrationTest extends RealAuthIntegrationTest {
         assertThat(linked.identityLinked()).isTrue();
         assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
         // The link attached to the existing account — it did NOT JIT a new one.
-        assertThat(accountRepository.count()).isEqualTo(accountsAfterLogin);
+        assertThat(accountRepository.findById(persistedId(github.getId()))).isPresent();
 
         // Exactly one SLACK identity link (subject U1, team T1, MANUAL_LINK) now hangs off the SAME
         // account.
@@ -87,7 +86,6 @@ class SlackIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void unauthenticatedSlackLinkStartCreatesNoAccount() {
         seedProvider("slack-noauth", LoginProvider.ProviderType.SLACK);
-        long before = accountRepository.count();
 
         // A LINK-mode Slack callback with no authenticated account binding must fail closed — never
         // an orphan.
@@ -98,7 +96,7 @@ class SlackIdentityIntegrationTest extends RealAuthIntegrationTest {
                         AuthIntentCookie.Intent.link(null, "/settings")))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(accountRepository.count()).isEqualTo(before);
+        assertThat(accountRepository.findByPrimaryEmail("dev@example.com")).isEmpty();
     }
 
     private void seedProvider(String registrationId, LoginProvider.ProviderType type) {

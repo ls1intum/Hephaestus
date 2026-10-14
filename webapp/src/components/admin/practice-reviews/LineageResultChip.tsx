@@ -63,7 +63,7 @@ export function LineageResultChip({
 	const outcome = OUTCOME_DEFS[result.outcome];
 	const words = [
 		`Result ${number}, ${outcome.label.toLowerCase()}`,
-		withSummary ? `: ${resultSummary({ summary: result.summary ?? undefined })}` : "",
+		withSummary ? `: ${resultSummary(result)}` : "",
 	].join("");
 	return (
 		<span

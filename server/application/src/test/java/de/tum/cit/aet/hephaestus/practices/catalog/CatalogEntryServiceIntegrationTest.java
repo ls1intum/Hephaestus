@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,20 +21,21 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     CatalogEntryRepository entries;
 
     @Test
-    void shouldKeepKindAndDefinitionInOneCatalogDocument() {
+    void shouldKeepKindInItsColumnWithoutDuplicatingAuthoredContent() {
         String slug = "local-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var created = catalog.putPractice(
-                slug, new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 2), true, null);
+        var created =
+                catalog.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 2));
         var row = entries.findById(new CatalogEntry.Id(CatalogEntryType.PRACTICE, slug))
                 .orElseThrow();
         assertThat(row.getKind()).isEqualTo(new ItemKind("scm.pull_request"));
         assertThat(row.getDefinition()).isNotNull();
+        assertThat(Objects.requireNonNull(row.getDefinition()).has("kind")).isFalse();
+        assertThat(row.getKind()).isEqualTo(created.kind());
         assertThat(created.effective().definition()).isEqualTo(definition);
-        assertThatThrownBy(() -> catalog.putPractice(
+        assertThatThrownBy(() -> catalog.updatePractice(
                         slug,
                         new CatalogPracticeInputDTO(slug, "scm.issue", null, definition, 2),
-                        false,
                         EntityTagPrecondition.parse(EntityTagPrecondition.format(created.etag()))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
@@ -42,8 +44,8 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
     void shouldRestoreExclusionWithoutLosingTheAuthoredDefinition() {
         String slug = "exclude-" + UUID.randomUUID();
         var definition = DefinitionTestFixtures.definition();
-        var created = catalog.putPractice(
-                slug, new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0), true, null);
+        var created =
+                catalog.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
         catalog.setExcluded(
                 CatalogEntryType.PRACTICE,
                 slug,
@@ -67,7 +69,7 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .findFirst()
                 .orElseThrow();
         var local = DefinitionTestFixtures.rename(shipped.effective().definition(), "Local catalog name");
-        var changed = catalog.putPractice(
+        var changed = catalog.updatePractice(
                 shipped.slug(),
                 new CatalogPracticeInputDTO(
                         shipped.slug(),
@@ -75,7 +77,6 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                         shipped.effective().groupSlug(),
                         local,
                         7),
-                false,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(shipped.etag())));
         catalog.setExcluded(
                 CatalogEntryType.PRACTICE,
@@ -108,5 +109,31 @@ class CatalogEntryServiceIntegrationTest extends AbstractWorkspaceIntegrationTes
                 false,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(reset.etag())));
         assertThat(catalog.practice(shipped.slug()).offered()).isTrue();
+    }
+
+    @Test
+    void shouldRejectAnOldEtagAfterTheDefinitionChangesAndIsRestored() {
+        String slug = "stale-" + UUID.randomUUID();
+        var definition = DefinitionTestFixtures.definition();
+        var first = catalog.createPractice(new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0));
+        var edited = catalog.updatePractice(
+                slug,
+                new CatalogPracticeInputDTO(
+                        slug, "scm.pull_request", null, DefinitionTestFixtures.rename(definition, "Edited name"), 0),
+                EntityTagPrecondition.parse(EntityTagPrecondition.format(first.etag())));
+        var restored = catalog.updatePractice(
+                slug,
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, definition, 0),
+                EntityTagPrecondition.parse(EntityTagPrecondition.format(edited.etag())));
+        assertThat(restored.effective()).isEqualTo(first.effective());
+        assertThat(restored.base()).isEqualTo(first.base());
+        assertThat(restored.etag()).isNotEqualTo(first.etag());
+        assertThatThrownBy(() -> catalog.setExcluded(
+                        CatalogEntryType.PRACTICE,
+                        slug,
+                        true,
+                        EntityTagPrecondition.parse(EntityTagPrecondition.format(first.etag()))))
+                .isInstanceOf(StaleCatalogEntryException.class);
+        assertThat(catalog.practice(slug).excluded()).isFalse();
     }
 }

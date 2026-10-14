@@ -11,7 +11,7 @@ export interface EvidenceLocation {
 	sourceKind: string;
 	side?: "OLD" | "NEW";
 	/** The commit a quote from the repository's history was verified against. */
-	revision?: string;
+	commit?: string;
 	/** Absent where the citation recorded only its place. */
 	snippet?: string;
 	/**
@@ -38,7 +38,7 @@ interface DiffBlock {
  * Two sides of one change: the same passage of the same file, quoted from either side of the diff.
  * The wire carries no hunk identity, so every other fact of a citation has to agree before two
  * blocks may become one — the source they were read from, the source kind, the file, and the
- * lines. The revision is deliberately not one of them: on a diff citation it names the commit of
+ * lines. The commit is deliberately not one of them: on a diff citation it names the commit of
  * the side it was read from, so the two sides of one change carry two different ones.
  */
 const pairsWith = (kept: DiffBlock, next: EvidenceCitation) =>
@@ -88,7 +88,7 @@ function foldDiffSides(citations: EvidenceCitation[]): EvidenceLocation[] {
 /**
  * One citation as the profile reads it. A folded block keeps neither the side, the commit nor the
  * quote of the citation it grew from, and is captioned with no line range: each side was read at
- * its own revision, so any one of them would be true of one side only, and the block shows both.
+ * its own commit, so any one of them would be true of one side only, and the block shows both.
  */
 function toLocation({ citation, change }: DiffBlock): EvidenceLocation {
 	if (change !== undefined) {
@@ -106,7 +106,7 @@ function toLocation({ citation, change }: DiffBlock): EvidenceLocation {
 		endLine: citation.endLine ?? undefined,
 		sourceKind: citation.sourceKind,
 		side: citation.side ?? undefined,
-		revision: citation.revision ?? undefined,
+		commit: citation.revision ?? undefined,
 		snippet: citation.quote ?? undefined,
 	};
 }

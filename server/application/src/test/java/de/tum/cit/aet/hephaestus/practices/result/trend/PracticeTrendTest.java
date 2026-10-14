@@ -74,6 +74,6 @@ class PracticeTrendTest {
     }
 
     private PracticeTrend trend(ResultView... practiceResults) {
-        return PracticeTrendCalculator.calculatePractice("testing", List.of(practiceResults), CUTOFF, properties);
+        return PracticeTrendCalculator.calculatePractice(List.of(practiceResults), CUTOFF, properties);
     }
 }

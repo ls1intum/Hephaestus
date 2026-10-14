@@ -13,70 +13,60 @@ import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewPracticeCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewResultCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewStatusCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.TimeBucketSize;
-import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @ConditionalOnServerRole
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReviewOverviewService {
-    private final JdbcClient jdbc;
+    private final ReviewOverviewRepository counts;
     private final PracticeRepository practices;
+    private final Clock clock;
+    private final JsonMapper json;
 
     public TimeRange allTime(long ws, @Nullable Instant to, Clock clock) {
         var now = clock.instant();
         var end = to == null || to.isAfter(now) ? now : to;
-        var first = jdbc.sql("SELECT min(created_at) FROM review WHERE workspace_id=:ws")
-                .param("ws", ws)
-                .query(OffsetDateTime.class)
-                .optional()
-                .map(OffsetDateTime::toInstant)
-                .filter(t -> t.isBefore(end))
-                .orElse(end);
-        return new TimeRange(first, end);
+        return new TimeRange(counts.first(ws).filter(t -> t.isBefore(end)).orElse(end), end);
     }
 
     public ReviewOverviewDTO overview(long ws, TimeBuckets buckets) {
         var range = buckets.range();
-        var result = outcomes(ws, range, null);
-        var feedback = feedback(ws, range, null);
-        var status = counts(ws, range, "review", "created_at", "status");
-        var reviewCounts = new ReviewStatusCountsDTO(
-                get(status, "QUEUED"),
-                get(status, "RUNNING"),
-                get(status, "COMPLETE"),
-                get(status, "PARTIAL"),
-                get(status, "FAILED"),
-                get(status, "CANCELLED"));
-        var byBucket = IntStream.range(0, buckets.starts().size())
+        var outcomes = counts.outcomes(ws, range.from(), range.to());
+        var feedback = counts.feedback(ws, range.from(), range.to());
+        var incorrect = counts.incorrect(ws, range.from(), range.to());
+        var status = counts.statuses(ws, range.from(), range.to()).stream()
+                .collect(Collectors.toMap(
+                        ReviewOverviewRepository.StatusCount::getStatus,
+                        ReviewOverviewRepository.StatusCount::getCount));
+        var groupedBuckets =
+                counts.buckets(ws, range.from(), range.to(), json.writeValueAsString(buckets.epochSeconds())).stream()
+                        .collect(Collectors.toMap(ReviewOverviewRepository.BucketCount::getBucket, b -> b));
+        var timeline = IntStream.range(0, buckets.starts().size())
                 .mapToObj(i -> {
-                    var from = buckets.starts().get(i).isBefore(range.from())
-                            ? range.from()
-                            : buckets.starts().get(i);
-                    var to = i + 1 == buckets.starts().size()
-                            ? range.to()
-                            : buckets.starts().get(i + 1);
+                    var b = groupedBuckets.get(i + 1);
                     return new ReviewBucketDTO(
                             buckets.starts().get(i),
-                            total(ws, "review", "created_at", from, to),
-                            total(ws, "result", "recorded_at", from, to),
-                            total(ws, "feedback", "created_at", from, to));
+                            b == null ? 0 : b.getReviews(),
+                            b == null ? 0 : b.getResults(),
+                            b == null ? 0 : b.getFeedback());
                 })
                 .toList();
         var byPractice = practices.findByWorkspaceId(ws).stream()
@@ -86,9 +76,9 @@ public class ReviewOverviewService {
                             p.getSlug(),
                             Objects.requireNonNull(p.getCurrentVersion().getName()),
                             g == null ? null : new GroupRefDTO(g.getSlug(), g.getName(), g.getIcon(), g.getColor()),
-                            outcomes(ws, range, p.getId()),
-                            incorrect(ws, range, p.getId()),
-                            feedback(ws, range, p.getId()));
+                            outcomes(outcomes, p.getId()),
+                            marked(incorrect, p.getId()),
+                            feedback(feedback, p.getId()));
                 })
                 .filter(p -> p.results().met()
                                 + p.results().notMet()
@@ -108,133 +98,78 @@ public class ReviewOverviewService {
                 range.from(),
                 range.to(),
                 TimeBucketSize.valueOf(buckets.size().name()),
-                reviewCounts,
-                result,
-                incorrect(ws, range, null),
-                feedback,
-                byBucket,
+                new ReviewStatusCountsDTO(
+                        status.getOrDefault(ReviewStatus.QUEUED, 0),
+                        status.getOrDefault(ReviewStatus.RUNNING, 0),
+                        status.getOrDefault(ReviewStatus.COMPLETE, 0),
+                        status.getOrDefault(ReviewStatus.PARTIAL, 0),
+                        status.getOrDefault(ReviewStatus.FAILED, 0),
+                        status.getOrDefault(ReviewStatus.CANCELLED, 0)),
+                outcomes(outcomes, null),
+                marked(incorrect, null),
+                feedback(feedback, null),
+                timeline,
                 byPractice);
     }
 
-    private ReviewResultCountsDTO outcomes(long ws, TimeRange range, @Nullable Long practice) {
-        var params = new LinkedHashMap<String, Object>();
-        params.put("ws", ws);
-        params.put("from", Timestamp.from(range.from()));
-        params.put("to", Timestamp.from(range.to()));
-        if (practice != null) params.put("practice", practice);
-        var c = jdbc
-                .sql("SELECT outcome,count(*) FROM result WHERE workspace_id=:ws AND recorded_at>=:from AND"
-                        + " recorded_at<:to"
-                        + (practice == null ? "" : " AND practice_id=:practice") + " GROUP BY outcome")
-                .params(params)
-                .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    private static ReviewResultCountsDTO outcomes(
+            List<ReviewOverviewRepository.OutcomeCount> rows, @Nullable Long practice) {
+        var c = rows.stream()
+                .filter(r -> Objects.equals(r.getPracticeId(), practice))
+                .collect(Collectors.toMap(
+                        ReviewOverviewRepository.OutcomeCount::getOutcome,
+                        ReviewOverviewRepository.OutcomeCount::getCount));
         return new ReviewResultCountsDTO(
-                get(c, "MET"), get(c, "NOT_MET"), get(c, "DOES_NOT_APPLY"), get(c, "COULD_NOT_DETERMINE"));
+                c.getOrDefault(ResultOutcome.MET, 0),
+                c.getOrDefault(ResultOutcome.NOT_MET, 0),
+                c.getOrDefault(ResultOutcome.DOES_NOT_APPLY, 0),
+                c.getOrDefault(ResultOutcome.COULD_NOT_DETERMINE, 0));
     }
 
-    private ReviewFeedbackCountsDTO feedback(long ws, TimeRange range, @Nullable Long practice) {
-        var params = new LinkedHashMap<String, Object>();
-        params.put("ws", ws);
-        params.put("from", Timestamp.from(range.from()));
-        params.put("to", Timestamp.from(range.to()));
-        if (practice != null) params.put("practice", practice);
-        var c = jdbc
-                .sql("SELECT f.state,count(*) FROM feedback f WHERE f.workspace_id=:ws AND f.created_at>=:from AND"
-                        + " f.created_at<:to"
-                        + (practice == null
-                                ? ""
-                                : " AND EXISTS(SELECT 1 FROM feedback_basis b JOIN result r ON"
-                                        + " r.id=b.result_id AND r.workspace_id=b.workspace_id WHERE"
-                                        + " b.workspace_id=f.workspace_id AND b.feedback_id=f.id AND"
-                                        + " r.practice_id=:practice)")
-                        + " GROUP BY f.state")
-                .params(params)
-                .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    private static ReviewFeedbackCountsDTO feedback(
+            List<ReviewOverviewRepository.FeedbackCount> rows, @Nullable Long practice) {
+        var c = rows.stream()
+                .filter(r -> Objects.equals(r.getPracticeId(), practice))
+                .collect(Collectors.toMap(
+                        ReviewOverviewRepository.FeedbackCount::getState,
+                        ReviewOverviewRepository.FeedbackCount::getCount));
         return new ReviewFeedbackCountsDTO(
-                get(c, "AWAITING_APPROVAL"),
-                get(c, "READY"),
-                get(c, "DELIVERED"),
-                get(c, "UNCONFIRMED"),
-                get(c, "WITHHELD"),
-                get(c, "REJECTED"),
-                get(c, "REPLACED"),
-                get(c, "FAILED"));
+                c.getOrDefault(FeedbackState.AWAITING_APPROVAL, 0),
+                c.getOrDefault(FeedbackState.READY, 0),
+                c.getOrDefault(FeedbackState.DELIVERED, 0),
+                c.getOrDefault(FeedbackState.UNCONFIRMED, 0),
+                c.getOrDefault(FeedbackState.WITHHELD, 0),
+                c.getOrDefault(FeedbackState.REJECTED, 0),
+                c.getOrDefault(FeedbackState.REPLACED, 0),
+                c.getOrDefault(FeedbackState.FAILED, 0));
     }
 
-    private int incorrect(long ws, TimeRange range, @Nullable Long practice) {
-        var params = new LinkedHashMap<String, Object>();
-        params.put("ws", ws);
-        params.put("from", Timestamp.from(range.from()));
-        params.put("to", Timestamp.from(range.to()));
-        if (practice != null) params.put("practice", practice);
-        return jdbc.sql("SELECT count(*) FROM result r WHERE r.workspace_id=:ws AND r.recorded_at>=:from AND"
-                        + " r.recorded_at<:to"
-                        + (practice == null ? "" : " AND r.practice_id=:practice")
-                        + " AND EXISTS(SELECT 1 FROM result_mark m WHERE m.workspace_id=r.workspace_id AND"
-                        + " m.result_id=r.id AND m.kind='INCORRECT' AND m.removed_at IS NULL)")
-                .params(params)
-                .query((rs, n) -> rs.getInt(1))
-                .single();
-    }
-
-    private Map<String, Integer> counts(long ws, TimeRange range, String table, String time, String field) {
-        return jdbc
-                .sql("SELECT " + field + ",count(*) FROM " + table + " WHERE workspace_id=:ws AND " + time
-                        + ">=:from AND " + time + "<:to GROUP BY " + field)
-                .param("ws", ws)
-                .param("from", Timestamp.from(range.from()))
-                .param("to", Timestamp.from(range.to()))
-                .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
-                .list()
-                .stream()
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-    }
-
-    private int total(long ws, String table, String time, Instant from, Instant to) {
-        return jdbc.sql("SELECT count(*) FROM " + table + " WHERE workspace_id=:ws AND " + time + ">=:from AND " + time
-                        + "<:to")
-                .param("ws", ws)
-                .param("from", Timestamp.from(from))
-                .param("to", Timestamp.from(to))
-                .query((rs, n) -> rs.getInt(1))
-                .single();
-    }
-
-    private static int get(Map<String, Integer> counts, String key) {
-        return counts.getOrDefault(key, 0);
+    private static int marked(List<ReviewOverviewRepository.MarkedCount> rows, @Nullable Long practice) {
+        return rows.stream()
+                .filter(r -> Objects.equals(r.getPracticeId(), practice))
+                .mapToInt(ReviewOverviewRepository.MarkedCount::getCount)
+                .sum();
     }
 
     public List<ReviewEvidenceOutcomeDTO> evidenceOutcomes(long ws) {
-        var range = new TimeRange(Instant.now().minus(Duration.ofDays(30)), Instant.now());
+        var now = clock.instant();
+        var from = now.minus(Duration.ofDays(30));
+        var outcomes = counts.outcomes(ws, from, now);
+        var states = counts.itemStates(ws, from, now).stream()
+                .collect(Collectors.groupingBy(ReviewOverviewRepository.ItemCount::getPracticeId));
         return practices.findByWorkspaceId(ws).stream()
                 .map(p -> {
-                    var c = outcomes(ws, range, p.getId());
-                    var statuses = jdbc
-                            .sql("SELECT m.state,count(*) FROM review_item m JOIN review q ON"
-                                    + " q.id=m.review_id AND q.workspace_id=m.workspace_id WHERE"
-                                    + " m.workspace_id=:ws AND m.practice_id=:practice AND q.created_at>=:from"
-                                    + " AND q.created_at<:to AND (m.state='WITHHELD' OR (m.state='LISTED'"
-                                    + " AND q.status IN ('COMPLETE','PARTIAL','FAILED','CANCELLED'))) GROUP BY m.state")
-                            .param("ws", ws)
-                            .param("practice", p.getId())
-                            .param("from", Timestamp.from(range.from()))
-                            .param("to", Timestamp.from(range.to()))
-                            .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
-                            .list()
-                            .stream()
-                            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+                    var c = outcomes(outcomes, p.getId());
+                    var s = states.getOrDefault(p.getId(), List.of()).stream()
+                            .collect(Collectors.toMap(
+                                    ReviewOverviewRepository.ItemCount::getState,
+                                    ReviewOverviewRepository.ItemCount::getCount));
                     return new ReviewEvidenceOutcomeDTO(
                             p.getSlug(),
                             Objects.requireNonNull(p.getCurrentVersion().getName()),
                             new OutcomeVectorDTO(c.met(), c.notMet(), c.doesNotApply(), c.couldNotDetermine()),
-                            get(statuses, "WITHHELD"),
-                            get(statuses, "LISTED"));
+                            s.getOrDefault(ReviewItemState.WITHHELD, 0),
+                            s.getOrDefault(ReviewItemState.LISTED, 0));
                 })
                 .toList();
     }

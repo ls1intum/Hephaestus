@@ -1,27 +1,50 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
+import type { FeedbackCopy } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { PRIVATE_FEEDBACK_TEXT, reviewFeedbackDetail } from "./fixtures";
 import { ReviewPackage } from "./ReviewPackage";
 
 const longPath =
 	"server/src/main/java/de/tum/cit/aet/hephaestus/integration/provider/gitlab/WorkspaceMembershipReconciliationService.java";
-const feedback = {
-	...reviewFeedbackDetail,
-	proposedPlacements: [
-		{
-			type: "SUMMARY" as const,
-			body: "### Keep the retry boundary explicit\n\nThe review found one error-handling change to make.",
-		},
-		{
-			type: "INLINE" as const,
-			body: "Catch only the provider failure that is safe to retry; programming errors must still surface.",
-			path: longPath,
-			startLine: 148,
-			endLine: 152,
-		},
-	],
-};
+const copy = (fields: Partial<FeedbackCopy> & Pick<FeedbackCopy, "id" | "kind" | "position">) =>
+	({
+		body: null,
+		chatMessageId: null,
+		endLine: null,
+		externalRef: null,
+		externalUrl: null,
+		lastError: null,
+		path: null,
+		postedAt: null,
+		side: null,
+		startLine: null,
+		state: "POSTED",
+		stopReason: null,
+		writeStartedAt: null,
+		...fields,
+	}) satisfies FeedbackCopy;
+
+const copies = [
+	copy({
+		id: "copy-summary",
+		kind: "SUMMARY",
+		position: 0,
+		body: "### Keep the retry boundary explicit\n\nThe review found one error-handling change to make.",
+	}),
+	copy({
+		id: "copy-line-note",
+		kind: "LINE_NOTE",
+		position: 1,
+		body: "Catch only the provider failure that is safe to retry; programming errors must still surface.",
+		path: longPath,
+		side: "NEW",
+		startLine: 148,
+		endLine: 152,
+		state: "FAILED",
+	}),
+];
+const feedback = { ...reviewFeedbackDetail, destination: "ON_WORK" as const, copies };
 
 const meta = {
 	component: ReviewPackage,
@@ -61,24 +84,15 @@ export const ExactSummaryAndInlinePackage: Story = {
 };
 
 /**
- * A card on the developer's own practice pages is theirs alone: handed placements anyway, the
+ * A card on the developer's own practice pages is theirs alone: handed copies anyway, the
  * package says the text is withheld and shows none of it, not even the file it is about.
  */
 export const PrivatePlaceNeverShown: Story = {
 	args: {
 		feedback: {
 			...feedback,
-			channel: "IN_APP",
-			location: "PRACTICE_PAGES",
-			proposedPlacements: [
-				{ type: "SUMMARY" as const, body: PRIVATE_FEEDBACK_TEXT },
-				{
-					type: "INLINE" as const,
-					body: PRIVATE_FEEDBACK_TEXT,
-					path: longPath,
-					startLine: 148,
-				},
-			],
+			destination: "PRACTICE_PAGE",
+			copies: copies.map((each) => ({ ...each, body: PRIVATE_FEEDBACK_TEXT })),
 		},
 	},
 	parameters: { chromatic: { viewports: [1440] } },

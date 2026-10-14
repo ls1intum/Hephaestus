@@ -25,13 +25,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab subgroup webhook events for real-time team structure updates.
- *
- * <p>Processes {@code subgroup_create} and {@code subgroup_destroy} events that are normalized to
- * the "subgroup" event key by the webhook receiver.
- *
- * <p>On creation, delegates to {@link GitLabTeamProcessor#process} to upsert a Team entity. On
- * deletion, delegates to {@link GitLabTeamProcessor#delete} to remove the team and cascade-clear
- * memberships and repo permissions.
+ * <p>
+ * Processes {@code subgroup_create} and {@code subgroup_destroy} events that are
+ * normalized to the "subgroup" event key by the webhook receiver.
+ * <p>
+ * On creation, delegates to {@link GitLabTeamProcessor#process} to upsert a Team entity.
+ * On deletion, delegates to {@link GitLabTeamProcessor#delete} to remove the team and
+ * cascade-clear memberships and repo permissions.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -101,11 +101,10 @@ public class GitLabSubgroupMessageHandler extends AbstractIntegrationMessageHand
     }
 
     /**
-     * On a connection route the event only says that a subgroup changed: the team stored is the
-     * group GitLab reports under that id now, and only while it lies inside the connected group. A
-     * team row another workspace's group owns is left to that workspace. Nothing is deleted here:
-     * GitLab not reporting a group to one connection does not prove it is gone, so a deleted
-     * subgroup's team stays until the next full team sync, which removes teams GitLab no longer
+     * On a connection route the event only says that a subgroup changed: the team stored is the group GitLab reports
+     * under that id now, and only while it lies inside the connected group. A team row another workspace's group owns
+     * is left to that workspace. Nothing is deleted here: GitLab not reporting a group to one connection does not prove
+     * it is gone, so a deleted subgroup's team stays until the next full team sync, which removes teams GitLab no longer
      * lists.
      */
     private void applyReportedGroup(GitLabRouteAdmission.AdmittedRoute route, long groupId, IdentityProvider provider) {

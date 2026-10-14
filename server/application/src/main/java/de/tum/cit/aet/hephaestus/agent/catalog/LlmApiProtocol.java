@@ -51,7 +51,7 @@ public enum LlmApiProtocol {
         return upstreamPath;
     }
 
-    /** Empty for a value no connection may hold, such as the protocols of pre-catalog snapshots. */
+    /** Empty for a protocol no connection supports. */
     public static Optional<LlmApiProtocol> parse(@Nullable String wire) {
         return Arrays.stream(values())
                 .filter(protocol -> protocol.wire.equals(wire))

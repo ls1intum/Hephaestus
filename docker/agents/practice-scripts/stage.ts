@@ -52,7 +52,7 @@ export const REQUESTED_PULL_REQUEST: Required<StagedInputs> = {
 	previous: null,
 };
 
-/** Stage one v3 input record beside each assigned script and its domain kits. */
+/** Stage one input record beside each assigned script and its domain kits. */
 export async function stagePracticeScripts(
 	scripts: Record<string, string | null>,
 	inputs: StagedInputs = REQUESTED_PULL_REQUEST,

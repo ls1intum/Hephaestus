@@ -2,29 +2,13 @@ package de.tum.cit.aet.hephaestus.practices.result.trend;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Reproducible evidence support and provenance for a trend direction — how much was compared, over which
- * calendar span, and under which parameters, so a reader can see what a direction rests on.
- *
- * <p>Carries counts rather than a graded level. A level existed here and was removed: with both bundles
- * necessarily full whenever a comparison is possible at all, it had exactly one reachable value, and across
- * every combination reachable at four opportunities per bundle it never once changed a verdict. The counts
- * below say the same thing without pretending to grade it.
- *
- * <p>{@code opportunities} is not {@code currentOpportunities + previousOpportunities}. At group scope one
- * piece of reviewed work can be current evidence for one practice and previous evidence for another, and a
- * reader counts it once; at practice scope the two bundles are disjoint and the sum is the same number.
- *
- * <p>{@code standingWork} and {@code reviewedWork} answer what a standing is read from, not what a direction
- * compares. {@code standingWork} is the distinct work in the current bundles: at practice scope it is
- * {@code currentOpportunities}; at group scope it covers every practice that joined the group's trend, compared
- * or not, because every one of them votes in the group's standing. {@code reviewedWork} is every distinct piece
- * of work in the look-back whose newest live review reached a verdict on the practice, or on any of the group's
- * practices, so it is never below {@code standingWork}. {@code reviewedWorkKind} is the kind all of that work
- * shares, and absent when it is mixed or there is none.
- */
+/** Evidence counts and time span used to compute a trend direction. */
 public record TrendSupport(
         int currentOpportunities,
         int previousOpportunities,
@@ -40,4 +24,100 @@ public record TrendSupport(
         @Nullable Integer calendarSpanDays,
         int bundleSize,
         double ropeHalfWidth,
-        double credibilityThreshold) {}
+        double credibilityThreshold) {
+    static TrendSupport forPractice(
+            TrendProperties properties,
+            int currentOpportunities,
+            int previousOpportunities,
+            int opportunitiesUntilComparable,
+            Map<Long, ItemKind> reviewedWork,
+            List<EvidenceOpportunity> trail) {
+        // One practice's bundles are disjoint, so no piece of reviewed work is in both.
+        return build(
+                properties,
+                currentOpportunities,
+                previousOpportunities,
+                currentOpportunities + previousOpportunities,
+                opportunitiesUntilComparable,
+                currentOpportunities,
+                reviewedWork,
+                null,
+                null,
+                trail);
+    }
+
+    static TrendSupport forGroup(
+            TrendProperties properties,
+            int currentOpportunities,
+            int previousOpportunities,
+            int opportunities,
+            int opportunitiesUntilComparable,
+            int standingWork,
+            Map<Long, ItemKind> reviewedWork,
+            int comparablePractices,
+            int eligiblePractices,
+            List<EvidenceOpportunity> trail) {
+        return build(
+                properties,
+                currentOpportunities,
+                previousOpportunities,
+                opportunities,
+                opportunitiesUntilComparable,
+                standingWork,
+                reviewedWork,
+                comparablePractices,
+                eligiblePractices,
+                trail);
+    }
+
+    private static TrendSupport build(
+            TrendProperties properties,
+            int currentOpportunities,
+            int previousOpportunities,
+            int opportunities,
+            int opportunitiesUntilComparable,
+            int standingWork,
+            Map<Long, ItemKind> reviewedWork,
+            @Nullable Integer comparablePractices,
+            @Nullable Integer eligiblePractices,
+            List<EvidenceOpportunity> trail) {
+        // The comparison span excludes work that offered no opportunity to apply the practice.
+        List<Instant> dated = trail.stream()
+                .filter(EvidenceOpportunity::decided)
+                .map(EvidenceOpportunity::occurredAt)
+                .toList();
+        Instant first = dated.stream().min(Instant::compareTo).orElse(null);
+        Instant last = dated.stream().max(Instant::compareTo).orElse(null);
+        Integer span = first == null || last == null ? null : inclusiveUtcDaySpan(first, last);
+        return new TrendSupport(
+                currentOpportunities,
+                previousOpportunities,
+                opportunities,
+                opportunitiesUntilComparable,
+                standingWork,
+                reviewedWork.size(),
+                sharedKind(reviewedWork),
+                comparablePractices,
+                eligiblePractices,
+                first,
+                last,
+                span,
+                properties.getBundleSize(),
+                properties.getRopeHalfWidth(),
+                properties.getCredibilityThreshold());
+    }
+
+    private static @Nullable ItemKind sharedKind(Map<Long, ItemKind> work) {
+        List<ItemKind> kinds = work.values().stream().distinct().toList();
+        return kinds.size() == 1 ? kinds.getFirst() : null;
+    }
+
+    public static int inclusiveUtcDaySpan(Instant first, Instant last) {
+        return (int) Math.max(
+                1,
+                ChronoUnit.DAYS.between(
+                                first.atZone(ZoneOffset.UTC).toLocalDate(),
+                                last.atZone(ZoneOffset.UTC).toLocalDate())
+                        + 1);
+    }
+}

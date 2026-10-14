@@ -71,8 +71,7 @@ public class PracticePageFeedbackBasis {
 
     public Map<Long, Practice> practices(long workspaceId, Collection<Result> results) {
         var ids = results.stream().map(Result::getPracticeId).collect(Collectors.toSet());
-        return practices.findAllById(ids).stream()
-                .filter(practice -> practice.getWorkspaceId() == workspaceId)
+        return practices.findByWorkspaceIdAndIdIn(workspaceId, ids).stream()
                 .collect(Collectors.toMap(Practice::getId, Function.identity()));
     }
 
@@ -85,13 +84,13 @@ public class PracticePageFeedbackBasis {
                 if (pinnedId == null) {
                     continue;
                 }
-                var pinned = versions.findById(pinnedId)
-                        .filter(version -> version.getWorkspaceId() == result.getWorkspaceId());
+                var pinned = versions.findByIdAndWorkspaceId(pinnedId, result.getWorkspaceId());
                 if (pinned.isEmpty()) {
                     continue;
                 }
-                var changedVersion = versions.findByPracticeIdOrderByNumberAsc(result.getPracticeId()).stream()
-                        .filter(version -> version.getWorkspaceId() == result.getWorkspaceId())
+                var changedVersion = versions
+                        .findByWorkspaceIdAndPracticeIdOrderByNumberAsc(result.getWorkspaceId(), result.getPracticeId())
+                        .stream()
                         .filter(version -> version.getNumber() > pinned.get().getNumber())
                         .filter(version ->
                                 !version.getReviewDigest().equals(pinned.get().getReviewDigest()))

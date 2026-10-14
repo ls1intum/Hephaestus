@@ -11,7 +11,7 @@
 			"citations": [
 				{
 					"sourceKind": "scm.pull-request.diff",
-					"artifactPath": "context/change.json",
+					"sourcePath": "context/change.json",
 					"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 					"side": "NEW",
 					"startLine": 88,
@@ -34,7 +34,7 @@
 			"citations": [
 				{
 					"sourceKind": "scm.pull-request.diff",
-					"artifactPath": "context/change.json",
+					"sourcePath": "context/change.json",
 					"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 					"side": "NEW",
 					"startLine": 41,
@@ -54,7 +54,7 @@
 	"example": {
 		"citation": {
 			"sourceKind": "scm.pull-request.diff",
-			"artifactPath": "context/change.json",
+			"sourcePath": "context/change.json",
 			"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 			"side": "NEW",
 			"startLine": 52,
@@ -65,17 +65,20 @@
 	},
 	"evidence": {
 		"search": {
-			"consulted": ["scm.pull-request.diff", "scm.repository.tree"],
+			"consulted": [
+				"scm.pull-request.diff",
+				"scm.repository.tree"
+			],
 			"lookedFor": "catch blocks and error callbacks that this pull request adds or changes and that drop the error",
 			"boundary": "every hunk of the three changed files; unchanged code only where a changed line calls it"
 		},
-		"undecidability": [
+		"openQuestions": [
 			{
 				"openQuestion": "Is an empty result here the documented contract for a missing invoice, or does it hide a failed lookup?",
 				"wouldSettleIt": "The contract of InvoiceRepository.findForExport, or a caller that treats an empty result as an error.",
 				"citation": {
 					"sourceKind": "scm.pull-request.diff",
-					"artifactPath": "context/change.json",
+					"sourcePath": "context/change.json",
 					"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 					"side": "NEW",
 					"startLine": 57,
@@ -96,8 +99,11 @@
 				"what": "lines of the export client beyond the read limit",
 				"count": 1,
 				"reason": "truncated",
-				"units": ["src/main/java/com/acme/billing/export/client/ExportClient.java"]
+				"items": [
+					"src/main/java/com/acme/billing/export/client/ExportClient.java"
+				]
 			}
-		]
+		],
+		"receipts": []
 	}
 }

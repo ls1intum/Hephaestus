@@ -52,8 +52,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
         String accountLogin = installation.accountLogin();
         if (accountLogin == null || !workspaceScopeFilter.isOrganizationAllowed(accountLogin)) {
             log.debug(
-                    "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={},"
-                            + " installationId={}",
+                    "Skipped workspace provisioning: reason=organizationFiltered, accountLogin={}, installationId={}",
                     installation.accountLogin(),
                     installation.installationId());
             return;
@@ -86,7 +85,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
 
             if (allowedRepos.size() < installation.repositories().size()) {
                 log.debug(
-                        "Filtered initial repositories by scope: installationId={}, allowed={}," + " total={}",
+                        "Filtered initial repositories by scope: installationId={}, allowed={}, total={}",
                         installation.installationId(),
                         allowedRepos.size(),
                         installation.repositories().size());
@@ -130,7 +129,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     public void onRepositoriesAdded(Long installationId, List<RepositorySnapshot> repositories) {
         if (installationId == null || repositories == null || repositories.isEmpty()) {
             log.debug(
-                    "Skipped repositories added event: reason=missingData, installationId={}," + " hasRepositories={}",
+                    "Skipped repositories added event: reason=missingData, installationId={}, hasRepositories={}",
                     installationId,
                     repositories != null && !repositories.isEmpty());
             return;
@@ -163,8 +162,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     public void onRepositoriesRemoved(Long installationId, List<RepositoryRemoval> repositories) {
         if (installationId == null || repositories == null || repositories.isEmpty()) {
             log.debug(
-                    "Skipped repositories removed event: reason=missingData, installationId={},"
-                            + " hasRepositories={}",
+                    "Skipped repositories removed event: reason=missingData, installationId={}, hasRepositories={}",
                     installationId,
                     repositories != null && !repositories.isEmpty());
             return;
@@ -184,7 +182,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
     public void onAccountRenamed(Long installationId, @Nullable String oldLogin, String newLogin) {
         if (installationId == null || newLogin == null || newLogin.isBlank()) {
             log.warn(
-                    "Skipped account rename: reason=invalidData, installationId={}, oldLogin={}," + " newLogin={}",
+                    "Skipped account rename: reason=invalidData, installationId={}, oldLogin={}, newLogin={}",
                     installationId,
                     oldLogin,
                     newLogin);
@@ -239,7 +237,7 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
 
     private void triggerInitialSync(Long installationId, Long workspaceId) {
         log.info(
-                "Starting initial sync for activated installation: installationId={}," + " workspaceId={}",
+                "Starting initial sync for activated installation: installationId={}, workspaceId={}",
                 installationId,
                 workspaceId);
 
@@ -247,12 +245,12 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
             try {
                 dataSyncTrigger.syncAllRepositories(workspaceId);
                 log.info(
-                        "Completed initial sync for activated installation:" + " installationId={}, workspaceId={}",
+                        "Completed initial sync for activated installation: installationId={}, workspaceId={}",
                         installationId,
                         workspaceId);
             } catch (Exception e) {
                 log.error(
-                        "Failed initial sync for activated installation: installationId={}," + " workspaceId={}",
+                        "Failed initial sync for activated installation: installationId={}, workspaceId={}",
                         installationId,
                         workspaceId,
                         e);
@@ -269,8 +267,8 @@ public class GitHubWorkspaceProvisioningAdapter implements ProvisioningListener 
 
     /**
      * Bridges the GitHub-shaped {@link ProvisioningListener.AccountType} (2 values) to the
-     * framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, including {@code
-     * TEAM_WORKSPACE} for Slack) — the third value is unreachable from the GitHub SPI surface.
+     * framework-wide {@link IntegrationLifecycleListener.AccountKind} (3 values, including
+     * {@code TEAM_WORKSPACE} for Slack) — the third value is unreachable from the GitHub SPI surface.
      */
     private static IntegrationLifecycleListener.AccountKind mapAccountKind(ProvisioningListener.AccountType type) {
         if (type == null) {

@@ -69,8 +69,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
             Long workspaceId, Long connectionId, String collectionId);
 
     /** Live document counts by collection — one query for the whole admin list. Each element is {@code [collectionId, count]}. */
-    @Query("SELECT d.collectionId, COUNT(d) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
-            + "AND d.connectionId = :connectionId AND d.deletedAt IS NULL GROUP BY d.collectionId")
+    @Query(
+            "SELECT d.collectionId, COUNT(d) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND d.deletedAt IS NULL GROUP BY d.collectionId")
     List<Object[]> countLiveByCollection(
             @Param("workspaceId") long workspaceId, @Param("connectionId") long connectionId);
 
@@ -85,30 +85,22 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * The body-free diff set the reconcile runs against. {@code LENGTH(body_markdown)} is evaluated in Postgres,
      * so no Markdown body crosses the wire or lands on the heap.
      */
-    @Query("SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id,"
-            + " d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt,"
-            + " d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject)"
-            + " FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId")
     List<OutlineDocumentSnapshot> findSnapshotsByWorkspaceIdAndConnectionId(
             @Param("workspaceId") long workspaceId, @Param("connectionId") long connectionId);
 
     /** One collection's mirrored rows, body-free — the scope of a collection-delete tombstone sweep. */
-    @Query("SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id,"
-            + " d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt,"
-            + " d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject)"
-            + " FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND"
-            + " d.collectionId = :collectionId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND d.collectionId = :collectionId")
     List<OutlineDocumentSnapshot> findSnapshotsByCollectionId(
             @Param("workspaceId") long workspaceId,
             @Param("connectionId") long connectionId,
             @Param("collectionId") String collectionId);
 
     /** One mirrored document's snapshot — the webhook targeted-refresh routing lookup (no body loaded). */
-    @Query("SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id,"
-            + " d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt,"
-            + " d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject)"
-            + " FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND"
-            + " d.documentId = :documentId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot(d.id, d.documentId, d.collectionId, d.collectionSlug, d.parentDocumentId, d.title, d.slug, d.archivedAt, d.outlineUpdatedAt, d.contentHash, d.deletedAt, LENGTH(d.bodyMarkdown), d.version, d.createdBySubject) FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND d.connectionId = :connectionId AND d.documentId = :documentId")
     Optional<OutlineDocumentSnapshot> findSnapshotByDocumentId(
             @Param("workspaceId") long workspaceId,
             @Param("connectionId") long connectionId,
@@ -124,8 +116,9 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * The linked-document lookup: matches reference tokens against either the document id or the slug, so a raw id
      * or a URL's trailing segment both resolve.
      */
-    @Query("SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId "
-            + "AND (d.documentId IN :refs OR d.slug IN :refs) " + PERSON_PROJECTION_GUARD)
+    @Query(
+            "SELECT d FROM OutlineDocument d WHERE d.workspaceId = :workspaceId AND (d.documentId IN :refs OR d.slug IN :refs) "
+                    + PERSON_PROJECTION_GUARD)
     List<OutlineDocument> findByWorkspaceIdAndReferenceIn(
             @Param("workspaceId") long workspaceId, @Param("refs") Collection<String> refs);
 
@@ -134,9 +127,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     Optional<OutlineDocument> findByWorkspaceIdAndIdForProjection(
             @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 
-    @Query("SELECT new"
-        + " de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentAccess(d.workspaceId,d.id,d.connectionId,d.createdBySubject,d.updatedBySubject,d.collaboratorSubjects,d.deletedAt)"
-        + " FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId")
+    @Query(
+            "SELECT new de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentAccess(d.workspaceId,d.id,d.connectionId,d.createdBySubject,d.updatedBySubject,d.collaboratorSubjects,d.deletedAt) FROM OutlineDocument d WHERE d.workspaceId=:workspaceId AND d.id=:documentId")
     Optional<OutlineDocumentAccess> findAccess(
             @Param("workspaceId") long workspaceId, @Param("documentId") long documentId);
 
@@ -163,13 +155,10 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * {@code left(...)} bound is a correctness guard and not an optimisation.
      */
     @Query(
-            value = "SELECT d.* FROM outline_document d WHERE d.workspace_id = :workspaceId "
-                    + PERSON_PROJECTION_SQL_GUARD
-                    + "AND deleted_at IS NULL AND body_markdown IS NOT NULL AND to_tsvector('simple', coalesce(title,"
-                    + " '') || ' ' || left(coalesce(body_markdown, ''), 900000)) @@ websearch_to_tsquery('simple',"
-                    + " :query) ORDER BY ts_rank(to_tsvector('simple', coalesce(title, '') || ' ' ||"
-                    + " left(coalesce(body_markdown, ''), 900000)), websearch_to_tsquery('simple', :query)) DESC,"
-                    + " outline_updated_at DESC NULLS LAST, id ASC LIMIT :limit",
+            value =
+                    "SELECT d.* FROM outline_document d WHERE d.workspace_id = :workspaceId "
+                            + PERSON_PROJECTION_SQL_GUARD
+                            + "AND deleted_at IS NULL AND body_markdown IS NOT NULL AND to_tsvector('simple', coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000)) @@ websearch_to_tsquery('simple', :query) ORDER BY ts_rank(to_tsvector('simple', coalesce(title, '') || ' ' || left(coalesce(body_markdown, ''), 900000)), websearch_to_tsquery('simple', :query)) DESC, outline_updated_at DESC NULLS LAST, id ASC LIMIT :limit",
             nativeQuery = true)
     List<OutlineDocument> searchByRelevance(
             @Param("workspaceId") long workspaceId, @Param("query") String query, @Param("limit") int limit);
@@ -187,8 +176,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * aggregate; coalesces an all-null/empty workspace to 0.
      */
     @Query(
-            value = "SELECT COALESCE(SUM(octet_length(body_markdown)), 0) FROM outline_document "
-                    + "WHERE workspace_id = :workspaceId",
+            value =
+                    "SELECT COALESCE(SUM(octet_length(body_markdown)), 0) FROM outline_document WHERE workspace_id = :workspaceId",
             nativeQuery = true)
     long sumBodySizeByWorkspaceId(@Param("workspaceId") long workspaceId);
 
@@ -206,9 +195,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * {@code octet_length(...)} projection.
      */
     @Query(
-            value = "SELECT id, octet_length(body_markdown) FROM outline_document "
-                    + "WHERE workspace_id = :workspaceId AND body_markdown IS NOT NULL "
-                    + "ORDER BY last_materialized_at ASC NULLS FIRST, id ASC LIMIT :limit",
+            value =
+                    "SELECT id, octet_length(body_markdown) FROM outline_document WHERE workspace_id = :workspaceId AND body_markdown IS NOT NULL ORDER BY last_materialized_at ASC NULLS FIRST, id ASC LIMIT :limit",
             nativeQuery = true)
     List<Object[]> findEvictionCandidates(@Param("workspaceId") long workspaceId, @Param("limit") int limit);
 
@@ -226,8 +214,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
     @Modifying
     @Transactional
     @Query(
-            value = "UPDATE outline_document SET body_markdown = NULL, body_evicted_at = now() "
-                    + "WHERE workspace_id = :workspaceId AND id IN (:ids)",
+            value =
+                    "UPDATE outline_document SET body_markdown = NULL, body_evicted_at = now() WHERE workspace_id = :workspaceId AND id IN (:ids)",
             nativeQuery = true)
     int evictBodies(@Param("workspaceId") long workspaceId, @Param("ids") List<Long> ids);
 
@@ -236,10 +224,8 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
      * collection is named as Outline shows it, never by its url id, which is a random slug nobody reads;
      * a collection whose name was never captured leaves it null.
      */
-    @Query("SELECT d.id AS id, d.title AS title, c.name AS collectionName FROM OutlineDocument d "
-            + "LEFT JOIN OutlineCollection c ON c.workspaceId = d.workspaceId AND c.connectionId = d.connectionId "
-            + "AND c.collectionId = d.collectionId "
-            + "WHERE d.workspaceId = :workspaceId AND d.id IN (:ids)")
+    @Query(
+            "SELECT d.id AS id, d.title AS title, c.name AS collectionName FROM OutlineDocument d LEFT JOIN OutlineCollection c ON c.workspaceId = d.workspaceId AND c.connectionId = d.connectionId AND c.collectionId = d.collectionId WHERE d.workspaceId = :workspaceId AND d.id IN (:ids)")
     List<DocumentLabel> findLabels(@Param("workspaceId") long workspaceId, @Param("ids") Collection<Long> ids);
 
     interface DocumentLabel {

@@ -1,3 +1,8 @@
+// Finds each note by someone other than the author, inline and in the conversation, one lead each, with
+// what the record shows beside it: the author's later reply, the resolution of the thread and who
+// resolved it, the reviewer's own later note, if and how soon the same reviewer approved after it, if
+// the note came after the work merged or closed, and the authored commits after it. The review decides
+// for each note if it asked something of this change and if the author engaged. The script never does.
 import { type ChangeCommit, readCapturedCommits } from "../kits/scm/change.ts";
 import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import {
@@ -13,11 +18,6 @@ import {
 	readReviewThreads,
 	reviewerCommentRows,
 } from "../kits/scm/review.ts";
-// Finds each note by someone other than the author, inline and in the conversation, one lead each, with
-// what the record shows beside it: the author's later reply, the resolution of the thread and who
-// resolved it, the reviewer's own later note, if and how soon the same reviewer approved after it, if
-// the note came after the work merged or closed, and the authored commits after it. The review decides
-// for each note if it asked something of this change and if the author engaged. The script never does.
 import { factsOf } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type Facts, type ReviewLead } from "../lib/core/practice-script.ts";
 
@@ -224,8 +224,9 @@ export default definePracticeScript({
 			facts: {
 				commentsFileAbsent: inline === null ? 1 : 0,
 				generalCommentsFileAbsent: general === null ? 1 : 0,
-				reviewerComments: inlineByPeople,
-				conversationComments: conversationByPeople,
+				// An uncaptured record counts nothing: its count is left out, never a measured 0.
+				...(inline === null ? {} : { reviewerComments: inlineByPeople }),
+				...(general === null ? {} : { conversationComments: conversationByPeople }),
 				botComments: notes.length - byPeople.length,
 				withAuthorReply: replied,
 				...(committedAfter === null ? {} : { withLaterCommitOnFile: committedAfter }),

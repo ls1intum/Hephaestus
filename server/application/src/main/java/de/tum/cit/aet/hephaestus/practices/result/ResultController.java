@@ -2,19 +2,16 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
-import de.tum.cit.aet.hephaestus.practices.result.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.ResultDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.ResultListDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
@@ -55,22 +52,6 @@ public class ResultController {
         Page<ResultListDTO> practiceResults =
                 resultQueryService.listOwnResults(workspaceContext.id(), filter.toQuery(), pageable);
         return ResponseEntity.ok(PageResponseDTO.from(practiceResults));
-    }
-
-    @GetMapping("/summary")
-    @Operation(
-            operationId = "getOwnResultSummary",
-            summary = "Per-practice summary for current developer",
-            description = "Aggregated result counts per practice for dashboard cards")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practice summaries returned",
-            content =
-                    @Content(
-                            array = @ArraySchema(schema = @Schema(implementation = DeveloperPracticeSummaryDTO.class))))
-    public ResponseEntity<List<DeveloperPracticeSummaryDTO>> getSummary(WorkspaceContext workspaceContext) {
-        List<DeveloperPracticeSummaryDTO> summaries = resultQueryService.ownSummary(workspaceContext.id());
-        return ResponseEntity.ok(summaries);
     }
 
     @GetMapping("/{resultId}")

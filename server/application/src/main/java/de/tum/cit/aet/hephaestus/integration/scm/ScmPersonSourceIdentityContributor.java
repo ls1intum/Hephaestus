@@ -55,13 +55,7 @@ public class ScmPersonSourceIdentityContributor implements PersonSourceIdentityC
         if (!itemKinds().contains(itemKind)) throw new IllegalArgumentException("Unsupported SCM item kind");
         if (itemKind.equals("scm.pull_request_review")) {
             var parents = jdbc.query(
-                    "SELECT parent.source_id FROM item child JOIN item parent ON"
-                            + " parent.workspace_id=child.workspace_id AND"
-                            + " parent.id=child.parent_id JOIN pull_request_review review ON"
-                            + " review.id=child.source_id AND"
-                            + " review.pull_request_id=parent.source_id WHERE"
-                            + " child.workspace_id=? AND child.kind='scm.pull_request_review'"
-                            + " AND child.source_id=? AND parent.kind='scm.pull_request'",
+                    "SELECT parent.source_id FROM item child JOIN item parent ON parent.workspace_id=child.workspace_id AND parent.id=child.parent_id JOIN pull_request_review review ON review.id=child.source_id AND review.pull_request_id=parent.source_id WHERE child.workspace_id=? AND child.kind='scm.pull_request_review' AND child.source_id=? AND parent.kind='scm.pull_request'",
                     (rs, row) -> rs.getLong("source_id"),
                     workspaceId,
                     sourceId);

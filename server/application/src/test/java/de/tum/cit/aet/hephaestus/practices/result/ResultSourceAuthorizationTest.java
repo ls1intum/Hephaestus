@@ -11,8 +11,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -41,7 +40,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     final AccountIdentityQuery identities = mock(AccountIdentityQuery.class);
     final AccountDirectory accounts = mock(AccountDirectory.class);
     final ItemSourceAccess source = mock(ItemSourceAccess.class);
-    final SourceCatalogRegistry catalog = mock(SourceCatalogRegistry.class);
+    final ClasspathSourceCatalogRegistry catalog = mock(ClasspathSourceCatalogRegistry.class);
     final ProblemRepository problems = mock(ProblemRepository.class);
     final JsonMapper json = new JsonMapper();
     final SourceUsePurpose purpose = SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW;
@@ -119,18 +118,11 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     void storedSourceKindUsesCurrentGovernanceRatherThanAnOldDefinition() {
         var evidence = json.createObjectNode();
         evidence.putArray("citations").addObject().put("sourceKind", "scm.pull-request.diff");
-        result.setEvidence(evidence);
-        var current = mock(SourceCatalog.class);
-        when(catalog.current()).thenReturn(current);
-        when(current.version()).thenReturn(SourceCatalogRegistry.CURRENT_VERSION);
+        var proof = result.toBuilder().evidence(evidence).build();
         var kind = new SourceKind("scm.pull-request.diff");
-        when(catalog.isSourceUsePermitted(SourceCatalogRegistry.CURRENT_VERSION, kind, purpose))
-                .thenReturn(false);
-        assertThat(authorization.authorized(result, receipt(List.of()), purpose))
-                .isFalse();
-        when(catalog.isSourceUsePermitted(SourceCatalogRegistry.CURRENT_VERSION, kind, purpose))
-                .thenReturn(true);
-        assertThat(authorization.authorized(result, receipt(List.of()), purpose))
-                .isTrue();
+        when(catalog.isSourceUsePermitted(kind, purpose)).thenReturn(false);
+        assertThat(authorization.authorized(proof, receipt(List.of()), purpose)).isFalse();
+        when(catalog.isSourceUsePermitted(kind, purpose)).thenReturn(true);
+        assertThat(authorization.authorized(proof, receipt(List.of()), purpose)).isTrue();
     }
 }

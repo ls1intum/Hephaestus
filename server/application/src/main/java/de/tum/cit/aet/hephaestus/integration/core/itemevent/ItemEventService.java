@@ -1,10 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -20,10 +19,9 @@ public class ItemEventService {
     private final ItemEventRepository repository;
     private final ItemRepository items;
     private final ApplicationEventPublisher publisher;
+    private final Clock clock;
 
     public UUID record(ItemEventInput input) {
-        if (input.foundBy() != FoundBy.WEBHOOK && input.foundBy() != FoundBy.SYNC)
-            throw new IllegalArgumentException("Only provider events create item events");
         var item = items.findByIdAndWorkspaceId(input.itemId(), input.workspaceId())
                 .orElseThrow(() -> new IllegalArgumentException("Item does not belong to workspace"));
         if (!input.name().value().startsWith(item.getKind().value() + "."))
@@ -39,7 +37,7 @@ public class ItemEventService {
                 input.foundBy().name(),
                 input.actorUserId(),
                 input.requestedById(),
-                Instant.now());
+                clock.instant());
         if (inserted == 1) {
             publisher.publishEvent(new ItemEventRecorded(input.workspaceId(), id, input.itemId()));
             return id;
@@ -56,7 +54,7 @@ public class ItemEventService {
             UUID eventId,
             ItemEventState from,
             ItemEventState to,
-            @Nullable ItemEventReason reason,
+            @Nullable String reason,
             @Nullable Instant retryAt) {
         if (from == ItemEventState.STARTED || from == ItemEventState.WITHHELD || from == ItemEventState.EXPIRED)
             throw new IllegalArgumentException("Terminal event decisions cannot be reopened");
@@ -65,6 +63,6 @@ public class ItemEventService {
                         || to == ItemEventState.BLOCKED
                         || to == ItemEventState.EXPIRED)
                 && reason == null) throw new IllegalArgumentException("Event decision requires a reason");
-        return repository.decide(workspaceId, eventId, from, to, reason, Instant.now(), retryAt) == 1;
+        return repository.decide(workspaceId, eventId, from, to, reason, clock.instant(), retryAt) == 1;
     }
 }

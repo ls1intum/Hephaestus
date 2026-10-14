@@ -3,17 +3,11 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
-import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeGuidance;
-import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
-import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
-import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasis;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -28,7 +22,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
-import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -39,7 +32,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Instant;
@@ -72,27 +64,11 @@ public class PracticeModelTestFixtures {
     public Work work(Workspace workspace, String slug, String kind, long sourceId) {
         var manager = Objects.requireNonNull(entities);
         var itemKind = new ItemKind(kind);
-        String source =
-                switch (kind) {
-                    case "scm.pull_request", "scm.pull_request_review" -> "scm.pull-request.core";
-                    case "scm.issue" -> "scm.issue.core";
-                    case "scm.file", "scm.repository" -> "scm.repository.tree";
-                    case "chat.thread" -> "slack.conversation.thread";
-                    case "docs.document" -> "docs.document.core";
-                    default -> throw new IllegalArgumentException("No source fixture for " + kind);
-                };
-        var definition = new PracticeDefinition(
-                slug,
-                new ReviewOn(List.of(), Map.of()),
-                null,
-                kind.equals("scm.file") || kind.equals("scm.repository") ? null : AboutRole.AUTHOR,
-                new PracticeReads("2.0.0", List.of(new PracticeReadSource(new SourceKind(source), ReadNeed.REQUIRED))),
-                new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
-                "Check the retained fixture work.",
-                null,
-                null,
-                false,
-                new PracticeGuidance(null, null, null, null, null));
+        var definition = DefinitionTestFixtures.withLineNotes(
+                DefinitionTestFixtures.withReviewOn(
+                        DefinitionTestFixtures.definition(itemKind, slug, "Check the retained fixture work.", null),
+                        new ReviewOn(List.of(), Map.of())),
+                false);
         var practice = versions.create(
                 new PracticeVersionService.NewPractice(workspace, slug, itemKind, definition, null, 0, null));
         var item = new Item();
@@ -219,8 +195,8 @@ public class PracticeModelTestFixtures {
         if (existing != 0) work = forkReview(work);
         jdbc.update(
                 "INSERT INTO"
-                    + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
-                    + " VALUES (?,?,'MEMBER',false,false,false,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
+                        + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
+                        + " VALUES (?,?,'MEMBER',false,false,false,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
                 work.review().getWorkspaceId(),
                 developerId);
         var at = Instant.now();

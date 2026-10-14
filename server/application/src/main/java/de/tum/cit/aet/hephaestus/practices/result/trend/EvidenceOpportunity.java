@@ -5,16 +5,6 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-/**
- * One comparable practice opportunity, normalized across all results in the latest run of one piece of reviewed work.
- *
- * <p>Carries no practice slug. The owning {@link PracticeTrend} already names the scope this list belongs to,
- * and the group aggregation merges opportunities that several practices saw on the same artifact — a merged
- * one answers to no single practice. A field nothing reads is a field that can only go stale or, worse, be
- * filtered on later as though it meant something.
- *
- * @param reviewId the run the opportunity was read off: the newest one that reviewed this piece of work
- */
 record EvidenceOpportunity(
         @NonNull ItemKind itemKind,
         long itemId,
@@ -30,7 +20,6 @@ record EvidenceOpportunity(
         return outcomes.decided() > 0;
     }
 
-    /** A verdict that raised no problem. Verdictless opportunities are neither clean nor dirty. */
     boolean clean() {
         return decided() && outcomes.notMet() == 0;
     }

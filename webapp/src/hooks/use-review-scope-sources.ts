@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { listGroupsOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
+import { listPracticeGroupsOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
 import {
 	groupFacetOptions,
 	type PracticeFacetOption,
@@ -21,7 +21,7 @@ export interface ReviewScopeSources {
  * deduplicates by key, so a switch between tabs asks for none of them again.
  */
 export function useReviewScopeSources(workspaceSlug: string): ReviewScopeSources {
-	const groupsQuery = useQuery({ ...listGroupsOptions({ path: { workspaceSlug } }) });
+	const groupsQuery = useQuery({ ...listPracticeGroupsOptions({ path: { workspaceSlug } }) });
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 	const people = useReviewPeople(workspaceSlug);
 	return {

@@ -18,7 +18,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub label webhook events. */
+/**
+ * Handles GitHub label webhook events.
+ */
 @Component
 public class GitHubLabelMessageHandler extends AbstractIntegrationMessageHandler<GitHubLabelEventDTO> {
 

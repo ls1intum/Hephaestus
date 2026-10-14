@@ -3,7 +3,7 @@ import { GripVertical, Library, ListChecks, MoreHorizontal, Plus } from "lucide-
 import { type ReactNode, useState } from "react";
 
 import { cn } from "cn";
-import type { CatalogPracticeSummary, Practice, PracticeGroup } from "@/api/types.gen";
+import type { Practice, PracticeGroup } from "@/api/types.gen";
 import { ITEM_KIND_TOGGLE_OPTIONS } from "@/components/admin/practice-editor/constants";
 import {
 	type GroupDetails,
@@ -18,6 +18,7 @@ import {
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-editor/SortableCatalogTree";
 import { AvailablePracticeList } from "@/components/admin/practices/AvailablePracticeList";
+import type { AdoptablePractice } from "@/components/admin/practices/catalog-adoption";
 import {
 	currentDefinition,
 	REVIEWED_BY_LABELS,
@@ -84,7 +85,7 @@ export interface PracticeCatalogPendingState {
 	creatingGroup: boolean;
 }
 
-export type LibraryState = PanelState<{ practices: CatalogPracticeSummary[] }>;
+export type LibraryState = PanelState<{ practices: AdoptablePractice[] }>;
 
 export interface PracticeLibrary {
 	open: boolean;

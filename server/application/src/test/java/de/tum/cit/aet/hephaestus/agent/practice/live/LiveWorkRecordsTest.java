@@ -3,11 +3,11 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
-import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
@@ -93,7 +93,7 @@ class LiveWorkRecordsTest {
     /** The single canonical v3 inputs file staged by the runtime serializer. */
     private JsonNode staged(String kind, ObjectNode work) throws IOException {
         var item = new ItemRef(1, 1, new ItemKind(kind), 1L, null, null);
-        var definition = RuntimePracticeTestData.definition(item.kind(), "Live practice", "Review the work.", null);
+        var definition = DefinitionTestFixtures.definition(item.kind(), "Live practice", "Review the work.", null);
         UUID reviewId = UUID.fromString("10000000-0000-4000-8000-000000000001");
         var pinned =
                 new PinnedPractice(1, 1, definition, "a".repeat(64), new ReviewMethod(1, "b".repeat(64), List.of()));
@@ -102,7 +102,7 @@ class LiveWorkRecordsTest {
                 new ReviewAssignmentId(reviewId, 1, 1), item, version, 1L, "live-practice", pinned);
         var review = new ReviewSnapshot(
                 reviewId, 1, item, ReviewKind.ITEM, version, ReviewOrigin.REQUEST, 1, List.of(pinned));
-        var staged = new PracticeScriptInputs(MAPPER).stage(review, assigned, work, LiveWorkRecords.AT, null, null);
+        var staged = new PracticeScriptInputs(MAPPER).stage(review, assigned, work, LiveWorkRecords.AT, null);
         return MAPPER.readTree(staged.values().iterator().next());
     }
 

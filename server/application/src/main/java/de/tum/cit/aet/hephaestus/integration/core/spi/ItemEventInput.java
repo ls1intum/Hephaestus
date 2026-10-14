@@ -14,7 +14,8 @@ public record ItemEventInput(
         @Nullable Long requestedById) {
     public ItemEventInput {
 
-        if (workspaceId <= 0
+        if ((foundBy != FoundBy.WEBHOOK && foundBy != FoundBy.SYNC)
+                || workspaceId <= 0
                 || itemId <= 0
                 || itemVersion.isBlank()
                 || itemVersion.length() > 1024

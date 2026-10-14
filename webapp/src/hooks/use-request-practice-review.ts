@@ -17,7 +17,7 @@ const READS_OF_STARTED_REVIEW: ReadonlySet<string> = new Set([
 	"getOwnItemTrace",
 	"listOwnItemReviews",
 	"listOwnReviews",
-	"getPracticeProfileOverview",
+	"getOwnPracticeProfileOverview",
 ]);
 
 /** Why an ask about one item started nothing, for the level that shows that item. */

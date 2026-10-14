@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import java.util.Collection;
 import java.util.Map;
@@ -21,7 +22,7 @@ public class FeedbackResponseSuppressionFilter {
         return basis.findSuppressedProblems(workspaceId, problemIds).stream()
                 .collect(Collectors.toUnmodifiableMap(
                         FeedbackBasisRepository.SuppressedProblem::getId,
-                        row -> "DISAGREE".equals(row.getResolution())
+                        row -> row.getResolution() == FeedbackResolution.DISAGREE
                                 ? FeedbackStopReason.REACTED_DISAGREE
                                 : FeedbackStopReason.REACTED_NOT_APPLICABLE,
                         (left, right) -> left == FeedbackStopReason.REACTED_DISAGREE ? left : right));

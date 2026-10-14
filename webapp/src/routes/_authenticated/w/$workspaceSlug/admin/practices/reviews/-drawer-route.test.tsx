@@ -1,44 +1,35 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, HttpResponse, http } from "msw";
+import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-	RESULT_WORDS_UNAVAILABLE,
-	resultSummary,
-} from "@/components/admin/practice-reviews/result-words";
 
-import {
-	getAgentJobQueryKey,
-	listPracticeReviewsInfiniteQueryKey,
-	listPracticeReviewsQueryKey,
-	listTracedArtifactsInfiniteQueryKey,
-	listTracedArtifactsQueryKey,
-} from "@/api/@tanstack/react-query.gen";
-import type { AgentJob, ReviewLineage } from "@/api/types.gen";
+import type { ReviewDetail, ReviewLineage, ReviewResult } from "@/api/types.gen";
 import {
 	feedbackDetail,
-	resultDetail,
 	practiceCounts,
-	practiceReviewOverview,
-	reviewFeedbackDetail,
-	reviewJob,
-	reviewObservations,
+	resultDetail,
+	reviewDetail,
+	reviewFeedback,
+	reviewItem,
+	reviewProblems,
+	reviewRefOf,
 	reviewResults,
-	reviewRuns,
+	reviews,
 	workspacePractices,
 } from "@/components/admin/practice-reviews/fixtures";
 import {
 	LINEAGE_REVIEW_ID,
-	lineageResult,
 	storyLineage,
 } from "@/components/admin/practice-reviews/lineage-fixtures";
+import { RESULT_WORDS_UNAVAILABLE } from "@/components/admin/practice-reviews/result-words";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { browserTimeZone } from "@/lib/dates";
+import { itemName } from "@/lib/item-kinds";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -51,11 +42,6 @@ const requested: URL[] = [];
 const record = ({ request }: { request: Request }) => {
 	requested.push(new URL(request.url));
 };
-
-/** The one-row reads behind the tab counts, which ask the lists' endpoints for their totals alone. */
-function isTabCount(url: URL): boolean {
-	return url.searchParams.get("size") === "1" && !url.searchParams.has("resultProcessing");
-}
 
 /** Every request to one endpoint so far, oldest first. */
 function requestsTo(pathname: string): URL[] {
@@ -77,16 +63,12 @@ function instant(url: URL | undefined, name: string): number | undefined {
 	return value == null ? undefined : new Date(value).getTime();
 }
 
-/** One review that timed out, for a request that asks for those; any other falls through. */
 beforeEach(() => {
+	// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	requested.length = 0;
 	server.events.on("request:start", record);
-	server.use(
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-		),
-		...reviewHandlers(),
-	);
+	server.use(...reviewHandlers());
 });
 
 afterEach(() => {
@@ -98,26 +80,32 @@ function openRow(kind: string, name: string) {
 	return { name: (accessibleName: string) => accessibleName.startsWith(`Open ${kind} ${name},`) };
 }
 
+/** A result of the fixture with its own summary, which names its row and its level. */
+function summarized(predicate: (result: ReviewResult) => boolean): ReviewResult & {
+	summary: string;
+} {
+	const result = reviewResults.find((row) => row.summary !== null && predicate(row));
+	assert(result);
+	const { summary } = result;
+	assert(summary !== null);
+	return { ...result, summary };
+}
+
 describe("practice review levels", () => {
 	/**
 	 * A row opens its record over the list rather than instead of it, so closing the record is the
 	 * list exactly as the reader left it — filters and all.
 	 */
 	it("opens a result over its filtered list and closes back to that list", async () => {
-		const result = reviewResults.find((row) => row.severity === "MAJOR");
-		assert(result);
+		const result = summarized((row) => row.severity === "MAJOR");
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}/results?severity=["MAJOR"]`);
 
 		await userEvent.click(
-			await screen.findByRole("link", openRow("result", resultSummary(result)), ROUTE_RENDER_WAIT),
+			await screen.findByRole("link", openRow("result", result.summary), ROUTE_RENDER_WAIT),
 		);
 
-		const level = await screen.findByRole(
-			"dialog",
-			{ name: resultSummary(result) },
-			ROUTE_RENDER_WAIT,
-		);
-		within(level).getByRole("heading", { name: resultSummary(result) });
+		const level = await screen.findByRole("dialog", { name: result.summary }, ROUTE_RENDER_WAIT);
+		within(level).getByRole("heading", { name: result.summary });
 		expect(router.state.location.searchStr).toBe(`?severity=MAJOR&detail=result:${result.id}`);
 
 		fireEvent.keyDown(document.body, { key: "Escape" });
@@ -129,28 +117,22 @@ describe("practice review levels", () => {
 		expect(router.state.location.pathname).toBe(`${REVIEWS}/results`);
 		expect(router.state.location.searchStr).toBe("?severity=MAJOR");
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-		screen.getByRole("link", openRow("result", resultSummary(result)));
+		screen.getByRole("link", openRow("result", result.summary));
 	});
 
-	/** A problem has no sheet of its own: its row opens the result it belongs to, which holds the evidence. */
-	it("opens the result a problem belongs to over the problems list", async () => {
-		// The second problem of a result, so its line is not the result's own summary.
-		const problem = reviewObservations.find(
-			(row) => row.summary === "The guard’s 403 never reaches this endpoint",
-		);
+	/** A problem's row opens the problem over the problems list, and closes back to it. */
+	it("opens a problem over the problems list", async () => {
+		const [problem] = reviewProblems;
 		assert(problem);
-		const result = reviewResults.find((row) => row.id === problem.practiceResultId);
-		assert(result);
-		assert(problem.summary !== undefined);
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}/observations`);
 
 		await userEvent.click(
-			await screen.findByRole("link", openRow("result", problem.summary), ROUTE_RENDER_WAIT),
+			await screen.findByRole("link", openRow("problem", problem.summary), ROUTE_RENDER_WAIT),
 		);
 
-		await screen.findByRole("dialog", { name: resultSummary(result) }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-			`result:${result.id}`,
+			`problem:${problem.id}`,
 		]);
 		fireEvent.keyDown(document.body, { key: "Escape" });
 		await waitFor(
@@ -162,21 +144,16 @@ describe("practice review levels", () => {
 
 	/** Closing the level gives focus back to the row it was opened from, so the reader goes on there. */
 	it("returns focus to the row the level was opened from", async () => {
-		const result = reviewResults.find((row) => row.severity === "MAJOR");
-		assert(result);
+		const result = summarized((row) => row.severity === "MAJOR");
 		renderRouteAtWithRouter(`${REVIEWS}/results`);
 		const row = await screen.findByRole(
 			"link",
-			openRow("result", resultSummary(result)),
+			openRow("result", result.summary),
 			ROUTE_RENDER_WAIT,
 		);
 
 		await userEvent.click(row);
-		const level = await screen.findByRole(
-			"dialog",
-			{ name: resultSummary(result) },
-			ROUTE_RENDER_WAIT,
-		);
+		const level = await screen.findByRole("dialog", { name: result.summary }, ROUTE_RENDER_WAIT);
 		await waitFor(() => expect(level.contains(document.activeElement)).toBe(true));
 
 		await userEvent.keyboard("{Escape}");
@@ -184,32 +161,28 @@ describe("practice review levels", () => {
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), ROUTE_RENDER_WAIT);
 		await waitFor(() =>
 			expect(document.activeElement).toBe(
-				screen.getByRole("link", openRow("result", resultSummary(result))),
+				screen.getByRole("link", openRow("result", result.summary)),
 			),
 		);
 	});
 
-	/**
-	 * Feedback and its results reach each other through the story. Following one from the other
-	 * replaces the level instead of opening over it, so there is never more than one; it is a step of
-	 * its own, so Back returns to the record it replaced, and dismissing closes to the page.
-	 */
 	/** A link from before that stacked several levels opens the one in front. */
 	it("opens only the front record of a stacked address", async () => {
-		const [source] = reviewFeedbackDetail.practiceResults;
-		assert(source);
+		const feedback = reviewFeedback.find(
+			(row) => feedbackDetail(row.id).basis.at(0)?.result.summary != null,
+		);
+		assert(feedback);
+		const [source] = feedbackDetail(feedback.id).basis;
+		assert(source?.result.summary != null);
 		const { router } = renderRouteAtWithRouter(
 			`${REVIEWS}/runs?detail=${encodeURIComponent(
-				JSON.stringify([
-					`feedback:${reviewFeedbackDetail.id}`,
-					`result:${source.practiceResultId}`,
-				]),
+				JSON.stringify([`feedback:${feedback.id}`, `result:${source.resultId}`]),
 			)}`,
 		);
-		await screen.findByRole("dialog", { name: source.summary }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("dialog", { name: source.result.summary }, ROUTE_RENDER_WAIT);
 		expect(screen.getAllByRole("dialog")).toHaveLength(1);
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
-			`result:${source.practiceResultId}`,
+			`result:${source.resultId}`,
 		]);
 	});
 
@@ -240,10 +213,10 @@ describe("practice review levels", () => {
 		]);
 		await within(sheet).findByRole("heading", { name: "What it is" }, ROUTE_RENDER_WAIT);
 		expect(within(sheet).queryByText(/^Counts /u)).toBeNull();
-		// Its versions are its history: what changed in each, read from the practice's own versions.
-		await within(sheet).findByText("Version 3", undefined, ROUTE_RENDER_WAIT);
-		within(sheet).getByText("Changed: Why it matters.");
-		expect(requestsTo(`/practices/${practice.practiceSlug}/revisions`)).toHaveLength(1);
+		// Its practice versions are its history, read from the practice's own versions.
+		await waitFor(() =>
+			expect(requestsTo(`/practices/${practice.practiceSlug}/versions`)).toHaveLength(1),
+		);
 		// It is the practice alone: Practice setup's form is where it changes, and no other record is linked.
 		const links = within(sheet).getAllByRole("link");
 		expect(links.map((link) => link.textContent)).toContain("Edit in Practice setup");
@@ -268,8 +241,6 @@ describe("practice review levels", () => {
 	it("asks for the period before the range, to set the totals against", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}?range=7d`);
 		await screen.findByRole("heading", { name: "What the reviews did" }, ROUTE_RENDER_WAIT);
-		// The range and the period before it; with 7 days as the range, the week the failures are
-		// counted over is the range's own read.
 		await waitFor(() => expect(requestsTo("/practices/reviews/overview")).toHaveLength(2));
 
 		const current = currentOverview();
@@ -286,109 +257,46 @@ describe("practice review levels", () => {
 		expect(previous?.searchParams.get("zone")).toBe(browserTimeZone());
 	});
 
-	/**
-	 * The review time is measured over the reviews the overview counts, so it asks from the
-	 * overview's own start until now; its warning opens the late reviews it counted.
-	 */
-	it("asks for the review time over the overview's range, and links the late reviews", async () => {
+	/** The review time is measured over the reviews the overview counts, from its start until now. */
+	it("asks for the review time over the overview's range", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}?range=7d`);
 		await screen.findByRole("heading", { name: "What the reviews did" }, ROUTE_RENDER_WAIT);
-		// The range's alone.
 		await waitFor(() => expect(requestsTo("/practices/reviews/timing")).toHaveLength(1));
 
 		const timing = requestsTo("/practices/reviews/timing").at(0);
 		expect(instant(timing, "from")).toBe(instant(currentOverview(), "from"));
 		expect(timing?.searchParams.has("to")).toBe(false);
-
-		const figure = await screen.findByText(
-			"median, start to comment",
-			undefined,
-			ROUTE_RENDER_WAIT,
-		);
-		expect(figure.previousElementSibling?.textContent).toBe("15 min");
-		expect(
-			within(screen.getByRole("list", { name: "Where the time went" }))
-				.getAllByRole("listitem")
-				.map((item) => item.textContent),
-		).toStrictEqual([
-			"Until asked2 min",
-			"Queue26 s",
-			"Preparation20 s",
-			"Execution12 min",
-			"To developer12 s",
-		]);
-
-		const late = screen.getByRole("link", { name: "9 reviews finished after the merge" });
-		expect(late.getAttribute("href")).toContain("finishedAfterMerge=true");
 	});
 
 	/**
 	 * A decision owed does not expire with the range, so the approvals ask for every piece of
-	 * feedback awaiting one, oldest first — the order they are worked through in. What failed is
-	 * asked for over the range, one row each, since the figures read only totals.
+	 * feedback awaiting one, oldest first — the order they are worked through in.
 	 */
-	it("asks for every decision owed, oldest first, and for the failures over the range", async () => {
+	it("asks for every decision owed, oldest first, whatever the range", async () => {
 		renderRouteAtWithRouter(REVIEWS);
 		await screen.findByRole("heading", { name: "Needs you" }, ROUTE_RENDER_WAIT);
-		const reviewReads = () => requestsTo("/practices/reviews").filter((url) => !isTabCount(url));
-		await waitFor(() => expect(reviewReads()).toHaveLength(1));
-
-		const overviewFrom = instant(currentOverview(), "from");
-		const approvals = requestsTo("/practices/reviews/feedback").find(
-			(url) => values(url, "deliveryState").join(",") === "AWAITING_APPROVAL",
+		await waitFor(() =>
+			expect(
+				requestsTo("/practices/reviews/feedback").some(
+					(url) => values(url, "state").join(",") === "AWAITING_APPROVAL",
+				),
+			).toBe(true),
 		);
-		const [unprocessedResults] = reviewReads();
 
+		const approvals = requestsTo("/practices/reviews/feedback").find(
+			(url) => values(url, "state").join(",") === "AWAITING_APPROVAL",
+		);
 		expect(approvals?.searchParams.get("sort")).toBe("OLDEST");
 		expect(approvals?.searchParams.has("from")).toBe(false);
 		expect(approvals?.searchParams.has("to")).toBe(false);
-		// Failed reviews and deliveries are the overview's own counts: no list is read for them.
+		// Failed deliveries are the overview's own counts: no list is read for them.
 		expect(
 			requestsTo("/practices/reviews/feedback").filter((url) =>
-				values(url, "deliveryState").includes("FAILED"),
+				values(url, "state").includes("FAILED"),
 			),
 		).toHaveLength(0);
-		expect(values(unprocessedResults, "resultProcessing")).toStrictEqual(["FAILED"]);
-		// The unprocessed results follow the range, from the overview's own first day; no week is read.
-		expect(instant(unprocessedResults, "from")).toBe(overviewFrom);
-		expect(unprocessedResults?.searchParams.has("to")).toBe(true);
-		expect(unprocessedResults?.searchParams.get("size")).toBe("1");
-		expect(values(unprocessedResults, "status")).toStrictEqual([]);
 	});
 
-	/**
-	 * A review that ran out of time did not finish either, so it is counted with the failed ones,
-	 * as the Reviews tile counts it, and the count opens the list filtered to both.
-	 */
-	it("counts a review that timed out among the failed reviews of the Reviews tile", async () => {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/overview", () =>
-				HttpResponse.json({
-					...practiceReviewOverview,
-					reviews: { ...practiceReviewOverview.reviews, failed: 0, timedOut: 1 },
-				}),
-			),
-		);
-		const { router } = renderRouteAtWithRouter(REVIEWS);
-
-		await userEvent.click(
-			await screen.findByRole(
-				"link",
-				{ name: /failed or timed out, 1 of 32 finished reviews$/u },
-				ROUTE_RENDER_WAIT,
-			),
-		);
-		await waitFor(
-			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`),
-			ROUTE_RENDER_WAIT,
-		);
-		expect(router.state.location.search).toMatchObject({ status: ["FAILED", "TIMED_OUT"] });
-	});
-
-	/**
-	 * A practice has no level: its row opens the Results list filtered to it, with its counts
-	 * over the list's days above the rows and the way to Practice setup.
-	 */
 	/** An address from before that opened a practice as a level opens its sheet. */
 	it("opens an address of a practice as the practice's sheet", async () => {
 		const [practice] = practiceCounts;
@@ -399,118 +307,11 @@ describe("practice review levels", () => {
 		await screen.findByRole("dialog", { name: practice.practiceName }, ROUTE_RENDER_WAIT);
 		expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`);
 	});
-
-	/** An address from before that opened a piece of work as a level opens the work's sheet. */
-	it("opens an address of a piece of work as the work's sheet", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/work?detail=work:issue:1430`);
-
-		await waitFor(
-			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`),
-			ROUTE_RENDER_WAIT,
-		);
-		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual(["work:issue:1430"]);
-		const sheet = await screen.findByRole(
-			"dialog",
-			{ name: /practice-binding contract/u },
-			ROUTE_RENDER_WAIT,
-		);
-		await within(sheet).findByRole("heading", { name: "State and history" }, ROUTE_RENDER_WAIT);
-		// What the provider reported about the issue: its author and when it was opened.
-		await within(sheet).findByText("Alex Smith", undefined, ROUTE_RENDER_WAIT);
-		within(within(sheet).getByRole("list", { name: "History" })).getByText("Opened");
-		expect(requestsTo("/practices/reviews/work/scm.issue/1430")).toHaveLength(1);
-	});
-
-	/** Work in a repository nobody monitors answers empty, once, and the sheet says why. */
-	it("says the work details are missing when the repository is not monitored", async () => {
-		server.use(
-			http.get(
-				"*/workspaces/:workspaceSlug/practices/reviews/work/:artifactKind/:artifactId",
-				() => new HttpResponse(null, { status: 204 }),
-			),
-		);
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/work?detail=work:issue:1430`);
-		const answer =
-			/^Server answer: 204 No Content from GET \S*\/practices\/reviews\/work\/scm\.issue\/1430$/u;
-		let sheet = await screen.findByRole(
-			"dialog",
-			{ name: /practice-binding contract/u },
-			ROUTE_RENDER_WAIT,
-		);
-		await within(sheet).findByText(
-			/workspace does not monitor the repository/u,
-			undefined,
-			ROUTE_RENDER_WAIT,
-		);
-		// What the server answered stands under the sentence, so an admin sees the reply itself.
-		within(sheet).getByText(answer);
-		expect(within(sheet).queryByRole("alert")).toBeNull();
-		expect(requestsTo("/practices/reviews/work/scm.issue/1430")).toHaveLength(1);
-
-		// Opened again from the cache, the sheet still says which answer left it without facts, also
-		// while it reads the work again.
-		server.use(
-			http.get(
-				"*/workspaces/:workspaceSlug/practices/reviews/work/:artifactKind/:artifactId",
-				async () => {
-					await delay("infinite");
-					return new HttpResponse(null, { status: 204 });
-				},
-			),
-		);
-		const { detail } = router.state.location.search;
-		await router.navigate({ to: ".", search: (previous) => ({ ...previous, detail: undefined }) });
-		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), ROUTE_RENDER_WAIT);
-		await router.navigate({
-			to: ".",
-			search: (previous) => ({ ...previous, detail }),
-		});
-		sheet = await screen.findByRole(
-			"dialog",
-			{ name: /practice-binding contract/u },
-			ROUTE_RENDER_WAIT,
-		);
-		await within(sheet).findByText(answer, undefined, ROUTE_RENDER_WAIT);
-	});
 });
 
 describe("the facts a sheet reads beyond its record", () => {
-	it("lists each delivery of a piece of feedback with its attempts, next attempt and last error", async () => {
-		const delivered = feedbackDetail("99999999-6666-6666-6666-666666666666");
-		server.use(
-			http.get(`*/workspaces/:workspaceSlug/practices/reviews/feedback/${delivered.id}`, () =>
-				HttpResponse.json({
-					...delivered,
-					deliveryState: "PARTIALLY_DELIVERED",
-					dispatches: [
-						{
-							id: "d15c0000-0000-4000-8000-000000000009",
-							destination: "AUTOMATIC_REVIEW_PACKAGE",
-							state: "PENDING",
-							attemptCount: 3,
-							nextAttemptAt: "2026-10-07T10:40:00Z",
-							lastError: "GitHub answered 502 Bad Gateway.",
-							createdAt: "2026-10-07T10:00:00Z",
-							updatedAt: "2026-10-07T10:30:00Z",
-						},
-					],
-				}),
-			),
-		);
-		renderRouteAtWithRouter(`${REVIEWS}/feedback?detail=feedback:${delivered.id}`);
-
-		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-		const history = within(
-			await within(sheet).findByRole("list", { name: "History" }, ROUTE_RENDER_WAIT),
-		);
-		history.getByText("Waiting to be sent");
-		history.getByText("The review’s comments · 3 attempts");
-		history.getByText(/Next attempt/u);
-		history.getByText("GitHub answered 502 Bad Gateway.");
-	});
-
-	it("says what a review cost per attempt and gives its trace id", async () => {
-		const [review] = reviewRuns;
+	it("says what a review cost per attempt", async () => {
+		const [review] = reviews;
 		assert(review);
 		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${review.id}`);
 
@@ -518,289 +319,21 @@ describe("the facts a sheet reads beyond its record", () => {
 		// Technical is open by default.
 		await within(sheet).findByText("$0.04 over 2 attempts", undefined, ROUTE_RENDER_WAIT);
 		within(sheet).getByText("Attempt 2");
-		expect(requestsTo(`/agents/jobs/${review.id}/usage`)).toHaveLength(1);
+		expect(requestsTo(`/practices/reviews/${review.id}/usage`)).toHaveLength(1);
 	});
 
 	it("says a result came from a review someone requested", async () => {
-		const [row] = reviewResults;
-		assert(row);
+		const row = summarized(() => true);
 		const detail = resultDetail(row.id);
 		server.use(
 			http.get(`*/workspaces/:workspaceSlug/practices/reviews/results/${row.id}`, () =>
-				HttpResponse.json({ ...detail, origin: "MANUAL" }),
+				HttpResponse.json({ ...detail, origin: "REQUEST" }),
 			),
 		);
 		renderRouteAtWithRouter(`${REVIEWS}/results?detail=result:${row.id}`);
 
 		const sheet = await screen.findByRole("dialog", { name: row.summary }, ROUTE_RENDER_WAIT);
 		await within(sheet).findByText("Requested", undefined, ROUTE_RENDER_WAIT);
-		within(sheet).getByText("Origin");
-	});
-});
-
-/** The fixture's trace with every practice answered and no moment waiting, so nothing on it polls. */
-const SETTLED_TRACE = {
-	...artifactTrace,
-	signals: artifactTrace.signals.filter((entry) => entry.state !== "PENDING"),
-	practices: artifactTrace.practices.filter(
-		(entry) => entry.outcome !== "PENDING" && entry.outcome !== "RUNNING",
-	),
-};
-
-/** A row's Request review, then the confirmation it asks first, since it starts an agent job. */
-async function requestFromRow(list: HTMLElement, work: string) {
-	await userEvent.click(within(list).getByRole("button", { name: `Request review of ${work}` }));
-	const dialog = await screen.findByRole("alertdialog", { name: `Request a review of ${work}?` });
-	await userEvent.click(within(dialog).getByRole("button", { name: "Request review" }));
-}
-
-describe("work without a review", () => {
-	const REQUESTS = "*/workspaces/:workspaceSlug/practices/review-requests";
-	const LIST = "/practices/trace";
-
-	/** The Work tab's address lands here, keeping the scope, and asks for the work no review started on. */
-	it("takes the Work tab's address to the Reviews tab with no review started", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/work?from=2026-08-01&kind=scm.issue`);
-
-		await waitFor(
-			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`),
-			ROUTE_RENDER_WAIT,
-		);
-		expect(router.state.location.search).toMatchObject({
-			status: "NOT_STARTED",
-			from: "2026-08-01",
-		});
-		await screen.findByRole(
-			"list",
-			{ name: "Work without a review, most recent first" },
-			ROUTE_RENDER_WAIT,
-		);
-		const read = requestsTo(LIST).at(-1);
-		expect(read?.searchParams.get("withoutReview")).toBe("true");
-		expect(read?.searchParams.has("from")).toBe(true);
-		// Not the reviews: "No review started" lists work instead of them. The Reviews tab still counts them.
-		expect(requestsTo("/practices/reviews").filter((url) => !isTabCount(url))).toHaveLength(0);
-	});
-
-	/**
-	 * The row opens the work's sheet, which says why no review started; a refused ask is a 200
-	 * carrying the server's own sentence, said on the sheet it was asked from.
-	 */
-	it("says on the work's sheet why no review started, and why an ask started none", async () => {
-		const bodies: unknown[] = [];
-		server.use(
-			http.post(REQUESTS, async ({ request }) => {
-				bodies.push(await request.json());
-				return HttpResponse.json({
-					status: "REFUSED",
-					reason: "BUDGET_EXHAUSTED",
-					reasonDescription: "The workspace's AI budget is used up.",
-				});
-			}),
-			// No review of the work waits or runs, so the sheet lets the reader ask.
-			http.get("*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId", () =>
-				HttpResponse.json({ ...SETTLED_TRACE, artifactKind: "scm.issue", artifactId: 1430 }),
-			),
-		);
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs?withoutReview=true`);
-		const list = await screen.findByRole(
-			"list",
-			{ name: "Work without a review, most recent first" },
-			ROUTE_RENDER_WAIT,
-		);
-		await userEvent.click(
-			within(list).getByRole("link", { name: "Define the practice-binding contract" }),
-		);
-		const sheet = await screen.findByRole(
-			"dialog",
-			{ name: /practice-binding contract/u },
-			ROUTE_RENDER_WAIT,
-		);
-		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual(["work:issue:1430"]);
-		within(sheet).getByText(
-			"This workspace’s review settings did not allow a review of this work.",
-		);
-		within(sheet).getByRole("link", { name: "Open Review: When and where" });
-
-		await userEvent.click(within(sheet).getByRole("button", { name: "Request review" }));
-		await userEvent.click(
-			within(await screen.findByRole("alertdialog")).getByRole("button", {
-				name: "Request review",
-			}),
-		);
-
-		await within(sheet).findByText("No review was started", undefined, ROUTE_RENDER_WAIT);
-		within(sheet).getByText("The workspace's AI budget is used up.");
-		expect(bodies).toStrictEqual([{ artifactKind: "scm.issue", artifactId: 1430 }]);
-	});
-
-	/** A started review moves the work off this list, so the list is read again. */
-	it("reads the list again once an ask is accepted", async () => {
-		server.use(
-			http.post(REQUESTS, () =>
-				HttpResponse.json({ status: "SUBMITTED", jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01" }),
-			),
-		);
-		renderRouteAtWithRouter(`${REVIEWS}/runs?withoutReview=true`);
-		const list = await screen.findByRole(
-			"list",
-			{ name: "Work without a review, most recent first" },
-			ROUTE_RENDER_WAIT,
-		);
-		const before = requestsTo(LIST).length;
-		await requestFromRow(list, "issue #1430");
-
-		await waitFor(() => expect(requestsTo(LIST).length).toBeGreaterThan(before), ROUTE_RENDER_WAIT);
-		expect(screen.queryByText("No review was started")).toBeNull();
-	});
-
-	/** An accepted ask refreshes this workspace's lists of work and of reviews, whatever their filters. */
-	it("reads the workspace's work and review lists again once an ask is accepted", async () => {
-		server.use(
-			http.post(REQUESTS, () =>
-				HttpResponse.json({ status: "SUBMITTED", jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01" }),
-			),
-		);
-		const { queryClient } = renderRouteAtWithRouter(`${REVIEWS}/runs?withoutReview=true`);
-		const list = await screen.findByRole(
-			"list",
-			{ name: "Work without a review, most recent first" },
-			ROUTE_RENDER_WAIT,
-		);
-		// Lists no screen shows right now: other filters, pages and infinite reads, and another workspace.
-		const acme = { workspaceSlug: "acme" };
-		const other = { workspaceSlug: "other" };
-		const paged = [
-			listTracedArtifactsQueryKey({ path: acme, query: { artifactKind: "scm.issue", page: 2 } }),
-			listPracticeReviewsQueryKey({ path: acme, query: { page: 3 } }),
-		];
-		const infinite = [
-			listTracedArtifactsInfiniteQueryKey({ path: acme, query: { artifactKind: "scm.issue" } }),
-			listPracticeReviewsInfiniteQueryKey({ path: acme, query: { size: 7 } }),
-		];
-		const untouched = [
-			listTracedArtifactsQueryKey({ path: other }),
-			listPracticeReviewsQueryKey({ path: other }),
-		];
-		for (const key of [...paged, ...untouched]) {
-			queryClient.setQueryData(key, { content: [] });
-		}
-		for (const key of infinite) {
-			queryClient.setQueryData(key, { pages: [], pageParams: [] });
-		}
-
-		await requestFromRow(list, "issue #1430");
-
-		await waitFor(() => {
-			for (const key of [...paged, ...infinite]) {
-				expect(queryClient.getQueryState(key)?.isInvalidated).toBe(true);
-			}
-		}, ROUTE_RENDER_WAIT);
-		for (const key of untouched) {
-			expect(queryClient.getQueryState(key)?.isInvalidated).toBe(false);
-		}
-	});
-
-	/**
-	 * The work's sheet reads its trace again while a review on it waits or runs, so its moments do not
-	 * go stale, and reads the work again once every review on it has settled.
-	 */
-	it("follows the work's trace until its reviews settle, then reads the work again", async () => {
-		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-		try {
-			const TRACE = "/practices/trace/scm.issue/1430";
-			const waiting = { ...artifactTrace, artifactKind: "scm.issue", artifactId: 1430 };
-			let trace = waiting;
-			server.use(
-				http.get("*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId", () =>
-					HttpResponse.json(trace),
-				),
-			);
-			const workReads = () =>
-				requestsTo(LIST).filter((url) => url.searchParams.get("artifactId") === "1430").length;
-			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=work:issue:1430`);
-			await screen.findByRole("dialog", { name: /practice-binding contract/u }, ROUTE_RENDER_WAIT);
-			await waitFor(() => expect(requestsTo(TRACE).length).toBeGreaterThan(0), ROUTE_RENDER_WAIT);
-
-			const whileWaiting = requestsTo(TRACE).length;
-			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
-			await vi.waitFor(() => expect(requestsTo(TRACE).length).toBeGreaterThan(whileWaiting));
-
-			trace = { ...SETTLED_TRACE, artifactKind: "scm.issue", artifactId: 1430 };
-			const before = workReads();
-			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-			await vi.waitFor(() => expect(workReads()).toBeGreaterThan(before));
-
-			const settled = requestsTo(TRACE).length;
-			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS * 2);
-			expect(requestsTo(TRACE)).toHaveLength(settled);
-		} finally {
-			vi.useRealTimers();
-		}
-	});
-
-	/**
-	 * Practice answers can settle before their run's results are processed. The sheet follows that run
-	 * while processing waits, reads the work again once it ends, and then stops asking.
-	 */
-	it("follows a run whose results wait to be processed after its answers settled, then reads the work again", async () => {
-		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-		try {
-			const jobId = "11111111-1111-1111-1111-111111111111";
-			const JOB = `/agents/jobs/${jobId}`;
-			const issue = tracedArtifacts.find((work) => work.artifactId === 1430);
-			assert(issue);
-			let job: AgentJob = { ...reviewJob(jobId), deliveryStatus: "PENDING" };
-			let row = { ...issue, reviewedSignalCount: 0 };
-			server.use(
-				// Every answer settled, nothing waiting: only the run's processing is left to follow.
-				http.get("*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId", () =>
-					HttpResponse.json({ ...SETTLED_TRACE, artifactKind: "scm.issue", artifactId: 1430 }),
-				),
-				http.get(`*/workspaces/:workspaceSlug${JOB}`, () => HttpResponse.json(job)),
-				http.get("*/workspaces/:workspaceSlug/practices/trace", () =>
-					HttpResponse.json({
-						content: [row],
-						page: { number: 0, size: 1, totalElements: 1, totalPages: 1 },
-					}),
-				),
-			);
-			const workReads = () =>
-				requestsTo(LIST).filter((url) => url.searchParams.get("artifactId") === "1430").length;
-			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=work:issue:1430`);
-			const sheet = await screen.findByRole(
-				"dialog",
-				{ name: /practice-binding contract/u },
-				ROUTE_RENDER_WAIT,
-			);
-			await within(sheet).findByText(
-				"2 moments, none started a review",
-				undefined,
-				ROUTE_RENDER_WAIT,
-			);
-			await waitFor(() => expect(requestsTo(JOB).length).toBeGreaterThan(0), ROUTE_RENDER_WAIT);
-
-			// Processing waits: the run is read again, the work is not.
-			const pendingReads = requestsTo(JOB).length;
-			const before = workReads();
-			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
-			await vi.waitFor(() => expect(requestsTo(JOB).length).toBeGreaterThan(pendingReads));
-			expect(workReads()).toBe(before);
-
-			job = { ...job, deliveryStatus: "DELIVERED" };
-			row = { ...row, reviewedSignalCount: 1 };
-			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-			await vi.waitFor(() => expect(workReads()).toBeGreaterThan(before));
-			await within(sheet).findByText("2 moments, 1 started a review", undefined, ROUTE_RENDER_WAIT);
-
-			const settled = requestsTo(JOB).length;
-			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS * 2);
-			expect(requestsTo(JOB)).toHaveLength(settled);
-		} finally {
-			vi.useRealTimers();
-		}
 	});
 });
 
@@ -808,32 +341,36 @@ describe("a new review from a row of the Reviews table", () => {
 	const REQUESTS = "*/workspaces/:workspaceSlug/practices/review-requests";
 
 	/**
-	 * A row's Request review asks for a new review of its work once the reader confirms: the
+	 * A row's Request review asks for a new review of its item once the reader confirms: the
 	 * same ask the sheet's footer makes. The server is mocked; nothing real is reviewed.
 	 */
-	it("asks for a review of the row's work after the confirmation, and reads the reviews again", async () => {
+	it("asks for a review of the row's item after the confirmation, and reads the reviews again", async () => {
 		const bodies: unknown[] = [];
 		server.use(
 			http.post(REQUESTS, async ({ request }) => {
 				bodies.push(await request.json());
 				return HttpResponse.json({
 					status: "SUBMITTED",
-					jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
+					reviewId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
+					reason: null,
+					reasonDescription: null,
 				});
 			}),
 		);
 		renderRouteAtWithRouter(`${REVIEWS}/runs`);
-		const listReads = () => requestsTo("/practices/reviews").filter((url) => !isTabCount(url));
+		const name = itemName(reviewItem);
+		const listReads = () =>
+			requestsTo("/practices/reviews").filter((url) => url.searchParams.get("size") !== "1");
 		// The table first stands as its skeleton, so the rows are found once they are drawn.
 		const [button] = await screen.findAllByRole(
 			"button",
-			{ name: "Request review of pull request #1423" },
+			{ name: `Request review of ${name}` },
 			ROUTE_RENDER_WAIT,
 		);
 		assert(button !== undefined);
 		await userEvent.click(button);
 		const dialog = await screen.findByRole("alertdialog", {
-			name: "Request a review of pull request #1423?",
+			name: `Request a review of ${name}?`,
 		});
 		// Nothing is asked for until the reader confirms.
 		expect(bodies).toHaveLength(0);
@@ -841,43 +378,22 @@ describe("a new review from a row of the Reviews table", () => {
 		await userEvent.click(within(dialog).getByRole("button", { name: "Request review" }));
 
 		await waitFor(() => expect(bodies).toHaveLength(1), ROUTE_RENDER_WAIT);
-		expect(bodies[0]).toMatchObject({ artifactKind: "scm.pull_request" });
+		expect(bodies[0]).toStrictEqual({ itemId: reviewItem.id });
 		await screen.findByText("Review started", undefined, ROUTE_RENDER_WAIT);
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 		await waitFor(() => expect(listReads().length).toBeGreaterThan(before), ROUTE_RENDER_WAIT);
 	});
-
-	/** While a review of the work is still running, the row offers no second one, and says why. */
-	it("keeps Request review disabled on work whose review is still running", async () => {
-		const bodies: unknown[] = [];
-		server.use(
-			http.post(REQUESTS, async ({ request }) => {
-				bodies.push(await request.json());
-				return HttpResponse.json({ status: "SUBMITTED" });
-			}),
-		);
-		renderRouteAtWithRouter(`${REVIEWS}/runs`);
-		const running = await screen.findByRole(
-			"button",
-			{ name: "Request review of pull request #1436" },
-			ROUTE_RENDER_WAIT,
-		);
-		expect(running.getAttribute("aria-disabled")).toBe("true");
-		await userEvent.click(running);
-		expect(screen.queryByRole("alertdialog")).toBeNull();
-		expect(bodies).toHaveLength(0);
-	});
 });
 
 describe("practices turned off today", () => {
-	/** The practices as they are set up now: "Thin controllers" has its autonomy at Off. */
+	/** The practices as they are set up now: "Thin controllers" has its feedback mode at Off. */
 	beforeEach(() => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices", () =>
 				HttpResponse.json(
 					workspacePractices.map((practice) =>
 						practice.slug === "thin-controllers"
-							? { ...practice, autonomy: { ...practice.autonomy, effective: "OFF" } }
+							? { ...practice, feedbackMode: { ...practice.feedbackMode, effective: "OFF" } }
 							: practice,
 					),
 				),
@@ -955,7 +471,7 @@ describe("practices turned off today", () => {
 	});
 });
 
-it("keeps denied result facts and navigation without restoring its text", async () => {
+it("keeps hidden result facts and navigation without restoring its text", async () => {
 	const [first] = reviewResults;
 	assert(first);
 	const detail = resultDetail(first.id);
@@ -963,11 +479,12 @@ it("keeps denied result facts and navigation without restoring its text", async 
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:id", () =>
 			HttpResponse.json({
 				...detail,
-				summary: undefined,
-				observations: [],
+				summary: null,
+				explanation: null,
+				problems: [],
 				evidenceHidden: true,
-				evidenceRationale: undefined,
-				evidence: undefined,
+				evidence: null,
+				example: null,
 			}),
 		),
 	);
@@ -982,343 +499,216 @@ it("keeps denied result facts and navigation without restoring its text", async 
 	const panel = within(dialog);
 	panel.getByText(RESULT_WORDS_UNAVAILABLE);
 	panel.getByText(detail.practiceName);
-	expect(panel.queryByText(/Nothing was quoted/u)).toBeNull();
 	await userEvent.click(panel.getByRole("button", { name: "Close" }));
 	await waitFor(() => expect(router.state.location.searchStr).not.toContain("detail="));
 });
 
-it("shows a failed live trace refresh and resumes only after Retry", async () => {
-	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-	try {
-		const id = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
-		const initial = reviewJob(LINEAGE_REVIEW_ID);
-		const job = {
-			...initial,
-			id,
-			status: "RUNNING",
-			completedAt: undefined,
-			deliveryStatus: undefined,
-		} satisfies AgentJob;
-		const lineage = storyLineage({
-			review: { id, createdAt: job.createdAt, status: "IN_PROGRESS", phase: "RUNNING" },
-			results: [],
-			feedback: [],
-		});
-		let reply = () => HttpResponse.json(lineage);
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () => reply()),
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => HttpResponse.json(job)),
-		);
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${id}`);
-		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
-		reply = () =>
-			HttpResponse.json({ status: 503, detail: "Trace temporarily unavailable" }, { status: 503 });
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
-		expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
-		const failedReads = requestsTo("/practices/reviews/lineage").length;
-		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
-		expect(requestsTo("/practices/reviews/lineage")).toHaveLength(failedReads);
-		reply = () => HttpResponse.json(lineage);
-		await userEvent.click(retry);
-		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
-		const recovered = requestsTo("/practices/reviews/lineage").length;
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		await vi.waitFor(() =>
-			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(recovered),
-		);
-	} finally {
-		vi.useRealTimers();
-	}
-});
+/** The trace of one review and nothing it recorded yet. */
+function lineageOf(review: ReviewDetail, item = review.item): ReviewLineage {
+	return storyLineage({
+		root: { kind: "REVIEW", id: review.id },
+		item,
+		reviews: [{ ...reviewRefOf(review), item }],
+		results: [],
+		feedback: [],
+	});
+}
 
-it("keeps the new selected terminal trace when an older active read arrives", async () => {
-	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-	const release = deferred();
-	try {
-		const firstId = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
-		const secondId = "6f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
-		const base = reviewJob(LINEAGE_REVIEW_ID);
-		const firstJob = {
-			...base,
-			id: firstId,
-			status: "RUNNING",
-			completedAt: undefined,
-			deliveryStatus: undefined,
-		} satisfies AgentJob;
-		const secondJob = {
-			...base,
-			id: secondId,
-			status: "COMPLETED",
-			deliveryStatus: "DELIVERED",
-		} satisfies AgentJob;
-		const first = storyLineage({
-			review: { id: firstId, createdAt: base.createdAt, status: "IN_PROGRESS", phase: "RUNNING" },
-			results: [],
-			feedback: [],
-		});
-		const work = base.target.reviewedWork;
-		assert(work);
-		const second = storyLineage({
-			work: { ...work, label: "Second selected work" },
-			review: { id: secondId, createdAt: base.createdAt, status: "COMPLETED", phase: "COMPLETED" },
-			results: [],
-			feedback: [],
-		});
-		const responses = new Map([
-			[firstId, async () => HttpResponse.json(first)],
-			[secondId, async () => HttpResponse.json(second)],
-		]);
-		const jobs = new Map<string, AgentJob>([
-			[firstId, firstJob],
-			[secondId, secondJob],
-		]);
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", async ({ request }) => {
-				const id = new URL(request.url).searchParams.get("id");
-				assert(id !== null);
-				const reply = responses.get(id);
-				assert(reply);
-				return reply();
-			}),
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", ({ params }) => {
-				const job = jobs.get(String(params.jobId));
-				assert(job);
-				return HttpResponse.json(job);
-			}),
-		);
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${firstId}`);
-		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
-		responses.set(firstId, async () => {
-			await release.promise;
-			return HttpResponse.json(first);
-		});
-		const firstReads = requestsTo("/practices/reviews/lineage").length;
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		await vi.waitFor(() =>
-			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(firstReads),
-		);
-		await router.navigate({
-			to: ".",
-			search: (previous) => ({ ...previous, detail: `trace:review:${secondId}` }),
-		});
-		await screen.findByRole(
-			"dialog",
-			{ name: "Review of Second selected work" },
-			ROUTE_RENDER_WAIT,
-		);
-		const secondReads = () =>
-			requestsTo("/practices/reviews/lineage").filter(
-				(url) => url.searchParams.get("id") === secondId,
-			).length;
-		const settled = secondReads();
-		release.resolve();
-		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
-		expect(secondReads()).toBe(settled);
-		screen.getByRole("dialog", { name: "Review of Second selected work" });
-		expect(router.state.location.search.detail).toBe(`trace:review:${secondId}`);
-	} finally {
-		release.resolve();
-		vi.useRealTimers();
-	}
-});
+const unavailable = (detail: string) => HttpResponse.json({ status: 503, detail }, { status: 503 });
 
-it("follows a selected review trace through acceptance and final processing", async () => {
-	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-	try {
-		const id = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
-		const initial = reviewJob(LINEAGE_REVIEW_ID);
-		let job: AgentJob = {
-			...initial,
+describe("a review's trace while the review runs", () => {
+	const RUNNING_ID = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+	const base = reviewDetail(LINEAGE_REVIEW_ID);
+
+	/** The review as its sheet and the trace read it, with the status given. */
+	function reviewAs(id: string, status: ReviewDetail["status"]): ReviewDetail {
+		const active = status === "QUEUED" || status === "RUNNING";
+		return {
+			...base,
 			id,
-			status: "RUNNING",
-			completedAt: undefined,
-			deliveryStatus: undefined,
-			firstFeedbackPostedAt: undefined,
-			firstFeedbackReadAt: undefined,
+			status,
+			completedAt: active ? null : base.createdAt,
+			activeJobCount: active ? 1 : 0,
 		};
-		let lineage: ReviewLineage = storyLineage({
-			review: {
-				id,
-				createdAt: job.createdAt,
-				startedAt: job.startedAt,
-				status: "IN_PROGRESS",
-				phase: "RUNNING",
-			},
-			results: [],
-			feedback: [],
-		});
+	}
+
+	function serveTrace(getLineage: () => Response, getReview: () => Response) {
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () =>
-				HttpResponse.json(lineage),
-			),
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => HttpResponse.json(job)),
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () => getLineage()),
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${RUNNING_ID}`, () => getReview()),
 		);
-		const { queryClient, router } = renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=trace:review:${id}`,
-		);
-		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
-		const before = requestsTo("/practices/reviews/lineage").length;
-		assert(job.startedAt);
-		const accepted = new Date(job.startedAt);
-		job = { ...job, publicReviewAcceptedAt: accepted };
-		lineage = {
-			...lineage,
-			results: [
-				lineageResult("9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c", {
-					agentJobId: id,
-					outcome: "MET",
-					practiceName: "Callback accounts for failure",
-				}),
-			],
-		};
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		await vi.waitFor(() =>
-			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(before),
-		);
-		const ownJob = () =>
-			queryClient.getQueryData<AgentJob>(
-				getAgentJobQueryKey({ path: { workspaceSlug: "acme", jobId: id } }),
+	}
+
+	it("shows a failed trace refresh and resumes only after Retry", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			const review = reviewAs(RUNNING_ID, "RUNNING");
+			let reply = () => HttpResponse.json(lineageOf(review));
+			serveTrace(
+				() => reply(),
+				() => HttpResponse.json(review),
 			);
-		await vi.waitFor(() =>
-			expect(ownJob()?.publicReviewAcceptedAt?.getTime()).toBe(accepted.getTime()),
-		);
-		await vi.waitFor(() =>
-			expect(screen.getByRole("group", { name: "How this came about" }).textContent).toContain(
-				"has recorded 1 result",
-			),
-		);
-		job = {
-			...job,
-			status: "COMPLETED",
-			completedAt: new Date(accepted.getTime() + 60_000),
-			deliveryStatus: "PENDING",
-		};
-		lineage = {
-			...lineage,
-			review: {
-				...lineage.review,
-				id,
-				createdAt: job.createdAt,
-				status: "COMPLETED",
-				phase: "COMPLETED",
-				finishedAt: job.completedAt,
-			},
-		};
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		await vi.waitFor(() => expect(ownJob()?.deliveryStatus).toBe("PENDING"));
-		await screen.findByText("Results awaiting processing", undefined, ROUTE_RENDER_WAIT);
-		const beforeFinal = requestsTo("/practices/reviews/lineage").length;
-		job = { ...job, deliveryStatus: "FAILED" };
-		lineage = {
-			...lineage,
-			results: [
-				...lineage.results,
-				lineageResult("4c2e8a1b-6d3f-4a5c-9e7b-0f1d2c3b4a5e", {
-					agentJobId: id,
-					outcome: "NOT_MET",
-					practiceName: "Final recorded practice",
-				}),
-			],
-		};
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		await vi.waitFor(() => expect(ownJob()?.deliveryStatus).toBe("FAILED"));
-		await screen.findByText("Result processing failed", undefined, ROUTE_RENDER_WAIT);
-		await vi.waitFor(() =>
-			expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(beforeFinal),
-		);
-		await vi.waitFor(() =>
-			expect(screen.getByRole("group", { name: "How this came about" }).textContent).toContain(
-				"2 results",
-			),
-		);
-		const settled = requestsTo("/practices/reviews/lineage").length;
-		const jobReads = requestsTo(`/agents/jobs/${id}`).length;
-		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
-		expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settled);
-		expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(jobReads);
-		expect(
-			requestsTo("/practices/reviews/lineage").every((url) => url.searchParams.get("id") === id),
-		).toBe(true);
-		expect(router.state.location.search.detail).toBe(`trace:review:${id}`);
-	} finally {
-		vi.useRealTimers();
-	}
-});
+			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`);
+			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+			reply = () => unavailable("Trace temporarily unavailable");
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+			expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
+			const failedReads = requestsTo("/practices/reviews/lineage").length;
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			expect(requestsTo("/practices/reviews/lineage")).toHaveLength(failedReads);
+			reply = () => HttpResponse.json(lineageOf(review));
+			await userEvent.click(retry);
+			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+			const recovered = requestsTo("/practices/reviews/lineage").length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await vi.waitFor(() =>
+				expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(recovered),
+			);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 
-it("shows a failed selected job refresh and retries its final state", async () => {
-	vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
-	try {
-		const id = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
-		const initial = reviewJob(LINEAGE_REVIEW_ID);
-		let job: AgentJob = {
-			...initial,
-			id,
-			status: "RUNNING",
-			completedAt: undefined,
-			deliveryStatus: undefined,
-			firstFeedbackPostedAt: undefined,
-			firstFeedbackReadAt: undefined,
-		};
-		let lineage: ReviewLineage = storyLineage({
-			review: { id, createdAt: job.createdAt, status: "IN_PROGRESS", phase: "RUNNING" },
-			results: [],
-			feedback: [],
-		});
-		let reply = () => HttpResponse.json(job);
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () =>
-				HttpResponse.json(lineage),
-			),
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () => reply()),
-		);
-		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${id}`);
-		await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
-		await vi.waitFor(() => expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(1));
-		reply = () =>
-			HttpResponse.json({ status: 503, detail: "Review temporarily unavailable" }, { status: 503 });
-		await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
-		const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
-		expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
-		const failedReads = requestsTo(`/agents/jobs/${id}`).length;
-		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
-		expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(failedReads);
-		job = {
-			...job,
-			status: "COMPLETED",
-			completedAt: new Date(job.createdAt.getTime() + 180_000),
-			deliveryStatus: "FAILED",
-		};
-		lineage = {
-			...lineage,
-			review: {
-				id,
-				createdAt: job.createdAt,
-				finishedAt: job.completedAt,
-				status: "COMPLETED",
-				phase: "COMPLETED",
-			},
-			results: [
-				lineageResult("9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c", {
-					agentJobId: id,
-					outcome: "MET",
+	it("keeps the newly selected finished trace when an older running read arrives", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		const release = deferred();
+		try {
+			const secondId = "6f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
+			const first = reviewAs(RUNNING_ID, "RUNNING");
+			const second = reviewAs(secondId, "COMPLETE");
+			const secondItem = { ...second.item, label: "Second selected work", title: null };
+			const lineages = new Map([
+				[RUNNING_ID, async () => HttpResponse.json(lineageOf(first))],
+				[secondId, async () => HttpResponse.json(lineageOf(second, secondItem))],
+			]);
+			server.use(
+				http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", async ({ request }) => {
+					const id = new URL(request.url).searchParams.get("reviewId");
+					assert(id !== null);
+					const reply = lineages.get(id);
+					assert(reply);
+					return reply();
 				}),
-			],
-		};
-		reply = () => HttpResponse.json(job);
-		await userEvent.click(retry);
-		await screen.findByText("Result processing failed", undefined, ROUTE_RENDER_WAIT);
-		await vi.waitFor(() =>
-			expect(screen.getByRole("group", { name: "How this came about" }).textContent).toContain(
-				"1 result",
-			),
-		);
-		const settledJobs = requestsTo(`/agents/jobs/${id}`).length;
-		const settledLineage = requestsTo("/practices/reviews/lineage").length;
-		await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
-		expect(requestsTo(`/agents/jobs/${id}`)).toHaveLength(settledJobs);
-		expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settledLineage);
-	} finally {
-		vi.useRealTimers();
-	}
+				...[first, second].map((review) =>
+					http.get(`*/workspaces/:workspaceSlug/practices/reviews/${review.id}`, () =>
+						HttpResponse.json(review),
+					),
+				),
+			);
+			const { router } = renderRouteAtWithRouter(
+				`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`,
+			);
+			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+			lineages.set(RUNNING_ID, async () => {
+				await release.promise;
+				return HttpResponse.json(lineageOf(first));
+			});
+			const firstReads = requestsTo("/practices/reviews/lineage").length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await vi.waitFor(() =>
+				expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(firstReads),
+			);
+			router.history.push(`${REVIEWS}/runs?detail=trace:review:${secondId}`);
+			await screen.findByRole("dialog", { name: /Second selected work/u }, ROUTE_RENDER_WAIT);
+			const secondReads = () =>
+				requestsTo("/practices/reviews/lineage").filter(
+					(url) => url.searchParams.get("reviewId") === secondId,
+				).length;
+			const settled = secondReads();
+			release.resolve();
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			expect(secondReads()).toBe(settled);
+			screen.getByRole("dialog", { name: /Second selected work/u });
+			expect(router.state.location.search.detail).toBe(`trace:review:${secondId}`);
+		} finally {
+			release.resolve();
+			vi.useRealTimers();
+		}
+	});
+
+	/**
+	 * The trace follows a running review, reads its chain once more when the review stops, since
+	 * feedback can settle after it, and then stops asking.
+	 */
+	it("follows a selected review's trace until it stops, then reads it once more", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			let review = reviewAs(RUNNING_ID, "RUNNING");
+			serveTrace(
+				() => HttpResponse.json(lineageOf(review)),
+				() => HttpResponse.json(review),
+			);
+			const { router } = renderRouteAtWithRouter(
+				`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`,
+			);
+			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+			await vi.waitFor(() =>
+				expect(requestsTo(`/practices/reviews/${RUNNING_ID}`).length).toBeGreaterThan(0),
+			);
+			const reviewReads = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
+			await vi.waitFor(() =>
+				expect(requestsTo(`/practices/reviews/${RUNNING_ID}`).length).toBeGreaterThan(reviewReads),
+			);
+
+			review = reviewAs(RUNNING_ID, "COMPLETE");
+			const before = requestsTo("/practices/reviews/lineage").length;
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			await vi.waitFor(() =>
+				expect(requestsTo("/practices/reviews/lineage").length).toBeGreaterThan(before),
+			);
+
+			const settledLineage = requestsTo("/practices/reviews/lineage").length;
+			const settledReview = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settledLineage);
+			expect(requestsTo(`/practices/reviews/${RUNNING_ID}`)).toHaveLength(settledReview);
+			expect(
+				requestsTo("/practices/reviews/lineage").every(
+					(url) => url.searchParams.get("reviewId") === RUNNING_ID,
+				),
+			).toBe(true);
+			expect(router.state.location.search.detail).toBe(`trace:review:${RUNNING_ID}`);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("shows a failed read of the review and retries its final state", async () => {
+		vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+		try {
+			let review = reviewAs(RUNNING_ID, "RUNNING");
+			let reply = () => HttpResponse.json(review);
+			serveTrace(
+				() => HttpResponse.json(lineageOf(review)),
+				() => reply(),
+			);
+			renderRouteAtWithRouter(`${REVIEWS}/runs?detail=trace:review:${RUNNING_ID}`);
+			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+			await vi.waitFor(() =>
+				expect(requestsTo(`/practices/reviews/${RUNNING_ID}`).length).toBeGreaterThan(0),
+			);
+			reply = () => unavailable("Review temporarily unavailable");
+			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
+			const retry = await screen.findByRole("button", { name: "Retry" }, ROUTE_RENDER_WAIT);
+			expect(screen.queryByRole("group", { name: "How this came about" })).toBeNull();
+			const failedReads = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			expect(requestsTo(`/practices/reviews/${RUNNING_ID}`)).toHaveLength(failedReads);
+
+			review = reviewAs(RUNNING_ID, "FAILED");
+			reply = () => HttpResponse.json(review);
+			await userEvent.click(retry);
+			await screen.findByRole("group", { name: "How this came about" }, ROUTE_RENDER_WAIT);
+			const settledReviews = requestsTo(`/practices/reviews/${RUNNING_ID}`).length;
+			const settledLineage = requestsTo("/practices/reviews/lineage").length;
+			await vi.advanceTimersByTimeAsync(2 * ACTIVE_REVIEW_POLL_MS);
+			expect(requestsTo(`/practices/reviews/${RUNNING_ID}`)).toHaveLength(settledReviews);
+			expect(requestsTo("/practices/reviews/lineage")).toHaveLength(settledLineage);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
 });

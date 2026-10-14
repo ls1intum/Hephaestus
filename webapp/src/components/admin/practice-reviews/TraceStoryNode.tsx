@@ -2,8 +2,8 @@ import { PanelRightOpenIcon } from "lucide-react";
 import { createContext, type ReactElement, type ReactNode, use } from "react";
 
 import { cn } from "cn";
-import type { AgentJob, ReviewLineage } from "@/api/types.gen";
-import type { ResultOrigin } from "@/components/practice-vocabulary/result-origin-defs";
+import type { ReviewDetail, ReviewLineage } from "@/api/types.gen";
+import type { ReviewOrigin } from "@/components/practice-vocabulary/review-origin-defs";
 
 import type { NumberedById, NumberedResult } from "./lineage-chain";
 import type { RailItem } from "./lineage-story";
@@ -25,14 +25,13 @@ export interface StoryContext {
 	display: TraceDisplay;
 	/** Whether every step shows its facts, as "Expand all" asks. */
 	factsOpen: boolean;
-	/** When a developer first read the review's feedback, from the review itself. */
-	firstReadAt: Date | undefined;
-	/** How the review processed its results, from the review itself; undefined until it is read. */
-	resultProcessing: AgentJob["deliveryStatus"];
 	/** How the review came to run, from its row. */
-	origin: ResultOrigin | undefined;
-	/** The review's own record, where the page read it and it is the trace's review. */
-	job: AgentJob | undefined;
+	origin: ReviewOrigin | undefined;
+	/**
+	 * The review's detail, where the page read it and it is the trace's review: its stop reason,
+	 * its practices and its runtime jobs.
+	 */
+	review: ReviewDetail | undefined;
 	/** Where the review stands among the reviews of its work. */
 	position: { index: number; total: number } | undefined;
 	/** Where the path was lost or slowed, which its stage's header marks. */
@@ -49,7 +48,7 @@ export function useStory(): StoryContext {
 	return context;
 }
 
-/** Whether a step lies off the path of the record in front. The work, the review and the moments never do. */
+/** Whether a step lies off the path of the record in front. The item, the review and its event never do. */
 export function offPath(traced: Traced | undefined, node: TraceNode): boolean {
 	if (traced === undefined) {
 		return false;
@@ -68,7 +67,7 @@ export function offPath(traced: Traced | undefined, node: TraceNode): boolean {
 // ------------------------------------------------------------------------------------------------
 
 /**
- * The part of a step that is its record. "You started here" and a ring mark the record the trace
+ * The control of a step that opens its record. "You started here" and a ring mark the record the trace
  * was opened for, with its facts under it where system info shows. A press on a step opens its
  * record's sheet over the trace; the mark stays where it is.
  */
@@ -81,7 +80,7 @@ export function StoryNode({
 }: {
 	node: TraceNode;
 	className?: string;
-	/** What belongs to the step but is no part of its control: the dots, which open themselves. */
+	/** What belongs to the step but is not in its control: the dots, which open themselves. */
 	after?: ReactNode;
 	/** A row of a table in a stage: flush with its neighbours, its columns saying what "Open" would. */
 	row?: boolean;
@@ -166,9 +165,9 @@ function HereMarker({ inset = false }: { inset?: boolean }) {
 }
 
 export interface StepProps {
-	/** The chain as the filter leaves it. */
+	/** The graph as the filter leaves it. */
 	lineage: ReviewLineage;
-	/** The whole chain, which says what the review did whatever the filter hides. */
+	/** The whole graph, which says what the review did whatever the filter hides. */
 	full: ReviewLineage;
 	filter: TraceFilter;
 	numbered: NumberedResult[];
@@ -185,9 +184,8 @@ export interface StepProps {
 	letters: ReadonlyMap<string, string>;
 	traced: Traced | undefined;
 	here: TraceNode | undefined;
-	/** Whether a moment on the work starts the rail, so the review need not say why it ran. */
+	/** Whether the event that started the review starts the rail, so the review need not say why it ran. */
 	hasStart: boolean;
-	reviewOutcome: AgentJob["reviewOutcome"] | undefined;
 	othersOpen: boolean;
 	onOthersOpenChange: (open: boolean) => void;
 	onShowSiblings: () => void;

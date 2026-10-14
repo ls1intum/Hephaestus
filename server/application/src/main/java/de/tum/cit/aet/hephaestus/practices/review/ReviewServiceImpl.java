@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
@@ -45,11 +46,9 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -77,14 +76,15 @@ public class ReviewServiceImpl implements ReviewService {
     private final ScanReportService reports;
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = ReviewRequestRejected.class)
     public UUID request(ReviewRequest request) {
         validate(request);
         if (request.requestKey() != null) {
             var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
             if (existing.isPresent()) {
                 if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This request key has a different body.");
+                    throw new ReviewRequestRejected(
+                            ReviewRequestRejected.Reason.REQUEST_CONFLICT, "This request key has a different body.");
                 return existing.orElseThrow().getId();
             }
         }
@@ -93,18 +93,26 @@ public class ReviewServiceImpl implements ReviewService {
             var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
             if (existing.isPresent()) {
                 if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This request key has a different body.");
+                    throw new ReviewRequestRejected(
+                            ReviewRequestRejected.Reason.REQUEST_CONFLICT, "This request key has a different body.");
                 return existing.orElseThrow().getId();
             }
         }
+        if (request.eventId() != null) {
+            var prior = reviews.findByWorkspaceIdAndEventId(request.workspaceId(), request.eventId());
+            if (prior.isPresent()) return prior.orElseThrow().getId();
+        }
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "The workspace is inactive.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.WORKSPACE_INACTIVE, "The workspace is inactive.");
         if (request.kind() == ReviewKind.SCAN
                 && reviews.existsByWorkspaceIdAndKindAndStatusIn(
                         request.workspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "A scan is already active in this workspace.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.SCAN_ACTIVE, "A scan is already active in this workspace.");
         if (!budget.canRequest(request.workspaceId(), request.kind(), request.budgetUsd()))
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "The review budget is unavailable.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.BUDGET_UNAVAILABLE, "The review budget is unavailable.");
         var ref = items.require(request.workspaceId(), request.itemId());
         var pinned = items.pin(ref, request.version());
         var now = clock.instant();
@@ -122,16 +130,19 @@ public class ReviewServiceImpl implements ReviewService {
                             rs.getString("item_version")))
                     .single();
             if (!pinned.version().value().equals(fact.version()))
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "The event version does not match the review.");
+                throw new ReviewRequestRejected(
+                        ReviewRequestRejected.Reason.REQUEST_CONFLICT, "The event version does not match the review.");
             event = fact.name();
             ordered = fact.at();
         }
         List<Practice> selected;
         if (request.kind() == ReviewKind.SCAN) {
             if (!coverage.admitsRepositoryItem(workspace, ref.itemId()))
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "The repository is outside the review scope.");
+                throw new ReviewRequestRejected(
+                        ReviewRequestRejected.Reason.REQUEST_CONFLICT, "The repository is outside the review scope.");
             if (!ref.kind().value().equals("scm.repository"))
-                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, "Select a repository for a scan.");
+                throw new ReviewRequestRejected(
+                        ReviewRequestRejected.Reason.ITEM_INELIGIBLE, "Select a repository for a scan.");
             selected = practices.findByWorkspaceId(request.workspaceId()).stream()
                     .filter(p -> {
                         var d = json.convertValue(p.getCurrentVersion().getDefinition(), PracticeDefinition.class);
@@ -144,8 +155,8 @@ public class ReviewServiceImpl implements ReviewService {
         } else {
             var decision = gate.evaluate(workspace, pinned, request.origin(), event, request.practiceIds());
             if (!(decision instanceof GateDecision.Run run))
-                throw new ResponseStatusException(
-                        HttpStatus.UNPROCESSABLE_CONTENT, "No practice can review this item.");
+                throw new ReviewRequestRejected(
+                        ReviewRequestRejected.Reason.ITEM_INELIGIBLE, "No practice can review this item.");
             selected = run.matchedPractices();
         }
         if (selected.isEmpty()
@@ -155,8 +166,8 @@ public class ReviewServiceImpl implements ReviewService {
                                         .map(Practice::getId)
                                         .toList()
                                         .containsAll(request.practiceIds()))))
-            throw new ResponseStatusException(
-                    HttpStatus.UNPROCESSABLE_CONTENT, "Select eligible practices from this workspace.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.ITEM_INELIGIBLE, "Select eligible practices from this workspace.");
         var planned = selected.stream()
                 .map(p -> selection(workspace, p, request.kind(), pinned))
                 .toList();
@@ -182,7 +193,8 @@ public class ReviewServiceImpl implements ReviewService {
                                 .orElseThrow()
                                 .model()
                         == null)
-            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The review model is unavailable.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.MODEL_UNAVAILABLE, "The review model is unavailable.");
         var digest = jdbc.sql("SELECT review_model_digest(CAST(:models AS jsonb))")
                 .param("models", json.writeValueAsString(models))
                 .query(String.class)
@@ -193,8 +205,9 @@ public class ReviewServiceImpl implements ReviewService {
         if (request.kind() == ReviewKind.SCAN) {
             var branch = pinned.state().get("defaultBranch");
             if (branch == null || branch.isBlank())
-                throw new ResponseStatusException(
-                        HttpStatus.SERVICE_UNAVAILABLE, "The repository default branch is unavailable.");
+                throw new ReviewRequestRejected(
+                        ReviewRequestRejected.Reason.SOURCE_UNAVAILABLE,
+                        "The repository default branch is unavailable.");
             checks.put("ref", branch);
         }
         var review = reviews.save(Review.builder()
@@ -342,11 +355,12 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional
     public void complete(long workspaceId, UUID reviewId, ReviewCompletion completion) {
         var review = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
-        if (terminal(review.getStatus())) return;
-        if (!terminal(completion.status()))
+        if (review.getStatus().isTerminal()) return;
+        if (!completion.status().isTerminal())
             throw new IllegalArgumentException("Completion requires a terminal status.");
         if (hasUnsettledInvocation(workspaceId, reviewId))
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "The active invocation must settle before closure.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.REQUEST_CONFLICT, "The active invocation must settle before closure.");
         boolean incomplete = (review.getKind() == ReviewKind.SCAN
                         && (review.getInventoryReceipt() == null
                                 || !review.getInventoryReceipt()
@@ -388,7 +402,7 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional
     public boolean cancel(long workspaceId, UUID reviewId, @Nullable String reason) {
         var review = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
-        if (terminal(review.getStatus())) return false;
+        if (review.getStatus().isTerminal()) return false;
         if (review.getChecks().path("cancellationRequested").asBoolean()) return true;
         var checks = (ObjectNode) review.getChecks().deepCopy();
         checks.put("cancellationRequested", true);
@@ -408,10 +422,6 @@ public class ReviewServiceImpl implements ReviewService {
     private boolean hasUnsettledInvocation(long workspaceId, UUID reviewId) {
         return !runtime.activeJobIds(workspaceId, reviewId).isEmpty()
                 || !runtime.unsettledJobIds(workspaceId, reviewId).isEmpty();
-    }
-
-    public static boolean terminal(ReviewStatus status) {
-        return status != ReviewStatus.QUEUED && status != ReviewStatus.RUNNING;
     }
 
     private static void validate(ReviewRequest r) {

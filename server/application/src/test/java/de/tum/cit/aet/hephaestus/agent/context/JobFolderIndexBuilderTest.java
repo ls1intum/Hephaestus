@@ -7,8 +7,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -28,7 +28,7 @@ class JobFolderIndexBuilderTest extends BaseUnitTest {
     private final SourceKind source = new SourceKind("docs.document.core");
 
     private JobFolderIndexBuilder builder() {
-        var registry = mock(SourceCatalogRegistry.class);
+        var registry = mock(ClasspathSourceCatalogRegistry.class);
         var catalog = mock(SourceCatalog.class);
         when(registry.current()).thenReturn(catalog);
         when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));

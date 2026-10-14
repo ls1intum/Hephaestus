@@ -38,7 +38,6 @@ class ItemSourceRegistryTest extends BaseUnitTest {
 
     private ItemSource source(boolean supports) {
         ItemSource source = mock(ItemSource.class);
-        when(source.kind()).thenReturn(KIND);
         when(source.supports(ITEM)).thenReturn(supports);
         return source;
     }

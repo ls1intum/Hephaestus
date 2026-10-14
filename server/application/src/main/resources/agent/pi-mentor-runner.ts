@@ -44,6 +44,7 @@ import {
 	type ServerCallbackRequest,
 } from "./pi-mentor-protocol.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
+import { isRecord } from "./pi-text.ts";
 
 /** The Pi SDK module, resolved from `<workspace>/node_modules` by bare specifier at runtime. */
 type PiSdk = typeof PiSdkModule;
@@ -138,10 +139,6 @@ function log(...args: unknown[]) {
 }
 
 /** Narrowing predicate for anything that arrived as parsed JSON, used instead of a cast. */
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
-
 /** Do not coerce objects or arrays into non-empty strings that pass required-field checks. */
 function jsonText(value: unknown): string {
 	if (typeof value === "string") {
@@ -337,13 +334,13 @@ const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 
 // Serialised delivery chain — every stdin frame AND watchdog rebind appends here so callers
 // cannot race `runtime.switchSession` against each other.
-let dispatchQueue = Promise.resolve();
+let sendQueue = Promise.resolve();
 
 // The tail of the chain is not a useful handle for any caller here —
 // every task is fire-and-forget and its failure is already logged below — and handing one out
 // invites an `await` that would deadlock a task queued from inside another task.
 function enqueue(fn: () => unknown): void {
-	dispatchQueue = runAfter(dispatchQueue, fn);
+	sendQueue = runAfter(sendQueue, fn);
 }
 
 async function runAfter(previous: Promise<void>, fn: () => unknown): Promise<void> {

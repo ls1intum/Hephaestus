@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUnavailableException;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
@@ -59,13 +60,13 @@ public class LlmAdmissionService {
         }
         try {
             return Optional.of(admitLocked(locked));
-        } catch (IllegalStateException unavailable) {
+        } catch (LlmModelUnavailableException unavailable) {
             return Optional.empty();
         }
     }
 
-    private static IllegalStateException modelUnavailable() {
-        return new IllegalStateException("The configured model is not available");
+    private static LlmModelUnavailableException modelUnavailable() {
+        return new LlmModelUnavailableException("The configured model is not available");
     }
 
     private AdmittedLlmModel admitLocked(ModelBindingSource locked) {
@@ -106,7 +107,7 @@ public class LlmAdmissionService {
         return priceRepository
                 .findByModelIdAndEffectiveToIsNull(modelId)
                 .map(price -> snapshot(price.getPricingMode(), UsageFundingSource.INSTANCE, price.getId(), null, price))
-                .orElseThrow(() -> new IllegalStateException("The configured model has no usable price"));
+                .orElseThrow(() -> new LlmModelUnavailableException("The configured model has no usable price"));
     }
 
     private LlmPriceSnapshot workspacePrice(Long modelId, Long workspaceId) {
@@ -163,7 +164,7 @@ public class LlmAdmissionService {
                 switch (mode) {
                     case PRICED -> UsagePricingState.PRICED;
                     case NO_CHARGE -> UsagePricingState.NO_CHARGE;
-                    case UNPRICED -> throw new IllegalStateException("The configured model has no usable price");
+                    case UNPRICED -> throw new LlmModelUnavailableException("The configured model has no usable price");
                 };
         return new LlmPriceSnapshot(source, state, priceId, workspaceModelId, input, output, cacheRead, cacheWrite);
     }

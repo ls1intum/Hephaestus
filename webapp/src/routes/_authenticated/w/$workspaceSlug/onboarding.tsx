@@ -6,7 +6,7 @@ import {
 	getAccountAiChoiceQueryKey,
 	getMemberOnboardingOptions,
 	getMemberOnboardingQueryKey,
-	updateMemberAiChoiceMutation,
+	updateAiChoiceMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceOnboarding } from "@/api/types.gen";
 import {
@@ -104,7 +104,7 @@ function OnboardingRoute() {
 		void query.refetch();
 	};
 	const choice = useMutation({
-		...updateMemberAiChoiceMutation(),
+		...updateAiChoiceMutation(),
 		onSuccess: (data, variables) => {
 			updateCache(data, variables);
 			// The answer is the account's: User settings and every other workspace's setup page read it.

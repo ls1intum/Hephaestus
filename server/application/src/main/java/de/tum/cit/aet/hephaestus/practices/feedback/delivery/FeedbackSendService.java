@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReadback;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackTarget;
@@ -99,7 +98,7 @@ public class FeedbackSendService {
                 copy.getId(),
                 Objects.requireNonNull(attempt.feedback().getBody()),
                 Objects.requireNonNull(copy.getWriteKey()),
-                copy.getWriteMarker());
+                Objects.requireNonNull(copy.getWriteMarker()));
         if (copy.getState() == FeedbackCopyState.WRITE_STARTED) {
             var lookup = writer.findExistingSummary(target, content);
             if (lookup.presence() == LookupPresence.FOUND) {
@@ -159,7 +158,7 @@ public class FeedbackSendService {
                 .toList();
         if (!unresolved.isEmpty()) {
             var found = writer.findPosted(
-                    target, unresolved.stream().map(FeedbackSendService::line).toList(), CopyReadback.PACKAGE);
+                    target, unresolved.stream().map(FeedbackSendService::line).toList());
             if (found == null) return;
             transactions.receipt(
                     attempt.feedback().getWorkspaceId(), attempt.feedback().getId(), owner, found);
@@ -179,7 +178,6 @@ public class FeedbackSendService {
                 () -> writer.postImmutablePackage(
                         target,
                         planned,
-                        CopyReadback.PACKAGE,
                         (attempting, completed) -> transactions.fence(
                                 attempt.feedback().getWorkspaceId(),
                                 attempt.feedback().getId(),
@@ -203,6 +201,6 @@ public class FeedbackSendService {
                         Objects.requireNonNull(copy.getPath()), copy.getStartLine(), copy.getEndLine(), copy.getSide()),
                 Objects.requireNonNull(copy.getBody()),
                 Objects.requireNonNull(copy.getWriteKey()),
-                copy.getWriteMarker());
+                Objects.requireNonNull(copy.getWriteMarker()));
     }
 }

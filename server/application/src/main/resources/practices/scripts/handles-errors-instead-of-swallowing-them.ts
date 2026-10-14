@@ -1,3 +1,7 @@
+// Finds the selected code that can discard or swallow an error, in all languages. Each lead is a
+// candidate: the review decides if the error is really lost, with no report, log or recovery. An empty
+// catch body often spans lines, so the patterns run over each block of consecutive selected lines of a
+// file, not over one line. To add a language, add a row.
 import { scm } from "../kits/scm/index.ts";
 import {
 	occurrences,
@@ -6,10 +10,6 @@ import {
 	occurrenceLead,
 	sortOccurrenceLeads,
 } from "../kits/scm/occurrences.ts";
-// Finds the selected code that can discard or swallow an error, in all languages. Each lead is a
-// candidate: the review decides if the error is really lost, with no report, log or recovery. An empty
-// catch body often spans lines, so the patterns run over each block of consecutive selected lines of a
-// file, not over one line. To add a language, add a row.
 import { noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

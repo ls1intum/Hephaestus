@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +23,7 @@ class FeedbackResponseSuppressionFilterTest {
         var other = UUID.randomUUID();
         var response = mock(FeedbackBasisRepository.SuppressedProblem.class);
         when(response.getId()).thenReturn(id);
-        when(response.getResolution()).thenReturn("DISAGREE");
+        when(response.getResolution()).thenReturn(FeedbackResolution.DISAGREE);
         when(basis.findSuppressedProblems(7, List.of(id, other))).thenReturn(List.of(response));
         assertThat(new FeedbackResponseSuppressionFilter(basis).suppressedProblems(7, List.of(id, other)))
                 .containsExactlyEntriesOf(Map.of(id, FeedbackStopReason.REACTED_DISAGREE));

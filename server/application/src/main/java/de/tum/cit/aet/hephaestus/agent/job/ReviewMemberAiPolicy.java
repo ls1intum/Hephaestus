@@ -7,10 +7,12 @@ import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
@@ -41,6 +43,36 @@ public class ReviewMemberAiPolicy {
     private Optional<WorkspaceAgentBinding> binding(ReviewJob job, AgentPurpose purpose) {
         if (!permitsReview(job)) return Optional.empty();
         return routing.bindingForPeople(job.getWorkspaceId(), purpose, people(job));
+    }
+
+    public Optional<WorkspaceAgentBinding> binding(long workspaceId, UUID reviewId, List<ReviewAssignmentId> selected) {
+        return binding(workspaceId, reviewId, selected, AgentPurpose.PRACTICE_REVIEW);
+    }
+
+    public Optional<WorkspaceAgentBinding> practiceScriptBinding(
+            long workspaceId, UUID reviewId, List<ReviewAssignmentId> selected, AgentPurpose purpose) {
+        return binding(workspaceId, reviewId, selected, purpose);
+    }
+
+    private Optional<WorkspaceAgentBinding> binding(
+            long workspaceId, UUID reviewId, List<ReviewAssignmentId> selected, AgentPurpose purpose) {
+        var pinned = assignments.load(
+                workspaceId, reviewId, new ReviewJobInput(selected.getFirst().itemId(), selected));
+        if (pinned.stream()
+                .anyMatch(assignment ->
+                        (assignment.developerId() != null && suppression.isAccountSuppressed(assignment.developerId()))
+                                || (assignment.item().sourceId() != null
+                                        && suppression.isSourceSuppressed(
+                                                workspaceId,
+                                                assignment.item().kind().value(),
+                                                assignment.item().sourceId())))) return Optional.empty();
+        List<@Nullable Long> people = new ArrayList<>();
+        for (var assignment : pinned)
+            if (!people.contains(assignment.developerId())) people.add(assignment.developerId());
+        if (people.stream()
+                .anyMatch(person -> person != null
+                        && !preferences.forDeveloper(workspaceId, person).permitsAi())) return Optional.empty();
+        return routing.bindingForPeople(workspaceId, purpose, people);
     }
 
     public boolean isProcessingSuppressed(ReviewJob job) {
@@ -83,10 +115,10 @@ public class ReviewMemberAiPolicy {
                     job.getWorkspaceId(),
                     accountId,
                     new LlmModelResolver.ConnectionRef(
-                            snapshot.connectionScope(),
-                            snapshot.connectionId(),
-                            snapshot.modelId(),
-                            snapshot.workspaceId()));
+                            snapshot.model().connectionScope(),
+                            snapshot.model().connectionId(),
+                            snapshot.model().modelId(),
+                            snapshot.model().workspaceId()));
         } catch (IllegalArgumentException | IllegalStateException | JacksonException invalid) {
             return false;
         }

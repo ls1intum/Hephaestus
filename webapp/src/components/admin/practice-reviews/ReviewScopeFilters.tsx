@@ -7,6 +7,7 @@ import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
+import { itemKindLabel } from "@/lib/item-kinds";
 import { nonEmpty } from "@/lib/search-params";
 
 import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
@@ -33,10 +34,10 @@ export interface ScopeFiltersProps {
 	/** Every practice, with its group. A chosen group narrows what the practice facet offers. */
 	practices: FacetSource<PracticeFacetOption>;
 	people: ReviewPeople;
-	/** The name of the person in the scope, when the rows already carry it. */
+	/** The name of the developer in the scope, when the rows already carry it. */
 	personName?: string;
 	/**
-	 * The one review, piece of work or result the scope is filtered to, by name — set by a "See
+	 * The one review, item or result the scope is filtered to, by name — set by a "See
 	 * all" link or a link from before. A record picked with a crosshair is the selection bar's instead,
 	 * so it is left out here.
 	 */
@@ -52,25 +53,25 @@ export interface ReviewScopeFiltersProps extends ScopeFiltersProps {
 
 /** A filter to one record, as its pill names it. */
 export interface ScopeRecordFilter {
-	facet: "review" | "work" | "result";
+	facet: "review" | "item" | "result";
 	/** Its name, once read; until then the kind of record stands in. */
 	name: string | undefined;
 }
 
 const RECORD_TITLES: Record<ScopeRecordFilter["facet"], string> = {
 	review: "Review",
-	work: "Work",
+	item: "Work",
 	result: "Result",
 };
 
 const RECORD_UNNAMED: Record<ScopeRecordFilter["facet"], string> = {
 	review: "one review",
-	work: "one piece of work",
+	item: "one piece of work",
 	result: "one result",
 };
 
-/** The person facet's name on every tab: the developer the review observed, or the feedback reached. */
-const PERSON_TITLE = "Developer";
+/** The developer facet's name on every tab: whose work was reviewed, or whom the feedback reached. */
+const DEVELOPER_TITLE = "Developer";
 
 interface ScopePill {
 	key: string;
@@ -105,12 +106,12 @@ function ScopeFacetControls({
 		: inGroups.filter((option) => option.turnedOff !== true || chosen.includes(option.value));
 	return (
 		<>
-			{applies.includes("person") && (
+			{applies.includes("developer") && (
 				<ReviewPersonFacet
-					title={PERSON_TITLE}
+					title={DEVELOPER_TITLE}
 					people={people}
-					selected={scope.personId}
-					onChange={(personId) => onChange({ personId })}
+					selected={scope.developerId}
+					onChange={(developerId) => onChange({ developerId })}
 					fallbackName={personName}
 				/>
 			)}
@@ -196,36 +197,35 @@ function ScopePills({
 	notAppliedNote = "Not applied on this list",
 }: ScopeFiltersProps & { notAppliedNote?: string }) {
 	const applies = SCOPE_APPLIES[tab];
-	const personLabel =
-		people.options.find((person) => person.userId === scope.personId)?.label ??
+	const developerLabel =
+		people.options.find((person) => person.accountId === scope.developerId)?.label ??
 		personName ??
-		(scope.personId === undefined ? undefined : `#${scope.personId}`);
-	const pills = scopePills(scope, { personLabel, groups, practices }, onChange);
+		(scope.developerId === undefined ? undefined : `#${scope.developerId}`);
+	const pills = scopePills(scope, { developerLabel, groups, practices }, onChange);
 	const recordPill: ScopePill | undefined = record && {
 		key: "record",
 		facet: record.facet,
 		title: RECORD_TITLES[record.facet],
 		value: record.name ?? RECORD_UNNAMED[record.facet],
-		onClear: () =>
-			onChange({
-				agentJobId: undefined,
-				practiceResultId: undefined,
-				artifactKind: undefined,
-				artifactId: undefined,
-			}),
+		onClear: () => onChange({ reviewId: undefined, resultId: undefined, itemId: undefined }),
 	};
-	const notApplied = [...pills, ...(recordPill ? [recordPill] : [])].filter(
-		(pill) => !applies.includes(pill.facet),
-	);
+	const referencePills = [
+		...referenceScopePills(scope, onChange),
+		...(recordPill ? [recordPill] : []),
+	];
+	const notApplied = [...pills, ...referencePills].filter((pill) => !applies.includes(pill.facet));
 	return (
 		<>
-			{recordPill && applies.includes(recordPill.facet) && (
-				<ReferenceFilterPill
-					label={recordPill.title}
-					value={recordPill.value}
-					onClear={recordPill.onClear}
-				/>
-			)}
+			{referencePills
+				.filter((pill) => applies.includes(pill.facet))
+				.map((pill) => (
+					<ReferenceFilterPill
+						key={pill.key}
+						label={pill.title}
+						value={pill.value}
+						onClear={pill.onClear}
+					/>
+				))}
 			{notApplied.map((pill) => (
 				<NotAppliedScopePill key={pill.key} pill={pill} note={notAppliedNote} />
 			))}
@@ -295,20 +295,20 @@ function practicesInGroups(
 function scopePills(
 	scope: ReviewScope,
 	names: {
-		personLabel: string | undefined;
+		developerLabel: string | undefined;
 		groups: FacetSource;
 		practices: FacetSource;
 	},
 	onChange: (patch: Partial<ReviewScope>) => void,
 ): ScopePill[] {
 	const pills: ScopePill[] = [];
-	if (names.personLabel !== undefined) {
+	if (names.developerLabel !== undefined) {
 		pills.push({
-			key: "person",
-			facet: "person",
-			title: PERSON_TITLE,
-			value: names.personLabel,
-			onClear: () => onChange({ personId: undefined }),
+			key: "developer",
+			facet: "developer",
+			title: DEVELOPER_TITLE,
+			value: names.developerLabel,
+			onClear: () => onChange({ developerId: undefined }),
 		});
 	}
 	for (const pill of facetPills("Group", names.groups.options, scope.groupSlug, (values) =>
@@ -330,6 +330,36 @@ function scopePills(
 			title: "Dates",
 			value: rangeText,
 			onClear: () => onChange({ from: undefined, to: undefined }),
+		});
+	}
+	return pills;
+}
+
+/**
+ * The parts of the scope that no facet sets, only a link: the kind of item and the one problem. Each
+ * shows as a pill the reader can clear.
+ */
+function referenceScopePills(
+	scope: ReviewScope,
+	onChange: (patch: Partial<ReviewScope>) => void,
+): ScopePill[] {
+	const pills: ScopePill[] = [];
+	if (scope.itemKind !== undefined) {
+		pills.push({
+			key: "kind",
+			facet: "kind",
+			title: "Kind",
+			value: itemKindLabel(scope.itemKind, 2),
+			onClear: () => onChange({ itemKind: undefined }),
+		});
+	}
+	if (scope.problemId !== undefined) {
+		pills.push({
+			key: "problem",
+			facet: "problem",
+			title: "Problem",
+			value: "one problem",
+			onClear: () => onChange({ problemId: undefined }),
 		});
 	}
 	return pills;

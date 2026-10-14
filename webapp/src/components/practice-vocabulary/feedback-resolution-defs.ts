@@ -25,6 +25,3 @@ export const FEEDBACK_RESOLUTION_DEFS: StatusDefs<FeedbackResolution> = {
 		description: "The feedback does not apply to this work.",
 	},
 };
-
-/** What the reader is told once they disagreed. */
-export const DISAGREED_SENTENCE = "You disagreed with this feedback.";

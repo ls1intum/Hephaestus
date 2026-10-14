@@ -99,7 +99,7 @@ const COUNT_ORDER = [
 	["failed", "failed"],
 	["withheld", "withheld"],
 	["retracted", "retracted"],
-] as const satisfies ReadonlyArray<readonly [keyof FeedbackCopyCounts, string]>;
+] as const satisfies readonly (readonly [keyof FeedbackCopyCounts, string])[];
 
 /**
  * The copy counts as one phrase: "1 posted · 2 failed". Empty when the package has no copies,
@@ -124,41 +124,6 @@ const KIND_NOUNS: Record<FeedbackCopyKind, [singular: string, plural: string]> =
 	FILE_NOTE: ["file note", "file notes"],
 	CHAT_TURN: ["conversation turn", "conversation turns"],
 };
-
-const STATE_VERBS: Record<FeedbackCopyState, string> = {
-	PLANNED: "planned",
-	WRITE_STARTED: "writing",
-	POSTED: "posted",
-	FAILED: "failed",
-	WITHHELD: "withheld",
-	RETRACTED: "retracted",
-};
-
-/**
- * The copies by kind and state, from the actual records: "1 summary posted · 2 line notes failed".
- * Groups keep the copies' own order, so the summary reads first when it is first.
- */
-export function copiesSentence(copies: readonly Pick<FeedbackCopy, "kind" | "state">[]): string {
-	const groups = new Map<
-		string,
-		{ kind: FeedbackCopyKind; state: FeedbackCopyState; count: number }
-	>();
-	for (const { kind, state } of copies) {
-		const key = `${kind}:${state}`;
-		const group = groups.get(key);
-		if (group) {
-			group.count += 1;
-		} else {
-			groups.set(key, { kind, state, count: 1 });
-		}
-	}
-	return [...groups.values()]
-		.map(({ kind, state, count }) => {
-			const [singular, plural] = KIND_NOUNS[kind];
-			return `${count} ${count === 1 ? singular : plural} ${STATE_VERBS[state]}`;
-		})
-		.join(" · ");
-}
 
 /** "a summary and 2 line notes": the kinds a package carries, for a sentence. */
 export function copyKindsPhrase(copies: readonly Pick<FeedbackCopy, "kind">[]): string {

@@ -22,9 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub Projects V2.
- *
- * <p>This service handles the conversion of GitHubProjectDTO to Project entities, persists them,
- * and publishes appropriate domain events.
+ * <p>
+ * This service handles the conversion of GitHubProjectDTO to Project entities,
+ * persists them, and publishes appropriate domain events.
  */
 @Slf4j
 @Service
@@ -67,8 +67,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @param ownerType the type of owner (ORGANIZATION, USER, REPOSITORY)
      * @param ownerId the ID of the owner entity
      * @param context processing context with scope information
-     * @param actorId the ID of the user who performed the action (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who performed the action (from webhook sender), or null for sync
      * @return the persisted Project entity
      */
     @Transactional
@@ -114,19 +113,20 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
         return result.project();
     }
 
-    /** Internal record to hold upsert result with new/existing flag. */
+    /**
+     * Internal record to hold upsert result with new/existing flag.
+     */
     private record UpsertResult(Project project, boolean isNew) {}
 
     /**
-     * Internal method to upsert a project without publishing events. Used by process(),
-     * processClosed(), and processReopened() to avoid double event publishing.
+     * Internal method to upsert a project without publishing events.
+     * Used by process(), processClosed(), and processReopened() to avoid double event publishing.
      *
      * @param dto the GitHub project DTO
      * @param ownerType the type of owner
      * @param ownerId the ID of the owner entity
      * @param context processing context with scope information
-     * @return UpsertResult containing the project and whether it was new, or null if processing was
-     *     skipped
+     * @return UpsertResult containing the project and whether it was new, or null if processing was skipped
      */
     private @Nullable UpsertResult upsertProject(
             GitHubProjectDTO dto, Project.OwnerType ownerType, Long ownerId, ProcessingContext context) {
@@ -203,8 +203,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @param ownerType the type of owner
      * @param ownerId the ID of the owner entity
      * @param context processing context
-     * @param actorId the ID of the user who closed the project (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who closed the project (from webhook sender), or null for sync
      * @return the updated Project entity
      */
     @Transactional
@@ -258,8 +257,7 @@ public class GitHubProjectProcessor extends BaseGitHubProcessor {
      * @param ownerType the type of owner
      * @param ownerId the ID of the owner entity
      * @param context processing context
-     * @param actorId the ID of the user who reopened the project (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who reopened the project (from webhook sender), or null for sync
      * @return the updated Project entity
      */
     @Transactional

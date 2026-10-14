@@ -9,7 +9,10 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ExactPersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CitationVerifier;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -19,17 +22,27 @@ import tools.jackson.databind.ObjectMapper;
 
 class ScmCaptureRoleContextTest extends BaseUnitTest {
     @ParameterizedTest
-    @CsvSource({"true,false,false,5", "false,true,false,5", "false,false,true,0"})
+    @CsvSource({"true,false,false,1", "false,true,false,1", "false,false,true,0"})
     void shouldRegisterSourcesOnlyWhereReviewInputsArePrepared(
             boolean server, boolean worker, boolean webhook, int expected) {
         new ApplicationContextRunner()
                 .withUserConfiguration(
-                        ScmItemSourceConfiguration.class,
+                        ScmItemService.class,
                         ScmCitationVerifier.class,
                         ScmCaptureConsent.class,
                         ExactPersonIdentityResolver.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
-                .withBean(ScmItemService.class, () -> mock(ScmItemService.class))
+                .withBean(ScmItemAccess.class, () -> mock(ScmItemAccess.class))
+                .withBean(ScmItemLabelQuery.class, () -> mock(ScmItemLabelQuery.class))
+                .withBean(ScmRepositoryAccess.class, () -> mock(ScmRepositoryAccess.class))
+                .withBean(ScmWorkLookup.class, () -> mock(ScmWorkLookup.class))
+                .withBean(IssueEvidenceVersion.class, () -> mock(IssueEvidenceVersion.class))
+                .withBean(ScmGitTree.class, () -> mock(ScmGitTree.class))
+                .withBean(ScmFileVersions.class, () -> mock(ScmFileVersions.class))
+                .withBean(ScmWorkCapture.class, () -> mock(ScmWorkCapture.class))
+                .withBean(ScmCaptureContributors.class, () -> mock(ScmCaptureContributors.class))
+                .withBean(RepositoryRepository.class, () -> mock(RepositoryRepository.class))
+                .withBean(PullRequestReviewRepository.class, () -> mock(PullRequestReviewRepository.class))
                 .withBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class))
                 .withBean(AccountDirectory.class, () -> mock(AccountDirectory.class))
                 .withBean(PersonDataCopyRecorder.class, () -> mock(PersonDataCopyRecorder.class))
@@ -45,15 +58,18 @@ class ScmCaptureRoleContextTest extends BaseUnitTest {
                     assertThat(context.getBeansOfType(ScmCaptureConsent.class)).hasSize(expected == 0 ? 0 : 1);
                     assertThat(context.getBeansOfType(ExactPersonIdentityResolver.class))
                             .hasSize(expected == 0 ? 0 : 1);
-                    if (expected > 0)
-                        assertThat(context.getBeansOfType(ItemSource.class).values())
-                                .extracting(ItemSource::kind)
-                                .containsExactlyInAnyOrder(
-                                        ScmItemEvents.ISSUE,
-                                        ScmItemEvents.PULL_REQUEST,
-                                        ScmItemEvents.PULL_REQUEST_REVIEW,
-                                        ScmItemEvents.REPOSITORY,
-                                        ScmItemEvents.FILE);
+                    if (expected > 0) {
+                        var source = context.getBean(ItemSource.class);
+                        for (var kind : ScmItemEvents.ALL)
+                            assertThat(source.supports(new ItemRef(
+                                            1,
+                                            2,
+                                            kind,
+                                            kind.equals(ScmItemEvents.FILE) ? null : 3L,
+                                            kind.equals(ScmItemEvents.FILE) ? 4L : null,
+                                            kind.equals(ScmItemEvents.FILE) ? "a.txt" : null)))
+                                    .isTrue();
+                    }
                 });
     }
 }

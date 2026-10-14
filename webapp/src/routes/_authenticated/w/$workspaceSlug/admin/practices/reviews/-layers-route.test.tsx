@@ -6,16 +6,19 @@ import { resultSummary } from "@/components/admin/practice-reviews/result-words"
 
 import {
 	feedbackDetail,
-	resultDetail,
+	itemTraceOf,
 	practiceCounts,
+	resultDetail,
+	reviewDetail,
 	reviewFeedback,
-	reviewJob,
-	reviewResults,
+	reviewFeedbackChecksOf,
+	reviewItem,
 	reviewPracticeScripts,
-	reviewRuns,
+	reviewResults,
+	reviews,
 } from "@/components/admin/practice-reviews/fixtures";
 import {
-	LINEAGE_OBS,
+	LINEAGE_RESULT,
 	LINEAGE_REVIEW_ID,
 	wholeReview,
 } from "@/components/admin/practice-reviews/lineage-fixtures";
@@ -25,10 +28,10 @@ import {
 } from "@/components/admin/practice-reviews/story-mock-server";
 import { forgetTraceDisplay } from "@/components/admin/practice-reviews/trace-display";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
-import { tracedArtifacts } from "@/components/practice-trace/fixtures";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred, sleep } from "@/test/async";
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -37,8 +40,8 @@ vi.setConfig({ testTimeout: 30_000 });
 
 function readsOldReview(url: URL) {
 	return (
-		url.pathname.endsWith(`/agents/jobs/${LINEAGE_REVIEW_ID}`) ||
-		url.searchParams.get("agentJobId") === LINEAGE_REVIEW_ID
+		url.pathname.endsWith(`/practices/reviews/${LINEAGE_REVIEW_ID}`) ||
+		url.searchParams.get("reviewId") === LINEAGE_REVIEW_ID
 	);
 }
 
@@ -58,18 +61,18 @@ const REVIEW = "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84";
 const RESULT_ROW = "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c";
 const FEEDBACK_ROW = "4c2e8a1b-6d3f-4a5c-9e7b-0f1d2c3b4a5e";
 /** The result of the traced chain that a step opens. */
-const RESULT = LINEAGE_OBS.cache404;
+const RESULT = LINEAGE_RESULT.cache404;
 const TRACE = `trace:review:${REVIEW}`;
 
-const fixtureRun = reviewRuns.find((run) => run.id === LINEAGE_REVIEW_ID);
+const fixtureReview = reviews.find((review) => review.id === LINEAGE_REVIEW_ID);
+/** The fixture's review, served under `REVIEW`. */
+const servedReview = { ...reviewDetail(LINEAGE_REVIEW_ID), id: REVIEW };
+const ITEM = `item:${reviewItem.id}`;
 const [fixtureResult] = reviewResults;
 const [fixtureFeedback] = reviewFeedback;
 
 function page(content: unknown[]) {
-	return HttpResponse.json({
-		content,
-		page: { number: 0, size: 25, totalElements: content.length, totalPages: 1 },
-	});
+	return HttpResponse.json({ content, totalElements: content.length });
 }
 
 const requested: URL[] = [];
@@ -82,33 +85,33 @@ function requestsTo(pathname: string): URL[] {
 }
 
 beforeEach(() => {
+	// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+	vi.stubGlobal("IntersectionObserver", ObserverStub);
 	forgetTraceDisplay();
 	requested.length = 0;
 	server.events.on("request:start", record);
 	server.use(
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-		),
 		// Every trace tells the whole review the fixture's records sit in.
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", () =>
 			HttpResponse.json(wholeReview),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
-			page([{ ...fixtureRun, id: REVIEW }]),
+			page([{ ...fixtureReview, id: REVIEW }]),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/results", () =>
-			page([{ ...fixtureResult, id: RESULT_ROW, agentJobId: REVIEW }]),
+			page([{ ...fixtureResult, id: RESULT_ROW, reviewId: REVIEW }]),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
-			page([{ ...fixtureFeedback, id: FEEDBACK_ROW, agentJobId: REVIEW }]),
+			page([{ ...fixtureFeedback, id: FEEDBACK_ROW, reviewId: REVIEW }]),
 		),
-		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", ({ params }) =>
-			HttpResponse.json({ ...reviewJob(LINEAGE_REVIEW_ID), id: String(params.jobId) }),
+		http.get(`*/workspaces/:workspaceSlug/practices/reviews/${REVIEW}`, () =>
+			HttpResponse.json(servedReview),
 		),
-		http.get(
-			"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
-			({ params }) =>
-				HttpResponse.json({ ...resultDetail(RESULT), id: String(params.practiceResultId) }),
+		http.get(`*/workspaces/:workspaceSlug/practices/reviews/${REVIEW}/feedback-checks`, () =>
+			HttpResponse.json(reviewFeedbackChecksOf(servedReview)),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId", ({ params }) =>
+			HttpResponse.json({ ...resultDetail(RESULT), id: String(params.resultId) }),
 		),
 		...feedbackCountHandlers(),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) =>
@@ -191,7 +194,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 	});
 
 	it("tracks a result from its row: every table narrows to it, and the bar names it", async () => {
-		const first = { ...fixtureResult, id: RESULT_ROW, agentJobId: REVIEW };
+		const first = { ...fixtureResult, id: RESULT_ROW, reviewId: REVIEW };
 		assert(fixtureResult);
 		const { router } = renderRouteAtWithRouter(`${REVIEWS}/results`);
 		// The loading table is replaced by the loaded one, so the row is found first and its table after.
@@ -205,8 +208,8 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 
 		await waitFor(() =>
 			expect(router.state.location.search).toMatchObject({
-				practiceResultId: first.id,
-				agentJobId: first.agentJobId,
+				resultId: first.id,
+				reviewId: first.reviewId,
 				selected: true,
 			}),
 		);
@@ -230,8 +233,8 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 			).toBe("true"),
 		);
 		await waitFor(() =>
-			expect(requestsTo("/practices/reviews/results").at(-1)?.searchParams.get("agentJobId")).toBe(
-				first.agentJobId,
+			expect(requestsTo("/practices/reviews/results").at(-1)?.searchParams.get("reviewId")).toBe(
+				first.reviewId,
 			),
 		);
 	});
@@ -249,7 +252,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 		await waitFor(() =>
 			expect(router.state.location.search).toMatchObject({
 				detail: TRACE,
-				agentJobId: REVIEW,
+				reviewId: REVIEW,
 				selected: true,
 			}),
 		);
@@ -281,7 +284,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 		expect(router.state.location.search).toMatchObject({
 			detail: `trace:feedback:${FEEDBACK_ROW}`,
 			feedbackId: FEEDBACK_ROW,
-			agentJobId: REVIEW,
+			reviewId: REVIEW,
 		});
 		await traceSheet();
 	});
@@ -305,49 +308,58 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 });
 
 describe("a review's sheet", () => {
-	/** The real route renders the phase boundaries the job endpoint supplies. */
+	/** The real route renders the phase boundaries the review's attempt recorded. */
 	it("shows each phase of the run between the boundaries the server sent", async () => {
+		assert(servedReview.runtime);
+		const [job] = servedReview.runtime.jobs;
+		assert(job);
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", ({ params }) =>
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${REVIEW}`, () =>
 				HttpResponse.json({
-					...reviewJob(LINEAGE_REVIEW_ID),
-					id: String(params.jobId),
-					createdAt: "2026-07-28T13:34:48Z",
-					startedAt: "2026-07-28T13:35:00Z",
-					executionStartedAt: "2026-07-28T13:35:30Z",
-					completedAt: "2026-07-28T13:40:30Z",
+					...servedReview,
+					status: "COMPLETE",
+					runtime: {
+						jobs: [
+							{
+								...job,
+								attempt: 1,
+								status: "COMPLETED",
+								availableAt: "2026-07-28T13:34:48Z",
+								startedAt: "2026-07-28T13:35:00Z",
+								completedAt: "2026-07-28T13:40:00Z",
+							},
+						],
+					},
 				}),
 			),
 		);
 
 		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${REVIEW}`);
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
-		const phase = async (label: string) => {
-			const term = await within(sheet).findByText(label, { selector: "dt" }, ROUTE_RENDER_WAIT);
-			return term.nextElementSibling?.textContent;
-		};
-
-		await expect(phase("Wait to start")).resolves.toBe("12 seconds");
-		await expect(phase("Preparation")).resolves.toBe("30 seconds");
-		await expect(phase("Execution")).resolves.toBe("5 minutes");
+		const execution = await within(sheet).findByRole(
+			"list",
+			{ name: "Execution" },
+			ROUTE_RENDER_WAIT,
+		);
+		expect(execution.textContent).toContain("Wait to start: 12 seconds · Running: 5 minutes");
 	});
 
-	/**
-	 * Its own read, by this review's id, so a slow or failed one costs the reader that section alone.
-	 * What the section shows of the answer is its stories' to prove.
-	 */
-	it("asks for what this review's practice scripts did", async () => {
+	/** The review names each practice's script run itself: the section needs no read of its own. */
+	it("shows what this review's practice scripts did", async () => {
+		const [practice, ...others] = servedReview.practices;
+		assert(practice);
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/practice-scripts", () =>
-				HttpResponse.json([reviewPracticeScripts.fromCode]),
+			http.get(`*/workspaces/:workspaceSlug/practices/reviews/${REVIEW}`, () =>
+				HttpResponse.json({
+					...servedReview,
+					practices: [{ ...practice, script: reviewPracticeScripts.fromCode }, ...others],
+				}),
 			),
 		);
 
 		renderRouteAtWithRouter(`${REVIEWS}/runs?detail=review:${REVIEW}`);
 		const sheet = await screen.findByRole("dialog", undefined, ROUTE_RENDER_WAIT);
 		await within(sheet).findByRole("region", { name: "Practice scripts" }, ROUTE_RENDER_WAIT);
-
-		expect(requestsTo(`/agents/jobs/${REVIEW}/practice-scripts`)).toHaveLength(1);
 	});
 });
 
@@ -492,9 +504,7 @@ describe("the trace and a record over it", () => {
 			await act(async () => router.history.push(`${REVIEWS}/runs?detail=${TRACE}`));
 			within(await traceSheet()).getByText("You started here");
 			await act(async () =>
-				router.history.push(
-					`/w/other/admin/practices/reviews/runs?detail=${TRACE}&subjectUserId=7`,
-				),
+				router.history.push(`/w/other/admin/practices/reviews/runs?detail=${TRACE}&developerId=7`),
 			);
 			const otherReads = () => requested.filter((url) => url.pathname.startsWith(`${OTHER}/`));
 			await waitFor(() => {
@@ -592,7 +602,7 @@ describe("a record's sheet is the record alone", () => {
 		["review", `review:${REVIEW}`],
 		["result", `result:${RESULT_ROW}`],
 		["feedback", `feedback:${FEEDBACK_ROW}`],
-		["work", "work:issue:1430"],
+		["item", ITEM],
 		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`],
 	])("renders no story in the %s sheet, alone or over a trace", async (_kind, level) => {
 		for (const detail of [[level], [TRACE, level]]) {
@@ -651,7 +661,7 @@ describe("a sheet over the trace is the sheet from its row", () => {
 		["review", `review:${REVIEW}`],
 		["result", `result:${RESULT_ROW}`],
 		["feedback", `feedback:${FEEDBACK_ROW}`],
-		["work", "work:issue:1430"],
+		["item", ITEM],
 		["practice", `practice:${String(practiceCounts[0]?.practiceSlug)}`],
 	])("renders the %s sheet alike from its row and over a trace", async (_kind, level) => {
 		const alone = await settledSheet([level]);
@@ -662,34 +672,38 @@ describe("a sheet over the trace is the sheet from its row", () => {
 });
 
 describe("the trace of work no review started on", () => {
-	const queued = {
-		...tracedArtifacts[1],
-		artifactKind: "scm.issue",
-		artifactId: 1430,
-		reviewedSignalCount: 0,
-		lastSignal: {
-			...tracedArtifacts[1]?.lastSignal,
-			state: "PENDING",
-			stateReason: "PRACTICES_DISABLED",
-			stateReasonDescription:
-				"Practice reviews are turned off for this workspace. Hephaestus tries again when they are turned on.",
-		},
+	const trace = itemTraceOf(servedReview);
+	const [event] = trace.events;
+	assert(event);
+	const waiting = {
+		...trace,
+		reviews: [],
+		events: [
+			{
+				...event,
+				reviewId: null,
+				state: "WAITING",
+				reason: "PRACTICES_DISABLED",
+			},
+		],
 	};
 
-	it("asks for no chain, and says the work is queued while reviews are on", async () => {
+	it("asks for no chain, and says the work waits while reviews are on", async () => {
 		server.use(
 			http.get("*/workspaces", () =>
 				HttpResponse.json([workspaceListItem("acme", { practicesEnabled: true })]),
 			),
-			http.get("*/workspaces/:workspaceSlug/practices/trace", () => page([queued])),
+			http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/trace", () =>
+				HttpResponse.json(waiting),
+			),
 		);
 		renderRouteAtWithRouter(
-			`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify(["trace:work:issue:1430"]))}`,
+			`${REVIEWS}/runs?detail=${encodeURIComponent(JSON.stringify([`trace:${ITEM}`]))}`,
 		);
 		const sheet = await traceSheet();
 		await waitFor(() =>
 			expect(sheet.querySelector("[data-trace-verdict]")?.textContent).toBe(
-				"No review has started on this work yet: it is queued for review.",
+				"No review has started on this work yet: it waits before a review starts.",
 			),
 		);
 		expect(sheet.textContent).not.toMatch(/turned off/u);
@@ -700,7 +714,7 @@ describe("the trace of work no review started on", () => {
 describe("deep links", () => {
 	it("opens a review's page address that focused a result as that result's trace, keeping the selection and the scope", async () => {
 		const { router } = renderRouteAtWithRouter(
-			`${REVIEWS}/review/${REVIEW}?focus=result:${RESULT}&agentJobId=${REVIEW}&selected=true&practiceSlug=thin-controllers&from=2026-08-01&subjectUserId=7`,
+			`${REVIEWS}/review/${REVIEW}?focus=result:${RESULT}&reviewId=${REVIEW}&selected=true&practiceSlug=thin-controllers&from=2026-08-01&developerId=7`,
 		);
 		await waitFor(
 			() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`),
@@ -708,11 +722,11 @@ describe("deep links", () => {
 		);
 		expect(router.state.location.search).toMatchObject({
 			detail: `trace:result:${RESULT}`,
-			agentJobId: REVIEW,
+			reviewId: REVIEW,
 			selected: true,
 			practiceSlug: "thin-controllers",
 			from: "2026-08-01",
-			subjectUserId: 7,
+			developerId: "7",
 		});
 		expect(router.state.location.search).not.toHaveProperty("focus");
 		const sheet = await traceSheet();

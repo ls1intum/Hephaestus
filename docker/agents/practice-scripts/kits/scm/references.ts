@@ -141,3 +141,20 @@ export function relatedReferences(text: string): number[] {
 export function branchIssueReferences(branch: string): number[] {
 	return numbers(BRANCH_REF, branch);
 }
+
+/** A heading under which an issue states what "done" means without a task list. */
+export const OUTCOME_HEADING =
+	/^\s*#+\s*(?:acceptance criteria|definition of done|dod\b|done when|expected (?:outcome|result|behaviou?r)|given\b)/imu;
+
+/** The issues that each named way of linking names, with every way that names each one. */
+export function namedIssues(
+	ways: readonly (readonly [how: string, issues: readonly number[]])[],
+): Map<number, string[]> {
+	const named = new Map<number, string[]>();
+	for (const [how, issues] of ways) {
+		for (const number of issues) {
+			named.set(number, [...(named.get(number) ?? []), how]);
+		}
+	}
+	return named;
+}

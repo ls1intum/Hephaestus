@@ -1,26 +1,22 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type {
 	ActivityPeople,
 	ActivityWork,
 	ActivityWorkPage,
 	OpenWork,
-	ReviewRequestOutcome,
-	WorkItem,
 	WorkspaceMembership,
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
-import { clearUserView } from "@/runtime/user-view/session";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
-import { storeUserView } from "@/test/user-view";
 
 // A case mounts the whole app chrome, whose route modules are imported lazily.
 vi.setConfig({ testTimeout: 40_000 });
@@ -163,44 +159,6 @@ function adaMembership(
 	};
 }
 
-const ownPullRequest = {
-	id: 3101,
-	itemId: "9101",
-	type: "PULL_REQUEST",
-	number: 42,
-	title: "Retry webhook delivery",
-	state: "OPEN",
-	isDraft: false,
-	// Approved, so it needs Ada and is not folded away with what waits on others.
-	reviewDecision: "APPROVED",
-	author: { id: 7, login: "ada-lrz", name: "Ada", avatarUrl: "", htmlUrl: "" },
-} satisfies WorkItem;
-const ownIssue = {
-	id: 3102,
-	itemId: "9102",
-	type: "ISSUE",
-	number: 43,
-	title: "Document the restore drill",
-	state: "OPEN",
-	isDraft: false,
-} satisfies WorkItem;
-const reviewRequested = {
-	...ownPullRequest,
-	reviewDecision: undefined,
-	id: 3103,
-	itemId: "9103",
-	number: 44,
-	title: "Bob's pull request",
-	author: { id: 8, login: "bob", name: "Bob", avatarUrl: "", htmlUrl: "" },
-} satisfies WorkItem;
-/** Ada's own pull request and assigned issue, and one of Bob's she was asked to review. */
-const ownWork = {
-	reviewRequests: { content: [reviewRequested], hasMore: false },
-	teamReviewRequests: nothing,
-	pullRequests: { content: [ownPullRequest], hasMore: false },
-	issues: { content: [ownIssue], hasMore: false },
-} satisfies OpenWork;
-
 /** Signed in as `ada`, while the workspace's connected instance knows the same account as `ada-lrz`. */
 describe("Activity", () => {
 	let reads: URL[] = [];
@@ -258,125 +216,6 @@ describe("Activity", () => {
 			"/workspaces/acme/activity/members/ada-lrz/open-work",
 		);
 		expect(reads.some((url) => url.searchParams.get("login") === "ada")).toBe(false);
-	});
-
-	describe("Request review", () => {
-		const submitted = {
-			status: "SUBMITTED",
-			reason: null,
-			reasonDescription: null,
-			reviewId: "5b1e7c2a-3d4f-4a6b-8c9d-0e1f2a3b4c5d",
-		} satisfies ReviewRequestOutcome;
-		let asked: unknown[] = [];
-		beforeEach(() => {
-			asked = [];
-			server.use(
-				http.get("*/workspaces/:workspaceSlug/activity/members/:login/open-work", () =>
-					HttpResponse.json(ownWork),
-				),
-				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
-					asked.push(await request.json());
-					return HttpResponse.json(submitted);
-				}),
-			);
-		});
-		afterEach(clearUserView);
-
-		it("asks for a review of your own work by its item, and of nobody else's", async () => {
-			const user = userEvent.setup();
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await user.click(
-				await screen.findByRole("button", { name: "Request review: #42" }, ROUTE_RENDER_WAIT),
-			);
-			await user.click(screen.getByRole("button", { name: "Request review: #43" }));
-
-			await waitFor(() => expect(asked).toStrictEqual([{ itemId: "9101" }, { itemId: "9102" }]));
-			expect(screen.queryByRole("button", { name: "Request review: #44" })).toBeNull();
-		});
-
-		it("says why a review asked for from open work was refused", async () => {
-			server.use(
-				http.post("*/workspaces/:workspaceSlug/practices/review-requests", () =>
-					HttpResponse.json({
-						status: "REFUSED",
-						reason: "REQUEST_COOLDOWN_ACTIVE",
-						reasonDescription: "A review of this was already asked for a moment ago.",
-						reviewId: null,
-					} satisfies ReviewRequestOutcome),
-				),
-			);
-			const user = userEvent.setup();
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await user.click(
-				await screen.findByRole("button", { name: "Request review: #42" }, ROUTE_RENDER_WAIT),
-			);
-
-			await screen.findByText("No review was started", undefined, ROUTE_RENDER_WAIT);
-			await screen.findByText("A review of this was already asked for a moment ago.");
-		});
-
-		/** A refusal answered after a second ask was sent is still said: every answer is its own. */
-		it("says why an earlier ask was refused after a later one was sent", async () => {
-			// The first ask is answered only once the test says so; the second at once.
-			const firstAnswer = deferred();
-			const answers = [
-				async () => {
-					await firstAnswer.promise;
-					return {
-						status: "REFUSED",
-						reason: "REQUEST_COOLDOWN_ACTIVE",
-						reasonDescription: "A review of this was already asked for a moment ago.",
-						reviewId: null,
-					} satisfies ReviewRequestOutcome;
-				},
-				async () => submitted,
-			];
-			server.use(
-				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
-					asked.push(await request.json());
-					const answer = answers.shift();
-					assert(answer, "Only two reviews are asked for");
-					return HttpResponse.json(await answer());
-				}),
-			);
-			const user = userEvent.setup();
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await user.click(
-				await screen.findByRole("button", { name: "Request review: #42" }, ROUTE_RENDER_WAIT),
-			);
-			await user.click(screen.getByRole("button", { name: "Request review: #43" }));
-			await waitFor(() => expect(asked).toHaveLength(2));
-			await screen.findByText("Review started");
-			firstAnswer.resolve();
-
-			await screen.findByText("No review was started", undefined, ROUTE_RENDER_WAIT);
-			await screen.findByText("A review of this was already asked for a moment ago.");
-		});
-
-		it("offers no review where the workspace reviews no practices", async () => {
-			server.use(
-				http.get("*/workspaces", () =>
-					HttpResponse.json([workspaceListItem("acme", { practicesEnabled: false })]),
-				),
-			);
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await screen.findByText("Retry webhook delivery", undefined, ROUTE_RENDER_WAIT);
-			expect(screen.queryByRole("button", { name: /^Request review/u })).toBeNull();
-		});
-
-		it("offers no review in a user view, which never spends the member's budget", async () => {
-			storeUserView({ workspaceSlug: "acme" });
-			renderRouteAtWithRouter("/w/acme/activity");
-
-			await screen.findByText("Retry webhook delivery", undefined, ROUTE_RENDER_WAIT);
-			// The view is on, so the absence below is the view's doing.
-			screen.getByText(/read-only/u);
-			expect(screen.queryByRole("button", { name: /^Request review/u })).toBeNull();
-		});
 	});
 
 	it("pages your timeline by the server's cursor and asks the server for the period", async () => {

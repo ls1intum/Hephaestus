@@ -178,11 +178,11 @@ public class AccountProvisioningService {
             }
             var exactIdentity = new PersonIdentity(providerId, subject, teamId);
             long sourceId = people.ensureHuman(exactIdentity, displayName(principal, subject));
+            requireActiveAccountForWrite(intent.linkingAccountId());
             if (sourceId != intent.linkingAccountId()) {
                 people.absorbUnclaimed(intent.linkingAccountId(), sourceId);
             }
             people.claim(exactIdentity);
-            requireActiveAccountForWrite(intent.linkingAccountId());
             Account account =
                     accountRepository.findById(intent.linkingAccountId()).orElseThrow();
             var linked = identityRepository

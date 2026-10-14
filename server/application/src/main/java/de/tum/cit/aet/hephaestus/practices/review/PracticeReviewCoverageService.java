@@ -30,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PracticeReviewCoverageService {
     static final int ESTIMATE_WINDOW_DAYS = 30;
     private final RepositoryToMonitorRepository monitorRepository;
@@ -38,7 +39,6 @@ public class PracticeReviewCoverageService {
     private final JdbcClient jdbc;
     private final MonitoredRepositoryQuery monitored;
 
-    @Transactional(readOnly = true)
     public Map<String, List<String>> generatedPaths(Workspace workspace) {
         var indexed = monitored.repositories(workspace.getId()).values().stream()
                 .collect(Collectors.toMap(ref -> ref.monitorId(), ref -> ref.repositoryItemId()));
@@ -67,7 +67,7 @@ public class PracticeReviewCoverageService {
                 (id, patterns) -> Objects.requireNonNull(monitors.get(id)).setGeneratedPaths(patterns));
     }
 
-    private static long positiveId(String value) {
+    public static long positiveId(String value) {
         if (!value.matches("[1-9][0-9]*"))
             throw new InvalidReviewScopeException("Use a positive account or repository item id.");
         try {
@@ -87,7 +87,6 @@ public class PracticeReviewCoverageService {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    @Transactional(readOnly = true)
     public WorkspaceReviewScope scope(Workspace workspace) {
         var indexed = monitored.repositories(workspace.getId()).values().stream()
                 .collect(Collectors.toMap(ref -> ref.monitorId(), ref -> ref.repositoryItemId()));
@@ -108,7 +107,6 @@ public class PracticeReviewCoverageService {
                 s.getReviewScopeRepositories(), s.getReviewScopePeople(), repositories, selected);
     }
 
-    @Transactional(readOnly = true)
     public WorkspaceReviewScopeDTO wireScope(Workspace workspace) {
         var internal = scope(workspace);
         return new WorkspaceReviewScopeDTO(

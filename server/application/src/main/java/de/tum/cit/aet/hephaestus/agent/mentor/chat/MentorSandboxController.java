@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 /** Lets the webapp start the member's Heph sandbox when Heph opens, so the first message does not wait for it. */
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/mentor/sandbox")
 @Tag(name = "Mentor Chat", description = "Heph conversations and the sandbox they run in")

@@ -7,3 +7,8 @@ export function hasText(value: string | null | undefined): value is string {
 export function isBlank(value: string | null | undefined): boolean {
 	return !hasText(value?.trim());
 }
+
+/** A JSON object with keys. A list is not one. */
+export function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}

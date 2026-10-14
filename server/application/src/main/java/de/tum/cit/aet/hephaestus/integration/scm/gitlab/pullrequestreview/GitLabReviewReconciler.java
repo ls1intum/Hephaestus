@@ -23,16 +23,17 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reconciles GitLab MR discussion starters into {@link PullRequestReview} rows with state {@link
- * PullRequestReview.State#COMMENTED}.
- *
- * <p>Unlike GitHub, GitLab has no first-class "review" entity. We derive one COMMENTED review for
- * the starter of a discussion so that inline feedback is attributed to a review, as on GitHub.
- * Approvals are handled separately (see {@code GitLabMergeRequestProcessor}).
- *
- * <p>Idempotency: a deterministic {@code nativeId} is derived by hashing {@code
- * (discussionGlobalId, authorNativeId)}; re-running the sync reuses the same row and updates {@code
- * submittedAt} if an earlier note is discovered.
+ * Reconciles GitLab MR discussion starters into {@link PullRequestReview} rows
+ * with state {@link PullRequestReview.State#COMMENTED}.
+ * <p>
+ * Unlike GitHub, GitLab has no first-class "review" entity. We derive one COMMENTED
+ * review for the starter of a discussion so that inline feedback is attributed
+ * to a review, as on GitHub. Approvals are handled separately (see
+ * {@code GitLabMergeRequestProcessor}).
+ * <p>
+ * Idempotency: a deterministic {@code nativeId} is derived by hashing
+ * {@code (discussionGlobalId, authorNativeId)}; re-running the sync reuses the same
+ * row and updates {@code submittedAt} if an earlier note is discovered.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -57,15 +58,14 @@ public class GitLabReviewReconciler {
     }
 
     /**
-     * Returns a {@link PullRequestReview} with state COMMENTED for the given {@code (pr, author,
-     * discussion)} tuple, creating it when absent and shifting {@code submittedAt} backwards when
-     * an earlier note is observed.
+     * Returns a {@link PullRequestReview} with state COMMENTED for the given
+     * {@code (pr, author, discussion)} tuple, creating it when absent and shifting
+     * {@code submittedAt} backwards when an earlier note is observed.
      *
      * @param pr the parent pull request
      * @param author the note author (must have a non-null native ID)
      * @param discussionGlobalId the GitLab Discussion GID (hex-hash string)
-     * @param earliestNoteCreatedAt earliest non-system note createdAt for this author in the
-     *     discussion
+     * @param earliestNoteCreatedAt earliest non-system note createdAt for this author in the discussion
      * @param provider the GitLab provider
      * @param ctx processing context for event emission (may be null during webhook paths)
      * @return the reconciled review, or {@code null} when inputs are invalid
@@ -80,8 +80,7 @@ public class GitLabReviewReconciler {
             @Nullable ProcessingContext ctx) {
         if (pr == null || author == null || author.getNativeId() == null || discussionGlobalId == null) {
             log.warn(
-                    "Skipped COMMENTED review synthesis: prId={}, authorPresent={},"
-                            + " authorNativeIdPresent={}, discussionPresent={}",
+                    "Skipped COMMENTED review synthesis: prId={}, authorPresent={}, authorNativeIdPresent={}, discussionPresent={}",
                     pr != null ? pr.getId() : null,
                     author != null,
                     author != null && author.getNativeId() != null,
@@ -118,19 +117,17 @@ public class GitLabReviewReconciler {
      *
      * @param body the note's body
      * @param at when the note was written
-     * @param globalId the note's GID ({@code gid://gitlab/Note/<id>}), the key of a
-     *     CHANGES_REQUESTED row
-     * @param live whether the note has just been written (a webhook), as opposed to a note replayed
-     *     by the sync against the current record
+     * @param globalId the note's GID ({@code gid://gitlab/Note/<id>}), the key of a CHANGES_REQUESTED row
+     * @param live whether the note has just been written (a webhook), as opposed to a note replayed by
+     *     the sync against the current record
      */
     public record SystemNote(String body, Instant at, String globalId, boolean live) {}
 
     /**
      * Records typed request-changes notes. Approval and withdrawal notes only invalidate readiness:
-     * GitLab writes them asynchronously without the approval's act time, and their author may have
-     * acted again (<a
-     * href="https://gitlab.com/gitlab-org/gitlab/-/blob/v19.4.1-ee/app/workers/merge_requests/create_approval_note_worker.rb">provider
-     * source</a>). Current approvals belong to the native approval snapshot, not note replay.
+     * GitLab writes them asynchronously without the approval's act time, and their author may have acted again
+     * (<a href="https://gitlab.com/gitlab-org/gitlab/-/blob/v19.4.1-ee/app/workers/merge_requests/create_approval_note_worker.rb">provider source</a>).
+     * Current approvals belong to the native approval snapshot, not note replay.
      *
      * @return whether the note requires a new readiness read
      */
@@ -160,10 +157,9 @@ public class GitLabReviewReconciler {
     }
 
     /**
-     * The system note "requested changes": one CHANGES_REQUESTED review by its author, at the time
-     * GitLab recorded the note. Each such note is its own decision, so the row is keyed by the
-     * note, and a re-sync finds the row it made before. The approval of the same person is GitLab's
-     * approval snapshot's to settle.
+     * The system note "requested changes": one CHANGES_REQUESTED review by its author, at the time GitLab recorded
+     * the note. Each such note is its own decision, so the row is keyed by the note, and a re-sync finds the row it
+     * made before. The approval of the same person is GitLab's approval snapshot's to settle.
      */
     @Nullable
     PullRequestReview recordChangesRequested(
@@ -268,10 +264,7 @@ public class GitLabReviewReconciler {
         return saved;
     }
 
-    /**
-     * Sync passes parents whose loading transaction has ended; lazy relationships belong to this
-     * write.
-     */
+    /** Sync passes parents whose loading transaction has ended; lazy relationships belong to this write. */
     private PullRequest managedParent(PullRequest parent) {
         return pullRequestRepository
                 .findById(Objects.requireNonNull(parent.getId()))
@@ -280,17 +273,19 @@ public class GitLabReviewReconciler {
 
     /**
      * Produces a deterministic positive Long native ID for a COMMENTED review.
-     *
-     * <p>Uses FNV-1a over {@code key + "|" + authorNativeId}. Collisions with the bit-packed
-     * approval native IDs ({@code (mr<<32)|user}) are astronomically unlikely because the two
-     * schemes occupy different hash spaces; any collision would surface as a DB unique-constraint
-     * violation and is logged.
+     * <p>
+     * Uses FNV-1a over {@code key + "|" + authorNativeId}. Collisions
+     * with the bit-packed approval native IDs ({@code (mr<<32)|user}) are
+     * astronomically unlikely because the two schemes occupy different hash spaces;
+     * any collision would surface as a DB unique-constraint violation and is logged.
      */
     public static long generateCommentedReviewNativeId(String discussionGlobalId, long authorNativeId) {
         return deterministicNativeId(discussionGlobalId, authorNativeId);
     }
 
-    /** Hashes the system-note GID with a separate namespace from COMMENTED discussion reviews. */
+    /**
+     * Hashes the system-note GID with a separate namespace from COMMENTED discussion reviews.
+     */
     public static long generateChangesRequestedNativeId(String noteGlobalId, long authorNativeId) {
         return deterministicNativeId("requested-changes:" + noteGlobalId, authorNativeId);
     }

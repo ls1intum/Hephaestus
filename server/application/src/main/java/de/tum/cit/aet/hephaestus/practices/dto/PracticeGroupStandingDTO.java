@@ -41,10 +41,4 @@ public record PracticeGroupStandingDTO(
         results = List.copyOf(results);
         sources = List.copyOf(sources);
     }
-
-    public static boolean isVerdict(PracticeStanding standing) {
-        return standing == PracticeStanding.DEVELOPING
-                || standing == PracticeStanding.MIXED
-                || standing == PracticeStanding.STRENGTH;
-    }
 }

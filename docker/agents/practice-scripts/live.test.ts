@@ -56,13 +56,15 @@ const EVERY_SLOT = await readFile(path.join(import.meta.dirname, "fixtures/every
  * A program that rates the added comments with a decision model and returns its own result: what it
  * could not settle, with the coverage it claims.
  */
-const DECIDES = `import { addedComments, classify, commentKinds, definePracticeScript, expectKind, requireChange } from "../lib/core/practice-script.ts";
+const DECIDES = `import { addedComments, commentKinds, expectKind, requireChange, scm } from "../kits/scm/index.ts";
+import { classify, definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { decision: "required" } },
 	async run(ctx) {
 		expectKind(ctx, "scm.pull_request");
-		const comments = addedComments(requireChange(ctx.files));
+		const { files } = scm(ctx);
+		const comments = addedComments(requireChange(files));
 		const { ratings, unrated } = await classify({
 			model: ctx.models.decision,
 			set: commentKinds,
@@ -73,7 +75,7 @@ export default definePracticeScript({
 		if (first === undefined) {
 			throw new Error("the change adds no comment");
 		}
-		const citation = await ctx.files.change.cite(first.at.change, "NEW", first.at.line, first.at.endLine);
+		const citation = await files.change.cite(first.at.change, "NEW", first.at.line, first.at.endLine);
 		return {
 			outcome: "COULD_NOT_DETERMINE",
 			summary: "The comments were rated, and the practice needs a reviewer",
@@ -193,7 +195,6 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 			{
 				slug,
 				inputs,
-				criteria: "",
 				files: { head: { revision: COMMIT }, change },
 				now: new Date().toISOString(),
 				deadline: Date.now() + PROGRAM_MS,

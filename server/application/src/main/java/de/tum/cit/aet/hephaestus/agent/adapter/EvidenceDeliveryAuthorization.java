@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.adapter;
 
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.CitationVerification;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -20,7 +20,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 @Component
 @RequiredArgsConstructor
 public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
-    private final SourceCatalogRegistry sourceCatalogs;
+    private final ClasspathSourceCatalogRegistry sourceCatalogs;
     private final CitedSourceAccess access;
 
     @Override
@@ -32,9 +32,7 @@ public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
         try {
             for (var citation : citations) {
                 if (!sourceCatalogs.isSourceUsePermitted(
-                        sourceCatalogs.current().version(),
-                        new SourceKind(citation.path("sourceKind").asString()),
-                        purpose)) return false;
+                        new SourceKind(citation.path("sourceKind").asString()), purpose)) return false;
             }
             return true;
         } catch (IllegalArgumentException unknownSource) {

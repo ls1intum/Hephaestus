@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -9,24 +11,43 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
-public record SourceCatalog(SourceContractVersion version, List<SourceContract> sources) {
-    public SourceCatalog {
+public final class SourceCatalog {
+    private final SourceContractVersion version;
+    private final List<SourceContract> sources;
+    private final Map<SourceKind, SourceContract> index;
+
+    @JsonCreator
+    public SourceCatalog(
+            @JsonProperty("version") SourceContractVersion version,
+            @JsonProperty("sources") List<SourceContract> sources) {
         Objects.requireNonNull(version, "version");
         sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
         if (sources.isEmpty()) {
-            throw new IllegalArgumentException("Artifact source catalog must contain sources");
+            throw new IllegalArgumentException("Source catalog must contain sources");
         }
-        indexSources(sources);
+        this.version = version;
+        this.sources = sources;
+        this.index = Map.copyOf(indexSources(sources));
+    }
+
+    @JsonProperty("version")
+    public SourceContractVersion version() {
+        return version;
+    }
+
+    @JsonProperty("sources")
+    public List<SourceContract> sources() {
+        return sources;
     }
 
     public Optional<SourceContract> source(SourceKind kind) {
-        return sources.stream().filter(source -> source.kind().equals(kind)).findFirst();
+        return Optional.ofNullable(index.get(kind));
     }
 
     /**
      * The sources a practice bound to this kind reads when its author has not said otherwise — a subset of
      * {@link #sourcesFor(String)}, the whole applicable evidence surface. In catalog order (best-established
-     * first); alphabetical would put a comment thread ahead of the artifact it hangs off.
+     * first); alphabetical would put a comment thread ahead of the item it describes.
      */
     public List<SourceKind> defaultSourcesFor(String itemKind) {
         Objects.requireNonNull(itemKind, "itemKind");
@@ -40,7 +61,7 @@ public record SourceCatalog(SourceContractVersion version, List<SourceContract> 
     }
 
     /**
-     * Every source that declares it applies to this artifact kind. Empty means nothing has declared itself
+     * Every source that declares it applies to this item kind. Empty means nothing has declared itself
      * usable for the kind, which callers treat as an unknown kind rather than a review with no evidence.
      */
     public Set<SourceKind> sourcesFor(String itemKind) {

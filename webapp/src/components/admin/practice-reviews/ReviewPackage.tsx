@@ -1,9 +1,13 @@
 import { FileCode2Icon } from "lucide-react";
 
-import type { GetPracticeReviewFeedbackResponse, ReviewProposedPlacement } from "@/api/types.gen";
+import type { FeedbackCopy, ReviewFeedbackDetail } from "@/api/types.gen";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
-import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
-import { PLACEMENT_DEFS } from "@/components/practice-vocabulary/placement-defs";
+import {
+	FEEDBACK_COPY_KIND_DEFS,
+	FEEDBACK_COPY_STATE_DEFS,
+} from "@/components/practice-vocabulary/feedback-copy-defs";
+import { ADMIN_WITHHELD_TEXT } from "@/components/practice-vocabulary/feedback-destination-defs";
+import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 import {
 	Accordion,
 	AccordionContent,
@@ -13,56 +17,61 @@ import {
 
 import { FeedbackBody } from "./FeedbackBody";
 
-/**
- * The placements a review proposed, the summary and the notes on lines. A private place's text is
- * never shown here, even when a caller passes placements for it: the place's own words stand in.
- */
-export function ReviewPackage({
-	feedback,
-	defaultExpanded = false,
-}: {
-	feedback: GetPracticeReviewFeedbackResponse;
+export interface ReviewPackageProps {
+	feedback: Pick<ReviewFeedbackDetail, "destination" | "copies">;
 	defaultExpanded?: boolean;
-}) {
-	if (OPERATOR_WITHHELD_TEXT[feedback.channel] !== undefined) {
-		return <FeedbackBody feedback={{ ...feedback, body: undefined }} />;
+}
+
+/**
+ * The copies of one piece of feedback, in the order they are written: the summary, then the notes
+ * on files and lines, each with where it stands. A private destination's text is never shown here,
+ * even when a caller passes copies for it: the destination's own words stand in.
+ */
+export function ReviewPackage({ feedback, defaultExpanded = false }: ReviewPackageProps) {
+	if (ADMIN_WITHHELD_TEXT[feedback.destination] !== undefined) {
+		return <FeedbackBody feedback={{ destination: feedback.destination, body: null }} />;
 	}
-	const summary = feedback.proposedPlacements.find((placement) => placement.type === "SUMMARY");
-	const inline = feedback.proposedPlacements.filter(isInline);
+	const copies = [...feedback.copies].sort((a, b) => a.position - b.position);
+	const summaries = copies.filter((copy) => copy.kind === "SUMMARY");
+	const notes = copies.filter(isNote);
 
 	return (
 		<div className="min-w-0 space-y-3">
-			{summary ? <FeedbackBody feedback={{ ...feedback, body: summary.body }} /> : null}
-			{inline.length > 0 ? (
+			{summaries.map((summary) => (
+				<div key={summary.id} className="min-w-0 space-y-1.5">
+					<StatusLabel
+						def={FEEDBACK_COPY_STATE_DEFS[summary.state]}
+						className="text-xs text-muted-foreground"
+					/>
+					<FeedbackBody feedback={{ destination: feedback.destination, body: summary.body }} />
+				</div>
+			))}
+			{notes.length > 0 ? (
 				<Accordion
 					multiple
-					defaultValue={defaultExpanded ? inline.map((_, index) => `inline-${index}`) : undefined}
+					defaultValue={defaultExpanded ? notes.map((note) => note.id) : undefined}
 					className="min-w-0 rounded-xl border px-4"
 				>
-					{inline.map((placement, index) => (
-						<AccordionItem
-							key={`${placement.path}:${placement.startLine}:${index}`}
-							value={`inline-${index}`}
-						>
+					{notes.map((note) => (
+						<AccordionItem key={note.id} value={note.id}>
 							<AccordionTrigger className="gap-3 no-underline hover:no-underline">
 								<span className="flex min-w-0 items-start gap-2">
 									<FileCode2Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
 									<span className="min-w-0">
-										<span className="block font-mono text-xs break-all">{placement.path}</span>
+										<span className="block font-mono text-xs break-all">{note.path}</span>
 										<span className="block text-xs font-normal text-muted-foreground">
-											{placement.endLine !== undefined && placement.endLine !== placement.startLine
-												? `Lines ${placement.startLine}–${placement.endLine}`
-												: `Line ${placement.startLine}`}
-											{placement.type === "LOCATION_COMMENT"
-												? ` · ${PLACEMENT_DEFS.LOCATION_COMMENT.label}`
-												: null}
+											{noteAnchor(note)}
 										</span>
+										<StatusLabel
+											def={FEEDBACK_COPY_STATE_DEFS[note.state]}
+											className="text-xs font-normal"
+										/>
 									</span>
 								</span>
 							</AccordionTrigger>
 							<AccordionContent className="min-w-0 pb-4 pl-6">
 								<div className={`${UNTRUSTED_MARKDOWN_PROSE} min-w-0 break-words`}>
-									<UntrustedMarkdown>{placement.body}</UntrustedMarkdown>
+									<UntrustedMarkdown>{note.body ?? ""}</UntrustedMarkdown>
 								</div>
 							</AccordionContent>
 						</AccordionItem>
@@ -73,20 +82,19 @@ export function ReviewPackage({
 	);
 }
 
-type InlinePlacement = ReviewProposedPlacement & {
-	type: "INLINE" | "LOCATION_COMMENT";
-	path: string;
-	startLine: number;
-};
+type NoteCopy = FeedbackCopy & { kind: "LINE_NOTE" | "FILE_NOTE"; path: string };
 
-/**
- * A placement about lines: proposed on them, or recorded as a comment linking to them. Either keeps its file
- * and first line; the summary has neither.
- */
-function isInline(placement: ReviewProposedPlacement): placement is InlinePlacement {
-	return (
-		(placement.type === "INLINE" || placement.type === "LOCATION_COMMENT") &&
-		placement.path !== undefined &&
-		placement.startLine !== undefined
-	);
+/** A note on one file or on lines in it. Either keeps its file; the summary has none. */
+function isNote(copy: FeedbackCopy): copy is NoteCopy {
+	return (copy.kind === "LINE_NOTE" || copy.kind === "FILE_NOTE") && copy.path !== null;
+}
+
+/** "Lines 148–152", "Line 148", or the kind's own name for a note on the whole file. */
+function noteAnchor(note: NoteCopy): string {
+	if (note.kind === "FILE_NOTE" || note.startLine === null) {
+		return FEEDBACK_COPY_KIND_DEFS.FILE_NOTE.label;
+	}
+	return note.endLine !== null && note.endLine !== note.startLine
+		? `Lines ${note.startLine}–${note.endLine}`
+		: `Line ${note.startLine}`;
 }

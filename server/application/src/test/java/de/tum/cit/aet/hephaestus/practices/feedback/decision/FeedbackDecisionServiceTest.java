@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSend;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckFacts;
@@ -64,7 +65,8 @@ class FeedbackDecisionServiceTest {
             Clock.fixed(now, ZoneOffset.UTC),
             gate,
             digests,
-            privacy);
+            privacy,
+            new FeedbackSendQueue(sends, Clock.fixed(now, ZoneOffset.UTC)));
     Feedback row;
 
     @BeforeEach
@@ -110,7 +112,7 @@ class FeedbackDecisionServiceTest {
         assertThat(decision.getAction()).isEqualTo(FeedbackDecisionAction.APPROVE);
         assertThat(decision.getFeedbackId()).isEqualTo(id);
         var capture = ArgumentCaptor.forClass(FeedbackSend.class);
-        verify(sends).save(capture.capture());
+        verify(sends).saveAndFlush(capture.capture());
         assertThat(capture.getValue().getState()).isEqualTo(FeedbackSendState.PENDING);
         assertThat(capture.getValue().getAction()).isEqualTo(FeedbackSendAction.POST);
     }
@@ -136,7 +138,7 @@ class FeedbackDecisionServiceTest {
                 1, id, 3, FeedbackDecisionAction.WITHDRAW, FeedbackDecisionReason.OTHER, "Remove this guidance.", null);
         assertThat(decision.getAction()).isEqualTo(FeedbackDecisionAction.WITHDRAW);
         var capture = ArgumentCaptor.forClass(FeedbackSend.class);
-        verify(sends).save(capture.capture());
+        verify(sends).saveAndFlush(capture.capture());
         assertThat(capture.getValue().getAction()).isEqualTo(FeedbackSendAction.RETRACT);
     }
 

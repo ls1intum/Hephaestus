@@ -1,11 +1,11 @@
 {
-	"outcome": "UNDETERMINED",
+	"outcome": "COULD_NOT_DETERMINE",
 	"summary": "Origin of the customer reference header is unclear",
 	"explanation": "The exporter now reads the customer reference from a request header and puts it into the export file name. Whether this needs validation depends on who can set the header. The captured repository does not contain the gateway configuration that answers this.",
 	"citations": [
 		{
 			"sourceKind": "scm.pull-request.diff",
-			"artifactPath": "context/change.json",
+			"sourcePath": "context/change.json",
 			"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 			"side": "NEW",
 			"startLine": 64,
@@ -15,17 +15,21 @@
 	],
 	"evidence": {
 		"search": {
-			"consulted": ["scm.pull-request.diff", "scm.repository.tree"],
+			"consulted": [
+				"scm.pull-request.diff",
+				"scm.repository.tree"
+			],
 			"lookedFor": "validation or escaping of X-Customer-Ref before it reaches the file name",
 			"boundary": "the changed files and every repository file that names X-Customer-Ref"
 		},
-		"undecidability": []
+		"openQuestions": []
 	},
 	"coverage": {
 		"source": "host",
 		"reads": 4,
 		"truncatedReads": 0,
 		"failedReads": 0,
-		"complete": true
+		"complete": true,
+		"receipts": []
 	}
 }

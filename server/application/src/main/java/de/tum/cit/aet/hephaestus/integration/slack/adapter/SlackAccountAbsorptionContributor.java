@@ -3,20 +3,17 @@ package de.tum.cit.aet.hephaestus.integration.slack.adapter;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAbsorptionContributor;
 import java.util.Map;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
+@Order(30)
 public class SlackAccountAbsorptionContributor implements AccountAbsorptionContributor {
     private final NamedParameterJdbcTemplate jdbc;
 
     public SlackAccountAbsorptionContributor(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
-    }
-
-    @Override
-    public int order() {
-        return 30;
     }
 
     @Override

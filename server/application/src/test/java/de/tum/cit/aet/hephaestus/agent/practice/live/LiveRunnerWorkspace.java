@@ -6,7 +6,6 @@ import static de.tum.cit.aet.hephaestus.agent.practice.live.PracticeCriteriaCase
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
-import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -22,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -241,7 +241,7 @@ final class LiveRunnerWorkspace {
             throws IOException {
         Path practices = workspace.resolve(SandboxLayout.PRACTICES_PREFIX);
         Files.createDirectories(practices);
-        var definition = RuntimePracticeTestData.definition(new ItemKind("scm.pull_request"), name, criteria, null);
+        var definition = DefinitionTestFixtures.definition(new ItemKind("scm.pull_request"), name, criteria, null);
         var entry = MAPPER.createObjectNode()
                 .put("slug", slug)
                 .put("name", name)
@@ -300,7 +300,7 @@ final class LiveRunnerWorkspace {
                     1,
                     List.of(pinned));
             var inputs =
-                    new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null, null);
+                    new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null);
             for (var file : inputs.entrySet()) {
                 Path path = workspace.resolve(file.getKey());
                 Files.createDirectories(path.getParent());

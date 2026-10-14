@@ -13,8 +13,7 @@ class PracticeV1ScanMembershipDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepScanMembershipAndReuseIndependentOfJobRetention(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         PracticeV1CutoverMigrationTest.execute(database, """
             BEGIN;
             INSERT INTO practice_version(id,workspace_id,practice_id,number,definition)
@@ -33,10 +32,10 @@ class PracticeV1ScanMembershipDatabaseTest {
             INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version)
             VALUES('00000000-0000-0000-0000-000000999811',992101,992121,999841,'file-a-head'),
                 ('00000000-0000-0000-0000-000000999811',992101,992121,999842,'file-b-head');
-            INSERT INTO review_job(id,review_id,workspace_id,status,processing_status,input,config_snapshot,trace_id)
-            VALUES('00000000-0000-0000-0000-000000999821','00000000-0000-0000-0000-000000999811',992101,'COMPLETED','DONE','{}','{}',repeat('f',32)),
-                ('00000000-0000-0000-0000-000000999822','00000000-0000-0000-0000-000000999811',992101,'COMPLETED','DONE','{}','{}',repeat('f',32)),
-                ('00000000-0000-0000-0000-000000999823','00000000-0000-0000-0000-000000999811',992101,'QUEUED','NONE','{}','{}',repeat('f',32));
+            INSERT INTO review_job(id,review_id,workspace_id,status,processing_status,input,config_snapshot,trace_id,submitted_at)
+            VALUES('00000000-0000-0000-0000-000000999821','00000000-0000-0000-0000-000000999811',992101,'COMPLETED','DONE','{}','{}',repeat('f',32),'2026-01-01T00:00:00Z'),
+                ('00000000-0000-0000-0000-000000999822','00000000-0000-0000-0000-000000999811',992101,'COMPLETED','DONE','{}','{}',repeat('f',32),'2026-01-01T00:00:00Z'),
+                ('00000000-0000-0000-0000-000000999823','00000000-0000-0000-0000-000000999811',992101,'QUEUED','NONE','{}','{}',repeat('f',32),'2026-01-01T00:00:00Z');
             INSERT INTO result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,outcome,coverage,recorded_at)
             VALUES('00000000-0000-0000-0000-000000999851',992101,'00000000-0000-0000-0000-000000999811',992121,999831,999841,'file-a-head','MET','{}',now());
             UPDATE review_item SET state='JUDGED',result_id='00000000-0000-0000-0000-000000999851',job_id='00000000-0000-0000-0000-000000999821'
@@ -44,8 +43,8 @@ class PracticeV1ScanMembershipDatabaseTest {
             COMMIT;
             """);
         assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(database, """
-            INSERT INTO review_job(id,review_id,workspace_id,status,input,config_snapshot,trace_id)
-            VALUES(gen_random_uuid(),'00000000-0000-0000-0000-000000999811',992101,'QUEUED','{}','{}',repeat('f',32))
+            INSERT INTO review_job(id,review_id,workspace_id,status,input,config_snapshot,trace_id,submitted_at)
+            VALUES(gen_random_uuid(),'00000000-0000-0000-0000-000000999811',992101,'QUEUED','{}','{}',repeat('f',32),'2026-01-01T00:00:00Z')
             """))
                 .isInstanceOf(SQLException.class)
                 .hasMessageContaining("uk_review_job_active_review");

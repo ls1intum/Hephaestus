@@ -105,8 +105,7 @@ public class OutlineMirrorTransactions {
                             collectionRepository.saveAndFlush(row);
                         },
                         () -> log.debug(
-                                "outline.sync: collection {} vanished from the registry mid-pass (workspaceId={}) —"
-                                        + " skipping its bookkeeping write",
+                                "outline.sync: collection {} vanished from the registry mid-pass (workspaceId={}) — skipping its bookkeeping write",
                                 collectionId,
                                 workspaceId));
     }

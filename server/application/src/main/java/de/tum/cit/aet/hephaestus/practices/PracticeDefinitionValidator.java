@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
@@ -15,7 +14,7 @@ import org.springframework.stereotype.Component;
 public class PracticeDefinitionValidator {
     private static final Pattern RESULT_WORD =
             Pattern.compile("\\b(?:MET|NOT_MET|DOES_NOT_APPLY|COULD_NOT_DETERMINE)\\b");
-    private final SourceCatalogRegistry sources;
+    private final ClasspathSourceCatalogRegistry sources;
     private final PracticeItemOptions items;
 
     public void validate(ItemKind kind, PracticeDefinition definition) {
@@ -96,14 +95,13 @@ public class PracticeDefinitionValidator {
         if (!reads.contract().equals(sources.current().version().value())) {
             throw new IllegalArgumentException("Choose the current source contract for a new definition.");
         }
-        var contract = new SourceContractVersion(reads.contract());
         var applicable = sources.current().sourcesFor(kind.value());
         for (var source : reads.sources()) {
             if (!applicable.contains(source.source())) {
                 throw new IllegalArgumentException("Choose read sources offered for this item kind.");
             }
             if (source.need() == ReadNeed.COMPLETE
-                    && !sources.requireSource(contract, source.source())
+                    && !sources.requireSource(source.source())
                             .completenessPolicy()
                             .supportsComplete()) {
                 throw new IllegalArgumentException("This source cannot provide a complete capture.");

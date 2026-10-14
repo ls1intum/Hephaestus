@@ -1,5 +1,4 @@
 {
-	"artifactKind": "scm.pull_request",
 	"sources": [
 		{
 			"kind": "scm.pull-request.core",
@@ -7,7 +6,11 @@
 				"availability": "AVAILABLE",
 				"content": "NON_EMPTY"
 			},
-			"artifacts": [
+			"citation": {
+				"side": "FORBIDDEN",
+				"revision": "FORBIDDEN"
+			},
+			"files": [
 				{
 					"path": "context/metadata.json"
 				}
@@ -19,7 +22,11 @@
 				"availability": "AVAILABLE",
 				"content": "NON_EMPTY"
 			},
-			"artifacts": [
+			"citation": {
+				"side": "REQUIRED",
+				"revision": "FORBIDDEN"
+			},
+			"files": [
 				{
 					"path": "context/change.json"
 				}
@@ -31,7 +38,11 @@
 				"availability": "AVAILABLE",
 				"content": "NON_EMPTY"
 			},
-			"artifacts": [
+			"citation": {
+				"side": "FORBIDDEN",
+				"revision": "FORBIDDEN"
+			},
+			"files": [
 				{
 					"path": "context/comments.json"
 				}
@@ -43,7 +54,11 @@
 				"availability": "AVAILABLE",
 				"content": "NON_EMPTY"
 			},
-			"artifacts": [
+			"citation": {
+				"side": "FORBIDDEN",
+				"revision": "OPTIONAL"
+			},
+			"files": [
 				{
 					"path": "repos/reviewed/.git/HEAD"
 				},
@@ -53,36 +68,38 @@
 			]
 		}
 	],
-	"artifacts": [
+	"itemKind": "scm.pull_request",
+	"files": [
 		{
 			"kind": "scm.pull-request.core",
-			"artifact": {
+			"file": {
 				"path": "context/metadata.json"
 			}
 		},
 		{
 			"kind": "scm.pull-request.diff",
-			"artifact": {
+			"file": {
 				"path": "context/change.json"
 			}
 		},
 		{
 			"kind": "scm.pull-request.comments",
-			"artifact": {
+			"file": {
 				"path": "context/comments.json"
 			}
 		},
 		{
 			"kind": "scm.repository.tree",
-			"artifact": {
+			"file": {
 				"path": "repos/reviewed/.git/HEAD"
 			}
 		},
 		{
 			"kind": "scm.repository.tree",
-			"artifact": {
+			"file": {
 				"path": "repos/reviewed/.git/hephaestus-captured-refs"
 			}
 		}
-	]
+	],
+	"citableTexts": []
 }

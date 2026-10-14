@@ -10,6 +10,9 @@ import { pageHead } from "@/lib/page-title";
 import { useAuth } from "@/runtime/auth/AuthContext";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 
+/** A workspace item id: a positive decimal. */
+const ITEM_ID = /^[1-9]\d{0,18}$/u;
+
 /**
  * The address every comment Hephaestus posts on reviewed work ends with, so it is a contract with
  * comments already out there: `itemId` is the workspace's item id, and the page shows only the
@@ -18,11 +21,10 @@ import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/feedback/$itemId")({
 	remountDeps: ({ params }) => params,
 	loader: ({ params: { itemId } }) => {
-		const id = Number(itemId);
-		if (!Number.isSafeInteger(id) || id < 1) {
+		if (!ITEM_ID.test(itemId)) {
 			throw notFound();
 		}
-		return { itemId: id };
+		return { itemId };
 	},
 	head: pageHead("Your feedback on this work"),
 	component: ItemFeedbackRoute,

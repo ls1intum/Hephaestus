@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -26,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -52,20 +54,21 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         User member = persistUser("membership-member");
         workspaceMembershipService.createMembership(workspace, accountId(member), WorkspaceRole.MEMBER);
 
-        List<WorkspaceMembershipDTO> memberships = webTestClient
+        PageResponseDTO<WorkspaceMembershipDTO> response = webTestClient
                 .get()
                 .uri("/workspaces/{slug}/members", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBodyList(WorkspaceMembershipDTO.class)
+                .expectBody(new ParameterizedTypeReference<PageResponseDTO<WorkspaceMembershipDTO>>() {})
                 .returnResult()
                 .getResponseBody();
 
-        assertThat(memberships).isNotNull();
-        assertThat(memberships)
-                .extracting(WorkspaceMembershipDTO::accountId)
+        var page = Objects.requireNonNull(response);
+        assertThat(page.totalElements()).isEqualTo(3);
+        assertThat(page.content())
+                .extracting(memberDto -> memberDto.account().id())
                 .containsExactlyInAnyOrder(
                         Long.toString(accountId(owner)),
                         Long.toString(accountId(member)),
@@ -75,7 +78,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     @ParameterizedTest
     @ValueSource(strings = {"?page=-1", "?size=0", "?size=-1"})
     @WithAdminUser
-    void shouldRejectInvalidPagination(String query) {
+    void shouldUseDefaultPaginationWhenParametersAreOutOfRange(String query) {
         Workspace workspace = createWorkspace(
                 "pagination-space", "Pagination Space", "pagination", AccountType.ORG, persistUser("pagination-owner"));
         ensureAdminMembership(workspace);
@@ -86,12 +89,12 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
-                .isBadRequest()
-                .expectHeader()
-                .contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON)
+                .isOk()
                 .expectBody()
-                .jsonPath("$.status")
-                .isEqualTo(400);
+                .jsonPath("$.number")
+                .isEqualTo(0)
+                .jsonPath("$.size")
+                .isEqualTo(50);
     }
 
     @Test
@@ -108,7 +111,9 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .exchange()
                 .expectStatus()
                 .isOk()
-                .expectBodyList(WorkspaceMembershipDTO.class);
+                .expectBody()
+                .jsonPath("$.size")
+                .isEqualTo(100);
     }
 
     @Test

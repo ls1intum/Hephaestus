@@ -169,7 +169,7 @@ async function readReviewRecord<T>(
 		const issue = parsed.error.issues[0];
 		throw new UnratedError(
 			"unavailable",
-			`${name} has an invalid record shape at ${issue?.path.join("../../lib/core") ?? ""}: ${issue?.message ?? "invalid"}`,
+			`${name} has an invalid record shape at ${issue?.path.join(".") ?? ""}: ${issue?.message ?? "invalid"}`,
 		);
 	}
 	return { data: parsed.data, source: record.text };

@@ -21,6 +21,19 @@ import org.springframework.stereotype.Repository;
 @Repository
 @WorkspaceAgnostic("Federated-login associations are user-scoped, resolved by (provider, subject) at login")
 public interface IdentityRepository extends JpaRepository<Identity, Long> {
+    @Query(value = "SELECT account_id FROM identity WHERE id=:identityId", nativeQuery = true)
+    Optional<Long> findOwnerId(@Param("identityId") long identityId);
+
+    @Query(value = """
+        SELECT count(pg_advisory_xact_lock(k)) FROM (
+          SELECT DISTINCT hashtextextended(jsonb_build_array(p,s,t)::text,0) k
+          FROM unnest(CAST(:providers AS bigint[]),CAST(:subjects AS text[]),CAST(:teams AS text[])) AS keys(p,s,t)
+          ORDER BY k
+        ) ordered_keys
+        """, nativeQuery = true)
+    long lockOwnership(
+            @Param("providers") Long[] providers, @Param("subjects") String[] subjects, @Param("teams") String[] teams);
+
     @Query("""
         SELECT i FROM Identity i JOIN FETCH i.account
         WHERE i.providerId = :providerId AND i.providerUserKey = :key AND i.teamKey = :teamKey
@@ -68,6 +81,16 @@ public interface IdentityRepository extends JpaRepository<Identity, Long> {
          ORDER BY il.id
         """)
     List<Identity> findActiveByAccountId(@Param("accountId") Long accountId);
+
+    @Query("""
+        SELECT i FROM Identity i JOIN FETCH i.account
+        WHERE i.account.id IN :accountIds AND i.disabledAt IS NULL ORDER BY i.id
+        """)
+    List<Identity> findActiveByAccountIds(@Param("accountIds") Collection<Long> accountIds);
+
+    @Modifying
+    @Query("UPDATE Identity i SET i.account.id = :target WHERE i.account.id = :source")
+    int absorbAccount(@Param("target") long target, @Param("source") long source);
 
     /**
      * Serializes the last-identity guard across concurrent unlinks, preventing both from removing

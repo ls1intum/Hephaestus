@@ -18,7 +18,7 @@ import { DeliveryBreakdownCard } from "./DeliveryBreakdownCard";
 import { deliveryFailures, finishedInRange } from "./overview-counts";
 import { type PracticeCountsFilter, PracticeCountsTable } from "./PracticeCountsTable";
 import type { OutcomeScope } from "./review-outcomes";
-import type { PracticeReviewOverviewState, PreviousReviewPeriodState } from "./review-states";
+import type { PreviousReviewPeriodState, ReviewOverviewState } from "./review-states";
 import { ReviewAttention } from "./ReviewAttention";
 import { ReviewPipeline } from "./ReviewPipeline";
 import { ReviewQueueCard } from "./ReviewQueueCard";
@@ -32,12 +32,12 @@ export interface PracticeReviewOverviewPageProps {
 	onRangeChange: (range: ReviewRange) => void;
 	/** The range as the lists' day filters, so every count opens the rows it counts. */
 	scope: OutcomeScope;
-	overview: PracticeReviewOverviewState;
+	overview: ReviewOverviewState;
 	/** The period before the range, which the stages' totals are set against. */
 	previous: PreviousReviewPeriodState;
 	/** The decisions an admin owes, whenever the feedback was composed. */
 	attention: ReviewAttentionReads;
-	/** The range's feedback by channel and by reason, beside the Feedback tile. */
+	/** The range's feedback by location and by reason, beside the Feedback tile. */
 	delivery: DeliveryBreakdownReads;
 	/** How long the range's reviews took, read apart from the overview. */
 	timing: ReviewTimingState;
@@ -100,7 +100,6 @@ export function PracticeReviewOverviewPage({
 					queue={queue}
 					timing={timing}
 					finished={finished}
-					scope={scope}
 					label={rangeDef.label}
 					during={rangeDef.during}
 				/>
@@ -143,7 +142,6 @@ export function PracticeReviewOverviewPage({
 								delivered={delivery.delivered}
 								withheld={delivery.withheld}
 								failedDeliveries={deliveryFailures(scope, overview)}
-								unprocessedResults={delivery.unprocessedResults}
 							/>
 						}
 					/>

@@ -1,17 +1,19 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatService;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
-import de.tum.cit.aet.hephaestus.testconfig.StubMentorChatStarter;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
@@ -24,7 +26,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 /**
  * Who may use Heph: on the web, through the real filter chain, a member of the workspace, decided per
@@ -44,8 +48,8 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     private WorkspaceRepository workspaces;
 
-    @Autowired
-    private StubMentorChatStarter mentorChatStarter;
+    @MockitoSpyBean
+    private MentorChatService mentorChatService;
 
     @Autowired
     private MentorTurnRunner mentorTurnRunner;
@@ -63,7 +67,14 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        mentorChatStarter.reset();
+        doAnswer(call -> {
+                    SseEmitter emitter = call.getArgument(1);
+                    emitter.send(SseEmitter.event().data("[DONE]"));
+                    emitter.complete();
+                    return null;
+                })
+                .when(mentorChatService)
+                .start(any(), any());
         member = persistUser("mentor");
     }
 
@@ -122,8 +133,11 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = workspace("mentor-access-member");
         ensureMembership(workspace, member, WorkspaceRole.MEMBER);
 
-        chat(MEMBER, workspace).expectStatus().isOk().expectBody(Void.class);
-        assertThat(mentorChatStarter.awaitInvocation()).isTrue();
+        chat(MEMBER, workspace)
+                .expectStatus()
+                .isOk()
+                .expectBody(String.class)
+                .value(body -> assertThat(body).contains("[DONE]"));
         threads(MEMBER, workspace).expectStatus().isOk().expectBody(Void.class);
     }
 

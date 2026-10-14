@@ -78,7 +78,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.http.client.HttpClient;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -126,7 +125,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         SecurityContextHolder.clearContext();
         meterRegistry = new SimpleMeterRegistry();
         filter = new JobTokenAuthenticationFilter(
-                jobRepository, jwtVerifier, new MentorProxyCredentialRegistry(), objectMapper, "worker-1");
+                jobRepository, jwtVerifier, new MentorProxyCredentialRegistry(), "worker-1");
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
     }
@@ -146,7 +145,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(result.authentication())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
-                .isInstanceOf(ProxyRouting.class);
+                .isInstanceOf(ProxyIdentity.class);
     }
 
     @Test
@@ -220,8 +219,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldFailClosedWhenCatalogModelIsDisabled() {
         ReviewJob job = runningJob(false);
-        long connectionId = job.getConfigSnapshot().get("connectionId").asLong();
-        long modelId = job.getConfigSnapshot().get("modelId").asLong();
+        long connectionId =
+                job.getConfigSnapshot().path("model").get("connectionId").asLong();
+        long modelId = job.getConfigSnapshot().path("model").get("modelId").asLong();
 
         assertThat(modelResolver.resolveProxyCredential(
                         new ConnectionRef(UsageFundingSource.INSTANCE, connectionId, modelId, workspace.getId())))
@@ -255,20 +255,20 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
      * the review's model, every direct slot and admission.
      */
     @ParameterizedTest
-    @CsvSource({
-        "/internal/llm/chat/completions,job:{job}",
-        "/internal/llm/practice-script/decision/decisions,job:{job}:practice-script",
-        "/internal/llm/admit-results,job:{job}"
-    })
-    void shouldAuthenticateTheJobsOneTokenWhenItCallsAnyModelRouteOrAdmission(String path, String principal)
-            throws Exception {
+    @ValueSource(
+            strings = {
+                "/internal/llm/chat/completions",
+                "/internal/llm/practice-script/decision/decisions",
+                "/internal/llm/admit-results"
+            })
+    void shouldAuthenticateTheJobsOneTokenWhenItCallsAnyModelRouteOrAdmission(String path) throws Exception {
         ReviewJob job = practiceScriptJob("https://models.example.com/v1");
 
         AuthenticationResult result = authenticate("POST", path, tokenFor(job));
 
         assertThat(result.status()).isEqualTo(200);
-        assertThat(routingOf(result).principalDescription())
-                .isEqualTo(principal.replace("{job}", job.getId().toString()));
+        assertThat(((ProxyIdentity) result.authentication().getPrincipal()).description())
+                .isEqualTo("job:" + job.getId());
         assertThat(result.authentication().getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
                 .containsExactly("SCOPE_" + WorkerJwtIssuer.LLM_PROXY_SCOPE);
@@ -624,7 +624,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         meterRegistry,
                         objectMapper),
                 policy,
-                mock(ScanCallGuard.class));
+                mock(ScanCallGuard.class),
+                new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry()));
     }
 
     private ProxyUsageAccumulator accumulator() {
@@ -707,7 +708,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
             slots.put(
                     kind,
                     new FrozenModel(
-                            model.protocol(),
+                            LlmApiProtocol.parse(model.protocol()).orElseThrow(),
                             baseUrl,
                             kind.name().toLowerCase(Locale.ROOT) + "-upstream",
                             UsageFundingSource.INSTANCE,
@@ -721,20 +722,21 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         CatalogModel chat = Objects.requireNonNull(catalog.get(ModelKind.CHAT));
         ConfigSnapshot snapshot = new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        chat.protocol(),
-                        baseUrl,
-                        "chat-upstream",
+                        new FrozenModel(
+                                LlmApiProtocol.parse(chat.protocol()).orElseThrow(),
+                                baseUrl,
+                                "chat-upstream",
+                                UsageFundingSource.INSTANCE,
+                                chat.connectionId(),
+                                chat.modelId(),
+                                workspace.getId(),
+                                DataHandlingTier.UNDECLARED,
+                                null,
+                                price),
                         null,
                         null,
-                        null,
-                        UsageFundingSource.INSTANCE,
-                        chat.connectionId(),
-                        chat.modelId(),
-                        workspace.getId(),
                         600,
                         false,
-                        price,
-                        DataHandlingTier.UNDECLARED,
                         null)
                 .withPracticeScript(slots);
 
@@ -773,9 +775,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getAttempt(), Duration.ofMinutes(5));
     }
 
-    private static ProxyRouting routingOf(AuthenticationResult result) {
+    private ProxyRouting routingOf(AuthenticationResult result) {
         Authentication authentication = Objects.requireNonNull(result.authentication(), "token did not authenticate");
-        return (ProxyRouting) Objects.requireNonNull(authentication.getPrincipal(), "no routing on the principal");
+        return new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry())
+                .resolve(
+                        (ProxyIdentity) authentication.getPrincipal(),
+                        new MockHttpServletRequest("POST", "/internal/llm/chat/completions"));
     }
 
     private ReviewJob runningJob(boolean modelEnabled) {
@@ -800,18 +805,25 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         binding.setTimeoutSeconds(600);
         agentBindingRepository.save(binding);
 
-        ObjectNode snapshot = objectMapper.createObjectNode();
-        snapshot.put("schemaVersion", 1);
-        snapshot.put("apiProtocol", "openai-completions");
-        snapshot.put("baseUrl", connection.getBaseUrl());
-        snapshot.put("upstreamModelId", model.getUpstreamModelId());
-        snapshot.put("connectionScope", "INSTANCE");
-        snapshot.put("fundingSource", "INSTANCE");
-        snapshot.put("connectionId", connection.getId());
-        snapshot.put("modelId", model.getId());
-        snapshot.put("workspaceId", workspace.getId());
-        snapshot.put("timeoutSeconds", 600);
-        snapshot.put("allowInternet", false);
+        var snapshot = new ConfigSnapshot(
+                        ConfigSnapshot.SCHEMA_VERSION,
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                connection.getBaseUrl(),
+                                model.getUpstreamModelId(),
+                                UsageFundingSource.INSTANCE,
+                                connection.getId(),
+                                model.getId(),
+                                workspace.getId(),
+                                DataHandlingTier.UNDECLARED,
+                                null,
+                                null),
+                        null,
+                        null,
+                        600,
+                        false,
+                        null)
+                .toJson(objectMapper);
 
         ReviewJob job = new ReviewJob();
         RuntimeJobTestData.initialize(job, workspace.getId());

@@ -20,6 +20,7 @@ const active: SlackMonitoredChannel = {
 	channelName: "team-standup",
 	consentState: "ACTIVE",
 	optedOutMemberCount: 0,
+	consentAnnouncedAt: null,
 };
 
 describe("RemoveChannelAlertDialog — resets on close", () => {

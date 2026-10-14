@@ -41,27 +41,38 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const engineering: OutlineCollection = {
-	id: 1,
+	id: "1",
 	collectionId: "col-engineering",
 	name: "Engineering",
 	urlId: "engineering-4nZ3x",
 	color: "#4E5C6E",
+	icon: null,
+	description: null,
 	state: "ENABLED",
 	syncStatus: "COMPLETE",
 	documentCount: 87,
+	documentsUpstream: 87,
+	exportsSkippedForBudget: null,
 	lastSyncedAt: minutesBefore(12),
+	lastSyncError: null,
 	createdAt: daysBefore(30),
 };
 
 const decisions: OutlineCollection = {
-	id: 2,
+	id: "2",
 	collectionId: "col-decisions",
 	name: "Architecture Decisions",
 	urlId: "adr-9kQ2p",
 	icon: "📐",
+	color: null,
+	description: null,
 	state: "ENABLED",
 	syncStatus: "PENDING",
 	documentCount: 14,
+	documentsUpstream: null,
+	exportsSkippedForBudget: null,
+	lastSyncedAt: null,
+	lastSyncError: null,
 	createdAt: minutesBefore(5),
 };
 

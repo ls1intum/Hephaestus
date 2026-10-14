@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.util.HashSet;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -26,16 +27,21 @@ public class ReviewJobAssignments {
     }
 
     public List<ReviewAssignmentSnapshot> load(ReviewJob job) {
-        ReviewSnapshot review = review(job);
-        return job.getInput().assignments().stream()
+        return load(job.getWorkspaceId(), job.getReviewId(), job.getInput());
+    }
+
+    public List<ReviewAssignmentSnapshot> load(long workspaceId, UUID reviewId, ReviewJobInput input) {
+        ReviewSnapshot review = reviews.find(workspaceId, reviewId)
+                .orElseThrow(() -> invalid("The review is unavailable in this workspace"));
+        return input.assignments().stream()
                 .map(id -> {
                     var assignment = assignments
-                            .find(job.getWorkspaceId(), id)
+                            .find(workspaceId, id)
                             .orElseThrow(() -> invalid("A frozen review assignment is unavailable"));
                     if (!assignment.id().equals(id)
                             || !id.reviewId().equals(review.id())
-                            || id.itemId() != job.getInput().itemId()
-                            || assignment.item().workspaceId() != job.getWorkspaceId()
+                            || id.itemId() != input.itemId()
+                            || assignment.item().workspaceId() != workspaceId
                             || assignment.item().itemId() != id.itemId()
                             || assignment.practice().practiceId() != id.practiceId()
                             || assignment.version() == null

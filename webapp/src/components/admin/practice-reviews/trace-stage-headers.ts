@@ -15,8 +15,8 @@ export type StageKey = RailStage["stage"] | "results";
 
 /** Each header's name, icon and what the stage holds, for the rail and the legend. */
 export const STAGE_HEADERS: Record<StageKey, { label: string; icon: LucideIcon; holds: string }> = {
-	trigger: {
-		label: TRACE_STAGE_LABELS.trigger,
+	start: {
+		label: TRACE_STAGE_LABELS.start,
 		icon: ZapIcon,
 		holds: "the work and what started the review",
 	},
@@ -43,7 +43,7 @@ export const STAGE_HEADERS: Record<StageKey, { label: string; icon: LucideIcon; 
 };
 
 export const STAGE_ORDER: readonly StageKey[] = [
-	"trigger",
+	"start",
 	"review",
 	"results",
 	"feedback",

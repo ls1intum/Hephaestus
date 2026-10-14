@@ -43,5 +43,3 @@ export const realPracticeDefinition = {
 
 export const realPracticeSlug = practice.slug;
 export const realPracticeKind = practice.kind;
-export const realGroupName = group.name;
-export const realGroupSlug = group.slug;

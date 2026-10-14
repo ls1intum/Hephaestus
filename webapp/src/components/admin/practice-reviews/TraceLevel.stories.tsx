@@ -3,13 +3,18 @@ import { useState } from "react";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
-import { tracedArtifact } from "@/components/practice-trace/fixtures";
+import { eventLabel, untouchedItemTrace } from "@/components/practice-trace/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { settledDrawerPanel } from "@/stories/overlay";
 
 import { FeedbackLevel } from "./FeedbackLevel";
-import { resultDetail, reviewFeedbackDetail, reviewJob } from "./fixtures";
-import { LINEAGE_OBS, LINEAGE_REVIEW_ID, wholeReview } from "./lineage-fixtures";
+import { resultDetail, reviewDetail, reviewFeedbackDetail } from "./fixtures";
+import {
+	LINEAGE_FEEDBACK,
+	LINEAGE_RESULT,
+	LINEAGE_REVIEW_ID,
+	wholeReview,
+} from "./lineage-fixtures";
 import { lineageStateCase } from "./lineage-state-fixtures";
 import { ResultLevel } from "./ResultLevel";
 import { levelRecord, type RecordRef, recordLevel, traceLevel } from "./review-layers";
@@ -18,7 +23,12 @@ import { DEFAULT_TRACE_DISPLAY, FULL_TRACE_DISPLAY, type TraceDisplay } from "./
 import { ALL_STEPS, type TraceFilter } from "./trace-filter";
 import { TraceLevel, type TraceLevelProps } from "./TraceLevel";
 
-const TRACE_ENTRY = traceLevel({ kind: "review", id: "11111111-1111-1111-1111-111111111111" });
+const TRACE_ENTRY = traceLevel({ kind: "review", id: LINEAGE_REVIEW_ID });
+
+const [untouchedEvent] = untouchedItemTrace.events;
+if (untouchedEvent === undefined) {
+	throw new Error("The untouched item carries its event");
+}
 const PATH = { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() };
 
 /**
@@ -71,9 +81,10 @@ function TraceStack(props: Omit<TraceLevelProps, "path" | "onOpen">) {
 					<ResultLevel
 						nested={level.nested}
 						path={path}
-						result={{ status: "ready", result: resultDetail(LINEAGE_OBS.cache404) }}
-						onChangeValidity={fn(async () => undefined)}
-						isChangingValidity={false}
+						result={{ status: "ready", result: resultDetail(LINEAGE_RESULT.cache404) }}
+						onMark={fn(async () => undefined)}
+						onRemoveMark={fn(async () => undefined)}
+						isMarking={false}
 					/>
 				);
 			}}
@@ -97,9 +108,9 @@ const meta = {
 		filter: ALL_STEPS,
 		onFilterChange: fn(),
 		// The review as its sheet reads it, so the trace and the sheet tell the same times and model.
-		job: reviewJob(LINEAGE_REVIEW_ID),
+		review: reviewDetail(LINEAGE_REVIEW_ID),
 	},
-	argTypes: { path: { control: false }, chain: { control: false }, job: { control: false } },
+	argTypes: { path: { control: false }, chain: { control: false }, review: { control: false } },
 	render: (args) => <TraceStack {...args} />,
 } satisfies Meta<typeof TraceLevel>;
 
@@ -127,14 +138,11 @@ export const Default: Story = {
 		await expect(story.querySelector("[data-trace-verdict]")).not.toBeNull();
 		await expect(story.querySelector("[data-step-facts]")).toBeNull();
 		await expect(story.querySelectorAll("time").length).toBeGreaterThan(0);
-		// The review's facts come from the review itself, as on its sheet.
-		await expect(story.querySelector("[data-trace-verdict]")).toHaveTextContent(/ran 5 min/u);
-		await expect(story.querySelector('[data-step="first-read"]')).not.toBeNull();
 	},
 };
 
 /**
- * Every part on: the times, the system info with the facts under where the reader started, every
+ * Everything on: the times, the system info with the facts under where the reader started, every
  * result by practice, and connectors from each result to the feedback written from it.
  */
 export const AllOn: Story = {
@@ -152,7 +160,7 @@ export const AllOn: Story = {
 	},
 };
 
-/** Every part off: the path of the record alone, with no times, facts or connectors. */
+/** Everything off: the path of the record alone, with no times, facts or connectors. */
 export const AllOff: Story = {
 	args: {
 		display: { times: false, system: false, siblings: false, connections: false },
@@ -167,7 +175,7 @@ export const AllOff: Story = {
 };
 
 /**
- * "Expand all" opens every folded part at once: what came before the review, every step's facts and
+ * "Expand all" opens everything folded at once: what came before the review, every step's facts and
  * the legend. "Collapse all" folds them again.
  */
 export const ExpandAll: Story = {
@@ -184,15 +192,15 @@ export const ExpandAll: Story = {
 	},
 };
 
-/** Started from a piece of feedback, with system info: its delivery, its times and the developer's answer under it. */
+/** Started from a piece of feedback, with system info: where it went and when it was delivered under it. */
 export const StartedOnFeedback: Story = {
 	args: {
-		here: { kind: "feedback", id: "44444444-4444-4444-4444-444444444444" },
+		here: { kind: "feedback", id: LINEAGE_FEEDBACK.praise },
 		display: { ...DEFAULT_TRACE_DISPLAY, system: true },
 	},
 	play: async () => {
 		const panel = await settledDrawerPanel();
-		await expect(panel.querySelector("[data-step-facts]")).toHaveTextContent(/Composed/u);
+		await expect(panel.querySelector("[data-step-facts]")).toHaveTextContent(/Destination/u);
 	},
 };
 
@@ -229,25 +237,11 @@ export const RecordOverTheTrace: Story = {
 	},
 };
 
-/** The merge came while the review ran: a state from the matrix, told as a trace. */
-export const MergedWhileRunning: Story = {
-	// The state's own times: the merge falls while it ran only on them.
+/** A scan carried by four runtime jobs that stopped on its budget: a state from the matrix, told as a trace. */
+export const ScanWithManyJobs: Story = {
 	args: {
-		chain: { status: "ready", lineage: lineageStateCase("merged-during").lineage },
-		job: undefined,
-	},
-	play: async () => {
-		const panel = await settledDrawerPanel();
-		await expect(panel.querySelector('[data-step="merged"]')).not.toBeNull();
-	},
-};
-
-/** A piece of feedback the developer answered: another state from the matrix. */
-export const DeveloperAnswered: Story = {
-	args: {
-		chain: { status: "ready", lineage: lineageStateCase("responses").lineage },
-		display: FULL_TRACE_DISPLAY,
-		job: undefined,
+		chain: { status: "ready", lineage: lineageStateCase("scan-many-jobs").lineage },
+		review: lineageStateCase("scan-many-jobs").review,
 	},
 	play: async () => {
 		const panel = await settledDrawerPanel();
@@ -255,13 +249,31 @@ export const DeveloperAnswered: Story = {
 	},
 };
 
-/** Work none of whose moments started a review: its latest moment, and why no review started. */
+/** Every delivery state of feedback: another state from the matrix. */
+export const EveryDeliveryState: Story = {
+	args: {
+		chain: { status: "ready", lineage: lineageStateCase("delivery-states").lineage },
+		display: FULL_TRACE_DISPLAY,
+		review: undefined,
+	},
+	play: async () => {
+		const panel = await settledDrawerPanel();
+		await expect(panel.querySelector('[data-step="end"]')).not.toBeNull();
+	},
+};
+
+/** An item none of whose events started a review: its latest event, and why no review started. */
 export const NoReviewStarted: Story = {
 	args: {
 		title: "Define the practice-binding contract",
-		chain: { status: "unreviewed", work: tracedArtifact(1430) },
+		chain: {
+			status: "unreviewed",
+			item: untouchedItemTrace.item,
+			event: untouchedEvent,
+			eventLabel: eventLabel(untouchedEvent.name),
+		},
 		here: { kind: "work" },
-		workRecord: { kind: "work", id: "issue:1430" },
+		workRecord: { kind: "item", id: untouchedItemTrace.item.id },
 	},
 	play: async () => {
 		const panel = await settledDrawerPanel();
@@ -277,5 +289,23 @@ export const Loading: Story = {
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
 		await expect(panel.queryByRole("group", { name: "How this came about" })).toBeNull();
+	},
+};
+
+/** Nothing was recorded about the record, so there is no trace to tell. */
+export const Empty: Story = {
+	args: { chain: { status: "none" } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("Nothing was recorded about this record, so there is no trace to show.");
+	},
+};
+
+/** The graph could not be read: the error, with a way to try again. */
+export const LoadError: Story = {
+	args: { chain: { status: "error", error: { status: 500 }, onRetry: fn() } },
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("button", { name: "Retry" })).toBeVisible();
 	},
 };

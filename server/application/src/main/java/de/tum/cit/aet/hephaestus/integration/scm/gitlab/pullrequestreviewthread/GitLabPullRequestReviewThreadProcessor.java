@@ -27,26 +27,26 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitLab merge request discussion threads.
- *
- * <p>Maps GitLab discussions (which are threaded containers of notes) to {@link
- * PullRequestReviewThread} entities. A GitLab discussion with {@code position != null} on any note
- * is a diff discussion that maps to a review thread.
- *
- * <p>GitLab Discussion IDs are SHA hex hashes (e.g. {@code
- * gid://gitlab/Discussion/6a9c1750b37d...}), NOT numeric. We store the full GID as {@code nodeId}
- * and use a deterministic hash as {@code nativeId} for the composite unique constraint.
- *
- * <p>A diff note webhook and the GraphQL read both name a discussion by its GID — the webhook
- * builds it from the {@code discussion_id} it carries — and find its thread by that GID or its
- * hash, completing a {@code nodeId} a thread stored earlier lacks. A thread found under another
- * merge request, holding another discussion's GID, or two threads for one discussion, are not this
- * discussion's, and nothing is linked to them.
- *
- * <p>A thread's resolution is set only by {@link #applyDiscussionRead}, which takes a whole read of
- * the merge request's discussions begun after the last one it recorded, and creates the thread of a
- * discussion not stored yet; the other paths find or create a thread for its comments without a
- * resolution. Every path finds and creates under the merge request's row lock, so that one
- * discussion gets one thread and no read creates a thread another has already resolved.
+ * <p>
+ * Maps GitLab discussions (which are threaded containers of notes) to
+ * {@link PullRequestReviewThread} entities. A GitLab discussion with
+ * {@code position != null} on any note is a diff discussion that maps
+ * to a review thread.
+ * <p>
+ * GitLab Discussion IDs are SHA hex hashes (e.g. {@code gid://gitlab/Discussion/6a9c1750b37d...}),
+ * NOT numeric. We store the full GID as {@code nodeId} and use a deterministic
+ * hash as {@code nativeId} for the composite unique constraint.
+ * <p>
+ * A diff note webhook and the GraphQL read both name a discussion by its GID — the webhook builds it from the
+ * {@code discussion_id} it carries — and find its thread by that GID or its hash, completing a {@code nodeId} a
+ * thread stored earlier lacks. A thread found under another merge request, holding another discussion's GID, or
+ * two threads for one discussion, are not this discussion's, and nothing is linked to them.
+ * <p>
+ * A thread's resolution is set only by {@link #applyDiscussionRead}, which takes a whole read of the merge request's
+ * discussions begun after the last one it recorded, and creates the thread of a discussion not stored yet; the other
+ * paths find or create a thread for its comments without a resolution. Every path finds and creates under the merge
+ * request's row lock, so that one discussion gets one thread and no read creates a thread another has already
+ * resolved.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -69,16 +69,16 @@ public class GitLabPullRequestReviewThreadProcessor {
 
     /**
      * Groups the discussion-level data needed to find or create a review thread.
+     * <p>
+     * Position fields ({@code filePath}, {@code newLine}, {@code oldLine},
+     * {@code side}, {@code commitSha}, {@code originalCommitSha}) come from the
+     * root diff note's {@code position} and are copied onto the thread so
+     * downstream consumers can index review threads by file/line/side without
+     * joining through comments.
      *
-     * <p>Position fields ({@code filePath}, {@code newLine}, {@code oldLine}, {@code side}, {@code
-     * commitSha}, {@code originalCommitSha}) come from the root diff note's {@code position} and
-     * are copied onto the thread so downstream consumers can index review threads by file/line/side
-     * without joining through comments.
-     *
-     * @param resolved whether GitLab says the discussion is resolved; null when the read did not
-     *     say, which changes nothing
-     * @param resolvedAt when GitLab says the discussion was resolved; the discussion states it, the
-     *     sync copies it
+     * @param resolved whether GitLab says the discussion is resolved; null when the read did not say, which changes
+     *     nothing
+     * @param resolvedAt when GitLab says the discussion was resolved; the discussion states it, the sync copies it
      */
     public record ThreadData(
             String discussionGlobalId,
@@ -132,8 +132,8 @@ public class GitLabPullRequestReviewThreadProcessor {
      * Groups the webhook-level data needed to find or create a webhook thread. {@code line} is the
      * {@link #anchoredLine anchored line}, resolved by the caller from the note's position.
      *
-     * @param discussionGlobalId the discussion's GID where the webhook named its discussion; then
-     *     {@code noteNativeId} is its hash
+     * @param discussionGlobalId the discussion's GID where the webhook named its discussion; then {@code noteNativeId}
+     *     is its hash
      */
     public record WebhookThreadData(
             long noteNativeId,
@@ -144,27 +144,26 @@ public class GitLabPullRequestReviewThreadProcessor {
             @Nullable String discussionGlobalId) {}
 
     /**
-     * The line a GitLab position anchors on, the pair of {@link
-     * de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor#deriveSide}:
-     * {@code new_line} on the RIGHT side, and {@code old_line} when the note sits on a removed line
-     * and only the LEFT side has one. Null when the position names no line, which is how GitLab
-     * reports a hunk a later push dropped.
+     * The line a GitLab position anchors on, the pair of
+     * {@link de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor#deriveSide}:
+     * {@code new_line} on the RIGHT side, and {@code old_line} when the note sits on a removed line and
+     * only the LEFT side has one. Null when the position names no line, which is how GitLab reports a
+     * hunk a later push dropped.
      */
     public static @Nullable Integer anchoredLine(@Nullable Integer newLine, @Nullable Integer oldLine) {
         return newLine != null ? newLine : oldLine;
     }
 
     /**
-     * Finds or creates a review thread from a GitLab discussion, for its comments. The discussion's
-     * resolution in {@code data} is not recorded here: a new thread is unresolved until {@link
-     * #applyDiscussionRead} records a read of it.
+     * Finds or creates a review thread from a GitLab discussion, for its comments. The discussion's resolution in
+     * {@code data} is not recorded here: a new thread is unresolved until {@link #applyDiscussionRead} records a read
+     * of it.
      *
      * @param data the discussion-level data (global ID, resolution state, file position, timestamp)
      * @param pr the parent pull request
      * @param provider the git provider
      * @param scopeId the scope ID for event context
-     * @return the thread entity, or null when the stored thread with this identity is not this
-     *     discussion's
+     * @return the thread entity, or null when the stored thread with this identity is not this discussion's
      */
     @Transactional
     public @Nullable PullRequestReviewThread findOrCreateThread(
@@ -182,12 +181,11 @@ public class GitLabPullRequestReviewThreadProcessor {
     }
 
     /**
-     * Records the resolution a whole read of merge request {@code iid}'s discussions found on their
-     * stored threads, unless a read begun at or after {@code requestedAt} was recorded first. An
-     * accepted read is recorded even where it changes nothing, so that an older one arriving later
-     * cannot undo it. A discussion with no stored thread gets one, with the resolution and position
-     * the read found; its comments link to it later. Holds the merge request's row lock, as its
-     * other writers do.
+     * Records the resolution a whole read of merge request {@code iid}'s discussions found on their stored threads,
+     * unless a read begun at or after {@code requestedAt} was recorded first. An accepted read is recorded even where it
+     * changes nothing, so that an older one arriving later cannot undo it. A discussion with no stored thread gets one,
+     * with the resolution and position the read found; its comments link to it later. Holds the merge request's row
+     * lock, as its other writers do.
      *
      * @param requestedAt when the read asked GitLab for its first page
      * @return whether the read was recorded
@@ -224,10 +222,7 @@ public class GitLabPullRequestReviewThreadProcessor {
         return true;
     }
 
-    /**
-     * The thread stored for a discussion, if any; {@code conflict} when a thread under its identity
-     * is not its own.
-     */
+    /** The thread stored for a discussion, if any; {@code conflict} when a thread under its identity is not its own. */
     private record Stored(@Nullable PullRequestReviewThread thread, boolean conflict) {}
 
     private Stored stored(String discussionGlobalId, PullRequest pr, IdentityProvider provider) {
@@ -260,16 +255,14 @@ public class GitLabPullRequestReviewThreadProcessor {
 
     /**
      * Finds or creates a thread from a webhook diff note.
+     * <p>
+     * A webhook that names its discussion finds and creates the thread as the GraphQL sync does; one that names
+     * none keeps its thread under the note's own id.
      *
-     * <p>A webhook that names its discussion finds and creates the thread as the GraphQL sync does;
-     * one that names none keeps its thread under the note's own id.
-     *
-     * @param data the webhook-level data (thread native ID, discussion GID, file position,
-     *     timestamps)
+     * @param data the webhook-level data (thread native ID, discussion GID, file position, timestamps)
      * @param pr the parent pull request
      * @param provider the git provider
-     * @return the thread entity, or null when the stored thread with this identity is not this
-     *     discussion's
+     * @return the thread entity, or null when the stored thread with this identity is not this discussion's
      */
     @Transactional
     public @Nullable PullRequestReviewThread findOrCreateWebhookThread(
@@ -471,10 +464,10 @@ public class GitLabPullRequestReviewThreadProcessor {
 
     /**
      * Generates a deterministic positive nativeId from a GitLab Discussion GID.
-     *
-     * <p>GitLab Discussion IDs are hex hashes (not numeric), so we use a hash function to produce a
-     * stable Long. This is collision-resistant enough for our use case since it's scoped per
-     * provider.
+     * <p>
+     * GitLab Discussion IDs are hex hashes (not numeric), so we use a hash function
+     * to produce a stable Long. This is collision-resistant enough for our use case
+     * since it's scoped per provider.
      */
     public static long deterministicNativeId(String discussionGlobalId) {
         // Use the same approach as java.lang.String.hashCode() but with long accumulator

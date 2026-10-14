@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.InstanceOfAssertFactories.type;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
@@ -33,7 +35,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.GenericApplicationContext;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -125,9 +129,7 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 .isEqualTo(404);
         assertThat(answerTo("POST", "/internal/llm/admit-results", APPLICATION_PORT))
                 .isEqualTo(404);
-        assertThat(answerTo("POST", "/internal/llm/complete-public-review", APPLICATION_PORT))
-                .isEqualTo(404);
-        assertThat(answerTo("POST", "/internal/llm/complete-public-review", APPLICATION_PORT))
+        assertThat(answerTo("POST", "/internal/llm/prepare-feedback", APPLICATION_PORT))
                 .isEqualTo(404);
     }
 
@@ -142,6 +144,17 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
 
         assertThat(answerTo("POST", "/internal/llm/responses", GATEWAY_PORT, oversized))
                 .isEqualTo(413);
+    }
+
+    @Test
+    void refusesOversizedFeedbackPreparationBeforeAuthentication() throws Exception {
+        assertThat(answerTo(
+                        "POST",
+                        "/internal/llm/prepare-feedback",
+                        GATEWAY_PORT,
+                        new byte[GATEWAY.maxRequestBytes() + 1]))
+                .isEqualTo(413);
+        Mockito.verifyNoInteractions(jobRepository, jwtVerifier);
     }
 
     /** The result upload is bounded by the archive budget, not by the model-call bound. */
@@ -181,7 +194,7 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
                 "/internal/llm/chat/completions",
                 "/internal/llm/admit-results",
                 "/internal/llm/public-feedback-history",
-                "/internal/llm/complete-public-review")) {
+                "/internal/llm/prepare-feedback")) {
             MockHttpServletRequest request = request("POST", path, GATEWAY_PORT);
             request.setCookies(
                     new Cookie("__Host-HEPHAESTUS_AT", "current-attempt"), new Cookie("JSESSIONID", "current-attempt"));
@@ -208,17 +221,17 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(servedAs.get())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
-                .asInstanceOf(type(ProxyRouting.class))
-                .extracting(ProxyRouting::principalDescription)
+                .asInstanceOf(type(ProxyIdentity.class))
+                .extracting(ProxyIdentity::description)
                 .isEqualTo("job:" + job.getId());
 
         assertThat(answerToTokenCall("dead-attempt")).isEqualTo(401);
         assertThat(servedAs.get()).isNull();
     }
 
-    @Test
-    void servesPublicHistoryOnlyOnTheGatewayForTheAuthenticatedCurrentAttempt() throws Exception {
-        String path = "/internal/llm/public-feedback-history";
+    @ParameterizedTest
+    @ValueSource(strings = {"/internal/llm/public-feedback-history", "/internal/llm/prepare-feedback"})
+    void servesCompositionOnlyOnTheGatewayForTheAuthenticatedCurrentAttempt(String path) throws Exception {
         ReviewJob job = runningJobOnAttempt(1);
         when(jobRepository.findById(job.getId())).thenReturn(Optional.of(job));
         when(jwtVerifier.verify("current-attempt")).thenReturn(jobJwt(job, 1));
@@ -229,8 +242,8 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(servedAs.get())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
-                .asInstanceOf(type(ProxyRouting.class))
-                .extracting(ProxyRouting::principalDescription)
+                .asInstanceOf(type(ProxyIdentity.class))
+                .extracting(ProxyIdentity::description)
                 .isEqualTo("job:" + job.getId());
         MockHttpServletRequest stale = request("POST", path, GATEWAY_PORT);
         stale.addHeader("Authorization", "Bearer dead-attempt");
@@ -260,9 +273,9 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         assertThat(servedAs.get())
                 .isNotNull()
                 .extracting(Authentication::getPrincipal)
-                .asInstanceOf(type(ProxyRouting.class))
-                .extracting(ProxyRouting::principalDescription)
-                .isEqualTo("job:" + job.getId() + ":practice-script");
+                .asInstanceOf(type(ProxyIdentity.class))
+                .extracting(ProxyIdentity::description)
+                .isEqualTo("job:" + job.getId());
         assertThat(answerTo("POST", path, APPLICATION_PORT)).isEqualTo(404);
         assertThat(answerTo("POST", path, GATEWAY_PORT, new byte[GATEWAY.maxRequestBytes() + 1]))
                 .isEqualTo(413);
@@ -385,20 +398,21 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         job.setAttempt(attempt);
         job.setConfigSnapshot(new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-responses",
-                        "https://api.example.com/v1",
-                        "catalog-model",
+                        new FrozenModel(
+                                LlmApiProtocol.parse("openai-responses").orElseThrow(),
+                                "https://api.example.com/v1",
+                                "catalog-model",
+                                null,
+                                null,
+                                null,
+                                workspace.getId(),
+                                null,
+                                null,
+                                null),
                         null,
                         null,
-                        null,
-                        null,
-                        null,
-                        null,
-                        workspace.getId(),
                         600,
                         false,
-                        null,
-                        null,
                         null)
                 .toJson(OBJECT_MAPPER));
         return job;

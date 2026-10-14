@@ -122,12 +122,6 @@ export const reviewAccounts = {
 	margaret: account("23", "Margaret Hamilton", [["GITHUB", "mhamilton"]], "UNCLAIMED"),
 } satisfies Record<string, AccountRef>;
 
-/** The account with a GitHub and a GitLab identity. */
-export const multiProviderAccount: AccountRef = reviewAccounts.ada;
-
-/** The account nobody has signed in to yet. */
-export const unclaimedAccount: AccountRef = reviewAccounts.margaret;
-
 function developerOf(owner: AccountRef): ReviewDeveloper {
 	return {
 		accountId: owner.id,
@@ -2443,46 +2437,6 @@ export const reviewResultDetail: ReviewResultDetail = resultDetail(
 	"66666666-6666-6666-6666-666666666666",
 );
 
-/** Marked incorrect, the mark removed, then marked accepted; incomplete coverage. */
-export const markHistoryResultDetail: ReviewResultDetail = resultDetail(
-	"77777777-7777-7777-7777-777777777777",
-);
-
-/** Marked incorrect and still marked. */
-export const markedIncorrectResultDetail: ReviewResultDetail = resultDetail(
-	"88888888-8888-8888-8888-888888888888",
-);
-
-/** Could not determine, with two open questions and no problems. */
-export const couldNotDetermineResultDetail: ReviewResultDetail = resultDetail(
-	"22222222-5555-5555-5555-555555555555",
-);
-
-/** Does not apply, with the prerequisite it ruled out. */
-export const doesNotApplyResultDetail: ReviewResultDetail = resultDetail(
-	"cccccccc-2222-2222-2222-222222222222",
-);
-
-/** Met without a summary of its own. */
-export const metWithoutSummaryResultDetail: ReviewResultDetail = resultDetail(
-	"ffffffff-3333-3333-3333-333333333333",
-);
-
-/** Met, recorded before proof was kept: evidence version 0. */
-export const unknownProofResultDetail: ReviewResultDetail = resultDetail(
-	"11111111-5555-5555-5555-555555555555",
-);
-
-/** Not met, with its evidence withheld from admins by consent; the problem still counts. */
-export const evidenceHiddenResultDetail: ReviewResultDetail = resultDetail(
-	"66666666-7777-7777-7777-777777777777",
-);
-
-/** A scan's result about one file: no developer, so "About the work". */
-export const aboutTheWorkResultDetail: ReviewResultDetail = resultDetail(
-	"eeeeeeee-9999-9999-9999-999999999999",
-);
-
 export function problemDetail(problemId: string): ReviewProblemDetail {
 	for (const { review, result } of allResultSpecs) {
 		const row = toProblemRows(review, result).find((entry) => entry.id === problemId);
@@ -2758,11 +2712,6 @@ export const reviewDetailExpiredRuntime: ReviewDetail = reviewDetail(
 	"bbbbbbbb-8888-8888-8888-888888888888",
 );
 
-/** The review of Grace's pull request review, an item whose parent is the pull request. */
-export const reviewDetailPullRequestReview: ReviewDetail = reviewDetail(
-	"cccccccc-8888-8888-8888-888888888888",
-);
-
 /** A review some stories need that no list row reaches, built on the completed review. */
 function standaloneReview(
 	id: string,
@@ -2848,19 +2797,6 @@ export const reviewDetailCancelledOnBudget: ReviewDetail = standaloneReview(
 	{ status: "CANCELLED", stopReason: "BUDGET_EXHAUSTED" },
 	(summary) => jobsOf(summary, 1).map((job) => ({ ...job, startedAt: null, exitCode: null })),
 );
-
-/** Every review detail, for a story that cycles through them. */
-export const reviewDetails: ReviewDetail[] = [
-	reviewDetailCompleted,
-	reviewDetailRunning,
-	reviewDetailQueued,
-	reviewDetailBackingOff,
-	reviewDetailScanManyJobs,
-	reviewDetailExpiredRuntime,
-	reviewDetailTimedOut,
-	reviewDetailProcessingFailed,
-	reviewDetailCancelledOnBudget,
-];
 
 /** What a review spent on the model: a first attempt that failed and the retry that finished. */
 export const reviewUsageTwoAttempts: ReviewUsage = {
@@ -3331,9 +3267,6 @@ export function itemEventsOf(review: ReviewSummary): ItemEvent[] {
 	];
 }
 
-/** The events of the pull request's completed review: started, withheld and blocked. */
-export const reviewItemEvents: ItemEvent[] = itemEventsOf(reviewDetailCompleted);
-
 /**
  * The trace of the item a review fixture looked at, told so it agrees with that review: its own
  * events, the review itself, and the practices it answered naming it. A trace taken from another
@@ -3388,9 +3321,6 @@ export const openIssueFacts: ItemFacts = {
 		{ name: "Labels", value: null, url: null },
 	],
 };
-
-/** A conversation the adapter reports nothing for. */
-export const noItemFacts: ItemFacts = { item: slackConversation, facts: [] };
 
 // ---------------------------------------------------------------------------------------------
 // A practice's versions, and how each practice's script ran in one review

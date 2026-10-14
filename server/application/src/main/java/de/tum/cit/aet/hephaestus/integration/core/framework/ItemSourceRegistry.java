@@ -16,9 +16,8 @@ public class ItemSourceRegistry {
     }
 
     public ItemSource sourceFor(ItemRef item) {
-        List<ItemSource> matching = sources.stream()
-                .filter(s -> s.kind().equals(item.kind()) && s.supports(item))
-                .toList();
+        List<ItemSource> matching =
+                sources.stream().filter(s -> s.supports(item)).toList();
         if (matching.size() != 1)
             throw new ItemCaptureException(
                     ItemCaptureCode.SOURCE_NOT_READY,

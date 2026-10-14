@@ -5,8 +5,12 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +34,16 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
         return identityRepository.findActiveByAccountId(accountId).stream()
                 .map(this::toView)
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, List<IdentityView>> activeLinksForAccounts(Collection<Long> accountIds) {
+        if (accountIds.isEmpty()) return Map.of();
+        return identityRepository.findActiveByAccountIds(accountIds).stream()
+                .collect(Collectors.groupingBy(
+                        identity -> Objects.requireNonNull(identity.getAccount().getId()),
+                        Collectors.mapping(this::toView, Collectors.toList())));
     }
 
     @Override

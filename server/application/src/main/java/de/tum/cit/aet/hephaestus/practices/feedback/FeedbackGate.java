@@ -1,11 +1,14 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
@@ -26,10 +29,14 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -111,7 +118,7 @@ public class FeedbackGate {
         var policy = basis.policy(workspaceId, feedback.getDeveloperId());
         boolean inScope = policy.isPresent()
                 && policy.get().getLeftAt() == null
-                && (!"SELECTED".equals(policy.get().getPeopleScope())
+                && (policy.get().getPeopleScope() != ReviewScopeMode.SELECTED
                         || policy.get().getSelected());
         boolean authorized = !support.isEmpty()
                 && support.stream()
@@ -120,9 +127,9 @@ public class FeedbackGate {
                 && evidence.permitsForNewDelivery(workspaceId, support, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
                                 .size()
                         == support.size();
-        boolean current = support.stream().allMatch(this::current) && currentItem(feedback, support);
-        boolean modelAllowed =
-                policy.isPresent() && !"NO_AI".equals(policy.get().getAiChoice());
+        var itemSnapshot = currentSnapshot(feedback);
+        boolean current = support.stream().allMatch(this::current) && currentItem(feedback, support, itemSnapshot);
+        boolean modelAllowed = policy.isPresent() && policy.get().getAiChoice() != AiChoice.NO_AI;
         boolean deliveryEnabled = policy.isPresent()
                 && policy.get().getDeliveryEnabled()
                 && !suppression.isAccountSuppressed(feedback.getDeveloperId());
@@ -153,23 +160,24 @@ public class FeedbackGate {
         else if (review.get().getOrigin() == ReviewOrigin.BACKFILL) refusal = FeedbackStopReason.BACKFILL_QUIET;
         else if (policy.isEmpty()
                 || !policy.get().getEnabled()
-                || !"ACTIVE".equals(policy.get().getWorkspaceStatus())) refusal = FeedbackStopReason.WORKSPACE_DISABLED;
+                || policy.get().getWorkspaceStatus() != WorkspaceStatus.ACTIVE)
+            refusal = FeedbackStopReason.WORKSPACE_DISABLED;
         else if (admitted != evaluated) refusal = FeedbackStopReason.STALE_ROLLOUT_REVISION;
         else if (!inScope) refusal = FeedbackStopReason.OUTSIDE_CURRENT_SCOPE;
         else if (suppression.isAccountSuppressed(feedback.getDeveloperId()))
             refusal = FeedbackStopReason.PERSON_SUPPRESSED;
         else if (!modelAllowed) refusal = FeedbackStopReason.NO_AI;
-        else if (!"ACTIVE".equals(policy.get().getAccountStatus())
-                && !"UNCLAIMED".equals(policy.get().getAccountStatus()))
+        else if (policy.get().getAccountStatus() != Account.Status.ACTIVE
+                && policy.get().getAccountStatus() != Account.Status.UNCLAIMED)
             refusal = FeedbackStopReason.RECIPIENT_UNAVAILABLE;
         else if (!deliveryEnabled) refusal = FeedbackStopReason.DELIVERY_OFF;
         else if (modes(support, workspaceId).contains(FeedbackMode.OFF)) refusal = FeedbackStopReason.FEEDBACK_OFF;
         else if (incorrect) refusal = FeedbackStopReason.RESULT_MARKED_INCORRECT;
         else if (!current) refusal = FeedbackStopReason.REVIEWED_VERSION_CHANGED;
-        else if (!eligibleState(feedback, support)) refusal = FeedbackStopReason.ITEM_STATE_INELIGIBLE;
-        else if (!authorized) refusal = FeedbackStopReason.APPROVAL_NO_LONGER_ELIGIBLE;
+        else if (!eligibleState(feedback, support, itemSnapshot)) refusal = FeedbackStopReason.ITEM_STATE_INELIGIBLE;
+        else if (!authorized) refusal = FeedbackStopReason.EVIDENCE_NOT_PERMITTED;
         else if (!approvalCurrent) refusal = FeedbackStopReason.APPROVAL_STALE;
-        else if ("PAUSED".equals(policy.get().getDeliveryStatus()))
+        else if (policy.get().getDeliveryStatus() == PracticeDeliveryStatus.PAUSED)
             refusal = FeedbackStopReason.WORKSPACE_DELIVERY_PAUSED;
         else if (feedback.getDestination() == FeedbackDestination.ON_WORK && silentMode.isSilentModeEngaged())
             refusal = FeedbackStopReason.INSTANCE_SILENCED;
@@ -210,8 +218,7 @@ public class FeedbackGate {
         FeedbackMode workspaceMode = stored == null ? null : FeedbackMode.valueOf(stored);
         return support.stream()
                 .map(result -> practices
-                        .findById(result.getPracticeId())
-                        .filter(practice -> practice.getWorkspaceId() == workspaceId)
+                        .findByIdAndWorkspaceId(result.getPracticeId(), workspaceId)
                         .map(practice -> FeedbackModeResolver.effectiveModeOf(practice, workspaceMode))
                         .orElse(FeedbackMode.OFF))
                 .toList();
@@ -220,22 +227,20 @@ public class FeedbackGate {
     private boolean current(Result result) {
         Long versionId = result.getPracticeVersionId();
         if (result.getEndedAt() != null || versionId == null || result.getEvidenceVersion() != 1) return false;
-        var version = versions.findById(versionId);
-        var practice =
-                practices.findById(result.getPracticeId()).filter(p -> p.getWorkspaceId() == result.getWorkspaceId());
+        var version = versions.findByIdAndWorkspaceId(versionId, result.getWorkspaceId());
+        var practice = practices.findByIdAndWorkspaceId(result.getPracticeId(), result.getWorkspaceId());
         return version.isPresent()
                 && practice.isPresent()
-                && version.get().getWorkspaceId() == result.getWorkspaceId()
                 && version.get()
                         .getReviewDigest()
                         .equals(practice.get().getCurrentVersion().getReviewDigest());
     }
 
-    private boolean currentItem(Feedback feedback, List<Result> support) {
+    private Optional<ItemSnapshot> currentSnapshot(Feedback feedback) {
         Long itemId = feedback.getItemId();
-        if (itemId == null) return true;
+        if (itemId == null) return Optional.empty();
         var rows = basis.findItems(feedback.getWorkspaceId(), List.of(itemId));
-        if (rows.size() != 1 || rows.getFirst().getRemovedAt() != null) return false;
+        if (rows.size() != 1 || rows.getFirst().getRemovedAt() != null) return Optional.empty();
         var row = rows.getFirst();
         var ref = new ItemRef(
                 feedback.getWorkspaceId(),
@@ -244,38 +249,25 @@ public class FeedbackGate {
                 row.getSourceId(),
                 row.getParentId(),
                 row.getPath());
-        var matching = sources.stream()
-                .filter(source -> source.kind().equals(ref.kind()) && source.supports(ref))
-                .toList();
-        if (matching.size() != 1) return false;
-        var snapshot = matching.getFirst().current(ref);
+        var matching = sources.stream().filter(source -> source.supports(ref)).toList();
+        return matching.size() == 1 ? matching.getFirst().current(ref) : Optional.empty();
+    }
+
+    private static boolean currentItem(Feedback feedback, List<Result> support, Optional<ItemSnapshot> snapshot) {
+        Long itemId = feedback.getItemId();
+        if (itemId == null) return true;
         if (snapshot.isEmpty()) return false;
         return support.stream()
                 .filter(result -> result.getItemId() == itemId)
                 .allMatch(result -> snapshot.get().version().value().equals(result.getItemVersion()));
     }
 
-    private boolean eligibleState(Feedback feedback, List<Result> support) {
+    private boolean eligibleState(Feedback feedback, List<Result> support, Optional<ItemSnapshot> snapshot) {
         if (feedback.getDestination() != FeedbackDestination.ON_WORK || feedback.getItemId() == null) return true;
-        var rows = basis.findItems(feedback.getWorkspaceId(), List.of(feedback.getItemId()));
-        if (rows.size() != 1) return false;
-        var row = rows.getFirst();
-        var ref = new ItemRef(
-                feedback.getWorkspaceId(),
-                row.getId(),
-                new ItemKind(row.getKind()),
-                row.getSourceId(),
-                row.getParentId(),
-                row.getPath());
-        var matching = sources.stream()
-                .filter(source -> source.kind().equals(ref.kind()) && source.supports(ref))
-                .toList();
-        if (matching.size() != 1) return false;
-        var snapshot = matching.getFirst().current(ref);
         if (snapshot.isEmpty()) return false;
         for (var result : support) {
             if (result.getPracticeVersionId() == null) return false;
-            var version = versions.findById(result.getPracticeVersionId());
+            var version = versions.findByIdAndWorkspaceId(result.getPracticeVersionId(), result.getWorkspaceId());
             if (version.isEmpty()) return false;
             var required = version.get().getDefinition().path("reviewOn").path("state");
             if (!required.isObject()) return false;

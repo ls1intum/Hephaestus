@@ -1,6 +1,6 @@
 import { CircleCheckIcon, SearchXIcon } from "lucide-react";
 
-import type { ProblemChanges } from "@/api/types.gen";
+import type { ProblemChanges, ScanReportProblem } from "@/api/types.gen";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
@@ -24,12 +24,11 @@ import {
 import { itemName } from "@/lib/item-kinds";
 
 import { ScanListMore, type ScanListState } from "./scan-list-state";
-import type { ScanProblemEntry } from "./scan-report-schemas";
 
 type BaselineFilter = ProblemBaselineState | "ALL";
 
 export interface ScanProblemTableProps {
-	state: ScanListState<ScanProblemEntry>;
+	state: ScanListState<ScanReportProblem>;
 	filter: ProblemBaselineState | undefined;
 	onFilterChange: (filter: ProblemBaselineState | undefined) => void;
 	/** How many problems compare each way with the scan before; the filters say them. */
@@ -57,7 +56,7 @@ function changeCount(changes: ProblemChanges, state: ProblemBaselineState): numb
 	}
 }
 
-function citationText(entry: ScanProblemEntry): string {
+function citationText(entry: ScanReportProblem): string {
 	const citation = entry.problem.citations[0];
 	const path = citation?.path ?? entry.item.path ?? itemName(entry.item);
 	if (citation?.startLine == null) {
@@ -109,7 +108,7 @@ function ScanProblemResults({
 	filtered,
 	pairsWithoutResult,
 }: {
-	state: ScanListState<ScanProblemEntry>;
+	state: ScanListState<ScanReportProblem>;
 	filtered: boolean;
 	pairsWithoutResult: number;
 }) {

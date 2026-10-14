@@ -39,7 +39,7 @@ describe("toEvidenceLocations", () => {
 				endLine: 44,
 				sourceKind: "scm.pull-request.diff",
 				side: "NEW",
-				revision: undefined,
+				commit: undefined,
 				snippet: "a();\nb();",
 			},
 		]);
@@ -74,7 +74,7 @@ describe("toEvidenceLocations", () => {
 	it("preserves the commit that a historical quote was verified against", () => {
 		const revision = "a".repeat(40);
 		const [location] = toEvidenceLocations([citation({ revision })]);
-		expect(location?.revision).toBe(revision);
+		expect(location?.commit).toBe(revision);
 	});
 
 	it("preserves the order the reviewer recorded", () => {
@@ -135,7 +135,7 @@ describe("toEvidenceLocations", () => {
 		]);
 
 		expect(location?.change).toStrictEqual({ before: "-a();", after: "+a();" });
-		expect(location?.revision).toBeUndefined();
+		expect(location?.commit).toBeUndefined();
 		expect(location?.side).toBeUndefined();
 	});
 

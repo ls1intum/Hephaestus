@@ -125,12 +125,12 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     // SPI hooks (IntegrationLifecycleListener)
 
     /**
-     * SPI hook: bridge to {@link #createOrUpdateFromInstallation} by parsing the installation id
-     * from {@link IntegrationRef#instanceKey()}.
+     * SPI hook: bridge to {@link #createOrUpdateFromInstallation} by parsing the
+     * installation id from {@link IntegrationRef#instanceKey()}.
      *
-     * <p>The {@code initialResources} list is ignored: repository monitor creation lives in {@code
-     * GitHubWorkspaceProvisioningAdapter}, which holds the monitor-service dependency that plain
-     * SPI dispatch doesn't carry.
+     * <p>The {@code initialResources} list is ignored: repository monitor creation lives
+     * in {@code GitHubWorkspaceProvisioningAdapter}, which holds the monitor-service dependency
+     * that plain SPI dispatch doesn't carry.
      */
     @Override
     public void onInstanceInstalled(InstanceProvisioned event) {
@@ -151,9 +151,9 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * SPI hook: run the full workspace purge for a vendor-side uninstall. Delegates to {@link
-     * #purgeWorkspaceForInstallation(long)} — see there for why a bare status write is not an
-     * acceptable substitute.
+     * SPI hook: run the full workspace purge for a vendor-side uninstall.
+     * Delegates to {@link #purgeWorkspaceForInstallation(long)} — see there for why a bare
+     * status write is not an acceptable substitute.
      */
     @Override
     public void onInstanceUninstalled(IntegrationRef ref) {
@@ -166,10 +166,10 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * SPI hook: log scope delta sizes. The actual repository-monitor reconciliation runs in {@code
-     * GitHubWorkspaceProvisioningAdapter.onRepositoriesAdded/Removed} which holds the
-     * monitor-service dependency. Empty deltas short-circuit so duplicate webhook deliveries don't
-     * flap audit logs.
+     * SPI hook: log scope delta sizes. The actual repository-monitor reconciliation
+     * runs in {@code GitHubWorkspaceProvisioningAdapter.onRepositoriesAdded/Removed} which
+     * holds the monitor-service dependency. Empty deltas short-circuit so duplicate
+     * webhook deliveries don't flap audit logs.
      */
     @Override
     public void onScopeChanged(IntegrationRef ref, ScopeDelta delta) {
@@ -183,9 +183,9 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * SPI hook: full account rename handling — workspace login update, monitor retargeting, repo
-     * renaming, NATS subject rotation. Bridges {@link IntegrationRef#instanceKey()} to {@link
-     * #handleAccountRename}.
+     * SPI hook: full account rename handling — workspace login update, monitor
+     * retargeting, repo renaming, NATS subject rotation. Bridges
+     * {@link IntegrationRef#instanceKey()} to {@link #handleAccountRename}.
      */
     @Override
     public void onTenantRenamed(IntegrationRef ref, String oldName, String newName) {
@@ -202,11 +202,11 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     /**
      * Creates or updates a workspace from a GitHub App installation with full account info.
      *
-     * @param installationId the GitHub App installation ID
-     * @param accountId the GitHub account database ID
-     * @param accountLogin the GitHub account login (organization or user)
-     * @param accountKind the account kind (USER or ORGANIZATION)
-     * @param avatarUrl the account's avatar URL
+     * @param installationId      the GitHub App installation ID
+     * @param accountId           the GitHub account database ID
+     * @param accountLogin        the GitHub account login (organization or user)
+     * @param accountKind         the account kind (USER or ORGANIZATION)
+     * @param avatarUrl           the account's avatar URL
      * @param repositorySelection the repository selection mode (ALL or SELECTED)
      * @return the created or updated workspace, or null if workspace creation was skipped
      */
@@ -232,9 +232,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         // Check suspension before any reactivation logic: replayed NATS "created" events
         // must not reactivate a suspended workspace and re-trigger failed repository syncs.
         if (gitHubAppTokenService.isInstallationMarkedSuspended(installationId)) {
-            log.info(
-                    "Skipped workspace reactivation: reason=installationSuspended," + " installationId={}",
-                    installationId);
+            log.info("Skipped workspace reactivation: reason=installationSuspended, installationId={}", installationId);
             return null;
         }
 
@@ -253,8 +251,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                     .orElse(null);
             if (existingByLogin != null && existingByLogin.getStatus() == Workspace.WorkspaceStatus.PURGED) {
                 log.info(
-                        "Skipped installation event for purged workspace account: accountLogin={},"
-                                + " installationId={}",
+                        "Skipped installation event for purged workspace account: accountLogin={}, installationId={}",
                         LoggingUtils.sanitizeForLog(accountLogin),
                         installationId);
                 return null;
@@ -272,9 +269,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                                 .isPresent();
                 if (hasNonGithubActive) {
                     log.info(
-                            "Skipped GitHub App installation cross-attach, workspace has non-GITHUB"
-                                    + " ACTIVE Connection: workspaceId={}, accountLogin={},"
-                                    + " installationId={}",
+                            "Skipped GitHub App installation cross-attach, workspace has non-GITHUB ACTIVE Connection: workspaceId={}, accountLogin={}, installationId={}",
                             existingByLogin.getId(),
                             LoggingUtils.sanitizeForLog(accountLogin),
                             installationId);
@@ -284,9 +279,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
             if (existingByLogin != null && !matchesInstallationAccount(existingByLogin, accountId, accountKind)) {
                 log.info(
-                        "Kept matching-login workspace separate:"
-                                + " reason=unverifiedInstallationAccount, workspaceId={},"
-                                + " installationId={}",
+                        "Kept matching-login workspace separate: reason=unverifiedInstallationAccount, workspaceId={}, installationId={}",
                         existingByLogin.getId(),
                         installationId);
                 existingByLogin = null;
@@ -305,8 +298,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
                 if (hasPatToken) {
                     log.info(
-                            "Skipped GitHub App installation linking, PAT workspace has stored"
-                                    + " token: workspaceId={}, accountLogin={}, installationId={}",
+                            "Skipped GitHub App installation linking, PAT workspace has stored token: workspaceId={}, accountLogin={}, installationId={}",
                             existingByLogin.getId(),
                             LoggingUtils.sanitizeForLog(accountLogin),
                             installationId);
@@ -315,15 +307,13 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
                 if (isPatWorkspace) {
                     log.info(
-                            "Promoted PAT workspace to GitHub App, no PAT token stored:"
-                                    + " workspaceId={}, accountLogin={}, installationId={}",
+                            "Promoted PAT workspace to GitHub App, no PAT token stored: workspaceId={}, accountLogin={}, installationId={}",
                             existingByLogin.getId(),
                             LoggingUtils.sanitizeForLog(accountLogin),
                             installationId);
                 } else {
                     log.info(
-                            "Linked existing workspace to installation: workspaceId={},"
-                                    + " accountLogin={}, installationId={}",
+                            "Linked existing workspace to installation: workspaceId={}, accountLogin={}, installationId={}",
                             existingByLogin.getId(),
                             LoggingUtils.sanitizeForLog(accountLogin),
                             installationId);
@@ -345,7 +335,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
             if (ownerUserId == null) {
                 // Likely an old or deleted installation whose owner user can no longer be resolved.
                 log.warn(
-                        "Skipped workspace creation, cannot sync owner user: installationId={}," + " accountLogin={}",
+                        "Skipped workspace creation, cannot sync owner user: installationId={}, accountLogin={}",
                         installationId,
                         LoggingUtils.sanitizeForLog(accountLogin));
                 return null;
@@ -361,8 +351,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
             // must surface the allocated slug to the user instead.
             workspace = createWorkspace(availableSlug, accountLogin, accountLogin, wsAccountType, ownerUserId);
             log.info(
-                    "Created workspace from installation: workspaceSlug={}, installationId={},"
-                            + " ownerUserId={}, requestedSlug={}",
+                    "Created workspace from installation: workspaceSlug={}, installationId={}, ownerUserId={}, requestedSlug={}",
                     LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
                     installationId,
                     ownerUserId,
@@ -379,8 +368,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
 
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {
             log.info(
-                    "Reactivated workspace from installation: workspaceId={}, previousStatus={},"
-                            + " installationId={}",
+                    "Reactivated workspace from installation: workspaceId={}, previousStatus={}, installationId={}",
                     workspace.getId(),
                     workspace.getStatus(),
                     installationId);
@@ -391,7 +379,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         if (accountKind == AccountKind.ORGANIZATION && accountId != null) {
             Long providerId = Objects.requireNonNull(gitProviderRepository
                     .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                    .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not" + " found"))
+                    .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"))
                     .getId());
             Organization org =
                     organizationService.upsertIdentity(accountId, Objects.requireNonNull(accountLogin), providerId);
@@ -458,9 +446,9 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
      * <p><b>Why not a status write.</b> {@code PURGED} is a terminal, slug-burning state that the
      * rest of the system reads as "this workspace's data is gone". Setting it without running the
      * purge chain makes that a lie: none of the {@code WorkspacePurgeContributor} beans fire, so
-     * mirrored Slack messages, Outline documents, org-tier {@code team} / {@code
-     * organization_membership} rows, practices/activity derived rows and still-ACTIVE {@code
-     * Connection} rows all survive under a label that says they were erased. An org admin
+     * mirrored Slack messages, Outline documents, org-tier {@code team} /
+     * {@code organization_membership} rows, practices/activity derived rows and still-ACTIVE
+     * {@code Connection} rows all survive under a label that says they were erased. An org admin
      * uninstalling the App on github.com is exactly the moment the lawful basis for holding that
      * mirror ends, so it must erase at least as much as an admin disconnect does.
      *
@@ -473,11 +461,11 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
      * rows (repositories another workspace still monitors, the {@code Organization} identity) are
      * protected by the orphan guards inside the purge chain, not by this method.
      *
-     * <p><b>Transaction.</b> Callers on the webhook-consumer path already run inside the {@code
-     * TransactionTemplate} boundary opened by {@code AbstractIntegrationMessageHandler}, which the
-     * delegate's {@code REQUIRED} propagation joins; the reconciliation path opens its own here.
-     * Tenancy needs no ambient workspace context — the purge chain's cross-tenant queries are the
-     * {@code @WorkspaceAgnostic} ones that open their own bypass scope.
+     * <p><b>Transaction.</b> Callers on the webhook-consumer path already run inside the
+     * {@code TransactionTemplate} boundary opened by {@code AbstractIntegrationMessageHandler},
+     * which the delegate's {@code REQUIRED} propagation joins; the reconciliation path opens its
+     * own here. Tenancy needs no ambient workspace context — the purge chain's cross-tenant
+     * queries are the {@code @WorkspaceAgnostic} ones that open their own bypass scope.
      *
      * @param installationId the GitHub App installation ID
      * @return the purged workspace, or empty if no workspace is bound to the installation
@@ -491,8 +479,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         var workspaceOpt = workspaceRepository.findByInstallationIdForUpdate(installationId);
         if (workspaceOpt.isEmpty()) {
             log.warn(
-                    "Skipped installation purge: reason=noWorkspaceForInstallation," + " installationId={}",
-                    installationId);
+                    "Skipped installation purge: reason=noWorkspaceForInstallation, installationId={}", installationId);
             return Optional.empty();
         }
 
@@ -524,11 +511,11 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
      * Update workspace status for a given installation if the status differs.
      *
      * <p>{@code PURGED} is rejected: it is not a status flip but a data-erasure operation, and
-     * routing it through here silently skipped every {@code WorkspacePurgeContributor}. Use {@link
-     * #purgeWorkspaceForInstallation(long)}.
+     * routing it through here silently skipped every {@code WorkspacePurgeContributor}. Use
+     * {@link #purgeWorkspaceForInstallation(long)}.
      *
      * @param installationId the GitHub App installation ID
-     * @param status the new workspace status
+     * @param status         the new workspace status
      * @return the updated workspace, or empty if no workspace exists for the installation
      * @throws IllegalArgumentException if {@code status} is {@code PURGED}
      */
@@ -536,8 +523,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     public Optional<Workspace> updateWorkspaceStatus(long installationId, Workspace.WorkspaceStatus status) {
         if (status == Workspace.WorkspaceStatus.PURGED) {
             throw new IllegalArgumentException(
-                    "PURGED must go through purgeWorkspaceForInstallation so the purge contributors"
-                            + " run: installationId="
+                    "PURGED must go through purgeWorkspaceForInstallation so the purge contributors run: installationId="
                             + installationId);
         }
 
@@ -569,10 +555,11 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Update repository selection for a given installation if provided and different.
+     * Update repository selection for a given installation if provided and
+     * different.
      *
      * @param installationId the GitHub App installation ID
-     * @param selection the new repository selection mode
+     * @param selection      the new repository selection mode
      * @return the updated workspace, or empty if no workspace exists for the installation
      */
     @Transactional
@@ -594,13 +581,13 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Handle a GitHub account rename (installation_target event). Updates the workspace account
-     * login, retargets repository monitors, renames tracked repositories, and rotates the NATS
-     * organization consumer.
+     * Handle a GitHub account rename (installation_target event).
+     * Updates the workspace account login, retargets repository monitors,
+     * renames tracked repositories, and rotates the NATS organization consumer.
      *
      * @param installationId the GitHub App installation ID
-     * @param previousLogin the previous account login (may be null)
-     * @param newLogin the new account login
+     * @param previousLogin  the previous account login (may be null)
+     * @param newLogin       the new account login
      */
     @Transactional
     public void handleAccountRename(long installationId, @Nullable String previousLogin, String newLogin) {
@@ -630,7 +617,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                             }
                         },
                         () -> log.warn(
-                                "Skipped account rename: reason=unknownInstallation," + " installationId={}",
+                                "Skipped account rename: reason=unknownInstallation, installationId={}",
                                 installationId));
     }
 
@@ -732,14 +719,13 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
     }
 
     /**
-     * Upserts the installation account by its immutable GitHub identity; login is only profile
-     * metadata.
+     * Upserts the installation account by its immutable GitHub identity; login is only profile metadata.
      *
      * @param installationId the GitHub App installation ID
-     * @param accountId the GitHub account database ID
-     * @param accountLogin the GitHub account login
-     * @param accountKind the account kind (USER or ORGANIZATION)
-     * @param avatarUrl the account's avatar URL
+     * @param accountId      the GitHub account database ID
+     * @param accountLogin   the GitHub account login
+     * @param accountKind    the account kind (USER or ORGANIZATION)
+     * @param avatarUrl      the account's avatar URL
      * @return the user ID, or null if user could not be created
      */
     private @Nullable Long syncGitHubUserForOwnership(
@@ -775,8 +761,7 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
                     null // updatedAt
                     );
             log.info(
-                    "Upserted user for workspace ownership: userLogin={}, userId={}, userType={},"
-                            + " installationId={}",
+                    "Upserted user for workspace ownership: userLogin={}, userId={}, userType={}, installationId={}",
                     LoggingUtils.sanitizeForLog(accountLogin),
                     accountId,
                     typeStr,
@@ -786,8 +771,8 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
             return userRepository
                     .findByNativeIdAndProviderId(accountId, providerId)
                     .map(User::getId)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Installation account was not found after its identity" + " upsert"));
+                    .orElseThrow(() ->
+                            new IllegalStateException("Installation account was not found after its identity upsert"));
         }
 
         log.warn(

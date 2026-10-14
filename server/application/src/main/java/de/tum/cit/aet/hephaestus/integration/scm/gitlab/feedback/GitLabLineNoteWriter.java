@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReadback;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateReceipt;
@@ -42,7 +41,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -58,14 +56,14 @@ import org.springframework.stereotype.Component;
  * lines at the reviewed commit. GitLab attaches an ordinary comment to no line, so the link is the
  * location: no diff note is created, resolved, edited or deleted to place it.
  *
- * <p>Each comment carries the package marker and a hidden correlation tag with its delivery key,
+ * <p>Each comment carries the copy marker and a hidden correlation tag with its delivery key,
  * and links to the reviewed commit, never to a newer head. Before any create, the merge request's
  * discussions are read completely and the copies of the package are indexed by key; an item with a
  * copy is never posted again. Explicit correction edits the existing authorized copy and preserves
  * its physical marker. Existing diff notes and ordinary comments stay readable as copies. Each
  * create is fenced on its own, so a stop between two comments leaves the second provably unrequested.
  *
- * <p>Every readback mode renders the same body: GitLab copies always carried the package marker.
+ * <p>Every copy includes its copy marker and final correlation tag.
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track {@link
  * GitLabGraphQlClientProvider}.
@@ -86,12 +84,6 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
 
     /** Hard ceiling on discussion pages walked per scan; a scan that reaches it proves nothing. */
     private static final int MAX_DISCUSSION_PAGES = 50;
-
-    /**
-     * Hidden per-delivery correlation tag; the key is alnum/dash/underscore/colon, so no escaping
-     * is needed.
-     */
-    private static final Pattern CK_TAG = Pattern.compile("<!-- hephaestus-diff-note-ck=([A-Za-z0-9_:-]+) -->");
 
     /** A commit id, the only revision a location link may name. */
     private static final Pattern COMMIT_SHA = Pattern.compile("[0-9a-fA-F]{7,64}");
@@ -122,7 +114,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
 
     @Override
     public CopyWriteResult postImmutablePackage(
-            FeedbackTarget target, List<LineNote> feedbackItems, CopyReadback readback, CopyWriteFence fence) {
+            FeedbackTarget target, List<LineNote> feedbackItems, CopyWriteFence fence) {
         if (feedbackItems.isEmpty()) {
             return CopyWriteResult.of(List.of());
         }
@@ -137,7 +129,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         if (rateLimited || revision == null || !COMMIT_SHA.matcher(revision).matches()) {
             // Without the reviewed commit no comment can link to the code the review read.
             log.warn(
-                    "GitLab location comments not requested: workspaceId={}, rateLimited={}," + " reviewedRevision={}",
+                    "GitLab location comments not requested: workspaceId={}, rateLimited={}, reviewedRevision={}",
                     scopeId,
                     rateLimited,
                     sanitizeForLog(revision));
@@ -191,7 +183,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                     locationBody(projectUrl, anchorVersion, diff, item),
                     diff,
                     item.copyId());
-            completed.add(attempt.signal());
+            completed.add(attempt.receipt());
             if (attempt.stop()) {
                 completed.addAll(unrequested(feedbackItems.subList(index + 1, feedbackItems.size()), copies));
                 break;
@@ -201,8 +193,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     }
 
     @Override
-    public @Nullable List<CopyReceipt> findPosted(
-            FeedbackTarget target, List<LineNote> feedbackItems, CopyReadback readback) {
+    public @Nullable List<CopyReceipt> findPosted(FeedbackTarget target, List<LineNote> feedbackItems) {
         if (feedbackItems.isEmpty()) {
             return List.of();
         }
@@ -279,10 +270,9 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
      */
     private Map<String, Copy> indexCopies(
             long scopeId, MrCoordinates mr, List<LineNote> items, ItemVersion version, String projectUrl) {
-        @Nullable String marker = items.getFirst().writeMarker();
         Map<String, LineNote> expected = new HashMap<>();
         for (LineNote item : items) {
-            if (item.writeKey() != null) expected.putIfAbsent(item.writeKey(), item);
+            expected.putIfAbsent(item.writeKey(), item);
         }
         Map<String, Copy> copies = new LinkedHashMap<>();
         try {
@@ -311,7 +301,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                     throw new FeedbackDeliveryException("GitLab discussion lookup was incomplete");
                 }
                 for (Object discussion : discussions) {
-                    indexDiscussion(discussion, marker, currentUserId, version, projectUrl, expected, copies);
+                    indexDiscussion(discussion, currentUserId, version, projectUrl, expected, copies);
                 }
                 Object hasNextPage = pageInfo.get("hasNextPage");
                 if (Boolean.FALSE.equals(hasNextPage)) {
@@ -335,7 +325,6 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
 
     private static void indexDiscussion(
             @Nullable Object node,
-            @Nullable String marker,
             String currentUserId,
             ItemVersion version,
             String projectUrl,
@@ -356,22 +345,22 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                     || noteId.isBlank()) {
                 throw new FeedbackDeliveryException("A GitLab note was not read completely");
             }
-            if (Boolean.TRUE.equals(note.get("system")) || (marker != null && !body.contains(marker))) continue;
-            String key = parseDeliveryKey(body);
+            if (Boolean.TRUE.equals(note.get("system"))) continue;
+            String key = ScmFeedbackFormatter.lastDeliveryKey(body);
             if (key == null) {
                 continue;
             }
             LineNote item = expected.get(key);
-            CopyForm placement = item != null
+            CopyForm copyForm = item != null
                             && note.get("author") instanceof Map<?, ?> author
                             && currentUserId.equals(author.get("id"))
-                    ? copyPlacement(note, body, item, version, projectUrl)
+                    ? copyForm(note, body, item, version, projectUrl)
                     : null;
             String url = note.get("url") instanceof String noteUrl ? noteUrl : null;
             Copy previous = copies.get(key);
-            if (placement != null && (previous == null || !previous.verified())) {
-                copies.put(key, new Copy(true, noteId, discussionId, url, placement));
-            } else if (placement == null && previous == null) {
+            if (copyForm != null && (previous == null || !previous.verified())) {
+                copies.put(key, new Copy(true, noteId, discussionId, url, copyForm));
+            } else if (copyForm == null && previous == null) {
                 copies.put(key, new Copy(false, noteId, discussionId, url, null));
             }
         }
@@ -379,11 +368,11 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
 
     /**
      * Where the note appears when it is a copy of the item, else {@code null}. A copy is the exact
-     * body this channel posts for the item: the ordinary comment linking to its lines at the
+     * body this writer posts for the item: the ordinary comment linking to its lines at the
      * reviewed commit; or, posted before that, a diff note at its line on the reviewed commit (this
      * adapter placed a range at its end line) or the ordinary comment that diff note fell back to.
      */
-    private static @Nullable CopyForm copyPlacement(
+    private static @Nullable CopyForm copyForm(
             Map<?, ?> note, String body, LineNote item, ItemVersion version, String projectUrl) {
         FeedbackAnchor diff = item.anchor();
         String revision = diff.side() == CitationSide.OLD ? version.baseVersion() : ScmVersion.reviewedHead(version);
@@ -427,22 +416,7 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
     }
 
     private static List<UUID> deliveryKeys(List<LineNote> feedbackItems) {
-        return feedbackItems.stream()
-                .map(LineNote::copyId)
-                .filter(Objects::nonNull)
-                .toList();
-    }
-
-    /**
-     * The key of the correlation tag this channel appends last, so text earlier in the comment
-     * cannot name one.
-     */
-    @Nullable
-    private static String parseDeliveryKey(String body) {
-        Matcher m = CK_TAG.matcher(body);
-        String key = null;
-        while (m.find()) key = m.group(1);
-        return key;
+        return feedbackItems.stream().map(LineNote::copyId).toList();
     }
 
     /**
@@ -455,14 +429,12 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
         return base + "/" + encodedPath(mr.projectPath());
     }
 
-    /** The item's body: slash commands escaped, then the package marker and the correlation tag. */
+    /** The item's body: slash commands escaped, then the copy marker and the correlation tag. */
     private static String postedBody(LineNote item) {
         String body = GitLabSummaryWriter.escapeSlashCommands(item.body());
-        if (item.writeMarker() != null && !item.writeMarker().isBlank()) {
-            body = body + "\n" + item.writeMarker();
-        }
+        body = body + "\n" + item.writeMarker();
         String key = item.writeKey();
-        return key == null || key.isBlank() ? body : body + "\n<!-- hephaestus-diff-note-ck=" + key + " -->";
+        return body + "\n" + ScmFeedbackFormatter.deliveryTag(key);
     }
 
     /**
@@ -513,14 +485,14 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
             String noteId,
             @Nullable String discussionId,
             @Nullable String url,
-            @Nullable CopyForm placement) {
+            @Nullable CopyForm copyForm) {
         CopyReceipt preserved(LineNote item) {
-            return new CopyReceipt(item.copyId(), CopyDisposition.PRESERVED_EXISTING, noteId, url, null, placement);
+            return new CopyReceipt(item.copyId(), CopyDisposition.PRESERVED_EXISTING, noteId, url, null, copyForm);
         }
     }
 
     /** One create request's outcome, and whether the rest of the package must wait. */
-    private record Attempt(CopyReceipt signal, boolean stop) {}
+    private record Attempt(CopyReceipt receipt, boolean stop) {}
 
     private static boolean isRateLimitError(Exception e) {
         String message = e.getMessage();
@@ -542,9 +514,8 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
             try {
                 ClientGraphQlResponse read = gitLabProvider
                         .forScope(workspaceId)
-                        .document("query ReadPracticeCopy($id:ID!){currentUser{id}"
-                                + " node(id:$id){__typename ... on Note{id body"
-                                + " author{id}}}}")
+                        .document(
+                                "query ReadPracticeCopy($id:ID!){currentUser{id} node(id:$id){__typename ... on Note{id body author{id}}}}")
                         .variable("id", externalRef)
                         .execute()
                         .block(GRAPHQL_TIMEOUT);
@@ -575,9 +546,8 @@ public class GitLabLineNoteWriter implements LineNoteWriter {
                 egressGuard.requireDeliveryAllowed("gitlab.correct-feedback-copy");
                 ClientGraphQlResponse response = gitLabProvider
                         .forScope(workspaceId)
-                        .document("mutation"
-                                      + " CorrectPracticeNote($id:NoteID!,$body:String!){updateNote(input:{id:$id,body:$body}){note{id"
-                                      + " url} errors}}")
+                        .document(
+                                "mutation CorrectPracticeNote($id:NoteID!,$body:String!){updateNote(input:{id:$id,body:$body}){note{id url} errors}}")
                         .variable("id", externalRef)
                         .variable("body", ScmFeedbackFormatter.withdrawnCopyBody(original))
                         .execute()

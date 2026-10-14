@@ -29,13 +29,13 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ReviewTimingFactsQueryService implements ReviewTimingFactsQuery {
     private static final int PAGE_SIZE = 1000;
     private final JdbcClient jdbc;
     private final ItemMergeTimeQuery mergeTimes;
 
     @Override
-    @Transactional(readOnly = true)
     public List<ReviewTimingFact> window(long workspaceId, Instant from, Instant to) {
         if (!from.isBefore(to)) throw new IllegalArgumentException("Use a nonempty timing range.");
         var output = new ArrayList<ReviewTimingFact>();
@@ -69,7 +69,6 @@ public class ReviewTimingFactsQueryService implements ReviewTimingFactsQuery {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public ReviewTimingFacts facts(long workspaceId, List<UUID> reviewIds, Instant from, Instant to) {
         if (!from.isBefore(to)) throw new IllegalArgumentException("Use a nonempty timing range.");
         double asked = 0;
@@ -100,7 +99,6 @@ public class ReviewTimingFactsQueryService implements ReviewTimingFactsQuery {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public List<ReviewTimingFact> timelines(long workspaceId, List<UUID> reviewIds) {
         var ids = reviewIds.stream()
                 .distinct()

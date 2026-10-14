@@ -107,12 +107,9 @@ describe("resetting a group to the catalog", () => {
 	it("refuses a reset when the group changed after the comparison was shown", async () => {
 		const reset = vi.fn();
 		const changed = { ...edited, description: "Someone else's words." };
+		let saved = edited;
 		server.use(
-			// The first read is what the reader compares; someone else saves before they confirm.
-			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([changed])),
-			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([edited]), {
-				once: true,
-			}),
+			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([saved])),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/groups/:slug", () =>
 				HttpResponse.json(offer),
 			),
@@ -138,7 +135,10 @@ describe("resetting a group to the catalog", () => {
 		);
 		fireEvent.click(await screen.findByRole("menuitem", { name: "Reset to catalog" }));
 		const dialog = await screen.findByRole("alertdialog");
-		fireEvent.click(await within(dialog).findByRole("button", { name: "Reset to catalog" }));
+		await within(dialog).findByText("Our own words.");
+		// Someone else saves after the reader read the comparison and before they confirm.
+		saved = changed;
+		fireEvent.click(within(dialog).getByRole("button", { name: "Reset to catalog" }));
 
 		const refused = await within(dialog).findByRole("alert", {}, ROUTE_RENDER_WAIT);
 		expect(refused.textContent).toContain("Nothing was reset.");

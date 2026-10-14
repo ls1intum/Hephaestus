@@ -14,13 +14,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Triggers commit metadata enrichment when new commits arrive via webhooks.
  *
- * <p>Listens for {@link ScmDomainEvent.CommitCreated} events and calls {@link
- * CommitMetadataEnrichmentService#enrichCommitMetadata} to resolve multi-author contributor data,
- * signature details, and associated PR links.
+ * <p>Listens for {@link ScmDomainEvent.CommitCreated} events and calls
+ * {@link CommitMetadataEnrichmentService#enrichCommitMetadata} to resolve
+ * multi-author contributor data, signature details, and associated PR links.
  *
- * <p>Only fires for <em>webhook</em>-originated events. Sync-originated commits are already
- * enriched by {@code GitHubDataSyncService} at the end of each sync cycle, so triggering enrichment
- * again would be redundant.
+ * <p>Only fires for <em>webhook</em>-originated events. Sync-originated commits
+ * are already enriched by {@code GitHubDataSyncService} at the end of each sync
+ * cycle, so triggering enrichment again would be redundant.
  */
 @Slf4j
 @RequiredArgsConstructor

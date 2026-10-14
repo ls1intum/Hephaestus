@@ -9,15 +9,15 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.config.SpringAsyncConfig;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -113,17 +113,18 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
                 .saveAndFlush(new IdentityProvider(type, "https://" + unique + ".example.com"))
                 .getId());
         repositoryId = Objects.requireNonNull(jdbc.queryForObject("""
-                INSERT INTO repository(native_id,provider_id,name,name_with_owner,has_discussions_enabled,is_private,is_archived,is_disabled,html_url,pushed_at,visibility)
-                VALUES (1,?,'repo',?,false,false,false,false,'https://example.com/repo',now(),'PUBLIC') RETURNING id
-                """, Long.class, providerId, "repair/" + unique));
+            INSERT INTO repository(native_id,provider_id,name,name_with_owner,has_discussions_enabled,is_private,is_archived,is_disabled,html_url,pushed_at,visibility)
+            VALUES (1,?,'repo',?,false,false,false,false,'https://example.com/repo',now(),'PUBLIC') RETURNING id
+            """, Long.class, providerId, "repair/" + unique));
         monitorId = Objects.requireNonNull(jdbc.queryForObject("""
-                INSERT INTO repository_to_monitor(workspace_id,name_with_owner,native_id,generated_paths)
-                VALUES (?,?,1,'[]') RETURNING id
-                """, Long.class, workspaceId, "repair/" + unique));
+            INSERT INTO repository_to_monitor(workspace_id,name_with_owner,native_id,generated_paths)
+            VALUES (?,?,1,'[]') RETURNING id
+            """, Long.class, workspaceId, "repair/" + unique));
         authorId = author(2, "author");
         actorSelector = mock(WorkspaceActorSelector.class);
         when(actorSelector.connectedProviderId(workspaceId)).thenReturn(Optional.of(providerId));
-        reconciler = new ActivityLedgerReconciler(ledgerRepository, new ActivityPersonWriteAdmission(users, fence), transactions, actorSelector);
+        reconciler = new ActivityLedgerReconciler(
+                ledgerRepository, new ActivityPersonWriteAdmission(users, fence), transactions, actorSelector);
     }
 
     private long author(long nativeId, String login) {
@@ -151,10 +152,10 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
     private long review(long pr, String state, long nativeId) {
         return Objects.requireNonNull(
                 jdbc.queryForObject("""
-                INSERT INTO pull_request_review(native_id,provider_id,pull_request_id,
-                    author_id,submitted_at,state,is_dismissed,body)
-                VALUES (?,?,?, ?,?,?,false,'') RETURNING id
-                """, Long.class, nativeId, providerId, pr, authorId, Timestamp.from(at), state));
+                    INSERT INTO pull_request_review(native_id,provider_id,pull_request_id,
+                        author_id,submitted_at,state,is_dismissed,body)
+                    VALUES (?,?,?, ?,?,?,false,'') RETURNING id
+                    """, Long.class, nativeId, providerId, pr, authorId, Timestamp.from(at), state));
     }
 
     @ParameterizedTest
@@ -260,9 +261,9 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         long replyReview = review(pr, "COMMENTED", 21);
         jdbc.update("UPDATE pull_request_review SET author_id=?,body=? WHERE id=?", replyAuthor, body, replyReview);
         long thread = Objects.requireNonNull(jdbc.queryForObject("""
-                INSERT INTO pull_request_review_thread(native_id,provider_id,pull_request_id)
-                VALUES (1,?,?) RETURNING id
-                """, Long.class, providerId, pr));
+            INSERT INTO pull_request_review_thread(native_id,provider_id,pull_request_id)
+            VALUES (1,?,?) RETURNING id
+            """, Long.class, providerId, pr));
         long root = reviewComment(pr, rootReview, thread, 30, null);
         long reply = reviewComment(pr, replyReview, thread, 31, root);
         jdbc.update("UPDATE pull_request_review_comment SET author_id=? WHERE id=?", replyAuthor, reply);
@@ -293,9 +294,9 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
                 .containsExactlyInAnyOrder(root, reply);
         long comment = Objects.requireNonNull(
                 jdbc.queryForObject("""
-                INSERT INTO issue_comment(native_id,provider_id,issue_id,author_id,created_at,body,html_url)
-                VALUES (1,?,?,?,?,'Discussion','https://example.com/comment') RETURNING id
-                """, Long.class, providerId, pr, authorId, Timestamp.from(at)));
+                    INSERT INTO issue_comment(native_id,provider_id,issue_id,author_id,created_at,body,html_url)
+                    VALUES (1,?,?,?,?,'Discussion','https://example.com/comment') RETURNING id
+                    """, Long.class, providerId, pr, authorId, Timestamp.from(at)));
         assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isEqualTo(1);
         assertThat(jdbc.queryForList(
                         "SELECT event_key FROM activity_event WHERE workspace_id=? AND target_type='issue_comment'",
@@ -315,7 +316,8 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
             writerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
             return fence.holdForWrite(invocation.getArgument(0));
         });
-        reconciler = new ActivityLedgerReconciler(ledgerRepository, new ActivityPersonWriteAdmission(users, observedFence), transactions, actorSelector);
+        reconciler = new ActivityLedgerReconciler(
+                ledgerRepository, new ActivityPersonWriteAdmission(users, observedFence), transactions, actorSelector);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var eraser = executor.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
                 fence.holdForErasure(List.of(new PersonIdentity(providerId, "2", null)));
@@ -326,12 +328,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
                     Thread.currentThread().interrupt();
                     throw new IllegalStateException(e);
                 }
-                jdbc.update(
-                        "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
-                        UUID.randomUUID(),
-                        providerId,
-                        "2",
-                        "");
+                databaseTestUtils.erase(providerId, "2", "");
             }));
             try {
                 assertThat(locked.await(10, TimeUnit.SECONDS)).isTrue();
@@ -339,7 +336,8 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
                 await().atMost(Duration.ofSeconds(10))
                         .until(() -> writerPid.get() != 0
                                 && Boolean.TRUE.equals(jdbc.queryForObject(
-                                        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=? AND wait_event='advisory')",
+                                        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=? AND"
+                                                + " wait_event='advisory')",
                                         Boolean.class,
                                         writerPid.get())));
                 release.countDown();
@@ -360,12 +358,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         long otherAuthor = author(3, "other");
         long deleted = issue("ISSUE", 3, otherAuthor);
         jdbc.update("UPDATE issue SET deleted_at=now() WHERE id=?", deleted);
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
-                UUID.randomUUID(),
-                providerId,
-                "2",
-                "");
+        databaseTestUtils.erase(providerId, "2", "");
         assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isZero();
         assertThat(jdbc.queryForList("SELECT id FROM activity_event WHERE workspace_id=?", UUID.class, workspaceId))
                 .isEmpty();
@@ -424,9 +417,9 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE issue SET number=9,deleted_at=now() WHERE id=?", retired);
         long comment = Objects.requireNonNull(
                 jdbc.queryForObject("""
-                INSERT INTO issue_comment(native_id,provider_id,issue_id,author_id,created_at,body,html_url)
-                VALUES (1,?,?,?,?,'Discussion','https://example.com/comment') RETURNING id
-                """, Long.class, providerId, retired, authorId, Timestamp.from(at)));
+                    INSERT INTO issue_comment(native_id,provider_id,issue_id,author_id,created_at,body,html_url)
+                    VALUES (1,?,?,?,?,'Discussion','https://example.com/comment') RETURNING id
+                    """, Long.class, providerId, retired, authorId, Timestamp.from(at)));
         String retiredComment = event(workspaceId, ActivityEventType.COMMENT_CREATED, "issue_comment", comment);
         var issueFacts = List.of(
                 event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", sibling),
@@ -467,12 +460,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         jdbc.update("UPDATE issue SET state='CLOSED',closed_at=NULL WHERE id=?", converted);
         long suppressedAuthor = author(5, "suppressed");
         long hidden = issue("PULL_REQUEST", 2, suppressedAuthor);
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
-                UUID.randomUUID(),
-                providerId,
-                "5",
-                "");
+        databaseTestUtils.erase(providerId, "5", "");
         long gone = issue("ISSUE", 3, authorId);
         jdbc.update("UPDATE issue SET deleted_at=now() WHERE id=?", gone);
         event(workspaceId, ActivityEventType.ISSUE_CREATED, "issue", converted);
@@ -495,11 +483,11 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldRepairAcrossChunkBoundariesWithoutDuplicatingChangedTimestamps() {
         jdbc.update("""
-                INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
-                    author_id,created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
-                SELECT 'PULL_REQUEST',n,?,?,n,?,?,'OPEN',0,false,false,'Work',false,0,0,0,0
-                FROM generate_series(1,1001) n
-                """, providerId, repositoryId, authorId, Timestamp.from(at));
+            INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
+                author_id,created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
+            SELECT 'PULL_REQUEST',n,?,?,n,?,?,'OPEN',0,false,false,'Work',false,0,0,0,0
+            FROM generate_series(1,1001) n
+            """, providerId, repositoryId, authorId, Timestamp.from(at));
         assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isEqualTo(1001);
         jdbc.update("UPDATE issue SET created_at=created_at + interval '1 second' WHERE repository_id=?", repositoryId);
         assertThat(reconciler.reconcileRepository(workspaceId, repositoryId)).isZero();
@@ -519,7 +507,8 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
                         workspaceId))
                 .containsExactly("REVIEW_COMMENTED");
         jdbc.update(
-                "UPDATE activity_event SET event_type='REVIEW_APPROVED',event_key=? WHERE workspace_id=? AND target_id=? AND target_type='review'",
+                "UPDATE activity_event SET event_type='REVIEW_APPROVED',event_key=? WHERE workspace_id=? AND"
+                        + " target_id=? AND target_type='review'",
                 ActivityEvent.buildKey(ActivityEventType.REVIEW_APPROVED, review, at),
                 workspaceId,
                 review);
@@ -534,13 +523,15 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldNotRestartTheSameCoverageGapAfterAnotherCompletedScan() {
         jdbc.update(
-                "UPDATE repository_to_monitor SET pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0 WHERE id=?",
+                "UPDATE repository_to_monitor SET"
+                        + " pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0 WHERE id=?",
                 monitorId);
         var tx = new TransactionTemplate(transactions);
         assertThat(tx.<Integer>execute(status -> monitors.restartCompletedBackfill(workspaceId, monitorId, 100, 0)))
                 .isEqualTo(1);
         jdbc.update(
-                "UPDATE repository_to_monitor SET pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0 WHERE id=?",
+                "UPDATE repository_to_monitor SET"
+                        + " pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0 WHERE id=?",
                 monitorId);
         assertThat(tx.<Integer>execute(status -> monitors.restartCompletedBackfill(workspaceId, monitorId, 100, 0)))
                 .isZero();
@@ -555,7 +546,8 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldKeepHistoryResetWhenAnEarlierRecentSyncSnapshotIsSaved() {
         jdbc.update(
-                "UPDATE repository_to_monitor SET pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0 WHERE id=?",
+                "UPDATE repository_to_monitor SET"
+                        + " pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0 WHERE id=?",
                 monitorId);
         var reset = new TransactionTemplate(transactions);
         reset.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -580,10 +572,10 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldRestartOnlyTheCompletedMonitorInThisWorkspace() {
         jdbc.update("""
-                UPDATE repository_to_monitor SET issue_backfill_high_water_mark=900,issue_backfill_checkpoint=0,
-                    pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0,
-                    pull_request_sync_cursor='stale',pull_requests_synced_at=? WHERE id=?
-                """, Timestamp.from(at), monitorId);
+            UPDATE repository_to_monitor SET issue_backfill_high_water_mark=900,issue_backfill_checkpoint=0,
+                pull_request_backfill_high_water_mark=950,pull_request_backfill_checkpoint=0,
+                pull_request_sync_cursor='stale',pull_requests_synced_at=? WHERE id=?
+            """, Timestamp.from(at), monitorId);
         var tx = new TransactionTemplate(transactions);
         assertThat(tx.<Integer>execute(
                         status -> monitors.restartCompletedBackfill(workspaceId + 10000, monitorId, 950, 0)))

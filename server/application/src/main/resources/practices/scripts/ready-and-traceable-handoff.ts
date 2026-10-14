@@ -1,8 +1,9 @@
-import { readCommits } from "../kits/scm/change.ts";
-import { scm, expectKind } from "../kits/scm/index.ts";
-import { branchIssueReferences, issueNumberReferences } from "../kits/scm/references.ts";
 // Finds the issue references of the handoff and counts its checklist. The review judges readiness
 // from the captured handoff.
+import { readCapturedCommits } from "../kits/scm/change.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { branchIssueReferences, issueNumberReferences } from "../kits/scm/references.ts";
+import { checkableItems } from "../kits/scm/review.ts";
 import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
@@ -18,8 +19,8 @@ export default definePracticeScript({
 		const directions: string[] = [];
 
 		// Traceability: does the handoff reference a motivating issue at all?
-		const commits = await readCommits(ctx.evidence);
-		const body = `${description}\n${commits.map((c) => c.message).join("\n")}`;
+		const commits = await readCapturedCommits(ctx.evidence);
+		const body = `${description}\n${(commits ?? []).map((c) => c.message).join("\n")}`;
 		const branch = domain.item.source_branch;
 		const quotedBranch = oneLine(branch, BRANCH_CHARS);
 		const bodyRefs = new Set(issueNumberReferences(body).map((n) => `#${n}`));
@@ -37,15 +38,18 @@ export default definePracticeScript({
 			);
 		} else {
 			directions.push(
-				`Traceability fact: no issue reference (#N, 'Refs #N', closing keyword, or issue-number branch prefix) was found in the body, the ${commits.length} commit message(s), or branch '${quotedBranch}'.`,
+				commits === null
+					? `Traceability fact: no issue reference (#N, 'Refs #N', closing keyword, or issue-number branch prefix) was found in the body or branch '${quotedBranch}'. The commits were not captured, so their messages were not searched.`
+					: `Traceability fact: no issue reference (#N, 'Refs #N', closing keyword, or issue-number branch prefix) was found in the body, the ${commits.length} commit message(s), or branch '${quotedBranch}'.`,
 				"Confirm in the body before concluding the handoff is untraceable.",
 			);
 		}
 
 		// Readiness: the checklist as written, counted, so a tick is never guessed at. The counts cannot
 		// say whose lines they are; the review reads that from the description.
-		const ticked = (description.match(/^\s*[-*+]\s*\[[xX]\]/gmu) ?? []).length;
-		const unticked = (description.match(/^\s*[-*+]\s*\[ \]/gmu) ?? []).length;
+		const items = checkableItems(description);
+		const ticked = items.filter((item) => item.checked).length;
+		const unticked = items.length - ticked;
 		if (ticked + unticked > 0) {
 			directions.push(
 				`Checklist fact: the description carries ${ticked} ticked and ${unticked} unticked checkbox line(s). These counts say neither whose lines they are nor what was done.`,
@@ -58,7 +62,7 @@ export default definePracticeScript({
 			leads: [],
 			facts: {
 				issueMentionSyntaxCandidateCount: allRefs.size,
-				commitCount: commits.length,
+				...(commits === null ? {} : { commitCount: commits.length }),
 				checklistTicked: ticked,
 				checklistUnticked: unticked,
 			},

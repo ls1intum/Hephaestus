@@ -3,7 +3,6 @@ import test from "node:test";
 
 import {
 	readCapturedCommits,
-	readCommits,
 	type ChangedFile,
 } from "../../../../../../docker/agents/practice-scripts/kits/scm/change.ts";
 import { subjectFacts } from "../../../../../../docker/agents/practice-scripts/kits/scm/commit-subjects.ts";
@@ -26,7 +25,6 @@ void test("captured commits distinguish empty history from missing or malformed 
 	assert.equal(await readCapturedCommits(evidence()), null);
 	for (const source of ["{", '{"commits":[null]}', '{"commits":{}}', '{"commits":[{}]}']) {
 		assert.equal(await readCapturedCommits(evidence(source)), null);
-		assert.deepEqual(await readCommits(evidence(source)), []);
 	}
 	assert.deepEqual(await readCapturedCommits(evidence('{"commits":[]}')), []);
 	const captured = await readCapturedCommits(

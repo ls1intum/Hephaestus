@@ -146,7 +146,7 @@ export const CodeSourceKeepsItsLines: Story = {
 /**
  * One changed line, cited from both sides of the diff: one block naming the file, with what the
  * line was above what it became. The caption names no line range, because each side sits at its
- * own coordinates in its own revision and the block shows both.
+ * own coordinates in its own commit and the block shows both.
  */
 export const OneChangedLine: Story = {
 	args: {
@@ -238,7 +238,7 @@ export const HistoricalSource: Story = {
 			startLine: 12,
 			endLine: 12,
 			sourceKind: "scm.repository.tree",
-			revision: "b".repeat(40),
+			commit: "b".repeat(40),
 			snippet: "return previousValue;",
 		},
 	},

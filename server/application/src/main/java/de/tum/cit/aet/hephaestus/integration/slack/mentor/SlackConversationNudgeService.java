@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
-import de.tum.cit.aet.hephaestus.practices.feedback.delivery.ConversationFeedbackPreparedEvent;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackPreparedEvent;
 import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import java.time.Duration;
 import java.time.Instant;

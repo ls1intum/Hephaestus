@@ -8,22 +8,19 @@ import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 @Component
+@Order(20)
 @ConditionalOnServerRole
 @RequiredArgsConstructor
 @WorkspaceAgnostic("Moves product attribution for two globally locked, verified accounts during absorption")
 public class ResultAccountAbsorptionContributor implements AccountAbsorptionContributor {
     private final JdbcClient jdbc;
     private final Clock clock;
-
-    @Override
-    public int order() {
-        return 20;
-    }
 
     @Override
     @Transactional

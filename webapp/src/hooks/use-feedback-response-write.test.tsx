@@ -9,7 +9,7 @@ import {
 	getOwnPracticePageFeedbackQueryKey,
 	getOwnResultQueryKey,
 	getReviewFeedbackQueryKey,
-	getPracticeProfileOverviewQueryKey,
+	getOwnPracticeProfileOverviewQueryKey,
 	listOwnGroupReviewsInfiniteQueryKey,
 	listOwnItemReviewsInfiniteQueryKey,
 	listOwnResultsQueryKey,
@@ -165,7 +165,7 @@ describe("useFeedbackResponseWrite", () => {
 		const carriers: QueryKey[] = [
 			getOwnPracticePageFeedbackQueryKey({ path }),
 			getOwnFeedbackResolutionCountsQueryKey({ path }),
-			getPracticeProfileOverviewQueryKey({ path }),
+			getOwnPracticeProfileOverviewQueryKey({ path }),
 			listOwnGroupReviewsInfiniteQueryKey({ path: { ...path, groupSlug: "packaging" } }),
 			listOwnReviewsInfiniteQueryKey({ path, query: { size: 25 } }),
 			listOwnItemReviewsInfiniteQueryKey({ path: { ...path, itemId: "1423" } }),

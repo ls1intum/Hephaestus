@@ -161,7 +161,8 @@ public class PracticeVersionService {
     public List<PracticeVersionDTO> history(Practice practice) {
         List<PracticeVersionDTO> history = new ArrayList<>();
         PracticeVersion previous = null;
-        for (PracticeVersion version : versions.findByPracticeIdOrderByNumberAsc(practice.getId())) {
+        for (PracticeVersion version :
+                versions.findByWorkspaceIdAndPracticeIdOrderByNumberAsc(practice.getWorkspaceId(), practice.getId())) {
             history.add(view(version, previous, createdBy(version)));
             previous = version;
         }

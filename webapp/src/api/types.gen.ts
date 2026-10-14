@@ -2708,6 +2708,63 @@ export type PageResponseDtoConfigAuditEntryView = {
  * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
+export type PageResponseDtoItemEvent = {
+    content: Array<ItemEvent>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoItemRef = {
+    content: Array<ItemRef>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoProfileReview = {
+    content: Array<ProfileReview>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
 export type PageResponseDtoResultList = {
     content: Array<ResultList>;
     empty: boolean;
@@ -2727,8 +2784,103 @@ export type PageResponseDtoResultList = {
  * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
+export type PageResponseDtoReviewBatch = {
+    content: Array<ReviewBatch>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
 export type PageResponseDtoReviewFeedback = {
     content: Array<ReviewFeedback>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewProblem = {
+    content: Array<ReviewProblem>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewResult = {
+    content: Array<ReviewResult>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoReviewSummary = {
+    content: Array<ReviewSummary>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoScanSummary = {
+    content: Array<ScanSummary>;
     empty: boolean;
     first: boolean;
     last: boolean;
@@ -2790,46 +2942,6 @@ export type Pageable = {
 
 export type PagedModelFeedbackItem = {
     content?: Array<FeedbackItem>;
-    page?: PageMetadata;
-};
-
-export type PagedModelItemEvent = {
-    content?: Array<ItemEvent>;
-    page?: PageMetadata;
-};
-
-export type PagedModelItemRef = {
-    content?: Array<ItemRef>;
-    page?: PageMetadata;
-};
-
-export type PagedModelProfileReview = {
-    content?: Array<ProfileReview>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewBatch = {
-    content?: Array<ReviewBatch>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewProblem = {
-    content?: Array<ReviewProblem>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewResult = {
-    content?: Array<ReviewResult>;
-    page?: PageMetadata;
-};
-
-export type PagedModelReviewSummary = {
-    content?: Array<ReviewSummary>;
-    page?: PageMetadata;
-};
-
-export type PagedModelScanSummary = {
-    content?: Array<ScanSummary>;
     page?: PageMetadata;
 };
 
@@ -4298,7 +4410,7 @@ export type ReviewResultDetail = {
 };
 
 export type ReviewRuntime = {
-    jobs?: Array<ReviewJob>;
+    jobs: Array<ReviewJob>;
 };
 
 export type ReviewSchedule = {
@@ -10935,7 +11047,7 @@ export type ReorderPracticeGroupsResponses = {
 
 export type ReorderPracticeGroupsResponse = ReorderPracticeGroupsResponses[keyof ReorderPracticeGroupsResponses];
 
-export type ListPracticeGroupStandingsData = {
+export type GetOwnGroupStandingsData = {
     body?: never;
     path: {
         /**
@@ -10947,14 +11059,14 @@ export type ListPracticeGroupStandingsData = {
     url: '/workspaces/{workspaceSlug}/practice-groups/standings';
 };
 
-export type ListPracticeGroupStandingsResponses = {
+export type GetOwnGroupStandingsResponses = {
     /**
      * Practice group standings returned
      */
     200: Array<PracticeGroupStanding>;
 };
 
-export type ListPracticeGroupStandingsResponse = ListPracticeGroupStandingsResponses[keyof ListPracticeGroupStandingsResponses];
+export type GetOwnGroupStandingsResponse = GetOwnGroupStandingsResponses[keyof GetOwnGroupStandingsResponses];
 
 export type DeletePracticeGroupData = {
     body?: never;
@@ -11091,12 +11203,12 @@ export type ListOwnGroupReviewsResponses = {
     /**
      * OK
      */
-    200: PagedModelProfileReview;
+    200: PageResponseDtoProfileReview;
 };
 
 export type ListOwnGroupReviewsResponse = ListOwnGroupReviewsResponses[keyof ListOwnGroupReviewsResponses];
 
-export type GetPracticeProfileOverviewData = {
+export type GetOwnPracticeProfileOverviewData = {
     body?: never;
     path: {
         /**
@@ -11108,14 +11220,14 @@ export type GetPracticeProfileOverviewData = {
     url: '/workspaces/{workspaceSlug}/practice-profile/overview';
 };
 
-export type GetPracticeProfileOverviewResponses = {
+export type GetOwnPracticeProfileOverviewResponses = {
     /**
      * Practice profile overview returned
      */
     200: PracticeProfileOverview;
 };
 
-export type GetPracticeProfileOverviewResponse = GetPracticeProfileOverviewResponses[keyof GetPracticeProfileOverviewResponses];
+export type GetOwnPracticeProfileOverviewResponse = GetOwnPracticeProfileOverviewResponses[keyof GetOwnPracticeProfileOverviewResponses];
 
 export type ListOwnReviewsData = {
     body?: never;
@@ -11138,7 +11250,7 @@ export type ListOwnReviewsResponses = {
     /**
      * OK
      */
-    200: PagedModelProfileReview;
+    200: PageResponseDtoProfileReview;
 };
 
 export type ListOwnReviewsResponse = ListOwnReviewsResponses[keyof ListOwnReviewsResponses];
@@ -11340,8 +11452,10 @@ export type ClearOwnFeedbackResponseResponses = {
     /**
      * Complete cleared response returned
      */
-    200: unknown;
+    200: FeedbackResponse;
 };
+
+export type ClearOwnFeedbackResponseResponse = ClearOwnFeedbackResponseResponses[keyof ClearOwnFeedbackResponseResponses];
 
 export type GetOwnFeedbackResponseData = {
     body?: never;
@@ -11365,10 +11479,12 @@ export type GetOwnFeedbackResponseErrors = {
 
 export type GetOwnFeedbackResponseResponses = {
     /**
-     * No response is currently recorded
+     * Complete current response returned
      */
-    200: unknown;
+    200: FeedbackResponse;
 };
+
+export type GetOwnFeedbackResponseResponse = GetOwnFeedbackResponseResponses[keyof GetOwnFeedbackResponseResponses];
 
 export type ReplaceOwnFeedbackResponseData = {
     body: FeedbackResponseRequest;
@@ -11427,7 +11543,7 @@ export type ListReviewItemsResponses = {
     /**
      * OK
      */
-    200: PagedModelItemRef;
+    200: PageResponseDtoItemRef;
 };
 
 export type ListReviewItemsResponse = ListReviewItemsResponses[keyof ListReviewItemsResponses];
@@ -11474,7 +11590,7 @@ export type ListItemEventsResponses = {
     /**
      * OK
      */
-    200: PagedModelItemEvent;
+    200: PageResponseDtoItemEvent;
 };
 
 export type ListItemEventsResponse = ListItemEventsResponses[keyof ListItemEventsResponses];
@@ -11545,7 +11661,7 @@ export type ListOwnItemReviewsResponses = {
     /**
      * OK
      */
-    200: PagedModelProfileReview;
+    200: PageResponseDtoProfileReview;
 };
 
 export type ListOwnItemReviewsResponse = ListOwnItemReviewsResponses[keyof ListOwnItemReviewsResponses];
@@ -11808,7 +11924,7 @@ export type ListReviewBatchesResponses = {
     /**
      * OK
      */
-    200: PagedModelReviewBatch;
+    200: PageResponseDtoReviewBatch;
 };
 
 export type ListReviewBatchesResponse = ListReviewBatchesResponses[keyof ListReviewBatchesResponses];
@@ -11827,9 +11943,9 @@ export type CreateReviewBatchData = {
 
 export type CreateReviewBatchResponses = {
     /**
-     * OK
+     * Created
      */
-    200: ReviewBatch;
+    201: ReviewBatch;
 };
 
 export type CreateReviewBatchResponse = CreateReviewBatchResponses[keyof CreateReviewBatchResponses];
@@ -11980,9 +12096,9 @@ export type CreateReviewScheduleData = {
 
 export type CreateReviewScheduleResponses = {
     /**
-     * OK
+     * Created
      */
-    200: ReviewSchedule;
+    201: ReviewSchedule;
 };
 
 export type CreateReviewScheduleResponse = CreateReviewScheduleResponses[keyof CreateReviewScheduleResponses];
@@ -12005,10 +12121,12 @@ export type DeleteReviewScheduleData = {
 
 export type DeleteReviewScheduleResponses = {
     /**
-     * OK
+     * Deleted
      */
-    200: unknown;
+    204: void;
 };
+
+export type DeleteReviewScheduleResponse = DeleteReviewScheduleResponses[keyof DeleteReviewScheduleResponses];
 
 export type SetReviewScheduleEnabledData = {
     body: SetReviewScheduleEnabledRequest;
@@ -12184,7 +12302,7 @@ export type ListReviewsResponses = {
     /**
      * Paginated review summaries returned
      */
-    200: PagedModelReviewSummary;
+    200: PageResponseDtoReviewSummary;
 };
 
 export type ListReviewsResponse = ListReviewsResponses[keyof ListReviewsResponses];
@@ -12382,9 +12500,9 @@ export type CreateFeedbackDecisionData = {
 
 export type CreateFeedbackDecisionResponses = {
     /**
-     * OK
+     * Feedback decision recorded
      */
-    200: FeedbackDecision;
+    201: FeedbackDecision;
 };
 
 export type CreateFeedbackDecisionResponse = CreateFeedbackDecisionResponses[keyof CreateFeedbackDecisionResponses];
@@ -12404,9 +12522,9 @@ export type RetryFeedbackData = {
 
 export type RetryFeedbackResponses = {
     /**
-     * OK
+     * Feedback retry accepted
      */
-    200: ReviewFeedbackDetail;
+    202: ReviewFeedbackDetail;
 };
 
 export type RetryFeedbackResponse = RetryFeedbackResponses[keyof RetryFeedbackResponses];
@@ -12522,7 +12640,7 @@ export type ListReviewProblemsResponses = {
     /**
      * OK
      */
-    200: PagedModelReviewProblem;
+    200: PageResponseDtoReviewProblem;
 };
 
 export type ListReviewProblemsResponse = ListReviewProblemsResponses[keyof ListReviewProblemsResponses];
@@ -12604,7 +12722,7 @@ export type ListReviewResultsResponses = {
     /**
      * OK
      */
-    200: PagedModelReviewResult;
+    200: PageResponseDtoReviewResult;
 };
 
 export type ListReviewResultsResponse = ListReviewResultsResponses[keyof ListReviewResultsResponses];
@@ -12668,9 +12786,9 @@ export type CreateResultMarkData = {
 
 export type CreateResultMarkResponses = {
     /**
-     * OK
+     * Created
      */
-    200: ResultMark;
+    201: ResultMark;
 };
 
 export type CreateResultMarkResponse = CreateResultMarkResponses[keyof CreateResultMarkResponses];
@@ -12778,9 +12896,13 @@ export type CancelReviewData = {
 
 export type CancelReviewResponses = {
     /**
-     * OK
+     * Completed
      */
     200: Review;
+    /**
+     * Accepted
+     */
+    202: Review;
 };
 
 export type CancelReviewResponse = CancelReviewResponses[keyof CancelReviewResponses];
@@ -12872,7 +12994,7 @@ export type ListScansResponses = {
     /**
      * OK
      */
-    200: PagedModelScanSummary;
+    200: PageResponseDtoScanSummary;
 };
 
 export type ListScansResponse = ListScansResponses[keyof ListScansResponses];
@@ -12894,9 +13016,9 @@ export type StartScanData = {
 
 export type StartScanResponses = {
     /**
-     * OK
+     * Accepted
      */
-    200: ScanSummary;
+    202: ScanSummary;
 };
 
 export type StartScanResponse = StartScanResponses[keyof StartScanResponses];
@@ -13027,7 +13149,7 @@ export type ExportScanSarifResponses = {
 
 export type ExportScanSarifResponse = ExportScanSarifResponses[keyof ExportScanSarifResponses];
 
-export type CancelScanData = {
+export type UpdateScanStatusData = {
     body: CancelScanRequest;
     path: {
         /**
@@ -13040,16 +13162,20 @@ export type CancelScanData = {
     url: '/workspaces/{workspaceSlug}/practices/scans/{scanId}/status';
 };
 
-export type CancelScanResponses = {
+export type UpdateScanStatusResponses = {
     /**
-     * OK
+     * Completed
      */
     200: ScanDetail;
+    /**
+     * Accepted
+     */
+    202: ScanDetail;
 };
 
-export type CancelScanResponse = CancelScanResponses[keyof CancelScanResponses];
+export type UpdateScanStatusResponse = UpdateScanStatusResponses[keyof UpdateScanStatusResponses];
 
-export type ListPracticeStandingsData = {
+export type GetOwnPracticeStandingsData = {
     body?: never;
     path: {
         /**
@@ -13061,14 +13187,14 @@ export type ListPracticeStandingsData = {
     url: '/workspaces/{workspaceSlug}/practices/standings';
 };
 
-export type ListPracticeStandingsResponses = {
+export type GetOwnPracticeStandingsResponses = {
     /**
      * Practice standings returned
      */
     200: Array<PracticeStanding>;
 };
 
-export type ListPracticeStandingsResponse = ListPracticeStandingsResponses[keyof ListPracticeStandingsResponses];
+export type GetOwnPracticeStandingsResponse = GetOwnPracticeStandingsResponses[keyof GetOwnPracticeStandingsResponses];
 
 export type GetPracticeWorkspaceTilesData = {
     body?: never;
@@ -13265,7 +13391,7 @@ export type GetPracticeGuidanceData = {
 
 export type GetPracticeGuidanceResponses = {
     /**
-     * OK
+     * Practice guidance
      */
     200: PracticeGuidanceDto;
 };

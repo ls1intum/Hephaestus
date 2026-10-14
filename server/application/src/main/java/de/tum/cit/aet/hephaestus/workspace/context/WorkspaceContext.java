@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  * @param displayName Workspace display name
  * @param accountType GitHub account type (ORG or USER)
  * @param installationId GitHub App installation ID (nullable; pulled from the active {@code GITHUB}
- *     Connection by the resolver — Workspace no longer carries the column directly)
+ *     connection by the resolver)
  * @param roles Set of workspace roles for the current user
  */
 public record WorkspaceContext(

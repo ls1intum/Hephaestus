@@ -30,7 +30,7 @@ public record ConfigAuditFilter(
         return entityTypes.stream()
                 .flatMap(value -> switch (value) {
                     case PRACTICE_GROUP -> Stream.of("PRACTICE_GROUP", "PRACTICE_AREA");
-                    case CURATED_PRACTICE_GROUP -> Stream.of("CURATED_PRACTICE_GROUP", "CURATED_PRACTICE_AREA");
+                    case CATALOG_GROUP -> Stream.of("CATALOG_GROUP", "CATALOG_PRACTICE_AREA");
                     default -> Stream.of(value.name());
                 })
                 .toArray(String[]::new);

@@ -1,11 +1,11 @@
 import { ChevronsDownUpIcon, ChevronsUpDownIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import type { AgentJob, ReviewLineage } from "@/api/types.gen";
+import type { ReviewDetail, ReviewLineage } from "@/api/types.gen";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { useNow } from "@/components/common/use-now";
-import type { ResultOrigin } from "@/components/practice-vocabulary/result-origin-defs";
+import type { ReviewOrigin } from "@/components/practice-vocabulary/review-origin-defs";
 import { Button } from "@/components/ui/button";
 import {
 	Select,
@@ -19,7 +19,12 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { formatWeekdayDay } from "@/lib/dates";
 
 import { TermSentence } from "./GlossaryTerm";
-import type { NumberedById, NumberedResult } from "./lineage-chain";
+import {
+	type LineageRecords,
+	lineageRecords,
+	type NumberedById,
+	type NumberedResult,
+} from "./lineage-chain";
 import {
 	feedbackLetters,
 	type RailItem,
@@ -31,9 +36,9 @@ import {
 } from "./lineage-story";
 import { connectorLanes, laneGutter, LineageConnectors } from "./LineageConnectors";
 import { LineageDay, LineageTimes } from "./LineageStep";
-import { type RecordRef, workRecord } from "./review-layers";
-import { type TraceNode, tracedBy, traceStepKey } from "./review-trace";
-import { mergedAtOf, traceBottleneck, traceSpans } from "./trace-bottleneck";
+import type { RecordRef } from "./review-layers";
+import { chainReview, type TraceNode, tracedBy, traceStepKey } from "./review-trace";
+import { traceBottleneck, traceSpans } from "./trace-bottleneck";
 import {
 	DEFAULT_TRACE_DISPLAY,
 	TRACE_DISPLAY_PARTS,
@@ -57,7 +62,7 @@ import { traceStepFacts } from "./TraceStepFacts";
 import { type StoryContext, StoryNodes } from "./TraceStoryNode";
 
 export interface ReviewLineageGraphProps {
-	/** The chain the trace tells, from `getPracticeReviewLineage` with `whole`. */
+	/** The chain the trace tells, from `getReviewLineage`. */
 	lineage: PanelState<{ lineage: ReviewLineage }>;
 	/**
 	 * The record the trace was opened for, marked "You started here" and ringed: its path is drawn
@@ -67,7 +72,7 @@ export interface ReviewLineageGraphProps {
 	here?: TraceNode;
 	/**
 	 * Opens a step's record over the trace: a result, a piece of feedback, the review, or the
-	 * work. Each record opens from one step; a moment, the count of results and the end open
+	 * item. Each record opens from one step; the start, the count of results and the end open
 	 * nothing. Absent, the steps are text.
 	 */
 	onOpen?: (record: RecordRef) => void;
@@ -81,28 +86,23 @@ export interface ReviewLineageGraphProps {
 	/** What of the chain is shown. Uncontrolled when absent. */
 	filter?: TraceFilter;
 	onFilterChange?: (filter: TraceFilter) => void;
-	/** Why a completed review assessed nothing, from the review itself. */
-	reviewOutcome?: AgentJob["reviewOutcome"];
 	/**
-	 * The review itself, as its sheet reads it. Where given, the review's times, model and outcome
-	 * and the time its feedback was first read come from it, so the trace and the sheet say the same.
+	 * The review itself, as its sheet reads it. Where it is the trace's review, the review's times,
+	 * model, start and runtime jobs come from it, so the trace and the sheet say the same.
 	 */
-	job?: AgentJob;
+	review?: ReviewDetail;
+	/** How the review came to run. Every result of the review shares it, so its step says it once. */
+	origin?: ReviewOrigin;
 	/**
-	 * How the review came to run, from its row: live, by hand or backfilled. Every result of
-	 * the review shares it, so the review's step says it once.
-	 */
-	origin?: ResultOrigin;
-	/**
-	 * Where the review stands among the reviews of its work, from its row: "Review 3 of 7 on this
-	 * work". Re-reviews of the same work are common, so the review's step says which one it is.
+	 * Where the review stands among the reviews of its item: "Review 3 of 7 on this work". Re-reviews
+	 * of the same work are common, so the review's step says which one it is.
 	 */
 	position?: { index: number; total: number };
 }
 
 /**
  * The trace of a record: its chain as one story read top to bottom in the order things happened —
- * the work and the moment that started the review, the review, its results as numbered verdict
+ * the work and the event that started the review, the review, its results as numbered verdict
  * dots or as a table of their own, the feedback written from them as a table with where each piece
  * went, how the developer answered and the results it came from, the merge wherever it fell,
  * and where the path ends. A sentence on top says what became of it.
@@ -132,42 +132,7 @@ export function ReviewLineageGraph({ lineage: state, ...props }: ReviewLineageGr
 			/>
 		);
 	}
-	return (
-		<Story
-			{...props}
-			lineage={withJob(state.lineage, props.job)}
-			// The lineage names the outcome itself, so the trace does not wait on the review's own read.
-			reviewOutcome={
-				props.job?.reviewOutcome ?? state.lineage.review?.outcome ?? props.reviewOutcome
-			}
-		/>
-	);
-}
-
-/**
- * The chain with its review's facts read from the review itself, where the trace has it: one
- * source for the times and the model the review's sheet shows.
- */
-function withJob(lineage: ReviewLineage, job: AgentJob | undefined): ReviewLineage {
-	const { review } = lineage;
-	const own = job !== undefined && review !== undefined && review.id === job.id ? job : undefined;
-	// The chain reads the merge from the pull request, which can miss it where the review or the
-	// merge moment on the work has it.
-	const workMergedAt = mergedAtOf(lineage, own);
-	if (own === undefined || review === undefined) {
-		return workMergedAt === lineage.workMergedAt ? lineage : { ...lineage, workMergedAt };
-	}
-	return {
-		...lineage,
-		workMergedAt,
-		review: {
-			...review,
-			createdAt: own.createdAt,
-			startedAt: own.startedAt,
-			finishedAt: own.completedAt,
-			model: own.model ?? review.model,
-		},
-	};
+	return <Story {...props} lineage={state.lineage} />;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -185,8 +150,7 @@ function Story({
 	onDisplayChange,
 	filter: filterProp,
 	onFilterChange,
-	reviewOutcome,
-	job,
+	review,
 	origin,
 	position,
 }: StoryProps) {
@@ -206,7 +170,6 @@ function Story({
 	};
 	const hereKey = here === undefined ? undefined : traceStepKey(here);
 	// The folded parts, opened one by one or all at once; none of them is a reading preference.
-	const [beforeOpen, setBeforeOpen] = useState(false);
 	const [othersOpen, setOthersOpen] = useState(false);
 	const [siblingsOpen, setSiblingsOpen] = useState(false);
 	const [factsOpen, setFactsOpen] = useState(false);
@@ -214,7 +177,6 @@ function Story({
 	// The results' table, opened or folded by hand; undefined follows what the reader shows.
 	const [tableOpen, setTableOpen] = useState<boolean | undefined>(undefined);
 	const setAllOpen = (open: boolean) => {
-		setBeforeOpen(open);
 		setOthersOpen(open);
 		setSiblingsOpen(open);
 		setFactsOpen(open);
@@ -225,52 +187,54 @@ function Story({
 	useReveal(rail, hereKey);
 
 	const lineage = filteredLineage(full, filter);
-	const { numbered, self } = storyResults(lineage, here, full);
+	const fullRecords = lineageRecords(full);
+	const records = lineageRecords(lineage);
+	const chain = chainReview(fullRecords);
+	// The review's own read, where it is the trace's review.
+	const ownReview = review !== undefined && review.id === chain?.id ? review : undefined;
+	const { numbered, self } = storyResults(records, here, fullRecords);
 	// A filter lists every step it leaves, and where the path folds away the record the reader
 	// started from — a sibling, a result drawn only as its dot — it is listed too.
 	const siblingsShown =
-		display.siblings || siblingsOpen || filtered || foldedOffPath(lineage, here, numbered, self);
+		display.siblings || siblingsOpen || filtered || foldedOffPath(records, here, numbered, self);
 	const byId: NumberedById = new Map(numbered.map((entry) => [entry.result.id, entry]));
-	const letters = feedbackLetters(full.feedback);
-	const told = storyFeedback(lineage, here, siblingsShown);
-	const path = siblingsShown ? undefined : pathResults(lineage, here, numbered, self);
+	const letters = feedbackLetters(fullRecords.feedback);
+	const told = storyFeedback(records, here, siblingsShown);
+	const path = siblingsShown ? undefined : pathResults(records, here, numbered, self);
 	// Every result is a row of the table where the reader opened it, where the siblings show, or
 	// where connectors need an end to start from. Folded, the table holds the path's own rows.
 	const listed = tableOpen ?? (siblingsShown || display.connections);
-	const expanded = beforeOpen && othersOpen && siblingsOpen && factsOpen && listed;
+	const expanded = othersOpen && siblingsOpen && factsOpen && listed;
 	const siblings: StorySiblings | undefined =
 		path === undefined
 			? undefined
-			: {
-					results: numbered.length + lineage.moreResults - path.length,
-					feedback: told.siblings.length + lineage.moreFeedback,
-				};
-	const stages = storyRail(lineage, told.shown, siblings);
-	const verdict = traceVerdict(full, here, reviewOutcome);
-	const { ownJob, bottleneck, spans } = pathTimes(full, here, job, now);
-	const traced = tracedBy(lineage, here);
+			: { results: numbered.length - path.length, feedback: told.siblings.length };
+	const stages = storyRail(records, told.shown, { startedBy: ownReview?.startedBy, siblings });
+	const verdict = traceVerdict(full, here);
+	const bottleneck = traceBottleneck(full, here, ownReview, now);
+	const spans = traceSpans(full, here, ownReview);
+	const traced = tracedBy(records, here);
 	const rows = resultRows(numbered, path, self, listed);
 	const lanes = display.connections ? connectorLanes(rows, told.shown) : [];
-	const hasStart = stages[0]?.items.some((item) => item.kind === "moment") ?? false;
-	const showBefore = beforeOpen;
+	const hasStart = stages[0]?.items.some((item) => item.kind === "start") ?? false;
 	const practices = tracePractices(full);
 
-	const work = full.work && workRecord(full.work.kind, full.work.id);
 	const recordOf = (node: TraceNode): RecordRef | undefined => {
 		switch (node.kind) {
-			// One step opens each record, once: a moment is part of the work, the count of results
-			// part of the review, and the end belongs to no record.
+			// One step opens each record, once: the count of results is part of the review, and the
+			// end belongs to no record.
 			case "work": {
-				return work;
+				return fullRecords.item === undefined
+					? undefined
+					: { kind: "item", id: fullRecords.item.id };
 			}
 			case "review": {
-				return full.review === undefined ? undefined : { kind: "review", id: full.review.id };
+				return chain === undefined ? undefined : { kind: "review", id: chain.id };
 			}
 			case "result":
 			case "feedback": {
 				return { kind: node.kind, id: node.id };
 			}
-			case "moment":
 			case "results":
 			case "end": {
 				return undefined;
@@ -287,32 +251,21 @@ function Story({
 				lineage: full,
 				node,
 				numbered,
-				letters,
 				here,
-				job: ownJob,
+				review: ownReview,
 				everyStep: factsOpen,
 			}),
 		display,
 		factsOpen,
-		firstReadAt: firstReadOf(job, full),
-		resultProcessing: resultProcessingOf(job, full),
 		origin,
-		job: ownJob,
+		review: ownReview,
 		position,
 		bottleneck,
 	};
 
-	const day = lineage.review?.createdAt ?? numbered[0]?.result.observedAt;
-	// A step's gap is from the step drawn above it with a time, and never runs backwards: the stages
-	// put the merge among the feedback even where it fell before a piece.
-	const drawn = stages.flatMap(({ items }) =>
-		items.flatMap((item) => {
-			if (item.kind !== "before") {
-				return [item];
-			}
-			return showBefore ? item.items : [];
-		}),
-	);
+	const day = chain?.createdAt ?? numbered[0]?.result.recordedAt;
+	// A step's gap is from the step drawn above it with a time, and never runs backwards.
+	const drawn = stages.flatMap(({ items }) => items);
 	const endAt = verdict.end.at ?? verdict.end.since;
 	const previousAt = (item: RailItem) => {
 		const index = drawn.indexOf(item);
@@ -320,7 +273,7 @@ function Story({
 		let earlier: Date | undefined;
 		for (const entry of drawn.slice(0, Math.max(index, 0))) {
 			// A review whose record is gone keeps its place on the rail, but has no time to count from.
-			const gone = entry.kind === "review" && full.review === undefined;
+			const gone = entry.kind === "review" && chain === undefined;
 			earlier = (gone ? undefined : entry.at) ?? earlier;
 		}
 		return at !== undefined && earlier !== undefined && earlier.getTime() <= at.getTime()
@@ -359,8 +312,8 @@ function Story({
 								aria-expanded={expanded}
 								title={
 									expanded
-										? "Fold what came before, the results, the siblings and the facts"
-										: "Open what came before, every result, the siblings and every step’s facts"
+										? "Fold the results, the siblings and the facts"
+										: "Open every result, the siblings and every step’s facts"
 								}
 								onClick={() => setAllOpen(!expanded)}
 							>
@@ -379,7 +332,6 @@ function Story({
 								<LineageConnectors
 									// Drawn again whenever what the rail lists changes; a resize it measures itself.
 									key={[
-										showBefore,
 										othersOpen,
 										siblingsShown,
 										listed,
@@ -409,8 +361,6 @@ function Story({
 										stage={stage}
 										first={index === 0}
 										previousAt={previousAt}
-										showBefore={showBefore}
-										onShowBefore={() => setBeforeOpen(true)}
 										end={verdict.end}
 										lineage={lineage}
 										full={full}
@@ -426,7 +376,6 @@ function Story({
 										traced={traced}
 										here={here}
 										hasStart={hasStart}
-										reviewOutcome={reviewOutcome}
 										othersOpen={othersOpen}
 										onOthersOpenChange={setOthersOpen}
 										onShowSiblings={() => setSiblingsOpen(true)}
@@ -439,34 +388,6 @@ function Story({
 			</LineageDay>
 		</StoryNodes>
 	);
-}
-
-/** The review's own record where it is the trace's review, and where the path was lost and its time went. */
-function pathTimes(
-	lineage: ReviewLineage,
-	here: TraceNode | undefined,
-	job: AgentJob | undefined,
-	now: Date,
-) {
-	const ownJob = job !== undefined && job.id === lineage.review?.id ? job : undefined;
-	return {
-		ownJob,
-		bottleneck: traceBottleneck(lineage, here, ownJob, now),
-		spans: traceSpans(lineage, here, ownJob),
-	};
-}
-
-/** How the trace's review processed its results, as the review itself says. */
-function resultProcessingOf(
-	job: AgentJob | undefined,
-	lineage: ReviewLineage,
-): AgentJob["deliveryStatus"] {
-	return job !== undefined && job.id === lineage.review?.id ? job.deliveryStatus : undefined;
-}
-
-/** When a developer first read feedback of the trace's review, as the review itself says. */
-function firstReadOf(job: AgentJob | undefined, lineage: ReviewLineage): Date | undefined {
-	return job !== undefined && job.id === lineage.review?.id ? job.firstFeedbackReadAt : undefined;
 }
 
 /** Above the rail: the day the times are on, while the times are shown. */
@@ -537,18 +458,18 @@ function TraceDisplayControl({
 
 /** Whether the path alone draws the step only folded: a result as a dot or a sibling, a sibling piece. */
 function foldedOffPath(
-	lineage: ReviewLineage,
+	records: LineageRecords,
 	here: TraceNode | undefined,
 	numbered: NumberedResult[],
 	self: NumberedResult | undefined,
 ): boolean {
 	const node = here;
 	if (node?.kind === "result") {
-		const path = pathResults(lineage, here, numbered, self) ?? [];
+		const path = pathResults(records, here, numbered, self) ?? [];
 		return !path.some((entry) => entry.result.id === node.id);
 	}
 	if (node?.kind === "feedback") {
-		return !storyFeedback(lineage, here, false).shown.some((entry) => entry.id === node.id);
+		return !storyFeedback(records, here, false).shown.some((entry) => entry.id === node.id);
 	}
 	return false;
 }
@@ -633,7 +554,7 @@ function useReveal(rail: React.RefObject<HTMLElement | null>, step: string | und
  * Undefined where the path is the whole review.
  */
 function pathResults(
-	lineage: ReviewLineage,
+	records: LineageRecords,
 	here: TraceNode | undefined,
 	numbered: readonly NumberedResult[],
 	self: NumberedResult | undefined,
@@ -642,7 +563,7 @@ function pathResults(
 		return self === undefined ? undefined : [self];
 	}
 	if (here?.kind === "feedback") {
-		const feedback = lineage.feedback.find((entry) => entry.id === here.id);
+		const feedback = records.feedback.find((entry) => entry.id === here.id);
 		return feedback === undefined ? undefined : sourcesOf(feedback, numbered);
 	}
 	return undefined;

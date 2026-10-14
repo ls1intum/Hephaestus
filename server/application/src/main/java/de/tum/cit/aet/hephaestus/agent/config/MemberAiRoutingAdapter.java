@@ -82,7 +82,10 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
      * this bean skips its proxy.
      */
     private Optional<WorkspaceAgentBinding> route(long workspaceId, AgentPurpose purpose, @Nullable Long developerId) {
-        if (developerId == null) return routePeople(workspaceId, purpose, Collections.singletonList(null));
+        if (developerId == null) {
+            if (!preferences.forDeveloper(workspaceId, null).permitsAi()) return Optional.empty();
+            return routePeople(workspaceId, purpose, Collections.singletonList(null));
+        }
         if (suppression.isAccountSuppressed(developerId)) return Optional.empty();
         var decision = preferences.forDeveloper(workspaceId, developerId);
         if (!decision.permitsAi()) return Optional.empty();

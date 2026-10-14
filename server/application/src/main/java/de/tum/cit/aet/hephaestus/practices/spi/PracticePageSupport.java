@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -23,9 +24,16 @@ public record PracticePageSupport(
             throw new IllegalArgumentException("Unavailable support cannot carry evidence.");
     }
 
-    public record PracticeSupport(String practiceSlug, PracticePageDecision decision, List<Occurrence> occurrences) {
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    public record PracticeSupport(
+            String practiceSlug,
+            PracticePageDecision decision,
+            @Nullable FeedbackStopReason stopReason,
+            List<Occurrence> occurrences) {
         public PracticeSupport {
             occurrences = List.copyOf(occurrences);
+            if (decision == PracticePageDecision.GATE_REFUSED && stopReason == null)
+                throw new IllegalArgumentException("A gate refusal needs its recorded stop reason.");
             if (decision != PracticePageDecision.ADMIT && !occurrences.isEmpty())
                 throw new IllegalArgumentException("Unadmitted support cannot carry evidence.");
         }

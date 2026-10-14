@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, within } from "storybook/test";
 
+import type { ReviewOverview } from "@/api/types.gen";
 import type { ReviewRange } from "@/components/admin/practice-reviews/review-range";
 import { ReviewRunningBanner } from "@/components/admin/practices/review/ReviewRunningBanner";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
@@ -11,7 +12,7 @@ import { precedes } from "@/test/dom";
 
 import {
 	busyReviewQueue,
-	deliveredByChannelCounts,
+	deliveredByLocationCounts,
 	feedbackCounts,
 	awaitingApprovalFeedback,
 	practiceReviewOverview,
@@ -22,14 +23,10 @@ import {
 	workspacePractices,
 } from "./fixtures";
 import { PracticeReviewOverviewPage } from "./PracticeReviewOverviewPage";
-import type { ReviewCountState, ReviewSectionState } from "./review-states";
+import type { ReviewSectionState } from "./review-states";
 
 function ready<T>(items: T[], total = items.length): ReviewSectionState<T> {
 	return { status: "ready", items, total };
-}
-
-function counted(total: number): ReviewCountState {
-	return { status: "ready", total, stale: false };
 }
 
 const RANGE = { from: reviewOverviewScope.from, to: reviewOverviewScope.to };
@@ -61,13 +58,8 @@ const meta = {
 			},
 		},
 		delivery: {
-			delivered: { status: "ready", counts: deliveredByChannelCounts, stale: false },
+			delivered: { status: "ready", counts: deliveredByLocationCounts, stale: false },
 			withheld: { status: "ready", counts: withheldByReasonCounts, stale: false },
-			unprocessedResults: {
-				state: counted(1),
-				list: { list: "runs", search: { ...RANGE, resultProcessing: ["FAILED"] } },
-				of: 31,
-			},
 		},
 		timing: { status: "ready", timing: practiceReviewTiming, stale: false },
 		queue: { status: "ready", queue: busyReviewQueue },
@@ -117,15 +109,11 @@ export const Default: Story = {
 		await expect(canvas.queryByRole("button", { name: /^Why last/u })).not.toBeInTheDocument();
 		const failed = new URL(
 			canvas.getByRole<HTMLAnchorElement>("link", {
-				name: "9 % failed or timed out, 3 of 34 finished reviews",
+				name: "9 % failed, 3 of 35 finished reviews",
 			}).href,
 		);
-		await expect(failed.searchParams.getAll("status")).toStrictEqual(["FAILED", "TIMED_OUT"]);
+		await expect(failed.searchParams.getAll("status")).toStrictEqual(["FAILED"]);
 		await expect(failed.searchParams.get("from")).toBe(RANGE.from);
-		const unprocessed = new URL(
-			canvas.getByRole<HTMLAnchorElement>("link", { name: "1 of 31 completed" }).href,
-		);
-		await expect(unprocessed.searchParams.getAll("resultProcessing")).toStrictEqual(["FAILED"]);
 		canvas.getByRole("list", { name: "Stages" });
 		// A header row, five practices and the totals; the sixth, not checked, is no row and no line.
 		const practices = within(canvas.getByRole("region", { name: "Practices" }));
@@ -142,7 +130,7 @@ export const Default: Story = {
 		// What waits and runs is now; what finished follows the range, as everything else in the area.
 		queueNow.getByText("Now");
 		reviewTime.getByText("Last 30 days");
-		reviewTime.getByRole("link", { name: "34 reviews finished" });
+		reviewTime.getByRole("link", { name: "35 reviews finished" });
 		const stages = canvas.getByRole("list", { name: "Stages" }).querySelectorAll(":scope > li");
 		await expect([...stages].map((card) => card.textContent)).toEqual([
 			expect.stringMatching(/^Reviews/u),
@@ -151,11 +139,11 @@ export const Default: Story = {
 		const delivery = canvas.getByRole("list", { name: "Delivery" }).querySelectorAll(":scope > li");
 		await expect(delivery).toHaveLength(2);
 		await expect(delivery[0]).toHaveTextContent(/^Feedback/u);
-		// Beside it, where the feedback went: by channel, by reason, and the share that failed to
-		// deliver over the range, 1 of the 15 pieces sent in the last 30 days.
-		await expect(delivery[1]).toHaveTextContent(/^By channel and reason/u);
+		// Beside it, where the feedback went: by location, by reason, and the share that failed to
+		// deliver over the range, 1 of the 16 pieces sent in the last 30 days.
+		await expect(delivery[1]).toHaveTextContent(/^By location and reason/u);
 		await expect(delivery[1]?.querySelector("[role=group][aria-label=Failures]")).toHaveTextContent(
-			/^Feedback failed to deliver · 1 of 15 sent7 %/u,
+			/^Feedback failed to deliver · 1 of 16 sent6 %/u,
 		);
 		// Awaiting approval is counted under Delivery; the way to approve stays under Needs you.
 		await expect(canvas.getByRole("list", { name: "Feedback by delivery" })).toHaveTextContent(
@@ -167,7 +155,7 @@ export const Default: Story = {
 			const url = new URL(feedbackLegend.getByRole<HTMLAnchorElement>("link", { name }).href);
 			return [
 				url.pathname,
-				url.searchParams.getAll("deliveryState").join(","),
+				url.searchParams.getAll("state").join(","),
 				url.searchParams.get("from"),
 				url.searchParams.get("to"),
 			];
@@ -178,11 +166,12 @@ export const Default: Story = {
 			RANGE.from,
 			RANGE.to,
 		]);
-		await expect(opens("1 prepared")[1]).toBe("PREPARED");
-		await expect(opens("14 delivered")[1]).toBe("DELIVERED,PARTIALLY_DELIVERED");
-		await expect(opens("4 withheld")[1]).toBe("SUPPRESSED,DISCARDED");
-		await expect(opens("1 failed to deliver")[1]).toBe("FAILED,PARTIALLY_FAILED");
-		await expect(opens("1 replaced by newer")[1]).toBe("SUPERSEDED");
+		await expect(opens("1 ready")[1]).toBe("READY");
+		await expect(opens("14 delivered")[1]).toBe("DELIVERED");
+		await expect(opens("1 delivery unconfirmed")[1]).toBe("UNCONFIRMED");
+		await expect(opens("4 withheld")[1]).toBe("WITHHELD,REJECTED");
+		await expect(opens("1 failed to deliver")[1]).toBe("FAILED");
+		await expect(opens("1 replaced by newer")[1]).toBe("REPLACED");
 		// The Results tile says each outcome in one short form, with marked incorrect as the
 		// quiet last item of the same row; each count opens the Results table filtered to it.
 		const resultsLegend = canvas.getByRole("list", { name: "Results by outcome" });
@@ -197,17 +186,16 @@ export const Default: Story = {
 		await expect(resultLink("27 not met").searchParams.getAll("outcome")).toStrictEqual([
 			"NOT_MET",
 		]);
-		await expect(resultLink("3 marked incorrect").searchParams.get("invalidated")).toBe("true");
+		await expect(resultLink("3 marked incorrect").searchParams.get("markedIncorrect")).toBe("true");
 		await expect(resultLink("3 marked incorrect").pathname).toBe(
 			"/w/demo/admin/practices/reviews/results",
 		);
 		// The Reviews tile alike: each outcome, and what is not finished yet, open the Reviews table.
-		await expect(resultLink("2 failed").searchParams.getAll("status")).toStrictEqual(["FAILED"]);
+		await expect(resultLink("3 failed").searchParams.getAll("status")).toStrictEqual(["FAILED"]);
 		await expect(resultLink("3 not finished yet").searchParams.getAll("status")).toStrictEqual([
 			"QUEUED",
 			"RUNNING",
 		]);
-		canvas.getByRole("link", { name: "9 reviews finished after the merge" });
 		await expect(canvas.queryByText(/recorded nothing/u)).not.toBeInTheDocument();
 
 		// The range belongs to the whole page: the practices' sentence follows it.
@@ -259,13 +247,6 @@ export const AllTime: Story = {
 		range: "all",
 		scope: {},
 		previous: { status: "none" },
-		delivery: {
-			...meta.args.delivery,
-			unprocessedResults: {
-				...meta.args.delivery.unprocessedResults,
-				list: { list: "runs", search: { resultProcessing: ["FAILED"] } },
-			},
-		},
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: "All time" })).toHaveAttribute(
@@ -298,25 +279,26 @@ export const Reflow: Story = {
 	},
 };
 
-/** A course afternoon that needs a look: 30 % of the prepared feedback came too late for the merge. */
-const COURSE_DAY = {
+/** A course afternoon that needs a look: 30 of the composed pieces were withheld. */
+const COURSE_DAY: ReviewOverview = {
 	...practiceReviewOverview,
 	feedback: {
 		...feedbackCounts([]),
 		delivered: 60,
-		prepared: 5,
+		ready: 5,
 		failed: 2,
-		suppressed: 30,
-		discarded: 3,
-		superseded: 20,
+		withheld: 30,
+		rejected: 3,
+		replaced: 20,
 	},
 	practices: [
 		{
 			feedback: feedbackCounts([]),
+			group: null,
 			practiceSlug: "thin-controllers",
 			practiceName: "Wiki pages are kept up to date",
-			practiceResults: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
-			practiceResultsInvalidated: 0,
+			results: { met: 0, notMet: 0, doesNotApply: 29, couldNotDetermine: 1 },
+			resultsMarkedIncorrect: 0,
 		},
 		...practiceReviewOverview.practices.filter(
 			(practice) => practice.practiceSlug !== "thin-controllers",
@@ -325,7 +307,7 @@ const COURSE_DAY = {
 };
 
 /**
- * Every attention signal past its threshold at once, as a course day can have it: the queue backed
+ * Every attention marker past its threshold at once, as a course day can have it: the queue backed
  * up past half an hour, and a practice that mostly does not apply leading the table. Each says so in its own tone, and nothing else on the page takes a colour.
  */
 export const NeedsAttention: Story = {

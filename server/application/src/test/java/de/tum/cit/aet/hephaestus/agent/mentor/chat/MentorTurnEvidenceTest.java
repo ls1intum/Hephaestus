@@ -50,7 +50,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
                         "inputs/context/current_thread_history.json",
                         "PRIVATE-HISTORY".getBytes(StandardCharsets.UTF_8)));
         var parsed = mapper.readTree(receipt);
-        var practiceResult = parsed.path("observations").path("recentResults").get(0);
+        var practiceResult = parsed.path("results").path("recentResults").get(0);
         assertThat(practiceResult).isNotNull();
         assertThat(practiceResult.path("resultId").asString()).isEqualTo("practiceResult-id");
         assertThat(practiceResult.path("outcome").asString()).isEqualTo("NEGATIVE");
@@ -67,7 +67,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
                 .isEqualTo("DIFFERS_FROM_STORED_WORK");
         assertThat(practiceResult.path("reviewedWork").path("headCoverage").asString())
                 .isEqualTo("MATCHES_STORED_WORK");
-        assertThat(parsed.path("observations")
+        assertThat(parsed.path("results")
                         .path("omittedForSize")
                         .path("earlierResults")
                         .asInt())
@@ -101,7 +101,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
                         MergeReadinessContentSource.OUTPUT_KEY,
                         "{\"pullRequests\":[{\"pullRequestId\":11,\"checks\":\"UNKNOWN\"}]}"
                                 .getBytes(StandardCharsets.UTF_8))));
-        assertThat(parsed.path("observations").path("status").asString()).isEqualTo("UNAVAILABLE");
+        assertThat(parsed.path("results").path("status").asString()).isEqualTo("UNAVAILABLE");
         assertThat(parsed.path("authoredWorkIndex").path("status").asString()).isEqualTo("UNAVAILABLE");
         assertThat(parsed.path("mergeReadiness")
                         .path("pullRequests")
@@ -177,7 +177,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         practiceResults.putArray("abstentions").addObject().put("resultId", "small-abstention");
         String receipt = MentorTurnEvidence.forRunner(
                 mapper, Map.of(ResultHistoryContentSource.OUTPUT_KEY, mapper.writeValueAsBytes(practiceResults)));
-        var selected = mapper.readTree(receipt).path("observations");
+        var selected = mapper.readTree(receipt).path("results");
         assertThat(receipt.length()).isLessThan(40_000);
         assertThat(selected.path("recentResults").size()
                         + selected.path("omittedFromReceipt")
@@ -263,12 +263,12 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         assertThat(parsed.has("status")).isFalse();
         Map<String, String> sourceOf = Map.of(
                 "mergeReadiness", MergeReadinessContentSource.OUTPUT_KEY,
-                "observations", ResultHistoryContentSource.OUTPUT_KEY,
+                "results", ResultHistoryContentSource.OUTPUT_KEY,
                 "authoredWorkIndex", RecentAuthoredWorkContentSource.OUTPUT_KEY,
                 "reviewAttempts", ReviewAttemptsContentSource.OUTPUT_KEY);
         Map<String, Map<String, Integer>> given = Map.of(
                 "mergeReadiness", Map.of("pullRequests", 25),
-                "observations", Map.of("recentResults", 30, "abstentions", 30, "earlierResults", 30),
+                "results", Map.of("recentResults", 30, "abstentions", 30, "earlierResults", 30),
                 "authoredWorkIndex", Map.of("pullRequests", 20, "issues", 20),
                 "reviewAttempts", Map.of("attempts", 20));
         int keptTogether = 0;
@@ -300,7 +300,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
                         .path("hasMore")
                         .asBoolean())
                 .isTrue();
-        for (var row : parsed.path("observations").path("recentResults")) {
+        for (var row : parsed.path("results").path("recentResults")) {
             assertThat(row.path("resource").asString())
                     .isEqualTo(ResultHistoryContentSource.resourceOf(
                             UUID.fromString(row.path("resultId").asString())));

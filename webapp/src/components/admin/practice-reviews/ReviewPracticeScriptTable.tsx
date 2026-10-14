@@ -1,10 +1,10 @@
-import type { ReviewPracticeScripts, ReviewPracticeScriptModel } from "@/api/types.gen";
+import type { PracticeScriptModel, PracticeScriptRun, ReviewPractice } from "@/api/types.gen";
 import { InlineLink } from "@/components/common/InlineLink";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { PracticeScriptFixLink } from "@/components/practice-trace/PracticeScriptFixLink";
+import type { AgentPurpose } from "@/components/practice-vocabulary/agent-purpose-defs";
 import { DataHandlingMark } from "@/components/practice-vocabulary/DataHandlingMark";
 import { ModelKindMark } from "@/components/practice-vocabulary/ModelKindMark";
-import { practiceScriptNotRated } from "@/components/practice-vocabulary/practice-script-not-rated-defs";
 import {
 	PRACTICE_SCRIPT_RUN_STATUS_DEFS,
 	practiceScriptFix,
@@ -45,18 +45,26 @@ function formatScriptTime(durationMs: number): string {
 
 export interface ReviewPracticeScriptTableProps {
 	workspaceSlug: string;
-	/** One entry per script the review's latest attempt staged. */
-	scripts: ReviewPracticeScripts[];
+	/** The review's practices whose program ran, each with its run. */
+	practices: ReviewPractice[];
 }
 
+/** The model a script called, as the workspace binds it. */
+const SCRIPT_MODEL_PURPOSE = {
+	CHAT: "PRACTICE_REVIEW",
+	DECISION: "PRACTICE_DECISION",
+	EMBEDDING: "PRACTICE_EMBEDDING",
+	RERANKING: "PRACTICE_RERANKING",
+} satisfies Record<PracticeScriptModel["kind"], AgentPurpose>;
+
 /**
- * How each practice's program ran in one review: how it ended, which models it had,
- * what they could not rate and why, how many calls the proxy counted, and how long it ran. The calls
- * to the review's own model are the review's, and spend is on AI usage, so neither is here.
+ * How each practice's program ran in one review: how it ended, which models it had, how many calls
+ * the proxy counted, and how long it ran. The calls to the review's own model are the review's, and
+ * spend is on AI usage, so neither is here.
  */
 export function ReviewPracticeScriptTable({
 	workspaceSlug,
-	scripts,
+	practices,
 }: ReviewPracticeScriptTableProps) {
 	// On a narrow screen, the practice and its result fit the screen's width and wrap there. The
 	// figures to their right scroll into view.
@@ -73,9 +81,6 @@ export function ReviewPracticeScriptTable({
 					</TableHead>
 					<TableHead scope="col">Models</TableHead>
 					<TableHead scope="col" numeric className="text-right">
-						Not rated
-					</TableHead>
-					<TableHead scope="col" numeric className="text-right">
 						Calls
 					</TableHead>
 					<TableHead scope="col" numeric className="text-right">
@@ -84,9 +89,17 @@ export function ReviewPracticeScriptTable({
 				</TableRow>
 			</TableHeader>
 			<TableBody>
-				{scripts.map((script) => (
-					<ScriptRow key={script.practiceSlug} workspaceSlug={workspaceSlug} script={script} />
-				))}
+				{practices.map(
+					(practice) =>
+						practice.script !== null && (
+							<ScriptRow
+								key={practice.practiceSlug}
+								workspaceSlug={workspaceSlug}
+								practice={practice}
+								run={practice.script}
+							/>
+						),
+				)}
 			</TableBody>
 		</Table>
 	);
@@ -98,33 +111,35 @@ export function ReviewPracticeScriptTable({
  */
 function ScriptRow({
 	workspaceSlug,
-	script,
+	practice,
+	run,
 }: {
 	workspaceSlug: string;
-	script: ReviewPracticeScripts;
+	practice: ReviewPractice;
+	run: PracticeScriptRun;
 }) {
-	const { run } = script;
-	const skipped = run.status === "SKIPPED";
 	const fix = practiceScriptFix(run);
-	// A practice deleted since the review has no script left to edit.
-	const shownFix = fix?.kind === "EDIT" && !hasText(script.practiceName) ? undefined : fix;
-	const notRated = skipped ? undefined : practiceScriptNotRated(run.models);
-	const error = run.status === "FAILED" && hasText(script.error) ? script.error : undefined;
-	const calls = script.models.reduce((sum, model) => sum + model.calls, 0);
+	const error = run.status === "FAILED" && hasText(run.error) ? run.error : undefined;
+	const calls = run.models.reduce((sum, model) => sum + model.calls, 0);
 	return (
 		<TableRow variant="static">
 			<TableHead scope="row" variant="body">
-				<PracticeName script={script} />
+				<InlineLink
+					className="font-medium"
+					render={<DetailStackLink entry={practiceLevel(practice.practiceSlug)} />}
+				>
+					{practice.practiceName}
+				</InlineLink>
 			</TableHead>
 			<TableCell className="align-top whitespace-normal">
 				<span className="flex flex-col items-start gap-1">
 					{PRACTICE_SCRIPT_RUN_STATUS_DEFS[run.status].result(run)}
-					{shownFix !== undefined && (
+					{fix !== undefined && (
 						<PracticeScriptFixLink
 							workspaceSlug={workspaceSlug}
-							practiceSlug={script.practiceSlug}
-							practiceName={script.practiceName ?? script.practiceSlug}
-							fix={shownFix}
+							practiceSlug={practice.practiceSlug}
+							practiceName={practice.practiceName}
+							fix={fix}
 						/>
 					)}
 					{error !== undefined && (
@@ -135,69 +150,36 @@ function ScriptRow({
 				</span>
 			</TableCell>
 			<TableCell className="align-top">
-				<ScriptModels models={script.models} />
+				<ScriptModels models={run.models} />
 			</TableCell>
 			<TableCell numeric className="text-right align-top">
-				{notRated === undefined || notRated.count === 0 ? (
-					<Nothing />
-				) : (
-					<>
-						{count.format(notRated.count)}
-						<ul className="text-xs text-muted-foreground">
-							{notRated.reasons.map((reason) => (
-								<li key={reason}>{reason}</li>
-							))}
-						</ul>
-					</>
-				)}
+				{run.models.length === 0 ? <Nothing /> : count.format(calls)}
 			</TableCell>
 			<TableCell numeric className="text-right align-top">
-				{skipped || script.models.length === 0 ? <Nothing /> : count.format(calls)}
-			</TableCell>
-			<TableCell numeric className="text-right align-top">
-				{script.durationMs === undefined ? <Nothing /> : formatScriptTime(script.durationMs)}
+				{run.durationMs === null ? <Nothing /> : formatScriptTime(run.durationMs)}
 			</TableCell>
 		</TableRow>
 	);
 }
 
-function PracticeName({ script }: { script: ReviewPracticeScripts }) {
-	if (!hasText(script.practiceName)) {
-		return (
-			<>
-				<div className="font-mono text-xs">{script.practiceSlug}</div>
-				<div className="text-xs text-muted-foreground">Not a current practice</div>
-			</>
-		);
-	}
-	return (
-		<InlineLink
-			className="font-medium"
-			render={<DetailStackLink entry={practiceLevel(script.practiceSlug)} />}
-		>
-			{script.practiceName}
-		</InlineLink>
-	);
-}
-
 /**
- * Each model with the tier of the model the review had for it. The tier's icon is enough beside the
- * kind's name, and a screen reader hears its label. A model with counted calls ran even when its
- * tier is unknown, as for a script that did not finish, so it claims nothing about its assignment.
+ * Each model with its data-handling tier. The tier's icon is enough beside the kind's name, and a
+ * screen reader hears its label. A model with counted calls ran even when its tier is unknown, as
+ * for a script that did not finish, so it claims nothing about its assignment.
  */
-function ScriptModels({ models }: { models: ReviewPracticeScriptModel[] }) {
+function ScriptModels({ models }: { models: PracticeScriptModel[] }) {
 	if (models.length === 0) {
 		return <Nothing />;
 	}
 	return (
 		<ul className="flex flex-col gap-1">
 			{models.map((model) => (
-				<li key={model.purpose} className="flex items-center gap-2">
-					<ModelKindMark purpose={model.purpose} />
-					{model.tier === undefined ? (
+				<li key={model.kind} className="flex items-center gap-2">
+					<ModelKindMark purpose={SCRIPT_MODEL_PURPOSE[model.kind]} />
+					{model.dataHandlingTier === null ? (
 						model.calls === 0 && <span className="text-muted-foreground">No model</span>
 					) : (
-						<DataHandlingMark tier={model.tier} />
+						<DataHandlingMark tier={model.dataHandlingTier} />
 					)}
 				</li>
 			))}

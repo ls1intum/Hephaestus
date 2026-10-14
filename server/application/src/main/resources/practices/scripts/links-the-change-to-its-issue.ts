@@ -1,3 +1,7 @@
+// Finds where the pull request names an issue: the provider's closing links, the title, the body and
+// the source branch. It looks up each reference in the project inventory and the linked items, in the
+// repository that the reference names. When the pull request names no issue, it tells what the
+// inventory holds. The review decides if a reference is a link.
 import {
 	isOpenState,
 	readProjectInventory,
@@ -12,10 +16,6 @@ import {
 	withoutHtmlComments,
 } from "../kits/scm/references.ts";
 import { readLinkedWorkItems } from "../kits/scm/review.ts";
-// Finds where the pull request names an issue: the provider's closing links, the title, the body and
-// the source branch. It looks up each reference in the project inventory and the linked items, in the
-// repository that the reference names. When the pull request names no issue, it tells what the
-// inventory holds. The review decides if a reference is a link.
 import { DIRECTION_CHARS, factsOf, listWithin, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

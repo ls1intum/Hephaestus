@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.LookupPresence;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
@@ -98,5 +99,50 @@ class FeedbackMarkRestorationIntegrationTest extends AbstractFeedbackDeliveryInt
         assertThat(provider.updates).isEqualTo(2);
         assertThat(children().getFirst().getExternalRef()).isEqualTo(copy.getExternalRef());
         assertThat(current().getDeliveredAt()).isNotNull();
+    }
+
+    @Test
+    void shouldReportUnsupportedAnchoredRestorationWithoutInventingAnotherDelivery() {
+        prepare(true);
+        sender.send(workspace.getId(), feedbackId);
+        var original = children().get(1);
+        UUID id = mark();
+        newSender().send(workspace.getId(), feedbackId);
+        assertThat(children().get(1).getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+        remove(id);
+        newSender().send(workspace.getId(), feedbackId);
+        var retained = children().get(1);
+        assertThat(retained.getState()).isEqualTo(FeedbackCopyState.RETRACTED);
+        assertThat(retained.getLastError())
+                .isEqualTo("Restoring a deleted anchored note is unsupported. The original receipt"
+                        + " remains retracted.");
+        assertThat(retained.getExternalRef()).isEqualTo(original.getExternalRef());
+        assertThat(retained.getPostedAt()).isEqualTo(original.getPostedAt());
+        assertThat(provider.noteCreates).isEqualTo(1);
+        assertThat(provider.physical).doesNotContainKey(original.getId());
+    }
+
+    @Test
+    void shouldRestoreAnAuthorizedAbsentRetryAfterAnIncorrectMarkIsRemoved() {
+        prepare(false);
+        provider.summaryFailure = Failure.BEFORE_CREATE;
+        sender.send(workspace.getId(), feedbackId);
+        var firstFence = children().getFirst().getWriteStartedAt();
+        provider.summaryFailure = Failure.NONE;
+        provider.readback = LookupPresence.ABSENT;
+        due();
+        newSender().send(workspace.getId(), feedbackId);
+        assertThat(children().getFirst().getReadback()).isEqualTo(FeedbackCopyReadback.ABSENT);
+        store.retry(workspace.getId(), feedbackId, developerId);
+        UUID id = mark();
+        assertThat(current().getState()).isEqualTo(FeedbackState.WITHHELD);
+        remove(id);
+        assertThat(current().getState()).isEqualTo(FeedbackState.READY);
+        assertThat(children().getFirst().getState()).isEqualTo(FeedbackCopyState.PLANNED);
+        assertThat(children().getFirst().getWriteStartedAt()).isEqualTo(firstFence);
+        newSender().send(workspace.getId(), feedbackId);
+        assertThat(children().getFirst().getState()).isEqualTo(FeedbackCopyState.POSTED);
+        assertThat(children().getFirst().getWriteStartedAt()).isEqualTo(firstFence);
+        assertThat(provider.physical).containsOnlyKeys(children().getFirst().getId());
     }
 }

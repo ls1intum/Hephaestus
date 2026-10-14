@@ -132,14 +132,6 @@ Do not substitute an empty problem list for unavailable problem detail.
 Feedback response resolution and usefulness remain independent dimensions.
 Result outcomes and feedback response values are different enums.
 
-**Developer preview databases.**
-If the database already applied an earlier version of this branch's unreleased changelog, reset it before this build starts.
-Run `vp run dev:reset`. This deletes local database data.
-
-Then use the normal local-development procedure.
-Do not reset a released installation's database.
-Released installations use the forward migration and verified backup procedure above.
-
 **Rollback.**
 Stop this release's roles and restore the verified pre-upgrade backup.
 Start the previous release with its matching images and configuration.

@@ -1,3 +1,6 @@
+// Finds each concurrency construct that the change adds to Swift files, with the type that encloses
+// it, and the lines of the project files that name a default actor isolation. The review decides
+// from the checkout whether the work must outlive the view and where each mutation runs.
 import { scm, type FileTree } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -5,9 +8,6 @@ import {
 	scanOccurrences,
 	type SourcePattern,
 } from "../kits/scm/source-scan.ts";
-// Finds each concurrency construct that the change adds to Swift files, with the type that encloses
-// it, and the lines of the project files that name a default actor isolation. The review decides
-// from the checkout whether the work must outlive the view and where each mutation runs.
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

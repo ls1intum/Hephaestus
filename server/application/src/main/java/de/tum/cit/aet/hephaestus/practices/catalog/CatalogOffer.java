@@ -15,8 +15,5 @@ public record CatalogOffer<D>(
         boolean excluded,
         CatalogEntryState state,
         CatalogChangeKind changeKind,
-        String etag) {
-    public boolean offered() {
-        return !excluded;
-    }
-}
+        String etag,
+        boolean offered) {}

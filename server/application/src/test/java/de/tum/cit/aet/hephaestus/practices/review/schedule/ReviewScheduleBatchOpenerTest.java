@@ -75,14 +75,15 @@ class ReviewScheduleBatchOpenerTest extends BaseUnitTest {
         when(workspaces.findById(1L)).thenReturn(Optional.empty());
         assertThat(opener.openDueRun(schedule.getId(), now))
                 .isEqualTo(ReviewScheduleOutcome.SKIPPED_WORKSPACE_UNAVAILABLE);
-        assertThat(schedule.getNextRunAt()).isEqualTo(now);
+        assertThat(schedule.getNextRunAt()).isEqualTo(now.plus(Duration.ofDays(1)));
+        assertThat(schedule.getLastRunAt()).isEqualTo(now);
     }
 
     @Test
     void activeBatchDefersTheNextSchedule() {
         when(batches.existsByWorkspaceIdAndStatusIn(eq(1L), any())).thenReturn(true);
-        assertThat(opener.openDueRun(schedule.getId(), now))
-                .isEqualTo(ReviewScheduleOutcome.SKIPPED_CAMPAIGN_UNDER_WAY);
+        assertThat(opener.openDueRun(schedule.getId(), now)).isEqualTo(ReviewScheduleOutcome.SKIPPED_BATCH_UNDER_WAY);
+        assertThat(schedule.getNextRunAt()).isEqualTo(now.plus(Duration.ofDays(1)));
     }
 
     @Test

@@ -12,12 +12,12 @@ The [product vocabulary](./practice-feedback-language.md) defines both terms.
 
 Other pages own the related facts:
 
-- [Add a visual and a guide](/admin/writing-practices#write-guidance) owns the markup that the server accepts, the limits, and the `pv-*` color classes.
+- [Add a visual and a guide](/admin/writing-practices#add-a-visual-and-a-guide) owns the markup that the server accepts, the limits, and the `pv-*` color classes.
 - [Bundled visuals and guides](./practice-catalogue.md#bundled-visuals-and-guides) owns the files and the catalog fields.
 
 The rules below are strict.
 All bundled practices use one grammar, so a developer learns it once.
-The [starter templates](/admin/writing-practices#write-guidance) are the reference for the contrast pair, the fork, and the sequence.
+The [starter templates](/admin/writing-practices#start-from-a-template) are the reference for the contrast pair, the fork, and the sequence.
 The visual of `scope-one-reviewable-change` is the reference for the [whole versus parts](#whole-versus-parts) pattern.
 Its figure is the reference for a sequence figure.
 
@@ -98,7 +98,7 @@ Their contrast is below the 3:1 of [WCAG 1.4.11](https://www.w3.org/WAI/WCAG22/U
 - Do not use `opacity`, `fill-opacity`, or `stroke-opacity`. The same opacity gives a different contrast in each theme.
 - Do not write color values. `PRACTICE_SVG_THEME` in `webapp/src/components/practice-guidance/PracticeVisual.tsx` maps each class to a theme token.
 
-The prompt in [Draw a visual with an AI assistant](/admin/writing-practices#write-guidance) repeats these meanings, because an admin sends it alone.
+The prompt in [Draw a visual with an AI assistant](/admin/writing-practices#draw-a-visual-with-an-ai-assistant) repeats these meanings, because an admin sends it alone.
 When you change this table, change the prompt too.
 If the prompt and this page disagree, this page is correct.
 

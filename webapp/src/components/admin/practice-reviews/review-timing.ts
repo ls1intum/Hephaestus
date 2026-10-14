@@ -1,4 +1,4 @@
-import type { PracticeReviewTiming, ReviewStageTiming, ReviewTimeShares } from "@/api/types.gen";
+import type { ReviewTimeShares, ReviewTiming, ReviewTimingStage } from "@/api/types.gen";
 
 import { TRACE_SPAN_LABELS, type TraceSpanKind } from "./trace-bottleneck";
 
@@ -67,11 +67,11 @@ export const REVIEW_STAGES: readonly ReviewStageDef[] = [
 ];
 
 /** A stage's timing once it measured at least one review. */
-export type MeasuredTiming = ReviewStageTiming & { medianSeconds: number; p90Seconds: number };
+export type MeasuredTiming = ReviewTimingStage & { medianSeconds: number; p90Seconds: number };
 
 /** The timing when it measured at least one review; otherwise there is nothing to say. */
-export function measured(stage: ReviewStageTiming): MeasuredTiming | undefined {
-	return stage.count > 0 && stage.medianSeconds !== undefined && stage.p90Seconds !== undefined
+export function measured(stage: ReviewTimingStage): MeasuredTiming | undefined {
+	return stage.count > 0 && stage.medianSeconds !== null && stage.p90Seconds !== null
 		? { ...stage, medianSeconds: stage.medianSeconds, p90Seconds: stage.p90Seconds }
 		: undefined;
 }
@@ -97,7 +97,7 @@ export interface TypicalReview {
 	stages: MeasuredStage[];
 }
 
-export function typicalReview(timing: PracticeReviewTiming): TypicalReview | undefined {
+export function typicalReview(timing: ReviewTiming): TypicalReview | undefined {
 	const toComment = measured(timing.total);
 	if (toComment !== undefined) {
 		return {
@@ -113,16 +113,16 @@ export function typicalReview(timing: PracticeReviewTiming): TypicalReview | und
 }
 
 function stagesOf(
-	shares: ReviewTimeShares | undefined,
+	shares: ReviewTimeShares | null,
 	timing: MeasuredTiming,
 	until: TypicalReview["until"],
 ): MeasuredStage[] {
-	if (shares === undefined) {
+	if (shares === null) {
 		return [];
 	}
 	return REVIEW_STAGES.flatMap((def) => {
 		const parts = def.parts.map((part) => shares[part]);
-		if (parts.some((part) => part === undefined)) {
+		if (parts.some((part) => part === null)) {
 			return [];
 		}
 		const share = parts.reduce<number>((sum, part) => sum + (part ?? 0), 0);
@@ -133,12 +133,12 @@ function stagesOf(
 		if (until === "comment" && def.key === "execution") {
 			measuredDef = {
 				...def,
-				text: "from the start of the execution until the review on the work is accepted (the review’s end for older runs).",
+				text: "from the start of the execution until the review on the work is accepted (the review’s end for older reviews).",
 			};
 		} else if (until === "comment" && def.key === "delivery") {
 			measuredDef = {
 				...def,
-				text: "from acceptance of the review on the work until its first comment (from the review’s end for older runs).",
+				text: "from acceptance of the review on the work until its first comment (from the review’s end for older reviews).",
 			};
 		}
 		return [{ def: measuredDef, share, seconds: share * timing.medianSeconds }];

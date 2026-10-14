@@ -157,7 +157,7 @@ class PiResultParserTest extends BaseUnitTest {
                 Duration.ofSeconds(10)));
 
         assertThat(result.success()).isFalse();
-        assertThat(result.output()).doesNotContainKey("rawOutput").containsKey("feedback");
+        assertThat(result.output()).doesNotContainKeys("rawOutput", "feedback");
         assertThat(result.usage()).isNotNull();
     }
 
@@ -230,7 +230,7 @@ class PiResultParserTest extends BaseUnitTest {
                 false,
                 Duration.ofSeconds(10)));
 
-        assertThat(result.output()).containsKey("practiceCoverage");
+        assertThat(result.output()).doesNotContainKey("practiceCoverage");
         assertThat(meterRegistry
                         .get("agent.review.practice.coverage.eligible")
                         .summary()
@@ -258,7 +258,7 @@ class PiResultParserTest extends BaseUnitTest {
 
         for (String coverage : invalid) {
             Map<String, Object> output = new HashMap<>();
-            parser.addPracticeCoverage(output, coverage.getBytes(StandardCharsets.UTF_8));
+            parser.addPracticeCoverage(coverage.getBytes(StandardCharsets.UTF_8));
             assertThat(output).doesNotContainKey("practiceCoverage");
         }
         assertThat(meterRegistry

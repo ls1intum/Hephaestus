@@ -137,6 +137,15 @@ function loadable<T>(query: {
  * preview — that row's work. The row's address is only a selector; the worker accepts it solely
  * against the tab's actual list.
  */
+/** The frame's queries over the worker bridge; the worker owns the API calls, so no generated key fits. */
+export const INLINE_QUERY_KEYS = {
+	state: ["state"],
+	reportView: ["report-view"],
+	context: (workspaceSlug: string | undefined) => ["context", workspaceSlug],
+	workFeedback: (workspaceSlug: string) => ["work-feedback", workspaceSlug],
+	results: (workspaceSlug: string) => ["results", workspaceSlug],
+} as const;
+
 function frameSubject(): WorkSubject {
 	const work = new URLSearchParams(location.search).get(WORK_PARAMETER);
 	return work === null ? THE_PAGE : { kind: "list-row", url: work };
@@ -147,10 +156,13 @@ function frameSubject(): WorkSubject {
  * switches on the same work; a fresh report starts closed until it answers.
  */
 function useRememberedView() {
-	const state = useQuery({ queryKey: ["state"], queryFn: async () => ask({ type: "get-state" }) });
+	const state = useQuery({
+		queryKey: INLINE_QUERY_KEYS.state,
+		queryFn: async () => ask({ type: "get-state" }),
+	});
 	const generation = state.data?.generation;
 	const remembered = useQuery({
-		queryKey: ["report-view"],
+		queryKey: INLINE_QUERY_KEYS.reportView,
 		queryFn: async () => ask({ type: "get-report-view" }),
 		staleTime: Number.POSITIVE_INFINITY,
 	});
@@ -188,7 +200,7 @@ function useWorkReview(subject: WorkSubject, workspaceSlug: string | undefined, 
 	// next interval.
 	const latestContext = useRef<ReviewContext>(undefined);
 	const context = useQuery({
-		queryKey: ["context", workspaceSlug],
+		queryKey: INLINE_QUERY_KEYS.context(workspaceSlug),
 		enabled,
 		queryFn: async () => ask({ type: "get-context", workspaceSlug, subject }),
 		refetchInterval: (query) =>
@@ -204,7 +216,7 @@ function useWorkReview(subject: WorkSubject, workspaceSlug: string | undefined, 
 			? false
 			: refreshInterval(latestContext.current);
 	const feedback = useQuery({
-		queryKey: ["work-feedback", slug],
+		queryKey: INLINE_QUERY_KEYS.workFeedback(slug),
 		queryFn: async () => ask({ type: "get-work-feedback", workspaceSlug: slug, subject }),
 		enabled: ready !== undefined,
 		refetchInterval,
@@ -239,7 +251,7 @@ function useWorkReview(subject: WorkSubject, workspaceSlug: string | undefined, 
 /** A list row's preview: the line, filled at once, and nothing to open. */
 function RowContent({ subject }: { subject: WorkSubject }) {
 	const webAppOrigin = useQuery({
-		queryKey: ["state"],
+		queryKey: INLINE_QUERY_KEYS.state,
 		queryFn: async () => ask({ type: "get-state" }),
 	}).data?.instance?.webAppOrigin;
 	const review = useWorkReview(subject, undefined, true);
@@ -264,7 +276,7 @@ function PageContent() {
 	const { ready } = review;
 	const slug = ready?.workspace.slug ?? "";
 	const results = useQuery({
-		queryKey: ["results", slug],
+		queryKey: INLINE_QUERY_KEYS.results(slug),
 		queryFn: async () => ask({ type: "list-results", workspaceSlug: slug }),
 		enabled: ready !== undefined && expanded,
 		refetchInterval: review.refetchInterval,

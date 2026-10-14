@@ -69,16 +69,14 @@ public class AuthenticatedGitProviderUserService {
                     HttpStatus.CONFLICT,
                     "Your account has more than one GitLab identity on "
                             + serverUrl
-                            + ". Disconnect the one you do not use in User settings, under"
-                            + " Connected accounts.");
+                            + ". Disconnect the one you do not use in User settings, under Connected accounts.");
         }
         if (matching.isEmpty()) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
                     "Connect your GitLab account on "
                             + serverUrl
-                            + " before you create a workspace there. Do this in User settings,"
-                            + " under Connected accounts.");
+                            + " before you create a workspace there. Do this in User settings, under Connected accounts.");
         }
         return resolveUser(matching.getFirst());
     }
@@ -93,15 +91,15 @@ public class AuthenticatedGitProviderUserService {
     private User resolveUser(IdentityView link) {
         IdentityProvider provider = gitProviderRepository
                 .findById(link.providerId())
-                .orElseThrow(() -> new IllegalStateException("We could not find the provider for this connected"
-                        + " account. Disconnect it in User settings,"
-                        + " then connect it again."));
+                .orElseThrow(
+                        () -> new IllegalStateException(
+                                "We could not find the provider for this connected account. Disconnect it in User settings, then connect it again."));
         long nativeId = parseSubject(link.providerUserKey(), provider.getType());
         return userRepository
                 .findByNativeIdAndProviderId(nativeId, link.providerId())
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.CONFLICT,
-                        "Your provider profile is not available yet. Wait for" + " synchronization, then try again."));
+                        "Your provider profile is not available yet. Wait for synchronization, then try again."));
     }
 
     private static long parseSubject(String subject, IdentityProviderType type) {
@@ -113,8 +111,7 @@ public class AuthenticatedGitProviderUserService {
                     HttpStatus.CONFLICT,
                     "Hephaestus cannot use your connected "
                             + type
-                            + " account because its ID is not a number. Disconnect it in User"
-                            + " settings, under Connected accounts, then connect it again.",
+                            + " account because its ID is not a number. Disconnect it in User settings, under Connected accounts, then connect it again.",
                     e);
         }
     }

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.practice;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -190,7 +191,17 @@ class PracticePiAdapterTest extends BaseUnitTest {
     }
 
     private static FrozenModel model(String protocol, String modelId) {
-        return new FrozenModel(protocol, "https://models.example", modelId, null, null, null, null, null, null, null);
+        return new FrozenModel(
+                LlmApiProtocol.parse(protocol).orElseThrow(),
+                "https://models.example",
+                modelId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
     }
 
     @Test

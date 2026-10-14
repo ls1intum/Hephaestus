@@ -25,8 +25,8 @@ class GroupTrendAggregatorTest {
                 trend("well", BetaPosterior.from(24, 21).differenceFrom(BetaPosterior.from(24, 3)));
         PracticeTrend thin = trend("thin", BetaPosterior.from(3, 0).differenceFrom(BetaPosterior.from(3, 3)));
 
-        PracticeTrend group = GroupTrendAggregator.aggregate(
-                "quality", List.of("well", "thin"), List.of(wellEvidenced, thin), properties);
+        PracticeTrend group =
+                GroupTrendAggregator.aggregate(List.of("well", "thin"), List.of(wellEvidenced, thin), properties);
 
         assertThat(group.direction()).isNotEqualTo(TrendDirection.DECLINING);
     }
@@ -36,20 +36,16 @@ class GroupTrendAggregatorTest {
         // The merged trail carries every practice's opportunities by artifact, so a verdictless one from a
         // sibling practice could otherwise date the whole group.
         PracticeTrend looked = PracticeTrendCalculator.calculatePractice(
-                "naming",
-                List.of(noVerdict(7L, "2026-03-01T09:00:00Z")),
-                Instant.parse("2026-01-01T00:00:00Z"),
-                properties);
+                List.of(noVerdict(7L, "2026-03-01T09:00:00Z")), Instant.parse("2026-01-01T00:00:00Z"), properties);
         PracticeTrend judged = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(
                         judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
                         judged(55L, "2026-06-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
-        PracticeTrend group = GroupTrendAggregator.aggregate(
-                "quality", List.of("naming", "testing"), List.of(looked, judged), properties);
+        PracticeTrend group =
+                GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(looked, judged), properties);
 
         assertThat(group.support().firstOpportunityAt()).isEqualTo(Instant.parse("2026-05-01T09:00:00Z"));
         assertThat(group.support().calendarSpanDays()).isEqualTo(32);
@@ -62,18 +58,16 @@ class GroupTrendAggregatorTest {
         // is what stops a group's chart from drawing the same PR once per practice — and what stops the
         // opportunity counts from inflating with the number of practices rather than the amount of work.
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
-                "naming",
                 List.of(judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(judged(40L, "2026-05-01T10:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
-        PracticeTrend group = GroupTrendAggregator.aggregate(
-                "quality", List.of("naming", "testing"), List.of(naming, testing), properties);
+        PracticeTrend group =
+                GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(naming, testing), properties);
 
         assertThat(group.opportunities()).hasSize(1);
         assertThat(group.opportunities().getFirst().outcomes().decided()).isEqualTo(2);
@@ -85,7 +79,6 @@ class GroupTrendAggregatorTest {
         // newer pieces of work. Adding the two bundle counts would tell the reader the group rests on 16
         // pieces of reviewed work when it rests on 15.
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
-                "naming",
                 List.of(
                         judged(100L, "2026-06-10T09:00:00Z", ResultOutcome.MET),
                         judged(101L, "2026-06-09T09:00:00Z", ResultOutcome.MET),
@@ -98,7 +91,6 @@ class GroupTrendAggregatorTest {
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(
                         judged(200L, "2026-06-14T09:00:00Z", ResultOutcome.MET),
                         judged(201L, "2026-06-13T09:00:00Z", ResultOutcome.MET),
@@ -111,15 +103,15 @@ class GroupTrendAggregatorTest {
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
-        PracticeTrend group = GroupTrendAggregator.aggregate(
-                "quality", List.of("naming", "testing"), List.of(naming, testing), properties);
+        PracticeTrend group =
+                GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(naming, testing), properties);
 
         assertThat(group.support().opportunities()).isEqualTo(15);
     }
 
     @Test
     void shouldCountBothBundlesWhenTheGroupHasNoPracticeToWaitOn() {
-        PracticeTrend group = GroupTrendAggregator.aggregate("quality", List.of(), List.of(), properties);
+        PracticeTrend group = GroupTrendAggregator.aggregate(List.of(), List.of(), properties);
 
         // A full current bundle of four, then a previous one of four.
         assertThat(group.support().opportunitiesUntilComparable()).isEqualTo(8);
@@ -128,17 +120,16 @@ class GroupTrendAggregatorTest {
     @Test
     void shouldWaitOnThePracticeClosestToAComparison() {
         PracticeTrend two = PracticeTrendCalculator.calculatePractice(
-                "naming",
                 List.of(
                         judged(1L, "2026-05-01T09:00:00Z", ResultOutcome.MET),
                         judged(2L, "2026-05-02T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
-        PracticeTrend none = PracticeTrendCalculator.calculatePractice(
-                "testing", List.of(), Instant.parse("2026-01-01T00:00:00Z"), properties);
+        PracticeTrend none =
+                PracticeTrendCalculator.calculatePractice(List.of(), Instant.parse("2026-01-01T00:00:00Z"), properties);
 
         PracticeTrend group =
-                GroupTrendAggregator.aggregate("quality", List.of("naming", "testing"), List.of(two, none), properties);
+                GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(two, none), properties);
 
         assertThat(group.support().opportunitiesUntilComparable()).isEqualTo(6);
     }
@@ -147,14 +138,12 @@ class GroupTrendAggregatorTest {
     void shouldCountWorkSeveralPracticesJudgedOnce() {
         // Pull request 2 is judged by both practices: the group was reviewed on three pieces of work, not four.
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
-                "naming",
                 List.of(
                         judged(1L, "2026-05-01T09:00:00Z", ResultOutcome.MET),
                         judged(2L, "2026-05-02T09:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(
                         judged(2L, "2026-05-02T09:00:00Z", ResultOutcome.MET),
                         judged(3L, "2026-05-03T09:00:00Z", ResultOutcome.MET),
@@ -162,8 +151,8 @@ class GroupTrendAggregatorTest {
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
-        PracticeTrend group = GroupTrendAggregator.aggregate(
-                "quality", List.of("naming", "testing"), List.of(naming, testing), properties);
+        PracticeTrend group =
+                GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(naming, testing), properties);
 
         assertThat(group.support().reviewedWork()).isEqualTo(3);
         assertThat(group.support().standingWork()).isEqualTo(3);
@@ -176,16 +165,15 @@ class GroupTrendAggregatorTest {
         for (int day = 1; day <= 8; day++) {
             compared.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), ResultOutcome.MET));
         }
-        PracticeTrend full = PracticeTrendCalculator.calculatePractice(
-                "naming", compared, Instant.parse("2026-01-01T00:00:00Z"), properties);
+        PracticeTrend full =
+                PracticeTrendCalculator.calculatePractice(compared, Instant.parse("2026-01-01T00:00:00Z"), properties);
         PracticeTrend thin = PracticeTrendCalculator.calculatePractice(
-                "testing",
                 List.of(judged(50L, "2026-05-20T09:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
-        PracticeTrend group = GroupTrendAggregator.aggregate(
-                "quality", List.of("naming", "testing"), List.of(full, thin), properties);
+        PracticeTrend group =
+                GroupTrendAggregator.aggregate(List.of("naming", "testing"), List.of(full, thin), properties);
 
         assertThat(group.support().comparablePractices()).isEqualTo(1);
         // The compared practice's newest four, and the thin practice's one: both vote in the standing.
@@ -210,15 +198,6 @@ class GroupTrendAggregatorTest {
                 properties.getBundleSize(),
                 properties.getRopeHalfWidth(),
                 properties.getCredibilityThreshold());
-        return new PracticeTrend(
-                slug,
-                TrendScope.PRACTICE,
-                TrendDirection.UNCERTAIN,
-                support,
-                OutcomeVector.EMPTY,
-                OutcomeVector.EMPTY,
-                List.of(),
-                Map.of(),
-                difference);
+        return new PracticeTrend(TrendDirection.UNCERTAIN, support, List.of(), Map.of(), difference);
     }
 }

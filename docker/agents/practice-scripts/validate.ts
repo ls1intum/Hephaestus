@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Run a v3 practice script against local pinned captures without model access. */
+/** Run a practice script against local pinned captures without model access. */
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
@@ -28,7 +28,7 @@ import { parseInputs } from "./lib/core/script-inputs.ts";
 import { stagePracticeScripts } from "./stage.ts";
 
 const USAGE =
-	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] --inputs <json> [--context <dir>] [--review <candidate.json>] [--out <dir>]";
+	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] --inputs <json> [--review <candidate.json>] [--out <dir>]";
 
 /** How long the program may run. */
 const DEADLINE_MS = 600_000;
@@ -78,7 +78,6 @@ function parsedArgs() {
 				script: { type: "string" },
 				repo: { type: "string" },
 				diff: { type: "string" },
-				context: { type: "string" },
 				inputs: { type: "string" },
 				review: { type: "string" },
 				out: { type: "string" },
@@ -90,7 +89,7 @@ function parsedArgs() {
 	}
 }
 
-const { script, repo, context, out, diff, inputs: inputsFile, review: reviewFile } = parsedArgs();
+const { script, repo, out, diff, inputs: inputsFile, review: reviewFile } = parsedArgs();
 if (script === undefined || repo === undefined || inputsFile === undefined) {
 	stop(`--script, --repo and --inputs are required. ${USAGE}`);
 }
@@ -101,9 +100,6 @@ if (!PRACTICE_SLUG.test(slug)) {
 	);
 }
 await requireFolder("repo", repo);
-if (context !== undefined) {
-	await requireFolder("context", context);
-}
 const source = await read("script", script);
 let change: Map<string, DiffFile> | null = null;
 if (diff !== undefined) {
@@ -179,7 +175,7 @@ try {
 			repo: path.resolve(repo),
 			headRevision: head,
 			treeSourceFile: TREE_SOURCE_PATH,
-			contextDir: context === undefined ? null : path.resolve(context),
+			contextDir: null,
 			contextReference: CONTEXT_REFERENCE,
 			change: captured,
 			sourceKindOf: () => undefined,
@@ -192,8 +188,6 @@ try {
 			{
 				slug,
 				inputs,
-				criteria: "",
-
 				files,
 				now: admittedAt,
 				deadline: started + DEADLINE_MS,
@@ -220,7 +214,6 @@ try {
 								leads,
 								CONTEXT_REFERENCE,
 								`\`${jsonPath}\``,
-								false,
 							);
 						}
 					} catch (error) {

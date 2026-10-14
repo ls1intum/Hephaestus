@@ -38,6 +38,19 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Component
 public class ScmFeedbackFormatter {
 
+    private static final Pattern DELIVERY_TAG = Pattern.compile("<!-- hephaestus-diff-note-ck=([A-Za-z0-9_:-]+) -->");
+
+    public static String deliveryTag(String key) {
+        return "<!-- hephaestus-diff-note-ck=" + key + " -->";
+    }
+
+    public static @Nullable String lastDeliveryKey(String body) {
+        Matcher matcher = DELIVERY_TAG.matcher(body);
+        String key = null;
+        while (matcher.find()) key = matcher.group(1);
+        return key;
+    }
+
     private final String webappUrl;
     private final String preferencesUrl;
     private final WorkspaceSummaryQuery workspaces;
@@ -196,9 +209,7 @@ public class ScmFeedbackFormatter {
      * punctuation (e.g., "LGTM!", "Approved.").
      */
     private static final Pattern APPROVAL_LANGUAGE = Pattern.compile(
-            "^\\s*(?:LGTM|(?:looks good to me)|(?:approved)|(?:ready to merge)|(?:ship"
-                    + " it)|(?:approved by\\b[^\\n"
-                    + "]*))[.!?]*\\s*$",
+            "^\\s*(?:LGTM|(?:looks good to me)|(?:approved)|(?:ready to merge)|(?:ship it)|(?:approved by\\b[^\\n]*))[.!?]*\\s*$",
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     /**

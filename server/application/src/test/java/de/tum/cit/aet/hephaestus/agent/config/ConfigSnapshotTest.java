@@ -2,9 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
@@ -13,377 +13,106 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
+import java.util.EnumMap;
 import java.util.Map;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mock;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 class ConfigSnapshotTest extends BaseUnitTest {
+    private final JsonMapper mapper = new JsonMapper();
 
-    // Mirrors spring.jackson.deserialization.fail-on-null-for-primitives=false from application.yml.
-    private static final ObjectMapper OBJECT_MAPPER = JsonMapper.builder()
-            .disable(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
-            .build();
-
-    @Mock
-    private LlmModelResolver resolver;
-
-    private WorkspaceAgentBinding createBinding() {
-        Workspace ws = new Workspace();
-        ws.setId(1L);
-
-        WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
-        binding.setId(42L);
-        binding.setWorkspace(ws);
-        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        LlmModel model = new LlmModel();
-        model.setId(20L);
-        binding.setInstanceModel(model);
-        binding.setTimeoutSeconds(600);
-        binding.setAllowInternet(false);
-        binding.setMaxConcurrentJobs(5);
-        return binding;
+    @Test
+    void roundTripStoresOneModelWithTypedProtocolAndNoCredentials() {
+        var snapshot = snapshot(600)
+                .withPriceSnapshot(LlmPriceSnapshot.unpricedInstance())
+                .withPracticeScript(Map.of(ModelKind.EMBEDDING, model(LlmApiProtocol.OPENAI_EMBEDDINGS)));
+        var json = snapshot.toJson(mapper);
+        assertThat(ConfigSnapshot.fromJson(json, mapper)).isEqualTo(snapshot);
+        assertThat(json.path("model").path("apiProtocol").asString()).isEqualTo("openai-responses");
+        assertThat(json.has("apiProtocol")).isFalse();
+        assertThat(json.toString()).doesNotContain("apiKey", "authHeaderName", "authValuePrefix");
+        assertThat(snapshot.model().priceSnapshot()).isEqualTo(LlmPriceSnapshot.unpricedInstance());
     }
 
-    private void stubResolver(WorkspaceAgentBinding binding) {
+    @Test
+    void freezesOneResolutionAndPreservesModelIdentityWhenRepriced() {
+        var binding = mock(WorkspaceAgentBinding.class);
+        var resolver = mock(LlmModelResolver.class);
+        when(binding.getTimeoutSeconds()).thenReturn(600);
+        when(binding.getDataHandlingTier()).thenReturn(DataHandlingTier.IN_HOUSE);
         when(resolver.resolve(binding))
                 .thenReturn(new ResolvedLlmModel(
-                        "https://api.anthropic.com",
-                        "anthropic-messages",
-                        "claude-sonnet-4-20250514",
-                        200000,
-                        8192,
-                        null));
+                        "https://models.example/v1", "openai-responses", "model-1", 16000, 1000, ReasoningEffort.HIGH));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, null, null));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, 9L, null));
+        var snapshot = ConfigSnapshot.from(binding, resolver);
+        assertThat(snapshot.contextWindow()).isEqualTo(16000);
+        assertThat(snapshot.maxOutputTokens()).isEqualTo(1000);
+        assertThat(snapshot.model().apiProtocol()).isEqualTo(LlmApiProtocol.OPENAI_RESPONSES);
+        assertThat(snapshot.withPriceSnapshot(LlmPriceSnapshot.unpricedInstance())
+                        .model()
+                        .connectionRef())
+                .isEqualTo(snapshot.model().connectionRef());
+        verify(resolver).resolve(binding);
     }
 
-    @Nested
-    class FromBinding {
-
-        @Test
-        void shouldCaptureAllIncludedFields() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-
-            assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
-            assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
-            assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
-            assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
-            assertThat(snapshot.contextWindow()).isEqualTo(200000);
-            assertThat(snapshot.maxOutputTokens()).isEqualTo(8192);
-            assertThat(snapshot.connectionScope()).isEqualTo(UsageFundingSource.INSTANCE);
-            assertThat(snapshot.connectionId()).isEqualTo(7L);
-            assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
-            assertThat(snapshot.allowInternet()).isFalse();
-        }
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 0, 5, 7, 9})
+    void rejectsEveryOtherSchemaVersion(int version) {
+        var json = (ObjectNode) snapshot(600).toJson(mapper);
+        json.put("schemaVersion", version);
+        assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, mapper)).isInstanceOf(IllegalStateException.class);
     }
 
     @Test
-    void shouldFreezeTheModelsReasoningEffortAndReadItBack() {
-        WorkspaceAgentBinding binding = createBinding();
-        when(resolver.resolve(binding))
-                .thenReturn(new ResolvedLlmModel(
-                        "https://api.openai.com", "openai-completions", "gpt-5", null, null, ReasoningEffort.XHIGH));
-        when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, null, null));
-
-        ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-        ConfigSnapshot roundTripped = ConfigSnapshot.fromJson(snapshot.toJson(OBJECT_MAPPER), OBJECT_MAPPER);
-
-        assertThat(snapshot.reasoningEffort()).isEqualTo(ReasoningEffort.XHIGH);
-        assertThat(roundTripped.reasoningEffort()).isEqualTo(ReasoningEffort.XHIGH);
+    void rejectsUnknownProtocolAtTheJsonBoundary() {
+        var json = (ObjectNode) snapshot(600).toJson(mapper);
+        ((ObjectNode) json.path("model")).put("apiProtocol", "unknown");
+        assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, mapper)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
-    void shouldLeaveAV5SnapshotOfANonReasoningModelWithoutAnEffort() {
-        ObjectNode node = OBJECT_MAPPER.createObjectNode();
-        node.put("schemaVersion", 5);
-        node.put("apiProtocol", "openai-completions");
-        node.put("baseUrl", "https://api.openai.com");
-        node.put("upstreamModelId", "gpt-4.1");
-        node.put("supportsReasoning", false);
-        node.put("timeoutSeconds", 600);
-
-        assertThat(ConfigSnapshot.fromJson(node, OBJECT_MAPPER).reasoningEffort())
-                .isNull();
-    }
-
-    @Nested
-    class JsonRoundTrip {
-        @Test
-        void shouldPreserveTheFrozenDataHandlingTierWhenRepricingAndSerializing() {
-            var binding = createBinding();
-            binding.setDataHandlingTier(DataHandlingTier.IN_HOUSE);
-            stubResolver(binding);
-            var snapshot =
-                    ConfigSnapshot.from(binding, resolver).withPriceSnapshot(LlmPriceSnapshot.unpricedInstance());
-            binding.setDataHandlingTier(DataHandlingTier.CLOUD);
-
-            assertThat(ConfigSnapshot.fromJson(snapshot.toJson(OBJECT_MAPPER), OBJECT_MAPPER)
-                            .dataHandlingTier())
-                    .isEqualTo(DataHandlingTier.IN_HOUSE);
-        }
-
-        @Test
-        void shouldSerializeAndDeserializeCorrectly() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
-
-            JsonNode json = original.toJson(OBJECT_MAPPER);
-            ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
-
-            assertThat(deserialized).isEqualTo(original);
-            assertThat(deserialized.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
-            assertThat(deserialized.timeoutSeconds()).isEqualTo(600);
-        }
-
-        @Test
-        void shouldRoundTripThePracticeScriptModelsWhenTheJobHasThem() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            var embedding = new FrozenModel(
-                    "openai-embeddings",
-                    "https://api.openai.com/v1",
-                    "text-embedding-3-small",
-                    UsageFundingSource.WORKSPACE,
-                    8L,
-                    21L,
-                    1L,
-                    DataHandlingTier.CLOUD,
-                    null,
-                    null);
-            var decision = new FrozenModel(
-                            "openai-completions",
-                            "https://gpu.example.com/v1",
-                            "gpt-oss-20b",
-                            UsageFundingSource.INSTANCE,
-                            9L,
-                            22L,
-                            1L,
-                            DataHandlingTier.IN_HOUSE,
-                            ReasoningEffort.LOW,
-                            null)
-                    .withPriceSnapshot(LlmPriceSnapshot.unpricedInstance());
-            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver)
-                    .withPracticeScript(Map.of(ModelKind.EMBEDDING, embedding, ModelKind.DECISION, decision));
-
-            JsonNode json = original.toJson(OBJECT_MAPPER);
-            ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
-
-            assertThat(deserialized).isEqualTo(original);
-            assertThat(json.path("practiceScript").path("EMBEDDING").has("connectionRef"))
-                    .as("only the record components are stored")
-                    .isFalse();
-            assertThat(json.toString()).doesNotContain("apiKey");
-        }
-
-        @Test
-        void shouldReadNoPracticeScriptModelsWhenTheRowPredatesThem() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ObjectNode json =
-                    (ObjectNode) ConfigSnapshot.from(binding, resolver).toJson(OBJECT_MAPPER);
-            json.remove("practiceScript");
-
-            ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
-
-            assertThat(deserialized.practiceScript()).isNull();
-            assertThat(deserialized.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
-        }
-
-        @Test
-        void shouldKeepThePracticeScriptModelsWhenTheReviewPriceIsFrozen() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            var reranking = new FrozenModel(
-                    "cohere-rerank",
-                    "https://api.cohere.com/v2",
-                    "rerank-v3.5",
-                    UsageFundingSource.WORKSPACE,
-                    8L,
-                    23L,
-                    1L,
-                    DataHandlingTier.UNDECLARED,
-                    null,
-                    null);
-
-            ConfigSnapshot priced = ConfigSnapshot.from(binding, resolver)
-                    .withPracticeScript(Map.of(ModelKind.RERANKING, reranking))
-                    .withPriceSnapshot(LlmPriceSnapshot.unpricedInstance());
-
-            assertThat(priced.practiceScriptSlot(ModelKind.RERANKING)).isEqualTo(reranking);
-        }
-
-        @Test
-        void shouldNotContainCredentialMaterialInJson() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-            JsonNode json = snapshot.toJson(OBJECT_MAPPER);
-            String jsonString = json.toString();
-
-            assertThat(jsonString).doesNotContain("llmApiKey");
-            assertThat(jsonString).doesNotContain("llm_api_key");
-            assertThat(jsonString).doesNotContain("apiKey");
-            assertThat(jsonString).doesNotContain("api_key");
-        }
-
-        @Test
-        void shouldNotContainAuthHeaderMaterialInJson() {
-            // authHeaderName/authValuePrefix are re-resolved live from the connection on every use, so
-            // freezing them here would pin a job to a header shape the connection has since moved off.
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-            String jsonString = snapshot.toJson(OBJECT_MAPPER).toString();
-
-            assertThat(jsonString).doesNotContain("authHeaderName");
-            assertThat(jsonString).doesNotContain("authValuePrefix");
-        }
-
-        @Test
-        void shouldNotContainMaxConcurrentJobsInJson() {
-            WorkspaceAgentBinding binding = createBinding();
-            binding.setMaxConcurrentJobs(10);
-            stubResolver(binding);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-            JsonNode json = snapshot.toJson(OBJECT_MAPPER);
-            String jsonString = json.toString();
-
-            assertThat(jsonString).doesNotContain("maxConcurrentJobs");
-            assertThat(jsonString).doesNotContain("max_concurrent_jobs");
-        }
-
-        @Test
-        void shouldIncludeSchemaVersionInJson() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
-            JsonNode json = snapshot.toJson(OBJECT_MAPPER);
-
-            assertThat(json.has("schemaVersion")).isTrue();
-            assertThat(json.get("schemaVersion").asInt()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
-        }
-
-        @Test
-        void shouldRejectNewerSchemaVersion() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
-            JsonNode json = original.toJson(OBJECT_MAPPER);
-
-            ((ObjectNode) json).put("schemaVersion", 999);
-
-            assertThatThrownBy(() -> ConfigSnapshot.fromJson(json, OBJECT_MAPPER))
-                    .isInstanceOf(IllegalStateException.class)
-                    .hasMessageContaining("newer than supported version");
-        }
-
-        @Test
-        void shouldTolerateUnknownFields() {
-            WorkspaceAgentBinding binding = createBinding();
-            stubResolver(binding);
-            ConfigSnapshot original = ConfigSnapshot.from(binding, resolver);
-            JsonNode json = original.toJson(OBJECT_MAPPER);
-
-            ((ObjectNode) json).put("futureField", "future-value");
-
-            ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
-            assertThat(deserialized).isEqualTo(original);
-        }
+    void freezesScriptSlotsAgainstCallerMutation() {
+        var slots = new EnumMap<ModelKind, FrozenModel>(ModelKind.class);
+        slots.put(ModelKind.EMBEDDING, model(LlmApiProtocol.OPENAI_EMBEDDINGS));
+        var snapshot = snapshot(600).withPracticeScript(slots);
+        slots.clear();
+        assertThat(snapshot.practiceScriptSlot(ModelKind.EMBEDDING)).isNotNull();
+        assertThat(snapshot.practiceScriptSlot(ModelKind.RERANKING)).isNull();
     }
 
     @Test
-    void shouldKeepTheChatSlotAbsentUnlessExplicitlyBound() {
-        WorkspaceAgentBinding binding = createBinding();
-        stubResolver(binding);
-        var embedding = new FrozenModel(
-                "openai-embeddings",
-                "https://api.openai.com/v1",
-                "text-embedding-3-small",
-                UsageFundingSource.WORKSPACE,
-                8L,
-                21L,
-                1L,
-                DataHandlingTier.CLOUD,
-                null,
+    void enforcesTheRunnerTimeoutFloorAndRejectsNonpositiveTimeouts() {
+        assertThat(snapshot(1).timeoutSeconds()).isEqualTo(PracticePiAdapter.MIN_TIMEOUT_SECONDS);
+        assertThatThrownBy(() -> snapshot(0)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    private static ConfigSnapshot snapshot(int timeout) {
+        return new ConfigSnapshot(
+                ConfigSnapshot.SCHEMA_VERSION,
+                model(LlmApiProtocol.OPENAI_RESPONSES),
+                16000,
+                1000,
+                timeout,
+                false,
                 null);
-
-        ConfigSnapshot snapshot =
-                ConfigSnapshot.from(binding, resolver).withPracticeScript(Map.of(ModelKind.EMBEDDING, embedding));
-
-        assertThat(snapshot.practiceScriptModels()).containsOnly(Map.entry(ModelKind.EMBEDDING, embedding));
-        assertThat(snapshot.model().upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
-        assertThat(snapshot.model().connectionRef())
-                .isEqualTo(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, null, null));
     }
 
-    @Nested
-    class Validation {
-
-        private ConfigSnapshot snapshot(String apiProtocol, String baseUrl, int timeoutSeconds) {
-            return new ConfigSnapshot(
-                    ConfigSnapshot.SCHEMA_VERSION,
-                    apiProtocol,
-                    baseUrl,
-                    "gpt",
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    timeoutSeconds,
-                    false,
-                    null,
-                    null,
-                    null);
-        }
-
-        @ParameterizedTest(name = "a snapshot with no {2} cannot be built")
-        @CsvSource(
-                nullValues = "NULL",
-                value = {"NULL, https://api.openai.com, apiProtocol", "openai-completions, NULL, baseUrl"})
-        void shouldRejectAMissingRoutingField(String apiProtocol, String baseUrl, String missingField) {
-            assertThatThrownBy(() -> snapshot(apiProtocol, baseUrl, 600))
-                    .as(missingField)
-                    .isInstanceOf(NullPointerException.class);
-        }
-
-        @Test
-        void shouldRaiseTheTimeoutToThePracticeFloorWhenTheBindingIsShorter() {
-            assertThat(snapshot("openai-completions", "https://api.openai.com", 30)
-                            .timeoutSeconds())
-                    .isEqualTo(PracticePiAdapter.MIN_TIMEOUT_SECONDS)
-                    .as("one second past the runner's shutdown buffer; no program stage is reserved")
-                    .isEqualTo(61);
-            assertThat(snapshot("openai-completions", "https://api.openai.com", 62)
-                            .timeoutSeconds())
-                    .isEqualTo(62);
-        }
-
-        @ParameterizedTest(name = "a timeout of {0}s cannot be built")
-        @ValueSource(ints = {0, -1})
-        void shouldRejectANonPositiveTimeout(int timeoutSeconds) {
-            assertThatThrownBy(() -> snapshot("openai-completions", "https://api.openai.com", timeoutSeconds))
-                    .isInstanceOf(IllegalArgumentException.class);
-        }
+    private static FrozenModel model(LlmApiProtocol protocol) {
+        return new FrozenModel(
+                protocol,
+                "https://models.example/v1",
+                "model-1",
+                UsageFundingSource.INSTANCE,
+                7L,
+                9L,
+                null,
+                DataHandlingTier.IN_HOUSE,
+                ReasoningEffort.HIGH,
+                null);
     }
 }

@@ -10,6 +10,7 @@ import io.github.bucket4j.Bucket;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -140,18 +141,10 @@ class SandboxGatewayRateLimitFilterTest extends BaseUnitTest {
     }
 
     private void authenticate(String principalDescription) {
-        var routing = new ProxyRouting(
-                principalDescription,
-                "openai-responses",
-                "https://api.example.com/v1",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
-        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(routing, null));
+        var session = new MentorProxyCredentialRegistry.AuthenticatedSession(
+                UUID.nameUUIDFromBytes(principalDescription.getBytes(StandardCharsets.UTF_8)), "test-hash");
+        SecurityContextHolder.getContext()
+                .setAuthentication(new TestingAuthenticationToken(new ProxyIdentity(null, null, session), null));
     }
 
     private void serve(ServletRequest request, ServletResponse response) {

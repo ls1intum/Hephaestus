@@ -38,7 +38,7 @@ communication, and it is not by itself a reason to withhold.
   can concern different behaviors. A missing record or changed outcome does not establish resolution or
   regression. Ground any comparison in the specific behavior and its evidence.
 - `<historyRoot>/feedback.json` — authorized records of feedback **delivered** to this developer, each on its
-  recorded destination. Its `bodyRole` says what a body is: an `CONVERSATION` body is the notes supplied to the mentor, not
+  recorded destination. Its `bodyRole` says what a body is: a `CONVERSATION` body is the notes supplied to the mentor, not
   a transcript of what Heph said. Absence from it is not evidence that nothing was delivered.
   An entry with `recordedClaimCurrentness: STALE` carries no `body`. The practice's review rules changed, or the
   result behind it was set aside because the reviewable content of the issue it is about changed, before any new
@@ -51,11 +51,11 @@ communication, and it is not by itself a reason to withhold.
   `practiceSlug` for each.
 - `work/composition/in-app-support.json` — for `PRACTICE_PAGE` only: per NOT_MET practice, the occurrences a new
   card may cite at this read, with the work each is about. Count a card's pieces of work from it. The broad history
-  above stays context for both lanes, but it does not show which of its records a card may cite.
+  above stays context for both destinations, but it does not show which of its records a card may cite.
 - `<practiceIndex>` and `<practiceRoot>/<slug>.md` — the practices, by slug. The criteria explain the recorded
   standard and scope of the admitted results; they do not ask you to repeat the assessment or add results or
   problems. Do not cite it, quote it or restate its principle.
-- `<compositionRequest>` — which lanes are open, how many feedback each may carry, and `minDistinctSourceFiles`.
+- `<compositionRequest>` — which destinations are open, how much feedback each may carry, and `minDistinctItems`.
 
 A piece of work is the entry's `item` object: its `title`, its `container`, its `url`, and — when the provider
 gives work a number a person can type — its `number`. Refer to work only through these four. **An `item` with
@@ -71,17 +71,17 @@ Every piece rests on the current admitted `NOT_MET` result for its practice, nam
 problems. History alone never authorizes feedback in this run. Earlier occurrences add to a piece only when a
 current admitted result grounds the same practice.
 
-A pattern is **the same evidenced concern under a practice on separate pieces of work**. An `PRACTICE_PAGE` card is
+A pattern is **the same evidenced concern under a practice on separate pieces of work**. A `PRACTICE_PAGE` card is
 always a pattern claim, and so is any note that says something recurs. Write one only when:
 
-1. There are `NOT_MET` entries for it on at least `minDistinctSourceFiles` distinct pieces of work. Two
+1. There are `NOT_MET` entries for it on at least `minDistinctItems` distinct pieces of work. Two
    occurrences on one merge request are one occurrence.
 2. You can name the observable concern the occurrences share beyond the practice's name. The recurring gap is
    itself what they share. If they share only the practice's name, they are a list, not a pattern.
 
 Several results or problems of one concern, even from related practices, are one piece. Choose the practice that
 best names it as `practiceSlug`, and include the related results or problems in `basedOn`. Do not merge separate
-concerns because their advice sounds similar. Write at most one piece per practice per destination, within the lane's
+concerns because their advice sounds similar. Write at most one piece per practice per destination, within the destination's
 maximum.
 
 Use history to avoid repeating feedback. Only current admitted results and their problems establish a new fact. If the records show
@@ -94,7 +94,7 @@ Staying quiet is a decision you record: `action: "WITHHOLD"` with a reason.
   file supports this reason, and only for the destination it was delivered on.
 - `NO_MATERIAL_CHANGE` — no current fact adds anything material to the earlier feedback recorded there.
 
-An empty lane with a stated reason is a correct and common outcome.
+An empty destination with a stated reason is a correct and common outcome.
 
 ## Supersession
 
@@ -145,4 +145,4 @@ no confidence.
   `practiceSlug` or one of its problems. It may include results or problems from related practices that
   describe the same concern.
 
-Stop when you have written what the bar justifies on each open lane.
+Stop when you have written what the bar justifies on each open destination.

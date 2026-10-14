@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 /**
  * Queue-health gauges for the {@code review_job} queue, sampled on a timer and never on a request path.
  * All of them come from ONE query ({@link ReviewJobRepository#queueHealthSnapshot}): separate COUNT/MIN
- * scans would cost the most exactly during the incident that makes the signal matter.
+ * scans multiply database work while the queue is under load.
  *
  * <p>Must stay gated to the server role, not just to {@code @Scheduled}: a registered-but-never-sampled
  * gauge on a worker or webhook pod publishes a permanent 0 into the same {@code agent.queue.*} series

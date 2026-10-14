@@ -17,9 +17,6 @@ public record NotReviewedScanReportItemDTO(
         String reason,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        String reasonDescription,
-
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         ResultListDTO lastResult,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = "NOT_REVIEWED")

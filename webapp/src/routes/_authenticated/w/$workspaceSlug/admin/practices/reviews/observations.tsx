@@ -1,13 +1,13 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
-import { listPracticeReviewResultObservationsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
-import { ObservationsListPage } from "@/components/admin/practice-reviews/ObservationsListPage";
+import { listReviewProblemsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
+import { ProblemsListPage } from "@/components/admin/practice-reviews/ProblemsListPage";
 import { practiceReviewsHead } from "@/components/admin/practice-reviews/review-levels";
 import {
-	type ObservationsSearch,
-	observationsQuery,
-	observationsSearchSchema,
+	type ProblemsSearch,
+	problemsQuery,
+	problemsSearchSchema,
 	REVIEW_PAGE_SIZE,
 } from "@/components/admin/practice-reviews/review-search";
 import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
@@ -19,23 +19,23 @@ import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations",
 )({
-	validateSearch: observationsSearchSchema,
+	validateSearch: problemsSearchSchema,
 	head: practiceReviewsHead("Problems"),
-	component: ObservationsListRoute,
+	component: ProblemsListRoute,
 });
 
-function ObservationsListRoute() {
+function ProblemsListRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
 	const setSearch = useSearchState();
-	const updateSearch = (patch: Partial<ObservationsSearch>) => {
+	const updateSearch = (patch: Partial<ProblemsSearch>) => {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 
-	const observationsQueryResult = useInfiniteQuery({
-		...listPracticeReviewResultObservationsInfiniteOptions({
+	const problemsQueryResult = useInfiniteQuery({
+		...listReviewProblemsInfiniteOptions({
 			path: { workspaceSlug },
-			query: observationsQuery(search, REVIEW_PAGE_SIZE),
+			query: problemsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 		...pagedModelParams,
 	});
@@ -43,10 +43,10 @@ function ObservationsListRoute() {
 	const record = useScopeRecordFilter(workspaceSlug, search);
 
 	return (
-		<ObservationsListPage
+		<ProblemsListPage
 			search={search}
 			onSearchChange={updateSearch}
-			observations={pagedListState(observationsQueryResult, (observation) => observation.id)}
+			problems={pagedListState(problemsQueryResult, (problem) => problem.id)}
 			groups={groups}
 			practices={practices}
 			people={people}

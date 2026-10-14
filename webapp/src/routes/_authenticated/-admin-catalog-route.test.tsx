@@ -38,12 +38,12 @@ const release: CatalogPracticeReleaseProposal = {
 	fields: [{ field: "CRITERIA", offeredChanged: true, changedLocally: true, conflict: true }],
 };
 
-/** The catalog as the server sends it, with the tag every order write sends back. */
+/** The catalog as the server sends it. */
 function mockCatalog({
 	groups = [packaging],
 	practices = [{ ...savedPractice, state: "UPDATE_WAITING", changeKind: "REVIEW" }],
 }: { groups?: CatalogGroup[]; practices?: CatalogPractice[] } = {}) {
-	const catalog = { etag: "structure-1", groups, practices };
+	const catalog = { groups, practices };
 	server.use(
 		http.get("*/admin/practice-catalog", () => HttpResponse.json(catalog)),
 		http.get("*/admin/practice-catalog/definition-options", () =>
@@ -167,13 +167,11 @@ describe("instance catalog routes", () => {
 		});
 	});
 
-	it("reorders groups with the catalog tag", async () => {
+	it("reorders groups", async () => {
 		mockCatalog({ groups: [packaging, delivery] });
-		let ifMatch: string | null = null;
 		let body: unknown;
 		server.use(
 			http.patch("*/admin/practice-catalog/groups/reorder", async ({ request }) => {
-				ifMatch = request.headers.get("if-match");
 				body = await request.json();
 				return HttpResponse.json({
 					groups: [
@@ -195,16 +193,15 @@ describe("instance catalog routes", () => {
 		);
 		fireEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
 
-		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
-		expect(body).toStrictEqual({ slugs: ["delivery", "packaging"] });
+		await waitFor(() => expect(body).toStrictEqual({ slugs: ["delivery", "packaging"] }));
 	});
 
-	it("restores the Hephaestus order with the catalog tag", async () => {
+	it("restores the Hephaestus order", async () => {
 		const catalog = mockCatalog();
-		let ifMatch: string | null = null;
+		let restored = false;
 		server.use(
-			http.delete("*/admin/practice-catalog/order", ({ request }) => {
-				ifMatch = request.headers.get("If-Match");
+			http.delete("*/admin/practice-catalog/order", () => {
+				restored = true;
 				return HttpResponse.json(catalog);
 			}),
 		);
@@ -216,7 +213,7 @@ describe("instance catalog routes", () => {
 		const dialog = await screen.findByRole("alertdialog");
 		fireEvent.click(within(dialog).getByRole("button", { name: "Use Hephaestus order" }));
 
-		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
+		await waitFor(() => expect(restored).toBe(true));
 	});
 
 	it("restores the order and focus after a reorder conflict", async () => {
@@ -255,13 +252,11 @@ describe("instance catalog routes", () => {
 		await waitFor(() => expect(document.activeElement).toBe(actions));
 	});
 
-	it("moves a practice to another group with the catalog tag", async () => {
+	it("moves a practice to another group", async () => {
 		const catalog = mockCatalog({ groups: [packaging, delivery] });
-		let ifMatch: string | null = null;
 		let body: unknown;
 		server.use(
 			http.patch(`${PRACTICE_PATH}/placement`, async ({ request }) => {
-				ifMatch = request.headers.get("if-match");
 				body = await request.json();
 				return HttpResponse.json({
 					...catalog,
@@ -283,8 +278,7 @@ describe("instance catalog routes", () => {
 		);
 		fireEvent.click(await screen.findByRole("menuitemradio", { name: "Delivery" }));
 
-		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
-		expect(body).toStrictEqual({ groupSlug: "delivery", position: 0 });
+		await waitFor(() => expect(body).toStrictEqual({ groupSlug: "delivery", position: 0 }));
 	});
 
 	it("explains which practices group exclusion affects", async () => {

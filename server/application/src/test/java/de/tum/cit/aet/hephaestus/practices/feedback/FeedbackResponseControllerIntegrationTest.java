@@ -58,9 +58,12 @@ class FeedbackResponseControllerIntegrationTest extends AbstractFeedbackIntegrat
                 .isEmpty()
                 .jsonPath("$.createdAt")
                 .exists();
-        assertThat(responses.findByWorkspaceIdAndFeedbackIdOrderByCreatedAtDescIdDesc(
-                        workspace.getId(), parent.getId()))
-                .hasSize(2);
+        assertThat(jdbc.queryForObject(
+                        "SELECT count(*) FROM feedback_response WHERE workspace_id=? AND" + " feedback_id=?",
+                        Integer.class,
+                        workspace.getId(),
+                        parent.getId()))
+                .isEqualTo(2);
     }
 
     @Test
@@ -77,8 +80,9 @@ class FeedbackResponseControllerIntegrationTest extends AbstractFeedbackIntegrat
         var shown = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT);
         long other = Objects.requireNonNull(persistAccount("Other developer").getId());
         jdbc.update(
-                "INSERT INTO membership(workspace_id,account_id,role,joined_at,review_selected)"
-                        + " VALUES (?,?,'MEMBER',now(),false)",
+                "INSERT INTO"
+                    + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
+                    + " VALUES (?,?,'MEMBER',now(),false,false,false)",
                 workspace.getId(),
                 other);
         jdbc.update("UPDATE feedback SET developer_id=? WHERE id=?", other, shown.getId());

@@ -20,14 +20,14 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 	"scm.pull-request.diff": {
 		path: "webapp/src/components/admin/practice-reviews/ReviewRow.tsx",
 		quote:
-			'const routeName = "detection-output";\nreturn <Link to={routeName}>{finding.title}</Link>;',
+			'const routeName = "detection-output";\nreturn <Link to={routeName}>{entry.title}</Link>;',
 	},
 	"scm.pull-request.comments": {
 		path: "Comment by @grace",
 		quote: "Can we name this after what an operator is looking for rather than the pipeline stage?",
 	},
 	"scm.repository.tree": {
-		path: "webapp/src/lib/artifact-kinds.ts",
+		path: "webapp/src/lib/item-kinds.ts",
 		quote: 'export const ITEM_KIND = {\n\tpullRequest: "scm.pull_request",\n};',
 	},
 	"scm.issue.core": {
@@ -36,7 +36,7 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 	},
 	"scm.issue.comments": {
 		path: "Comment by @ada",
-		quote: "The wording here still says findings — we agreed on results.",
+		quote: "The wording here still uses the pipeline term — we agreed on results.",
 	},
 	"docs.document.core": {
 		path: "Reviewing practices",
@@ -85,14 +85,15 @@ function citation(sourceKind: string, overrides: Partial<EvidenceCitation> = {})
 	const isDiff = sourceKind === "scm.pull-request.diff";
 	return {
 		sourceKind,
-		artifactPath: `inputs/context/${sourceKind}.json`,
+		sourcePath: `inputs/context/${sourceKind}.json`,
 		path,
 		quote,
-		quoteRedacted: false,
 		startLine: 12,
 		endLine: quote.includes("\n") ? 13 : 12,
 		// The server enforces the biconditional: a side is set exactly when the kind is the diff.
-		...(isDiff ? { side: "NEW" as const } : {}),
+		side: isDiff ? "NEW" : null,
+		revision: null,
+		verification: null,
 		...overrides,
 	};
 }
@@ -174,7 +175,7 @@ export const LineNumbersOnlyWhereTheyAreReal: Story = {
 		citations: [citation("scm.repository.tree"), citation("slack.conversation.thread")],
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("webapp/src/lib/artifact-kinds.ts:12–13");
+		canvas.getByText("webapp/src/lib/item-kinds.ts:12–13");
 		canvas.getByText("Message from Ada Lovelace");
 		await expect(canvas.queryByText(/Message from Ada Lovelace:12/u)).not.toBeInTheDocument();
 	},
@@ -183,7 +184,7 @@ export const LineNumbersOnlyWhereTheyAreReal: Story = {
 /** A withheld quote still shows its location, because that is the part an operator can act on. */
 export const RedactedQuote: Story = {
 	args: {
-		citations: [citation("scm.pull-request.diff", { quote: undefined, quoteRedacted: true })],
+		citations: [citation("scm.pull-request.diff", { quote: null })],
 	},
 	play: async ({ canvas, canvasElement }) => {
 		canvas.getByText("Not quoted. The passage was withheld, so only its location was kept.");
@@ -197,12 +198,14 @@ export const UnknownSource: Story = {
 		citations: [
 			{
 				sourceKind: "wiki.page.body",
-				artifactPath: "inputs/context/wiki.json",
+				sourcePath: "inputs/context/wiki.json",
 				path: "Onboarding",
 				quote: "New reviewers shadow an existing reviewer for their first week.",
-				quoteRedacted: false,
 				startLine: 4,
 				endLine: 4,
+				side: null,
+				revision: null,
+				verification: null,
 			},
 		],
 	},
@@ -229,7 +232,7 @@ export const Mobile: Story = {
 	args: {
 		citations: [
 			citation("scm.pull-request.diff", {
-				path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId.tsx",
+				path: "webapp/src/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/items/$itemId/feedback.tsx",
 				quote:
 					"const detectionOutputRouteNameThatIsMuchLongerThanAnyMobileViewport = buildRouteName();",
 			}),
@@ -251,5 +254,16 @@ export const HistoricalSource: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("b".repeat(40))).toBeVisible();
+	},
+};
+
+/** A citation recorded without a place keeps its quote and says that no location was kept. */
+export const WithoutALocation: Story = {
+	args: {
+		citations: [citation("scm.pull-request.diff", { path: null, startLine: null, endLine: null })],
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Location not recorded");
+		await expect(canvas.queryByText(/:12/u)).not.toBeInTheDocument();
 	},
 };

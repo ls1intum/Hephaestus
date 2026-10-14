@@ -24,7 +24,7 @@ import { ITEM_KIND_VALUES } from "@/lib/item-kinds";
 import { multiValue, narrowToEnum, nonEmpty } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
 
-import type { ReviewScopeSearch } from "./review-scope";
+import { type ReviewScope, type ReviewScopeSearch, readScope } from "./review-scope";
 import { positiveIdParam, uuidParam } from "./review-selection";
 
 /**
@@ -108,6 +108,16 @@ const scope = {
 	groupSlug: multiValue,
 	practiceSlug: multiValue,
 };
+
+/**
+ * The shared scope out of whichever tab's search holds it, for a reader above the tabs: the router
+ * hands such a reader the address as written, where a list of one is its one value and an id may be
+ * a number, and with every tab's own filters in it.
+ */
+export function parseScopeSearch(search: unknown): ReviewScope {
+	const parsed = z.object(scope).safeParse(search);
+	return parsed.success ? readScope(parsed.data) : {};
+}
 
 function canonicalDateRange<T extends { from?: string; to?: string }>(search: T): T {
 	if (!hasText(search.from) || (hasText(search.to) && search.to < search.from)) {
@@ -213,24 +223,20 @@ export function dateWindowQuery(search: { from?: string; to?: string }) {
 /** A decimal id where the generated query still types it as a number. */
 const numericId = (id: string | undefined) => (id === undefined ? undefined : Number(id));
 
-/**
- * The practices a list narrows to: a tracked practice alone, since tracking it is the question the
- * reader asks now, or else the practice filter.
- */
-function practiceQuery(search: { practiceSlug?: string[]; selectedPractice?: string }) {
-	if (hasText(search.selectedPractice)) {
-		return [search.selectedPractice];
-	}
-	return nonEmpty(search.practiceSlug ?? []);
+/** The one value a filter narrows to, or undefined where it narrows to none or to several. */
+function oneValue(values: string[] | undefined): string | undefined {
+	return values?.length === 1 ? values[0] : undefined;
 }
 
-/** The one practice a list narrows to, or undefined where it narrows to none or to several. */
+/**
+ * The one practice a list narrows to: a tracked practice alone, since tracking it is the question
+ * the reader asks now, or else the practice filter.
+ */
 export function onePracticeQuery(search: {
 	practiceSlug?: string[];
 	selectedPractice?: string;
 }): string | undefined {
-	const slugs = practiceQuery(search);
-	return slugs?.length === 1 ? slugs[0] : undefined;
+	return hasText(search.selectedPractice) ? search.selectedPractice : oneValue(search.practiceSlug);
 }
 
 /** The scope every review list applies, in the names the endpoints share. */
@@ -238,8 +244,8 @@ function scopeQuery(search: Partial<ReviewScopeSearch>) {
 	return {
 		...dateWindowQuery(search),
 		reviewId: search.reviewId,
-		practiceSlug: practiceQuery(search),
-		groupSlug: nonEmpty(search.groupSlug ?? []),
+		practiceSlug: onePracticeQuery(search),
+		groupSlug: oneValue(search.groupSlug),
 	};
 }
 

@@ -2,26 +2,23 @@ import { ChevronRightIcon, RepeatIcon } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
 
 import { cn } from "cn";
-import type { AgentJob, ReviewLineage } from "@/api/types.gen";
-import type { BadgeVariant } from "@/components/common/status-def";
-import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
-import { RESULT_PROCESSING_DEFS } from "@/components/practice-vocabulary/review-status-defs";
-import { REVIEW_TRIGGER_DEFS } from "@/components/practice-vocabulary/review-trigger-defs";
+import type { ItemRef, ReviewDetail, ReviewLineage } from "@/api/types.gen";
+import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { hasText } from "@/lib/text";
 
-import { GlossaryTerm, TermSentence } from "./GlossaryTerm";
-import { countOf, stageCounts } from "./lineage-chain";
+import { TermSentence } from "./GlossaryTerm";
+import { countOf, lineageRecords, stageCounts } from "./lineage-chain";
 import {
 	type RailItem,
 	type RailStage,
 	reviewStepState,
 	type StorySiblings,
 } from "./lineage-story";
-import { MergeIcon, StageIcon, Step, StepTag, StepTime, ToneIcon } from "./LineageStep";
-import { mergeNote, momentNode } from "./review-trace";
-import { ReviewArtifactLabel } from "./ReviewArtifact";
+import { StageIcon, Step, StepTag, StepTime, ToneIcon } from "./LineageStep";
+import { chainReview, ownResults } from "./review-trace";
+import { ReviewItemLabel } from "./ReviewItem";
 import { type TraceBottleneck, traceSpans } from "./trace-bottleneck";
 import { hiddenByFilter, type TraceFilter } from "./trace-filter";
 import { STAGE_HEADERS, STAGE_MARKS, type StageKey } from "./trace-stage-headers";
@@ -30,14 +27,13 @@ import { FeedbackTableStep } from "./TraceFeedbackTable";
 import { ResultsStep } from "./TraceResultTable";
 import { type RailStepProps, type StepProps, StoryNode, useStory } from "./TraceStoryNode";
 
-function WorkStep({ lineage, here }: { lineage: ReviewLineage; here: boolean }) {
-	const { work } = lineage;
+function WorkStep({ item, here }: { item: ItemRef | undefined; here: boolean }) {
 	return (
 		<Step dot={{ tone: "outline", hollow: true, here }} data-step="work">
 			<StoryNode node={{ kind: "work" }} className="px-1.5 py-1">
-				<ReviewArtifactLabel reviewedWork={work} className="font-medium" />
-				{hasText(work?.title) && (
-					<span className="block break-words text-muted-foreground">{work.title}</span>
+				<ReviewItemLabel item={item} className="font-medium" />
+				{hasText(item?.title) && (
+					<span className="block break-words text-muted-foreground">{item.title}</span>
 				)}
 			</StoryNode>
 		</Step>
@@ -108,14 +104,14 @@ function StageHeader({
 }
 
 /** A stage's summary next to its name: the review's queue and run, the feedback's count and reach. */
-function stageSummary(stage: RailStage["stage"], full: ReviewLineage): ReactNode {
+function stageSummary(
+	stage: RailStage["stage"],
+	full: ReviewLineage,
+	detail: ReviewDetail | undefined,
+): ReactNode {
 	if (stage === "review") {
-		const spans = traceSpans(full, undefined).filter(
-			(entry) =>
-				entry.kind === "queue" ||
-				entry.kind === "preparation" ||
-				entry.kind === "execution" ||
-				entry.kind === "run",
+		const spans = traceSpans(full, undefined, detail).filter(
+			(entry) => entry.kind === "queue" || entry.kind === "run",
 		);
 		if (spans.length === 0) {
 			return undefined;
@@ -140,44 +136,40 @@ function stageSummary(stage: RailStage["stage"], full: ReviewLineage): ReactNode
 		);
 	}
 	if (stage === "feedback") {
-		const counts = stageCounts(full);
+		const counts = stageCounts(lineageRecords(full));
 		if (counts.feedback === 0) {
 			return undefined;
 		}
 		return (
 			<span className="text-2xs text-muted-foreground tabular-nums">
-				{`${countOf(counts.feedback, "listed piece", "listed pieces")}, ${counts.reached} reached the developer`}
+				{`${countOf(counts.feedback, "piece", "pieces")}, ${counts.reached} reached the developer`}
 			</span>
 		);
 	}
 	return undefined;
 }
 
-/** One stage of the rail under its header: Trigger, Review, Feedback, Effect. */
+/** One stage of the rail under its header: Started by, Review, Feedback, Effect. */
 export function StageSteps({
 	stage,
 	first,
 	previousAt,
-	showBefore,
-	onShowBefore,
 	end,
 	...props
 }: StepProps & {
 	stage: RailStage;
 	first: boolean;
 	previousAt: (item: RailItem) => Date | undefined;
-	showBefore: boolean;
-	onShowBefore: () => void;
 	end: TraceEnd;
 }) {
 	const { lineage, full, filter } = props;
-	const { firstReadAt } = useStory();
+	const { review: detail } = useStory();
 	const feedbackCount = stage.items.filter((item) => item.kind === "feedback").length;
 	const siblingCount = stage.items.some((item) => item.kind === "siblings");
 	const step = (item: RailItem) => (
 		<RailStep key={item.key} {...props} item={item} previous={previousAt(item)} />
 	);
-	// Pieces written one after another, with nothing on the work between them, share one table.
+	// Pieces one after another share one table.
 	const runs: (RailItem | { kind: "table"; key: string; items: FeedbackItem[] })[] = [];
 	for (const item of stage.items) {
 		const last = runs.at(-1);
@@ -191,9 +183,13 @@ export function StageSteps({
 	}
 	return (
 		<>
-			<StageHeader stage={stage.stage} first={first} summary={stageSummary(stage.stage, full)} />
-			{stage.stage === "trigger" && (
-				<WorkStep lineage={lineage} here={props.here?.kind === "work"} />
+			<StageHeader
+				stage={stage.stage}
+				first={first}
+				summary={stageSummary(stage.stage, full, detail)}
+			/>
+			{stage.stage === "start" && (
+				<WorkStep item={lineageRecords(lineage).item} here={props.here?.kind === "work"} />
 			)}
 			{runs.map((item) => {
 				if (item.kind === "table") {
@@ -206,17 +202,6 @@ export function StageSteps({
 						/>
 					);
 				}
-				if (item.kind === "before") {
-					return (
-						<BeforeSteps
-							key={item.key}
-							items={item.items}
-							open={showBefore}
-							onOpen={onShowBefore}
-							renderStep={step}
-						/>
-					);
-				}
 				if (item.kind === "results") {
 					return (
 						<Fragment key={item.key}>
@@ -226,22 +211,7 @@ export function StageSteps({
 					);
 				}
 				if (item.kind === "end") {
-					return (
-						<Fragment key={item.key}>
-							{firstReadAt !== undefined && (
-								<Step
-									dot={{ tone: "outline", hollow: true }}
-									at={firstReadAt}
-									data-step="first-read"
-								>
-									<span className="block px-1.5 py-1 text-muted-foreground">
-										A developer first read feedback of this review.
-									</span>
-								</Step>
-							)}
-							<EndStep end={end} previous={previousAt(item)} />
-						</Fragment>
-					);
+					return <EndStep key={item.key} end={end} previous={previousAt(item)} />;
 				}
 				return step(item);
 			})}
@@ -250,13 +220,6 @@ export function StageSteps({
 					<span className="px-1.5 text-muted-foreground">
 						{noFeedbackText(full, lineage, filter)}
 					</span>
-				</Step>
-			)}
-			{stage.stage === "feedback" && props.path === undefined && lineage.moreFeedback > 0 && (
-				<Step dot={{ tone: "outline", hollow: true }}>
-					<p className="px-1.5 text-muted-foreground">
-						{`${countOf(lineage.moreFeedback, "more piece", "more pieces")} of feedback not listed`}
-					</p>
 				</Step>
 			)}
 		</>
@@ -268,18 +231,17 @@ export function StageSteps({
  * this review"; a filter, or a path that leaves the review's other pieces off, says so instead.
  */
 function noFeedbackText(full: ReviewLineage, shown: ReviewLineage, filter: TraceFilter): string {
-	const reviewId = full.review?.id;
-	const own = full.feedback.filter(
-		(entry) => reviewId === undefined || entry.agentJobId === reviewId,
-	).length;
-	const any = own + full.moreFeedback > 0;
+	const records = lineageRecords(full);
+	const recorded = new Set(ownResults(records).map((entry) => entry.id));
+	const any = records.feedback.some((entry) => entry.basis.some((id) => recorded.has(id)));
 	if (filter.kind !== "all" && any) {
 		return hiddenByFilter(filter);
 	}
-	if (any || shown.feedback.length > 0) {
+	if (any || lineageRecords(shown).feedback.length > 0) {
 		return "No feedback on this path.";
 	}
-	return full.review?.phase === "QUEUED" || full.review?.phase === "RUNNING"
+	const status = chainReview(records)?.status;
+	return status === "QUEUED" || status === "RUNNING"
 		? "No feedback yet."
 		: "No feedback from this review.";
 }
@@ -287,8 +249,8 @@ function noFeedbackText(full: ReviewLineage, shown: ReviewLineage, filter: Trace
 function RailStep(props: RailStepProps) {
 	const { item, previous, lineage } = props;
 	switch (item.kind) {
-		case "moment": {
-			return <MomentStep item={item} previous={previous} lineage={lineage} />;
+		case "start": {
+			return <StartStep item={item} previous={previous} />;
 		}
 		case "review": {
 			return (
@@ -296,7 +258,6 @@ function RailStep(props: RailStepProps) {
 					lineage={lineage}
 					at={item.at}
 					previous={previous}
-					reviewOutcome={props.reviewOutcome}
 					hasStart={props.hasStart}
 					here={props.here?.kind === "review"}
 				/>
@@ -306,7 +267,7 @@ function RailStep(props: RailStepProps) {
 			return <ResultsStep {...props} at={item.at} />;
 		}
 		case "feedback": {
-			return <FeedbackTableStep {...props} items={[item.feedback]} />;
+			return <FeedbackTableStep {...props} items={[item.feedback]} previous={previous} />;
 		}
 		case "siblings": {
 			return (
@@ -317,63 +278,11 @@ function RailStep(props: RailStepProps) {
 				/>
 			);
 		}
-		case "before":
 		case "end": {
-			// The stage draws these itself: one folds steps, the other reads the verdict.
+			// The stage draws it itself, from the verdict.
 			return null;
 		}
 	}
-}
-
-/**
- * What happened on the work before the moment that started the review, folded into one line: the
- * moments before it and feedback an earlier review wrote. None of it caused this review.
- */
-function BeforeSteps({
-	items,
-	open,
-	onOpen,
-	renderStep,
-}: {
-	items: readonly RailItem[];
-	open: boolean;
-	onOpen: () => void;
-	renderStep: (item: RailItem) => ReactNode;
-}) {
-	if (open) {
-		return <>{items.map(renderStep)}</>;
-	}
-	const moments = items.filter((item) => item.kind === "moment");
-	const merged = moments.some((item) => item.moment.kind === "MERGED");
-	const others = moments.length - (merged ? 1 : 0);
-	const feedback = items.filter((item) => item.kind === "feedback").length;
-	return (
-		<Step dot={{ tone: "outline", hollow: true }} data-step="before">
-			<span className="block px-1.5 text-muted-foreground">
-				Before this review: {merged && "the work was merged"}
-				{merged && (others > 0 || feedback > 0) && ", "}
-				{others > 0 && (
-					<>
-						{others}{" "}
-						<GlossaryTerm term="moment">{others === 1 ? "moment" : "moments"}</GlossaryTerm>
-					</>
-				)}
-				{others > 0 && feedback > 0 && ", "}
-				{feedback > 0 &&
-					`${countOf(feedback, "piece", "pieces")} of feedback from an earlier review`}
-				.{" "}
-				<Button
-					variant="link"
-					size="inline"
-					className="text-muted-foreground"
-					aria-label="Show what came before this review"
-					onClick={onOpen}
-				>
-					Show
-				</Button>
-			</span>
-		</Step>
-	);
 }
 
 /** The record's siblings, as one line; it lists them on the rail. */
@@ -428,81 +337,44 @@ function EndStep({ end, previous }: { end: TraceEnd; previous: Date | undefined 
 	);
 }
 
-const MERGE_TONE: Record<"by-design" | "problem" | "plain", BadgeVariant> = {
-	"by-design": "outline",
-	problem: "warning",
-	plain: "outline",
-};
-
-/** What happened on the work: what started the review, a later moment folded into it, the merge. */
-function MomentStep({
+/** What started the review: an event on the work, a request, a schedule or a backfill. */
+function StartStep({
 	item,
 	previous,
-	lineage,
 }: {
-	item: Extract<RailItem, { kind: "moment" }>;
+	item: Extract<RailItem, { kind: "start" }>;
 	previous: Date | undefined;
-	lineage: ReviewLineage;
 }) {
-	const { moment } = item;
-	const def = REVIEW_TRIGGER_DEFS[moment.kind];
-	const merged = moment.kind === "MERGED";
-	const note = merged ? mergeNote(lineage) : undefined;
-	const tone = merged ? MERGE_TONE[note?.tone ?? "plain"] : "outline";
+	const def = REVIEW_ORIGIN_DEFS[item.origin];
 	return (
-		<Step
-			// Filled only where the merge has something to judge: a plain one is hollow, as the legend says.
-			dot={{ tone, hollow: tone === "outline" }}
-			at={item.at}
-			gapFrom={previous}
-			data-step={merged ? "merged" : "moment"}
-		>
-			<StoryNode node={momentNode(moment)} className="px-1.5 py-1">
+		<Step dot={{ tone: "outline", hollow: true }} at={item.at} gapFrom={previous} data-step="start">
+			<span className="block px-1.5 py-1">
 				<span className="flex items-center gap-1.5">
-					{merged ? <MergeIcon tone={tone} /> : <ToneIcon def={def} />}
-					<span className={cn(merged && "font-medium")}>{def.label}</span>
+					<ToneIcon def={def} />
+					<span>{def.label}</span>
 				</span>
-				{moment.startedReview && (
-					<span className="block text-muted-foreground">
-						This{" "}
-						<GlossaryTerm term="moment" as="span">
-							moment
-						</GlossaryTerm>{" "}
-						started the review.
-					</span>
-				)}
-				{moment.joinedReview && (
-					<span className="block text-muted-foreground">
-						<GlossaryTerm term="coalesced" as="span">
-							Coalesced
-						</GlossaryTerm>{" "}
-						into this review.
-					</span>
-				)}
-				{note !== undefined && <span className="block text-muted-foreground">{note.text}</span>}
-			</StoryNode>
+				<span className="block text-muted-foreground">{def.description}</span>
+			</span>
 		</Step>
 	);
 }
 
-/** The review: how it stands, why it ran, and with system info how long it waited and ran and its model. */
+/** The review: how it stands, why it ran, and with system info its model. */
 function ReviewStep({
 	lineage,
 	at,
 	previous,
-	reviewOutcome,
 	hasStart,
 	here,
 }: {
 	lineage: ReviewLineage;
-	at: Date;
+	at: Date | undefined;
 	previous: Date | undefined;
-	reviewOutcome: AgentJob["reviewOutcome"] | undefined;
 	hasStart: boolean;
 	here: boolean;
 }) {
-	const { display, resultProcessing, origin, position, factsOpen } = useStory();
-	const { review, reviewTrigger } = lineage;
+	const { display, review: detail, position, factsOpen } = useStory();
+	const review = chainReview(lineageRecords(lineage));
 	if (review === undefined) {
 		return (
 			<Step dot={{ tone: "outline", hollow: true }}>
@@ -510,10 +382,12 @@ function ReviewStep({
 			</Step>
 		);
 	}
-	const state = reviewStepState(review, reviewOutcome);
-	const trigger = reviewTrigger && REVIEW_TRIGGER_DEFS[reviewTrigger];
+	// The detail the page read speaks for this review only.
+	const own = detail?.id === review.id ? detail : undefined;
+	const state = reviewStepState(review, own);
+	const origin = REVIEW_ORIGIN_DEFS[review.origin];
 	// The queue and the run stand on the stage's header; the model is all the system adds here.
-	const facts = [review.model].filter(hasText);
+	const facts = [own?.model].filter(hasText);
 	return (
 		<Step
 			dot={{ tone: state.def.badgeVariant, here }}
@@ -527,13 +401,8 @@ function ReviewStep({
 						<ToneIcon def={state.def} />
 						{state.title}
 					</span>
-					{/* Processed results and a live run are the ordinary case, said by saying nothing. */}
-					{resultProcessing !== undefined && resultProcessing !== "DELIVERED" && (
-						<StepTag def={RESULT_PROCESSING_DEFS[resultProcessing]} />
-					)}
-					{origin !== undefined && origin !== "LIVE" && (
-						<StepTag def={RESULT_ORIGIN_DEFS[origin]} />
-					)}
+					{/* An event is the ordinary case, said by saying nothing. */}
+					{review.origin !== "EVENT" && <StepTag def={origin} />}
 					{position !== undefined && position.total > 1 && (
 						<Badge variant="outline" size="xs" data-review-position>
 							<RepeatIcon aria-hidden />
@@ -542,13 +411,8 @@ function ReviewStep({
 					)}
 				</span>
 				{hasText(state.note) && <span className="block">{state.note}</span>}
-
 				{!hasStart && (
-					<span className="block text-muted-foreground">
-						{trigger === undefined
-							? "Why it ran: not recorded on the work"
-							: `Why it ran: ${trigger.label}`}
-					</span>
+					<span className="block text-muted-foreground">{`Why it ran: ${origin.description}`}</span>
 				)}
 				{/* The facts box under the step names the model where it opens. */}
 				{display.system && !factsOpen && !here && facts.length > 0 && (

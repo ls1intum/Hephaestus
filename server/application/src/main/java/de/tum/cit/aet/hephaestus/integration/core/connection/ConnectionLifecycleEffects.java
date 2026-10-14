@@ -50,8 +50,7 @@ final class ConnectionLifecycleEffects {
                     providerTeardownTemplate.execute(status -> strategy.prepareProviderTeardown(ref)));
         } catch (RuntimeException e) {
             log.warn(
-                    "Provider teardown could not be prepared on disconnect of connection={}"
-                            + " kind={}: {} — disconnecting without it",
+                    "Provider teardown could not be prepared on disconnect of connection={} kind={}: {} — disconnecting without it",
                     ref.connectionId(),
                     ref.kind(),
                     e.toString());
@@ -65,9 +64,7 @@ final class ConnectionLifecycleEffects {
                             call.run();
                         } catch (RuntimeException e) {
                             log.warn(
-                                    "Provider teardown failed after disconnect of"
-                                            + " connection={} kind={}: {} — local data"
-                                            + " already erased",
+                                    "Provider teardown failed after disconnect of connection={} kind={}: {} — local data already erased",
                                     ref.connectionId(),
                                     ref.kind(),
                                     e.toString());

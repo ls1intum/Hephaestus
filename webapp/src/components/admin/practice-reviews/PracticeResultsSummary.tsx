@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { PencilIcon } from "lucide-react";
 
 import { cn } from "cn";
-import type { PracticeReviewCounts } from "@/api/types.gen";
+import type { ReviewPracticeCounts } from "@/api/types.gen";
 import { STALE } from "@/components/activity/activity-tones";
 import { practiceFormLevel } from "@/components/admin/practices/practice-search";
 import { InlineLink } from "@/components/common/InlineLink";
@@ -10,7 +10,7 @@ import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { feedbackComposed } from "./practice-totals";
@@ -24,7 +24,7 @@ export interface PracticeResultsSummaryProps {
 	/** "Since 7 Sep": the days every count covers, which are the list's own. */
 	rangeLabel: string;
 	/** The practice's counts in those days; absent when it recorded nothing there. */
-	counts: PanelState<{ counts?: PracticeReviewCounts; stale: boolean }>;
+	counts: PanelState<{ counts?: ReviewPracticeCounts; stale: boolean }>;
 }
 
 /**
@@ -109,8 +109,8 @@ function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 			</p>
 		);
 	}
-	const { practiceResults, practiceResultsInvalidated, feedback } = state.counts;
-	const verdicts = resultSlots(practiceResults);
+	const { results, resultsMarkedIncorrect, feedback } = state.counts;
+	const verdicts = resultSlots(results);
 	const total = slotsTotal(verdicts);
 	// Replaced feedback is left out, as in the Practices table.
 	const feedbackTotal = feedbackComposed(feedback);
@@ -129,8 +129,8 @@ function Figures({ state }: { state: PracticeResultsSummaryProps["counts"] }) {
 					.join(" · ")}
 			</Figure>
 			<Figure
-				label={MARKED_INCORRECT_DEF.label}
-				value={`${practiceResultsInvalidated} of ${total}`}
+				label={RESULT_MARK_DEFS.INCORRECT.label}
+				value={`${resultsMarkedIncorrect} of ${total}`}
 			/>
 			<Figure
 				label="Feedback delivered"

@@ -13,7 +13,9 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
+import java.util.Comparator;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -191,5 +193,40 @@ class FeedbackReviewControllerIntegrationTest extends AbstractFeedbackIntegratio
                 .expectStatus()
                 .isBadRequest()
                 .expectBody(Void.class);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldApplyLocationBeforePaginationAndUseTheSameFilteredCounts() {
+        piece(FeedbackDestination.ON_WORK, FeedbackState.FAILED, null);
+        var first = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
+        var second = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
+        var expected = Stream.of(first, second)
+                .min(Comparator.comparing(row -> row.getId().toString()))
+                .orElseThrow();
+        client.get()
+                .uri(route() + "?location=PRACTICE_PAGES&sort=OLDEST&size=1")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.content.length()")
+                .isEqualTo(1)
+                .jsonPath("$.content[0].id")
+                .isEqualTo(expected.getId().toString());
+        client.get()
+                .uri(route() + "/locations?location=PRACTICE_PAGES")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].reason")
+                .isEqualTo("PRACTICE_PAGES")
+                .jsonPath("$[0].count")
+                .isEqualTo(2);
     }
 }

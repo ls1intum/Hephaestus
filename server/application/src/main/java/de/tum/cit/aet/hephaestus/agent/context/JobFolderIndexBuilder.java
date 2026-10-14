@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.agent.context;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -31,11 +31,11 @@ import tools.jackson.databind.ObjectMapper;
 /** Builds the manifest from source-owned captures without interpreting domain records. */
 @Component
 public class JobFolderIndexBuilder {
-    private final SourceCatalogRegistry catalogs;
+    private final ClasspathSourceCatalogRegistry catalogs;
     private final ObjectMapper mapper;
     private final Clock clock;
 
-    public JobFolderIndexBuilder(SourceCatalogRegistry catalogs, ObjectMapper mapper, Clock clock) {
+    public JobFolderIndexBuilder(ClasspathSourceCatalogRegistry catalogs, ObjectMapper mapper, Clock clock) {
         this.catalogs = catalogs;
         this.mapper = mapper;
         this.clock = clock;

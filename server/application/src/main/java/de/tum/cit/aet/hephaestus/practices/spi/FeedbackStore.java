@@ -23,7 +23,7 @@ public interface FeedbackStore {
             @Nullable String note,
             @Nullable String contentDigest);
 
-    boolean retry(long workspaceId, UUID feedbackId, long actorId);
+    void retry(long workspaceId, UUID feedbackId, long actorId);
 
     void respond(
             long workspaceId,

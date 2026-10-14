@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
@@ -31,6 +32,7 @@ import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -99,12 +101,12 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         sweeper = new ReviewJobZombieSweeper(
                 jobRepository,
                 workerRegistryRepository,
-                agentProperties,
                 objectMapper,
                 transactionTemplate,
                 usageRecorder,
                 meterRegistry,
-                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP));
+                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
+                new ReviewJobRecovery(jobRepository, agentProperties, objectMapper, usageRecorder, Optional.empty()));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("stale-reap"));
         instanceModel =
@@ -123,7 +125,7 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         assertThat(reaped.getStatus()).isEqualTo(ReviewJobStatus.TIMED_OUT);
         assertThat(reaped.getErrorMessage()).contains("exceeded its timeout");
 
-        LlmUsageEvent event = onlyUsageEvent();
+        LlmUsageEvent event = onlyUsageEvent(jobId);
         assertThat(event.getSourceId()).isEqualTo(jobId);
         assertThat(event.getSourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
         assertThat(event.getWorkspace().getId()).isEqualTo(workspace.getId());
@@ -146,7 +148,7 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
                 .as("an unreadable price must not cost the job its exit from RUNNING")
                 .isEqualTo(ReviewJobStatus.TIMED_OUT);
 
-        LlmUsageEvent event = onlyUsageEvent();
+        LlmUsageEvent event = onlyUsageEvent(jobId);
         assertThat(event.getSourceId()).isEqualTo(jobId);
         assertThat(event.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
         assertThat(event.getCostUsd()).isNull();
@@ -156,7 +158,9 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         // And the slot is genuinely released: a second sweep finds nothing left to reap, which is the
         // difference between "recovered" and "wedged in a 2-minute retry loop forever".
         sweeper.reapStaleRunningJobs();
-        assertThat(usageEventRepository.findAll()).hasSize(1);
+        assertThat(usageEventRepository.findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
+                        workspace.getId(), UsageSourceType.REVIEW_JOB, jobId))
+                .hasSize(1);
         assertThat(jobRepository.findById(jobId).orElseThrow().getStatus()).isEqualTo(ReviewJobStatus.TIMED_OUT);
     }
 
@@ -203,9 +207,15 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
     }
 
     private void assertPracticeScriptLedgerRows(UUID jobId) {
-        List<LlmUsageEvent> rows = usageEventRepository.findAll().stream()
-                .filter(event -> event.getSourceId().equals(jobId))
-                .toList();
+        List<LlmUsageEvent> rows =
+                usageEventRepository.findByWorkspaceIdAndSourceTypeInAndSourceIdOrderBySourceAttemptAsc(
+                        workspace.getId(),
+                        List.of(
+                                UsageSourceType.REVIEW_JOB,
+                                UsageSourceType.PRACTICE_SCRIPT_DECISION,
+                                UsageSourceType.PRACTICE_SCRIPT_EMBEDDING,
+                                UsageSourceType.PRACTICE_SCRIPT_RERANKING),
+                        jobId);
         assertThat(rows)
                 .extracting(LlmUsageEvent::getSourceType)
                 .containsExactlyInAnyOrder(
@@ -285,7 +295,7 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
     private FrozenModel slot(String protocol, String upstreamModelId, @Nullable LlmPriceSnapshot price) {
         return new FrozenModel(
-                protocol,
+                LlmApiProtocol.parse(protocol).orElseThrow(),
                 "https://models.example.com/v1",
                 upstreamModelId,
                 price == null ? UsageFundingSource.INSTANCE : price.fundingSource(),
@@ -297,8 +307,10 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
                 price);
     }
 
-    private LlmUsageEvent onlyUsageEvent() {
-        List<LlmUsageEvent> events = usageEventRepository.findAll();
+    private LlmUsageEvent onlyUsageEvent(UUID jobId) {
+        List<LlmUsageEvent> events =
+                usageEventRepository.findByWorkspaceIdAndSourceTypeAndSourceIdOrderBySourceAttemptAsc(
+                        workspace.getId(), UsageSourceType.REVIEW_JOB, jobId);
         assertThat(events).as("the reap must append exactly one ledger event").hasSize(1);
         return events.getFirst();
     }
@@ -326,20 +338,21 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
     private ConfigSnapshot snapshot() {
         return new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-completions",
-                        "https://api.openai.com/v1",
-                        "test-model",
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://api.openai.com/v1",
+                                "test-model",
+                                UsageFundingSource.INSTANCE,
+                                instanceModel.getConnection().getId(),
+                                instanceModel.getId(),
+                                workspace.getId(),
+                                null,
+                                null,
+                                null),
                         null,
                         null,
-                        null,
-                        UsageFundingSource.INSTANCE,
-                        instanceModel.getConnection().getId(),
-                        instanceModel.getId(),
-                        workspace.getId(),
                         600,
                         false,
-                        null,
-                        null,
                         null)
                 .withPriceSnapshot(new LlmPriceSnapshot(
                         UsageFundingSource.INSTANCE, UsagePricingState.NO_CHARGE, null, null, null, null, null, null));

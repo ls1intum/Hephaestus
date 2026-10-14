@@ -10,13 +10,13 @@ import {
 	type PinnedBlob,
 	type PinnedDiff,
 } from "../../../main/resources/agent/pi-change.ts";
-import { isRecord } from "../../../main/resources/agent/pi-result-normalize.ts";
 import {
 	buildBrief,
 	buildPrimarySourceReference,
 	buildPublicReviewHistory,
 	buildSameWorkContext,
 } from "../../../main/resources/agent/pi-review-brief.ts";
+import { isRecord } from "../../../main/resources/agent/pi-text.ts";
 
 const paths = { contextRoot: "context", repositoryRoot: "repos/reviewed" };
 

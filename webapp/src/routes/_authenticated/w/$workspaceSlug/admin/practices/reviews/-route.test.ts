@@ -3,8 +3,10 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
+import { parseSearch } from "@/lib/router-search";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
@@ -20,22 +22,19 @@ const REVIEWS = "/w/acme/admin/practices/reviews";
  * review id is a real version-4 UUID: the lists' schema drops one that is not, as the fixtures' are.
  */
 const SCOPE = {
-	agentJobId: "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84",
-	practiceResultId: "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c",
-	artifactKind: "scm.pull_request",
-	artifactId: "42",
+	reviewId: "3f2b6c1e-8a4d-4f0b-9c7e-2d5a1b0c9e84",
+	resultId: "9a1d3c5e-7b2f-4e6a-8c0d-1f3b5d7e9a2c",
+	itemKind: "scm.pull_request",
+	itemId: "42",
 	from: "2026-09-01",
 	to: "2026-09-10",
 };
 const SCOPE_QUERY = new URLSearchParams(SCOPE).toString();
 
 beforeEach(() => {
-	server.use(
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-		),
-		...reviewHandlers(),
-	);
+	// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+	vi.stubGlobal("IntersectionObserver", ObserverStub);
+	server.use(...reviewHandlers());
 });
 
 /**
@@ -50,8 +49,9 @@ async function sectionNavigation() {
 	);
 }
 
+/** A link's search as the app reads it back. */
 function carriedSearch(link: HTMLAnchorElement) {
-	return Object.fromEntries(new URL(link.href).searchParams);
+	return parseSearch(new URL(link.href).search);
 }
 
 /** A section's name, with or without the count a list tab carries once it is known: "Reviews, 3". */
@@ -66,6 +66,21 @@ function sectionLink(navigation: HTMLElement, name: string) {
 	});
 }
 
+/** A one-row page that holds no row and counts `total`. */
+function countPage(total: number) {
+	return {
+		content: [],
+		empty: true,
+		first: true,
+		last: true,
+		number: 0,
+		numberOfElements: 0,
+		size: 1,
+		totalElements: total,
+		totalPages: total,
+	};
+}
+
 /**
  * A list endpoint that answers its one-row count reads with `total` and records them; a list's own
  * read falls through to the fixture's handler.
@@ -77,10 +92,7 @@ function countRead(path: string, total: number, counted: URL[]) {
 			return;
 		}
 		counted.push(url);
-		return HttpResponse.json({
-			content: [],
-			page: { number: 0, size: 1, totalElements: total, totalPages: 1 },
-		});
+		return HttpResponse.json(countPage(total));
 	});
 }
 
@@ -96,10 +108,7 @@ function failingOnceCount(total: number) {
 			reads += 1;
 			return reads === 1
 				? HttpResponse.json({ status: 503 }, { status: 503 })
-				: HttpResponse.json({
-						content: [],
-						page: { number: 0, size: 1, totalElements: total, totalPages: 1 },
-					});
+				: HttpResponse.json(countPage(total));
 		},
 	);
 	return { handler, count: () => reads };
@@ -113,15 +122,12 @@ function heldScopedCount() {
 		"*/workspaces/:workspaceSlug/practices/reviews/results",
 		async ({ request }) => {
 			const url = new URL(request.url);
-			if (url.searchParams.get("size") !== "1" || url.searchParams.get("subjectUserId") !== "7") {
+			if (url.searchParams.get("size") !== "1" || url.searchParams.get("developerId") !== "7") {
 				return;
 			}
 			asked = true;
 			await held.promise;
-			return HttpResponse.json({
-				content: [],
-				page: { number: 0, size: 1, totalElements: 42, totalPages: 1 },
-			});
+			return HttpResponse.json(countPage(42));
 		},
 	);
 	return { handler, release: () => held.resolve(), asked: () => asked };
@@ -130,10 +136,9 @@ function heldScopedCount() {
 describe("practice review routes", () => {
 	it.each([
 		["Overview", REVIEWS],
-		// The Work tab is gone: its address lands on the Reviews tab, showing the work without a review.
-		["Reviews", `${REVIEWS}/work`],
 		["Reviews", `${REVIEWS}/runs`],
 		["Results", `${REVIEWS}/results`],
+		["Problems", `${REVIEWS}/observations`],
 		["Feedback", `${REVIEWS}/feedback`],
 		// A level is opened over the tab the reader is on, and never moves them off it.
 		["Results", `${REVIEWS}/results?detail=feedback:${FEEDBACK}`],
@@ -151,41 +156,36 @@ describe("practice review routes", () => {
 	});
 
 	/**
-	 * The shared scope follows the reader to every tab: the person, practices and groups, the range,
-	 * and the selection. The person is the developer a result is
-	 * about, and on the feedback list the person the feedback is addressed to. A tab's own facets stay
-	 * on that tab.
+	 * The shared scope follows the reader to every tab: the developer, practices and groups, the
+	 * range, and the selection. A tab's own facets stay on that tab.
 	 */
 	it.each([
-		["/results", `subjectUserId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
-		["/feedback", `recipientUserId=7&location=${encodeURIComponent('["GITHUB"]')}`],
-		["/runs", `subjectUserId=7&status=${encodeURIComponent('["FAILED"]')}`],
-		["/work", "subjectUserId=7&kind=scm.issue"],
-		["", "subjectUserId=7"],
+		["/results", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
+		["/observations", `developerId=7&severity=${encodeURIComponent('["MAJOR"]')}`],
+		["/feedback", `developerId=7&location=GITHUB`],
+		["/runs", `developerId=7&status=${encodeURIComponent('["FAILED"]')}`],
+		["", "developerId=7"],
 	])('carries the scope from "%s" to every tab', async (fromPath, own) => {
 		const scope = `${SCOPE_QUERY}&practiceSlug=${encodeURIComponent('["thin-controllers"]')}&groupSlug=${encodeURIComponent('["design"]')}`;
 		renderRouteAtWithRouter(`${REVIEWS}${fromPath}?${scope}&${own}`);
 
 		const navigation = await sectionNavigation();
 		// A list of one is written as its one value.
-		const expected = { ...SCOPE, practiceSlug: "thin-controllers", groupSlug: "design" };
-		for (const [tab, person] of [
-			["Overview", "subjectUserId"],
-			["Reviews", "subjectUserId"],
-			["Results", "subjectUserId"],
-			["Feedback", "recipientUserId"],
-		] as const) {
-			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({
-				...expected,
-				[person]: "7",
-			});
+		const expected = {
+			...SCOPE,
+			practiceSlug: "thin-controllers",
+			groupSlug: "design",
+			developerId: "7",
+		};
+		for (const tab of ["Overview", "Reviews", "Results", "Problems", "Feedback"]) {
+			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual(expected);
 		}
 	});
 
 	it("carries nothing when nothing is scoped", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}/results?severity=${encodeURIComponent('["MAJOR"]')}`);
 		const navigation = await sectionNavigation();
-		for (const tab of ["Overview", "Reviews", "Results", "Feedback"]) {
+		for (const tab of ["Overview", "Reviews", "Results", "Problems", "Feedback"]) {
 			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({});
 		}
 	});
@@ -197,7 +197,7 @@ describe("practice review routes", () => {
 	it("keeps a chosen range on the overview and off every tab", async () => {
 		renderRouteAtWithRouter(`${REVIEWS}?range=90d`);
 		const navigation = await sectionNavigation();
-		for (const tab of ["Overview", "Reviews", "Results", "Feedback"]) {
+		for (const tab of ["Overview", "Reviews", "Results", "Problems", "Feedback"]) {
 			expect(carriedSearch(sectionLink(navigation, tab))).toStrictEqual({});
 		}
 	});
@@ -218,28 +218,6 @@ describe("practice review routes", () => {
 			detail: "practice:thin-controllers",
 			range: "90d",
 		});
-	});
-});
-
-describe("the old Work tab address", () => {
-	// The browser extension's "review details" link opens one piece of work.
-	it("lands on that work's own reviews, with its sheet open", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/work?detail=work:pull-request:42`);
-		await sectionNavigation();
-		await waitFor(() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`));
-		expect(router.state.location.search).toMatchObject({
-			artifactKind: "scm.pull_request",
-			artifactId: 42,
-			detail: "work:pull-request:42",
-		});
-		expect(router.state.location.search).not.toHaveProperty("status");
-	});
-
-	it("lists the work no review started on when it opens no work", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}/work`);
-		await sectionNavigation();
-		await waitFor(() => expect(router.state.location.pathname).toBe(`${REVIEWS}/runs`));
-		expect(router.state.location.search).toMatchObject({ status: "NOT_STARTED" });
 	});
 });
 
@@ -274,10 +252,11 @@ describe("practice review page titles", () => {
 		server.use(
 			countRead("/practices/reviews", 1688, counted),
 			countRead("/practices/reviews/results", 13_308, counted),
+			countRead("/practices/reviews/problems", 2210, counted),
 			countRead("/practices/reviews/feedback", 1951, counted),
 		);
 		renderRouteAtWithRouter(
-			`${REVIEWS}/runs?subjectUserId=7&groupSlug=${encodeURIComponent('["design"]')}&status=${encodeURIComponent('["FAILED"]')}`,
+			`${REVIEWS}/runs?developerId=7&groupSlug=${encodeURIComponent('["design"]')}&status=${encodeURIComponent('["FAILED"]')}`,
 		);
 		const navigation = await sectionNavigation();
 		await within(navigation).findByRole(
@@ -286,17 +265,17 @@ describe("practice review page titles", () => {
 			ROUTE_RENDER_WAIT,
 		);
 		await within(navigation).findByRole("link", { name: "Results, 13,308", hidden: true });
+		await within(navigation).findByRole("link", { name: "Problems, 2,210", hidden: true });
 		await within(navigation).findByRole("link", { name: "Feedback, 1,951", hidden: true });
 		within(navigation).getByRole("link", { name: "Overview", hidden: true });
 
 		const reviews = counted.find((url) => url.pathname.endsWith("/practices/reviews"));
-		expect(reviews?.searchParams.get("subjectUserId")).toBe("7");
+		expect(reviews?.searchParams.get("developerId")).toBe("7");
 		expect(reviews?.searchParams.getAll("groupSlug").join(",")).toContain("design");
 		// The Reviews tab's own Status facet narrows its table, not its count.
 		expect(reviews?.searchParams.has("status")).toBe(false);
-		// The feedback list names the person as the one the feedback is addressed to.
 		const feedback = counted.find((url) => url.pathname.endsWith("/feedback"));
-		expect(feedback?.searchParams.get("recipientUserId")).toBe("7");
+		expect(feedback?.searchParams.get("developerId")).toBe("7");
 	});
 
 	/**
@@ -329,8 +308,9 @@ describe("practice review page titles", () => {
 				ROUTE_RENDER_WAIT,
 			);
 			await router.navigate({
-				to: ".",
-				search: (previous: Record<string, unknown>) => ({ ...previous, subjectUserId: 7 }),
+				to: "/w/$workspaceSlug/admin/practices/reviews/runs",
+				params: { workspaceSlug: "acme" },
+				search: { developerId: "7" },
 			});
 			await waitFor(() => expect(scoped.asked()).toBe(true));
 			expect(

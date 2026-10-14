@@ -40,14 +40,14 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 /**
  * Incremental commit sync for GitLab repositories via the REST API.
- *
- * <p>Uses {@code GET /api/v4/projects/:id/repository/commits} to fetch commits on the default
- * branch. The list endpoint returns commit metadata (SHA, message, author/committer info,
- * timestamps) but not diff statistics; those come from the JGit walk in {@link
- * GitLabCommitBackfillService} and the push handler.
- *
- * <p>Supports incremental sync via the {@code since} parameter (ISO 8601 date), which maps to the
- * repository's {@code lastSyncAt} timestamp.
+ * <p>
+ * Uses {@code GET /api/v4/projects/:id/repository/commits} to fetch commits
+ * on the default branch. The list endpoint returns commit metadata (SHA, message,
+ * author/committer info, timestamps) but not diff statistics; those come from the
+ * JGit walk in {@link GitLabCommitBackfillService} and the push handler.
+ * <p>
+ * Supports incremental sync via the {@code since} parameter (ISO 8601 date),
+ * which maps to the repository's {@code lastSyncAt} timestamp.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -83,9 +83,9 @@ public class GitLabCommitSyncService {
     /**
      * Syncs commits for a repository from the GitLab REST API.
      *
-     * @param scopeId the workspace scope ID
+     * @param scopeId    the workspace scope ID
      * @param repository the repository to sync commits for
-     * @param since optional lower bound for incremental sync (ISO 8601)
+     * @param since      optional lower bound for incremental sync (ISO 8601)
      * @return sync result with count of commits processed
      */
     public SyncResult syncCommitsForRepository(Long scopeId, Repository repository, @Nullable OffsetDateTime since) {
@@ -160,8 +160,7 @@ public class GitLabCommitSyncService {
         String commitUrl = base
                 + "/api/v4/projects/"
                 + projectId
-                + "/repository/commits"
-                + "?ref_name="
+                + "/repository/commits?ref_name="
                 + URLEncoder.encode(branch, StandardCharsets.UTF_8)
                 + "&per_page="
                 + PER_PAGE

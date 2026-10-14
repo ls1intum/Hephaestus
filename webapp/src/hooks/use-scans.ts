@@ -43,9 +43,9 @@ export function useScanList(
 	if (query.data !== undefined) {
 		return {
 			status: "ready",
-			scans: query.data.content ?? [],
+			scans: query.data.content,
 			page,
-			totalPages: query.data.page?.totalPages ?? 0,
+			totalPages: query.data.totalPages,
 			onPageChange,
 		};
 	}
@@ -67,7 +67,9 @@ export function useScanList(
  */
 function scanPracticeOption(practice: Practice): ScanPracticeOption | undefined {
 	const { definition } = practice.currentVersion;
-	return definition !== null && definition.scan !== null && definition.reviewedBy.by === "HEPHAESTUS"
+	return definition !== null &&
+		definition.scan !== null &&
+		definition.reviewedBy.by === "HEPHAESTUS"
 		? { slug: practice.slug, name: definition.name }
 		: undefined;
 }
@@ -203,7 +205,7 @@ export function useStartScan(
 	if (repositoriesQuery.data !== undefined && practicesQuery.data !== undefined) {
 		options = {
 			status: "ready",
-			repositories: repositoriesQuery.data.content ?? [],
+			repositories: repositoriesQuery.data.content,
 			practices: scanPracticeOptions(practicesQuery.data),
 		};
 	} else if (repositoriesQuery.isError || practicesQuery.isError) {

@@ -1,4 +1,4 @@
-import type { PracticeReviewOverview } from "@/api/types.gen";
+import type { ReviewOverview } from "@/api/types.gen";
 
 import {
 	FINISHED_REVIEW_STATUSES,
@@ -8,13 +8,13 @@ import {
 	scopeSearch,
 } from "./review-outcomes";
 import type { FeedbackSearch } from "./review-search";
-import type { PracticeReviewOverviewState, ReviewCountState } from "./review-states";
+import type { ReviewCountState, ReviewOverviewState } from "./review-states";
 import type { AttentionGroup } from "./ReviewAttention";
 
 /** A count the overview already holds, in the state of the overview itself. */
 export function overviewCount(
-	overview: PracticeReviewOverviewState,
-	count: (overview: PracticeReviewOverview) => number,
+	overview: ReviewOverviewState,
+	count: (overview: ReviewOverview) => number,
 ): ReviewCountState {
 	return overview.status === "ready"
 		? { status: "ready", total: count(overview.overview), stale: overview.stale }
@@ -22,37 +22,38 @@ export function overviewCount(
 }
 
 /**
- * Feedback composed in `scope` whose delivery failed, in full or in part, out of the feedback sent
- * in it: the overview's own counts for the range on screen, so the Delivery card and the Feedback
- * tile beside it cannot disagree, and the count opens the list filtered to exactly those states.
+ * Feedback composed in `scope` whose delivery failed, out of the feedback sent in it — delivered,
+ * delivery unconfirmed, or failed: the overview's own counts for the range on screen, so the Delivery
+ * card and the Feedback tile beside it cannot disagree, and the count opens the list filtered to
+ * exactly that state. A package of which only some copies posted is delivered; its copy counts say
+ * which copies failed.
  */
 export function deliveryFailures(
 	scope: OutcomeScope,
-	overview: PracticeReviewOverviewState,
+	overview: ReviewOverviewState,
 ): AttentionGroup<ReviewCountState> {
 	const search: Partial<FeedbackSearch> = {
 		...scopeSearch(scope, "feedback"),
-		deliveryState: ["FAILED", "PARTIALLY_FAILED"],
+		state: ["FAILED"],
 	};
 	return {
-		state: overviewCount(overview, ({ feedback }) => feedback.failed + feedback.partiallyFailed),
+		state: overviewCount(overview, ({ feedback }) => feedback.failed),
 		list: { list: "feedback", search },
 		of:
 			overview.status === "ready"
 				? overview.overview.feedback.delivered +
-					overview.overview.feedback.partiallyDelivered +
-					overview.overview.feedback.failed +
-					overview.overview.feedback.partiallyFailed
+					overview.overview.feedback.unconfirmed +
+					overview.overview.feedback.failed
 				: undefined,
 	};
 }
 
 /**
- * The reviews of the range that finished, completed, failed or timed out, as the Reviews tile counts
+ * The reviews of the range that finished, complete, partial or failed, as the Reviews tile counts
  * them, and the Reviews table filtered to exactly those.
  */
 export function finishedInRange(
-	overview: PracticeReviewOverviewState,
+	overview: ReviewOverviewState,
 	scope: OutcomeScope,
 ): { state: ReviewCountState; list: ReviewListTarget } {
 	const list: ReviewListTarget = {

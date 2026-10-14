@@ -1,9 +1,9 @@
-import { scm } from "../kits/scm/index.ts";
-import { countLabel, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 // Finds the print-style calls and the logger calls that the change adds in application code, for
 // each language. It also tells if a bounded search of the checkout finds a logger. The shapes of each
 // language follow the criteria. The review decides from the file if a print is the output of the
 // program, such as a CLI or a script, or a diagnostic that ships.
+import { scm } from "../kits/scm/index.ts";
+import { countLabel, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 import { DIRECTION_CHARS, factsOf, noMatchDirections, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

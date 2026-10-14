@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogConflictException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredException;
-import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogConflictException;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPreconditionRequiredException;
+import de.tum.cit.aet.hephaestus.practices.catalog.StaleCatalogEntryException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
 import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewScopeException;
@@ -52,24 +52,24 @@ public class PracticesControllerAdvice {
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(CuratedCatalogConflictException.class)
-    ProblemDetail handleCuratedConflict(CuratedCatalogConflictException exception) {
+    @ExceptionHandler(CatalogConflictException.class)
+    ProblemDetail handleCatalogConflict(CatalogConflictException exception) {
         return problem(
                 HttpStatus.CONFLICT,
                 "Practice catalog conflict",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(StaleCuratedEntryException.class)
-    ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
+    @ExceptionHandler(StaleCatalogEntryException.class)
+    ProblemDetail handleStaleCatalogEntry(StaleCatalogEntryException exception) {
         return problem(
                 HttpStatus.CONFLICT,
                 "Practice catalog changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(CuratedPreconditionRequiredException.class)
-    ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
+    @ExceptionHandler(CatalogPreconditionRequiredException.class)
+    ProblemDetail handleCatalogPreconditionRequired(CatalogPreconditionRequiredException exception) {
         return problem(
                 HttpStatus.PRECONDITION_REQUIRED,
                 "Practice catalog version required",

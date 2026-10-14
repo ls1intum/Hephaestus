@@ -12,7 +12,9 @@ import org.springframework.data.jpa.repository.Query;
 public interface PracticeVersionRepository extends JpaRepository<PracticeVersion, Long> {
     Optional<PracticeVersion> findFirstByPracticeIdOrderByNumberDesc(Long practiceId);
 
-    List<PracticeVersion> findByPracticeIdOrderByNumberAsc(Long practiceId);
+    Optional<PracticeVersion> findByIdAndWorkspaceId(Long id, Long workspaceId);
+
+    List<PracticeVersion> findByWorkspaceIdAndPracticeIdOrderByNumberAsc(Long workspaceId, Long practiceId);
 
     Optional<PracticeVersion> findFirstByPracticeIdAndNumberLessThanOrderByNumberDesc(Long practiceId, int number);
 

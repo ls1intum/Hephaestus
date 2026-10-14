@@ -80,7 +80,7 @@ affected-row counter. The names, labels and cardinality guarantee are in the
 3. Alert if more than 48 hours pass without a successful daily `llm_usage_retention` run.
 
 Review this map with the [record of processing](./record-of-processing.md),
-[artifact-source governance](./artifact-source-governance.md), and the public privacy statement.
+[source governance](./artifact-source-governance.md), and the public privacy statement.
 
 ## Member onboarding and AI choices
 

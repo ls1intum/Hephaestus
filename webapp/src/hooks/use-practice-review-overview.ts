@@ -1,25 +1,21 @@
-import { type UseQueryResult, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { subDays } from "date-fns";
 import { useEffect, useRef } from "react";
 
 import {
-	countPracticeReviewFeedbackByLocationOptions,
-	countPracticeReviewFeedbackByReasonOptions,
-	getPracticeReviewOverviewOptions,
-	getPracticeReviewQueueOptions,
-	getPracticeReviewTimingOptions,
-	listPracticeReviewsOptions,
+	countReviewFeedbackByLocationOptions,
+	countReviewFeedbackByReasonOptions,
+	getReviewOverviewOptions,
+	getReviewQueueOptions,
+	getReviewTimingOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { PracticeReviewOverview } from "@/api/types.gen";
+import type { ReviewOverview } from "@/api/types.gen";
 import { DELIVERED_STATES } from "@/components/admin/practice-reviews/delivery-breakdown";
 import type {
-	DeliveredByChannelState,
+	DeliveredByLocationState,
 	WithheldByReasonState,
 } from "@/components/admin/practice-reviews/DeliveryBreakdownCard";
-import {
-	type OutcomeScope,
-	scopeSearch,
-} from "@/components/admin/practice-reviews/review-outcomes";
+import type { OutcomeScope } from "@/components/admin/practice-reviews/review-outcomes";
 import { QUEUE_POLL_MS, queueActive } from "@/components/admin/practice-reviews/review-queue";
 import {
 	REVIEW_RANGE_DEFS,
@@ -28,19 +24,13 @@ import {
 import {
 	ACTIVE_REVIEW_POLL_MS,
 	dateWindowQuery,
-	type RunsSearch,
-	runsQuery,
 } from "@/components/admin/practice-reviews/review-search";
 import {
-	type PracticeReviewOverviewState,
+	type ReviewOverviewState,
 	type PreviousReviewPeriodState,
-	type ReviewCountState,
 	toSectionState,
 } from "@/components/admin/practice-reviews/review-states";
-import type {
-	AttentionGroup,
-	ReviewAttentionProps,
-} from "@/components/admin/practice-reviews/ReviewAttention";
+import type { ReviewAttentionProps } from "@/components/admin/practice-reviews/ReviewAttention";
 import type { ReviewQueueState } from "@/components/admin/practice-reviews/ReviewQueueNow";
 import type { ReviewTimingState } from "@/components/admin/practice-reviews/ReviewTimeCard";
 import { panelState } from "@/components/common/panel-state";
@@ -57,9 +47,9 @@ import { keepSameSubject } from "@/runtime/tanstack-query/keep-same-subject";
 export function usePracticeReviewOverview(
 	workspaceSlug: string,
 	from: Date | undefined,
-): PracticeReviewOverviewState {
+): ReviewOverviewState {
 	const query = useQuery({
-		...getPracticeReviewOverviewOptions({
+		...getReviewOverviewOptions({
 			path: { workspaceSlug },
 			query: { ...rangeQuery(from), zone: browserTimeZone() },
 		}),
@@ -86,10 +76,10 @@ function rangeQuery(from: Date | undefined): { from: Date } | { allTime: true } 
 export function usePracticeReviewTiming(
 	workspaceSlug: string,
 	from: Date | undefined,
-	overview: PracticeReviewOverviewState,
+	overview: ReviewOverviewState,
 ): ReviewTimingState {
 	const query = useQuery({
-		...getPracticeReviewTimingOptions({ path: { workspaceSlug }, query: rangeQuery(from) }),
+		...getReviewTimingOptions({ path: { workspaceSlug }, query: rangeQuery(from) }),
 		placeholderData: keepSameSubject({ workspaceSlug }),
 		refetchInterval:
 			overview.status === "ready" && reviewsActive(overview.overview)
@@ -111,11 +101,11 @@ export function usePracticeReviewTiming(
  */
 export function usePracticeReviewQueue(
 	workspaceSlug: string,
-	overview: PracticeReviewOverviewState,
+	overview: ReviewOverviewState,
 ): ReviewQueueState {
 	const overviewActive = overview.status === "ready" && reviewsActive(overview.overview);
 	const query = useQuery({
-		...getPracticeReviewQueueOptions({ path: { workspaceSlug } }),
+		...getReviewQueueOptions({ path: { workspaceSlug } }),
 		refetchInterval: ({ state: { data } }) =>
 			overviewActive || (data !== undefined && queueActive(data)) ? QUEUE_POLL_MS : false,
 	});
@@ -135,7 +125,7 @@ export function usePreviousReviewPeriod(
 ): PreviousReviewPeriodState {
 	const { days } = REVIEW_RANGE_DEFS[range];
 	const query = useQuery({
-		...getPracticeReviewOverviewOptions({
+		...getReviewOverviewOptions({
 			path: { workspaceSlug },
 			query: {
 				from: from === undefined ? undefined : subDays(from, days),
@@ -157,20 +147,6 @@ export function usePreviousReviewPeriod(
 /** What Needs you shows. */
 export type ReviewAttentionReads = ReviewAttentionProps;
 
-/** A count read as the total of a one-row page: the problems line needs how many, never which. */
-const COUNT_ONLY = 1;
-
-/** A one-row page's total, stale while another range's stands in for the range just chosen. */
-function toCountState(
-	query: UseQueryResult<{ page?: { totalElements?: number } }, unknown>,
-): ReviewCountState {
-	return panelState(query, (page) => ({
-		status: "ready" as const,
-		total: page.page?.totalElements ?? 0,
-		stale: query.isPlaceholderData,
-	}));
-}
-
 /**
  * What an admin owes the reviews: every piece of feedback awaiting approval, whenever it was
  * composed and oldest first. The approvals are the admin navigation's read too, one cache entry,
@@ -179,7 +155,7 @@ function toCountState(
  */
 export function useReviewAttention(
 	workspaceSlug: string,
-	overview: PracticeReviewOverviewState,
+	overview: ReviewOverviewState,
 ): ReviewAttentionReads {
 	const approvalsQuery = useQuery({
 		...awaitingApprovalOptions(workspaceSlug),
@@ -196,18 +172,14 @@ export function useReviewAttention(
 	};
 }
 
-/**
- * What the Delivery card splits: delivered feedback by channel, withheld feedback by reason, and
- * the reviews whose results could not be processed or delivered, out of those that completed.
- */
+/** What the Delivery card splits: delivered feedback by location and withheld feedback by reason. */
 export interface DeliveryBreakdownReads {
-	delivered: DeliveredByChannelState;
+	delivered: DeliveredByLocationState;
 	withheld: WithheldByReasonState;
-	unprocessedResults: AttentionGroup<ReviewCountState>;
 }
 
 /**
- * The feedback of `scope` split as the Delivery card shows it: delivered by channel and withheld by
+ * The feedback of `scope` split as the Delivery card shows it: delivered by location and withheld by
  * reason, each read with the Feedback table's own filter, so a row and the table it opens hold the
  * same rows. Counts only: the server returns no text, rating or comment. Re-read with the overview
  * while a review in the range is queued or running.
@@ -215,7 +187,7 @@ export interface DeliveryBreakdownReads {
 export function useDeliveryBreakdown(
 	workspaceSlug: string,
 	scope: OutcomeScope,
-	overview: PracticeReviewOverviewState,
+	overview: ReviewOverviewState,
 ): DeliveryBreakdownReads {
 	const path = { workspaceSlug };
 	const days = dateWindowQuery(scope);
@@ -227,35 +199,20 @@ export function useDeliveryBreakdown(
 				: false,
 	} as const;
 	const deliveredQuery = useQuery({
-		...countPracticeReviewFeedbackByLocationOptions({
+		...countReviewFeedbackByLocationOptions({
 			path,
-			query: { ...days, deliveryState: [...DELIVERED_STATES] },
+			query: { ...days, state: [...DELIVERED_STATES] },
 		}),
 		...live,
 	});
 	const withheldQuery = useQuery({
-		...countPracticeReviewFeedbackByReasonOptions({
+		...countReviewFeedbackByReasonOptions({
 			path,
-			query: { ...days, deliveryState: ["SUPPRESSED"] },
+			query: { ...days, state: ["WITHHELD"] },
 		}),
 		...live,
 	});
-	const unprocessed: Partial<RunsSearch> = {
-		...scopeSearch(scope, "runs"),
-		resultProcessing: ["FAILED"],
-	};
-	const unprocessedQuery = useQuery({
-		...listPracticeReviewsOptions({ path, query: runsQuery(unprocessed, COUNT_ONLY) }),
-		...live,
-	});
 	return {
-		unprocessedResults: {
-			state: toCountState(unprocessedQuery),
-			list: { list: "runs", search: unprocessed },
-			// Only a completed review has results to process: a failed or timed-out one is counted on
-			// the Reviews tile instead, so the two figures never share a review.
-			of: overview.status === "ready" ? overview.overview.reviews.completed : undefined,
-		},
 		delivered: panelState(deliveredQuery, (counts) => ({
 			status: "ready" as const,
 			counts,
@@ -274,10 +231,7 @@ export function useDeliveryBreakdown(
  * active, on the overview's word. When the overview says the last one finished, the others may hold
  * a read from just before: read them once more, so the page settles on one answer.
  */
-export function useSettleWhenReviewsFinish(
-	workspaceSlug: string,
-	overview: PracticeReviewOverviewState,
-) {
+export function useSettleWhenReviewsFinish(workspaceSlug: string, overview: ReviewOverviewState) {
 	const queryClient = useQueryClient();
 	const active = overview.status === "ready" && reviewsActive(overview.overview);
 	const wasActive = useRef(active);
@@ -291,14 +245,14 @@ export function useSettleWhenReviewsFinish(
 }
 
 const SETTLING_READS: ReadonlySet<string> = new Set([
-	"countPracticeReviewFeedbackByLocation",
-	"countPracticeReviewFeedbackByReason",
-	"getPracticeReviewTiming",
-	"getPracticeReviewQueue",
-	"listPracticeReviews",
-	"listPracticeReviewFeedback",
+	"countReviewFeedbackByLocation",
+	"countReviewFeedbackByReason",
+	"getReviewTiming",
+	"getReviewQueue",
+	"listReviews",
+	"listReviewFeedback",
 ]);
 
-function reviewsActive({ reviews }: PracticeReviewOverview): boolean {
+function reviewsActive({ reviews }: ReviewOverview): boolean {
 	return reviews.queued + reviews.running > 0;
 }

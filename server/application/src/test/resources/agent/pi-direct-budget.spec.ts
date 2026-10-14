@@ -66,7 +66,7 @@ const exit = await runRunner(
 		LLM_PROXY_URL: standIn.url,
 		LLM_PROXY_TOKEN: JOB_TOKEN,
 		PI_DIRECT_MODEL_TOKENS: String(ACCOUNT),
-		// The retired second credential: nothing reads it, so no call carries it.
+		// Calls use only the job credential.
 		PRACTICE_SCRIPT_PROXY_TOKEN: "practice-script-token",
 	},
 );

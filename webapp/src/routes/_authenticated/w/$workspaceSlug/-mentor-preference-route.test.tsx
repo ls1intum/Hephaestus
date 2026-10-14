@@ -7,7 +7,7 @@ import { getMemberOnboardingQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { ChatThreadDetail, WorkspaceOnboarding } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
 
@@ -19,9 +19,7 @@ it("keeps an existing conversation readable under No AI and restores its compose
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () => HttpResponse.json(preference)),
 		http.get("*/workspaces/acme/mentor/threads", () =>
 			HttpResponse.json([{ id: threadId, title: "Earlier conversation" }]),
@@ -73,9 +71,7 @@ it("names the saved choice when no Heph model is set up for it", async () => {
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),
@@ -106,9 +102,7 @@ it("says Heph is not set up, and offers no choice to change, where no model is r
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),
@@ -136,9 +130,7 @@ it("opens Heph for a member whose account carries no feature flags", async () =>
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		// Heph follows the workspace and the member's AI choice, not an account flag.
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),
@@ -161,9 +153,7 @@ it("prepares the member's Heph sandbox when Heph opens, and again when they come
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),
@@ -196,9 +186,7 @@ it("prepares nothing when Heph is off for the member", async () => {
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({ ...workspaceOnboarding(), aiChoice: "NO_AI" }),
 		),
@@ -237,9 +225,7 @@ it("offers Heph in the navigation where a Heph model is ready, whatever the memb
 	server.use(
 		http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 		http.get("*/user/features", () => HttpResponse.json({})),
-		http.get("*/workspaces/acme/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
-		),
+		http.get("*/workspaces/acme/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 		http.get("*/workspaces/acme/onboarding/me", () =>
 			HttpResponse.json({
 				...workspaceOnboarding(),
@@ -265,7 +251,7 @@ it("keeps Heph out of the navigation of a workspace where only practice reviews 
 		),
 		http.get("*/user/features", () => HttpResponse.json({})),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
+			HttpResponse.json(ownMembership("MEMBER")),
 		),
 		http.get("*/workspaces/acme/onboarding/me", () => HttpResponse.json(ready)),
 		http.get("*/workspaces/other/onboarding/me", () =>

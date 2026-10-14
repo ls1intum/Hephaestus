@@ -176,14 +176,7 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
                 workspace, IntegrationKind.SLACK, TEAM, new ConnectionConfig.SlackConfig(TEAM, null, null, Set.of())));
         IdentityProvider provider = identityProviderRepository.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.SLACK, "https://slack.com"));
-        UUID suppressionId = UUID.randomUUID();
-        jdbcTemplate.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES"
-                        + " (?,?,?,?,'ERASED')",
-                suppressionId,
-                provider.getId(),
-                OPTED_OUT_USER,
-                TEAM);
+        UUID suppressionId = databaseTestUtils.erase(Objects.requireNonNull(provider.getId()), OPTED_OUT_USER, TEAM);
         participantConsentRepository.optInToIngestion(workspaceId, OPTED_OUT_USER);
 
         ingestService.ingestChannelMessage(TEAM, CHANNEL, "100.1", null, OPTED_OUT_USER, "must stay absent");

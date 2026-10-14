@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackCheckDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReasonCountDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewFeedbackSort;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -25,7 +24,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -54,16 +52,7 @@ public class FeedbackReviewController {
             @Valid @ParameterObject @ModelAttribute FeedbackQueryFilter filter,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
-        return PageResponseDTO.from(reader.list(
-                workspace.id(),
-                filter,
-                PageRequest.of(
-                        page,
-                        size,
-                        Sort.by(
-                                filter.sort() == ReviewFeedbackSort.OLDEST ? Sort.Direction.ASC : Sort.Direction.DESC,
-                                "createdAt",
-                                "id"))));
+        return PageResponseDTO.from(reader.list(workspace.id(), filter, PageRequest.of(page, size)));
     }
 
     @GetMapping("/feedback/locations")

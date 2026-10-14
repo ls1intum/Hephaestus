@@ -3,9 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -25,7 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.data.projection.SpelAwareProxyProjectionFactory;
 import tools.jackson.databind.ObjectMapper;
 
 class ScmWorkItemListerTest extends BaseUnitTest {
@@ -33,7 +30,7 @@ class ScmWorkItemListerTest extends BaseUnitTest {
     void shouldRetainMembershipAndVersionsEstablishedByTheFirstPage() {
         var sources = mock(ScmItemService.class);
         var writer = mock(ItemWriter.class);
-        var jdbc = mock(JdbcTemplate.class);
+        var queries = mock(ScmItemQueryRepository.class);
         var root = new ItemRef(1, 2, ScmItemEvents.REPOSITORY, 10L, null, null);
         var commit = new ItemVersion("a".repeat(40), null);
         var revision = new AtomicReference<>("before");
@@ -61,11 +58,14 @@ class ScmWorkItemListerTest extends BaseUnitTest {
                     registration.parentId(),
                     null);
         });
-        when(jdbc.queryForList(anyString(), eq(Long.class), anyLong()))
-                .thenAnswer(call -> ((String) call.getArgument(0)).startsWith("SELECT repository_id")
-                        ? List.of(10L)
-                        : List.of(11L, 12L));
-        var lister = new ScmWorkItemLister(sources, writer, new ObjectMapper(), jdbc);
+        var projections = new SpelAwareProxyProjectionFactory();
+        var rows = List.of(11L, 12L).stream()
+                .map(id -> projections.createProjection(
+                        ScmItemQueryRepository.WorkRow.class, Map.of("sourceId", id, "repositoryId", 10L)))
+                .toList();
+        when(queries.listWork(10, "ISSUE")).thenReturn(rows);
+        when(queries.owners(List.of(11L, 12L), false)).thenReturn(rows);
+        var lister = new ScmWorkItemLister(sources, writer, new ObjectMapper(), queries);
         var first = lister.list(new ItemListRequest(root, commit, ScmItemEvents.ISSUE, null, 1));
         assertThat(first.complete()).isFalse();
         revision.set("after");

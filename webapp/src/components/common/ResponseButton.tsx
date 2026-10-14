@@ -4,12 +4,12 @@ import { cn } from "cn";
 import type { BadgeVariant } from "@/components/common/status-def";
 import { Button } from "@/components/ui/button";
 
-/** What a response says: agreeing, disputing, or neither. */
+/** What a response says: agreeing, disagreeing, or neither. */
 export type ResponseTone = "positive" | "negative" | "neutral";
 
 /**
  * The tone a response wears, read off its registry entry's badge variant: the success green
- * agrees, the destructive red and the warning amber both dispute — "Not helpful" and "Disputed"
+ * agrees, the destructive red and the warning amber both disagree — "Not helpful" and "Disagree"
  * press the same red — and every other variant says neither.
  */
 export function toneOf(variant: BadgeVariant): ResponseTone {

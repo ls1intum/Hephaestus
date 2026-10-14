@@ -174,7 +174,7 @@ class ProxyBudgetGateTest extends BaseUnitTest {
             if (inputTokens > 0) {
                 credentials.accumulate(meter.turnId(), new ProxyTokenUsage(inputTokens, 0, 0, 0, 0));
             }
-            return credentials.validate(token).orElseThrow();
+            return credentials.authenticate(token).flatMap(credentials::resolve).orElseThrow();
         }
 
         /** At $10 per million input tokens, 100k tokens is $1.00 — the whole cap; 90k is still under it. */

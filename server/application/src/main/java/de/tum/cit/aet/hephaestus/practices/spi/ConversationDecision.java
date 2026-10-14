@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.spi;
 
 public enum ConversationDecision {
     ADMIT,
+    FEEDBACK_OFF,
     MENTOR_UNAVAILABLE,
     NOT_DELIVERABLE,
     HAS_INLINE_ANCHOR,

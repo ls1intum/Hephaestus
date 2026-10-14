@@ -7,7 +7,6 @@ import { after, test } from "node:test";
 
 import {
 	executionReportSchema,
-	LEGACY_CONTRACT_ERROR,
 	REASONS,
 	type ExecutionEntry,
 } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
@@ -22,6 +21,7 @@ import {
 	type RunnerExit,
 	type SessionBehaviour,
 	type StagedPractice,
+	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
 // The runner runs each admitted practice's program on the host: a custom program in a child process, the
@@ -41,16 +41,6 @@ export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
 		return ctx.review({ directions: ["Check each added authentication call."] });
-	},
-});
-`;
-
-/** A program written for the retired leads contract. */
-const LEGACY_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
-export default definePracticeScript({
-	meta: { version: 1, kinds: { call: "An added call." } },
-	async run() {
-		return { leads: [] };
 	},
 });
 `;
@@ -102,7 +92,7 @@ const main = await run(
 	[
 		{ slug: "a-direct", program: directProgram() },
 		{ slug: "b-builtin" },
-		{ slug: "c-legacy", program: LEGACY_PROGRAM },
+		{ slug: "c-invalid-meta", program: INVALID_META_PROGRAM },
 		{ slug: "d-silent", program: REVIEWING_PROGRAM },
 		{ slug: "e-no-inputs", inputs: false },
 	],
@@ -179,15 +169,15 @@ void test("the built-in program opens one review session and reports the reads t
 	);
 });
 
-void test("a program in the retired leads contract fails with the legacy error, and only it is left out", () => {
-	const entry = entryOf(executionReport(main.cwd).practices, "c-legacy");
+void test("a program whose meta the contract refuses fails as an invalid program, and only it is left out", () => {
+	const entry = entryOf(executionReport(main.cwd).practices, "c-invalid-meta");
 	assert.partialDeepStrictEqual(entry, {
-		program: { kind: "custom", digest: digestOf(main.cwd, "c-legacy") },
+		program: { kind: "custom", digest: digestOf(main.cwd, "c-invalid-meta") },
 		status: "failed",
 		stopReason: "invalid-program",
-		error: LEGACY_CONTRACT_ERROR,
 		calls: noCalls,
 	});
+	assert.match(String(field(entry, "error")), /^meta: /u);
 	assert.deepEqual(admittedSlugs(main.cwd), ["a-direct", "b-builtin"]);
 });
 
@@ -229,7 +219,7 @@ void test("the execution report has one entry for each admitted practice, sorted
 	assert.equal(report.truncated, false);
 	assert.deepEqual(
 		report.practices.map((entry) => entry.practiceSlug),
-		["a-direct", "b-builtin", "c-legacy", "d-silent", "e-no-inputs"],
+		["a-direct", "b-builtin", "c-invalid-meta", "d-silent", "e-no-inputs"],
 	);
 });
 

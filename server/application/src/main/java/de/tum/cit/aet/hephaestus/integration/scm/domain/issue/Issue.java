@@ -89,12 +89,12 @@ public class Issue extends BaseGitServiceEntity {
 
     /**
      * Timestamp of the last successful sync for this issue/PR and its associated data.
-     *
-     * <p>This is ETL infrastructure used by the sync engine to track when this issue (and its
-     * comments) or pull request (and its reviews, review comments) was last synchronized via
-     * GraphQL. Used to implement incremental sync and detect stale data.
-     *
-     * <p>Updated by the GitHub sync processors after successfully syncing all related entities.
+     * <p>
+     * This is ETL infrastructure used by the sync engine to track when this issue
+     * (and its comments) or pull request (and its reviews, review comments) was last
+     * synchronized via GraphQL. Used to implement incremental sync and detect stale data.
+     * <p>
+     * Updated by the GitHub sync processors after successfully syncing all related entities.
      */
     private @Nullable Instant lastSyncAt;
 
@@ -165,8 +165,8 @@ public class Issue extends BaseGitServiceEntity {
     }
 
     /**
-     * The parent issue if this is a sub-issue. Null if this is a top-level issue. Maps to GitHub's
-     * Issue.parent GraphQL field.
+     * The parent issue if this is a sub-issue. Null if this is a top-level issue.
+     * Maps to GitHub's Issue.parent GraphQL field.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_issue_id")
@@ -174,34 +174,37 @@ public class Issue extends BaseGitServiceEntity {
     private @Nullable Issue parentIssue;
 
     /**
-     * Sub-issues of this issue. Empty if this issue has no children. Maps to GitHub's
-     * Issue.subIssues GraphQL connection.
+     * Sub-issues of this issue. Empty if this issue has no children.
+     * Maps to GitHub's Issue.subIssues GraphQL connection.
      */
     @OneToMany(mappedBy = "parentIssue")
     @ToString.Exclude
     private Set<Issue> subIssues = new HashSet<>();
 
     /**
-     * Total number of sub-issues (from GitHub's sub_issues_summary.total). This is a denormalized
-     * count for efficient querying without loading all sub-issues.
+     * Total number of sub-issues (from GitHub's sub_issues_summary.total).
+     * This is a denormalized count for efficient querying without loading all
+     * sub-issues.
      */
     private Integer subIssuesTotal;
 
     /**
-     * Number of completed sub-issues (from GitHub's sub_issues_summary.completed). A sub-issue is
-     * considered completed when its state is CLOSED.
+     * Number of completed sub-issues (from GitHub's sub_issues_summary.completed).
+     * A sub-issue is considered completed when its state is CLOSED.
      */
     private Integer subIssuesCompleted;
 
     /**
-     * Percentage of sub-issues completed (from GitHub's sub_issues_summary.percent_completed).
+     * Percentage of sub-issues completed (from GitHub's
+     * sub_issues_summary.percent_completed).
      * Value between 0 and 100. Null if no sub-issues exist.
      */
     private Integer subIssuesPercentCompleted;
 
     /**
-     * The issue type (category) for this issue. Managed at the organization level in GitHub. Maps
-     * to GitHub's Issue.issueType GraphQL field.
+     * The issue type (category) for this issue.
+     * Managed at the organization level in GitHub.
+     * Maps to GitHub's Issue.issueType GraphQL field.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issue_type_id")
@@ -209,9 +212,9 @@ public class Issue extends BaseGitServiceEntity {
     private @Nullable IssueType issueType;
 
     /**
-     * Issues that block this issue from being worked on or completed. Maps to GitHub's
-     * Issue.blockedBy GraphQL connection. When this issue is blocked, blockedBy contains the
-     * blockers.
+     * Issues that block this issue from being worked on or completed.
+     * Maps to GitHub's Issue.blockedBy GraphQL connection.
+     * When this issue is blocked, blockedBy contains the blockers.
      */
     @ManyToMany
     @JoinTable(
@@ -222,8 +225,9 @@ public class Issue extends BaseGitServiceEntity {
     private Set<Issue> blockedBy = new HashSet<>();
 
     /**
-     * Issues that this issue is blocking. Maps to GitHub's Issue.blocking GraphQL connection. When
-     * this issue blocks others, blocking contains the blocked issues.
+     * Issues that this issue is blocking.
+     * Maps to GitHub's Issue.blocking GraphQL connection.
+     * When this issue blocks others, blocking contains the blocked issues.
      */
     @ManyToMany(mappedBy = "blockedBy")
     @ToString.Exclude
@@ -239,9 +243,7 @@ public class Issue extends BaseGitServiceEntity {
     /**
      * Reason for the issue's current state. Maps to GitHub GraphQL IssueClosedStateReason.
      *
-     * @see <a
-     *     href="https://docs.github.com/en/graphql/reference/enums#issueclosedstatereason">GitHub
-     *     IssueClosedStateReason</a>
+     * @see <a href="https://docs.github.com/en/graphql/reference/enums#issueclosedstatereason">GitHub IssueClosedStateReason</a>
      */
     public enum StateReason {
         /** Issue was completed/resolved. */

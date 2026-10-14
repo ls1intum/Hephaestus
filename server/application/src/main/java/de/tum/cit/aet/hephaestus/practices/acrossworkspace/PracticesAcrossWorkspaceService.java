@@ -6,10 +6,10 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticeWorkspaceOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.acrossworkspace.dto.PracticeWorkspaceTileDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.GroupRefDTO;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -40,10 +40,7 @@ public class PracticesAcrossWorkspaceService {
     public PracticeWorkspaceOverviewDTO read(WorkspaceContext ws) {
         var developers = scope.eligibleAccountIds(ws.id());
         var rows = read.forDevelopersSince(
-                ws.id(),
-                developers,
-                clock.instant().minus(Duration.ofDays(PracticeStandingService.LOOKBACK_DAYS)),
-                true);
+                ws.id(), developers, clock.instant().minus(Duration.ofDays(PracticeTrendService.LOOKBACK_DAYS)), true);
         var permitted = visibility.permitsAll(ws.id(), rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         var byPractice =
                 views

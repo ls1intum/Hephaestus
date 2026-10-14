@@ -18,14 +18,15 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
 class PracticeItemEventCoverageTest {
     private final ItemDescriptor descriptor = mock(ItemDescriptor.class);
     private final ItemCatalog catalog = mock(ItemCatalog.class);
     private final ItemEventCoverage coverage = mock(ItemEventCoverage.class);
-    private final PracticeItemEventCoverage policy =
-            new PracticeItemEventCoverage(coverage, new PracticeItemOptions(catalog), mock(PracticeRepository.class));
+    private final PracticeItemEventCoverage policy = new PracticeItemEventCoverage(
+            coverage, new PracticeItemOptions(catalog), mock(PracticeRepository.class), new JsonMapper());
 
     @BeforeEach
     void vocabulary() {

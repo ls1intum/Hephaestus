@@ -15,7 +15,10 @@ public enum CandidateRefusal {
     DUPLICATE_PROBLEM_KEY("duplicate_problem_key"),
     BASIS_STATE_UNSUPPORTED("basis_state_unsupported"),
     BASIS_REVISION_UNSUPPORTED("basis_revision_unsupported"),
-    QUOTE_UNVERIFIED("quote_unverified");
+    QUOTE_UNVERIFIED("quote_unverified"),
+    SOURCE_UNAVAILABLE("source_unavailable"),
+    BASIS_WITNESS_MISSING("basis_witness_missing"),
+    DUTY_QUOTE_UNVERIFIED("duty_quote_unverified");
 
     private final String wireValue;
 

@@ -30,6 +30,7 @@ import { assessmentCacheExtension } from "./pi-assessment-cache.ts";
 import {
 	CHANGE_ROOT,
 	checkedOutCommit,
+	isCommitId,
 	pinnedDiff,
 	readChange,
 	readDescription,
@@ -61,8 +62,7 @@ import {
 	SEVERITY_DESCRIPTIONS,
 	citesReviewedTurn,
 	describeVocabulary,
-	isRecord,
-	normalizePracticeSlug,
+	trimmedSlug,
 	normalizeSubmission,
 	resolveQuote,
 	resolveCapturedText,
@@ -70,7 +70,6 @@ import {
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
-	type NormalizedCitation,
 	type NormalizedSubmission,
 } from "./pi-result-normalize.ts";
 import {
@@ -140,7 +139,7 @@ import {
 	stopSession,
 } from "./pi-session-lifecycle.ts";
 import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task-paths.ts";
-import { hasText, isBlank } from "./pi-text.ts";
+import { hasText, isBlank, isRecord } from "./pi-text.ts";
 import { prepareResultArguments } from "./pi-tool-arguments.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
 import { parseDiff } from "./work/practice-scripts/kits/scm/diff-parser.ts";
@@ -149,11 +148,13 @@ import { MODEL_CONCURRENCY } from "./work/practice-scripts/lib/core/concurrency.
 import {
 	boundModelsSchema,
 	CANDIDATE_LIMITS,
+	compositionRequestSchema,
 	OUTCOMES,
 	parseCandidate,
 	SEVERITIES,
 	type BoundModels,
 	type Candidate,
+	type Citation,
 	type CitationIdentity,
 	type Coverage,
 	type Omission,
@@ -186,12 +187,6 @@ import {
 import { InputReader } from "./work/practice-scripts/lib/core/script-inputs.ts";
 import { abortReasonOf, RETURN_MS } from "./work/practice-scripts/lib/core/script-run.ts";
 
-// Staged work notes survive isolated sessions and context compaction.
-
-function parseJson(text: string): unknown {
-	return JSON.parse(text);
-}
-
 function jsonArray(value: unknown): unknown[] {
 	return Array.isArray(value) ? value : [];
 }
@@ -212,47 +207,24 @@ function listOrEmpty<T>(items: T[] | undefined): T[] {
 }
 
 /** Accept array, single-item and serialized-list forms; validate each parsed item separately. */
-function submittedList(
-	value: unknown,
-	itemKeys: ReadonlySet<string>,
-): { items: unknown[]; repaired: boolean } | { error: string } {
-	if (typeof value === "string") {
-		// Only a string that does not parse is repaired: valid JSON is read as written.
-		try {
-			return { items: listOrItem(parseJson(value)), repaired: false };
-		} catch {
-			// Repaired below.
-		}
-		const repaired = repairedClosers(value, itemKeys);
-		try {
-			return { items: listOrItem(parseJson(repaired)), repaired: true };
-		} catch (error) {
-			// Where the parse stopped, shown: resending the same text cannot fix a fault nobody located.
-			const at = /position (?<position>\d+)/u.exec(errorText(error))?.groups?.position;
-			const near =
-				at === undefined
-					? ""
-					: `; it breaks here: ${JSON.stringify(repaired.slice(Math.max(0, Number(at) - 60), Number(at)))} ⟵ ${JSON.stringify(repaired.slice(Number(at), Number(at) + 20))}`;
-			return {
-				error: `the list arrived as a string that is not valid JSON (${errorText(error)})${near}. Fix that spot — usually a quote inside a text left unescaped — or send the array itself`,
-			};
-		}
+function submittedList(value: unknown): { items: unknown[] } | { error: string } {
+	if (typeof value !== "string") {
+		return { items: listOrItem(value) };
 	}
-	return { items: listOrItem(value), repaired: false };
+	try {
+		return { items: listOrItem(JSON.parse(value)) };
+	} catch (error) {
+		// Where the parse stopped, shown: resending the same text cannot fix a fault nobody located.
+		const at = /position (?<position>\d+)/u.exec(errorText(error))?.groups?.position;
+		const near =
+			at === undefined
+				? ""
+				: `; it breaks here: ${JSON.stringify(value.slice(Math.max(0, Number(at) - 60), Number(at)))} ⟵ ${JSON.stringify(value.slice(Number(at), Number(at) + 20))}`;
+		return {
+			error: `the list arrived as a string that is not valid JSON (${errorText(error)})${near}. Fix that spot — usually a quote inside a text left unescaped — or send the array itself`,
+		};
+	}
 }
-
-/** The keys of a feedback piece that never belong to an object inside it. */
-const FEEDBACK_ITEM_KEYS: ReadonlySet<string> = new Set([
-	"destination",
-	"practiceSlug",
-	"action",
-	"basedOn",
-	"title",
-	"body",
-	"nextStep",
-	"withholdReason",
-	"supersedesThreadKey",
-]);
 
 /** The list, or the one item that was sent where a list of them was asked for. */
 function listOrItem(value: unknown): unknown[] {
@@ -260,109 +232,6 @@ function listOrItem(value: unknown): unknown[] {
 		return value;
 	}
 	return isRecord(value) ? [value] : [];
-}
-
-/**
- * Repair missing or unmatched closers without changing quoted strings; JSON.parse rejects other faults.
- * `itemKeys` are keys that belong to an item of the list and never to an object inside one: met inside
- * a nested object, they mean that object was left open, and it is closed before them.
- */
-function repairedClosers(text: string, itemKeys: ReadonlySet<string>): string {
-	const owed: string[] = [];
-	let out = "";
-	let changed = false;
-	let inString = false;
-	let escaped = false;
-	for (let index = 0; index < text.length; index += 1) {
-		const char = text[index] ?? "";
-		if (inString) {
-			out += char;
-			if (escaped) {
-				escaped = false;
-			} else if (char === "\\") {
-				escaped = true;
-			} else if (char === '"') {
-				inString = false;
-			}
-			continue;
-		}
-		if (char === '"') {
-			inString = true;
-		} else if (char === "," && owed.length > 2 && owed[0] === "]") {
-			const key = followingKey(text, index);
-			if (key !== null && itemKeys.has(key)) {
-				while (owed.length > 2) {
-					out += owed.pop() ?? "";
-				}
-				changed = true;
-			}
-		} else if (char === "{" || char === "[") {
-			const comma = out.trimEnd().length - 1;
-			if (char === "{" && owed.at(-1) === "}" && owed.includes("]") && out[comma] === ",") {
-				let closers = "";
-				while (owed.at(-1) === "}") {
-					closers += owed.pop();
-				}
-				out = out.slice(0, comma) + closers + out.slice(comma);
-				changed = true;
-			}
-			owed.push(char === "{" ? "}" : "]");
-		} else if (char === "}" || char === "]") {
-			if (owed.at(-1) !== char) {
-				changed = true;
-				continue;
-			}
-			if (
-				char === "}" &&
-				owed.length === 2 &&
-				owed[0] === "]" &&
-				followingKey(text, index + 1) !== null
-			) {
-				changed = true;
-				continue;
-			}
-			owed.pop();
-		}
-		out += char;
-	}
-	if (inString || (!changed && owed.length === 0)) {
-		return text;
-	}
-	return out.trimEnd() + owed.toReversed().join("");
-}
-
-/**
- * The key, when `, "key":` is what comes next — a member of an object, not the next item of a list;
- * null otherwise.
- */
-function followingKey(text: string, from: number): string | null {
-	let index = from;
-	const skipSpace = () => {
-		while (index < text.length && /\s/u.test(text[index] ?? "")) {
-			index += 1;
-		}
-	};
-	skipSpace();
-	if (text[index] !== ",") {
-		return null;
-	}
-	index += 1;
-	skipSpace();
-	if (text[index] !== '"') {
-		return null;
-	}
-	const start = index + 1;
-	index += 1;
-	while (index < text.length && text[index] !== '"') {
-		if (text[index] === "\\") {
-			index += 1;
-		}
-		index += 1;
-	}
-	const key = text.slice(start, index);
-	index += 1;
-	skipSpace();
-	return text[index] === ":" ? key : null;
 }
 
 /** The schema for such a list: the array, or the same array as a JSON string. */
@@ -401,7 +270,7 @@ interface TaskEnvelope {
 	pullRequestNumber: unknown;
 }
 
-/** How much feedback this run may compose, per lane. */
+/** How much feedback this run may compose for one destination. */
 interface DestinationBounds {
 	enabled: boolean;
 	maxPieces: number;
@@ -414,7 +283,7 @@ type CopyForm = "LINE_NOTE" | "FILE_NOTE";
 interface CompositionRequest {
 	destinations: Record<Destination, DestinationBounds>;
 	onWorkCopyForms: CopyForm[];
-	minDistinctSourceFiles: number;
+	minDistinctItems: number;
 }
 
 /** One citation as admission projected it: its index, its coordinates and whether a note may sit on it. */
@@ -620,7 +489,7 @@ mkdirSync(OUTPUT, { recursive: true });
 
 /** Snapshot the eligible practices once for the whole review. */
 function readPracticeIndex(): PracticeIndexEntry[] {
-	const index = parseJson(readFileSync(INPUT_PATHS.practiceIndex, "utf8"));
+	const index: unknown = JSON.parse(readFileSync(INPUT_PATHS.practiceIndex, "utf8"));
 	if (!Array.isArray(index)) {
 		throw new Error("the task-declared practice index: expected an array");
 	}
@@ -664,7 +533,7 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 	});
 }
 
-const folderIndex = parseJson(readFileSync(INPUT_PATHS.manifest, "utf8"));
+const folderIndex: unknown = JSON.parse(readFileSync(INPUT_PATHS.manifest, "utf8"));
 const { availableSourceKinds, sourceFileSources, citationCapabilities } =
 	folderCitationIndex(folderIndex);
 const capturedTexts = citableTextIndex(folderIndex);
@@ -794,7 +663,7 @@ const executions = new Map<string, ProgramOutcome>();
 /** Why a practice that no program reached was not reached, when the run ends before it. */
 let unreachedReason: "deadline" | "budget" | "error" = "deadline";
 
-/** Slugs in the order the server sorts them: by UTF-16 code piece, as Java compares strings. */
+/** Slugs in the order the server sorts them: by UTF-16 code unit, as Java compares strings. */
 function compareSlugs(a: string, b: string): number {
 	if (a === b) {
 		return 0;
@@ -1399,10 +1268,7 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 }
 
 /** Infer an omitted diff side by exact quote match, preferring NEW; never override a supplied side. */
-function resolveOnEitherSide(
-	citation: NormalizedCitation,
-	content: string,
-): ReturnType<typeof resolveQuote> {
+function resolveOnEitherSide(citation: Citation, content: string): ReturnType<typeof resolveQuote> {
 	if (citation.sourceKind !== "scm.pull-request.diff" || citation.side !== undefined) {
 		return resolveQuote(citation, content);
 	}
@@ -1457,7 +1323,7 @@ function candidateReadTheChange(candidate: Candidate): boolean {
 const BINARY = Symbol("binary");
 
 /** Select the capture's logical text, not a serialized metadata record that mentions it. */
-function capturedText(citation: NormalizedCitation): string | null {
+function capturedText(citation: Citation): string | null {
 	const matches = capturedTexts.filter(
 		(entry) =>
 			entry.source === citation.sourceKind &&
@@ -1483,7 +1349,7 @@ function capturedText(citation: NormalizedCitation): string | null {
 }
 
 /** What a citation quotes: the checkout at HEAD or at the named revision, or the derived change view. */
-function citedContent(citation: NormalizedCitation): string | typeof BINARY | null {
+function citedContent(citation: Citation): string | typeof BINARY | null {
 	if (citation.sourceKind === TREE_SOURCE) {
 		return citation.revision === undefined
 			? readCheckoutFile(citation.path, citationRepository(citation))
@@ -1497,7 +1363,7 @@ function citedContent(citation: NormalizedCitation): string | typeof BINARY | nu
 
 /** The citation resolved against what it quotes, or the mismatch that says why it cannot be. */
 function resolveCited(
-	citation: NormalizedCitation,
+	citation: Citation,
 	content: string | typeof BINARY | null,
 ): ReturnType<typeof resolveOnEitherSide> {
 	if (content === null) {
@@ -1524,7 +1390,7 @@ function asText(bytes: Buffer): string | typeof BINARY {
 }
 
 /** The sourceFile index, not the task's primary checkout, determines which repository a citation reads. */
-function citationRepository(citation: NormalizedCitation): string {
+function citationRepository(citation: Citation): string {
 	const match = /^repos\/(?<repository>[A-Za-z0-9_-]+)\/\.git\/HEAD$/u.exec(citation.sourcePath);
 	if (!match?.groups || typeof match.groups.repository !== "string") {
 		throw new Error("Repository citation requires a captured repository HEAD");
@@ -1538,13 +1404,17 @@ function readRevisionFile(
 	revision: string,
 	repository: string,
 ): string | typeof BINARY | null {
-	if (path.startsWith("/") || path.split("/").includes("..")) {
+	if (!isCommitId(revision) || path.startsWith("/") || path.split("/").includes("..")) {
 		return null;
 	}
-	const child = spawnSync("git", ["-C", repository, "--no-pager", "show", `${revision}:${path}`], {
-		maxBuffer: 64 * 1024 * 1024,
-		env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
-	});
+	const child = spawnSync(
+		"git",
+		["-C", repository, "--no-pager", "show", "--end-of-options", `${revision}:${path}`],
+		{
+			maxBuffer: 64 * 1024 * 1024,
+			env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" },
+		},
+	);
 	return child.status === 0 ? asText(child.stdout) : null;
 }
 
@@ -2171,7 +2041,6 @@ function governedScanRead(reader: EvidenceReader) {
 			const read = await reader.answer(
 				{
 					op: "read",
-					tree: "head",
 					path: params.path,
 					...(params.offset === undefined ? {} : { offsetLine: params.offset }),
 					...(params.limit === undefined ? {} : { maxLines: params.limit }),
@@ -2352,7 +2221,7 @@ function readBoundModels(): BoundModels {
 		return {};
 	}
 	try {
-		return boundModelsSchema.parse(parseJson(readFileSync(PRACTICE_SCRIPT_MODELS_PATH, "utf8")));
+		return boundModelsSchema.parse(JSON.parse(readFileSync(PRACTICE_SCRIPT_MODELS_PATH, "utf8")));
 	} catch (error) {
 		console.error(
 			`[pi-runner] the bound models do not parse, so none is bound: ${errorText(error)}`,
@@ -2435,7 +2304,7 @@ function readTaskEnvelope(): TaskEnvelope {
 	}
 	let parsed: unknown;
 	try {
-		parsed = parseJson(raw);
+		parsed = JSON.parse(raw);
 	} catch (error) {
 		console.error(`[pi-runner] Failed to parse ${TASK_PATH}: ${errorText(error)}`);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
@@ -2586,7 +2455,7 @@ function optionalString(value: unknown): string | undefined {
 	return typeof value === "string" ? value : undefined;
 }
 
-/** The notes an CONVERSATION piece carries TO the mentor. Kept in step with ConversationBrief by Java. */
+/** The notes a CONVERSATION piece carries TO the mentor. Kept in step with ConversationBrief by Java. */
 interface ConversationNotes {
 	situation?: string;
 	capability?: string;
@@ -2702,59 +2571,46 @@ const composedFeedback: ComposedFeedback = {
  */
 const admittedResults: AdmittedResult[] = [];
 
-function isCopyForm(value: unknown): value is CopyForm {
-	return value === "LINE_NOTE" || value === "FILE_NOTE";
-}
-
+/**
+ * The staged composition request, or null when the server staged none or opened no destination. A request
+ * that breaks the contract fails the run: composing without it would silently drop every delivery.
+ */
 function loadCompositionRequest(): CompositionRequest | null {
-	try {
-		if (!existsSync(COMPOSITION_REQUEST_PATH)) {
-			return null;
-		}
-		const parsed = parseJson(readFileSync(COMPOSITION_REQUEST_PATH, "utf8"));
-		if (!isRecord(parsed) || parsed.enabled !== true) {
-			return null;
-		}
-		const declared: Record<string, unknown> = isRecord(parsed.destinations)
-			? parsed.destinations
-			: {};
-		const boundsFor = (destination: Destination): DestinationBounds => {
-			const bounds: Record<string, unknown> = isRecord(declared[destination])
-				? declared[destination]
-				: {};
-			return {
-				enabled: bounds.enabled === true,
-				maxPieces: Math.max(0, Math.min(Number(bounds.maxPieces) || 0, 10)),
-			};
-		};
-		// Spelled out rather than folded into the DESTINATIONS loop, so that Record<Destination, …> is what makes
-		// every lane present: adding a destination to DESTINATIONS then fails to compile until it is bounded here.
-		const destinations: Record<Destination, DestinationBounds> = {
-			ON_WORK: boundsFor("ON_WORK"),
-			PRACTICE_PAGE: boundsFor("PRACTICE_PAGE"),
-			CONVERSATION: boundsFor("CONVERSATION"),
-		};
-		if (
-			!DESTINATIONS.some(
-				(destination) =>
-					destinations[destination].enabled && destinations[destination].maxPieces > 0,
-			)
-		) {
-			return null;
-		}
-		const onWorkCopyForms = jsonArray(parsed.onWorkCopyForms).filter(isCopyForm);
-		if (destinations.ON_WORK.enabled && onWorkCopyForms.length === 0) {
-			return null;
-		}
-		return {
-			destinations,
-			onWorkCopyForms,
-			minDistinctSourceFiles: Math.max(2, Number(parsed.minDistinctSourceFiles) || 2),
-		};
-	} catch (error) {
-		console.error(`[pi-runner] composition request unreadable: ${errorText(error)}`);
+	if (!existsSync(COMPOSITION_REQUEST_PATH)) {
 		return null;
 	}
+	const parsed = compositionRequestSchema.safeParse(
+		JSON.parse(readFileSync(COMPOSITION_REQUEST_PATH, "utf8")),
+	);
+	if (!parsed.success) {
+		throw new Error(
+			`composition request breaks the contract: ${parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`,
+		);
+	}
+	const request = parsed.data;
+	const closed: DestinationBounds = { enabled: false, maxPieces: 0 };
+	// Spelled out rather than folded into the DESTINATIONS loop, so that Record<Destination, …> is what makes
+	// every destination present: adding one to DESTINATIONS then fails to compile until it is bounded here.
+	const destinations: Record<Destination, DestinationBounds> = {
+		ON_WORK: request.destinations.ON_WORK ?? closed,
+		PRACTICE_PAGE: request.destinations.PRACTICE_PAGE ?? closed,
+		CONVERSATION: request.destinations.CONVERSATION ?? closed,
+	};
+	if (
+		!DESTINATIONS.some(
+			(destination) => destinations[destination].enabled && destinations[destination].maxPieces > 0,
+		)
+	) {
+		return null;
+	}
+	if (destinations.ON_WORK.enabled && request.onWorkCopyForms.length === 0) {
+		throw new Error("composition request opens ON_WORK without a copy form");
+	}
+	return {
+		destinations,
+		onWorkCopyForms: request.onWorkCopyForms,
+		minDistinctItems: request.minDistinctItems,
+	};
 }
 
 function composablePracticeSlugs(): string[] {
@@ -2767,7 +2623,7 @@ function stagedPreparedTargets(): PreparedFeedbackTarget[] {
 		if (!existsSync(PREPARED_FEEDBACK_PATH)) {
 			return [];
 		}
-		const prepared = parseJson(readFileSync(PREPARED_FEEDBACK_PATH, "utf8"));
+		const prepared: unknown = JSON.parse(readFileSync(PREPARED_FEEDBACK_PATH, "utf8"));
 		const entries = isRecord(prepared) ? jsonArray(prepared.prepared) : [];
 		return entries.flatMap((entry) => {
 			if (!isRecord(entry)) {
@@ -2800,7 +2656,7 @@ function stagedDeliveredPractices(): Set<string> {
 		if (!existsSync(file)) {
 			return new Set();
 		}
-		const history = parseJson(readFileSync(file, "utf8"));
+		const history: unknown = JSON.parse(readFileSync(file, "utf8"));
 		if (
 			!isRecord(history) ||
 			history.recordRole !== "RECORDED_DELIVERY" ||
@@ -2827,7 +2683,7 @@ function stagedDeliveredPractices(): Set<string> {
 				}
 				return jsonArray(entry.basedOn).flatMap((support) =>
 					isRecord(support) && support.outcome === "NOT_MET"
-						? [`${destination}:${normalizePracticeSlug(support.practiceSlug)}`]
+						? [`${destination}:${trimmedSlug(support.practiceSlug)}`]
 						: [],
 				);
 			}),
@@ -2935,7 +2791,7 @@ function buildFeedbackTool(
 		const bounds = request.destinations[piece.destination];
 		if (!bounds.enabled) {
 			return skipped(
-				`${piece.destination} is not a lane this run may write for (open: ${enabledDestinations.join(", ")}); skipped.`,
+				`${piece.destination} is not a destination this run may write for (open: ${enabledDestinations.join(", ")}); skipped.`,
 			);
 		}
 		const key = `${piece.destination}:${piece.practiceSlug}`;
@@ -2964,9 +2820,9 @@ function buildFeedbackTool(
 		// PRACTICE_PAGE pattern feedback requires NOT_MET results on distinct pieces of work.
 		if (piece.destination === "PRACTICE_PAGE" && delivers) {
 			const pieces = negativePiecesOfWork(piece.practiceSlug);
-			if (pieces < request.minDistinctSourceFiles) {
+			if (pieces < request.minDistinctItems) {
 				return skipped(
-					`PRACTICE_PAGE needs a pattern across at least ${request.minDistinctSourceFiles} pieces of work, and ` +
+					`PRACTICE_PAGE needs a pattern across at least ${request.minDistinctItems} pieces of work, and ` +
 						`${piece.practiceSlug} has support on ${pieces} (the PRACTICE_PAGE support read); WITHHOLD it ` +
 						`with BELOW_BAR. Skipped.`,
 				);
@@ -2982,7 +2838,7 @@ function buildFeedbackTool(
 		});
 		return {
 			stored: true,
-			text: `stored a ${piece.destination} piece for ${piece.practiceSlug} (${piece.action}); ${usedPerDestination[piece.destination]}/${bounds.maxPieces} used on that lane.${repairs.map((repair) => ` ${repair}.`).join("")}`,
+			text: `stored a ${piece.destination} piece for ${piece.practiceSlug} (${piece.action}); ${usedPerDestination[piece.destination]}/${bounds.maxPieces} used on that destination.${repairs.map((repair) => ` ${repair}.`).join("")}`,
 		};
 	};
 
@@ -3128,10 +2984,7 @@ function buildFeedbackTool(
 					details: { stored: 0 },
 				};
 			}
-			const submitted = submittedList(
-				isRecord(params) ? params.feedback : null,
-				FEEDBACK_ITEM_KEYS,
-			);
+			const submitted = submittedList(isRecord(params) ? params.feedback : null);
 			if ("error" in submitted) {
 				return refusal(toolCallId, `feedback refused — ${submitted.error}`);
 			}
@@ -3386,7 +3239,6 @@ function boundedText(
 	return { text };
 }
 
-/** Validate one feedback item; the outer tool schema intentionally permits partial batch success. */
 /**
  * A WITHHOLD sent with no basedOn rests on its practice's NOT_MET result, the only one it can withhold: it is filled
  * in, and said so.
@@ -3403,7 +3255,7 @@ function withholdBasis(
 	) {
 		return value;
 	}
-	const slug = normalizePracticeSlug(value.practiceSlug);
+	const slug = trimmedSlug(value.practiceSlug);
 	const ids = results
 		.filter((result) => result.practiceSlug === slug && result.outcome === "NOT_MET")
 		.map((result) => result.resultId);
@@ -3539,7 +3391,7 @@ const THIS_WORK = ((): string | undefined => {
 	if (!existsSync(metadataPath) || !isRecord(folderIndex)) {
 		return undefined;
 	}
-	const metadata = parseJson(readFileSync(metadataPath, "utf8"));
+	const metadata: unknown = JSON.parse(readFileSync(metadataPath, "utf8"));
 	if (!isRecord(metadata)) {
 		return undefined;
 	}
@@ -3570,7 +3422,7 @@ function negativePiecesOfWork(practiceSlug: string): number {
 /** The CONVERSATION lane: notes to the mentor, and nothing that would be read out. */
 function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
 	if (hasText(piece.body) || hasText(piece.nextStep)) {
-		return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing on this lane is read out; skipped.";
+		return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing for this destination is read out; skipped.";
 	}
 	const { notes } = piece;
 	for (const field of [
@@ -3639,7 +3491,7 @@ function validateFeedback(
 			return (
 				`${reason} rests on feedback recorded as delivered on ${piece.destination} for ${unrecorded.join(", ")} in the ` +
 				`delivered-feedback history: current, not withdrawn, with its words, for each NOT_MET practice in basedOn. The captured history does not establish that prerequisite; prepared ` +
-				`feedback and other destinations do not count. Decide this lane on its own evidence: the piece it supports, ` +
+				`feedback and other destinations do not count. Decide this destination on its own evidence: the piece it supports, ` +
 				`or WITHHOLD with BELOW_BAR. Skipped.`
 			);
 		}
@@ -3785,7 +3637,7 @@ function priorFeedbackFacts(label: string, file: string, key: "feedback" | "prep
 	const pointer = `### ${label} — read \`${file}\` for the recorded history; its contents are not shown here\n`;
 	let history: unknown;
 	try {
-		history = parseJson(readFileSync(file, "utf8"));
+		history = JSON.parse(readFileSync(file, "utf8"));
 	} catch {
 		return pointer;
 	}
@@ -3868,7 +3720,10 @@ function buildCompositionTurn(
 	const onTheWork = plannedReviewFacts();
 	const historyRoot = nodePath.dirname(PREPARED_FEEDBACK_PATH);
 	const context = [
-		stagedBlock("The composition request (lanes, caps, placements)", COMPOSITION_REQUEST_PATH),
+		stagedBlock(
+			"The composition request (destinations, limits, copy forms)",
+			COMPOSITION_REQUEST_PATH,
+		),
 		stagedBlock("What earlier reviews recorded about this person", `${historyRoot}/problems.json`),
 		request.destinations.PRACTICE_PAGE.enabled
 			? stagedBlock(
@@ -3897,7 +3752,7 @@ ${context}
 ${onTheWork}
 Lanes open this turn: ${lanes}.${closedNote}
 The practices each open lane may carry: ${routing}. Write no piece, not even a WITHHOLD, for a practice on a lane that does not list it.
-A pattern claim needs at least ${request.minDistinctSourceFiles} distinct pieces of work.
+A pattern claim needs at least ${request.minDistinctItems} distinct pieces of work.
 
 ${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a lane is a correct and common outcome; say in one line why, and stop.`;
 }
@@ -3923,7 +3778,7 @@ const ADMISSION_ATTEMPT_TIMEOUT_MS = 10 * 60_000;
 async function answerText(response: Response): Promise<string> {
 	try {
 		const body = await response.text();
-		const problem: unknown = body.trim().startsWith("{") ? parseJson(body) : null;
+		const problem: unknown = body.trim().startsWith("{") ? JSON.parse(body) : null;
 		const detail = isRecord(problem) ? problem.detail : null;
 		return typeof detail === "string" && detail.length > 0 ? detail : body.slice(0, 500);
 	} catch {
@@ -5215,7 +5070,7 @@ async function main() {
 			if (stoppedBy() !== null || pastSafety() || signal.aborted) {
 				throw new UnratedError(noResultReason(slug, signal), "the scope ended before the review");
 			}
-			const leads = await resolveLeads(options.leads ?? [], evidenceSources, undefined, signal);
+			const leads = await resolveLeads(options.leads ?? [], evidenceSources, signal);
 			signal.throwIfAborted();
 			const fullInput = `${REVIEW_INPUT_ROOT}/${slug}.json`;
 			const preparing =
@@ -5243,7 +5098,7 @@ async function main() {
 				if (path === undefined) {
 					throw new UnratedError("unavailable", "the scan has no assigned file");
 				}
-				const file = await reader.answer({ op: "read", tree: "head", path }, signal);
+				const file = await reader.answer({ op: "read", path }, signal);
 				if (file.status !== "FOUND" || file.truncated) {
 					throw new UnratedError(
 						file.status === "FOUND" ? "too-large" : "unavailable",
@@ -5381,7 +5236,6 @@ async function main() {
 				{
 					slug,
 					inputs: read.inputs,
-					criteria: criteriaFileOf(slug) ?? "",
 					files: jobFiles(read.inputs.kind),
 					now: new Date(PROCESS_START_MS).toISOString(),
 					deadline: measureEnd - RETURN_MS,
@@ -5615,7 +5469,7 @@ async function main() {
 	async function continueAdmittedReview(): Promise<void> {
 		measuring = false;
 		measurementClosed = true;
-		acceptAdmission(parseJson(readFileSync(CONTINUATION_PATH, "utf8")));
+		acceptAdmission(JSON.parse(readFileSync(CONTINUATION_PATH, "utf8")));
 		// The original selection, less what was admitted: what that attempt did not reach stays not reached.
 		const unreachedSlugs = missingSlugs(
 			allSlugs,

@@ -90,8 +90,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         var gitLabLink = link(7L, "42", null);
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(slackLink, gitLabLink));
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(
-                        new AccountMembershipQuery.MembershipView(1L, "acme", "Hephaestus", "MEMBER", ACCOUNT_ID)));
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(1L, "acme", "Hephaestus", "MEMBER")));
         Connection visible = slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack");
         when(connectionRepository.findActive(1L, IntegrationKind.SLACK)).thenReturn(Optional.of(visible));
         when(participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(1L, "U1"))

@@ -79,7 +79,9 @@ function matches(selected: string[], actual: string | null | undefined): boolean
 }
 
 function matchesAny(selected: string[], actual: readonly (string | null)[]): boolean {
-	return selected.length === 0 || actual.some((value) => hasText(value) && selected.includes(value));
+	return (
+		selected.length === 0 || actual.some((value) => hasText(value) && selected.includes(value))
+	);
 }
 
 /** A boolean filter: unset selects every row, `true`/`false` the rows that are or are not. */
@@ -128,12 +130,7 @@ function pageOf<T>(rows: readonly T[], url: URL) {
 }
 
 /** A `PagedModel` page: the rows, and the page facts under `page`. */
-function paged(rows: readonly unknown[], url: URL) {
-	const { content, ...page } = pageOf(rows, url);
-	return HttpResponse.json({ content, page });
-}
-
-/** A Spring `Page`, as the feedback list returns it: the page facts beside the rows. */
+/** A Spring `Page`, as every list returns it: the page facts beside the rows. */
 function springPage(rows: readonly unknown[], url: URL) {
 	const page = pageOf(rows, url);
 	return HttpResponse.json({
@@ -275,7 +272,13 @@ function reviewOfItem(itemId: string): ReviewSummary | undefined {
 	return reviews.find((review) => review.item.id === itemId);
 }
 
-const LINEAGE_KINDS = ["ITEM", "REVIEW", "RESULT", "PROBLEM", "FEEDBACK"] as const satisfies readonly LineageKind[];
+const LINEAGE_KINDS = [
+	"ITEM",
+	"REVIEW",
+	"RESULT",
+	"PROBLEM",
+	"FEEDBACK",
+] as const satisfies readonly LineageKind[];
 const lineageKindSchema = z.enum(LINEAGE_KINDS);
 
 const LINEAGE_ID_PARAM: Record<LineageKind, string> = {
@@ -296,7 +299,14 @@ const removeMarkSchema = z.object({ reason: z.string().min(1) });
 const createDecisionSchema = z.object({
 	action: z.enum(["APPROVE", "REJECT", "WITHDRAW", "RESTORE"]),
 	reasonCode: z
-		.enum(["INCORRECT", "MISSING_CONTEXT", "UNHELPFUL", "DUPLICATE", "INAPPROPRIATE_PLACEMENT", "OTHER"])
+		.enum([
+			"INCORRECT",
+			"MISSING_CONTEXT",
+			"UNHELPFUL",
+			"DUPLICATE",
+			"INAPPROPRIATE_PLACEMENT",
+			"OTHER",
+		])
 		.optional(),
 	note: z.string().optional(),
 	contentDigest: z.string().optional(),
@@ -353,7 +363,7 @@ export function reviewHandlers({
 		),
 		...resultHandlers(resultRows, requireResultSort),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/problems", ({ request }) =>
-			paged(filterProblems(reviewProblems, new URL(request.url)), new URL(request.url)),
+			springPage(filterProblems(reviewProblems, new URL(request.url)), new URL(request.url)),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/problems/:problemId", ({ params }) =>
 			HttpResponse.json(problemDetail(String(params.problemId))),
@@ -377,7 +387,9 @@ export function reviewHandlers({
 		...reviewDetailHandlers(),
 		...itemHandlers(),
 		...catalogHandlers(),
-		http.get("*/workspaces/:workspaceSlug/members/me", () => HttpResponse.json(ownMembership(role))),
+		http.get("*/workspaces/:workspaceSlug/members/me", () =>
+			HttpResponse.json(ownMembership(role)),
+		),
 		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
 	];
 }
@@ -389,20 +401,24 @@ function resultHandlers(rows: readonly ReviewResult[], requireResultSort: string
 			if (hasText(requireResultSort) && single(url, "sort") !== requireResultSort) {
 				return HttpResponse.json({ detail: `Expected sort=${requireResultSort}` }, { status: 400 });
 			}
-			return paged(sortResults(filterResults(rows, url), url), url);
+			return springPage(sortResults(filterResults(rows, url), url), url);
 		}),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId", ({ params }) =>
 			HttpResponse.json(resultDetail(String(params.resultId))),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId/marks", ({ params }) =>
-			HttpResponse.json(resultMarks(String(params.resultId))),
+		http.get(
+			"*/workspaces/:workspaceSlug/practices/reviews/results/:resultId/marks",
+			({ params }) => HttpResponse.json(resultMarks(String(params.resultId))),
 		),
 		http.post(
 			"*/workspaces/:workspaceSlug/practices/reviews/results/:resultId/marks",
 			async ({ params, request }) => {
 				const body = createMarkSchema.safeParse(await request.json());
 				if (!body.success) {
-					return HttpResponse.json({ detail: "A mark needs a kind and a reason." }, { status: 400 });
+					return HttpResponse.json(
+						{ detail: "A mark needs a kind and a reason." },
+						{ status: 400 },
+					);
 				}
 				const resultId = String(params.resultId);
 				const mark: ResultMark = {
@@ -485,8 +501,7 @@ export function feedbackHandlers(rows: readonly ReviewFeedback[] = reviewFeedbac
 		),
 		http.post(
 			"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/retry",
-			({ params }) =>
-				HttpResponse.json(feedbackDetail(String(params.feedbackId)), { status: 202 }),
+			({ params }) => HttpResponse.json(feedbackDetail(String(params.feedbackId)), { status: 202 }),
 		),
 	];
 }
@@ -511,7 +526,7 @@ function reviewDetailHandlers() {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
 			const url = new URL(request.url);
-			return paged(filterReviews(reviews, url), url);
+			return springPage(filterReviews(reviews, url), url);
 		}),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId", ({ params }) =>
 			HttpResponse.json(reviewDetail(String(params.reviewId))),
@@ -522,8 +537,10 @@ function reviewDetailHandlers() {
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/practice-scripts", () =>
 			HttpResponse.json(Object.values(reviewPracticeScripts)),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/feedback-checks", ({ params }) =>
-			HttpResponse.json(reviewFeedbackChecksOf(reviewDetail(String(params.reviewId)))),
+		http.get(
+			"*/workspaces/:workspaceSlug/practices/reviews/:reviewId/feedback-checks",
+			({ params }) =>
+				HttpResponse.json(reviewFeedbackChecksOf(reviewDetail(String(params.reviewId)))),
 		),
 		// Already ended answers 200 with the review as it is; asking jobs to stop answers 202.
 		http.post("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/cancel", ({ params }) => {
@@ -548,7 +565,7 @@ function itemHandlers() {
 		http.get("*/workspaces/:workspaceSlug/practices/items", ({ request }) => {
 			const url = new URL(request.url);
 			const kind = single(url, "itemKind");
-			return paged(
+			return springPage(
 				reviewedItems().filter((item) => !hasText(kind) || item.kind === kind),
 				url,
 			);
@@ -575,10 +592,13 @@ function itemHandlers() {
 			}
 			return HttpResponse.json({ item, facts: [] });
 		}),
-		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/events", ({ params, request }) => {
-			const review = reviewOfItem(String(params.itemId));
-			return paged(review === undefined ? [] : itemEventsOf(review), new URL(request.url));
-		}),
+		http.get(
+			"*/workspaces/:workspaceSlug/practices/items/:itemId/events",
+			({ params, request }) => {
+				const review = reviewOfItem(String(params.itemId));
+				return springPage(review === undefined ? [] : itemEventsOf(review), new URL(request.url));
+			},
+		),
 	];
 }
 

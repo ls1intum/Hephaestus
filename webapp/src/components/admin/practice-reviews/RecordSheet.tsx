@@ -167,7 +167,7 @@ export interface TechnicalFact {
 }
 
 /**
- * IDs, the model, tokens, revisions and codes: what an operator checks against a log. Open by default
+ * IDs, the model, tokens, versions and codes: what an operator checks against a log. Open by default
  * so the facts can be copied without an extra click; it can still be folded.
  */
 export function SheetTechnical({

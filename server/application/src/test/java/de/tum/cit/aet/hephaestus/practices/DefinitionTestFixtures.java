@@ -3,10 +3,12 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 public final class DefinitionTestFixtures {
     private DefinitionTestFixtures() {}
@@ -38,9 +40,77 @@ public final class DefinitionTestFixtures {
     }
 
     public static PracticeDefinition rename(PracticeDefinition original, String name) {
+        return edit(original, name, original.criteria());
+    }
+
+    public static PracticeDefinition withCriteria(PracticeDefinition original, String criteria) {
+        return edit(original, original.name(), criteria);
+    }
+
+    private static PracticeDefinition edit(PracticeDefinition original, String name, String criteria) {
         return new PracticeDefinition(
                 name,
                 original.reviewOn(),
+                original.appliesWhen(),
+                original.about(),
+                original.reads(),
+                original.reviewedBy(),
+                criteria,
+                original.script(),
+                original.scan(),
+                original.lineNotes(),
+                original.guidance());
+    }
+
+    public static PracticeDefinition definition(ItemKind kind, String name, String criteria, @Nullable String script) {
+        String event =
+                switch (kind.value()) {
+                    case "docs.document" -> "published";
+                    case "chat.thread" -> "settled";
+                    default -> "opened";
+                };
+        String source =
+                switch (kind.value()) {
+                    case "scm.pull_request", "scm.pull_request_review" -> "scm.pull-request.core";
+                    case "scm.issue" -> "scm.issue.core";
+                    case "chat.thread" -> "slack.conversation.thread";
+                    case "docs.document" -> "docs.document.core";
+                    case "scm.file", "scm.repository" -> "scm.repository.tree";
+                    default -> throw new IllegalArgumentException("Unsupported fixture kind");
+                };
+        return new PracticeDefinition(
+                name,
+                new ReviewOn(List.of(new ItemEventName(kind.value() + "." + event)), Map.of()),
+                null,
+                kind.value().equals("scm.file") || kind.value().equals("scm.repository") ? null : AboutRole.AUTHOR,
+                new PracticeReads("2.0.0", List.of(new PracticeReadSource(new SourceKind(source), ReadNeed.REQUIRED))),
+                new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
+                criteria,
+                script,
+                null,
+                kind.value().equals("scm.pull_request"),
+                new PracticeGuidance(null, null, null, null, null));
+    }
+
+    public static PracticeDefinition withAbout(PracticeDefinition original, @Nullable AboutRole about) {
+        return new PracticeDefinition(
+                original.name(),
+                original.reviewOn(),
+                original.appliesWhen(),
+                about,
+                original.reads(),
+                original.reviewedBy(),
+                original.criteria(),
+                original.script(),
+                original.scan(),
+                original.lineNotes(),
+                original.guidance());
+    }
+
+    public static PracticeDefinition withReviewOn(PracticeDefinition original, ReviewOn reviewOn) {
+        return new PracticeDefinition(
+                original.name(),
+                reviewOn,
                 original.appliesWhen(),
                 original.about(),
                 original.reads(),
@@ -49,6 +119,21 @@ public final class DefinitionTestFixtures {
                 original.script(),
                 original.scan(),
                 original.lineNotes(),
+                original.guidance());
+    }
+
+    public static PracticeDefinition withLineNotes(PracticeDefinition original, boolean lineNotes) {
+        return new PracticeDefinition(
+                original.name(),
+                original.reviewOn(),
+                original.appliesWhen(),
+                original.about(),
+                original.reads(),
+                original.reviewedBy(),
+                original.criteria(),
+                original.script(),
+                original.scan(),
+                lineNotes,
                 original.guidance());
     }
 }

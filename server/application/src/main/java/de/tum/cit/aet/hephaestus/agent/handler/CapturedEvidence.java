@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
+import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -81,7 +82,7 @@ final class CapturedEvidence {
                 .toList();
         if (!available.contains(kind) || matches.size() != 1) {
             throw new CandidateEvidenceVerifier.Unverified(
-                    "quote_unverified", "The citation has no unique captured text", null);
+                    CandidateRefusal.SOURCE_UNAVAILABLE, "The citation has no unique captured text", null);
         }
         return matches.getFirst();
     }

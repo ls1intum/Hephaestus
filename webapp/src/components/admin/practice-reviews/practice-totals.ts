@@ -1,8 +1,4 @@
-import type {
-	PracticeReviewCounts,
-	PracticeReviewOverview,
-	ReviewFeedbackCounts,
-} from "@/api/types.gen";
+import type { ReviewFeedbackCounts, ReviewOverview, ReviewPracticeCounts } from "@/api/types.gen";
 
 import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 
@@ -16,8 +12,8 @@ import { familyCount, resultSlots, slotsTotal } from "./review-outcomes";
 export interface PracticeTotals {
 	results: number;
 	notMet: number;
-	notApplicable: number;
-	undetermined: number;
+	doesNotApply: number;
+	couldNotDetermine: number;
 	markedIncorrect: number;
 	/** Pieces of feedback delivered, each once, as the Feedback tile counts them. */
 	feedbackDelivered: number;
@@ -38,32 +34,30 @@ export interface PracticeTotals {
 export function feedbackComposed(counts: ReviewFeedbackCounts): number {
 	return (
 		counts.awaitingApproval +
-		counts.prepared +
+		counts.ready +
 		counts.delivered +
-		counts.partiallyDelivered +
 		counts.unconfirmed +
-		counts.suppressed +
-		counts.discarded +
-		counts.failed +
-		counts.partiallyFailed
+		counts.withheld +
+		counts.rejected +
+		counts.failed
 	);
 }
 
-const resultsOf = (counts: PracticeReviewCounts) => slotsTotal(resultSlots(counts.practiceResults));
+const resultsOf = (counts: ReviewPracticeCounts) => slotsTotal(resultSlots(counts.results));
 
 /** The totals of the range, with the rows on screen to tell how much the filters hide. */
 export function practiceTotals(
-	overview: PracticeReviewOverview,
-	shown: readonly PracticeReviewCounts[],
+	overview: ReviewOverview,
+	shown: readonly ReviewPracticeCounts[],
 ): PracticeTotals {
 	const shownSlugs = new Set(shown.map((counts) => counts.practiceSlug));
 	const hiddenRows = overview.practices.filter((counts) => !shownSlugs.has(counts.practiceSlug));
 	return {
-		results: slotsTotal(resultSlots(overview.practiceResults)),
-		notMet: overview.practiceResults.notMet,
-		notApplicable: overview.practiceResults.notApplicable,
-		undetermined: overview.practiceResults.undetermined,
-		markedIncorrect: overview.practiceResultsInvalidated,
+		results: slotsTotal(resultSlots(overview.results)),
+		notMet: overview.results.notMet,
+		doesNotApply: overview.results.doesNotApply,
+		couldNotDetermine: overview.results.couldNotDetermine,
+		markedIncorrect: overview.resultsMarkedIncorrect,
 		feedbackDelivered: familyCount(overview.feedback, "DELIVERED"),
 		feedbackComposed: feedbackComposed(overview.feedback),
 		feedbackDeliveredInRows: overview.practices.reduce(

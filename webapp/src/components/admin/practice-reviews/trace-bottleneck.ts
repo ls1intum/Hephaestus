@@ -1,47 +1,43 @@
 import {
 	CircleAlertIcon,
 	CircleCheckIcon,
+	CircleDashedIcon,
 	CircleSlashIcon,
 	ClockIcon,
 	EyeOffIcon,
 	HourglassIcon,
 	type LucideIcon,
-	PauseIcon,
 	TimerOffIcon,
 } from "lucide-react";
 
-import type { AgentJob, ReviewLineage, ReviewLineageFeedback } from "@/api/types.gen";
+import type { ReviewBoundFeedback, ReviewDetail, ReviewLineage, ReviewRef } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
-import { REVIEW_CANCELLATION_DEFS } from "@/components/practice-vocabulary/review-cancellation-defs";
-import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
+import { REVIEW_STOP_REASON_SENTENCES } from "@/components/practice-vocabulary/review-status-defs";
 import { durationBetween } from "@/lib/dates";
 import { hasText } from "@/lib/text";
 
-import { holdReasonCopy } from "./job-utils";
-import { countOf, isSlowGap, reachedDeveloper, shortReason, silentNotMet } from "./lineage-chain";
-import { traceStart } from "./lineage-story";
-import { withheldClass } from "./review-attention";
+import {
+	countOf,
+	feedbackOf,
+	isSlowGap,
+	type LineageFeedback,
+	type LineageRecords,
+	lineageRecords,
+	reachedDeveloper,
+	silentNotMet,
+} from "./lineage-chain";
+import type { TraceStage } from "./lineage-story";
 import type { TraceNode } from "./review-trace";
 
 /**
- * The stretch of time between two steps of a trace that a reader asks about: how long the review
- * waited to be asked for after the moment, how long it waited in the queue, how long it ran, how
- * long until its feedback reached the developer, and until a developer first opened it.
+ * The stretches of time a review's timing names, on the overview and on a trace: how long the
+ * review waited to be asked for after the event, how long it waited in the queue, how long it
+ * prepared and executed, and how long until its feedback reached the developer. The overview splits
+ * the run into Preparation and Execution; one review records only its whole Run.
  */
-export type TraceSpanKind =
-	| "asked"
-	| "queue"
-	| "preparation"
-	| "execution"
-	| "run"
-	| "delivery"
-	| "read";
+export type TraceSpanKind = "asked" | "queue" | "preparation" | "execution" | "run" | "delivery";
 
-/**
- * Each span's word on the strip, which the overview's review time and the review's own sheet use for
- * the same stretch. A run splits into Preparation and Execution where the review recorded when its
- * execution started; where it did not, it stays one Run.
- */
+/** Each span's word, which the overview's review time and a review's trace use for the same stretch. */
 export const TRACE_SPAN_LABELS: Record<TraceSpanKind, string> = {
 	asked: "Until asked",
 	queue: "Queue",
@@ -49,11 +45,13 @@ export const TRACE_SPAN_LABELS: Record<TraceSpanKind, string> = {
 	execution: "Execution",
 	run: "Run",
 	delivery: "To developer",
-	read: "First read",
 };
 
+/** The spans one review's record can measure. */
+export type MeasuredSpanKind = Extract<TraceSpanKind, "asked" | "queue" | "run" | "delivery">;
+
 export interface TraceSpan {
-	kind: TraceSpanKind;
+	kind: MeasuredSpanKind;
 	/** "Queue", "Run": the word on the strip. */
 	label: string;
 	/** What the span runs from and to, for its tooltip. */
@@ -67,13 +65,13 @@ export interface TraceSpan {
 }
 
 /** Where on the trace the path was lost or slowed: the stage its line names. */
-export type BottleneckStage = "trigger" | "review" | "feedback" | "effect";
+export type BottleneckStage = TraceStage;
 
 /**
  * The one thing a reader of a trace looks for first: where the path was lost, held or slowed, and
  * why, in one line next to the verdict.
  *
- * - `failed`: the review stopped and composed nothing more.
+ * - `failed`: the review stopped before it finished.
  * - `lost`: feedback did not reach the developer, or no longer stands.
  * - `slow`: everything arrived, but one wait took half an hour or more.
  * - `waiting`: the path is still on its way and waits on something named.
@@ -91,26 +89,23 @@ export interface TraceBottleneck {
 	tone: BadgeVariant;
 	icon: LucideIcon;
 	/** The span that took longest where it was slow, also coloured on the strip. */
-	span?: TraceSpanKind;
+	span?: MeasuredSpanKind;
 	/** The reason in a few words, for where the verdict above already says the whole sentence. */
 	short?: string;
-	/** Words that, where the verdict says them, mean it already tells the reason: then `short` stands. */
-	echo?: string;
 }
 
 function span(
-	kind: TraceSpanKind,
-	label: string,
+	kind: MeasuredSpanKind,
 	hint: string,
-	from: Date | undefined,
-	to: Date | undefined,
+	from: Date | null | undefined,
+	to: Date | null | undefined,
 ): TraceSpan | undefined {
-	if (from === undefined || to === undefined || to.getTime() < from.getTime()) {
+	if (from == null || to == null || to.getTime() < from.getTime()) {
 		return undefined;
 	}
 	return {
 		kind,
-		label,
+		label: TRACE_SPAN_LABELS[kind],
 		hint,
 		from,
 		to,
@@ -120,170 +115,126 @@ function span(
 }
 
 /**
- * When the work was merged: from the chain, else from the review's own record, else from the
- * merge moment on the work. The chain reads it from the pull request, which can miss it where the
- * moment has it.
+ * The review a trace stands on: the one whose detail the page read, else the review of the graph's
+ * root result, else the graph's first review.
  */
-export function mergedAtOf(
-	lineage: ReviewLineage,
-	job?: Pick<AgentJob, "workMergedAt">,
-): Date | undefined {
-	if (lineage.workMergedAt !== undefined) {
-		return lineage.workMergedAt;
+export function traceReview(
+	records: LineageRecords,
+	detail: ReviewDetail | undefined,
+): ReviewRef | undefined {
+	if (detail !== undefined) {
+		return detail;
 	}
-	if (job?.workMergedAt !== undefined) {
-		return job.workMergedAt;
+	const rootReviewId = records.root?.review?.id ?? records.root?.result?.reviewId;
+	return records.reviews.find((review) => review.id === rootReviewId) ?? records.reviews[0];
+}
+
+/** The feedback written from the review's own results. */
+function reviewFeedback(records: LineageRecords, review: ReviewRef | undefined): LineageFeedback[] {
+	if (review === undefined) {
+		return records.feedback;
 	}
-	let merged: Date | undefined;
-	for (const moment of lineage.workMoments) {
-		if (moment.kind === "MERGED") {
-			merged = moment.occurredAt;
-		}
-	}
-	return merged;
+	const own = new Set(
+		records.results.filter((result) => result.reviewId === review.id).map((result) => result.id),
+	);
+	return records.feedback.filter((entry) => entry.basis.some((id) => own.has(id)));
 }
 
 /** The feedback the trace stands on: the piece itself, a result's pieces, or the review's own. */
 function feedbackOnPath(
-	lineage: ReviewLineage,
+	records: LineageRecords,
+	review: ReviewRef | undefined,
 	here: TraceNode | undefined,
-): ReviewLineageFeedback[] {
+): LineageFeedback[] {
 	if (here?.kind === "feedback") {
-		return lineage.feedback.filter((entry) => entry.id === here.id);
+		return records.feedback.filter((entry) => entry.id === here.id);
 	}
 	if (here?.kind === "result") {
-		return lineage.feedback.filter((entry) => entry.practiceResultIds.includes(here.id));
+		return feedbackOf(records.feedback, here.id);
 	}
-	const reviewId = lineage.review?.id;
-	return lineage.feedback.filter(
-		(entry) => reviewId === undefined || entry.agentJobId === reviewId,
-	);
+	return reviewFeedback(records, review);
+}
+
+/** When the first runtime job of the review was picked up by a worker. */
+function pickedUpAt(detail: ReviewDetail | undefined): Date | undefined {
+	const starts = (detail?.runtime?.jobs ?? [])
+		.map((job) => job.startedAt)
+		.filter((startedAt) => startedAt !== null)
+		.sort((a, b) => a.getTime() - b.getTime());
+	return starts[0];
 }
 
 /**
- * Where the time of the path went, stage by stage: asked for after the moment, the queue, the run,
- * until the feedback on the path reached the developer, until a developer first opened it. A span
- * the record cannot tell is left out, never guessed.
+ * Where the time of the path went, stage by stage: asked for after the event, the queue, the run,
+ * until the feedback on the path first reached the developer. A span the record cannot tell is left
+ * out, never guessed: the queue and the run need the review's runtime jobs, which expire.
  */
 export function traceSpans(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,
-	job?: Pick<AgentJob, "firstFeedbackReadAt" | "executionStartedAt">,
+	detail?: ReviewDetail,
 ): TraceSpan[] {
-	const { review } = lineage;
+	const records = lineageRecords(lineage);
+	const review = traceReview(records, detail);
 	if (review === undefined) {
 		return [];
 	}
-	const start = traceStart(lineage);
-	const moment =
-		start !== undefined && start.getTime() < review.createdAt.getTime() ? start : undefined;
-	// The first piece on the path that reached the developer: from when it was composed to then.
-	const first = feedbackOnPath(lineage, here)
-		.filter((entry) => reachedDeveloper(entry) && entry.deliveredAt !== undefined)
-		.sort((a, b) => (a.deliveredAt?.getTime() ?? 0) - (b.deliveredAt?.getTime() ?? 0))[0];
-	const delivered = first?.deliveredAt;
-	const finished = review.finishedAt;
+	const pickedUp = pickedUpAt(detail);
+	const [delivered] = feedbackOnPath(records, review, here)
+		.map((entry) => entry.deliveredAt)
+		.filter((deliveredAt) => deliveredAt !== null)
+		.sort((a, b) => a.getTime() - b.getTime());
 	return [
 		span(
 			"asked",
-			TRACE_SPAN_LABELS.asked,
-			"From the moment that started it to when the review was asked for",
-			moment,
+			"From the event that started it to when the review was asked for",
+			detail?.startedBy?.occurredAt,
 			review.createdAt,
 		),
 		span(
 			"queue",
-			TRACE_SPAN_LABELS.queue,
 			"From when the review was asked for to when a worker picked it up",
 			review.createdAt,
-			review.startedAt,
+			pickedUp,
 		),
-		...runSpans(review.startedAt ?? review.createdAt, job?.executionStartedAt, finished),
+		span(
+			"run",
+			"From when a worker picked the review up to when it finished",
+			pickedUp,
+			review.completedAt,
+		),
 		span(
 			"delivery",
-			TRACE_SPAN_LABELS.delivery,
-			"From when the feedback was composed to when it reached the developer",
-			first?.createdAt,
+			"From when the review finished to when its feedback first reached the developer",
+			review.completedAt,
 			delivered,
-		),
-		span(
-			"read",
-			TRACE_SPAN_LABELS.read,
-			"From delivery to when a developer first opened feedback of this review",
-			delivered,
-			job?.firstFeedbackReadAt,
 		),
 	].filter((entry) => entry !== undefined);
-}
-
-/**
- * The run as Preparation and Execution when the review recorded when its execution started, between
- * its pick-up and its end; otherwise, or when that moment is out of order, as one Run.
- */
-function runSpans(
-	from: Date,
-	executionStartedAt: Date | undefined,
-	to: Date | undefined,
-): (TraceSpan | undefined)[] {
-	const split =
-		executionStartedAt !== undefined &&
-		to !== undefined &&
-		executionStartedAt.getTime() >= from.getTime() &&
-		executionStartedAt.getTime() <= to.getTime();
-	if (!split) {
-		return [
-			span(
-				"run",
-				TRACE_SPAN_LABELS.run,
-				"From when a worker picked the review up to when it finished",
-				from,
-				to,
-			),
-		];
-	}
-	return [
-		span(
-			"preparation",
-			TRACE_SPAN_LABELS.preparation,
-			"From when a worker picked the review up to when its execution started",
-			from,
-			executionStartedAt,
-		),
-		span(
-			"execution",
-			TRACE_SPAN_LABELS.execution,
-			"From when its execution started to when the review finished",
-			executionStartedAt,
-			to,
-		),
-	];
 }
 
 export interface FeedbackLoss {
 	title: string;
 	text: string;
 	short: string;
-	echo?: string;
 	/**
-	 * How much the loss asks of an admin: red where sending failed, amber where timing cost it (the
-	 * work moved on before the comment was ready), and neutral where it was the review, the developer
-	 * or an admin deciding, as the overview splits withheld feedback.
+	 * How much the loss asks of an admin: red where sending failed, amber where it was withheld, and
+	 * neutral where an admin decided or newer feedback took its place.
 	 */
 	tone: LossTone;
 }
 
 type LossTone = "destructive" | "warning" | "secondary";
 
-/** Why a piece of feedback did not reach the developer or no longer stands; undefined while it stands or waits. */
-export function feedbackLoss(
-	feedback: ReviewLineageFeedback,
-	lineage: ReviewLineage,
-	job?: Pick<AgentJob, "workMergedAt">,
-): FeedbackLoss | undefined {
-	if (feedback.withdrawnAt !== undefined) {
+/**
+ * Why a piece of feedback did not reach the developer or no longer stands; undefined while it
+ * stands or waits. The graph records no stop reason, so a withheld piece says only that it was
+ * withheld.
+ */
+export function feedbackLoss(feedback: ReviewBoundFeedback): FeedbackLoss | undefined {
+	if (feedback.withdrawn) {
 		return {
 			title: "Withdrawn",
-			// A prepared piece can be withdrawn too: only a recorded delivery says it was delivered.
+			// A ready piece can be withdrawn too: only a recorded delivery says it was delivered.
 			text: reachedDeveloper(feedback)
 				? "An admin withdrew it after it was delivered."
 				: "An admin withdrew it before it reached the developer.",
@@ -291,8 +242,8 @@ export function feedbackLoss(
 			tone: "secondary",
 		};
 	}
-	switch (feedback.deliveryState) {
-		case "DISCARDED": {
+	switch (feedback.state) {
+		case "REJECTED": {
 			return {
 				title: "Rejected",
 				text: "An admin rejected it before it was sent.",
@@ -308,17 +259,9 @@ export function feedbackLoss(
 				tone: "destructive",
 			};
 		}
-		case "PARTIALLY_FAILED": {
-			return {
-				title: "Partly failed",
-				text: "Only part of it was delivered; sending the rest failed.",
-				short: "partly failed",
-				tone: "destructive",
-			};
-		}
-		case "SUPERSEDED": {
+		case "REPLACED": {
 			// Replaced after it reached the developer is the ordinary course of a re-review.
-			if (feedback.deliveredAt !== undefined) {
+			if (feedback.deliveredAt !== null) {
 				return undefined;
 			}
 			return {
@@ -328,33 +271,19 @@ export function feedbackLoss(
 				tone: "secondary",
 			};
 		}
-		case "SUPPRESSED":
-		case "PARTIALLY_DELIVERED": {
-			const reason = feedback.suppressionReason;
-			if (reason === undefined) {
-				return feedback.deliveryState === "SUPPRESSED"
-					? {
-							title: "Withheld",
-							text: "It was withheld; the reason is not recorded.",
-							short: "withheld",
-							tone: "warning",
-						}
-					: undefined;
-			}
-			const partly = feedback.deliveryState === "PARTIALLY_DELIVERED";
+		case "WITHHELD": {
 			return {
-				title: partly ? "Partly withheld" : "Withheld",
-				text: `${partly ? "Part of it was delivered, the rest was withheld. " : ""}${withheldText(feedback, lineage, job)}`,
-				short:
-					reason === "ARTIFACT_MERGED"
-						? (mergeWhere(feedback, lineage, job) ?? shortReason(reason))
-						: shortReason(reason),
-				echo: reason === "ARTIFACT_MERGED" ? "merged" : undefined,
-				tone: withheldClass(reason) === "TIMING" ? "warning" : "secondary",
+				title: "Withheld",
+				text:
+					feedback.deliveredAt === null
+						? "It was withheld before it reached the developer. Its feedback record says why."
+						: "It was delivered, then withheld. Its feedback record says why.",
+				short: "withheld",
+				tone: "warning",
 			};
 		}
 		case "AWAITING_APPROVAL":
-		case "PREPARED":
+		case "READY":
 		case "DELIVERED":
 		case "UNCONFIRMED": {
 			return undefined;
@@ -362,100 +291,7 @@ export function feedbackLoss(
 	}
 }
 
-/** Where in the review's run the work merged, as a clause: "merged while the review ran". */
-const MERGE_PLACES = {
-	startedReview: "the merge started this review",
-	beforeRequest: "merged before the review was asked for",
-	inQueue: "merged while the review waited in the queue",
-	whileRunning: "merged while the review ran",
-	afterFinish: "merged after the review finished",
-} as const;
-
-interface MergeTiming {
-	/** When the work merged; absent when only the start of the review says the merge came first. */
-	merged?: Date;
-	/** Where in the review's run; absent when the review is not known. */
-	where?: keyof typeof MERGE_PLACES;
-}
-
-/**
- * When the work merged against a piece withheld as already merged: the one answer the bottleneck
- * line and the verdict both tell. Undefined when the merge time is not known or came after the
- * piece was ready.
- */
-export function mergeTiming(
-	feedback: ReviewLineageFeedback,
-	lineage: ReviewLineage,
-	job?: Pick<AgentJob, "workMergedAt">,
-): MergeTiming | undefined {
-	const merged = mergedAtOf(lineage, job);
-	if (
-		lineage.reviewTrigger === "MERGED" ||
-		lineage.workMoments.some((moment) => moment.startedReview && moment.kind === "MERGED")
-	) {
-		return { merged, where: "startedReview" };
-	}
-	if (merged === undefined || merged.getTime() > feedback.createdAt.getTime()) {
-		return undefined;
-	}
-	const { review } = lineage;
-	if (review === undefined) {
-		return { merged };
-	}
-	if (merged.getTime() < review.createdAt.getTime()) {
-		return { merged, where: "beforeRequest" };
-	}
-	if (review.startedAt === undefined || merged.getTime() < review.startedAt.getTime()) {
-		return { merged, where: "inQueue" };
-	}
-	// The comments are written after the review finishes, so the work can merge in between.
-	if (review.finishedAt !== undefined && merged.getTime() > review.finishedAt.getTime()) {
-		return { merged, where: "afterFinish" };
-	}
-	return { merged, where: "whileRunning" };
-}
-
-/**
- * The reason a piece was withheld, said plainly. A piece withheld as already merged also says when
- * the work merged against the review, since that is where the time was lost: before the review was
- * asked for, in the queue, while it ran, or after it finished.
- */
-export function withheldText(
-	feedback: ReviewLineageFeedback,
-	lineage: ReviewLineage,
-	job?: Pick<AgentJob, "workMergedAt">,
-): string {
-	const reason = feedback.suppressionReason;
-	if (reason === undefined) {
-		return "It was withheld; the reason is not recorded.";
-	}
-	const timing = reason === "ARTIFACT_MERGED" ? mergeTiming(feedback, lineage, job) : undefined;
-	if (timing?.where === "startedReview") {
-		return "The merge started this review, so a comment on the work would always come too late.";
-	}
-	if (timing?.merged !== undefined) {
-		const before = `The work was merged ${durationBetween(timing.merged, feedback.createdAt)} before the comment was ready`;
-		return timing.where === undefined
-			? `${before}.`
-			: `${before}: it ${MERGE_PLACES[timing.where]}.`;
-	}
-	return withholdingReasonSentence(reason);
-}
-
-/**
- * Where in the review's run the work merged, before a piece withheld as already merged was ready:
- * "merged while the review ran". Undefined where the merge time or the review is not known.
- */
-function mergeWhere(
-	feedback: ReviewLineageFeedback,
-	lineage: ReviewLineage,
-	job?: Pick<AgentJob, "workMergedAt">,
-): string | undefined {
-	const where = mergeTiming(feedback, lineage, job)?.where;
-	return where === undefined ? undefined : MERGE_PLACES[where];
-}
-
-/** "already merged (2), settings changed (1)": the reasons of several lost pieces, most first. */
+/** "withheld (2), rejected (1)": the reasons of several lost pieces, most first. */
 function lossesByReason(losses: readonly { short: string }[]): string {
 	const counts = new Map<string, number>();
 	for (const loss of losses) {
@@ -469,8 +305,7 @@ function lossesByReason(losses: readonly { short: string }[]): string {
 
 /**
  * Lost feedback in the tone of what it asks of an admin, the strongest of its pieces: a delivery
- * failure is red, a loss to timing amber, and a piece the review, the developer or an admin held
- * back is neutral, since nothing went wrong.
+ * failure is red, a withheld piece amber, and a piece an admin held back is neutral.
  */
 function lost(losses: readonly FeedbackLoss[]): { tone: LossTone; icon: LucideIcon } {
 	let tone: LossTone = "secondary";
@@ -485,134 +320,112 @@ function lost(losses: readonly FeedbackLoss[]): { tone: LossTone; icon: LucideIc
 /** A not-met result the review told nobody about: worth a look, never a failure. */
 const NOT_TOLD = { tone: "warning", icon: EyeOffIcon } as const;
 
-type BottleneckJob = Pick<
-	AgentJob,
-	| "errorMessage"
-	| "cancellationReason"
-	| "retryCount"
-	| "workMergedAt"
-	| "firstFeedbackReadAt"
-	| "executionStartedAt"
->;
+/** The error the review's last failed runtime job recorded, and how many attempts it took. */
+function runtimeFailure(detail: ReviewDetail | undefined): { error?: string; attempts: number } {
+	const jobs = detail?.runtime?.jobs ?? [];
+	const failed = [...jobs].reverse().find((job) => hasText(job.errorMessage));
+	const attempts = Math.max(0, ...jobs.map((job) => job.attempt));
+	return {
+		error: hasText(failed?.errorMessage)
+			? failed.errorMessage.trim().replace(/\.?$/u, ".")
+			: undefined,
+		attempts,
+	};
+}
 
-/** A review that stopped, is held or still runs is its own bottleneck; a completed one is not. */
+/** A review that stopped or still runs is its own bottleneck; a complete one is not. */
 function reviewBottleneck(
-	review: NonNullable<ReviewLineage["review"]>,
-	job: BottleneckJob | undefined,
+	review: ReviewRef,
+	detail: ReviewDetail | undefined,
 	now: Date,
 ): TraceBottleneck | undefined {
-	const retries =
-		job !== undefined && job.retryCount > 0
-			? ` It was tried ${countOf(job.retryCount + 1, "time", "times")}.`
-			: "";
-	const error = hasText(job?.errorMessage)
-		? job.errorMessage.trim().replace(/\.?$/u, ".")
-		: undefined;
-	switch (review.phase) {
+	const stopReason = detail?.stopReason ?? null;
+	const because = stopReason === null ? undefined : REVIEW_STOP_REASON_SENTENCES[stopReason];
+	const { error, attempts } = runtimeFailure(detail);
+	const tries = attempts > 1 ? ` It was tried ${countOf(attempts, "time", "times")}.` : "";
+	switch (review.status) {
 		case "FAILED": {
+			const timedOut = stopReason === "TIMED_OUT" || stopReason === "DEADLINE_EXCEEDED";
 			return {
 				kind: "failed",
 				stage: "review",
-				title: "Review failed",
-				text: `${error ?? "It stopped on an error; the error is not recorded here."}${retries}`,
+				title: timedOut ? "Review timed out" : "Review failed",
+				text: `${error ?? because ?? "It stopped on an error. The error is not recorded here."}${tries}`,
 				tone: "destructive",
-				icon: CircleAlertIcon,
+				icon: timedOut ? TimerOffIcon : CircleAlertIcon,
 			};
 		}
-		case "TIMED_OUT": {
+		case "PARTIAL": {
 			return {
 				kind: "failed",
 				stage: "review",
-				title: "Review timed out",
-				text: `${error ?? "It ran past the time it is allowed and was stopped."}${retries}`,
-				tone: "destructive",
-				icon: TimerOffIcon,
+				title: "Review did not finish",
+				text: `${because ?? "It stopped before it finished."} What it recorded up to then still stands.`,
+				tone: "warning",
+				icon: CircleDashedIcon,
 			};
 		}
 		case "CANCELLED": {
-			const reason = job?.cancellationReason;
 			return {
 				kind: "failed",
 				stage: "review",
-				title: "Review canceled",
-				text:
-					reason === undefined
-						? (error ?? "Somebody stopped it before it finished.")
-						: REVIEW_CANCELLATION_DEFS[reason].description,
+				title: "Review cancelled",
+				text: because ?? "Somebody stopped it before it finished.",
 				tone: "outline",
 				icon: CircleSlashIcon,
 			};
 		}
 		case "QUEUED": {
-			return queuedBottleneck(review, now);
+			const slow = isSlowGap((now.getTime() - review.createdAt.getTime()) / 1000);
+			return {
+				kind: "waiting",
+				stage: "review",
+				title: "In the queue",
+				text: `It has waited ${durationBetween(review.createdAt, now)} for a worker so far.`,
+				tone: slow ? "warning" : "secondary",
+				icon: ClockIcon,
+				span: "queue",
+			};
 		}
 		case "RUNNING": {
 			return {
 				kind: "waiting",
 				stage: "review",
 				title: "Running",
-				text: `It has run ${durationBetween(review.startedAt ?? review.createdAt, now)} so far.`,
+				text: `It has run ${durationBetween(pickedUpAt(detail) ?? review.createdAt, now)} so far.`,
 				tone: "secondary",
 				icon: HourglassIcon,
 				span: "run",
 			};
 		}
-		case "COMPLETED": {
+		case "COMPLETE": {
 			return undefined;
 		}
 	}
 }
 
-function queuedBottleneck(
-	review: NonNullable<ReviewLineage["review"]>,
-	now: Date,
-): TraceBottleneck {
-	if (hasText(review.holdReason)) {
-		const hold = holdReasonCopy(review.holdReason);
-		return {
-			kind: "waiting",
-			stage: "review",
-			title: "On hold",
-			text: `${hold.label}, for ${durationBetween(review.createdAt, now)} so far. ${hold.detail}`,
-			tone: "warning",
-			icon: PauseIcon,
-			span: "queue",
-		};
-	}
-	const slow = isSlowGap((now.getTime() - review.createdAt.getTime()) / 1000);
-	return {
-		kind: "waiting",
-		stage: "review",
-		title: "In the queue",
-		text: `It has waited ${durationBetween(review.createdAt, now)} for a worker so far.`,
-		tone: slow ? "warning" : "secondary",
-		icon: ClockIcon,
-		span: "queue",
-	};
-}
-
 /** The not-met results on the path that led to no feedback at all. */
-function silentOnPath(lineage: ReviewLineage, here: TraceNode | undefined) {
+function silentOnPath(records: LineageRecords, review: ReviewRef, here: TraceNode | undefined) {
 	if (here?.kind === "feedback") {
 		return [];
 	}
-	const silent = silentNotMet(lineage);
-	return here?.kind === "result" ? silent.filter((entry) => entry.id === here.id) : silent;
+	const silent = silentNotMet(records);
+	return here?.kind === "result"
+		? silent.filter((entry) => entry.id === here.id)
+		: silent.filter((entry) => entry.reviewId === review.id);
 }
 
 /** What of the path's feedback was lost: one piece, all of them, or some. */
 function lossBottleneck(
-	lineage: ReviewLineage,
+	records: LineageRecords,
+	review: ReviewRef,
 	here: TraceNode | undefined,
-	job: BottleneckJob | undefined,
 ): TraceBottleneck | undefined {
-	const pieces = feedbackOnPath(lineage, here);
-	const losses = pieces
-		.map((feedback) => feedbackLoss(feedback, lineage, job))
-		.filter((loss) => loss !== undefined);
+	const pieces = feedbackOnPath(records, review, here);
+	const losses = pieces.map(feedbackLoss).filter((loss) => loss !== undefined);
 	const reached = pieces.filter(reachedDeveloper).length;
 	if (losses.length === 0) {
-		const silent = silentOnPath(lineage, here);
+		const silent = silentOnPath(records, review, here);
 		if (pieces.length > 0 || silent.length === 0) {
 			return undefined;
 		}
@@ -632,7 +445,6 @@ function lossBottleneck(
 			title: first.title,
 			text: first.text,
 			short: first.short,
-			echo: first.echo,
 			...lost(losses),
 		};
 	}
@@ -654,47 +466,56 @@ function lossBottleneck(
 	};
 }
 
-/** What a path still on its way waits on: an admin's approval, or a conversation that has not come. */
+/**
+ * What a path still on its way waits on: an admin's approval, a conversation that has not come, a
+ * send in progress, or a conversation that did not record showing it.
+ */
 function waitBottleneck(
-	lineage: ReviewLineage,
+	records: LineageRecords,
+	review: ReviewRef,
 	here: TraceNode | undefined,
-	now: Date,
 ): TraceBottleneck | undefined {
-	const pieces = feedbackOnPath(lineage, here);
-	const waiting = pieces.find((entry) => entry.deliveryState === "AWAITING_APPROVAL");
-	if (waiting !== undefined) {
+	const pieces = feedbackOnPath(records, review, here);
+	if (pieces.some(reachedDeveloper)) {
+		return undefined;
+	}
+	if (pieces.some((entry) => entry.state === "AWAITING_APPROVAL")) {
 		return {
 			kind: "waiting",
 			stage: "feedback",
 			title: "Awaiting approval",
-			text: `It has waited ${durationBetween(waiting.createdAt, now)} for an admin to approve it.`,
+			text: "It waits for a workspace admin to approve or reject it before anything is sent.",
 			tone: "warning",
 			icon: HourglassIcon,
 		};
 	}
-	const chat = pieces.find(
-		(entry) => entry.deliveryState === "PREPARED" && entry.channel === "IN_CHAT",
-	);
-	const reached = pieces.some(reachedDeveloper);
-	if (chat !== undefined && !reached) {
+	const ready = pieces.filter((entry) => entry.state === "READY");
+	if (ready.some((entry) => entry.destination === "CONVERSATION")) {
 		return {
 			kind: "waiting",
 			stage: "feedback",
 			title: "Waiting for a conversation",
-			text: `Prepared ${durationBetween(chat.createdAt, now)} ago; it reaches the developer only when they next talk with Heph.`,
+			text: "It reaches the developer only when they next talk with Heph.",
 			tone: "secondary",
 			icon: HourglassIcon,
 		};
 	}
-	const prepared = pieces.find(
-		(entry) => entry.deliveryState === "PREPARED" || entry.deliveryState === "PARTIALLY_DELIVERED",
-	);
-	if (prepared !== undefined && !reached) {
+	if (ready.length > 0) {
 		return {
 			kind: "waiting",
 			stage: "feedback",
 			title: "Not sent yet",
-			text: `Prepared ${durationBetween(prepared.createdAt, now)} ago and not delivered yet.`,
+			text: "It is ready and not delivered yet.",
+			tone: "secondary",
+			icon: HourglassIcon,
+		};
+	}
+	if (pieces.some((entry) => entry.state === "UNCONFIRMED")) {
+		return {
+			kind: "waiting",
+			stage: "effect",
+			title: "Delivery unconfirmed",
+			text: "The conversation linked this feedback, but its appearance was not recorded.",
 			tone: "secondary",
 			icon: HourglassIcon,
 		};
@@ -702,62 +523,45 @@ function waitBottleneck(
 	return undefined;
 }
 
-const SPAN_STAGE: Record<TraceSpanKind, BottleneckStage> = {
-	asked: "trigger",
+const SPAN_STAGE: Record<MeasuredSpanKind, BottleneckStage> = {
+	asked: "start",
 	queue: "review",
-	preparation: "review",
-	execution: "review",
 	run: "review",
 	delivery: "feedback",
-	read: "effect",
 };
 
 function spanLength(entry: TraceSpan): number {
 	return entry.to.getTime() - entry.from.getTime();
 }
 
-/** The longest wait of half an hour or more, and whether the path's card is still unopened. */
+/** The longest wait of half an hour or more. */
 function timeBottleneck(
 	lineage: ReviewLineage,
+	records: LineageRecords,
+	review: ReviewRef,
 	here: TraceNode | undefined,
-	job: BottleneckJob | undefined,
+	detail: ReviewDetail | undefined,
 ): TraceBottleneck {
-	const pieces = feedbackOnPath(lineage, here);
-	const reached = pieces.filter(reachedDeveloper);
-	const [slowest] = traceSpans(lineage, here, job)
-		.filter((entry) => entry.slow && entry.kind !== "read")
+	const pieces = feedbackOnPath(records, review, here);
+	const [slowest] = traceSpans(lineage, here, detail)
+		.filter((entry) => entry.slow)
 		.sort((a, b) => spanLength(b) - spanLength(a));
-	const unread =
-		job !== undefined &&
-		job.firstFeedbackReadAt === undefined &&
-		reached.some((entry) => entry.channel === "IN_APP" && entry.deliveryState === "DELIVERED");
 	if (slowest !== undefined) {
-		const note = unread ? " Its card on the practice pages is not opened yet." : "";
 		return {
 			kind: "slow",
 			stage: SPAN_STAGE[slowest.kind],
 			title: SLOW_TITLE[slowest.kind],
-			text: `${SLOW_TEXT[slowest.kind](slowest.text)}${note}`,
+			text: SLOW_TEXT[slowest.kind](slowest.text),
 			tone: "warning",
 			icon: ClockIcon,
 			span: slowest.kind,
-		};
-	}
-	if (unread) {
-		return {
-			kind: "waiting",
-			stage: "effect",
-			title: "Not opened yet",
-			text: "It is on the developer’s practice pages, but no developer has opened feedback of this review yet.",
-			tone: "secondary",
-			icon: EyeOffIcon,
 		};
 	}
 	return {
 		kind: "none",
 		stage: "effect",
 		title: "No bottleneck",
-		text: noneText(pieces.length, reached.length),
+		text: noneText(pieces.length, pieces.filter(reachedDeveloper).length),
 		// The ordinary case takes no colour, so the ones that do stand out.
 		tone: "secondary",
 		icon: CircleCheckIcon,
@@ -765,18 +569,19 @@ function timeBottleneck(
 }
 
 /**
- * The bottleneck of the path the trace stands on, read from the chain and, where the page has it,
- * the review's own record: its error, its cancellation, its merge time and its first read. It names
- * the first thing that stopped the path: the review itself, then lost feedback; where nothing stopped
- * it, what it still waits on, else the longest wait.
+ * The bottleneck of the path the trace stands on, read from the graph and, where the page has it,
+ * the review's detail: its stop reason, its runtime jobs and the event that started it. It names
+ * the first thing that stopped the path: the review itself, then lost feedback; where nothing
+ * stopped it, what it still waits on, else the longest wait.
  */
 export function traceBottleneck(
 	lineage: ReviewLineage,
 	here: TraceNode | undefined,
-	job?: BottleneckJob,
+	detail?: ReviewDetail,
 	now: Date = new Date(),
 ): TraceBottleneck {
-	const { review } = lineage;
+	const records = lineageRecords(lineage);
+	const review = traceReview(records, detail);
 	if (review === undefined) {
 		return {
 			kind: "none",
@@ -788,10 +593,10 @@ export function traceBottleneck(
 		};
 	}
 	return (
-		reviewBottleneck(review, job, now) ??
-		lossBottleneck(lineage, here, job) ??
-		waitBottleneck(lineage, here, now) ??
-		timeBottleneck(lineage, here, job)
+		reviewBottleneck(review, detail, now) ??
+		lossBottleneck(records, review, here) ??
+		waitBottleneck(records, review, here) ??
+		timeBottleneck(lineage, records, review, here, detail)
 	);
 }
 
@@ -804,24 +609,19 @@ function noneText(pieces: number, reached: number): string {
 		: "Nothing was lost on this path.";
 }
 
-const SLOW_TITLE: Record<TraceSpanKind, string> = {
+const SLOW_TITLE: Record<MeasuredSpanKind, string> = {
 	asked: "Slow start",
 	queue: "Slow queue",
-	preparation: "Slow preparation",
-	execution: "Slow execution",
 	run: "Slow run",
 	delivery: "Slow delivery",
-	read: "Read late",
 };
 
-const SLOW_TEXT: Record<TraceSpanKind, (duration: string) => string> = {
-	asked: (duration) => `The review was asked for ${duration} after the moment that started it.`,
+const SLOW_TEXT: Record<MeasuredSpanKind, (duration: string) => string> = {
+	asked: (duration) => `The review was asked for ${duration} after the event that started it.`,
 	queue: (duration) => `The review waited ${duration} in the queue for a worker.`,
-	preparation: (duration) => `The review prepared its evidence for ${duration}.`,
-	execution: (duration) => `The review's execution took ${duration}.`,
 	run: (duration) => `The review ran for ${duration}.`,
-	delivery: (duration) => `Its feedback reached the developer ${duration} after it was composed.`,
-	read: (duration) => `It was first read ${duration} after it was delivered.`,
+	delivery: (duration) =>
+		`Its feedback reached the developer ${duration} after the review finished.`,
 };
 
 function plain(text: string): string {
@@ -836,10 +636,7 @@ function plain(text: string): string {
  * few words, so the two lines never say the same thing twice.
  */
 export function bottleneckText(bottleneck: TraceBottleneck, verdict: string): string {
-	const told =
-		plain(verdict).includes(plain(bottleneck.text)) ||
-		(bottleneck.echo !== undefined && plain(verdict).includes(bottleneck.echo));
-	if (bottleneck.short !== undefined && told) {
+	if (bottleneck.short !== undefined && plain(verdict).includes(plain(bottleneck.text))) {
 		return bottleneck.short;
 	}
 	return bottleneck.text;

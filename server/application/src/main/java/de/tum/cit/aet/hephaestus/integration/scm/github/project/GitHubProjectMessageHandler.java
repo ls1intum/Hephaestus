@@ -21,21 +21,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub Projects V2 webhook events.
- *
- * <p>This handler processes project create, edit, close, reopen, and delete events.
- *
  * <p>
- *
+ * This handler processes project create, edit, close, reopen, and delete events.
+ * <p>
  * <h2>Supported Owner Types</h2>
- *
- * <p>GitHub Projects V2 can be owned by organizations, repositories, or users. This handler
- * supports all three:
- *
+ * <p>
+ * GitHub Projects V2 can be owned by organizations, repositories, or users.
+ * This handler supports all three:
  * <ul>
- *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.
- *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").
- *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated with a
- *       monitored workspace/scope.
+ *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.</li>
+ *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").</li>
+ *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated
+ *       with a monitored workspace/scope.</li>
  * </ul>
  */
 @Slf4j
@@ -145,16 +142,15 @@ public class GitHubProjectMessageHandler extends AbstractIntegrationMessageHandl
 
     /**
      * Resolves the scope ID based on the owner type.
-     *
-     * <p>Resolution strategies:
-     *
+     * <p>
+     * Resolution strategies:
      * <ul>
-     *   <li>ORGANIZATION: Look up by organization login
-     *   <li>REPOSITORY: Look up by repository fullName
-     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)
+     *   <li>ORGANIZATION: Look up by organization login</li>
+     *   <li>REPOSITORY: Look up by repository fullName</li>
+     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)</li>
      * </ul>
      *
-     * @param event the webhook event
+     * @param event     the webhook event
      * @param ownerType the detected owner type
      * @return the scope ID, or null if not found or not supported
      */

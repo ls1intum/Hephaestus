@@ -1,15 +1,18 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Serializes exact identity ownership before account rows are locked. */
 @Component
@@ -17,24 +20,18 @@ import org.springframework.transaction.annotation.Transactional;
 @WorkspaceAgnostic("Exact provider identity ownership spans workspaces")
 @RequiredArgsConstructor
 class IdentityKeyLock {
-    private final JdbcTemplate jdbc;
+    private final IdentityRepository identityRepository;
+    private final PersonDataWriteFence writeFence;
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void lock(List<PersonIdentity> identities) {
-        var keys = identities.stream()
-                .map(identity -> {
-                    if (identity.providerId() <= 0 || identity.subject().isBlank())
-                        throw new IllegalArgumentException("An exact provider identity is required");
-                    return Objects.requireNonNull(jdbc.queryForObject(
-                            "SELECT" + " hashtextextended(jsonb_build_array(?::bigint,?::text,?::text)::text,0)",
-                            Long.class,
-                            identity.providerId(),
-                            identity.subject(),
-                            Objects.requireNonNullElse(identity.teamId(), "")));
-                })
-                .distinct()
-                .sorted()
-                .toList();
-        for (long key : keys) jdbc.query("SELECT pg_advisory_xact_lock(?)", rs -> {}, key);
+    public void holdAndLock(List<PersonIdentity> identities) {
+        if (!writeFence.holdForWrite(identities))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This identity is being erased.");
+        identityRepository.lockOwnership(
+                identities.stream().map(PersonIdentity::providerId).toArray(Long[]::new),
+                identities.stream().map(PersonIdentity::subject).toArray(String[]::new),
+                identities.stream()
+                        .map(identity -> Objects.requireNonNullElse(identity.teamId(), ""))
+                        .toArray(String[]::new));
     }
 }

@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import type { ExtensionFactory, ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 import type { ProviderConfig } from "./pi-provider.ts";
-import { isRecord } from "./pi-result-normalize.ts";
+import { isRecord } from "./pi-text.ts";
 
 /** Keep review-local cache accounting separate from native conversation identity. */
 export function assessmentCacheExtension(

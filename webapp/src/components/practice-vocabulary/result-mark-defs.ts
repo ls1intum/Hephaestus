@@ -44,9 +44,6 @@ export const RESULT_MARK_ACTIONS: Record<ResultMarkKind, string> = {
 /** The action that reverses a mark. */
 export const REMOVE_MARK_ACTION = "Remove mark";
 
-/** The longest reason a mark or its removal accepts. */
-export const MARK_REASON_MAX_LENGTH = 500;
-
 /** Whether the developer disagrees with feedback written from a result, as admins filter it. */
 export type Disagreement = "DISAGREED" | "NOT_DISAGREED";
 

@@ -20,8 +20,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Bounds {@code review_job} growth in two passes: TERMINAL rows older than
- * {@link AgentProperties#payloadRetention} keep everything but their bulky {@code container_logs} /
- * {@code output}, and unreferenced rows older than {@link AgentProperties#rowRetention} go entirely.
+ * {@link AgentProperties#payloadRetention} keep everything but their bulky {@code capture} and {@code output}, and unreferenced rows older than {@link AgentProperties#rowRetention} go entirely.
  *
  * <p>Both run as {@link BoundedBatchPass} batches, so the queue sharing this table is never held up
  * by one unbounded statement.

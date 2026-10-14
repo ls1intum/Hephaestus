@@ -18,6 +18,8 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,10 +31,12 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
+@Validated
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class PracticeService {
@@ -68,7 +72,7 @@ public class PracticeService {
     }
 
     @Transactional
-    public Practice createPractice(WorkspaceContext ctx, CreatePracticeRequestDTO request) {
+    public Practice createPractice(WorkspaceContext ctx, @Valid CreatePracticeRequestDTO request) {
         return create(
                 ctx,
                 request.slug(),
@@ -143,11 +147,9 @@ public class PracticeService {
     }
 
     @Transactional
-    public Practice updatePractice(WorkspaceContext ctx, String slug, UpdatePracticeRequestDTO request) {
+    public Practice updatePractice(WorkspaceContext ctx, String slug, @Valid UpdatePracticeRequestDTO request) {
         lock(ctx);
         Practice practice = getPractice(ctx, slug);
-        if (request.expectedVersionId() == null || !request.expectedVersionId().matches("[1-9][0-9]*"))
-            throw new IllegalArgumentException("Use a positive decimal practice version id.");
         long expectedVersionId = Long.parseLong(request.expectedVersionId());
         if (expectedVersionId
                 != Objects.requireNonNull(practice.getCurrentVersion().getId())) {
@@ -202,9 +204,9 @@ public class PracticeService {
     }
 
     @Transactional
-    public List<Practice> placePractice(WorkspaceContext ctx, String slug, @Nullable String groupSlug, int position) {
+    public List<Practice> movePractice(
+            WorkspaceContext ctx, String slug, @Nullable String groupSlug, @PositiveOrZero int position) {
         lock(ctx);
-        if (position < 0) throw new IllegalArgumentException("Use a nonnegative position.");
         Practice practice = getPractice(ctx, slug);
         var before = PracticeDefinitionSnapshot.of(practice);
         PracticeGroup destination = group(ctx, groupSlug);

@@ -45,21 +45,21 @@ export const Review: Story = {
 };
 
 /** A piece of work is named the way its provider writes it, with its title. No review read it yet. */
-export const Work: Story = {
+export const Item: Story = {
 	args: {
-		kind: "work",
+		kind: "item",
 		name: {
 			status: "ready",
 			name: "Pull request #1423 · Member-facing review activity: say why a practice stayed quiet",
 		},
-		trace: { kind: "work", id: "pull-request:1423" },
+		trace: { kind: "item", id: "pull-request:1423" },
 	},
 	play: async ({ canvas }) => {
 		canvas.getByText(
 			"Pull request #1423 · Member-facing review activity: say why a practice stayed quiet",
 		);
 		await expect(levelsOpenedBy(canvas.getByRole("link", { name: "Show trace" }))).toEqual([
-			"trace:work:pull-request:1423",
+			"trace:item:42",
 		]);
 	},
 };
@@ -81,7 +81,7 @@ export const Result: Story = {
 
 /** Until the record is read, the name is a placeholder. */
 export const Loading: Story = {
-	args: { kind: "work", name: { status: "loading" }, trace: undefined },
+	args: { kind: "item", name: { status: "loading" }, trace: undefined },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("link", { name: "Show trace" })).not.toBeInTheDocument();
 		canvas.getByRole("button", { name: "Stop tracking (a piece of work)" });

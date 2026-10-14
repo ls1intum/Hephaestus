@@ -20,17 +20,18 @@ const longContent = {
 	id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
 	summary:
 		"The review keeps every boundary visible even when the result needs enough words to wrap across a narrow screen twice over",
-	subject: {
-		id: 10,
-		login: "alexandria-occasional-contributor",
-		name: "Alexandria Catherine Montgomery-Worthington",
+	developer: {
+		accountId: "10",
+		avatarUrl: null,
+		providerLogin: "alexandria-weekend-contributor",
+		displayName: "Alexandria Catherine Montgomery-Worthington",
 	},
 } satisfies ReviewResult;
 
 /** The fixture's results spread over a week, about three a day. */
 const overAWeek: ReviewResult[] = reviewResults.map((result, index) => ({
 	...result,
-	observedAt: index < 3 ? hoursBefore(index + 1) : daysBefore(Math.floor(index / 3)),
+	recordedAt: index < 3 ? hoursBefore(index + 1) : daysBefore(Math.floor(index / 3)),
 }));
 
 /** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
@@ -42,7 +43,7 @@ const TABLE = { name: "Results" } as const;
 /**
  * The Results stream, drawn as the Reviews table: one body per day under its heading, the time and
  * the outcome as an icon, named with the problems a not met result counts, the result with its
- * practice, the work, the developer and what came of it. The whole row opens the result's sheet;
+ * practice, the item and the developer. The whole row opens the result's sheet;
  * Track and Trace end it.
  */
 const meta = {
@@ -87,7 +88,10 @@ export const Default: Story = {
 		const open = canvas
 			.getAllByRole("link", { name: /^Open result /u })
 			.find(
-				(link) => link.getAttribute("aria-label")?.includes(resultSummary(firstResult)) === true,
+				(link) =>
+					link
+						.getAttribute("aria-label")
+						?.includes(resultSummary({ summary: firstResult.summary ?? undefined })) === true,
 			);
 		await expect(open === undefined ? [] : levelsOpenedBy(open)).toEqual([
 			`result:${firstResult.id}`,
@@ -113,8 +117,8 @@ export const CouldNotDetermine: Story = {
 			results: [
 				{
 					...firstResult,
-					outcome: "UNDETERMINED",
-					severity: undefined,
+					outcome: "COULD_NOT_DETERMINE",
+					severity: null,
 					problemCount: 0,
 					summary: "The captured discussion leaves the chosen approach ambiguous",
 				},
@@ -150,7 +154,7 @@ export const NoFeedbackCounts: Story = {
 };
 
 /**
- * A row opens one thing, its result's sheet. The practice and the work are plain text; Track
+ * A row opens one thing, its result's sheet. The practice and the item are plain text; Track
  * and Trace end the row.
  */
 export const OneLinkPerRow: Story = {
@@ -246,7 +250,7 @@ export const LoadFailed: Story = {
 	},
 };
 
-/** The verdict icons, the day headings and the exception badges keep their contrast on dark. */
+/** The outcome icons, the day headings and the exception badges keep their contrast on dark. */
 export const Dark: Story = {
 	globals: { theme: "dark" },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -262,7 +266,7 @@ export const Dark: Story = {
 export const Tracked: Story = {
 	parameters: {
 		router: {
-			initialUrl: `/?practiceResultId=${firstResult.id}&agentJobId=${firstResult.agentJobId}&selected=true`,
+			initialUrl: `/?resultId=${firstResult.id}&reviewId=${firstResult.reviewId}&selected=true`,
 		},
 	},
 	play: async ({ canvas }) => {
@@ -274,7 +278,7 @@ export const Tracked: Story = {
 
 /** Denied source prose keeps the result’s facts and a usable, truthfully named link. */
 export const TextUnavailable: Story = {
-	args: { state: { status: "ready", results: [{ ...firstResult, summary: undefined }] } },
+	args: { state: { status: "ready", results: [{ ...firstResult, summary: null }] } },
 	play: async ({ canvas }) => {
 		canvas.getByText("Result text unavailable");
 		const link = canvas.getByRole("link", {

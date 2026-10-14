@@ -45,6 +45,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -89,8 +91,9 @@ class FeedbackPreparationServiceTest {
             Result about = call.getArgument(0);
             List<Result> evidence = call.getArgument(1);
             return new PracticePageFeedbackRouter().supportsPattern(about, evidence)
-                    ? PracticePageDecision.ADMIT
-                    : PracticePageDecision.UNCORROBORATED;
+                    ? new FeedbackCompositionContextService.PageAdmission(PracticePageDecision.ADMIT, null)
+                    : new FeedbackCompositionContextService.PageAdmission(
+                            PracticePageDecision.UNCORROBORATED, FeedbackStopReason.UNCORROBORATED);
         });
     }
 
@@ -143,14 +146,14 @@ class FeedbackPreparationServiceTest {
         var prepared =
                 service.prepare(draft(List.of(resultId)), Optional.empty()).draft();
         assertThat(prepared.state()).isEqualTo(FeedbackState.WITHHELD);
-        assertThat(prepared.stopReason()).isEqualTo(FeedbackStopReason.NOTHING_NEW);
+        assertThat(prepared.stopReason()).isEqualTo(FeedbackStopReason.UNCORROBORATED);
     }
 
     @Test
     void shouldRejectCallerChosenHistoricalIdsBeforePreparingAnyFeedback() {
         UUID historical = UUID.randomUUID();
-        var older = result(historical, 4);
-        older.setReviewId(UUID.randomUUID());
+        var older =
+                result(historical, 4).toBuilder().reviewId(UUID.randomUUID()).build();
         when(results.findByWorkspaceIdAndIdIn(1, List.of(resultId, historical)))
                 .thenReturn(List.of(result(resultId, 3), older));
         assertThatThrownBy(() -> service.prepare(draft(List.of(resultId, historical)), Optional.empty()))
@@ -161,8 +164,8 @@ class FeedbackPreparationServiceTest {
     void shouldAcceptExactlyTheAuthorizedHistoricalBasisAndRecheckItAtPreparation() {
         UUID historical = UUID.randomUUID();
         var current = result(resultId, 3);
-        var older = result(historical, 4);
-        older.setReviewId(UUID.randomUUID());
+        var older =
+                result(historical, 4).toBuilder().reviewId(UUID.randomUUID()).build();
         when(results.findByWorkspaceIdAndIdIn(1, List.of(resultId, historical))).thenReturn(List.of(current, older));
         when(support.select(1, 7, 5, now))
                 .thenReturn(new PracticePageSupportReader.Selection(Optional.empty(), List.of(current, older)));
@@ -190,5 +193,30 @@ class FeedbackPreparationServiceTest {
                 service.prepare(draft(List.of(resultId)), Optional.of(stored)).draft();
         assertThat(prepared.basis()).extracting(FeedbackBasisInput::resultId).containsExactly(resultId, retained);
         verify(support, never()).select(anyLong(), anyLong(), anyLong(), any());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "NO_EVIDENCE,NO_EVIDENCE", "UNCORROBORATED,UNCORROBORATED", "BACKFILL_HELD,BACKFILL_QUIET",
+        "UNATTRIBUTABLE_SUBJECT,PUBLIC_SUBJECT_INELIGIBLE", "RECENTLY_SURFACED,NOTHING_NEW", "FEEDBACK_OFF,FEEDBACK_OFF"
+    })
+    void shouldRecordTheActualPageAdmissionRefusal(PracticePageDecision decision, FeedbackStopReason expected) {
+        when(composition.pageDecision(any(), anyList(), any(), any()))
+                .thenReturn(new FeedbackCompositionContextService.PageAdmission(decision, expected));
+        var prepared =
+                service.prepare(draft(List.of(resultId)), Optional.empty()).draft();
+        assertThat(prepared.state()).isEqualTo(FeedbackState.WITHHELD);
+        assertThat(prepared.stopReason()).isEqualTo(expected);
+    }
+
+    @Test
+    void shouldRecordTheSameGateReasonAtPagePreparation() {
+        when(composition.pageDecision(any(), anyList(), any(), any()))
+                .thenReturn(new FeedbackCompositionContextService.PageAdmission(
+                        PracticePageDecision.GATE_REFUSED, FeedbackStopReason.NO_AI));
+        assertThat(service.prepare(draft(List.of(resultId)), Optional.empty())
+                        .draft()
+                        .stopReason())
+                .isEqualTo(FeedbackStopReason.NO_AI);
     }
 }

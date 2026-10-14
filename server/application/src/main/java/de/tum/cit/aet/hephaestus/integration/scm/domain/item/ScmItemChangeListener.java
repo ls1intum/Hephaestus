@@ -32,7 +32,7 @@ public class ScmItemChangeListener {
 
     private void advance(long sourceId) {
         Instant at = Instant.now();
-        for (var item : items.issueItems(sourceId))
+        for (var item : items.issueItems(ScmItemEvents.ISSUE.value(), sourceId))
             results.endCurrent(item.getWorkspaceId(), item.getItemId(), ResultEndReason.WORK_CHANGED, at);
     }
 }

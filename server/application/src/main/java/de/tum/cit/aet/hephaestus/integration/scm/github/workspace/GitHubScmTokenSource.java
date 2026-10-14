@@ -11,13 +11,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * {@link ScmTokenSource} for GitHub — exposes either a minted GitHub App installation token or a
- * stored PAT for the workspace's active GitHub connection.
+ * {@link ScmTokenSource} for GitHub — exposes either a minted GitHub App installation
+ * token or a stored PAT for the workspace's active GitHub connection.
  *
  * <p>Resolution precedence is GitHub-App-first (installation tokens are short-lived but
- * fully-scoped); a PAT is only consulted when no active App config exists. The returned server URL
- * is whatever the active connection's config carries, defaulting to {@code https://github.com} when
- * blank.
+ * fully-scoped); a PAT is only consulted when no active App config exists. The returned
+ * server URL is whatever the active connection's config carries, defaulting to
+ * {@code https://github.com} when blank.
  */
 @Component
 public class GitHubScmTokenSource implements ScmTokenSource {
@@ -52,7 +52,7 @@ public class GitHubScmTokenSource implements ScmTokenSource {
                 return (token == null || token.isBlank()) ? Optional.empty() : Optional.of(token);
             } catch (Exception e) {
                 log.warn(
-                        "Failed to mint GitHub App installation token: scopeId={}," + " installationId={}, error={}",
+                        "Failed to mint GitHub App installation token: scopeId={}, installationId={}, error={}",
                         scopeId,
                         appConfig.get().installationId(),
                         e.getMessage());

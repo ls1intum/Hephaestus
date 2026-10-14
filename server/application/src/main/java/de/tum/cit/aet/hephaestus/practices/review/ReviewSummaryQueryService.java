@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
@@ -32,6 +31,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScriptQuery;
@@ -342,7 +342,7 @@ public class ReviewSummaryQueryService {
                         rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
                         FoundBy.valueOf(rs.getString("found_by")),
                         ItemEventState.valueOf(rs.getString("state")),
-                        rs.getString("reason") == null ? null : ItemEventReason.valueOf(rs.getString("reason")),
+                        rs.getString("reason") == null ? null : ReviewRequestReason.valueOf(rs.getString("reason")),
                         instant(rs.getObject("decided_at", OffsetDateTime.class)),
                         rs.getObject("review_id", UUID.class)))
                 .optional()

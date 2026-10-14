@@ -115,9 +115,9 @@ public class SyncController {
             WorkspaceContext workspace,
             @PathVariable Long connectionId,
             @RequestBody @Valid @NotNull TriggerSyncJobRequestDTO body) {
-        Long triggeredByUserId = SecurityUtils.getCurrentAccountId().orElse(null);
+        Long triggeredByAccountId = SecurityUtils.getCurrentAccountId().orElse(null);
         SyncStatusService.TriggerOutcome outcome =
-                syncStatusService.triggerSync(workspace.id(), connectionId, body.type(), triggeredByUserId);
+                syncStatusService.triggerSync(workspace.id(), connectionId, body.type(), triggeredByAccountId);
         return outcome.created()
                 ? ResponseEntity.status(HttpStatus.ACCEPTED).body(outcome.job())
                 : ResponseEntity.ok(outcome.job());

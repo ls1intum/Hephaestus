@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.core.itemevent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
@@ -22,12 +23,13 @@ public class PendingItemEventReaper {
     private final ItemEventRepository repository;
     private final ItemEventLedgerProperties properties;
     private final ApplicationEventPublisher publisher;
+    private final Clock clock;
 
     @Scheduled(fixedDelay = 15, initialDelay = 5, timeUnit = TimeUnit.MINUTES)
     @SchedulerLock(name = "pending-item-event-reaper", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     @Transactional
     public void sweep() {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         repository.expire(now.minus(properties.pendingLapseAfter()), now);
         repository.deleteUnreferenced(now.minus(properties.retainFor()), properties.sweepBatchSize());
         for (var event : repository.claimDue(now, properties.sweepBatchSize())) {

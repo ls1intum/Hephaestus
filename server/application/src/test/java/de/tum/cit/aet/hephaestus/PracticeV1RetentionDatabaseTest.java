@@ -61,8 +61,7 @@ class PracticeV1RetentionDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldRequireProductCleanupBeforeMembershipAndKeepTheSharedProviderRows(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(
                         database, "DELETE FROM membership WHERE workspace_id=992101 AND account_id=992106"))
                 .isInstanceOf(SQLException.class);

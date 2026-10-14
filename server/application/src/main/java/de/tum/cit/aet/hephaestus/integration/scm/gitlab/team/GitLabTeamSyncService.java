@@ -92,10 +92,7 @@ public class GitLabTeamSyncService {
     private static final int TEAM_PAGE_SIZE = 20;
     private static final int MEMBER_PAGE_SIZE = 100;
 
-    /**
-     * Project collaborators who belong to the subgroup's team: developers and reporters, such as
-     * students.
-     */
+    /** Project collaborators who belong to the subgroup's team: developers and reporters, such as students. */
     private static final List<RepositoryCollaborator.Permission> TEAM_COLLABORATOR_PERMISSIONS =
             List.of(RepositoryCollaborator.Permission.WRITE, RepositoryCollaborator.Permission.TRIAGE);
 
@@ -141,14 +138,13 @@ public class GitLabTeamSyncService {
 
     /**
      * Synchronizes all descendant subgroups of a GitLab group as teams.
+     * <p>
+     * NOT @Transactional — orchestrator delegates to TransactionTemplate-wrapped helpers
+     * so DB connections are not held during API calls or throttle delays.
      *
-     * <p>NOT @Transactional — orchestrator delegates to TransactionTemplate-wrapped helpers so DB
-     * connections are not held during API calls or throttle delays.
-     *
-     * @param scopeId the workspace/scope ID
+     * @param scopeId       the workspace/scope ID
      * @param groupFullPath the root group full path (e.g., "ase/introcourse")
-     * @return the teams synced, and whether GitLab listed the whole team graph and every team's
-     *     members
+     * @return the teams synced, and whether GitLab listed the whole team graph and every team's members
      */
     public Result syncTeamsForGroup(Long scopeId, String groupFullPath) {
         if (groupFullPath == null || groupFullPath.isBlank()) {
@@ -276,7 +272,7 @@ public class GitLabTeamSyncService {
         }
 
         log.info(
-                "GitLab team sync complete: groupPath={}, teams={}, members={}, permissions={}," + " complete={}",
+                "GitLab team sync complete: groupPath={}, teams={}, members={}, permissions={}, complete={}",
                 groupFullPath,
                 totalSynced,
                 totalMembers,
@@ -289,27 +285,24 @@ public class GitLabTeamSyncService {
     /**
      * What one team sync did.
      *
-     * @param teams the teams GitLab listed and this sync recorded
-     * @param complete whether GitLab listed the whole team graph and every team's members; only a
-     *     complete sync removes teams, parent links and team memberships everywhere
+     * @param teams    the teams GitLab listed and this sync recorded
+     * @param complete whether GitLab listed the whole team graph and every team's members; only a complete sync
+     *                 removes teams, parent links and team memberships everywhere
      */
     public record Result(int teams, boolean complete) {
         static final Result INCOMPLETE = new Result(0, false);
     }
 
-    /**
-     * One team's member listing: the members recorded, and whether both of its sources were read in
-     * full.
-     */
+    /** One team's member listing: the members recorded, and whether both of its sources were read in full. */
     record MemberSync(int synced, boolean complete) {}
 
     // Phase A.0: Fetch Root Group
 
     /**
-     * Fetches the root group metadata and upserts it as a Team so subgroups have a real parent row
-     * to point at. A failure here is non-fatal: the root team is a parity-with-GitHub enhancement,
-     * not a prerequisite for descendant sync. Returns the persisted root Team, or {@code null} if
-     * unavailable.
+     * Fetches the root group metadata and upserts it as a Team so subgroups have
+     * a real parent row to point at. A failure here is non-fatal: the root team
+     * is a parity-with-GitHub enhancement, not a prerequisite for descendant
+     * sync. Returns the persisted root Team, or {@code null} if unavailable.
      */
     @Nullable
     private Team fetchAndProcessRootGroup(
@@ -441,7 +434,7 @@ public class GitLabTeamSyncService {
                 Team team = parentNativeId == null ? null : teamProcessor.process(group, groupFullPath, provider);
                 if (team == null) {
                     log.warn(
-                            "Stopped descendant group sync: reason=unreadableSubgroup," + " groupPath={}, subgroup={}",
+                            "Stopped descendant group sync: reason=unreadableSubgroup, groupPath={}, subgroup={}",
                             groupFullPath,
                             group == null ? null : group.fullPath());
                     return false;
@@ -483,9 +476,9 @@ public class GitLabTeamSyncService {
     // Phase B: Resolve Parent References
 
     /**
-     * Points each synced team at its parent's row. A parent this sync did not record is cleared
-     * only when {@code graphComplete}; after a partial listing it may simply be on a page that was
-     * not read, so the stored link stays.
+     * Points each synced team at its parent's row. A parent this sync did not record is cleared only when
+     * {@code graphComplete}; after a partial listing it may simply be on a page that was not read, so the
+     * stored link stays.
      */
     void resolveParentReferences(
             Map<Long, Team> syncedTeamsByNativeId,
@@ -511,7 +504,7 @@ public class GitLabTeamSyncService {
                         correctParentId = parent.getId();
                     } else {
                         log.warn(
-                                "Parent team not found in sync: child={}," + " parentNativeId={}, graphComplete={}",
+                                "Parent team not found in sync: child={}, parentNativeId={}, graphComplete={}",
                                 child.getSlug(),
                                 parentNativeId,
                                 graphComplete);
@@ -602,9 +595,7 @@ public class GitLabTeamSyncService {
                         providerId);
                 if (user == null) {
                     status.setRollbackOnly();
-                    log.warn(
-                            "Skipped team membership changes:" + " reason=userNotResolved, teamSlug={}",
-                            team.getSlug());
+                    log.warn("Skipped team membership changes: reason=userNotResolved, teamSlug={}", team.getSlug());
                     return new MemberSync(0, false);
                 }
                 syncedMemberIds.add(user.getId());
@@ -631,8 +622,8 @@ public class GitLabTeamSyncService {
     }
 
     /**
-     * Fetches all group members via paginated GraphQL calls. Runs OUTSIDE a transaction to avoid
-     * holding a DB connection during network I/O.
+     * Fetches all group members via paginated GraphQL calls.
+     * Runs OUTSIDE a transaction to avoid holding a DB connection during network I/O.
      *
      * @return true if pagination completed normally, false if interrupted or failed
      */
@@ -700,7 +691,7 @@ public class GitLabTeamSyncService {
             cursor = memberPageInfo.endCursor();
             if (cursor == null) {
                 log.warn(
-                        "Member pagination cursor is null despite hasNextPage=true: groupPath={}," + " page={}",
+                        "Member pagination cursor is null despite hasNextPage=true: groupPath={}, page={}",
                         groupFullPath,
                         pageCount);
                 return false;
@@ -731,9 +722,8 @@ public class GitLabTeamSyncService {
      * One member entry GitLab listed with a readable user id, username and access level.
      *
      * @param nativeId the user's numeric GitLab id
-     * @param user the listed user
-     * @param role the team role the access level grants; null for no or minimal access, which is no
-     *     membership
+     * @param user     the listed user
+     * @param role     the team role the access level grants; null for no or minimal access, which is no membership
      */
     private record ListedMember(long nativeId, GitLabMemberUser user, TeamMembership.@Nullable Role role) {
 
@@ -758,10 +748,7 @@ public class GitLabTeamSyncService {
         }
     }
 
-    /**
-     * The parent group's numeric id of a listed subgroup, or null when it is missing or not a group
-     * GID.
-     */
+    /** The parent group's numeric id of a listed subgroup, or null when it is missing or not a group GID. */
     private static @Nullable Long parentNativeId(@Nullable GitLabDescendantGroupResponse group) {
         GitLabDescendantGroupResponse.ParentRef parent = group == null ? null : group.parent();
         if (parent == null || parent.id() == null || parent.fullPath() == null) {
@@ -776,8 +763,8 @@ public class GitLabTeamSyncService {
 
     /**
      * Maps GitLab access level string to TeamMembership.Role.
-     *
-     * <p>Returns null for access levels that should be skipped.
+     * <p>
+     * Returns null for access levels that should be skipped.
      */
     public static TeamMembership.@Nullable Role mapAccessLevel(@Nullable String accessLevel) {
         if (accessLevel == null) {
@@ -884,9 +871,8 @@ public class GitLabTeamSyncService {
     }
 
     /**
-     * The group GitLab reports under {@code groupNativeId} to the workspace's own credential,
-     * whatever path it has now; empty when GitLab reports none. Only reads; a response GitLab could
-     * not give throws, so a caller can retry.
+     * The group GitLab reports under {@code groupNativeId} to the workspace's own credential, whatever path it has now;
+     * empty when GitLab reports none. Only reads; a response GitLab could not give throws, so a caller can retry.
      */
     public Optional<GitLabDescendantGroupResponse> fetchGroup(Long scopeId, long groupNativeId) {
         String globalId = GROUP_GLOBAL_ID_PREFIX + groupNativeId;
@@ -901,12 +887,11 @@ public class GitLabTeamSyncService {
     }
 
     /**
-     * What GitLab reports about {@code userNativeId}'s membership of the group at {@code
-     * groupFullPath}, which must still be the group {@code groupNativeId}: one entry per relation
-     * GitLab counts, read as the connected group's roster ({@code effective}) or a team's, none
-     * when the user is not a member. Empty when GitLab reports no such group, which proves nothing
-     * about the membership. Only reads; a response GitLab could not give throws, so a caller can
-     * retry.
+     * What GitLab reports about {@code userNativeId}'s membership of the group at {@code groupFullPath}, which must still
+     * be the group {@code groupNativeId}: one entry per relation GitLab counts, read as the connected group's roster
+     * ({@code effective}) or a team's, none when the user is not a member. Empty
+     * when GitLab reports no such group, which proves nothing about the membership. Only reads; a response GitLab could
+     * not give throws, so a caller can retry.
      */
     public Optional<List<GitLabGroupMemberResponse>> fetchMembership(
             Long scopeId, String groupFullPath, long groupNativeId, long userNativeId, boolean effective) {

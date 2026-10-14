@@ -4,7 +4,7 @@ import type { ReviewResult } from "@/api/types.gen";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { useNow } from "@/components/common/use-now";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
-import { ReviewRunWorkCell } from "@/components/practice-trace/ReviewRunDayTable";
+import { ReviewItemCell } from "@/components/practice-trace/ReviewDayTable";
 import { ClaimCurrentnessBadge } from "@/components/practice-vocabulary/ClaimCurrentness";
 import { OUTCOME_DEFS, problemCount } from "@/components/practice-vocabulary/outcome-defs";
 import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
@@ -14,8 +14,7 @@ import {
 	type RecordTableColumn,
 	RecordTimeCell,
 } from "@/components/practice-vocabulary/RecordTable";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 import { TableCell } from "@/components/ui/table";
@@ -85,7 +84,7 @@ export function ResultRows({ state, byDay = true }: ResultRowsProps) {
 						aria-label={LIST_LABEL}
 						columns={RESULT_COLUMNS}
 						rows={rows}
-						dateOf={(result) => result.observedAt}
+						dateOf={(result) => result.recordedAt}
 						rowKey={(result) => result.id}
 						renderRow={(result) => <ResultRow result={result} />}
 						empty={empty}
@@ -107,18 +106,18 @@ export function ResultRows({ state, byDay = true }: ResultRowsProps) {
 
 /**
  * The rank "Most actionable first" sorts by, in the server's words: not met by severity, then met,
- * then not applicable and undetermined together.
+ * then does not apply and could not determine together.
  */
 function actionabilityRank(result: ReviewResult): string {
 	if (result.outcome === "NOT_MET") {
-		return result.severity === undefined
+		return result.severity === null
 			? OUTCOME_DEFS.NOT_MET.label
 			: `${OUTCOME_DEFS.NOT_MET.label} · ${SEVERITY_DEFS[result.severity].label}`;
 	}
 	if (result.outcome === "MET") {
 		return OUTCOME_DEFS.MET.label;
 	}
-	return `${OUTCOME_DEFS.NOT_APPLICABLE.label} or ${OUTCOME_DEFS.UNDETERMINED.label.toLowerCase()}`;
+	return `${OUTCOME_DEFS.DOES_NOT_APPLY.label} or ${OUTCOME_DEFS.COULD_NOT_DETERMINE.label.toLowerCase()}`;
 }
 
 /**
@@ -142,23 +141,18 @@ export function byActionability(
 }
 
 export interface ResultExceptionsProps {
-	result: Pick<ReviewResult, "claimCurrentness" | "invalidatedAt" | "disputedAt">;
+	result: Pick<ReviewResult, "currentness" | "markedIncorrectAt">;
 }
 
-/** What went wrong with a result: a claim that is no longer current, a correction, a dispute. */
+/** What went wrong with a result: a claim that is no longer current, or an admin's Incorrect mark. */
 export function ResultExceptions({ result }: ResultExceptionsProps) {
-	if (
-		result.claimCurrentness === "CURRENT" &&
-		result.invalidatedAt === undefined &&
-		result.disputedAt === undefined
-	) {
+	if (result.currentness === "CURRENT" && result.markedIncorrectAt === null) {
 		return null;
 	}
 	return (
 		<span className="flex flex-wrap items-center gap-1.5">
-			<ClaimCurrentnessBadge currentness={result.claimCurrentness} />
-			{result.invalidatedAt !== undefined && <StatusBadge def={MARKED_INCORRECT_DEF} />}
-			{result.disputedAt !== undefined && <StatusBadge def={DEVELOPER_RESPONSE_DEFS.DISPUTED} />}
+			<ClaimCurrentnessBadge currentness={result.currentness} />
+			{result.markedIncorrectAt !== null && <StatusBadge def={RESULT_MARK_DEFS.INCORRECT} />}
 		</span>
 	);
 }
@@ -182,44 +176,43 @@ function costlySeverity(result: ReviewResult) {
 
 /**
  * One result, drawn as a review row is: the time and the outcome as an icon, named with the problems
- * a not met result counts, what it says with its practice as text, the work and who it is about;
+ * a not met result counts, what it says with its practice as text, the item and who it is about;
  * what came of it is the trace's to tell. Badges are kept for what went wrong: a claim that is no
- * longer current, a correction, a dispute. The whole row opens the result's sheet, and that is its
- * one link; Track and Trace end the row.
+ * longer current, or an Incorrect mark. The whole row opens the result's sheet, and that is its one
+ * link; Track and Trace end the row.
  */
 export function ResultRow({ result, withDay = false }: ResultRowProps) {
 	const today = new Date(useNow());
 	const tracked = useTracked({ kind: "result", id: result.id });
 	const severity = costlySeverity(result);
+	const summary = resultSummary({ summary: result.summary ?? undefined });
 	return (
 		<PracticeTableRow
 			link={{
 				text: "Open result",
-				name: `${resultSummary(result)}, ${formatDayTime(result.observedAt, today)}`,
+				name: `${summary}, ${formatDayTime(result.recordedAt, today)}`,
 				render: <DetailStackLink entry={resultLevel(result.id)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
 			action={
 				<RecordRowActions
 					record={{ kind: "result", id: result.id }}
-					agentJobId={result.agentJobId}
-					name={`result ${resultSummary(result)}`}
+					reviewId={result.reviewId}
+					name={`result ${summary}`}
 				/>
 			}
 		>
 			<RecordTimeCell
 				status={resultOutcomeDef(result.outcome, result.problemCount)}
-				at={result.observedAt}
+				at={result.recordedAt}
 				statusTooltip={false}
 				withDay={withDay}
 			/>
 			<TableCell className="align-top whitespace-normal">
 				<span className="flex min-w-0 flex-col items-start gap-1.5">
-					<span className="max-w-md text-sm font-semibold break-words">
-						{resultSummary(result)}
-					</span>
+					<span className="max-w-md text-sm font-semibold break-words">{summary}</span>
 					<span className="flex max-w-full flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-						<ReviewPracticeName practiceName={result.practiceName} group={result.group} />
+						<ReviewPracticeName practiceName={result.practiceName} group={null} />
 						{result.outcome === "NOT_MET" && result.problemCount > 0 && (
 							<span>{problemCount(result.problemCount)}</span>
 						)}
@@ -229,9 +222,9 @@ export function ResultRow({ result, withDay = false }: ResultRowProps) {
 					<ResultExceptions result={result} />
 				</span>
 			</TableCell>
-			<ReviewRunWorkCell work={result.reviewedWork} linked={false} />
+			<ReviewItemCell item={result.item} linked={false} />
 			<TableCell className="align-top whitespace-normal">
-				<ReviewPerson person={result.subject} />
+				<ReviewPerson person={result.developer} />
 			</TableCell>
 		</PracticeTableRow>
 	);

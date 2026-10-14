@@ -126,7 +126,7 @@ record TerminalUsage(
                         UsageSourceType.REVIEW_JOB,
                         job.getId(),
                         job.getAttempt(),
-                        snapshot == null ? null : snapshot.upstreamModelId(),
+                        snapshot == null ? null : snapshot.model().upstreamModelId(),
                         inputTokens,
                         outputTokens,
                         cacheReadTokens,

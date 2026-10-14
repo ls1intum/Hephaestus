@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 
@@ -14,5 +14,5 @@ public sealed interface GateDecision permits GateDecision.Run, GateDecision.Skip
         }
     }
 
-    record Skip(String reason, ItemEventReason eventReason) implements GateDecision {}
+    record Skip(String reason, ReviewRequestReason eventReason) implements GateDecision {}
 }

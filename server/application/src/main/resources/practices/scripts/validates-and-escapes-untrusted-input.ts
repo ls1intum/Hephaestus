@@ -1,9 +1,9 @@
-import { isCommentLine } from "../kits/scm/declarations.ts";
-import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
-import { languageOf } from "../kits/scm/languages.ts";
 // Finds each added line with a dangerous operation (a sink) that has an untrusted input (a source)
 // within a small window of added lines in the same file. The review traces if the source reaches the
 // sink without validation or escaping. Each language adds rows to the source and sink tables.
+import { isCommentLine } from "../kits/scm/declarations.ts";
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
+import { languageOf } from "../kits/scm/languages.ts";
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

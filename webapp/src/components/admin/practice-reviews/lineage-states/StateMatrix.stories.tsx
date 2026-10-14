@@ -15,11 +15,10 @@ import {
 } from "@/components/admin/practice-reviews/trace-display";
 
 /**
- * Every state the story of a review can meet, one small chain per state: how the review ran, what
- * started it, the merge against it, its results, where its feedback went and what became of
- * it, an admin's decision, the developer's answer, and many records at once. Each case heads its
- * story with the verdict the chain gives and ends it with where the review's path ended. A story per
- * group, and one with all of them.
+ * Every state the story of a review can meet, one small graph per state: how the review ran, what
+ * started it, the item reviewed, its results, where its feedback went, what became of it, and many
+ * records at once. Each case heads its story with the verdict the graph gives and ends it with
+ * where the review's path ended. A story per group, and one with all of them.
  */
 const meta = {
 	parameters: { layout: "fullscreen" },
@@ -31,23 +30,18 @@ type Story = StoryObj<typeof meta>;
 
 const GROUPS: readonly LineageStateGroup[] = [
 	"review",
-	"trigger",
-	"merge",
+	"origin",
+	"item",
 	"results",
-	"location",
+	"destination",
 	"delivery",
-	"withholding",
-	"decision",
-	"response",
 	"volume",
 ];
 
-/** The groups whose state lives in each piece of feedback read best with every part shown. */
+/** The groups whose state lives in each piece of feedback read best with everything shown. */
 const DISPLAY: Partial<Record<LineageStateGroup, TraceDisplay>> = {
+	destination: FULL_TRACE_DISPLAY,
 	delivery: FULL_TRACE_DISPLAY,
-	withholding: FULL_TRACE_DISPLAY,
-	decision: FULL_TRACE_DISPLAY,
-	response: FULL_TRACE_DISPLAY,
 };
 
 function Case({ entry, display }: { entry: LineageStateCase; display: TraceDisplay }) {
@@ -61,28 +55,18 @@ function Case({ entry, display }: { entry: LineageStateCase; display: TraceDispl
 			<ReviewLineageGraph
 				lineage={{ status: "ready", lineage: entry.lineage }}
 				defaultDisplay={display}
-				reviewOutcome={entry.reviewOutcome}
-				job={entry.job}
+				review={entry.review}
 			/>
 		</section>
 	);
 }
 
-/**
- * The cases a group shows. The overview leaves out the one-reason-each withholding cases, which
- * the Withholding story shows, so one page stays quick to render.
- */
-function casesOf(group: LineageStateGroup, overview: boolean): LineageStateCase[] {
-	const cases = LINEAGE_STATE_CASES[group];
-	return overview ? cases.filter((entry) => !entry.key.startsWith("withheld-")) : cases;
-}
-
-function Group({ group, overview = false }: { group: LineageStateGroup; overview?: boolean }) {
+function Group({ group }: { group: LineageStateGroup }) {
 	return (
 		<section aria-label={LINEAGE_STATE_GROUP_TITLES[group]} className="space-y-3">
 			<h2 className="text-base font-semibold">{LINEAGE_STATE_GROUP_TITLES[group]}</h2>
 			<div className="grid grid-cols-[repeat(auto-fill,minmax(min(24rem,100%),1fr))] items-start gap-4">
-				{casesOf(group, overview).map((entry) => (
+				{LINEAGE_STATE_CASES[group].map((entry) => (
 					<Case key={entry.key} entry={entry} display={DISPLAY[group] ?? DEFAULT_TRACE_DISPLAY} />
 				))}
 			</div>
@@ -112,32 +96,23 @@ function groupStory(group: LineageStateGroup): Story {
 	};
 }
 
-/** Queued, on hold, running, completed, failed, timed out, canceled, nothing assessed, answered earlier. */
+/** Queued, running, complete, failed, timed out, cancelled, a withheld practice, expired runtime, a scan. */
 export const Review = groupStory("review");
 
-/** Every moment that starts a review, and a review no moment names. */
-export const Trigger = groupStory("trigger");
+/** Started by an event, a request, a schedule and a backfill. */
+export const Origin = groupStory("origin");
 
-/** Merged before, in the queue, while running, after, never, and the merge as the start. */
-export const Merge = groupStory("merge");
+/** A pull request, a merge request, a Slack thread, an Outline document and a pull request review. */
+export const Item = groupStory("item");
 
-/** Every verdict by severity, marked incorrect, an earlier review's answers, none, and 24. */
+/** Every outcome by severity, stale, unverifiable, an earlier review's answers, none, and 24. */
 export const Results = groupStory("results");
 
-/** GitHub, GitLab, another provider, their practice pages, Heph in the app and in Slack. */
-export const Location = groupStory("location");
+/** On the work, their practice pages and a conversation. */
+export const Destination = groupStory("destination");
 
-/** Every delivery state, a replacement across reviews, and a card shown then withheld. */
+/** Every delivery state, a withdrawal and a replacement. */
 export const Delivery = groupStory("delivery");
-
-/** One withholding reason of each kind, then every reason on its own. */
-export const Withholding = groupStory("withholding");
-
-/** Awaiting approval, approved, rejected and withdrawn. */
-export const Decision = groupStory("decision");
-
-/** Answered (privately), disputed with a reason, resolved by the work, no answer. */
-export const Response = groupStory("response");
 
 /** Many pieces of feedback from a few results. */
 export const Volume = groupStory("volume");
@@ -147,12 +122,12 @@ export const Overview: Story = {
 	render: () => (
 		<div className="space-y-10 p-6">
 			{GROUPS.map((group) => (
-				<Group key={group} group={group} overview />
+				<Group key={group} group={group} />
 			))}
 		</div>
 	),
 	play: async ({ canvasElement }) => {
-		const total = GROUPS.reduce((sum, group) => sum + casesOf(group, true).length, 0);
+		const total = GROUPS.reduce((sum, group) => sum + LINEAGE_STATE_CASES[group].length, 0);
 		// A role query over a page this size takes longer than the test may; the attribute says the same.
 		await expect(
 			canvasElement.querySelectorAll('[role="group"][aria-label="How this came about"]'),

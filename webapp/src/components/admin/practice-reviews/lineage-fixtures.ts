@@ -3,12 +3,10 @@ import type {
 	ProblemSummary,
 	ReviewBoundFeedback,
 	ReviewBoundResult,
-	ReviewFeedbackDetail,
 	ReviewLineage,
 	ReviewLineageEdge,
 	ReviewLineageNode,
 	ReviewRef,
-	ReviewResultDetail,
 } from "@/api/types.gen";
 
 import {
@@ -200,61 +198,6 @@ export function reviewLineage(kind: LineageKind, id: string): ReviewLineage {
 	});
 }
 
-function reviewRefFor(reviewId: string, item: ItemRef, createdAt: Date): ReviewRef {
-	const known = reviews.find((review) => review.id === reviewId);
-	return known === undefined
-		? {
-				id: reviewId,
-				kind: "ITEM",
-				item,
-				itemVersion: null,
-				origin: "EVENT",
-				status: "COMPLETE",
-				createdAt,
-				completedAt: createdAt,
-			}
-		: reviewRefOf(known);
-}
-
-/** The graph a result's level reads, from the record the level shows. */
-export function lineageOfResult(result: ReviewResultDetail): ReviewLineage {
-	return storyLineage({
-		root: { kind: "RESULT", id: result.id },
-		item: result.item,
-		reviews: [reviewRefFor(result.reviewId, result.item, result.recordedAt)],
-		results: [
-			{
-				result: boundResultOf(result),
-				problems: result.problems.map(({ id, severity, summary }) => ({ id, severity, summary })),
-			},
-		],
-		feedback: result.feedback.map((feedback) => ({ feedback, basis: [result.id] })),
-	});
-}
-
-/** The graph a piece of feedback's level reads, from the record the level shows. */
-export function lineageOfFeedback(feedback: ReviewFeedbackDetail): ReviewLineage {
-	const item = feedback.item ?? reviewItem;
-	return storyLineage({
-		root: { kind: "FEEDBACK", id: feedback.id },
-		item,
-		reviews: [reviewRefFor(feedback.reviewId, item, feedback.createdAt)],
-		results: feedback.basis.map((entry) => ({ result: entry.result })),
-		feedback: [
-			{
-				feedback: {
-					id: feedback.id,
-					destination: feedback.destination,
-					state: feedback.state,
-					deliveredAt: feedback.deliveredAt,
-					withdrawn: feedback.withdrawn,
-				},
-				basis: feedback.basis.map((entry) => entry.resultId),
-			},
-		],
-	});
-}
-
 // ------------------------------------------------------------------------------------------------
 // One review of a pull request, told several ways, for the graph's stories. Fixed instants, so a
 // gap between two steps reads the same every time.
@@ -313,9 +256,6 @@ export const lineageItemFocus: ReviewLineage = reviewLineage("ITEM", reviewItem.
  * them, and every state the review's feedback reached.
  */
 export const wholeReview: ReviewLineage = reviewLineage("REVIEW", LINEAGE_REVIEW_ID);
-
-/** A scan: one review over a repository, its results about files. */
-export const scanReviewLineage: ReviewLineage = reviewLineage("REVIEW", LINEAGE_SCAN_ID);
 
 /** Fourteen pieces of feedback from the same four results, for the lines to cross. */
 export const wholeReviewManyFeedback: ReviewLineage = (() => {

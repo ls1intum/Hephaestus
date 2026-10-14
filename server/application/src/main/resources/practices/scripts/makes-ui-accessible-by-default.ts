@@ -1,3 +1,6 @@
+// Finds the interface lines that the change adds in Swift files and that the criteria ask about:
+// icon-only controls, images, fixed-size fonts, height caps and colour-only state. It also finds the
+// accessibility modifiers that the change adds with them. The review reads the view chain.
 import { scm } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -5,9 +8,6 @@ import {
 	scanOccurrences,
 	type SourcePattern,
 } from "../kits/scm/source-scan.ts";
-// Finds the interface lines that the change adds in Swift files and that the criteria ask about:
-// icon-only controls, images, fixed-size fonts, height caps and colour-only state. It also finds the
-// accessibility modifiers that the change adds with them. The review reads the view chain.
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

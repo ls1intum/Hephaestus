@@ -23,7 +23,7 @@ class FeedbackCopyCleanupCustodyIntegrationTest extends AbstractFeedbackIntegrat
         assertThatThrownBy(() -> custody.requireAcknowledged(workspace.getId(), List.of(parent.getId())))
                 .isInstanceOf(ResponseStatusException.class);
         assertThat(copies.findById(copy.getId())).isPresent();
-        copies.recordAbsent(workspace.getId(), parent.getId(), copy.getId(), "ABSENT: exact provider readback");
+        copies.recordAbsent(workspace.getId(), parent.getId(), copy.getId(), "Exact provider readback");
         assertThatCode(() -> custody.requireAcknowledged(workspace.getId(), List.of(parent.getId())))
                 .doesNotThrowAnyException();
     }

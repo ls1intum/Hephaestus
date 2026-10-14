@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -21,6 +22,9 @@ import tools.jackson.databind.JsonNode;
 
 @Repository
 public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
+    List<ReviewJob> findByWorkspaceIdAndStatusInOrderByAvailableAtAscIdAsc(
+            long workspaceId, Collection<ReviewJobStatus> statuses, Limit limit);
+
     List<ReviewJob> findByWorkspaceIdAndAvailableAtGreaterThanEqualOrderByAvailableAtDesc(
             long workspaceId, Instant since, Pageable page);
 
@@ -48,7 +52,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @Query(value = """
         SELECT COUNT(*) FROM review_job
         WHERE workspace_id = :workspaceId AND status = 'RUNNING'
-          AND COALESCE(config_snapshot ->> 'dataHandlingTier', 'UNDECLARED') = :#{#tier.name()}
+          AND COALESCE(config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED') = :#{#tier.name()}
         """, nativeQuery = true)
     long countRunningByWorkspaceIdAndDataHandlingTier(Long workspaceId, DataHandlingTier tier);
 
@@ -280,8 +284,6 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     int markExecutionStarted(
             @Param("id") UUID id, @Param("workerId") @Nullable String workerId, @Param("now") Instant now);
 
-    // DELIVERED settles result processing here: no model output exists to process, and no recipient delivery is
-    // claimed.
     @WorkspaceAgnostic("ID-based evidence-refusal transition; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(EVIDENCE_REFUSAL_TRANSITION)
@@ -309,12 +311,12 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             value = "SELECT j.id FROM review_job j JOIN workspace w ON w.id = j.workspace_id WHERE j.status = 'QUEUED'"
                 + " AND w.status = 'ACTIVE' AND j.available_at <= now() AND (  (SELECT count(*) FROM review_job r     "
                 + " WHERE r.workspace_id = j.workspace_id AND r.status = 'RUNNING'        AND"
-                + " COALESCE(r.config_snapshot ->> 'dataHandlingTier', 'UNDECLARED')          ="
-                + " COALESCE(j.config_snapshot ->> 'dataHandlingTier', 'UNDECLARED'))   < COALESCE((SELECT"
+                + " COALESCE(r.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED')          ="
+                + " COALESCE(j.config_snapshot -> 'model' ->> 'dataHandlingTier', 'UNDECLARED'))   < COALESCE((SELECT"
                 + " b.max_concurrent_jobs FROM workspace_agent_binding b      WHERE b.workspace_id = j.workspace_id"
-                + " AND b.purpose = 'PRACTICE_REVIEW'        AND b.data_handling_tier = COALESCE(j.config_snapshot ->>"
-                + " 'dataHandlingTier', 'UNDECLARED')),      2147483647)) ORDER BY j.available_at ASC, j.id ASC LIMIT"
-                + " :limit",
+                + " AND b.purpose = 'PRACTICE_REVIEW'        AND b.data_handling_tier = COALESCE(j.config_snapshot ->"
+                + " 'model' ->> 'dataHandlingTier', 'UNDECLARED')),      2147483647)) ORDER BY j.available_at ASC,"
+                + " j.id ASC LIMIT :limit",
             nativeQuery = true)
     List<UUID> findQueuedIdsOldestFirst(@Param("limit") int limit);
 
@@ -371,24 +373,18 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @WorkspaceAgnostic("ID-based fenced requeue; caller is @WorkspaceAgnostic sweeper or worker-local drain")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, j.executionStartedAt ="
-            + " null, j.attempt = j.attempt + 1, j.availableAt = :#{#request.availableAt}, j.jobTokenHash ="
-            + " :#{#request.newJobTokenHash}, j.llmCalls = 0, j.llmInputTokens = 0, j.llmOutputTokens = 0,"
-            + " j.llmReasoningTokens = 0, j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0 WHERE j.id = :id AND"
-            + " j.status = 'RUNNING' AND j.workerId = :workerId AND j.attempt = :#{#request.attempt} AND j.attempt <"
-            + " :#{#request.maxRetries} AND j.output IS NULL AND NOT (" + NOT_ADMITTED + ") "
+            + " null, j.attempt = j.attempt + 1, j.availableAt = :#{#request.availableAt}, j.llmCalls = 0,"
+            + " j.llmInputTokens = 0, j.llmOutputTokens = 0, j.llmReasoningTokens = 0, j.llmCacheReadTokens = 0,"
+            + " j.llmCacheWriteTokens = 0 WHERE j.id = :id AND j.status = 'RUNNING' AND j.workerId = :workerId AND"
+            + " j.attempt = :#{#request.attempt} AND j.attempt < :#{#request.maxRetries} AND"
+            + " j.output IS NULL AND NOT (" + NOT_ADMITTED + ") "
             + "AND EXISTS (SELECT 1 FROM ReviewCompositionBasis b WHERE b.jobId = j.id "
             + "AND b.workspaceId = j.workspaceId AND b.expiresAt > :#{#request.now} "
             + "AND b.admissionDigest = j.admissionDigest)")
     int requeueLockedForComposition(
             @Param("id") UUID id, @Param("workerId") String workerId, @Param("request") CompositionRequeue request);
 
-    record CompositionRequeue(
-            int attempt,
-            int maxRetries,
-            Instant now,
-            Instant availableAt,
-            String newJobToken,
-            String newJobTokenHash) {}
+    record CompositionRequeue(int attempt, int maxRetries, Instant now, Instant availableAt) {}
 
     /**
      * Ends a RUNNING attempt whose results were admitted but whose run was lost before it finished:
@@ -464,7 +460,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
 
     /**
      * Depth, oldest-eligible-age, held count and running count in a single pass, so the scan cost does
-     * not multiply exactly when an incident has inflated the backlog. {@code :now} is bound rather than
+     * not multiply when the backlog grows. {@code :now} is bound rather than
      * read from the DB clock, matching {@link #findByIdQueuedForUpdateSkipLocked}.
      *
      * <p>{@code depth} counts only jobs a worker could claim right now, which is what "are we keeping
@@ -542,7 +538,7 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
     @WorkspaceAgnostic("The worker supplies the claimed job id and ownership fence")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("UPDATE ReviewJob j SET j.status = 'QUEUED', j.workerId = null, j.startedAt = null, j.executionStartedAt ="
-            + " null, j.attempt = j.attempt + 1, j.availableAt = :availableAt, j.jobTokenHash = :newJobTokenHash,"
+            + " null, j.attempt = j.attempt + 1, j.availableAt = :availableAt,"
             + " j.llmCalls = 0, j.llmInputTokens = 0, j.llmOutputTokens = 0, j.llmReasoningTokens = 0,"
             + " j.llmCacheReadTokens = 0, j.llmCacheWriteTokens = 0 WHERE j.id = :id AND j.status = 'RUNNING' AND"
             + " j.workerId = :workerId AND j.attempt < :maxRetries AND j.admissionDigest IS NULL")
@@ -550,6 +546,5 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
             @Param("id") UUID id,
             @Param("workerId") String workerId,
             @Param("maxRetries") int maxRetries,
-            @Param("availableAt") Instant availableAt,
-            @Param("newJobTokenHash") String newJobTokenHash);
+            @Param("availableAt") Instant availableAt);
 }

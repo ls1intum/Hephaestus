@@ -120,12 +120,7 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
                         + " ('SLACK','https://slack.com',CURRENT_TIMESTAMP) ON CONFLICT(type,server_url) DO UPDATE SET"
                         + " server_url=EXCLUDED.server_url RETURNING id",
                 Long.class);
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES"
-                        + " (?,?,?,'T1','ERASED')",
-                UUID.randomUUID(),
-                providerId,
-                "UPRIVACYTARGET");
+        databaseTestUtils.erase(providerId, "UPRIVACYTARGET", "");
         var captured = new ArrayList<ObjectNode>();
         projector.forEachWorkspaceMessage(workspace, captured::add);
         assertThat(captured)

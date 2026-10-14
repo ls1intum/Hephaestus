@@ -475,7 +475,7 @@ not on a verdict about their truthfulness.
 
 ### Name the highest-leverage test seam (M6)
 
-When you coach a test gap, point at the MOST piece-testable seam in the change — a pure function, a value type, a
+When you coach a test gap, point at the MOST unit-testable seam in the change — a pure function, a value type, a
 threshold/state-machine calculator, or a decode↔encode round-trip — NOT a GPU / Metal / render / IO / network /
 UI symbol that needs a device or a running app. "The `DepthData` struct is a pure value type — a round-trip test
 locks its shape without hardware" teaches a testing practice they can repeat; "write a test for the Metal bloom pass"

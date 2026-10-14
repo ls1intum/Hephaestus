@@ -5,12 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
-import { practiceReviewTiming, reviewOverviewScope } from "./fixtures";
+import { practiceReviewTiming } from "./fixtures";
 import { ReviewTimeCard } from "./ReviewTimeCard";
 
 type Canvas = StoryContext["canvas"];
 
-const EMPTY_STAGE = { count: 0 };
+const EMPTY_STAGE = { count: 0, medianSeconds: null, p90Seconds: null };
 
 /** A figure's number, by its key: "finished", "lost", "late". */
 function figureOf(canvas: Canvas, key: string) {
@@ -67,7 +67,6 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		state: { status: "ready", timing: practiceReviewTiming, stale: false },
-		scope: reviewOverviewScope,
 		label: "Last 30 days",
 		during: "in the last 30 days",
 		finished: {
@@ -77,7 +76,7 @@ const meta = {
 				search: {
 					from: "2026-09-10",
 					to: "2026-10-09",
-					status: ["COMPLETED", "FAILED", "TIMED_OUT"],
+					status: ["COMPLETE", "PARTIAL", "FAILED"],
 				},
 			},
 		},
@@ -279,16 +278,16 @@ export const NoData: Story = {
 				model: EMPTY_STAGE,
 				posted: EMPTY_STAGE,
 				total: EMPTY_STAGE,
-				totalShares: undefined,
+				totalShares: null,
 				finished: EMPTY_STAGE,
-				finishedShares: undefined,
+				finishedShares: null,
 				read: EMPTY_STAGE,
 				finishedAfterMerge: 0,
 			},
 		},
 		finished: {
 			state: { status: "ready", total: 0, stale: false },
-			list: { list: "runs", search: { status: ["COMPLETED", "FAILED", "TIMED_OUT"] } },
+			list: { list: "runs", search: { status: ["COMPLETE", "PARTIAL", "FAILED"] } },
 		},
 	},
 	play: async ({ canvas }) => {
@@ -312,7 +311,7 @@ export const NoComment: Story = {
 				...practiceReviewTiming,
 				posted: EMPTY_STAGE,
 				total: EMPTY_STAGE,
-				totalShares: undefined,
+				totalShares: null,
 				finished: { count: 40, medianSeconds: 600, p90Seconds: 1200 },
 				finishedShares: {
 					asked: 0.1,
@@ -320,6 +319,7 @@ export const NoComment: Story = {
 					preparation: 0.01,
 					model: 0.88,
 					runUnsplit: 0,
+					posted: null,
 				},
 				finishedAfterMerge: 0,
 			},

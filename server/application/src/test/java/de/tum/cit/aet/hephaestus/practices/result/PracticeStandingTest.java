@@ -75,7 +75,7 @@ class PracticeStandingTest {
                 .mapToObj(index -> result(index, cleanOldestFirst[index]))
                 .toList();
         PracticeTrendService trends = new PracticeTrendService(new TrendProperties(), Clock.fixed(NOW, ZoneOffset.UTC));
-        return trends.calculatePractice(SLUG, practiceResults, trends.horizon());
+        return trends.calculatePractice(practiceResults, trends.horizon());
     }
 
     private static ResultView result(int index, boolean isClean) {

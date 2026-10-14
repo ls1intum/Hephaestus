@@ -7,6 +7,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
@@ -14,12 +15,12 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository;
 import de.tum.cit.aet.hephaestus.agent.scan.ScanBudget;
+import de.tum.cit.aet.hephaestus.agent.scan.ScanModelUnavailableException;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -39,6 +40,7 @@ import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
@@ -49,13 +51,8 @@ class ScanCallGuardTest extends BaseUnitTest {
     private final ScanBudget budget = mock(ScanBudget.class);
     private final JsonMapper mapper = new JsonMapper();
     private final ReviewJob job = RuntimeReviewTestData.job();
-    private final ScanCallGuard guard = new ScanCallGuard(
-            jobs,
-            reviews,
-            budget,
-            new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 200000, 1000),
-            new SandboxGatewayProperties(8081, 10000, 120),
-            mapper);
+    private final ScanCallGuard guard =
+            new ScanCallGuard(jobs, reviews, budget, new SandboxGatewayProperties(8081, 10000, 120), mapper);
 
     private ProxyRouting route() {
         return new ProxyRouting(
@@ -73,6 +70,7 @@ class ScanCallGuardTest extends BaseUnitTest {
 
     @BeforeEach
     void setup() {
+        lenient().when(budget.callCap(ArgumentMatchers.anyInt())).thenReturn(36L);
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker");
         var price = new LlmPriceSnapshot(
@@ -85,21 +83,22 @@ class ScanCallGuardTest extends BaseUnitTest {
                 null,
                 null);
         job.setConfigSnapshot(mapper.valueToTree(new ConfigSnapshot(
-                7,
-                "openai-completions",
-                "https://model.example",
-                "test",
+                ConfigSnapshot.SCHEMA_VERSION,
+                new de.tum.cit.aet.hephaestus.agent.config.FrozenModel(
+                        LlmApiProtocol.parse("openai-completions").orElseThrow(),
+                        "https://model.example",
+                        "test",
+                        UsageFundingSource.INSTANCE,
+                        1L,
+                        1L,
+                        null,
+                        DataHandlingTier.IN_HOUSE,
+                        null,
+                        price),
                 1000,
                 100,
-                null,
-                UsageFundingSource.INSTANCE,
-                1L,
-                1L,
-                null,
                 60,
                 false,
-                price,
-                DataHandlingTier.IN_HOUSE,
                 null)));
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         var old = RuntimeReviewTestData.assignment(null, null).practice();
@@ -161,6 +160,20 @@ class ScanCallGuardTest extends BaseUnitTest {
     void refusesUnverifiableSpend() {
         when(budget.spent(1, job.getReviewId())).thenReturn(new ReviewRuntimeRepository.Spend(BigDecimal.ZERO, false));
         refused("{}");
+    }
+
+    @Test
+    void refusesUnavailableFrozenPricing() {
+        when(budget.inFlight(any(), any())).thenThrow(new ScanModelUnavailableException("Unpriced model"));
+        refused("{}");
+    }
+
+    @Test
+    void programmingFailureDoesNotBecomeABudgetRefusal() {
+        var bug = new IllegalStateException("Invariant failed");
+        when(budget.inFlight(any(), any())).thenThrow(bug);
+        assertThatThrownBy(() -> guard.acquire(route(), "{}".getBytes(StandardCharsets.UTF_8)))
+                .isSameAs(bug);
     }
 
     @Test

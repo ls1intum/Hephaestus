@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -218,12 +219,7 @@ class ActivityEventRepositoryIntegrationTest extends BaseIntegrationTest {
         var targetEvent = persistCommitCreatedEvent(targetCommit, null);
         var otherEvent = persistCommitCreatedEvent(otherCommit, null);
         activityEventRepository.flush();
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
-                UUID.randomUUID(),
-                gitProvider.getId(),
-                "900",
-                "");
+        databaseTestUtils.erase(Objects.requireNonNull(gitProvider.getId()), "900", "");
         assertThat(activityEventService.backfillCommitActors(targetRepository.getId()))
                 .isEqualTo(1);
         assertThat(activityEventRepository

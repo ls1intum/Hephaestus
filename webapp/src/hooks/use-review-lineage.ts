@@ -32,7 +32,9 @@ export function useReviewLineage(
 		queryFn: target === undefined ? skipToken : options.queryFn,
 		retry: retryUnlessNotFound,
 		refetchInterval: ({ state }) =>
-			state.data?.nodes.some((node) => node.review !== null && isActiveReview(node.review.status))
+			state.data?.nodes.some(
+				(node) => node.review !== null && isActiveReview(node.review.status),
+			) === true
 				? ACTIVE_REVIEW_POLL_MS
 				: false,
 	});

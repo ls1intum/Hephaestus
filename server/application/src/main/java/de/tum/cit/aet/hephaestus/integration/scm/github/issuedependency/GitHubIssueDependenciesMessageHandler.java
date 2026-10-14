@@ -18,16 +18,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Handles GitHub {@code issue_dependencies} webhook events: an issue's blocked-by relationships
- * changed.
+ * Handles GitHub {@code issue_dependencies} webhook events: an issue's blocked-by relationships changed.
+ * <p>
+ * Both deliveries of a change apply it, so either one alone keeps the relationship current;
+ * {@link GitHubIssueDependencySyncService#syncDependenciesForScope} reconciles what deliveries miss.
  *
- * <p>Both deliveries of a change apply it, so either one alone keeps the relationship current;
- * {@link GitHubIssueDependencySyncService#syncDependenciesForScope} reconciles what deliveries
- * miss.
- *
- * @see <a
- *     href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies">
- *     GitHub Webhook Events - issue_dependencies</a>
+ * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#issue_dependencies">
+ *      GitHub Webhook Events - issue_dependencies</a>
  */
 @Component
 public class GitHubIssueDependenciesMessageHandler
@@ -72,8 +69,7 @@ public class GitHubIssueDependenciesMessageHandler
         }
 
         log.debug(
-                "Received issue_dependencies event: action={}, blockedIssueNumber={},"
-                        + " blockingIssueNumber={}, repoName={}",
+                "Received issue_dependencies event: action={}, blockedIssueNumber={}, blockingIssueNumber={}, repoName={}",
                 event.action(),
                 blockedIssueDto.number(),
                 blockingIssueDto.number(),

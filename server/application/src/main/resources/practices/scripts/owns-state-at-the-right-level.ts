@@ -1,7 +1,7 @@
-import { scm } from "../kits/scm/index.ts";
-import { sampleNote, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 // Finds each state declaration and each state wiring that the change adds to Swift files, with the
 // type that encloses it. The review applies the four rules of the practice to each lead.
+import { scm } from "../kits/scm/index.ts";
+import { sampleNote, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

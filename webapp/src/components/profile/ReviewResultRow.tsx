@@ -309,7 +309,7 @@ function EvidenceBlocks({ locations }: { locations: EvidenceLocation[] }) {
 				<EvidenceFileBlock
 					// A diff pair only folds when both sides carry a quote, so a side with none leaves two
 					// citations of the same lines apart: the side and the missing quote tell them apart.
-					key={`${location.sourceKind}-${location.path ?? ""}-${location.revision ?? ""}-${location.startLine ?? ""}-${location.side ?? ""}-${location.snippet === undefined}`}
+					key={`${location.sourceKind}-${location.path ?? ""}-${location.commit ?? ""}-${location.startLine ?? ""}-${location.side ?? ""}-${location.snippet === undefined}`}
 					location={location}
 				/>
 			))}

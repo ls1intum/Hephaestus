@@ -2,24 +2,40 @@ package de.tum.cit.aet.hephaestus.practices.scan.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record StartScanRequestDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string", pattern = "^[1-9][0-9]*$")
+        @NotNull
+        @Pattern(regexp = "[1-9][0-9]*")
+        @DecimalMax("9223372036854775807")
         String repositoryItemId,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable @Size(min = 1, max = 1024)
         String ref,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable @Size(min = 1, max = 1024)
         String expectedVersion,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        List<String> practiceSlugs,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable @Size(min = 1, max = 1000)
+        List<@NotBlank @Size(max = 128) String> practiceSlugs,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String budgetUsd,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED)
+        @NotNull
+        @Pattern(regexp = "(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,4})?")
+        @Digits(integer = 6, fraction = 4)
+        @DecimalMin("0.0001")
+        @DecimalMax("100000")
+        String budgetUsd,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Boolean reuse) {

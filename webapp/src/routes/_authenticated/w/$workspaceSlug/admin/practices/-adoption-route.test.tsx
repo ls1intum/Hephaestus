@@ -1,10 +1,13 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getPracticeGuidanceOptions } from "@/api/@tanstack/react-query.gen";
-import type { CatalogPracticePreview, CatalogPracticeSummary } from "@/api/types.gen";
 import { definitionOf } from "@/components/admin/practice-editor/fixtures";
+import type {
+	AdoptablePractice,
+	PracticeAdoptionPreview,
+} from "@/components/admin/practices/catalog-adoption";
 import { stackInSearch } from "@/components/layout/detail-drawer/detail-stack";
 import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
@@ -29,7 +32,7 @@ const definition = definitionOf({
 	criteria: "Explain the change and why it is needed.",
 });
 
-const preview: Wire<CatalogPracticePreview> = {
+const preview: Wire<PracticeAdoptionPreview> = {
 	slug: "describe-what-and-why",
 	kind: "scm.pull_request",
 	availability: "AVAILABLE",
@@ -48,17 +51,16 @@ function summary(
 	slug: string,
 	name: string,
 	kind: string,
-	availability: CatalogPracticeSummary["availability"],
-	groupSlug: string | null = null,
-): Wire<CatalogPracticeSummary> {
+	availability: AdoptablePractice["availability"],
+	groupSlug?: string,
+): Wire<AdoptablePractice> {
 	return {
 		slug,
 		name,
 		kind,
 		availability,
 		groupSlug,
-		groupName: groupSlug === null ? null : "Review-ready work",
-		whyItMatters: null,
+		groupName: groupSlug === undefined ? undefined : "Review-ready work",
 		reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 	};
 }
@@ -348,6 +350,11 @@ describe("catalog adoption over practice setup", () => {
 		fireEvent.change(screen.getByRole("textbox", { name: /What to look for/u }), {
 			target: { value: "Check that the description says why." },
 		});
+		fireEvent.click(screen.getByRole("button", { name: "Choose sources" }));
+		const details = await screen.findByRole("radiogroup", {
+			name: "How Pull request details is read",
+		});
+		fireEvent.click(within(details).getByRole("radio", { name: "Required" }));
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 
 		// One request: the kind and the whole definition, the group beside it and never inside it.

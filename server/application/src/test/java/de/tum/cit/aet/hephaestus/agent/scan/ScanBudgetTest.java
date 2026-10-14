@@ -36,9 +36,9 @@ class ScanBudgetTest extends BaseUnitTest {
     @Test
     void anUnknownPriceCannotBeReportedAsFree() {
         assertThatThrownBy(() -> ScanBudget.cost(LlmPriceSnapshot.unpricedInstance(), 1, 1))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ScanModelUnavailableException.class);
         assertThatThrownBy(() -> ScanBudget.rate(LlmPriceSnapshot.unpricedInstance()))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ScanModelUnavailableException.class);
     }
 
     @Test

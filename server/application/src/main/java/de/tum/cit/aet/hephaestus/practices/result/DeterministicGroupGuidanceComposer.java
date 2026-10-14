@@ -8,42 +8,17 @@ import org.jspecify.annotations.Nullable;
 
 final class DeterministicGroupGuidanceComposer {
 
-    /** Keeps catalog prose from turning the compact group card into a full practice description. */
     private static final int MAX_REMINDER_LENGTH = 180;
 
     private DeterministicGroupGuidanceComposer() {}
 
-    /**
-     * Produces a short standing sentence, a concrete focus, and at most one catalog-authored reminder.
-     * Review criteria never enter this method: {@code whatGoodLooksLike}/{@code whyItMatters} are the
-     * catalog's dedicated developer-facing layer.
-     */
-    static @Nullable String compose(PracticeStanding status, List<PracticeStandingDTO> cards) {
-        // Without a verdict there is nothing to summarise, and inventing encouragement here would state
-        // more than the evidence supports. The surface renders its own reason-specific empty copy.
-        if (!StandingScale.isVerdict(status)) {
-            return null;
-        }
-
-        // Partitioned by standing, exactly as the group status is: a practice whose recent evidence already
-        // earned it a STRENGTH standing must not be named as the group's next focus merely because older items
-        // are still on its card, and the sentence would otherwise contradict the status it explains. A MIXED
-        // practice belongs on both sides — that is what makes it mixed.
-        //
-        // Non-verdict practices are dropped FIRST. Their standing is neither DEVELOPING nor STRENGTH, so a
-        // negated filter would put a practice with nothing to say on both sides at once and name it as a
-        // strength and a gap in the same sentence.
-        List<PracticeStandingDTO> verdicts = cards.stream()
-                .filter(card -> StandingScale.isVerdict(card.standing()))
-                .toList();
-        // A MIXED practice counts as a strength only with a strength on its card: one problem on a short history
-        // reads MIXED (StandingScale), and naming it a strength would claim what no review found.
-        List<PracticeStandingDTO> strengths = verdicts.stream()
+    static String compose(PracticeStanding status, List<PracticeStandingDTO> cards) {
+        List<PracticeStandingDTO> strengths = cards.stream()
                 .filter(card -> card.standing() == PracticeStanding.STRENGTH
                         || (card.standing() == PracticeStanding.MIXED
                                 && !card.strengths().isEmpty()))
                 .toList();
-        List<PracticeStandingDTO> gaps = verdicts.stream()
+        List<PracticeStandingDTO> gaps = cards.stream()
                 .filter(card -> card.standing() != PracticeStanding.STRENGTH)
                 .toList();
 

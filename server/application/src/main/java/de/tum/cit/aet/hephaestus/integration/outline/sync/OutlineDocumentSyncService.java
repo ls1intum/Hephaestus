@@ -396,7 +396,7 @@ public class OutlineDocumentSyncService {
             mirrored.ifPresent(d -> existing.put(documentId, d));
             Instant now = Instant.now();
             upsert(ctx, collection.get(), null, meta, existing, /* budget: single doc */ null, now);
-            // Read the row back rather than recording from `mirrored`: a content-shaped signal is keyed on
+            // Read the row back rather than recording from `mirrored`: a content version is keyed on
             // the document's hash, and the whole point of this signal is that the content just changed.
             documentRepository
                     .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)

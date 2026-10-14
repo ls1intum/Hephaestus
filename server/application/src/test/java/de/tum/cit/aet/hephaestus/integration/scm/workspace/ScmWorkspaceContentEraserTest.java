@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.workspace;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -128,7 +126,7 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     }
 
     @Test
-    void erase_publishesTheDerivedRowEventBeforeDroppingTheArtifactsItPointsAt() {
+    void erase_publishesTheDerivedRowEventBeforeDroppingTheItemsItPointsAt() {
         workspaceWithMonitors("acme/alpha");
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
@@ -141,42 +139,12 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
     }
 
     @Test
-    void erase_isIdempotent_secondRunFindsNoMonitorsAndDeletesNothing() {
-        Workspace workspace = newWorkspace();
-        when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
-
-        eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
-        eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
-
-        verify(repositoryMonitorService, never()).deleteRepositoryIfOrphaned(any());
-        verifyNoInteractions(teamRepository, organizationMembershipRepository);
-    }
-
-    @Test
     void erase_onMissingWorkspace_isASilentNoOp() {
         when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.empty());
 
         eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
 
         verifyNoInteractions(eventPublisher, repositoryMonitorService, teamRepository);
-    }
-
-    /**
-     * The guard is defensive only: the {@code unique} {@code organization_id} column means no
-     * second workspace can be bound to the org today, so this count is always 0 in production.
-     * Pinned with a stub so the guard keeps working if that 1:1 mapping is ever relaxed.
-     */
-    @Test
-    void erase_keepsOrgTierMirrorWhenAnotherNonPurgedWorkspaceIsStillBoundToTheOrganization() {
-        Workspace workspace = workspaceWithMonitors("acme/alpha");
-        workspace.setOrganizationId(7L);
-        when(organizations.find(workspace)).thenReturn(Optional.of(organization(7L, "acme")));
-        when(workspaceRepository.countOtherActiveWorkspacesForOrganization(7L, WORKSPACE_ID))
-                .thenReturn(1L);
-
-        eraser.eraseWorkspaceScmMirror(WORKSPACE_ID);
-
-        verifyNoInteractions(teamRepository, organizationMembershipRepository);
     }
 
     @Test

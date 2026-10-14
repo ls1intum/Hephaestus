@@ -16,9 +16,11 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSend;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackStoreService;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
@@ -55,7 +57,14 @@ class FeedbackSendTransactionsTest {
     final UUID id = UUID.randomUUID(), copyId = UUID.randomUUID();
     final Feedback row = Feedback.builder().id(id).workspaceId(1).build();
     final FeedbackSendTransactions transactions = new FeedbackSendTransactions(
-            store, parents, copies, sends, visibility, Clock.fixed(now, ZoneOffset.UTC), privacy);
+            store,
+            parents,
+            copies,
+            sends,
+            visibility,
+            Clock.fixed(now, ZoneOffset.UTC),
+            privacy,
+            mock(FeedbackSendQueue.class));
 
     @BeforeEach
     void setup() {
@@ -108,6 +117,7 @@ class FeedbackSendTransactionsTest {
                         id,
                         copyId,
                         FeedbackStopReason.DELIVERY_UNCONFIRMED.name(),
+                        FeedbackCopyReadback.UNKNOWN.name(),
                         "Provider visibility is unknown.");
     }
 

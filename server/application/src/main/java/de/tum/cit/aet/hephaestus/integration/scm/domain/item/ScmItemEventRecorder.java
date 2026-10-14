@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
@@ -20,7 +21,6 @@ import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -35,7 +35,8 @@ public class ScmItemEventRecorder {
     private final ScmItemService items;
     private final ScmRepositoryAccess access;
     private final RepositoryRepository repositories;
-    private final JdbcTemplate jdbc;
+    private final ScmItemSourceQuery queries;
+    private final PracticeReviewRefusalMetrics refusals;
 
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onPullRequest(ScmDomainEvent.PullRequestEvent event) {
@@ -66,12 +67,11 @@ public class ScmItemEventRecorder {
     @TransactionalEventListener(phase = TransactionPhase.BEFORE_COMMIT)
     public void onIssue(ScmDomainEvent.IssueEvent event) {
         if (event instanceof ScmDomainEvent.IssueDeleted deleted) {
-            jdbc.query(
-                            "SELECT workspace_id,id FROM item WHERE kind='scm.issue' AND" + " source_id=?",
-                            (rs, row) -> new long[] {rs.getLong(1), rs.getLong(2)},
-                            deleted.issueId())
-                    .forEach(
-                            ids -> writer.remove(ids[0], ids[1], event.context().occurredAt()));
+            queries.deletedItems(ScmItemEvents.ISSUE.value(), deleted.issueId())
+                    .forEach(item -> writer.remove(
+                            item.getWorkspaceId(),
+                            item.getItemId(),
+                            event.context().occurredAt()));
             return;
         }
         var issue = Objects.requireNonNull(event.issue());
@@ -90,16 +90,11 @@ public class ScmItemEventRecorder {
         if (name != null) record(issue.repository().id(), issue.id(), ScmItemEvents.ISSUE, null, name, event.context());
         if (event instanceof ScmDomainEvent.IssueUpdated updated
                 && !Collections.disjoint(updated.changedFields(), ScmItemEvents.LINKED_ISSUE_MATERIAL_FIELDS)) {
-            var parents = jdbc.query(
-                    "SELECT p.id,p.repository_id FROM pull_request_closing_issue link JOIN"
-                            + " issue p ON p.id=link.pull_request_id WHERE link.issue_id=? AND"
-                            + " p.deleted_at IS NULL",
-                    (rs, row) -> new long[] {rs.getLong(1), rs.getLong(2)},
-                    issue.id());
-            for (long[] parent : parents)
+            var parents = queries.closingPullRequests(issue.id());
+            for (var parent : parents)
                 record(
-                        parent[1],
-                        parent[0],
+                        parent.getRepositoryId(),
+                        parent.getSourceId(),
                         ScmItemEvents.PULL_REQUEST,
                         null,
                         ScmItemEvents.PULL_REQUEST_LINKED_ISSUE_UPDATED,
@@ -128,10 +123,7 @@ public class ScmItemEventRecorder {
             ItemEventName name,
             EventContext context) {
         var repository = repositories.findById(repositoryId).orElseThrow();
-        List<Long> workspaces = jdbc.query(
-                "SELECT workspace_id FROM repository_to_monitor WHERE name_with_owner=?" + " ORDER BY workspace_id",
-                (rs, rowNum) -> rs.getLong("workspace_id"),
-                repository.getNameWithOwner());
+        List<Long> workspaces = queries.monitoredWorkspaces(repository.getNameWithOwner());
         for (long workspace : workspaces) {
             try {
                 access.authorize(workspace, repository);
@@ -149,7 +141,16 @@ public class ScmItemEventRecorder {
                         .itemId();
             ItemRef item = writer.upsert(new ItemRegistration(workspace, kind, sourceId, parent, null));
             writer.restore(workspace, item.itemId());
-            ItemVersion version = items.pin(item, null).version();
+            ItemVersion version;
+            try {
+                version = items.pin(item, null).version();
+            } catch (ItemCaptureException unavailable) {
+                if (unavailable.code() != ItemCaptureCode.VERSION_UNAVAILABLE
+                        && unavailable.code() != ItemCaptureCode.SOURCE_NOT_READY) throw unavailable;
+                // A partial provider read can update the mirror without proving an event version.
+                refusals.recordSubmissionRefusal(unavailable.code().name());
+                continue;
+            }
             writer.record(new ItemEventInput(
                     workspace,
                     item.itemId(),

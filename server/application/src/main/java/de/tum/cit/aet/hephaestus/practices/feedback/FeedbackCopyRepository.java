@@ -34,9 +34,9 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state = 'WRITE_STARTED', write_started_at = COALESCE(write_started_at,:startedAt), stop_reason='DELIVERY_UNCONFIRMED',last_error=NULL
+        UPDATE feedback_copy SET state = 'WRITE_STARTED', write_started_at = COALESCE(write_started_at,:startedAt), stop_reason='DELIVERY_UNCONFIRMED',last_error=NULL,readback='UNKNOWN'
          WHERE workspace_id = :workspaceId AND feedback_id = :feedbackId AND id = :copyId
-           AND state = 'PLANNED' AND (write_started_at IS NULL OR last_error LIKE 'ABSENT:%')
+           AND state = 'PLANNED' AND (write_started_at IS NULL OR readback = 'ABSENT')
            AND external_ref IS NULL AND posted_at IS NULL AND write_key IS NOT NULL
         """, nativeQuery = true)
     int beginWrite(
@@ -49,7 +49,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
     @Query(value = """
         UPDATE feedback_copy SET state = 'POSTED', posted_at = :postedAt,
             external_ref = :externalRef, external_url = :externalUrl, kind = :kind,
-            stop_reason = NULL, last_error = NULL
+            stop_reason = NULL, last_error = NULL, readback=NULL
          WHERE workspace_id = :workspaceId AND feedback_id = :feedbackId AND id = :copyId
            AND state = 'WRITE_STARTED' AND write_started_at IS NOT NULL
            AND external_ref IS NULL AND posted_at IS NULL
@@ -65,7 +65,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state = 'FAILED', stop_reason = NULL, last_error = :error
+        UPDATE feedback_copy SET state = 'FAILED', stop_reason = NULL, last_error = :error, readback='ABSENT'
          WHERE workspace_id = :workspaceId AND feedback_id = :feedbackId AND id = :copyId
            AND state = 'WRITE_STARTED' AND external_ref IS NULL AND posted_at IS NULL
         """, nativeQuery = true)
@@ -77,16 +77,8 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state = 'RETRACTED' WHERE workspace_id = :workspaceId
-          AND feedback_id = :feedbackId AND id = :copyId AND state = 'POSTED' AND posted_at IS NOT NULL
-        """, nativeQuery = true)
-    int confirmRetracted(
-            @Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId, @Param("copyId") UUID copyId);
-
-    @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query(value = """
         UPDATE feedback_copy SET state='WITHHELD',stop_reason=:reason
-        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='PLANNED' AND (write_started_at IS NULL OR last_error LIKE 'ABSENT:%')
+        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='PLANNED' AND (write_started_at IS NULL OR readback = 'ABSENT')
         """, nativeQuery = true)
     int withholdPlanned(
             @Param("workspaceId") long workspaceId,
@@ -96,7 +88,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         UPDATE feedback_copy SET state='PLANNED',stop_reason=NULL,last_error=NULL
-        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='WITHHELD' AND stop_reason='RESULT_MARKED_INCORRECT' AND write_started_at IS NULL
+        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='WITHHELD' AND stop_reason='RESULT_MARKED_INCORRECT' AND (write_started_at IS NULL OR readback='ABSENT') AND posted_at IS NULL AND external_ref IS NULL AND chat_message_id IS NULL
         """, nativeQuery = true)
     int restoreUnsent(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
@@ -104,13 +96,13 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
     @Query(value = """
         UPDATE feedback_copy SET state='PLANNED' WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId
           AND state='FAILED' AND external_ref IS NULL AND posted_at IS NULL
-          AND (write_started_at IS NULL OR last_error LIKE 'ABSENT:%')
+          AND (write_started_at IS NULL OR readback = 'ABSENT')
         """, nativeQuery = true)
     int retryAbsent(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET last_error=:error,stop_reason=:reason
+        UPDATE feedback_copy SET last_error=:error,stop_reason=:reason,readback=:readback
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId
         """, nativeQuery = true)
     int recordError(
@@ -118,11 +110,12 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
             @Param("feedbackId") UUID feedbackId,
             @Param("copyId") UUID copyId,
             @Param("reason") @Nullable String reason,
+            @Param("readback") @Nullable String readback,
             @Param("error") @Nullable String error);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state=:state,last_error=NULL,stop_reason=NULL
+        UPDATE feedback_copy SET state=:state,last_error=NULL,stop_reason=NULL,readback=NULL
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId
           AND state IN ('POSTED','RETRACTED') AND posted_at IS NOT NULL
         """, nativeQuery = true)
@@ -135,7 +128,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         UPDATE feedback_copy SET state='WITHHELD',stop_reason=:reason WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId
-          AND id=:copyId AND state='PLANNED' AND (write_started_at IS NULL OR last_error LIKE 'ABSENT:%')
+          AND id=:copyId AND state='PLANNED' AND (write_started_at IS NULL OR readback = 'ABSENT')
         """, nativeQuery = true)
     int withholdCopy(
             @Param("workspaceId") long workspaceId,
@@ -145,8 +138,8 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state='FAILED',last_error='ABSENT: No provider request was admitted.'
-        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='PLANNED' AND (write_started_at IS NULL OR last_error LIKE 'ABSENT:%')
+        UPDATE feedback_copy SET state='FAILED',readback='ABSENT',last_error='No provider request was admitted.'
+        WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND state='PLANNED' AND (write_started_at IS NULL OR readback = 'ABSENT')
         """, nativeQuery = true)
     int failUnstarted(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
@@ -163,7 +156,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
         UPDATE feedback_copy SET state='WRITE_STARTED',write_started_at=:at,chat_message_id=:messageId,
-          stop_reason='DELIVERY_UNCONFIRMED',last_error=NULL
+          stop_reason='DELIVERY_UNCONFIRMED',last_error=NULL,readback='UNKNOWN'
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId AND kind='CHAT_TURN'
           AND state='PLANNED' AND write_started_at IS NULL AND posted_at IS NULL AND external_ref IS NULL
           AND chat_message_id IS NULL AND body IS NULL AND write_key IS NOT NULL
@@ -189,7 +182,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state='POSTED',posted_at=:at,body=:body,stop_reason=NULL,last_error=NULL
+        UPDATE feedback_copy SET state='POSTED',posted_at=:at,body=:body,stop_reason=NULL,last_error=NULL,readback=NULL
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId AND kind='CHAT_TURN'
           AND chat_message_id=:messageId AND write_started_at IS NOT NULL AND posted_at IS NULL
           AND state IN ('WRITE_STARTED','FAILED') AND body IS NULL
@@ -204,7 +197,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """
-        UPDATE feedback_copy SET state=:state,stop_reason=:reason,last_error=:detail
+        UPDATE feedback_copy SET state=:state,stop_reason=:reason,last_error=:detail,readback=:readback
         WHERE workspace_id=:workspaceId AND feedback_id=:feedbackId AND id=:copyId AND kind='CHAT_TURN'
           AND chat_message_id=:messageId AND write_started_at IS NOT NULL AND posted_at IS NULL
           AND state IN ('WRITE_STARTED','FAILED')
@@ -216,6 +209,7 @@ public interface FeedbackCopyRepository extends JpaRepository<FeedbackCopy, UUID
             @Param("messageId") UUID messageId,
             @Param("state") String state,
             @Param("reason") @Nullable String reason,
+            @Param("readback") String readback,
             @Param("detail") @Nullable String detail);
 
     @Query(value = """

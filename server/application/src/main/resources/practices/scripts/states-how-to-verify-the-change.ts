@@ -1,14 +1,15 @@
+// Tells what kind of change this is, where text that tells how to verify it can be, and which added
+// lines keep an Xcode placeholder or read a secret. The criteria's applicability gate needs these facts
+// first: a small model often judges a diagram or an introduction as a change without instructions.
 import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
+	namedIssues,
 	withoutHtmlComments,
 } from "../kits/scm/references.ts";
 import { readLinkedWorkItemCapture } from "../kits/scm/review.ts";
-// Tells what kind of change this is, where text that tells how to verify it can be, and which added
-// lines keep an Xcode placeholder or read a secret. The criteria's applicability gate needs these facts
-// first: a small model often judges a diagram or an introduction as a change without instructions.
 import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
@@ -147,21 +148,17 @@ export default definePracticeScript({
 		// branch, or the provider's closing link. A template's example in code or a comment names nothing.
 		const capture = await readLinkedWorkItemCapture(ctx.evidence);
 		const captured = capture?.items.map((item) => item.number) ?? [];
-		const named = new Map<number, string[]>();
-		const name = (how: string, numbers: number[]) => {
-			for (const n of numbers) {
-				named.set(n, [...(named.get(n) ?? []), how]);
-			}
-		};
-		name(
-			"provider closing link",
-			(capture?.items ?? [])
-				.filter((item) => item.how === "closesOnMerge")
-				.map((item) => item.number),
-		);
-		name("closing keyword in the description", closingReferences(body));
-		name("title", issueNumberReferences(record.title ?? ""));
-		name("branch", branchIssueReferences(record.source_branch));
+		const named = namedIssues([
+			[
+				"provider closing link",
+				(capture?.items ?? [])
+					.filter((item) => item.how === "closesOnMerge")
+					.map((item) => item.number),
+			],
+			["closing keyword in the description", closingReferences(body)],
+			["title", issueNumberReferences(record.title ?? "")],
+			["branch", branchIssueReferences(record.source_branch)],
+		]);
 
 		const directions: string[] = [];
 		if (paths.length === 0 || addedLines + removedLines === 0) {

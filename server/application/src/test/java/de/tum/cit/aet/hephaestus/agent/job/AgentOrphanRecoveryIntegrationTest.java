@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
@@ -14,11 +15,11 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
@@ -54,6 +56,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -145,13 +148,13 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         sweeper = new ReviewJobZombieSweeper(
                 jobRepository,
                 workerRegistryRepository,
-                properties,
                 objectMapper,
                 transactionTemplate,
                 usageRecorder,
                 meterRegistry,
-                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP));
-        sweeper.setCompositionContinuation(continuation);
+                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
+                new ReviewJobRecovery(
+                        jobRepository, properties, objectMapper, usageRecorder, Optional.of(continuation)));
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("orphan-recovery-ws"));
 
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("orphan-recovery"));
@@ -176,7 +179,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 workspace,
                 "orphan-recovery-practice",
                 new ItemKind("scm.pull_request"),
-                RuntimePracticeTestData.definition(
+                DefinitionTestFixtures.definition(
                         new ItemKind("scm.pull_request"), "Orphan recovery practice", "The first definition", null),
                 null,
                 0,
@@ -205,29 +208,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         fastForwardAvailableAt(jobId);
 
         assertThat(eligibleForClaim(jobId)).isTrue();
-    }
-
-    @Test
-    @DisplayName("orphan requeue rotates the job token — the old token no longer authenticates, the new one does")
-    void orphanRequeueRotatesTheJobToken() {
-        UUID jobId = runningJobOwnedBy("dead-replica", Instant.now().minus(Duration.ofMinutes(5)), 0);
-        registerStaleWorker("dead-replica");
-        ReviewJob before = jobRepository.findById(jobId).orElseThrow();
-        String oldTokenHash = before.getJobTokenHash();
-
-        sweeper.recoverOrphanedJobs();
-
-        ReviewJob requeued = jobRepository.findById(jobId).orElseThrow();
-        String newTokenHash = requeued.getJobTokenHash();
-        assertThat(newTokenHash).isNotEqualTo(oldTokenHash);
-
-        // Credentials for the previous attempt cannot authorize the requeued execution.
-        assertThat(jobRepository.findById(jobId).orElseThrow().getAttempt()).isEqualTo(before.getAttempt() + 1);
-
-        fastForwardAvailableAt(jobId);
-
-        assertThat(eligibleForClaim(jobId)).isTrue();
-        assertThat(jobRepository.findById(jobId).orElseThrow().getAttempt()).isEqualTo(before.getAttempt() + 1);
     }
 
     @Test
@@ -289,9 +269,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         // @Modifying queries need an active transaction (the sweeper normally provides one via
         // TransactionTemplate); wrap here too.
-        String candidateNewToken = ReviewJob.generateJobToken();
-        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                jobId, "dead-replica", 5, Instant.now(), ReviewJob.computeTokenHash(candidateNewToken)));
+        int updated =
+                transactionTemplate.execute(s -> jobRepository.requeueOrphan(jobId, "dead-replica", 5, Instant.now()));
 
         assertThat(updated)
                 .as("the CAS must not match — the row's worker_id does not match the stale caller's")
@@ -307,9 +286,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     void requeueOrphanRefusesPastTheRetryCapEvenUnchecked() {
         UUID jobId = runningJobOwnedBy("dead-replica-3", Instant.now(), 5);
 
-        String candidateNewToken = ReviewJob.generateJobToken();
-        int updated = transactionTemplate.execute(s -> jobRepository.requeueOrphan(
-                jobId, "dead-replica-3", 5, Instant.now(), ReviewJob.computeTokenHash(candidateNewToken)));
+        int updated = transactionTemplate.execute(
+                s -> jobRepository.requeueOrphan(jobId, "dead-replica-3", 5, Instant.now()));
 
         assertThat(updated).isZero();
         ReviewJob unchanged = jobRepository.findById(jobId).orElseThrow();
@@ -365,9 +343,8 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         admitWithResult(admitted);
         UUID unadmitted = runningJobOwnedBy("owner", Instant.now(), 0);
 
-        String token = ReviewJob.generateJobToken();
-        int requeued = transactionTemplate.execute(s ->
-                jobRepository.requeueOrphan(admitted, "owner", 5, Instant.now(), ReviewJob.computeTokenHash(token)));
+        int requeued =
+                transactionTemplate.execute(s -> jobRepository.requeueOrphan(admitted, "owner", 5, Instant.now()));
         int byStranger = transactionTemplate.execute(
                 s -> jobRepository.failAdmittedOwnedBy(admitted, "stranger", 0, Instant.now(), "lost"));
         int byLaterAttempt = transactionTemplate.execute(
@@ -416,14 +393,12 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                         jobId.toString()))
                 .containsExactly(3);
         // The lost worker's own attempt is gone: its requeue or its failure matches nothing now.
-        String token = ReviewJob.generateJobToken();
         Integer staleRequeue = transactionTemplate.execute(s -> {
             continuation.holdRecoveryCustody();
             return continuation.requeue(
                     continuing,
                     "dead-replica-9",
-                    new ReviewJobRepository.CompositionRequeue(
-                            0, 5, Instant.now(), Instant.now(), token, ReviewJob.computeTokenHash(token)));
+                    new ReviewJobRepository.CompositionRequeue(0, 5, Instant.now(), Instant.now()));
         });
         assertThat(staleRequeue).isZero();
         Integer staleFailure = transactionTemplate.execute(
@@ -654,7 +629,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         var kind = practice.getKind();
         runtimePracticeVersions.append(
                 practice,
-                RuntimePracticeTestData.definition(kind, "Updated standard", "The second definition", null),
+                DefinitionTestFixtures.definition(kind, "Updated standard", "The second definition", null),
                 null);
     }
 
@@ -665,20 +640,21 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-completions",
-                        "https://api.openai.com/v1",
-                        "test-model",
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://api.openai.com/v1",
+                                "test-model",
+                                UsageFundingSource.INSTANCE,
+                                instanceModel.getConnection().getId(),
+                                instanceModel.getId(),
+                                workspace.getId(),
+                                null,
+                                null,
+                                null),
                         null,
                         null,
-                        null,
-                        UsageFundingSource.INSTANCE,
-                        instanceModel.getConnection().getId(),
-                        instanceModel.getId(),
-                        workspace.getId(),
                         600,
                         false,
-                        null,
-                        null,
                         null)
                 .withPriceSnapshot(new LlmPriceSnapshot(
                         UsageFundingSource.INSTANCE, UsagePricingState.NO_CHARGE, null, null, null, null, null, null))

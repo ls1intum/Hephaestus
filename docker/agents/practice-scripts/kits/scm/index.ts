@@ -61,7 +61,6 @@ export interface ChangeView {
 }
 export interface Files {
 	head: FileTree;
-	base: FileTree | null;
 	change: ChangeView | null;
 }
 
@@ -74,18 +73,15 @@ export function requireChange(files: Files | null): ReadonlyMap<string, DiffFile
 
 export function scm<M extends ModelNeeds>(ctx: PracticeScriptContext<M>) {
 	const { files, port } = domainAccess(ctx);
-	const treeOf = (side: "head" | "base", revision: string): FileTree => ({
+	const treeOf = (revision: string): FileTree => ({
 		revision,
-		read: async (path, options = {}) => port.read({ op: "read", tree: side, path, ...options }),
-		list: async (glob) =>
-			port.read({ op: "list", tree: side, ...(glob === undefined ? {} : { glob }) }),
-		grep: async (pattern, options = {}) =>
-			port.read({ op: "grep", tree: side, pattern, ...options }),
+		read: async (path, options = {}) => port.read({ op: "read", path, ...options }),
+		list: async (glob) => port.read({ op: "list", ...(glob === undefined ? {} : { glob }) }),
+		grep: async (pattern, options = {}) => port.read({ op: "grep", pattern, ...options }),
 		cite: async (path, startLine, endLine) =>
 			port.read({
 				op: "cite",
 				source: "tree",
-				tree: side,
 				path,
 				startLine,
 				...(endLine === undefined ? {} : { endLine }),
@@ -95,8 +91,7 @@ export function scm<M extends ModelNeeds>(ctx: PracticeScriptContext<M>) {
 		files === null
 			? null
 			: {
-					head: treeOf("head", files.head.revision),
-					base: null,
+					head: treeOf(files.head.revision),
 					change:
 						files.change === null
 							? null

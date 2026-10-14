@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -8,8 +9,11 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -68,5 +72,23 @@ class AccountReferenceServiceTest extends BaseUnitTest {
             assertThat(identity.displayName()).isNull();
             assertThat(identity.avatarUrl()).isNull();
         });
+    }
+
+    @Test
+    void shouldResolveOnlyRequestedAccountsInOneBatch() {
+        var first = new AccountDirectory.AccountView(41L, Account.Status.ACTIVE, "First", null, null, true);
+        var second = new AccountDirectory.AccountView(42L, Account.Status.UNCLAIMED, "Second", null, null, true);
+        when(accounts.findAll(List.of(41L, 42L))).thenReturn(Map.of(41L, first, 42L, second));
+        when(identities.activeLinksForAccounts(List.of(41L, 42L))).thenReturn(Map.of());
+        var page = references.references(7L, List.of(41L, 42L));
+        assertThat(page.keySet()).containsExactlyInAnyOrder(41L, 42L);
+        assertThat(Objects.requireNonNull(page.get(41L)).displayName()).isEqualTo("First");
+        assertThat(Objects.requireNonNull(page.get(42L)).status()).isEqualTo(Account.Status.UNCLAIMED);
+    }
+
+    @Test
+    void shouldReportAccountNotFoundWhenTheAccountDoesNotExist() {
+        when(accounts.find(404L)).thenReturn(Optional.empty());
+        assertThatThrownBy(() -> references.reference(7L, 404L)).isInstanceOf(EntityNotFoundException.class);
     }
 }

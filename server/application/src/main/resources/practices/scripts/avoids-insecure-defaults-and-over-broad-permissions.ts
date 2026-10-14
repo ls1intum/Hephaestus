@@ -1,3 +1,6 @@
+// Finds the selected code lines that match a pattern of an insecure default, an over-broad permission or
+// an exposed secret, in all languages. Each lead is a candidate: the review decides if it is real and
+// exploitable on a reachable path.
 import { scm } from "../kits/scm/index.ts";
 import {
 	occurrences,
@@ -6,9 +9,6 @@ import {
 	occurrenceLead,
 	sortOccurrenceLeads,
 } from "../kits/scm/occurrences.ts";
-// Finds the selected code lines that match a pattern of an insecure default, an over-broad permission or
-// an exposed secret, in all languages. Each lead is a candidate: the review decides if it is real and
-// exploitable on a reachable path.
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {

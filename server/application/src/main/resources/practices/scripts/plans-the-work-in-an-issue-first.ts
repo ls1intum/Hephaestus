@@ -1,15 +1,16 @@
+// Finds each issue that the change names as its own, with the time when it was opened, the time when
+// the earliest commit of the change was authored, and the time between them. The review reads the two
+// times beside each other.
 import { readCapturedCommits } from "../kits/scm/change.ts";
 import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
+	namedIssues,
 	relatedReferences,
 } from "../kits/scm/references.ts";
 import { millisBetween, readLinkedWorkItemCapture } from "../kits/scm/review.ts";
-// Finds each issue that the change names as its own, with the time when it was opened, the time when
-// the earliest commit of the change was authored, and the time between them. The review reads the two
-// times beside each other.
 import { factsOf, listWithin } from "../lib/core/bounded-text.ts";
 import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
@@ -45,20 +46,16 @@ export default definePracticeScript({
 		const title = domain.item.title ?? "";
 		const capture = await readLinkedWorkItemCapture(ctx.evidence);
 		const linked = capture?.items ?? null;
-		const named = new Map<number, string[]>();
-		const name = (how: string, numbers: number[]) => {
-			for (const n of numbers) {
-				named.set(n, [...(named.get(n) ?? []), how]);
-			}
-		};
-		name(
-			"provider closing link",
-			(linked ?? []).filter((item) => item.how === "closesOnMerge").map((item) => item.number),
-		);
-		name("closing keyword", closingReferences(body));
-		name("title", issueNumberReferences(title));
-		name("branch", branchIssueReferences(domain.item.source_branch));
-		name("Related to", relatedReferences(body));
+		const named = namedIssues([
+			[
+				"provider closing link",
+				(linked ?? []).filter((item) => item.how === "closesOnMerge").map((item) => item.number),
+			],
+			["closing keyword", closingReferences(body)],
+			["title", issueNumberReferences(title)],
+			["branch", branchIssueReferences(domain.item.source_branch)],
+			["Related to", relatedReferences(body)],
+		]);
 		const capturedCommits = await readCapturedCommits(ctx.evidence);
 		const commitsCaptured = capturedCommits !== null;
 		const commits = capturedCommits ?? [];

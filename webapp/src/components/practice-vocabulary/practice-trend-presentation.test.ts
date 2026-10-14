@@ -117,11 +117,7 @@ describe("practice trend copy", () => {
 			"Recent reviews found both strengths and problems here. Read from your last four reviewed pull or merge requests. In the last 90 days, five pull or merge requests were reviewed for this practice.",
 		);
 		expect(
-			explainStanding(
-				"MIXED",
-				"practice",
-				support({ reviewedWork: 5, reviewedWorkKind: undefined }),
-			),
+			explainStanding("MIXED", "practice", support({ reviewedWork: 5, reviewedWorkKind: null })),
 		).toBe(
 			"Recent reviews found both strengths and problems here. Read from your last four reviewed pieces of work. In the last 90 days, five pieces of work were reviewed for this practice.",
 		);

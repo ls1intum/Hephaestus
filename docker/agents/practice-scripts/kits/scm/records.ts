@@ -68,11 +68,8 @@ export const issueRecordSchema = z.object({
 	issue_number: z.int(),
 	title: z.string().nullable(),
 	body: z.string(),
-	/** UNKNOWN when the mirror holds no state, or a state that the contract does not name. */
-	state: z.union([
-		z.enum(["OPEN", "CLOSED", "UNKNOWN"]),
-		z.unknown().transform(() => "UNKNOWN" as const),
-	]),
+	/** UNKNOWN when the mirror holds no state. */
+	state: z.enum(["OPEN", "CLOSED", "UNKNOWN"]),
 	state_reason: z.string().nullable(),
 	html_url: z.string().nullable(),
 	repository_full_name: z.string(),

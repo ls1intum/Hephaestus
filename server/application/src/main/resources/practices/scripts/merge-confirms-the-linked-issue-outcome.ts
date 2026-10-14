@@ -1,14 +1,15 @@
+// Finds each captured linked issue of a merged pull request: its task-list items as captured, ticked
+// and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
+// of them this change implements. A lead is a candidate, not a claim.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { subIssueRollup } from "../kits/scm/issue-classification.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
+	OUTCOME_HEADING,
 } from "../kits/scm/references.ts";
 import { checkableItems, readLinkedWorkItems, reviewsMergedWork } from "../kits/scm/review.ts";
-// Finds each captured linked issue of a merged pull request: its task-list items as captured, ticked
-// and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
-// of them this change implements. A lead is a candidate, not a claim.
 import { factsOf } from "../lib/core/bounded-text.ts";
 import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
@@ -22,10 +23,6 @@ export const LABELS = {
 		"A linked issue with no task list, no outcome heading, and no count that shows it has no sub-issues.",
 };
 type OutcomeKind = keyof typeof LABELS;
-
-/** Headings under which an issue states what "done" means without a task list. */
-const OUTCOME_HEADING =
-	/^\s*#+\s*(?:acceptance criteria|definition of done|dod|expected (?:outcome|result|behaviou?r)|given\b)/imu;
 
 /** How the change names a linked issue, strongest form first. */
 function howLinked(

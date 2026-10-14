@@ -22,12 +22,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub Projects V2 items.
- *
- * <p>This service handles the conversion of GitHubProjectItemDTO to ProjectItem entities, persists
- * them, and publishes appropriate domain events.
- *
- * <p>Extends {@link BaseGitHubProcessor} for consistency with other GitHub entity processors and to
- * reuse common functionality like the {@code sanitize()} method.
+ * <p>
+ * This service handles the conversion of GitHubProjectItemDTO to ProjectItem entities,
+ * persists them, and publishes appropriate domain events.
+ * <p>
+ * Extends {@link BaseGitHubProcessor} for consistency with other GitHub entity processors
+ * and to reuse common functionality like the {@code sanitize()} method.
  */
 @Slf4j
 @Service
@@ -71,8 +71,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the GitHub project item DTO
      * @param project the project this item belongs to
      * @param context processing context with scope information
-     * @param actorId the ID of the user who performed the action (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who performed the action (from webhook sender), or null for sync
      * @return the persisted ProjectItem entity
      */
     @Transactional
@@ -187,8 +186,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the GitHub project item DTO
      * @param project the project this item belongs to
      * @param context processing context
-     * @param actorId the ID of the user who archived the item (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who archived the item (from webhook sender), or null for sync
      * @return the updated ProjectItem entity
      */
     @Transactional
@@ -235,8 +233,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the GitHub project item DTO
      * @param project the project this item belongs to
      * @param context processing context
-     * @param actorId the ID of the user who restored the item (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who restored the item (from webhook sender), or null for sync
      * @return the updated ProjectItem entity
      */
     @Transactional
@@ -283,8 +280,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the GitHub project item DTO
      * @param project the project this item belongs to
      * @param context processing context
-     * @param actorId the ID of the user who converted the item (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who converted the item (from webhook sender), or null for sync
      * @return the updated ProjectItem entity
      */
     @Transactional
@@ -326,8 +322,7 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
      * @param dto the GitHub project item DTO
      * @param project the project this item belongs to
      * @param context processing context
-     * @param actorId the ID of the user who reordered the item (from webhook sender), or null for
-     *     sync
+     * @param actorId the ID of the user who reordered the item (from webhook sender), or null for sync
      * @return the updated ProjectItem entity
      */
     @Transactional
@@ -372,9 +367,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
     /**
      * Removes stale Draft Issues that no longer exist in the project.
-     *
-     * <p>This method is used by the project-side sync which only handles Draft Issues. Issue and PR
-     * items are synced from the issue/PR side and should not be removed here.
+     * <p>
+     * This method is used by the project-side sync which only handles Draft Issues.
+     * Issue and PR items are synced from the issue/PR side and should not be removed here.
      *
      * @param projectId the project ID
      * @param syncedDraftIssueNodeIds list of Draft Issue node IDs that were synced
@@ -407,12 +402,12 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
     /**
      * Removes stale Issue/PR items that no longer exist in the project.
-     *
-     * <p>This method is called after a full project-side sync that iterated through ALL items. The
-     * project-side sync sees Issue/PR items (but doesn't process them) and tracks their node IDs.
-     * Items not in the tracked list were removed from the project on GitHub.
-     *
-     * <p><b>Archived items are preserved:</b> GitHub's {@code ProjectV2.items} connection excludes
+     * <p>
+     * This method is called after a full project-side sync that iterated through ALL items.
+     * The project-side sync sees Issue/PR items (but doesn't process them) and tracks their
+     * node IDs. Items not in the tracked list were removed from the project on GitHub.
+     * <p>
+     * <b>Archived items are preserved:</b> GitHub's {@code ProjectV2.items} connection excludes
      * archived items, so they would always appear "stale" even though they still exist on GitHub.
      * Archived items are synced from the issue/PR-side embedded {@code projectItems} connection
      * (which supports {@code includeArchived: true}) and via {@code projects_v2_item} webhooks.
@@ -450,10 +445,10 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
     /**
      * Relinks orphaned project items to their issues after issue sync completes.
-     *
-     * <p>Project items for ISSUE/PULL_REQUEST content may have NULL issue_id when the referenced
-     * issue hasn't been synced locally yet. This uses the stored content_database_id to fill in the
-     * FK once the issue exists.
+     * <p>
+     * Project items for ISSUE/PULL_REQUEST content may have NULL issue_id when the
+     * referenced issue hasn't been synced locally yet. This uses the stored
+     * content_database_id to fill in the FK once the issue exists.
      *
      * @return number of items relinked
      */
@@ -468,11 +463,11 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
     /**
      * Resolve the issue ID from the DTO, verifying the issue exists locally.
-     *
-     * <p>GitHub Projects V2 are organization-scoped and can contain items from ANY repository in
-     * the organization. If an item references an issue from a repository that is not being synced
-     * by this Hephaestus instance, we gracefully skip the issue link rather than failing with a FK
-     * constraint violation.
+     * <p>
+     * GitHub Projects V2 are organization-scoped and can contain items from ANY
+     * repository in the organization. If an item references an issue from a repository
+     * that is not being synced by this Hephaestus instance, we gracefully skip the
+     * issue link rather than failing with a FK constraint violation.
      *
      * @param dto the project item DTO containing the GitHub issue database ID
      * @return the issue ID if it exists locally, null otherwise
@@ -500,9 +495,9 @@ public class GitHubProjectItemProcessor extends BaseGitHubProcessor {
 
     /**
      * Resolve the creator ID from the DTO, verifying the user exists locally.
-     *
-     * <p>The creator is the user who added the item to the project. We only link to users that
-     * exist in our database to avoid FK constraint violations.
+     * <p>
+     * The creator is the user who added the item to the project. We only link
+     * to users that exist in our database to avoid FK constraint violations.
      *
      * @param dto the project item DTO containing creator information
      * @return the creator's user ID if they exist locally, null otherwise

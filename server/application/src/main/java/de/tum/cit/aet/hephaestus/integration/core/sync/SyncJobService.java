@@ -147,7 +147,7 @@ public class SyncJobService implements SmartLifecycle {
                         connection.getKind(),
                         request.type(),
                         request.trigger(),
-                        request.triggeredByUserId()));
+                        request.triggeredByAccountId()));
                 // Must be published in-transaction for the AFTER_COMMIT listener.
                 publish(request.workspaceId(), connectionId, created.getKind(), SyncStateChangedEvent.Scope.JOB);
                 return created;

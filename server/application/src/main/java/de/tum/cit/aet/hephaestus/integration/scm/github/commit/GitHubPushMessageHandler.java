@@ -36,17 +36,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub push webhook events for commit synchronization.
- *
- * <p>When a push event is received:
- *
+ * <p>
+ * When a push event is received:
  * <ol>
- *   <li>Validates the event (skips branch deletions, empty pushes, non-default branches)
- *   <li>If local git checkout is enabled: clone/fetch, walk commits, extract file changes
- *   <li>Otherwise: persist commits from webhook payload data only
+ *   <li>Validates the event (skips branch deletions, empty pushes, non-default branches)</li>
+ *   <li>If local git checkout is enabled: clone/fetch, walk commits, extract file changes</li>
+ *   <li>Otherwise: persist commits from webhook payload data only</li>
  * </ol>
  *
- * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#push">GitHub Push
- *     Event Documentation</a>
+ * @see <a href="https://docs.github.com/en/webhooks/webhook-events-and-payloads#push">
+ *      GitHub Push Event Documentation</a>
  */
 @Slf4j
 @Component
@@ -138,7 +137,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         String defaultBranch = repository.getDefaultBranch();
         if (defaultBranch == null || !isDefaultBranch(event.ref(), defaultBranch)) {
             log.debug(
-                    "Skipped push event: reason=notDefaultBranch, branch={}, defaultBranch={}," + " repoName={}",
+                    "Skipped push event: reason=notDefaultBranch, branch={}, defaultBranch={}, repoName={}",
                     getBranchName(event.ref()),
                     defaultBranch,
                     repoName);
@@ -156,7 +155,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         } else {
             if (gitRepositoryManager.isEnabled() && !scopeActive) {
                 log.debug(
-                        "Skipped local git processing: reason=scopeNotActive, scopeId={}," + " repoName={}",
+                        "Skipped local git processing: reason=scopeNotActive, scopeId={}, repoName={}",
                         scopeId,
                         repoName);
             }
@@ -198,7 +197,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
             log.info("Processed push commits via local git: repoName={}, failed={}", repoName, failed[0]);
         } catch (Exception e) {
             log.error(
-                    "Failed to process commits via local git, falling back to webhook: repoName={}," + " error={}",
+                    "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
                     repoName,
                     e.getMessage());
             failed[0]++;
@@ -274,7 +273,7 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         log.info(
-                "Processed push commits via webhook: processed={}, total={}, branch={}," + " fallback={}, repoName={}",
+                "Processed push commits via webhook: processed={}, total={}, branch={}, fallback={}, repoName={}",
                 processed,
                 commits.size(),
                 getBranchName(event.ref()),
@@ -310,14 +309,12 @@ public class GitHubPushMessageHandler extends AbstractIntegrationMessageHandler<
 
     /**
      * Resolves the scope ID (workspace ID) for a repository.
-     *
-     * <p>Mirrors the resolution logic in {@link
-     * de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory}:
-     *
+     * <p>
+     * Mirrors the resolution logic in {@link de.tum.cit.aet.hephaestus.integration.scm.github.common.ProcessingContextFactory}:
      * <ol>
-     *   <li>For organization-owned repos: lookup by organization login
-     *   <li>For personal repos (no organization): lookup by repository nameWithOwner
-     *   <li>Fallback for org repos: if org lookup fails, try repository lookup
+     *   <li>For organization-owned repos: lookup by organization login</li>
+     *   <li>For personal repos (no organization): lookup by repository nameWithOwner</li>
+     *   <li>Fallback for org repos: if org lookup fails, try repository lookup</li>
      * </ol>
      *
      * @param repository the repository to resolve scope for

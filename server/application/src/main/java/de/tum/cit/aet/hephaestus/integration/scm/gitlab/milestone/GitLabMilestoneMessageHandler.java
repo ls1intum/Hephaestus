@@ -20,16 +20,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab milestone webhook events.
- *
- * <p>Routes to {@link GitLabMilestoneProcessor} based on the action:
- *
+ * <p>
+ * Routes to {@link GitLabMilestoneProcessor} based on the action:
  * <ul>
- *   <li>{@code create} / {@code update} / {@code close} / {@code reopen} &rarr; {@link
- *       GitLabMilestoneProcessor#process} (state is encoded in the DTO)
+ *   <li>{@code create} / {@code update} / {@code close} / {@code reopen} &rarr;
+ *       {@link GitLabMilestoneProcessor#process} (state is encoded in the DTO)</li>
  * </ul>
- *
- * <p>GitLab does not send a webhook when a milestone is deleted — stale milestones are cleaned up
- * by the GraphQL sync service's stale removal logic.
+ * <p>
+ * GitLab does not send a webhook when a milestone is deleted — stale milestones
+ * are cleaned up by the GraphQL sync service's stale removal logic.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)

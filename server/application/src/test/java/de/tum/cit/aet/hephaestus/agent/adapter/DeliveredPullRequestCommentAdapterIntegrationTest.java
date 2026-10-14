@@ -23,7 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.feedback.DeliveredPullRequestCommentAdapter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -55,7 +55,7 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
     private long recipientAccountId;
 
     @Autowired
-    private DeliveredPullRequestCommentAdapter lookup;
+    private DeliveredPullRequestCommentLookup lookup;
 
     @Autowired
     private RepositoryRepository repositories;

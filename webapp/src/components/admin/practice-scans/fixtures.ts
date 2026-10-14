@@ -5,11 +5,11 @@ import type {
 	ScanDetail,
 	ScanPracticeReport,
 	ScanReport,
+	ScanReportItem,
+	ScanReportProblem,
 	ScanSummary,
 } from "@/api/types.gen";
 import { daysBefore, hoursBefore, minutesBefore } from "@/stories/story-clock";
-
-import type { ScanItemEntry, ScanProblemEntry } from "./scan-report-schemas";
 
 /** Prop fixtures: real `Date`s, the shape the generated client hands a component. */
 
@@ -357,7 +357,7 @@ const entryBase = (path: string, slug = "error-handling", fileId = "901") => ({
 	itemVersion: COMMIT,
 });
 
-export const JUDGED_ENTRY: ScanItemEntry = {
+export const JUDGED_ENTRY: ScanReportItem = {
 	...entryBase("server/src/ScanService.java"),
 	status: "JUDGED",
 	resultId: "r-1",
@@ -370,7 +370,7 @@ export const JUDGED_ENTRY: ScanItemEntry = {
 	recordedAt: hoursBefore(2),
 };
 
-export const REUSED_ENTRY: ScanItemEntry = {
+export const REUSED_ENTRY: ScanReportItem = {
 	...entryBase("server/src/ScanController.java", "error-handling", "902"),
 	status: "REUSED",
 	resultId: "r-2",
@@ -383,27 +383,37 @@ export const REUSED_ENTRY: ScanItemEntry = {
 	recordedAt: daysBefore(7),
 };
 
-export const WITHHELD_ENTRY: ScanItemEntry = {
+export const WITHHELD_ENTRY: ScanReportItem = {
 	...entryBase("webapp/src/main.tsx", "error-handling", "903"),
 	status: "WITHHELD",
 	reason: "MODEL_UNAVAILABLE",
 	reasonDescription: "MODEL_UNAVAILABLE",
 };
 
-export const NOT_REVIEWED_ENTRY: ScanItemEntry = {
+export const NOT_REVIEWED_ENTRY: ScanReportItem = {
 	...entryBase("webapp/src/main.tsx", "comment-quality", "903"),
 	status: "NOT_REVIEWED",
 	reason: null,
 	reasonDescription: null,
 	lastResult: {
 		id: "r-0",
+		reviewId: "0b0b0b0b-1111-4222-8333-444455556666",
+		item: fileRef("903", "webapp/src/main.tsx"),
+		practiceSlug: "comment-quality",
+		practiceName: "Comments explain why",
+		origin: "SCHEDULE",
 		outcome: "MET",
+		severity: null,
 		summary: "Comments say why the retry waits.",
+		problems: [],
+		currentness: "STALE",
+		markedIncorrectAt: null,
+		acceptedAt: null,
 		recordedAt: daysBefore(14),
 	},
 };
 
-export const LISTED_ENTRY: ScanItemEntry = {
+export const LISTED_ENTRY: ScanReportItem = {
 	...entryBase("server/src/ScanReport.java", "comment-quality", "904"),
 	status: "LISTED",
 	reason: null,
@@ -411,7 +421,7 @@ export const LISTED_ENTRY: ScanItemEntry = {
 	lastResult: null,
 };
 
-export const REMOVED_ENTRY: ScanItemEntry = {
+export const REMOVED_ENTRY: ScanReportItem = {
 	...JUDGED_ENTRY,
 	item: fileRef("905", "server/src/LegacyExporter.java", daysBefore(1)),
 	outcome: "MET",
@@ -421,7 +431,7 @@ export const REMOVED_ENTRY: ScanItemEntry = {
 	resultId: "r-5",
 };
 
-export const ITEM_ENTRIES: ScanItemEntry[] = [
+export const ITEM_ENTRIES: ScanReportItem[] = [
 	JUDGED_ENTRY,
 	REUSED_ENTRY,
 	WITHHELD_ENTRY,
@@ -432,18 +442,33 @@ export const ITEM_ENTRIES: ScanItemEntry[] = [
 function problemEntry(
 	id: string,
 	summary: string,
-	baselineState: ScanProblemEntry["baselineState"],
-	overrides: Partial<ScanProblemEntry> = {},
-): ScanProblemEntry {
+	baselineState: ScanReportProblem["baselineState"],
+	overrides: Partial<ScanReportProblem> = {},
+): ScanReportProblem {
 	return {
 		problem: {
 			id,
 			resultId: "r-1",
+			position: 0,
+			key: null,
+			basis: null,
 			severity: "MAJOR",
 			summary,
 			explanation: null,
 			nextStep: null,
-			citations: [{ path: "server/src/ScanService.java", startLine: 42, endLine: 48 }],
+			citations: [
+				{
+					sourceKind: "scm.file",
+					sourcePath: null,
+					path: "server/src/ScanService.java",
+					startLine: 42,
+					endLine: 48,
+					side: null,
+					quote: null,
+					revision: null,
+					verification: null,
+				},
+			],
 		},
 		resultId: "r-1",
 		item: fileRef("901", "server/src/ScanService.java"),
@@ -490,7 +515,7 @@ export const REPAIRED_PROBLEM = problemEntry(
 	{ absentReason: "REPAIRED" },
 );
 
-export const PROBLEM_ENTRIES: ScanProblemEntry[] = [
+export const PROBLEM_ENTRIES: ScanReportProblem[] = [
 	NEW_PROBLEM,
 	UNCHANGED_PROBLEM,
 	UPDATED_PROBLEM,

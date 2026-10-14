@@ -23,7 +23,7 @@ public final class AdmittedResultFixtures {
                 .put("quote", quote);
         citation.putObject("verification")
                 .put("status", "VERIFIED")
-                .put("artifactSha256", "a".repeat(64))
+                .put("itemSha256", "a".repeat(64))
                 .put("quoteSha256", CitationVerification.quoteDigest(quote));
         return evidence;
     }

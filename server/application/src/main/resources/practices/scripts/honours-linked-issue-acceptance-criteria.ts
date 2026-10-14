@@ -1,7 +1,8 @@
-import { scm, expectKind } from "../kits/scm/index.ts";
-import { readLinkedWorkItems } from "../kits/scm/review.ts";
 // Finds the issue references in the title, the body and the branch of a pull request, and the
 // acceptance-criteria blocks of the linked issues. It gives facts, never a verdict of compliance.
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { OUTCOME_HEADING } from "../kits/scm/references.ts";
+import { checkableItems, readLinkedWorkItems } from "../kits/scm/review.ts";
 import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
@@ -26,14 +27,9 @@ function collect(re: RegExp, text: string, into: Set<string>): void {
 	}
 }
 
-// A checkable acceptance-criteria section: an AC/DoD heading or a "- [ ]" checklist in the issue body.
+// A checkable acceptance-criteria section: an outcome heading or a task list in the issue body.
 function acFacts(body: string): { heading: boolean; boxes: number } {
-	const heading =
-		/(?:acceptance criteria|definition of done|\bDoD\b|done when|expected (?:outcome|result|behaviou?r))/iu.test(
-			body,
-		);
-	const boxes = (body.match(/^[\s>]*[-*]\s+\[[ xX]\]/gmu) ?? []).length;
-	return { heading, boxes };
+	return { heading: OUTCOME_HEADING.test(body), boxes: checkableItems(body).length };
 }
 
 export default definePracticeScript({

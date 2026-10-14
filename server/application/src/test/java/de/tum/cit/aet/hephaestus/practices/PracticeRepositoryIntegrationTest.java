@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -16,6 +18,9 @@ class PracticeRepositoryIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     PracticeRepository practices;
+
+    @Autowired
+    PracticeVersionRepository versionRows;
 
     private Practice create(String suffix) {
         var owner = persistUser("version-owner");
@@ -39,6 +44,30 @@ class PracticeRepositoryIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .extracting(Practice::getId)
                 .contains(practice.getId());
         assertThat(practices.findByWorkspaceIdAndKind(practice.getWorkspace().getId() + 1, practice.getKind()))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldScopePracticeAndVersionLookupsToTheOwningWorkspace() {
+        var own = create("lookup-own");
+        var foreign = create("lookup-foreign");
+        var workspaceId = own.getWorkspace().getId();
+        var ownId = Objects.requireNonNull(own.getId());
+        var foreignId = Objects.requireNonNull(foreign.getId());
+        var versionId = Objects.requireNonNull(own.getCurrentVersion().getId());
+        assertThat(practices.findByIdAndWorkspaceId(ownId, workspaceId)).isPresent();
+        assertThat(practices.findByIdAndWorkspaceId(foreignId, workspaceId)).isEmpty();
+        assertThat(practices.findByWorkspaceIdAndIdIn(workspaceId, List.of(ownId, foreignId)))
+                .extracting(Practice::getId)
+                .containsExactly(ownId);
+        assertThat(versionRows.findByIdAndWorkspaceId(versionId, workspaceId)).isPresent();
+        assertThat(versionRows.findByIdAndWorkspaceId(
+                        versionId, foreign.getWorkspace().getId()))
+                .isEmpty();
+        assertThat(versionRows.findByWorkspaceIdAndPracticeIdOrderByNumberAsc(workspaceId, ownId))
+                .extracting(version -> version.getId())
+                .containsExactly(versionId);
+        assertThat(versionRows.findByWorkspaceIdAndPracticeIdOrderByNumberAsc(workspaceId, foreignId))
                 .isEmpty();
     }
 }

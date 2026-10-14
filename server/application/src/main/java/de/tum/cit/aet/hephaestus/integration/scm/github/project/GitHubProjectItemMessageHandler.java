@@ -21,21 +21,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub Projects V2 Item webhook events.
- *
- * <p>This handler processes item create, edit, delete, archive, and restore events.
- *
  * <p>
- *
+ * This handler processes item create, edit, delete, archive, and restore events.
+ * <p>
  * <h2>Supported Owner Types</h2>
- *
- * <p>Project items inherit the owner type from their parent project. This handler supports all
- * three owner types:
- *
+ * <p>
+ * Project items inherit the owner type from their parent project.
+ * This handler supports all three owner types:
  * <ul>
- *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.
- *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").
- *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated with a
- *       monitored workspace/scope.
+ *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.</li>
+ *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").</li>
+ *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated
+ *       with a monitored workspace/scope.</li>
  * </ul>
  */
 @Slf4j
@@ -73,8 +70,7 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
     }
 
     /**
-     * Projects V2 item webhook events are skipped when {@code
-     * hephaestus.sync.projects.enabled=false}.
+     * Projects V2 item webhook events are skipped when {@code hephaestus.sync.projects.enabled=false}.
      */
     @Override
     public boolean isEnabled() {
@@ -105,7 +101,7 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
         Long scopeId = resolveScopeId(event, ownerType);
         if (scopeId == null) {
             log.debug(
-                    "Skipped projects_v2_item event: reason=noAssociatedScope, ownerType={}," + " owner={}",
+                    "Skipped projects_v2_item event: reason=noAssociatedScope, ownerType={}, owner={}",
                     ownerType,
                     sanitizeForLog(ownerIdentifier));
             return;
@@ -185,8 +181,8 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
 
     /**
      * Finds the project associated with an item event.
-     *
-     * <p>The webhook payload includes project_node_id which we use to look up the project.
+     * <p>
+     * The webhook payload includes project_node_id which we use to look up the project.
      */
     private @Nullable Project findProjectForItem(GitHubProjectItemEventDTO event) {
         var itemDto = event.item();
@@ -209,16 +205,15 @@ public class GitHubProjectItemMessageHandler extends AbstractIntegrationMessageH
 
     /**
      * Resolves the scope ID based on the owner type.
-     *
-     * <p>Resolution strategies:
-     *
+     * <p>
+     * Resolution strategies:
      * <ul>
-     *   <li>ORGANIZATION: Look up by organization login
-     *   <li>REPOSITORY: Look up by repository fullName
-     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)
+     *   <li>ORGANIZATION: Look up by organization login</li>
+     *   <li>REPOSITORY: Look up by repository fullName</li>
+     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)</li>
      * </ul>
      *
-     * @param event the webhook event
+     * @param event     the webhook event
      * @param ownerType the detected owner type
      * @return the scope ID, or null if not found or not supported
      */

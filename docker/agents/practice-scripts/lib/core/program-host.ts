@@ -6,7 +6,6 @@
 import { createHash } from "node:crypto";
 
 import {
-	LEGACY_CONTRACT_ERROR,
 	parseCandidate,
 	parseMeta,
 	parseReviewOptions,
@@ -19,7 +18,6 @@ import {
 } from "./contract.ts";
 import { noReceipts, type Receipts } from "./evidence-reader.ts";
 import type { ProgramJob } from "./ipc.ts";
-import { isJsonObject } from "./json.ts";
 import { definePracticeScript, reasonOf, UnratedError } from "./practice-script.ts";
 import { programContext } from "./program-context.ts";
 import {
@@ -60,11 +58,6 @@ export interface ProgramOutcome {
 /** The SHA-256 of a staged program's bytes. */
 export const programDigest = (source: Buffer): string =>
 	createHash("sha256").update(source).digest("hex");
-
-/** A value that still has the form of the retired leads return. */
-function isLeadsReturn(value: unknown): boolean {
-	return isJsonObject(value) && Object.hasOwn(value, "leads") && !Object.hasOwn(value, "outcome");
-}
 
 /**
  * The outcome of a practice the host did not start: the attempt's time or budget ran out first, or
@@ -208,9 +201,7 @@ export async function runPracticeProgram(
 	);
 	if (!parsed.ok) {
 		return finished("failed", "invalid-candidate", {
-			error: isLeadsReturn(execution.value)
-				? LEGACY_CONTRACT_ERROR
-				: `the program returned no valid result: ${parsed.reasonCode}: ${parsed.message}`,
+			error: `the program returned no valid result: ${parsed.reasonCode}: ${parsed.message}`,
 		});
 	}
 	let { candidate } = parsed;

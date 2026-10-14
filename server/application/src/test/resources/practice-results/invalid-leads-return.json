@@ -11,5 +11,7 @@
 	"facts": {
 		"catches": 3
 	},
-	"directions": ["Check each added catch block."]
+	"directions": [
+		"Check each added catch block."
+	]
 }

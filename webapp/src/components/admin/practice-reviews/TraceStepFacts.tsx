@@ -1,12 +1,9 @@
 import { ArrowRightIcon, ExternalLinkIcon } from "lucide-react";
 import type { ReactElement, ReactNode } from "react";
 
-import type { AgentJob, ReviewLineage, ReviewLineageFeedback } from "@/api/types.gen";
+import type { ItemRef, ReviewDetail, ReviewLineage } from "@/api/types.gen";
 import { useNow } from "@/components/common/use-now";
-import {
-	DEVELOPER_ANSWER_DEFS,
-	developerAnswers,
-} from "@/components/practice-vocabulary/developer-answer-defs";
+import { claimCurrentnessNote } from "@/components/practice-vocabulary/claim-currentness";
 import { feedbackLocationSentence } from "@/components/practice-vocabulary/feedback-location-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
@@ -18,13 +15,14 @@ import {
 	feedbackLocation,
 	gapLabel,
 	isSlowGap,
+	type LineageFeedback,
+	type LineageRecords,
+	lineageRecords,
 	type NumberedResult,
 	stageCounts,
 } from "./lineage-chain";
-import { writtenBy } from "./lineage-story";
-import { ToneIcon } from "./LineageStep";
 import { sameTraceNode, type TraceNode } from "./review-trace";
-import { feedbackLoss } from "./trace-bottleneck";
+import { feedbackLoss, traceReview } from "./trace-bottleneck";
 import { traceVerdict } from "./trace-verdict";
 
 export interface TraceStepFactsProps {
@@ -32,11 +30,10 @@ export interface TraceStepFactsProps {
 	/** The step whose facts these are. */
 	node: TraceNode;
 	numbered: readonly NumberedResult[];
-	letters: ReadonlyMap<string, string>;
 	/** The record the trace was opened for, whose verdict already heads the trace. */
 	here?: TraceNode;
-	/** The review's own record, where the page has it: its retries. */
-	job?: AgentJob;
+	/** The review's detail, where the page has it: its runtime jobs and its model. */
+	review?: ReviewDetail;
 	/**
 	 * Whether every step shows its facts, as "Expand all" asks. The results' table then names
 	 * each practice, so a piece of feedback does not name them again.
@@ -46,26 +43,26 @@ export interface TraceStepFactsProps {
 
 /**
  * What "Expand all" and the system info add under a step: only what the step's own line does not
- * already say. A moment, the count of results and the end say everything on their line, so
- * they add nothing and draw no box. The review adds its times, model, retries and error; the work
- * its link and merge; a result what became of it; a piece of feedback where exactly it went,
- * its timeline and the practices it was written from.
+ * already say. The count of results and the end say everything on their line, so they
+ * add nothing and draw no box. The review adds its times, model and attempts; the item its link; a
+ * result what became of it; a piece of feedback where exactly it went, when it was delivered and the
+ * practices it was written from.
  */
 export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null {
-	const { node, lineage, numbered, letters, here, job, everyStep = false } = props;
+	const { node, lineage, numbered, here, review, everyStep = false } = props;
+	const records = lineageRecords(lineage);
 	// The record the trace stands on already heads it with its verdict.
 	const told = sameTraceNode(here, node);
 	switch (node.kind) {
 		case "end":
-		case "moment":
 		case "results": {
 			return null;
 		}
 		case "work": {
-			return <WorkFacts lineage={lineage} />;
+			return records.item === undefined ? null : <ItemFacts item={records.item} />;
 		}
 		case "review": {
-			return lineage.review === undefined ? null : <ReviewFacts lineage={lineage} job={job} />;
+			return <ReviewFacts records={records} detail={review} />;
 		}
 		case "result": {
 			const entry = numbered.find((candidate) => candidate.result.id === node.id);
@@ -74,13 +71,13 @@ export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null 
 			);
 		}
 		case "feedback": {
-			const feedback = lineage.feedback.find((candidate) => candidate.id === node.id);
+			const feedback = records.feedback.find((candidate) => candidate.id === node.id);
 			return feedback === undefined ? null : (
 				<FeedbackFacts
 					feedback={feedback}
 					lineage={lineage}
+					item={records.item}
 					numbered={numbered}
-					letters={letters}
 					told={told}
 					namesSources={!everyStep}
 				/>
@@ -90,8 +87,8 @@ export function traceStepFacts(props: TraceStepFactsProps): ReactElement | null 
 }
 
 /**
- * A result: what became of it in one sentence, unless the trace stands on it and says so on
- * top, the day it was observed, and when an admin marked it incorrect.
+ * A result: what became of it in one sentence, unless the trace stands on it and says so on top,
+ * when it was recorded, and whether it is still current.
  */
 function ResultFacts({
 	lineage,
@@ -104,17 +101,14 @@ function ResultFacts({
 }) {
 	const { result } = entry;
 	const node: TraceNode = { kind: "result", id: result.id };
+	const currentness = claimCurrentnessNote(result.currentness);
 	return (
 		<FactList>
 			{!told && <Fact label="Outcome">{traceVerdict(lineage, node).sentence}</Fact>}
 			<Fact label="Recorded">
-				<DayTime at={result.observedAt} />
+				<DayTime at={result.recordedAt} />
 			</Fact>
-			{result.markedIncorrectAt !== undefined && (
-				<Fact label="Marked incorrect">
-					<DayTime at={result.markedIncorrectAt} from={result.observedAt} />
-				</Fact>
-			)}
+			{currentness !== undefined && <Fact label="Current">{currentness}</Fact>}
 		</FactList>
 	);
 }
@@ -133,15 +127,15 @@ function FactList({ children }: { children: ReactNode }) {
 	return <dl className="grid grid-cols-[5.75rem_minmax(0,1fr)] gap-x-3 gap-y-0.5">{children}</dl>;
 }
 
-function DayTime({ at, from }: { at: Date; from?: Date }) {
+function DayTime({ at, from }: { at: Date; from?: Date | null }) {
 	const today = new Date(useNow());
-	const slow = from !== undefined && isSlowGap((at.getTime() - from.getTime()) / 1000);
+	const slow = from != null && isSlowGap((at.getTime() - from.getTime()) / 1000);
 	return (
 		<span className="inline-flex flex-wrap items-baseline gap-x-1.5">
 			<time dateTime={at.toISOString()} className="tabular-nums">
 				{formatDayTime(at, today)}
 			</time>
-			{from !== undefined && from.getTime() <= at.getTime() && (
+			{from != null && from.getTime() <= at.getTime() && (
 				<span
 					className={
 						slow
@@ -156,47 +150,48 @@ function DayTime({ at, from }: { at: Date; from?: Date }) {
 	);
 }
 
-const PROVIDER_NAMES: Record<string, string> = { GITHUB: "GitHub", GITLAB: "GitLab" };
+const PROVIDER_NAMES: Record<NonNullable<ItemRef["provider"]>, string> = {
+	GITHUB: "GitHub",
+	GITLAB: "GitLab",
+	SLACK: "Slack",
+	OUTLINE: "Outline",
+};
 
-function WorkFacts({ lineage }: { lineage: ReviewLineage }) {
-	const { work } = lineage;
-	const pullRequest = work?.kind === "scm.pull_request";
+function ItemFacts({ item }: { item: ItemRef }) {
+	if (!hasText(item.url) && item.removedAt === null) {
+		return null;
+	}
 	return (
 		<FactList>
-			{hasText(work?.url) && (
+			{hasText(item.url) && (
 				<Fact label="Link">
 					<a
-						href={work.url}
+						href={item.url}
 						target="_blank"
 						rel="noopener noreferrer"
 						className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
 					>
-						{`Open on ${PROVIDER_NAMES[work.provider ?? ""] ?? "its site"}`}
+						{`Open on ${item.provider === null ? "its site" : PROVIDER_NAMES[item.provider]}`}
 						<ExternalLinkIcon aria-hidden className="size-3" />
 					</a>
 				</Fact>
 			)}
-			<Fact label="Moments">
-				{`${countOf(lineage.workMoments.length, "moment", "moments")} recorded on the work`}
-			</Fact>
-			{lineage.workMergedAt !== undefined && (
-				<Fact label="Merged">
-					<DayTime at={lineage.workMergedAt} />
+			{item.removedAt !== null && (
+				<Fact label="Removed">
+					<DayTime at={item.removedAt} />
 				</Fact>
 			)}
-			{lineage.workMergedAt === undefined && pullRequest && <Fact label="Merged">Not yet</Fact>}
 		</FactList>
 	);
 }
 
-/** How far the review got, step by step: observed, written, reached the developer, answered. */
-function StageLine({ lineage }: { lineage: ReviewLineage }) {
-	const counts = stageCounts(lineage);
+/** How far the review got, step by step: recorded, written, reached the developer. */
+function StageLine({ records }: { records: LineageRecords }) {
+	const counts = stageCounts(records);
 	const stages = [
 		countOf(counts.results, "listed result", "listed results"),
 		countOf(counts.feedback, "listed piece of feedback", "listed pieces of feedback"),
 		`${counts.reached} reached the developer`,
-		`${counts.answered} answered`,
 	];
 	return (
 		<span className="flex flex-wrap items-center gap-1">
@@ -206,41 +201,47 @@ function StageLine({ lineage }: { lineage: ReviewLineage }) {
 					{stage}
 				</span>
 			))}
-			{counts.resolvedByWork > 0 && (
-				<span>{`· ${counts.resolvedByWork} resolved by the work`}</span>
-			)}
 		</span>
 	);
 }
 
-function ReviewFacts({ lineage, job }: { lineage: ReviewLineage; job: AgentJob | undefined }) {
-	const { review } = lineage;
+function ReviewFacts({
+	records,
+	detail,
+}: {
+	records: LineageRecords;
+	detail: ReviewDetail | undefined;
+}) {
+	const review = traceReview(records, detail);
 	if (review === undefined) {
 		return null;
 	}
+	const jobs = detail?.runtime?.jobs ?? [];
+	const [pickedUp] = jobs
+		.map((job) => job.startedAt)
+		.filter((startedAt) => startedAt !== null)
+		.sort((a, b) => a.getTime() - b.getTime());
+	const attempts = Math.max(0, ...jobs.map((job) => job.attempt));
 	return (
 		<FactList>
 			<Fact label="Asked for">
 				<DayTime at={review.createdAt} />
 			</Fact>
-			{review.startedAt !== undefined && (
+			{pickedUp !== undefined && (
 				<Fact label="Picked up">
-					<DayTime at={review.startedAt} from={review.createdAt} />
+					<DayTime at={pickedUp} from={review.createdAt} />
 				</Fact>
 			)}
-			{review.finishedAt !== undefined && (
+			{review.completedAt !== null && (
 				<Fact label="Finished">
-					<DayTime at={review.finishedAt} from={review.startedAt ?? review.createdAt} />
+					<DayTime at={review.completedAt} from={pickedUp ?? review.createdAt} />
 				</Fact>
 			)}
-			{job !== undefined && job.retryCount > 0 && (
-				<Fact label="Attempts">
-					{`${job.retryCount + 1}, after ${countOf(job.retryCount, "retry", "retries")}`}
-				</Fact>
-			)}
-			{hasText(review.model) && <Fact label="Model">{review.model}</Fact>}
+			{jobs.length > 1 && <Fact label="Jobs">{countOf(jobs.length, "job", "jobs")}</Fact>}
+			{attempts > 1 && <Fact label="Attempts">{attempts}</Fact>}
+			{hasText(detail?.model) && <Fact label="Model">{detail.model}</Fact>}
 			<Fact label="How far">
-				<StageLine lineage={lineage} />
+				<StageLine records={records} />
 			</Fact>
 		</FactList>
 	);
@@ -250,8 +251,8 @@ function ReviewFacts({ lineage, job }: { lineage: ReviewLineage; job: AgentJob |
  * What became of a piece, said without the trace's opening words: why it was lost where it was,
  * otherwise where its path ended.
  */
-function outcomeText(feedback: ReviewLineageFeedback, lineage: ReviewLineage): string {
-	const loss = feedbackLoss(feedback, lineage);
+function outcomeText(feedback: LineageFeedback, lineage: ReviewLineage): string {
+	const loss = feedbackLoss(feedback);
 	if (loss !== undefined) {
 		return loss.text;
 	}
@@ -259,100 +260,30 @@ function outcomeText(feedback: ReviewLineageFeedback, lineage: ReviewLineage): s
 	return `${end.label}: ${end.reason}.`;
 }
 
-interface TimelineEntry {
-	key: string;
-	label: string;
-	at: Date;
-	from?: Date;
-	body?: ReactNode;
-}
-
-/** Every dated thing that happened to a piece, in order, each with the wait since the one before. */
-function feedbackTimeline(feedback: ReviewLineageFeedback): TimelineEntry[] {
-	const { response } = feedback;
-	const entries: TimelineEntry[] = [{ key: "composed", label: "Composed", at: feedback.createdAt }];
-	if (feedback.decision !== undefined && feedback.decidedAt !== undefined) {
-		entries.push({
-			key: "decided",
-			label: feedback.decision === "APPROVED" ? "Approved" : "Rejected",
-			at: feedback.decidedAt,
-		});
-	}
-	if (feedback.deliveredAt !== undefined) {
-		entries.push({ key: "delivered", label: "Delivered", at: feedback.deliveredAt });
-	}
-	if (feedback.withdrawnAt !== undefined) {
-		entries.push({ key: "withdrawn", label: "Withdrawn", at: feedback.withdrawnAt });
-	}
-	if (feedback.replacedAt !== undefined) {
-		entries.push({ key: "replaced", label: "Replaced", at: feedback.replacedAt });
-	}
-	const answers = developerAnswers(response).filter((answer) => answer !== "RESOLVED_BY_WORK");
-	if (response?.respondedAt !== undefined && answers.length > 0) {
-		entries.push({
-			key: "answered",
-			label: "Answered",
-			at: response.respondedAt,
-			body: (
-				<span className="inline-flex flex-wrap items-center gap-x-2">
-					{answers.map((answer) => (
-						<span key={answer} className="inline-flex items-center gap-1">
-							<ToneIcon def={DEVELOPER_ANSWER_DEFS[answer]} />
-							{DEVELOPER_ANSWER_DEFS[answer].label}
-						</span>
-					))}
-				</span>
-			),
-		});
-	}
-	if (response?.resolvedByWorkAt !== undefined) {
-		entries.push({ key: "resolved", label: "Resolved", at: response.resolvedByWorkAt });
-	}
-	entries.sort((a, b) => a.at.getTime() - b.at.getTime());
-	return entries.map((entry, index) => ({ ...entry, from: entries[index - 1]?.at }));
-}
-
 function FeedbackFacts({
 	feedback,
 	lineage,
+	item,
 	numbered,
-	letters,
 	told,
 	namesSources,
 }: {
-	feedback: ReviewLineageFeedback;
+	feedback: LineageFeedback;
 	lineage: ReviewLineage;
+	item: ItemRef | undefined;
 	numbered: readonly NumberedResult[];
-	letters: ReadonlyMap<string, string>;
 	told: boolean;
 	namesSources: boolean;
 }) {
-	const location = feedbackLocation(feedback, lineage.work);
-	const timeline = feedbackTimeline(feedback);
-	const elsewhere = writtenBy(feedback, lineage.review);
-	const sources = numbered.filter(({ result }) => feedback.practiceResultIds.includes(result.id));
+	const location = feedbackLocation(feedback, item);
+	const sources = numbered.filter(({ result }) => feedback.basis.includes(result.id));
 	return (
 		<FactList>
-			<Fact label="Channel">{feedbackLocationSentence(location, lineage.work)}</Fact>
+			<Fact label="Destination">{feedbackLocationSentence(location, item ?? null)}</Fact>
 			{!told && <Fact label="Outcome">{outcomeText(feedback, lineage)}</Fact>}
-			{timeline.map((entry) => (
-				<Fact key={entry.key} label={entry.label}>
-					<span className="inline-flex flex-wrap items-baseline gap-x-2">
-						<DayTime at={entry.at} from={entry.from} />
-						{entry.body}
-					</span>
-				</Fact>
-			))}
-			{elsewhere !== undefined && <Fact label="Composed by">{elsewhere}</Fact>}
-			{hasText(feedback.replacesId) && (
-				<Fact label="Replaces">{letters.get(feedback.replacesId) ?? "Earlier feedback"}</Fact>
-			)}
-			{hasText(feedback.replacedById) && (
-				<Fact label="Replaced by">{letters.get(feedback.replacedById) ?? "Newer feedback"}</Fact>
-			)}
-			{hasText(feedback.response?.disputeExplanation) && (
-				<Fact label="Their reason">
-					<q className="italic">{feedback.response.disputeExplanation}</q>
+			{feedback.deliveredAt !== null && (
+				<Fact label="Delivered">
+					<DayTime at={feedback.deliveredAt} />
 				</Fact>
 			)}
 			{namesSources && sources.length > 0 && (
@@ -364,7 +295,7 @@ function FeedbackFacts({
 								{result.practiceName}
 								<span className="text-muted-foreground">
 									{` · ${OUTCOME_DEFS[result.outcome].label.toLowerCase()}${
-										result.severity === undefined
+										result.severity === null
 											? ""
 											: `, ${SEVERITY_DEFS[result.severity].label.toLowerCase()}`
 									}`}

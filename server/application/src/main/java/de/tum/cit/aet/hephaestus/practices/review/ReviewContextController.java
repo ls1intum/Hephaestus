@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewContextDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -16,19 +15,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * "Which of this workspace's work is the page I am looking at?" — answered from the page's address.
- *
- * <p>The answer is the work's identity plus what the caller may do about it. Its history is not here: the
- * returned kind and id address the trace, results and feedback endpoints, so work that is mirrored but
- * was never reviewed still resolves, and "nothing recorded" stays the trace's own answer.
- *
- */
+/** Resolves an item and the caller's review permissions from its provider URL. */
 @ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/practices/review-context")
@@ -40,6 +33,7 @@ public class ReviewContextController {
     private final ReviewContextService reviewContextService;
 
     @GetMapping
+    @PreAuthorize("@workspaceSecure.isMember()")
     @Operation(
             summary = "Find the reviewed work a provider page shows",
             description = "Reads the address only: nothing is fetched from it. The address must be on the server "
@@ -77,9 +71,6 @@ public class ReviewContextController {
                     @RequestParam
                     @Size(max = 2048)
                     String url) {
-        if (!workspaceContext.hasMembership()) {
-            throw new AccessForbiddenException("You must be a member of the workspace to look up reviewed work.");
-        }
         return ResponseEntity.ok(reviewContextService.resolve(workspaceContext.id(), url));
     }
 }

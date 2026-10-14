@@ -20,13 +20,18 @@ export function readChange(contextRoot: string): { base: string; head: string } 
 		typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, "base_sha") : null;
 	const head: unknown =
 		typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, "head_sha") : null;
-	if (typeof base !== "string" || typeof head !== "string" || !isSha(base) || !isSha(head)) {
+	if (
+		typeof base !== "string" ||
+		typeof head !== "string" ||
+		!isCommitId(base) ||
+		!isCommitId(head)
+	) {
 		throw new Error("change.json: expected base_sha and head_sha as full commit ids");
 	}
 	return { base, head };
 }
 
-function isSha(value: string): boolean {
+export function isCommitId(value: string): boolean {
 	return /^[0-9a-f]{40}$|^[0-9a-f]{64}$/u.test(value);
 }
 
@@ -201,7 +206,7 @@ export function readPinnedBlob(
 	file: string,
 	limit: number,
 ): PinnedBlob {
-	if (!isSha(revision) || !safeRepositoryPath(file)) {
+	if (!isCommitId(revision) || !safeRepositoryPath(file)) {
 		return { kind: "unsafe" };
 	}
 	let entry: RegExpExecArray | null;
@@ -270,7 +275,7 @@ export function pinnedDiff(
 	head: string,
 	limit: number,
 ): PinnedDiff {
-	if (!isSha(base) || !isSha(head)) {
+	if (!isCommitId(base) || !isCommitId(head)) {
 		return { kind: "unreadable" };
 	}
 	const range = [base, head];
@@ -312,7 +317,7 @@ export function checkedOutCommit(repository: string): string | null {
 		const head = git(repository, ["rev-parse", "--verify", "HEAD^{commit}"])
 			.toString("utf8")
 			.trim();
-		return isSha(head) ? head : null;
+		return isCommitId(head) ? head : null;
 	} catch {
 		return null;
 	}

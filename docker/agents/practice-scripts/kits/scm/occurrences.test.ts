@@ -66,7 +66,7 @@ void test("ITEM selection keeps a multi-line occurrence only when its own extent
 	);
 });
 
-void test("declaration placement uses full pinned source and does not enlarge a call's extent", () => {
+void test("declaration location uses full pinned source and does not enlarge a call's extent", () => {
 	const file: SourceFile = {
 		path: "Screen.swift",
 		language: "swift",

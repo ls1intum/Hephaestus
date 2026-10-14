@@ -57,8 +57,8 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0016](0016-unified-identity-keycloak-as-truth.md) | Unified identity — SCM `User` is the authoritative person row, Keycloak `sub` is the persisted join key | Superseded by [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md) |
 | [0017](0017-replace-keycloak-with-spring-native-auth.md) | Native accounts and federated sign-in | Accepted |
 | [0018](0018-pg-partman-for-auth-event-partitioning.md) | pg_partman for `auth_event` partitioning (supersedes ADR 0017's self-managed partitions) | Accepted (PostgreSQL version superseded by [ADR 0038](0038-postgresql-18-release-baseline.md); amended 2026-09-17 — image name and changeset location) |
-| [0019](0019-workspace-membership-keyed-on-account.md) | Workspace membership uses accounts | Accepted |
-| [0020](0020-context-fabric-everything-is-an-integration.md) | Authorized source context has one boundary | Accepted |
+| [0019](0019-workspace-membership-keyed-on-account.md) | Workspace membership uses accounts | Accepted (amended 2026-10-14 — model details superseded by [0056](0056-one-practice-model-for-items-and-scans.md)) |
+| [0020](0020-context-fabric-everything-is-an-integration.md) | Authorized source context has one boundary | Accepted (amended 2026-10-14 — model details superseded by [0056](0056-one-practice-model-for-items-and-scans.md)) |
 | [0021](0021-observations-feedback-synthesis-seam.md) | Evidence and feedback have separate records | Superseded by [0056](0056-one-practice-model-for-items-and-scans.md) |
 | [0022](0022-observation-presence-assessment-and-schema-cleanup.md) | Earlier result classification | Superseded by [0056](0056-one-practice-model-for-items-and-scans.md) |
 | [0023](0023-outline-documentation-integration.md) | Outline supplies authorized document evidence | Accepted |
@@ -88,12 +88,12 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0047](0047-the-practice-profile-has-one-reader.md) | The Practice profile has one reader | Accepted |
 | [0048](0048-installed-clients-sign-in-with-a-pkce-handoff.md) | Installed clients sign in with a PKCE handoff to their own revocable session | Accepted |
 | [0049](0049-browser-extension-report-in-the-page.md) | The browser extension shows its report in the page and confirms changes in its own window | Accepted (amended 2026-10-12 — a not met result names its problems, see the update below) |
-| [0050](0050-one-practice-standard-one-outcome.md) | One practice standard, one outcome | Accepted |
+| [0050](0050-one-practice-standard-one-outcome.md) | One practice standard, one outcome | Accepted (amended 2026-10-14 — model details superseded by [0056](0056-one-practice-model-for-items-and-scans.md)) |
 | [0051](0051-practices-across-the-workspace-counts-developers.md) | Practices across the workspace counts developers and never names one | Accepted |
 | [0052](0052-activity-sorts-by-contributions-and-can-be-public.md) | Workspace activity sorts people by plain counts, and a workspace can publish it | Accepted |
 | [0053](0053-workspace-addresses-are-a-presentation-origin.md) | A workspace address is a presentation origin, and sign-in stays on the apex | Accepted |
 | [0054](0054-practice-visuals-and-guides.md) | Practice visuals and guides are themeable inline SVG and Markdown | Accepted |
 | [0055](0055-practice-scripts-call-models-through-the-runner.md) | Practice scripts use one result contract | Accepted |
+| [0056](0056-one-practice-model-for-items-and-scans.md) | One practice model for items and scans | Accepted |
 
 Template: [0000-template.md](0000-template.md).
-| [0056](0056-one-practice-model-for-items-and-scans.md) | One practice model for items and scans | Accepted |

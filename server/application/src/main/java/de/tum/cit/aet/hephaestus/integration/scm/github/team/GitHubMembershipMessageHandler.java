@@ -22,7 +22,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub membership webhook events (team member changes). */
+/**
+ * Handles GitHub membership webhook events (team member changes).
+ */
 @Component
 public class GitHubMembershipMessageHandler extends AbstractIntegrationMessageHandler<GitHubMembershipEventDTO> {
 

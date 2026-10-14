@@ -157,7 +157,7 @@ public class ReviewIntegrationData {
                 .method(new ReviewMethod(1, digest, slots))
                 .build());
         var evidence = json.readTree("""
-            {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Main.java","side":"NEW","revision":"commit-1","startLine":1,"endLine":1,"quote":"changed();","verification":{"status":"VERIFIED","artifactSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","quoteSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}],"openQuestions":[]}
+            {"citations":[{"sourceKind":"scm.pull-request.diff","sourcePath":"inputs/sources/scm/diff.patch","path":"src/Main.java","side":"NEW","revision":"commit-1","startLine":1,"endLine":1,"quote":"changed();","verification":{"status":"VERIFIED","itemSha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","quoteSha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}],"openQuestions":[]}
             """);
         var result = Result.builder()
                 .id(UUID.randomUUID())
@@ -222,8 +222,8 @@ public class ReviewIntegrationData {
     public UUID job(Result result) {
         var id = UUID.randomUUID();
         jdbc.sql("""
-            INSERT INTO review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,available_at,started_at,completed_at)
-            VALUES(:id,:review,:ws,'COMPLETED',1,'DONE',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:at)
+            INSERT INTO review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at,completed_at)
+            VALUES(:id,:review,:ws,'COMPLETED',1,'DONE',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:at,:at)
             """)
                 .param("id", id)
                 .param("review", result.getReviewId())

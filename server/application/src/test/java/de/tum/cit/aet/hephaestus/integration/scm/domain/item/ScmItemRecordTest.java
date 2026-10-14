@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -31,14 +30,14 @@ class ScmItemRecordTest extends BaseUnitTest {
     private final ObjectMapper mapper = new ObjectMapper();
     private final ScmItemAccess items = mock(ScmItemAccess.class);
     private final RepositoryRepository repositories = mock(RepositoryRepository.class);
-    private final IssueRepository issues = mock(IssueRepository.class);
+    private final ScmWorkLookup workLookup = mock(ScmWorkLookup.class);
     private final PullRequestReviewRepository reviews = mock(PullRequestReviewRepository.class);
     private final ScmItemService service = new ScmItemService(
             items,
             mock(ScmItemLabelQuery.class),
             mock(ScmRepositoryAccess.class),
             repositories,
-            issues,
+            workLookup,
             reviews,
             mock(IssueEvidenceVersion.class),
             mock(ScmGitTree.class),
@@ -67,16 +66,16 @@ class ScmItemRecordTest extends BaseUnitTest {
         String path = value.equals("scm.file") || value.equals("scm.repository")
                 ? "context/item.json"
                 : "context/metadata.json";
-        var source = new ScmItemSource(pinned.item().kind(), service);
+        var source = service;
         assertThat(source.record(pinned, Map.of(path, mapper.writeValueAsBytes(record))))
                 .isEqualTo(record);
-        verifyNoInteractions(items, repositories, issues, reviews);
+        verifyNoInteractions(items, repositories, workLookup, reviews);
     }
 
     @Test
     void shouldRefuseMissingOrMalformedGovernedBytesWithoutFallingBackToCurrentState() {
         var pinned = snapshot("scm.issue");
-        var source = new ScmItemSource(pinned.item().kind(), service);
+        var source = service;
         for (var files : List.<Map<String, byte[]>>of(
                 Map.of(),
                 Map.of("context/metadata.json", new byte[0]),
@@ -89,7 +88,7 @@ class ScmItemRecordTest extends BaseUnitTest {
                             ItemCaptureException.class,
                             failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.CAPTURE_FAILED));
         }
-        verifyNoInteractions(items, repositories, issues, reviews);
+        verifyNoInteractions(items, repositories, workLookup, reviews);
     }
 
     @ParameterizedTest
@@ -101,8 +100,7 @@ class ScmItemRecordTest extends BaseUnitTest {
         record.put("blobId", BLOB);
         record.put("commitId", HEAD);
         record.put(changed, changed.equals("path") ? "src/other.ts" : "d".repeat(40));
-        assertThatThrownBy(() -> new ScmItemSource(pinned.item().kind(), service)
-                        .record(pinned, Map.of("context/item.json", mapper.writeValueAsBytes(record))))
+        assertThatThrownBy(() -> service.record(pinned, Map.of("context/item.json", mapper.writeValueAsBytes(record))))
                 .isInstanceOfSatisfying(
                         ItemCaptureException.class,
                         failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.VERSION_UNAVAILABLE));

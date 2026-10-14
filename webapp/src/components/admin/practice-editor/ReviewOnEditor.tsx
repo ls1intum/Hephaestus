@@ -126,14 +126,18 @@ export function ReviewOnEditor({
 						Review only items in these states. A requested review ignores them.
 					</FieldDescription>
 					{itemType.reviewOnStateDimensions.map((dimension) => {
+						// A state with no value cannot be chosen; one with no label shows its value.
+						const options = dimension.values.flatMap(({ value, label }) =>
+							value === undefined ? [] : [{ value, label: label ?? value }],
+						);
 						const selectedValues =
-							reviewOn.state[dimension.name] ?? dimension.values.map(({ value }) => value);
+							reviewOn.state[dimension.name] ?? options.map(({ value }) => value);
 						return (
 							<FieldSet key={dimension.name} className="gap-2">
 								<FieldLegend variant="label" className="text-muted-foreground">
 									{dimension.label}
 								</FieldLegend>
-								{dimension.values.map((option) => {
+								{options.map((option) => {
 									const controlId = `${REVIEW_ON_ID_PREFIX}-${dimension.name}-${option.value}`;
 									return (
 										<Field key={option.value} orientation="horizontal">
@@ -154,7 +158,7 @@ export function ReviewOnEditor({
 															([name]) => name !== dimension.name,
 														),
 													);
-													if (values.length < dimension.values.length) {
+													if (values.length < options.length) {
 														state[dimension.name] = values;
 													}
 													onChange(normalizeReviewOn({ ...reviewOn, state }));

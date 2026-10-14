@@ -152,10 +152,12 @@ function stubSettings(initial: PracticeReviewSettings) {
 	return { previews, patches, handlers };
 }
 
+/** Opens the Hygiene group unless it is already open, then finds the practice's row in it. */
 async function openPractice(name: string): Promise<HTMLElement> {
-	await userEvent.click(
-		await screen.findByRole("button", { name: /^Hygiene/u }, ROUTE_RENDER_WAIT),
-	);
+	const group = await screen.findByRole("button", { name: /^Hygiene/u }, ROUTE_RENDER_WAIT);
+	if (group.getAttribute("aria-expanded") !== "true") {
+		await userEvent.click(group);
+	}
 	const label = await screen.findByText(name);
 	const row = label.closest("li");
 	assert(row instanceof HTMLElement, "Practice row not rendered");
@@ -348,7 +350,7 @@ describe("review route", () => {
 			{ name: "Remove grace from the review scope" },
 			ROUTE_RENDER_WAIT,
 		);
-		await screen.findByText("owner/repo");
+		await screen.findAllByText("owner/repo");
 
 		await userEvent.click(screen.getByRole("radio", { name: "All monitored repositories" }));
 		await userEvent.click(screen.getByRole("button", { name: "Review changes" }));

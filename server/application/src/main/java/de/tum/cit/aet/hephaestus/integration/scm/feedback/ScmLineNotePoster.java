@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.feedback;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReadback;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyWriteFence;
@@ -23,13 +22,12 @@ public class ScmLineNotePoster {
         this.writers = List.copyOf(writers);
     }
 
-    public CopyWriteResult post(
-            FeedbackTarget target, List<LineNote> notes, CopyReadback readback, CopyWriteFence fence) {
-        return writer(target).postImmutablePackage(target, notes, readback, fence);
+    public CopyWriteResult post(FeedbackTarget target, List<LineNote> notes, CopyWriteFence fence) {
+        return writer(target).postImmutablePackage(target, notes, fence);
     }
 
-    public @Nullable List<CopyReceipt> findPosted(FeedbackTarget target, List<LineNote> notes, CopyReadback readback) {
-        return writer(target).findPosted(target, notes, readback);
+    public @Nullable List<CopyReceipt> findPosted(FeedbackTarget target, List<LineNote> notes) {
+        return writer(target).findPosted(target, notes);
     }
 
     public List<CopyUpdateReceipt> retract(FeedbackTarget target, List<CopyReceipt> copies) {

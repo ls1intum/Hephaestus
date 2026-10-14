@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { hasText } from "@/lib/text";
 
-/** `FeedbackResponseRequestDTO.comment` caps the comment; a dispute has to carry one. */
+/** `FeedbackResponseRequestDTO.comment` caps the comment; a disagreement has to carry one. */
 const FEEDBACK_COMMENT_MAX_LENGTH = 2000;
 
 export interface ResponseCommentBandProps {

@@ -80,7 +80,6 @@ import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsFeedbackRouteI
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/results'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs'
-import { Route as AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/work'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesScansIndexRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/scans/index'
 import { Route as AuthenticatedWWorkspaceSlugAdminPracticesScansScanIdRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/practices/scans/$scanId'
 import { Route as AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRouteImport } from './routes/_authenticated/w/$workspaceSlug/user/$username/practice-groups.$groupSlug'
@@ -494,12 +493,6 @@ const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute =
     path: '/runs',
     getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
   } as any)
-const AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute =
-  AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRouteImport.update({
-    id: '/work',
-    path: '/work',
-    getParentRoute: () => AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute,
-  } as any)
 const AuthenticatedWWorkspaceSlugAdminPracticesScansIndexRoute =
   AuthenticatedWWorkspaceSlugAdminPracticesScansIndexRouteImport.update({
     id: '/',
@@ -600,7 +593,6 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin/practices/reviews/observations': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRoute
   '/w/$workspaceSlug/admin/practices/reviews/results': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRoute
   '/w/$workspaceSlug/admin/practices/reviews/runs': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute
-  '/w/$workspaceSlug/admin/practices/reviews/work': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   '/w/$workspaceSlug/admin/practices/scans/$scanId': typeof AuthenticatedWWorkspaceSlugAdminPracticesScansScanIdRoute
   '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug': typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute
   '/w/$workspaceSlug/admin/practices/reviews/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
@@ -669,7 +661,6 @@ export interface FileRoutesByTo {
   '/w/$workspaceSlug/admin/practices/reviews/observations': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRoute
   '/w/$workspaceSlug/admin/practices/reviews/results': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRoute
   '/w/$workspaceSlug/admin/practices/reviews/runs': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute
-  '/w/$workspaceSlug/admin/practices/reviews/work': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   '/w/$workspaceSlug/admin/practices/scans/$scanId': typeof AuthenticatedWWorkspaceSlugAdminPracticesScansScanIdRoute
   '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug': typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute
   '/w/$workspaceSlug/admin/practices/reviews': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
@@ -748,7 +739,6 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews/results': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute
-  '/_authenticated/w/$workspaceSlug/admin/practices/reviews/work': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/scans/$scanId': typeof AuthenticatedWWorkspaceSlugAdminPracticesScansScanIdRoute
   '/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug': typeof AuthenticatedWWorkspaceSlugUserUsernamePracticeGroupsGroupSlugRoute
   '/_authenticated/w/$workspaceSlug/admin/practices/reviews/': typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
@@ -827,7 +817,6 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices/reviews/observations'
     | '/w/$workspaceSlug/admin/practices/reviews/results'
     | '/w/$workspaceSlug/admin/practices/reviews/runs'
-    | '/w/$workspaceSlug/admin/practices/reviews/work'
     | '/w/$workspaceSlug/admin/practices/scans/$scanId'
     | '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug'
     | '/w/$workspaceSlug/admin/practices/reviews/'
@@ -896,7 +885,6 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin/practices/reviews/observations'
     | '/w/$workspaceSlug/admin/practices/reviews/results'
     | '/w/$workspaceSlug/admin/practices/reviews/runs'
-    | '/w/$workspaceSlug/admin/practices/reviews/work'
     | '/w/$workspaceSlug/admin/practices/scans/$scanId'
     | '/w/$workspaceSlug/user/$username/practice-groups/$groupSlug'
     | '/w/$workspaceSlug/admin/practices/reviews'
@@ -974,7 +962,6 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations'
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/results'
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs'
-    | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/work'
     | '/_authenticated/w/$workspaceSlug/admin/practices/scans/$scanId'
     | '/_authenticated/w/$workspaceSlug/user/$username/practice-groups/$groupSlug'
     | '/_authenticated/w/$workspaceSlug/admin/practices/reviews/'
@@ -1498,13 +1485,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRouteImport
       parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
     }
-    '/_authenticated/w/$workspaceSlug/admin/practices/reviews/work': {
-      id: '/_authenticated/w/$workspaceSlug/admin/practices/reviews/work'
-      path: '/work'
-      fullPath: '/w/$workspaceSlug/admin/practices/reviews/work'
-      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRouteImport
-      parentRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRoute
-    }
     '/_authenticated/w/$workspaceSlug/admin/practices/scans/': {
       id: '/_authenticated/w/$workspaceSlug/admin/practices/scans/'
       path: '/'
@@ -1615,7 +1595,6 @@ interface AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren {
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsObservationsRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute
-  AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute
   AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute: typeof AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute
 }
@@ -1630,8 +1609,6 @@ const AuthenticatedWWorkspaceSlugAdminPracticesReviewsRouteChildren: Authenticat
       AuthenticatedWWorkspaceSlugAdminPracticesReviewsResultsRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesReviewsRunsRoute,
-    AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute:
-      AuthenticatedWWorkspaceSlugAdminPracticesReviewsWorkRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute:
       AuthenticatedWWorkspaceSlugAdminPracticesReviewsIndexRoute,
     AuthenticatedWWorkspaceSlugAdminPracticesReviewsReviewReviewIdRoute:

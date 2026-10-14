@@ -21,7 +21,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub member webhook events (repository collaborator changes). */
+/**
+ * Handles GitHub member webhook events (repository collaborator changes).
+ */
 @Component
 public class GitHubMemberMessageHandler extends AbstractIntegrationMessageHandler<GitHubMemberEventDTO> {
 

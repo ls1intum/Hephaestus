@@ -1,12 +1,15 @@
 /**
  * The workspace of the golden prompt test: one review of one practice of a pull request, staged as the server
- * stages it. The frozen prompts in `golden-prompts/` were captured from commit 5347f0108 over this same
- * workspace, so a prompt block that differs is a block the runner changed.
+ * stages it. The complete captured prompts and tools are asserted against `golden-prompts/`.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import nodePath from "node:path";
 
-/** The lead labels of the prepared review input: the lead kinds of the retired script, word for word. */
+export const AUTHENTICATION_CRITERION = "Added authentication calls use checked(), not insecure().";
+export const AUTHENTICATION_PRACTICE =
+	"# Uses secure authentication\n\n## Standard\n" + AUTHENTICATION_CRITERION + "\n";
+
+/** Labels for the prepared review input. */
 export const LEAD_LABELS = {
 	"insecure-call": "An added call to insecure(); check whether a checked() call guards it.",
 	"auth-helper": "The repository's authentication helper that the change could call instead.",
@@ -65,7 +68,7 @@ export const GOLDEN_RECORD = {
 	assignees: [],
 };
 
-/** The frozen v3 inputs used by the runner prompt tests. */
+/** Captured inputs shared by the runner prompt tests. */
 export const GOLDEN_INPUTS = {
 	contractVersion: 3,
 	kind: "scm.pull_request",
@@ -126,7 +129,8 @@ export function stageGoldenWorkspace(
 	mkdirSync(nodePath.join(cwd, "repos/primary/.git"), { recursive: true });
 	write(
 		"catalog/practices/test-practice.md",
-		"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n\n## applicability\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.\n",
+		AUTHENTICATION_PRACTICE +
+			"\n## applicability\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.\n",
 	);
 	write(
 		"catalog/practices/index.json",

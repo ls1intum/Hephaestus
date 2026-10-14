@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
@@ -23,10 +24,12 @@ import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
+import de.tum.cit.aet.hephaestus.practices.spi.InapplicabilityWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
+import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,12 +42,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ObjectNode;
 
 /** Admission is fenced by workspace, review, job, worker and exact execution attempt. */
 @Service
@@ -182,12 +185,26 @@ public class ResultAdmissionService {
                                         publicEligible);
                             })
                             .toList();
-                    ObjectNode evidence = (ObjectNode) mapper.valueToTree(candidate.evidence());
-                    if (candidate.evidence().search() == null) evidence.putNull("search");
-                    if (candidate.evidence().inapplicability() == null) evidence.putNull("inapplicability");
-                    explicitCitationNulls(evidence);
-                    JsonNode example = candidate.example() == null ? null : mapper.valueToTree(candidate.example());
-                    if (example != null) explicitCitationNulls(example);
+                    JsonNode evidence = mapper.valueToTree(new ProjectedEvidence(
+                            projected(candidate.evidence().citations(), false),
+                                    candidate.evidence().search(),
+                            candidate.evidence().inapplicability(),
+                                    candidate.evidence().openQuestions().stream()
+                                            .map(question -> new ProjectedQuestion(
+                                                    question.openQuestion(),
+                                                    question.wouldSettleIt(),
+                                                    question.citation() == null
+                                                            ? null
+                                                            : projected(List.of(question.citation()), false)
+                                                                    .getFirst()))
+                                            .toList()));
+                    var sourceExample = candidate.example();
+                    JsonNode example = sourceExample == null
+                            ? null
+                            : mapper.valueToTree(new ProjectedExample(
+                                    projected(List.of(sourceExample.citation()), false)
+                                            .getFirst(),
+                                    sourceExample.note()));
                     return new AdmittedResultDTO(
                             assignment.practiceSlug(),
                             Long.toString(candidate.itemId()),
@@ -379,17 +396,20 @@ public class ResultAdmissionService {
         return List.copyOf(projected);
     }
 
-    private static void explicitCitationNulls(JsonNode node) {
-        if (node instanceof ObjectNode object) {
-            if (object.has("sourceKind"))
-                for (String key : List.of(
-                        "sourcePath", "path", "side", "revision", "startLine", "endLine", "quote", "verification")) {
-                    if (!object.has(key)) object.putNull(key);
-                }
-            if (object.has("openQuestion") && !object.has("citation")) object.putNull("citation");
-            object.properties().forEach(entry -> explicitCitationNulls(entry.getValue()));
-        } else if (node.isArray()) node.forEach(ResultAdmissionService::explicitCitationNulls);
-    }
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    private record ProjectedEvidence(
+            List<ProjectedCitationDTO> citations,
+            @Nullable SearchWarrant search,
+            @Nullable InapplicabilityWarrant inapplicability,
+            List<ProjectedQuestion> openQuestions) {}
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    private record ProjectedQuestion(
+            String openQuestion,
+            String wouldSettleIt,
+            @Nullable ProjectedCitationDTO citation) {}
+
+    private record ProjectedExample(ProjectedCitationDTO citation, String note) {}
 
     public static class StaleAttemptException extends RuntimeException {
         @Serial

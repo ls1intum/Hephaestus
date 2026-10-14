@@ -9,8 +9,15 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRecorded;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
@@ -28,6 +35,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -52,6 +60,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
@@ -74,15 +83,30 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.node.JsonNodeFactory;
 
 @Import({ReviewIntegrationData.class, ReviewAdmissionData.class})
 class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    ItemEventService itemEvents;
+
+    @Autowired
+    ItemEventRepository eventRows;
+
+    @Autowired
+    ApplicationEventPublisher publishedEvents;
+
+    @Autowired
+    PlatformTransactionManager transactions;
+
     @Autowired
     JdbcClient jdbc;
 
@@ -332,7 +356,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                 pending.review().getOrderedAt());
 
         assertThatThrownBy(() -> service.complete(workspaceId, reviewId, completion))
-                .isInstanceOf(ResponseStatusException.class);
+                .isInstanceOf(ReviewRequestRejected.class);
         assertThat(service.cancel(workspaceId, reviewId, "CANCELLED_BY_ADMIN")).isTrue();
         assertThat(reviews.findById(reviewId).orElseThrow().getCompletedAt()).isNull();
         assertThat(reviews.findById(reviewId).orElseThrow().getStatus()).isEqualTo(ReviewStatus.RUNNING);
@@ -567,5 +591,103 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         scenario.practice().setFeedbackMode(FeedbackMode.OFF);
         var id = admit(pending, ResultOutcome.NOT_MET).resultIds().getFirst();
         assertThat(results.findById(id).orElseThrow().getOutcome()).isEqualTo(ResultOutcome.NOT_MET);
+    }
+
+    private ItemEventInput eventInput() {
+        var definition = DefinitionTestFixtures.definition();
+        scenario = data.scenario(new PracticeDefinition(
+                definition.name(),
+                definition.reviewOn(),
+                definition.appliesWhen(),
+                null,
+                definition.reads(),
+                definition.reviewedBy(),
+                definition.criteria(),
+                definition.script(),
+                definition.scan(),
+                definition.lineNotes(),
+                definition.guidance()));
+        long workspace = scenario.workspace().getId();
+        var ref = productItems.require(workspace, scenario.item().getId());
+        var version = new ItemVersion("event-version", null);
+        var snapshot = new ItemSnapshot(
+                ref,
+                version,
+                new IntegrationRef(IntegrationKind.GITHUB, workspace, "https://github.com", null),
+                Map.of(),
+                List.of(),
+                new ItemLabel(
+                        ref.itemId(), "Event pull request", "pull request", 1, null, null, IntegrationKind.GITHUB));
+        doReturn(snapshot).when(productItems).pin(eq(ref), eq(version));
+        when(budget.canRequest(workspace, ReviewKind.ITEM, null)).thenReturn(true);
+        when(models.models(eq(workspace), anyList()))
+                .thenReturn(List.of(
+                        new BoundModelSlot("chat", ModelKind.CHAT, null),
+                        new BoundModelSlot("decision", ModelKind.DECISION, null),
+                        new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
+                        new BoundModelSlot("reranking", ModelKind.RERANKING, null),
+                        new BoundModelSlot(
+                                "review",
+                                ModelKind.CHAT,
+                                new FrozenModel("instance:1", "OPENAI_COMPLETIONS", "test-model", null, Map.of()))));
+        return new ItemEventInput(
+                workspace,
+                ref.itemId(),
+                new ItemEventName("scm.pull_request.opened"),
+                version.value(),
+                Instant.now().minusSeconds(30),
+                FoundBy.WEBHOOK,
+                null,
+                null);
+    }
+
+    @Test
+    void shouldStartExactlyOneEventReviewWhenAnItemEventIsRecordedAndReplayed() {
+        var input = eventInput();
+        var workspace = input.workspaceId();
+        var ref = productItems.require(workspace, input.itemId());
+        var eventId = itemEvents.record(input);
+        var review = reviews.findByWorkspaceIdAndEventId(workspace, eventId).orElseThrow();
+        assertThat(review.getOrigin()).isEqualTo(ReviewOrigin.EVENT);
+        assertThat(review.getEventId()).isEqualTo(eventId);
+        assertThat(review.getItemVersion()).isEqualTo("event-version");
+        assertThat(review.getStatus()).isEqualTo(ReviewStatus.QUEUED);
+        assertThat(eventRows
+                        .findByIdAndWorkspaceId(eventId, workspace)
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(ItemEventState.STARTED);
+        assertThat(itemEvents.record(input)).isEqualTo(eventId);
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(ignored ->
+                        publishedEvents.publishEvent(new ItemEventRecorded(workspace, eventId, ref.itemId())));
+        assertThat(reviews.findByWorkspaceIdAndItemIdOrderByOrderedAtDesc(workspace, ref.itemId()))
+                .extracting(r -> r.getId())
+                .containsExactly(review.getId());
+    }
+
+    @Test
+    void shouldRecordBudgetWaitingAndStartTheSameEventAfterBudgetBecomesAvailable() {
+        var input = eventInput();
+        when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(false);
+        var id = itemEvents.record(input);
+        var waiting = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
+        assertThat(waiting.getState()).isEqualTo(ItemEventState.WAITING);
+        assertThat(waiting.getReason()).isEqualTo("BUDGET_EXHAUSTED");
+        assertThat(waiting.getRetryAt()).isNotNull();
+        assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
+        when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(true);
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(ignored ->
+                        publishedEvents.publishEvent(new ItemEventRecorded(input.workspaceId(), id, input.itemId())));
+        assertThat(eventRows
+                        .findByIdAndWorkspaceId(id, input.workspaceId())
+                        .orElseThrow()
+                        .getState())
+                .isEqualTo(ItemEventState.STARTED);
+        assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)
+                        .orElseThrow()
+                        .getOrigin())
+                .isEqualTo(ReviewOrigin.EVENT);
     }
 }

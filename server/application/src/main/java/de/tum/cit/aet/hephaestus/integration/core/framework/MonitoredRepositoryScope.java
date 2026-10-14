@@ -36,16 +36,11 @@ public final class MonitoredRepositoryScope implements FunctionContributor {
      * monitor_connection}.
      */
     private static final String SOURCE_PROVIDER =
-            " FROM connection monitor_connection JOIN identity_provider monitor_provider ON"
-                    + " monitor_provider.type = monitor_connection.kind AND monitor_provider.server_url"
-                    + " = COALESCE(monitor_connection.config ->> 'serverUrl', CASE"
-                    + " monitor_connection.kind WHEN 'GITHUB' THEN '"
+            " FROM connection monitor_connection JOIN identity_provider monitor_provider ON monitor_provider.type = monitor_connection.kind AND monitor_provider.server_url = COALESCE(monitor_connection.config ->> 'serverUrl', CASE monitor_connection.kind WHEN 'GITHUB' THEN '"
                     + PersonSourceNamespace.GITHUB_DEFAULT_URL
                     + "' WHEN 'GITLAB' THEN '"
                     + PersonSourceNamespace.GITLAB_DEFAULT_URL
-                    + "' END)"
-                    + " WHERE monitor_connection.kind IN ('GITHUB', 'GITLAB')"
-                    + " AND monitor_connection.state IN ('ACTIVE', 'SUSPENDED')";
+                    + "' END) WHERE monitor_connection.kind IN ('GITHUB', 'GITLAB') AND monitor_connection.state IN ('ACTIVE', 'SUSPENDED')";
 
     /**
      * The predicate over {@code ?1} monitor workspace id, {@code ?2} monitor native id, {@code ?3}
@@ -61,8 +56,7 @@ public final class MonitoredRepositoryScope implements FunctionContributor {
      */
     public static final String NATIVE_RTM_SOURCE_OF_R = "EXISTS (SELECT 1"
             + SOURCE_PROVIDER
-            + " AND monitor_connection.workspace_id = rtm.workspace_id AND"
-            + " monitor_provider.id = r.provider_id)";
+            + " AND monitor_connection.workspace_id = rtm.workspace_id AND monitor_provider.id = r.provider_id)";
 
     /**
      * Whether provider {@code :providerId} is the source provider of the workspace that owns
@@ -70,18 +64,16 @@ public final class MonitoredRepositoryScope implements FunctionContributor {
      */
     public static final String NATIVE_RTM_SOURCE_PROVIDER = "EXISTS (SELECT 1"
             + SOURCE_PROVIDER
-            + " AND monitor_connection.workspace_id = rtm.workspace_id AND"
-            + " monitor_provider.id = :providerId)";
+            + " AND monitor_connection.workspace_id = rtm.workspace_id AND monitor_provider.id = :providerId)";
 
     /**
      * {@link #PATTERN} for native SQL that aliases {@code repository_to_monitor} as {@code rtm} and
      * {@code repository} as {@code r}. A unit test keeps it equal to the pattern.
      */
-    public static final String NATIVE_RTM_R = "((rtm.native_id IS NULL OR rtm.native_id = r.native_id) AND EXISTS"
-            + " (SELECT 1"
-            + SOURCE_PROVIDER
-            + " AND monitor_connection.workspace_id = rtm.workspace_id AND"
-            + " monitor_provider.id = r.provider_id))";
+    public static final String NATIVE_RTM_R =
+            "((rtm.native_id IS NULL OR rtm.native_id = r.native_id) AND EXISTS (SELECT 1"
+                    + SOURCE_PROVIDER
+                    + " AND monitor_connection.workspace_id = rtm.workspace_id AND monitor_provider.id = r.provider_id))";
 
     @Override
     public void contributeFunctions(FunctionContributions contributions) {

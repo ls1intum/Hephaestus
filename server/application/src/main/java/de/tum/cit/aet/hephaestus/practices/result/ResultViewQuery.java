@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -25,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResultViewQuery {
 
     private final PracticeRepository practices;
-    private final PracticeVersionRepository versions;
+    private final ResultPracticeVersionRepository versions;
     private final ReviewRepository reviews;
     private final ProductReferenceQuery references;
 
@@ -37,16 +36,21 @@ public class ResultViewQuery {
         if (results.stream().anyMatch(result -> result.getWorkspaceId() != workspaceId)) {
             throw new IllegalArgumentException("Results do not belong to the workspace");
         }
-        Map<Long, Practice> practiceById = practices.findByWorkspaceId(workspaceId).stream()
+        Map<Long, Practice> practiceById = practices
+                .findByWorkspaceIdAndIdIn(
+                        workspaceId,
+                        results.stream().map(Result::getPracticeId).distinct().toList())
+                .stream()
                 .collect(Collectors.toMap(practice -> Objects.requireNonNull(practice.getId()), Function.identity()));
         Map<Long, PracticeVersion> versionById = versions
-                .findAllById(results.stream()
-                        .map(Result::getPracticeVersionId)
-                        .filter(Objects::nonNull)
-                        .distinct()
-                        .toList())
+                .findByWorkspaceIdAndIdIn(
+                        workspaceId,
+                        results.stream()
+                                .map(Result::getPracticeVersionId)
+                                .filter(Objects::nonNull)
+                                .distinct()
+                                .toList())
                 .stream()
-                .filter(version -> version.getWorkspaceId() == workspaceId)
                 .collect(Collectors.toMap(version -> Objects.requireNonNull(version.getId()), Function.identity()));
         var reviewById = reviews
                 .findAllById(

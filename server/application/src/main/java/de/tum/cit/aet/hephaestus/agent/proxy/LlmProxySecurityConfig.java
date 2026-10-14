@@ -20,6 +20,8 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManagers;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
@@ -76,7 +78,7 @@ class LlmProxySecurityConfig {
                 practiceScriptCalls,
                 paths.matcher(HttpMethod.POST, "/internal/llm/admit-results"),
                 paths.matcher(HttpMethod.POST, "/internal/llm/public-feedback-history"),
-                paths.matcher(HttpMethod.POST, "/internal/llm/complete-public-review"));
+                paths.matcher(HttpMethod.POST, "/internal/llm/prepare-feedback"));
         RequestMatcher runtimeReads = new OrRequestMatcher(
                 paths.matcher(HttpMethod.GET, "/internal/llm/runtime/{id}"),
                 paths.matcher(HttpMethod.GET, "/internal/llm/runtime/{id}/workspace"),
@@ -90,14 +92,17 @@ class LlmProxySecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .exceptionHandling(errors -> errors.authenticationEntryPoint(
                         (request, response, exception) -> response.setStatus(HttpStatus.NOT_FOUND.value())))
-                .authorizeHttpRequests(auth -> auth.anyRequest().access(hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE)))
+                .authorizeHttpRequests(auth -> auth.requestMatchers(practiceScriptCalls)
+                        .access(AuthorizationManagers.allOf(
+                                hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE),
+                                (authentication, context) -> new AuthorizationDecision(
+                                        authentication.get().getPrincipal() instanceof ProxyIdentity identity
+                                                && identity.job() != null)))
+                        .anyRequest()
+                        .access(hasScope(WorkerJwtIssuer.LLM_PROXY_SCOPE)))
                 .addFilterBefore(
                         new JobTokenAuthenticationFilter(
-                                agentJobRepository,
-                                jwtVerifier,
-                                mentorRegistry,
-                                objectMapper,
-                                workerProperties.resolvedWorkerId()),
+                                agentJobRepository, jwtVerifier, mentorRegistry, workerProperties.resolvedWorkerId()),
                         UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(
                         bounded(gatewayProperties.maxRequestBytes(), modelCalls), JobTokenAuthenticationFilter.class)

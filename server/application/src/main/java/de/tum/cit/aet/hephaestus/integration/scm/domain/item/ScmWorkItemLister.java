@@ -12,10 +12,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ListedItem;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +47,7 @@ public class ScmWorkItemLister implements ItemLister {
     private final ScmItemService sources;
     private final ItemWriter writer;
     private final ObjectMapper mapper;
-    private final JdbcTemplate jdbc;
+    private final ScmItemQueryRepository queries;
 
     @Override
     public ItemKind containerKind() {
@@ -72,20 +74,15 @@ public class ScmWorkItemLister implements ItemLister {
         Cursor cursor;
         if (request.cursor() == null) {
             List<ListedItem> items = new ArrayList<>();
-            String sql = request.memberKind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)
-                    ? "SELECT review.id FROM pull_request_review review JOIN issue work ON"
-                            + " work.id=review.pull_request_id WHERE work.repository_id=? AND"
-                            + " work.deleted_at IS NULL AND review.submitted_at IS NOT NULL"
-                            + " ORDER BY review.submitted_at, review.id"
-                    : "SELECT id FROM issue WHERE repository_id=? AND deleted_at IS NULL"
-                            + " AND issue_type='"
-                            + (request.memberKind().equals(ScmItemEvents.ISSUE) ? "ISSUE" : "PULL_REQUEST")
-                            + "' ORDER BY created_at,id";
-            for (long source : jdbc.queryForList(sql, Long.class, repositoryId)) {
+            var rows = request.memberKind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)
+                    ? queries.listReviews(repositoryId)
+                    : queries.listWork(
+                            repositoryId, request.memberKind().equals(ScmItemEvents.ISSUE) ? "ISSUE" : "PULL_REQUEST");
+            for (var row : rows) {
+                long source = row.getSourceId();
                 Long parent = request.container().itemId();
                 if (request.memberKind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
-                    long pull = Objects.requireNonNull(jdbc.queryForObject(
-                            "SELECT pull_request_id FROM pull_request_review WHERE" + " id=?", Long.class, source));
+                    long pull = Objects.requireNonNull(row.getParentSourceId());
                     var parentItem = writer.upsert(new ItemRegistration(
                             request.container().workspaceId(), ScmItemEvents.PULL_REQUEST, pull, parent, null));
                     writer.restore(parentItem.workspaceId(), parentItem.itemId());
@@ -120,6 +117,15 @@ public class ScmWorkItemLister implements ItemLister {
                     || !cursor.holderVersion().equals(request.version().value())
                     || !cursor.memberKind().equals(request.memberKind()))
                 throw new IllegalArgumentException("Cursor belongs to another pinned listing");
+            var sourceIds = cursor.items().stream()
+                    .map(entry -> entry.item().sourceId())
+                    .filter(Objects::nonNull)
+                    .toList();
+            var owners = sourceIds.isEmpty()
+                    ? Map.<Long, ScmItemQueryRepository.WorkRow>of()
+                    : queries.owners(sourceIds, request.memberKind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)).stream()
+                            .collect(
+                                    Collectors.toMap(ScmItemQueryRepository.WorkRow::getSourceId, Function.identity()));
             for (var entry : cursor.items()) {
                 var registration = entry.item();
                 if (registration.workspaceId() != cursor.workspaceId()
@@ -132,24 +138,15 @@ public class ScmWorkItemLister implements ItemLister {
                                 registration.parentId(), request.container().itemId()))
                     throw new IllegalArgumentException("Work cursor contains a foreign parent");
                 if (registration.kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
-                    var parents = jdbc.queryForList(
-                            "SELECT parent.id FROM item parent JOIN pull_request_review"
-                                    + " review ON review.pull_request_id=parent.source_id WHERE"
-                                    + " parent.workspace_id=? AND"
-                                    + " parent.kind='scm.pull_request' AND review.id=?",
-                            Long.class,
+                    var parents = queries.reviewParents(
                             cursor.workspaceId(),
-                            registration.sourceId());
+                            ScmItemEvents.PULL_REQUEST.value(),
+                            Objects.requireNonNull(registration.sourceId()));
                     if (parents.size() != 1 || !Objects.equals(parents.getFirst(), registration.parentId()))
                         throw new IllegalArgumentException("Work cursor contains a foreign review parent");
                 }
-                String ownerSql = registration.kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)
-                        ? "SELECT work.repository_id FROM pull_request_review review JOIN"
-                                + " issue work ON work.id=review.pull_request_id WHERE"
-                                + " review.id=?"
-                        : "SELECT repository_id FROM issue WHERE id=?";
-                var owners = jdbc.queryForList(ownerSql, Long.class, registration.sourceId());
-                if (owners.size() != 1 || owners.getFirst() != repositoryId)
+                var owner = owners.get(registration.sourceId());
+                if (owner == null || owner.getRepositoryId() != repositoryId)
                     throw new IllegalArgumentException("Work cursor contains an item from another repository");
             }
         }

@@ -1,11 +1,7 @@
-/**
- * Text that a bundled practice script returns, cut to the bounds that `lib/contract.ts` validates: a
- * direction is one line of at most 300 characters, and a fact is one line of at most 200 characters.
- */
-import type { Facts } from "./contract.ts";
+/** Text that a bundled practice script returns, cut to the bounds that `contract.ts` validates. */
+import { FACT_CHARS, type Facts } from "./contract.ts";
 
-export const DIRECTION_CHARS = 300;
-const FACT_CHARS = 200;
+export { DIRECTION_CHARS } from "./contract.ts";
 
 /** The text on one line, cut to `max` characters with an ellipsis. */
 export function oneLine(text: string, max: number): string {

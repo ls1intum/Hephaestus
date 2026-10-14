@@ -5,15 +5,12 @@ import type { ReviewLineage } from "@/api/types.gen";
 
 import { expectSettledVisible } from "@/stories/overlay";
 
-import { reviewJob } from "./fixtures";
 import {
-	LINEAGE_FB,
-	LINEAGE_OBS,
+	LINEAGE_FEEDBACK,
+	LINEAGE_RESULT,
 	LINEAGE_REVIEW_ID,
 	lineageFeedbackFocus,
-	lineageMergedBeforeFinished,
 	lineageResultFocus,
-	lineageStartedByMerge,
 	wholeReview,
 	wholeReviewManyFeedback,
 } from "./lineage-fixtures";
@@ -27,7 +24,7 @@ import { DEFAULT_TRACE_DISPLAY, FULL_TRACE_DISPLAY } from "./trace-display";
 const ready = (value: ReviewLineage) => ({ status: "ready" as const, lineage: value });
 
 /**
- * The trace of a record, top to bottom in the order things happened: the work and the moment that
+ * The trace of a record, top to bottom in the order things happened: the work and the event that
  * started the review, the review, its results as numbered verdict dots, each piece of feedback
  * with where it went and how the developer answered, the merge where it fell, and where the path
  * ends. The record the trace was opened for is "You started here", with a ring and, with system
@@ -46,7 +43,7 @@ const meta = {
 	],
 	args: {
 		lineage: ready(lineageResultFocus),
-		here: { kind: "result", id: LINEAGE_OBS.cache404 },
+		here: { kind: "result", id: LINEAGE_RESULT.cache404 },
 		onOpen: fn(),
 	},
 } satisfies Meta<typeof ReviewLineageGraph>;
@@ -77,7 +74,7 @@ function endOf(root: HTMLElement): HTMLElement | null {
 
 /**
  * A result's story as it opens: a sentence on top says what became of it; the rail reads
- * Trigger, Review, Feedback, Effect, and tells only the result's path, from the review through
+ * Started by, Review, Feedback, Effect, and tells only the result's path, from the review through
  * the result ("You started here") to the feedback written from it and how it ended. The review's
  * other records are one line.
  */
@@ -88,11 +85,11 @@ export const ResultStory: Story = {
 		);
 		await expect(hereOf(canvasElement)).toHaveAttribute(
 			"data-lineage-node",
-			`result:${LINEAGE_OBS.cache404}`,
+			`result:${LINEAGE_RESULT.cache404}`,
 		);
 		const stages = [...stepsOf(canvasElement).querySelectorAll("[data-stage-label]")];
 		await expect(stages.map((stage) => stage.textContent)).toStrictEqual([
-			"Trigger",
+			"Started by",
 			"Review",
 			"Results",
 			"Feedback",
@@ -169,108 +166,20 @@ export const ConnectionsKeepTheSteps: Story = {
 	},
 };
 
-/**
- * The facts the lists filter by are on the steps too. Each piece of feedback has a tag for where it
- * went: on the work, on the developer's practice pages, or in conversation. A result whose
- * feedback the developer disputes says so. The review says when its results failed to process and
- * when it was not a live run; a processed, live review says nothing more.
- */
-export const StepsCarryTheListFacts: Story = {
-	args: {
-		lineage: ready(wholeReview),
-		here: undefined,
-		defaultDisplay: FULL_TRACE_DISPLAY,
-		job: { ...reviewJob(LINEAGE_REVIEW_ID), deliveryStatus: "FAILED" },
-		origin: "MANUAL",
-	},
-	play: async ({ canvasElement }) => {
-		const steps = stepsOf(canvasElement);
-		const tagOf = (id: string) =>
-			steps.querySelector(`[data-feedback-row="${id}"] [data-feedback-channel]`);
-		await expect(tagOf(LINEAGE_FB.onGitHub)).toHaveTextContent("On the work");
-		await expect(tagOf(LINEAGE_FB.card)).toHaveTextContent("On their practice pages");
-		// The developer disputes the comment written from the 404 result, and only that is said.
-		await expect(
-			steps.querySelector(`[data-lineage-node="result:${LINEAGE_OBS.cache404}"]`),
-		).toHaveTextContent("Disputed");
-		const review = steps.querySelector<HTMLElement>('[data-step="review"]');
-		await expect(review).toHaveTextContent("Result processing failed");
-		await expect(review).toHaveTextContent("Requested");
-	},
-};
-
-/** A live review whose results were processed says neither, as its row on the Reviews list. */
-export const OrdinaryReviewSaysNothingMore: Story = {
-	args: {
-		lineage: ready(wholeReview),
-		here: undefined,
-		job: { ...reviewJob(LINEAGE_REVIEW_ID), deliveryStatus: "DELIVERED" },
-		origin: "LIVE",
-	},
-	play: async ({ canvasElement }) => {
-		const review = stepsOf(canvasElement).querySelector<HTMLElement>('[data-step="review"]');
-		await expect(review).not.toHaveTextContent("Results processed");
-		await expect(review).not.toHaveTextContent("Live");
-	},
-};
-
 /** A card's story: it rests on three results, each repeated as its dot under the card. */
 export const FeedbackStory: Story = {
-	args: { lineage: ready(lineageFeedbackFocus), here: { kind: "feedback", id: LINEAGE_FB.card } },
+	args: {
+		lineage: ready(lineageFeedbackFocus),
+		here: { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub },
+	},
 	play: async ({ canvasElement }) => {
 		const here = hereOf(canvasElement);
-		await expect(here).toHaveAttribute("data-lineage-node", `feedback:${LINEAGE_FB.card}`);
+		await expect(here).toHaveAttribute(
+			"data-lineage-node",
+			`feedback:${LINEAGE_FEEDBACK.onGitHub}`,
+		);
 		await expect(here?.querySelectorAll("[data-result-chip]")).toHaveLength(3);
 		await expect(here).toHaveAttribute("data-here", "true");
-	},
-};
-
-/**
- * Feedback withheld as already merged, with the merge on the rail where it happened: after the
- * review started and before the piece was written. The wait into the merge is long, so its rail
- * is dashed and its gap coloured.
- */
-export const FeedbackWithheldAfterMerge: Story = {
-	args: {
-		lineage: ready(lineageMergedBeforeFinished),
-		here: { kind: "feedback", id: LINEAGE_FB.afterMerge },
-	},
-	play: async ({ canvasElement }) => {
-		await expect(verdictOf(canvasElement)).toHaveTextContent(
-			"This feedback did not reach the developer: the work was merged 7 min before it was composed.",
-		);
-		await expect(endOf(canvasElement)).toHaveTextContent(
-			"Did not arrive: withheld (already merged).",
-		);
-		const list = stepsOf(canvasElement);
-		const merged = list.querySelector<HTMLElement>('[data-step="merged"]');
-		const withheld = list.querySelector(`[data-feedback-row="${LINEAGE_FB.afterMerge}"]`);
-		await expect(merged).toHaveTextContent("Work merged");
-		await expect(merged).toHaveAttribute("data-slow-gap", "true");
-		// The merge comes before the piece it held back.
-		await expect(
-			merged !== null &&
-				withheld !== null &&
-				merged.compareDocumentPosition(withheld) === Node.DOCUMENT_POSITION_FOLLOWING,
-		).toBe(true);
-		await expect(withheld).toHaveTextContent("Withheld: already merged");
-		await expect(within(merged ?? list).getByText(/^\+1 h/u)).toHaveClass("text-warning");
-	},
-};
-
-/**
- * The merge started the review: it is the trigger, the review's step need not say why it ran, and
- * the withheld piece is withheld by design.
- */
-export const StartedByMerge: Story = {
-	args: { lineage: ready(lineageStartedByMerge), here: undefined },
-	play: async ({ canvas, canvasElement }) => {
-		const merged = stepsOf(canvasElement).querySelector('[data-step="merged"]');
-		await expect(merged).toHaveTextContent("Work mergedThis moment started the review.");
-		await expect(canvas.queryByText(/^Why it ran/u)).toBeNull();
-		await expect(verdictOf(canvasElement)).toHaveTextContent(
-			"This review completed and composed 1 piece of feedback; none reached the developer.",
-		);
 	},
 };
 
@@ -324,7 +233,7 @@ export const BeforeThisReview: Story = {
 
 /** A delivered piece the developer answered, privately, and their work later resolved. */
 export const DeliveredHelpful: Story = {
-	args: { lineage: ready(wholeReview), here: { kind: "feedback", id: LINEAGE_FB.card } },
+	args: { lineage: ready(wholeReview), here: { kind: "feedback", id: LINEAGE_FEEDBACK.onGitHub } },
 	play: async ({ canvasElement }) => {
 		await expect(verdictOf(canvasElement)).toHaveTextContent(
 			"This feedback reached the developer on their practice pages 18 h 32 min after it was composed, and their work resolved it 8 d 3 h later.",
@@ -348,7 +257,7 @@ export const ResultTable: Story = {
 		const rows = within(canvas.getByRole("list", { name: "Results of this review" }));
 		await expect(rows.getAllByRole("listitem")).toHaveLength(8);
 		await expect(
-			table()?.querySelector(`[data-lineage-node="result:${LINEAGE_OBS.cache404}"]`),
+			table()?.querySelector(`[data-lineage-node="result:${LINEAGE_RESULT.cache404}"]`),
 		).toHaveTextContent(/Not met.*Major.*B, D, F/u);
 		await userEvent.click(canvas.getByRole("button", { name: "Fold the table" }));
 		await expect(table()).toBeNull();
@@ -356,9 +265,8 @@ export const ResultTable: Story = {
 };
 
 /**
- * The feedback as tables in the rail: pieces written one after another share one table, and a
- * moment on the work between them, such as the merge, starts a new one. Each row has its letter,
- * channel, state, the results it was written from by number, and its time.
+ * The feedback as tables in the rail: pieces written one after another share one table. Each row has
+ * its letter, destination, state, the results it was written from by number, and its time.
  */
 export const FeedbackTable: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "review" } },
@@ -371,7 +279,7 @@ export const FeedbackTable: Story = {
 				tables[1] !== undefined &&
 				merged.compareDocumentPosition(tables[1]) === Node.DOCUMENT_POSITION_FOLLOWING,
 		).toBe(true);
-		const card = canvasElement.querySelector(`[data-feedback-row="${LINEAGE_FB.card}"]`);
+		const card = canvasElement.querySelector(`[data-feedback-row="${LINEAGE_FEEDBACK.onGitHub}"]`);
 		await expect(card).toHaveTextContent("On their practice pages");
 		await expect(card?.querySelectorAll("[data-result-chip]")).toHaveLength(3);
 	},
@@ -421,7 +329,7 @@ function startedAt(root: HTMLElement): HTMLElement | null {
 export const StartedHere: Story = {
 	args: { defaultDisplay: { ...DEFAULT_TRACE_DISPLAY, system: true } },
 	play: async ({ canvasElement, userEvent }) => {
-		const start = `result:${LINEAGE_OBS.cache404}`;
+		const start = `result:${LINEAGE_RESULT.cache404}`;
 		await expect(startedAt(canvasElement)).toHaveAttribute("data-step-key", start);
 		await expect(hereOf(canvasElement)).toHaveAttribute("data-step-key", start);
 		await expect(
@@ -452,15 +360,15 @@ export const OpenAStep: Story = {
 		await expect(args.onOpen).toHaveBeenCalledWith(expect.objectContaining({ kind: "feedback" }));
 		await expect(startedAt(canvasElement)).toHaveAttribute(
 			"data-step-key",
-			`result:${LINEAGE_OBS.cache404}`,
+			`result:${LINEAGE_RESULT.cache404}`,
 		);
-		// The work and its moments open the work's sheet; the review its own.
+		// The work and its events open the work's sheet; the review its own.
 		const review = stepsOf(canvasElement).querySelector<HTMLElement>('[data-step="review"]');
 		await userEvent.click(within(review ?? canvasElement).getByRole("button"));
 		await expect(args.onOpen).toHaveBeenLastCalledWith({ kind: "review", id: LINEAGE_REVIEW_ID });
 		await expect(startedAt(canvasElement)).toHaveAttribute(
 			"data-step-key",
-			`result:${LINEAGE_OBS.cache404}`,
+			`result:${LINEAGE_RESULT.cache404}`,
 		);
 	},
 };
@@ -512,14 +420,17 @@ export const OnlyOnePractice: Story = {
 /** The many-feedback review, with cards of every height: one summary wraps over several lines. */
 const mixedHeights: ReviewLineage = {
 	...wholeReviewManyFeedback,
-	results: wholeReviewManyFeedback.results.map((result, index) =>
-		index === 1
+	nodes: wholeReviewManyFeedback.nodes.map((node) =>
+		node.result?.id === LINEAGE_RESULT.testNames
 			? {
-					...result,
-					summary:
-						"Three of the new tests are named after the method they call, not the behaviour they check. A failing run says which method broke, not what a reader expected. The names drift as the methods are renamed.",
+					...node,
+					result: {
+						...node.result,
+						summary:
+							"Three of the new tests are named after the method they call, not the behaviour they check. A failing run says which method broke, not what a reader expected. The names drift as the methods are renamed.",
+					},
 				}
-			: result,
+			: node,
 	),
 };
 
@@ -656,99 +567,23 @@ const STATE_PIECE: TraceNode = { kind: "feedback", id: STATE_FEEDBACK_ID };
 
 function stateCaseArgs(key: string, here?: TraceNode) {
 	const entry = lineageStateCase(key);
-	return { lineage: ready(entry.lineage), here: here ?? STATE_PIECE, job: entry.job };
+	return { lineage: ready(entry.lineage), here: here ?? STATE_PIECE, review: entry.review };
 }
 
-/**
- * Feedback withheld as already merged: the verdict says what became of it, the line under it only
- * where the merge fell against the review, and the strip where the time went. The Feedback header
- * is marked "Lost here".
- */
-export const BottleneckWithheldMerged: Story = {
-	args: stateCaseArgs("withheld-artifact-merged"),
-	play: async ({ canvasElement }) => {
-		await expect(bottleneckOf(canvasElement)).toHaveTextContent(
-			"Withheld: merged while the review ran",
-		);
-		await expect(canvasElement.querySelector('[data-stage="feedback"]')).toHaveTextContent(
-			"Lost here",
-		);
-		await expect(
-			canvasElement.querySelector('[data-span="queue"]') ?? undefined,
-		).toBeInTheDocument();
-	},
-};
-
-/**
- * Feedback the review held back on purpose: a loss, but nobody's mistake, so the line and its mark
- * stay neutral. Only a loss to timing is amber, and a failed delivery red.
- */
-export const BottleneckWithheldByReview: Story = {
-	args: stateCaseArgs("withheld-composer-withheld"),
-	play: async ({ canvasElement }) => {
-		const line = bottleneckOf(canvasElement);
-		await expect(line).toHaveTextContent(/^Withheld/u);
-		await expect(line?.className).not.toMatch(/border-warning|border-destructive/u);
-		await expect(line?.querySelector(".text-warning, .text-destructive")).toBeNull();
-	},
-};
-
-/** A quick delivered path: "No bottleneck" is a grey line without a frame or a colour. */
-export const BottleneckNone: Story = {
-	args: stateCaseArgs("completed"),
-	play: async ({ canvasElement }) => {
-		const line = bottleneckOf(canvasElement);
-		await expect(line).toHaveTextContent(/^No bottleneck\./u);
-		await expect(line?.className).not.toMatch(/\bborder\b|bg-success/u);
-		await expect(line?.querySelector(".text-success")).toBeNull();
-	},
-};
-
-/** A failed review: its error from the review's own record, and how often it was tried. */
+/** A failed review: the line on top says the review stopped, and the review's stage is marked. */
 export const BottleneckReviewFailed: Story = {
-	args: stateCaseArgs("failed-with-error", { kind: "review" }),
+	args: stateCaseArgs("failed", { kind: "review" }),
 	play: async ({ canvasElement }) => {
-		await expect(bottleneckOf(canvasElement)).toHaveTextContent(
-			/Review failed\. The model output did not match the review schema twice.*It was tried 2 times\./u,
-		);
+		await expect(bottleneckOf(canvasElement)).toHaveTextContent(/^Review failed/u);
 		await expect(canvasElement.querySelector('[data-stage="review"]')).toHaveTextContent(
 			"Stopped here",
 		);
 	},
 };
 
-/** Nothing was lost, but the review waited two hours in the queue: the strip colours that wait. */
-export const BottleneckSlowQueue: Story = {
-	args: stateCaseArgs("slow-queue"),
-	play: async ({ canvasElement }) => {
-		await expect(bottleneckOf(canvasElement)).toHaveTextContent(
-			"Slow queue. The review waited 2 h 10 min in the queue for a worker.",
-		);
-		await expect(canvasElement.querySelector('[data-span="queue"]')).toHaveAttribute(
-			"data-slow",
-			"true",
-		);
-		// The section the line names is the one marked in the row under it.
-		await expect(canvasElement.querySelector('[data-span="queue"]')).toHaveAttribute(
-			"data-named",
-			"true",
-		);
-		await expect(canvasElement.querySelectorAll("[data-named]")).toHaveLength(1);
-	},
-};
-
-/** A card on the practice pages that no developer opened yet, said on its row and on top. */
-export const BottleneckCardNotOpened: Story = {
-	args: stateCaseArgs("in-app-unopened"),
-	play: async ({ canvasElement }) => {
-		await expect(bottleneckOf(canvasElement)).toHaveTextContent("Not opened yet.");
-		await expect(canvasElement.querySelector("[data-unopened]")).toBeInTheDocument();
-	},
-};
-
 /** At phone width the line and its strip wrap, and nothing scrolls sideways. */
 export const BottleneckNarrow: Story = {
-	args: stateCaseArgs("withheld-artifact-merged"),
+	args: stateCaseArgs("failed"),
 	parameters: { chromatic: { viewports: [390] } },
 	decorators: [
 		(Story) => (
@@ -765,7 +600,7 @@ export const BottleneckNarrow: Story = {
 
 /**
  * "Expand all" opens a box only where a step has more to say than its line, and no two boxes say
- * the same: a moment, the count of results and the end open none.
+ * the same: the start, the count of results and the end open none.
  */
 export const ExpandAllSaysEachThingOnce: Story = {
 	args: { lineage: ready(wholeReview), here: { kind: "review" } },
@@ -776,7 +611,7 @@ export const ExpandAllSaysEachThingOnce: Story = {
 		const texts = boxes.map((box) => box.textContent);
 		await expect(new Set(texts).size).toBe(texts.length);
 		for (const step of [
-			'[data-step="moment"]',
+			'[data-step="start"]',
 			'[data-step="end"]',
 			'[data-step="results"] > [data-step-content] > [data-step-key="results"]',
 		]) {

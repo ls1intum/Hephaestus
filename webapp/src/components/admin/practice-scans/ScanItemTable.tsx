@@ -1,4 +1,5 @@
 import { FileSearchIcon } from "lucide-react";
+import type { ScanReportItem } from "@/api/types.gen";
 
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -25,7 +26,6 @@ import { hasText } from "@/lib/text";
 
 import { notReviewedSentence, withheldSentence } from "./scan-display";
 import { ScanListMore, type ScanListState } from "./scan-list-state";
-import type { ScanItemEntry } from "./scan-report-schemas";
 import { SCAN_FILE_FILTERS } from "./scans-search";
 
 type FileFilter = ScanEntryStatus | "ALL";
@@ -36,7 +36,7 @@ const FILTER_OPTIONS: readonly FilterOption<FileFilter>[] = [
 ];
 
 export interface ScanItemTableProps {
-	state: ScanListState<ScanItemEntry>;
+	state: ScanListState<ScanReportItem>;
 	filter: ScanEntryStatus | undefined;
 	onFilterChange: (filter: ScanEntryStatus | undefined) => void;
 }
@@ -66,7 +66,7 @@ function ScanItemResults({
 	state,
 	filtered,
 }: {
-	state: ScanListState<ScanItemEntry>;
+	state: ScanListState<ScanReportItem>;
 	filtered: boolean;
 }) {
 	if (state.status === "error") {
@@ -138,7 +138,7 @@ function ScanItemResults({
 	);
 }
 
-function EntryResult({ entry }: { entry: ScanItemEntry }) {
+function EntryResult({ entry }: { entry: ScanReportItem }) {
 	switch (entry.status) {
 		case "JUDGED":
 		case "REUSED": {
@@ -184,7 +184,7 @@ function EntryResult({ entry }: { entry: ScanItemEntry }) {
 function EarlierEvidence({
 	result,
 }: {
-	result: Extract<ScanItemEntry, { status: "LISTED" }>["lastResult"];
+	result: Extract<ScanReportItem, { status: "LISTED" }>["lastResult"];
 }) {
 	if (result === null) {
 		return null;

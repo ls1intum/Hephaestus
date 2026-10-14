@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReadback;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackNotSentException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
@@ -23,7 +22,7 @@ class ScmLineNotePosterTest extends BaseUnitTest {
         var poster = new ScmLineNotePoster(List.of(first, second));
         var target = ScmFeedbackFixtures.target(
                 new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#1", "b".repeat(40));
-        assertThatThrownBy(() -> poster.post(target, List.of(), CopyReadback.AUTHORED, (attempting, completed) -> {
+        assertThatThrownBy(() -> poster.post(target, List.of(), (attempting, completed) -> {
                     throw new AssertionError("Ambiguous writer reached the fence");
                 }))
                 .isInstanceOf(FeedbackNotSentException.class);

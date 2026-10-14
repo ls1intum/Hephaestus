@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
-import type { CatalogGroupAdoptionPreview, CatalogPracticePreview } from "@/api/types.gen";
 import { definitionOf } from "@/components/admin/practice-editor/fixtures";
+import type {
+	GroupAdoptionPreview,
+	PracticeAdoptionPreview,
+} from "@/components/admin/practices/catalog-adoption";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -11,21 +14,21 @@ import { expectGenuinelyDisabled } from "@/test/controls";
 
 import { GroupAdoptionPanel } from "./GroupAdoptionPanel";
 
-const practice: CatalogPracticePreview = {
+const practice: PracticeAdoptionPreview = {
 	slug: "describe-what-and-why",
 	kind: "scm.pull_request",
 	availability: "AVAILABLE",
 	etag: '"practice-preview"',
 	initialFeedbackMode: "APPROVE_FIRST",
 	offeredDigest: "sha256:describe-what-and-why",
-	group: { slug: "review-ready-work", disposition: "CREATE_CATALOG_GROUP", definition: null },
+	group: { slug: "review-ready-work", disposition: "CREATE_CATALOG_GROUP" },
 	definition: definitionOf({
 		name: "Describe what changed and why",
 		criteria: "Confirm the pull request explains both the change and its motivation.",
 	}),
 };
 
-const preview: CatalogGroupAdoptionPreview = {
+const preview: GroupAdoptionPreview = {
 	slug: "review-ready-work",
 	definition: {
 		name: "Review-ready work",
@@ -58,7 +61,7 @@ const preview: CatalogGroupAdoptionPreview = {
 };
 
 const ready = (
-	over: Partial<CatalogGroupAdoptionPreview> = {},
+	over: Partial<GroupAdoptionPreview> = {},
 	action: "idle" | "adding" | "stale" = "idle",
 ) => ({ status: "ready", preview: { ...preview, ...over }, action }) as const;
 

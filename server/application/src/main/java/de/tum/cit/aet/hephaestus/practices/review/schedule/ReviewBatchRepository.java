@@ -9,8 +9,6 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
 
 public interface ReviewBatchRepository extends JpaRepository<ReviewBatch, UUID> {
     Page<ReviewBatch> findByWorkspaceId(long workspaceId, Pageable pageable);
@@ -22,6 +20,5 @@ public interface ReviewBatchRepository extends JpaRepository<ReviewBatch, UUID> 
     boolean existsByWorkspaceIdAndStatusIn(long workspaceId, Collection<ReviewBatchStatus> statuses);
 
     @WorkspaceAgnostic("The driver reads active batches across workspaces")
-    @Query("SELECT b FROM ReviewBatch b WHERE b.status IN :statuses ORDER BY b.updatedAt, b.id")
-    List<ReviewBatch> findByStatusIn(@Param("statuses") Collection<ReviewBatchStatus> statuses, Pageable pageable);
+    List<ReviewBatch> findByStatusOrderByUpdatedAtAscIdAsc(ReviewBatchStatus status, Pageable pageable);
 }

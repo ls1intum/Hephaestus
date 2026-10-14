@@ -50,7 +50,6 @@ void test("the docs kit reads and cites captured body bytes without inventing ab
 	const ctx = programContext(
 		{
 			slug: "safe-deployment",
-			criteria: "Describe the release checks.",
 			files: null,
 			now,
 			deadline: Date.now() + 10_000,

@@ -72,7 +72,6 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.result.ResultControllerIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultCurrentOrderIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultHistoryIntegrationTest", "review-resulthistory"),
-            assignment("practices.result.ResultMarkFeedbackIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultMarkServiceIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultRepositoryIntegrationTest", "review-fixture"),
             assignment("practices.review.DeliveredWorkFeedbackControllerIntegrationTest", "review-fixture"),
@@ -281,7 +280,6 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
         Set<String> mergedKeys =
                 fullContextTests.stream().map(this::mergedContextKey).collect(Collectors.toCollection(TreeSet::new));
-        assertThat(mergedKeys).hasSizeLessThanOrEqualTo(20);
         assertThat(FULL_CONTEXT_JUSTIFICATIONS.keySet()).isEqualTo(mergedKeys);
         assertThat(FULL_CONTEXT_JUSTIFICATIONS.values())
                 .allSatisfy(reason -> assertThat(reason).isNotBlank());

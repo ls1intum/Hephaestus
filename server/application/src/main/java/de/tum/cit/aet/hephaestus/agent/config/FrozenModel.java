@@ -18,13 +18,11 @@ import org.jspecify.annotations.Nullable;
  * {@link #connectionScope} and {@link #connectionId} only identify the connection, and the proxy
  * resolves its credential live.
  *
- * @param apiProtocol a {@code String}, because a pre-catalog snapshot can hold a protocol that {@link
- *     LlmApiProtocol} does not name
  * @param dataHandlingTier the tier slot of the binding that supplied this model
  * @param priceSnapshot the price frozen when the job was admitted; {@code null} until then
  */
 public record FrozenModel(
-        String apiProtocol,
+        LlmApiProtocol apiProtocol,
         String baseUrl,
         String upstreamModelId,
         @Nullable UsageFundingSource connectionScope,
@@ -44,8 +42,12 @@ public record FrozenModel(
     public static FrozenModel from(ModelBindingSource source, LlmModelResolver resolver) {
         ResolvedLlmModel resolved = resolver.resolve(source);
         LlmModelResolver.ConnectionRef ref = resolver.connectionRef(source);
+        return from(source, resolved, ref);
+    }
+
+    static FrozenModel from(ModelBindingSource source, ResolvedLlmModel resolved, LlmModelResolver.ConnectionRef ref) {
         return new FrozenModel(
-                resolved.apiProtocol(),
+                LlmApiProtocol.parse(resolved.apiProtocol()).orElseThrow(),
                 resolved.baseUrl(),
                 resolved.upstreamModelId(),
                 ref.scope(),
@@ -65,11 +67,11 @@ public record FrozenModel(
     public boolean isAdmittedAs(AdmittedLlmModel admitted) {
         return admitted.connection().equals(connectionRef())
                 && admitted.resolved().upstreamModelId().equals(upstreamModelId)
-                && admitted.resolved().apiProtocol().equals(apiProtocol)
+                && admitted.resolved().apiProtocol().equals(apiProtocol.wire())
                 && Objects.equals(admitted.resolved().reasoningEffort(), reasoningEffort);
     }
 
-    public FrozenModel withPriceSnapshot(LlmPriceSnapshot price) {
+    public FrozenModel withPriceSnapshot(@Nullable LlmPriceSnapshot price) {
         return new FrozenModel(
                 apiProtocol,
                 baseUrl,

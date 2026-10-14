@@ -10,7 +10,6 @@ import org.jspecify.annotations.Nullable;
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
 public record WorkspaceMembershipDTO(
-        @NonNull @Schema(pattern = "^[1-9][0-9]*$") String accountId,
         @NonNull AccountRefDTO account,
         @NonNull WorkspaceRole role,
         @NonNull Instant joinedAt,

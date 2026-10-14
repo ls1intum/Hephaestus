@@ -211,13 +211,7 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
                         12L,
                         "state",
                         "OPEN"));
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind)"
-                        + " VALUES (?,?,?,?,'ERASED')",
-                UUID.randomUUID(),
-                provider.getId(),
-                "42",
-                "");
+        databaseTestUtils.erase(Objects.requireNonNull(provider.getId()), "42", "");
         assertThat(suppression.isSourceSuppressed(first.getWorkspace().getId(), "scm.issue", 812502L))
                 .isTrue();
         assertThat(suppression.isSourceSuppressed(second.getWorkspace().getId(), "scm.issue", 812502L))

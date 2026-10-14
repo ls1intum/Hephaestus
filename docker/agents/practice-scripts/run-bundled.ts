@@ -85,7 +85,7 @@ export function issueRecord(fields: Record<string, unknown> = {}): Record<string
 	};
 }
 
-/** Frozen v3 inputs for an authored script test. */
+/** Frozen inputs for an authored script test. */
 export function requested(kind = "scm.pull_request", state: Record<string, string> = {}) {
 	return {
 		contractVersion: 3,
@@ -167,7 +167,7 @@ export interface RunInputs {
 	 * these fields go over a record that holds every required field.
 	 */
 	item?: Record<string, unknown>;
-	/** The inputs record file: `kind`, `subject`, `practice`, `scope` and `inputs record`. The default is a requested pull request review. */
+	/** The practice inputs, as `practiceInputsSchema` reads them. The default is a requested pull request review. */
 	inputs?: unknown;
 	previous?: unknown;
 	/** The checkout: a folder, or the files of a new one. The default is an empty checkout. */
@@ -266,10 +266,6 @@ export async function leadKeys(slug: string): Promise<(label: string) => string>
 	};
 }
 
-/**
- * Run the bundled program `slug` on validated inputs with the fake review, and return each review it
- * asked for and what it returned or threw.
- */
 /** Assemble the complete pinned fixture, including unchanged hunk context. */
 function fixtureSource(change: DiffFile): string {
 	const captured = new Map(change.addedLines);
@@ -286,6 +282,10 @@ function fixtureSource(change: DiffFile): string {
 	return Array.from({ length: last }, (_, i) => captured.get(i + 1) ?? "").join("\n");
 }
 
+/**
+ * Run the bundled program `slug` on validated inputs with the fake review, and return each review it
+ * asked for and what it returned or threw.
+ */
 export async function runBundledProgram(slug: string, inputs: RunInputs = {}): Promise<BundledRun> {
 	const { definition, root } = await load(slug);
 	try {
@@ -324,7 +324,6 @@ export async function runBundledProgram(slug: string, inputs: RunInputs = {}): P
 			{
 				slug,
 				inputs: parsed,
-				criteria: "",
 				files:
 					parsed.kind === "scm.pull_request" || parsed.kind === "scm.file"
 						? {

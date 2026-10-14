@@ -7,12 +7,20 @@ import { expectSettledVisible } from "@/stories/overlay";
 import { RemoveCollectionAlertDialog } from "./RemoveCollectionAlertDialog";
 
 const collection: OutlineCollection = {
-	id: 1,
+	id: "1",
 	collectionId: "3f9a2c10-8b4e-4d2a-9c1f-2b6d5e4a7c88",
 	name: "Engineering Handbook",
+	urlId: null,
+	color: null,
+	icon: null,
+	description: null,
 	documentCount: 42,
+	documentsUpstream: 42,
+	exportsSkippedForBudget: null,
 	state: "ENABLED",
 	syncStatus: "COMPLETE",
+	lastSyncedAt: new Date("2026-06-01T00:10:00Z"),
+	lastSyncError: null,
 	createdAt: new Date("2026-06-01T00:00:00Z"),
 };
 

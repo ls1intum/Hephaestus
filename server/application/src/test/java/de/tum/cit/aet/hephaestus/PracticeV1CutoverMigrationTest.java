@@ -10,7 +10,9 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import liquibase.Contexts;
@@ -218,10 +220,75 @@ class PracticeV1CutoverMigrationTest {
                 .containsExactly("false");
     }
 
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldKeepPostedSendsFinishedAndConsentFactsImmutableWhenReleasedDataIsMigrated(String context)
+            throws Exception {
+        var database = releasedDatabase(context);
+        upgrade(database, context);
+        assertThat(column(
+                        database,
+                        "SELECT feedback_id::text || '|' || action || '|' || state || '|' || attempts FROM"
+                            + " feedback_send WHERE feedback_id IN"
+                            + " ('00000000-0000-0000-0000-000000992161','00000000-0000-0000-0000-000000992231','00000000-0000-0000-0000-000000992232')"
+                            + " ORDER BY feedback_id"))
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000992161|POST|DONE|2",
+                        "00000000-0000-0000-0000-000000992231|POST|DONE|3",
+                        "00000000-0000-0000-0000-000000992232|POST|DONE|4");
+        assertThat(column(
+                        database,
+                        "SELECT review_scope_repositories || '|' || review_scope_people FROM workspace WHERE"
+                                + " id=992101"))
+                .containsExactly("ALL|ALL");
+        assertThat(column(
+                        database,
+                        "SELECT account_id || '|' || purpose || '|' || granted || '|' || mechanism || '|' ||"
+                                + " notice_version FROM consent_decision WHERE id=992251"))
+                .containsExactly("992106|PRIVACY_NOTICE_ACKNOWLEDGEMENT|true|ACCOUNT_SETTINGS|2026-08-30");
+        assertThatThrownBy(() -> execute(database, "UPDATE consent_decision SET granted=false WHERE id=992251"))
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        error -> assertThat(error.getSQLState()).isEqualTo("55000"));
+        assertThat(column(
+                        database,
+                        "SELECT state || '|' || external_ref FROM feedback_copy WHERE"
+                                + " id='00000000-0000-0000-0000-000000992171'"))
+                .containsExactly("POSTED|provider:123");
+        assertThat(column(
+                        database,
+                        "SELECT admission_attempt || '|' || admission_digest || '|' || basis_digest FROM"
+                                + " review_composition_basis WHERE job_id='00000000-0000-0000-0000-000000992111'"))
+                .containsExactly("0|" + "a".repeat(64) + "|" + "b".repeat(64));
+        assertThat(column(
+                        database,
+                        "SELECT actor_account_id::text FROM feedback_decision WHERE"
+                                + " id='00000000-0000-0000-0000-000000992261'"))
+                .containsExactly("992106");
+        assertThat(column(
+                        database,
+                        "SELECT f.developer_id::text || '|' || r.resolution || '|' || r.usefulness FROM"
+                                + " feedback_response r JOIN feedback f ON f.id=r.feedback_id AND"
+                                + " f.workspace_id=r.workspace_id WHERE r.id='00000000-0000-0000-0000-000000992263'"))
+                .containsExactly("992106|ADDRESSED|HELPFUL");
+    }
+
+    private static final Map<String, TestDatabase> NATIVE_TEMPLATES = new HashMap<>();
+
+    static synchronized TestDatabase migratedDatabase(String context) throws Exception {
+        var template = NATIVE_TEMPLATES.get(context);
+        if (template == null) {
+            template = releasedDatabase(context);
+            upgrade(template, context);
+            NATIVE_TEMPLATES.put(context, template);
+        }
+        return PostgreSQLTestContainer.copyDatabase(
+                "native_model_" + UUID.randomUUID().toString().replace("-", ""), template);
+    }
+
     static TestDatabase releasedDatabase(String context) throws Exception {
-        var database = PostgreSQLTestContainer.createDatabase(
-                "practice_v1_" + context + "_" + UUID.randomUUID().toString().replace("-", ""));
-        release(database, context);
+        var database = PostgreSQLTestContainer.createReleasedDatabase(
+                "practice_v1_" + context + "_" + UUID.randomUUID().toString().replace("-", ""), context);
         assertThat(column(
                         database,
                         "SELECT count(*)::text FROM databasechangelog WHERE filename LIKE '%" + BRANCH_FILE + "'"))
@@ -239,15 +306,13 @@ class PracticeV1CutoverMigrationTest {
     }
 
     static void upgrade(TestDatabase database, String context) throws Exception {
-        try (var liquibase = liquibase(database, "db/changelog/" + BRANCH_FILE)) {
+        try (var liquibase = liquibase(database, "db/master.xml")) {
             liquibase.update(new Contexts(context), new LabelExpression());
         }
     }
 
     static void release(TestDatabase database, String context) throws Exception {
-        try (var liquibase = liquibase(database, "db/practice-cutover/released-main.xml")) {
-            liquibase.update(new Contexts(context), new LabelExpression());
-        }
+        PostgreSQLTestContainer.migrateReleasedDatabase(database, context);
         assertThat(column(
                         database,
                         "SELECT count(*)::text FROM databasechangelog WHERE id='1791941746633-2' AND"

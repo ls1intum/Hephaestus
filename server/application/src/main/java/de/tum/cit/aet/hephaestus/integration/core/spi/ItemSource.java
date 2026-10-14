@@ -9,8 +9,6 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 public interface ItemSource {
-    ItemKind kind();
-
     boolean supports(ItemRef item);
 
     Map<Long, ItemLabel> labels(long workspaceId, Collection<ItemRef> items);

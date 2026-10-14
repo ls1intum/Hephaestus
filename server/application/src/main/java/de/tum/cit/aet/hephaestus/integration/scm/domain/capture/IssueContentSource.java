@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
@@ -197,7 +198,7 @@ public class IssueContentSource {
             files.put(
                     OUTPUT_PREFIX + name,
                     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(node));
-        } catch (Exception e) {
+        } catch (JacksonException e) {
             throw new ItemCaptureException(
                     ItemCaptureCode.CAPTURE_FAILED, "Failed to serialize " + name + ": " + e.getMessage(), e);
         }
@@ -206,8 +207,7 @@ public class IssueContentSource {
     /**
      * The issue's work record, {@code context/metadata.json}, as the practice runner reads it
      * ({@code WORK_RECORDS["scm.issue"]} in {@code lib/contract.ts}). {@code children} is the
-     * stored sub-issue rollup, read only when the provider reported no count. Test harnesses that
-     * stage a review build their record here too.
+     * stored sub-issue rollup, read only when the provider reported no count.
      */
     public static ObjectNode workRecord(
             Issue issue, ScmCapturedWork metadata, IssueRepository.@Nullable ChildRollup children) {

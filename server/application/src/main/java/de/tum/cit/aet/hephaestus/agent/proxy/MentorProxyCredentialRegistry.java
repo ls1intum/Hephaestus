@@ -18,29 +18,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Mints and validates proxy-scoped bearer tokens for the mentor's interactive sandbox, which is a
- * reused developer-attached session rather than an {@code review_job} row and so cannot use the
- * DB-backed job token. A token grants exactly what a job token grants: the proxy will resolve ONE
- * connection's credential for the holder, nothing else. Process-local, like the interactive sandbox
- * registry it shadows.
+ * Registers proxy credentials for mentor sandboxes. Authentication returns a revocation-fenced
+ * session handle; each model call resolves the route and its current turn's spend separately.
  *
- * <p>A mentor token has no terminal event of its own, so the sandbox adapter {@link #revoke(UUID)}s it
- * on any dispose path and {@link #TTL} is the backstop for a hard crash. The TTL must therefore expire
- * on the wall clock rather than on read: a token whose sandbox never attached is never presented, so a
- * check-on-read would never fire and both index entries would leak for the worker's lifetime.
+ * <p>A session can outlive several turns. The caller holds the per-sandbox lock while a turn's
+ * {@link MentorTurnMeter} is bound. Unbinding removes that turn's usage target, so late calls cannot
+ * charge a later turn. The meter serves the budget gate; the durable billing record is the turn's
+ * {@code chat_message} row.
  *
- * <p>The credential is per SESSION and a session outlives many turns, so it names no billing target on
- * its own. A turn {@link #bindTurn binds} its {@link MentorTurnMeter} for the window in which it holds
- * the per-sandbox lock and {@link #unbindTurn unbinds} at the end, so at most one turn is bound at any
- * instant and {@link #validate} can report the call's billing target. A call that authenticates after
- * its turn unbound is dropped by the turn-id fence in {@link #accumulate} rather than charged to
- * whoever is bound now.
- *
- * <p>The meter is only the budget gate's read model; the billed record is the turn's
- * {@code chat_message} row, so a worker that dies mid-turn still bills what the proxy recorded.
- *
- * <p>Overshoot bound and what it does not cover:
- * {@code docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md}.
+ * <p>Sandbox disposal revokes the credential. A bounded cache expires credentials after {@link #TTL}
+ * without extending their lifetime on access.
  */
 @Component
 public class MentorProxyCredentialRegistry {
@@ -150,17 +137,20 @@ public class MentorProxyCredentialRegistry {
                         entry.workspaceId()));
     }
 
-    /**
-     * Empty when the token is unknown or expired. The routing carries what the bound turn has already
-     * spent, which is what makes a turn's own in-flight spend visible to {@code ProxyBudgetGate}. A
-     * call arriving between turns names no turn and {@code LlmProxyService} refuses it, because
-     * nothing would record its tokens.
-     */
-    public Optional<ProxyRouting> validate(String token) {
-        Entry entry = byTokenHash.getIfPresent(ReviewJob.computeTokenHash(token));
-        if (entry == null) {
-            return Optional.empty();
-        }
+    /** Verifies the registered credential without reading routing or turn usage. */
+    public Optional<AuthenticatedSession> authenticate(String token) {
+        String hash = ReviewJob.computeTokenHash(token);
+        Entry entry = byTokenHash.getIfPresent(hash);
+        return entry == null ? Optional.empty() : Optional.of(new AuthenticatedSession(entry.sessionId(), hash));
+    }
+
+    /** Non-secret, revocation-fenced handle for an authenticated mentor sandbox. */
+    public record AuthenticatedSession(UUID sessionId, String credentialHash) {}
+
+    /** Resolves the current billed turn only when a model call needs its route. */
+    public Optional<ProxyRouting> resolve(AuthenticatedSession session) {
+        Entry entry = byTokenHash.getIfPresent(session.credentialHash());
+        if (entry == null || !entry.sessionId().equals(session.sessionId())) return Optional.empty();
         MentorTurnMeter turn = entry.currentTurn().get();
         return Optional.of(new ProxyRouting(
                 // Names the session, because everything keyed on the principal — the gateway's rate

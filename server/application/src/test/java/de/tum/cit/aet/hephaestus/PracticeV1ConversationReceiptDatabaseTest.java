@@ -143,8 +143,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
     }
 
     private static TestDatabase prepared(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         PracticeV1CutoverMigrationTest.execute(database, """
             INSERT INTO feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body)
             SELECT '00000000-0000-0000-0000-000000998161',workspace_id,review_id,item_id,developer_id,

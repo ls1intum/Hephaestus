@@ -1,3 +1,4 @@
+import { isRecord } from "./pi-text.ts";
 import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 /**
  * The host's check of what a review session submits with `submit_result`: one result for its one
@@ -29,9 +30,6 @@ export const REVIEWED_CHECKOUT = "repos/reviewed/";
 /** The refs file beside a checkout's HEAD witness; admission needs both captured. */
 const CAPTURED_REFS = ".git/hephaestus-captured-refs";
 
-/** One quote and where it comes from: the contract's citation, with every field checked. */
-export type NormalizedCitation = Citation;
-
 /** Which side of a diff hunk a citation quotes. It is absent on every source that is not a diff. */
 export type DiffSide = "OLD" | "NEW";
 
@@ -53,11 +51,8 @@ export interface RecordedInapplicability {
 export interface RecordedOpenQuestion {
 	openQuestion: string;
 	wouldSettleIt: string;
-	citation?: NormalizedCitation;
+	citation?: Citation;
 }
-
-/** Why a problem belongs to this work. The indices name the problem's own citations. */
-export type ClaimBasisShape = ClaimBasis;
 
 /** One gap of a NOT_MET result, checked. */
 export interface NormalizedProblem {
@@ -65,8 +60,8 @@ export interface NormalizedProblem {
 	severity: Severity;
 	summary: string;
 	explanation: string;
-	citations: NormalizedCitation[];
-	basis: ClaimBasisShape;
+	citations: Citation[];
+	basis: ClaimBasis;
 	nextStep?: string;
 }
 
@@ -78,23 +73,14 @@ export interface NormalizedSubmission {
 	outcome: Outcome;
 	summary: string;
 	explanation: string;
-	citations: NormalizedCitation[];
+	citations: Citation[];
 	problems?: NormalizedProblem[];
-	example?: { citation: NormalizedCitation; note: string };
+	example?: { citation: Citation; note: string };
 	evidence: {
 		search?: RecordedSearch;
 		inapplicability?: RecordedInapplicability;
 		openQuestions?: RecordedOpenQuestion[];
 	};
-}
-
-export function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
-
-/** An object with keys. A list is not one. */
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-	return isRecord(value) && !Array.isArray(value);
 }
 
 export const OUTCOME_DESCRIPTIONS: Record<Outcome, string> = {
@@ -152,8 +138,8 @@ export function describeVocabulary<T extends string>(
 /** The summary heads the developer's practice page. It is a phrase, not the explanation. */
 export const MAX_SUMMARY_CHARS: number = CANDIDATE_LIMITS.summaryChars;
 
-export function normalizePracticeSlug(value: unknown): string {
-	return trimmedText(value).toLowerCase().replaceAll("_", "-");
+export function trimmedSlug(value: unknown): string {
+	return trimmedText(value);
 }
 
 function trimmedText(value: unknown): string {
@@ -264,7 +250,7 @@ export function normalizeOpenQuestion(
 	which: string,
 	repairs: CitationRepairs = {},
 ): RecordedOpenQuestion {
-	if (!isPlainRecord(raw)) {
+	if (!isRecord(raw)) {
 		throw new Error(`${which} must be an object with openQuestion and wouldSettleIt`);
 	}
 	const openQuestion = trimmedText(raw.openQuestion);
@@ -360,10 +346,10 @@ export function normalizeCitation(
 	raw: unknown,
 	which: string,
 	{ sourceOf, notes = [] }: CitationRepairs = {},
-): NormalizedCitation {
+): Citation {
 	// A citation that is not an object reads as one with every field missing. The required-field
 	// checks below refuse it by name.
-	const fields: Record<string, unknown> = isPlainRecord(raw) ? raw : {};
+	const fields: Record<string, unknown> = isRecord(raw) ? raw : {};
 	const given = typeof fields.path === "string" ? fields.path : "";
 	const { sourcePath, sourceKind } = completedFromManifest(fields, given, which, sourceOf, notes);
 	const path = insideCheckout(given, sourceKind, sourcePath, (read) => {
@@ -470,26 +456,6 @@ function parseVocabulary<T extends string>(
 	return admitted;
 }
 
-/** Shorten at a sentence boundary, or a clause boundary past half the limit; otherwise refuse. */
-export function boundedAtSentenceEnd(text: string, max: number): string | undefined {
-	if (text.length <= max) {
-		return text;
-	}
-	const prefix = text.slice(0, max + 1);
-	let end = -1;
-	for (const match of prefix.matchAll(/[.!?](?=\s|$)/gu)) {
-		end = match.index;
-	}
-	if (end >= 0) {
-		return prefix.slice(0, end + 1).trim();
-	}
-	let clause = -1;
-	for (const match of prefix.matchAll(/[,;:](?=\s)|\s[—–-](?=\s)/gu)) {
-		clause = match.index;
-	}
-	return clause < max / 2 ? undefined : prefix.slice(0, clause).trim();
-}
-
 // ── The submission ───────────────────────────────────────────────────────────
 
 const RESULT_FIELDS = [
@@ -593,7 +559,7 @@ function citationList(
 	max: number,
 	repairs: CitationRepairs,
 	problems: string[],
-): NormalizedCitation[] | undefined {
+): Citation[] | undefined {
 	if (!Array.isArray(value)) {
 		problems.push(`${name} must be a list of citations`);
 		return undefined;
@@ -616,7 +582,7 @@ function checkedBasis(
 	citationCount: number | undefined,
 	problems: string[],
 ): ClaimBasis | undefined {
-	if (!isPlainRecord(value)) {
+	if (!isRecord(value)) {
 		problems.push(
 			`${at}: basis is required: an object whose type is ${BASIS_TYPES.join(", ")}, saying why the problem belongs to this work`,
 		);
@@ -695,7 +661,7 @@ function normalizeProblem(
 	problems: string[],
 ): NormalizedProblem | undefined {
 	const at = `problem ${position}`;
-	if (!isPlainRecord(value)) {
+	if (!isRecord(value)) {
 		problems.push(
 			`${at} must be an object with severity, summary, explanation, citations and basis`,
 		);
@@ -705,7 +671,7 @@ function normalizeProblem(
 	checkedKeys(value, PROBLEM_FIELDS, at, problems);
 	let key: string | undefined;
 	if (!nullish(value.key) && value.key !== "") {
-		key = normalizePracticeSlug(value.key);
+		key = trimmedSlug(value.key).toLowerCase().replaceAll("_", "-");
 		if (!PRACTICE_SLUG.test(key)) {
 			problems.push(
 				`${at}: key must be a short slug of lowercase letters, digits and hyphens, received ${JSON.stringify(value.key)}`,
@@ -723,7 +689,7 @@ function normalizeProblem(
 		problems,
 	);
 	const sentCitations = value.citations;
-	let citations: NormalizedCitation[] | undefined;
+	let citations: Citation[] | undefined;
 	if (!Array.isArray(sentCitations) || sentCitations.length === 0) {
 		problems.push(`${at}: citations are required: a problem cites at least one place of the work`);
 	} else {
@@ -830,7 +796,7 @@ function checkedExample(
 		problems.push(`example is permitted only for MET or NOT_MET; a ${outcome} result has none`);
 		return undefined;
 	}
-	if (!isPlainRecord(value)) {
+	if (!isRecord(value)) {
 		problems.push("example must be an object with citation and note");
 		return undefined;
 	}
@@ -842,7 +808,7 @@ function checkedExample(
 		problems,
 		"example.note is required: say in one sentence what the cited place does well",
 	);
-	let citation: NormalizedCitation | undefined;
+	let citation: Citation | undefined;
 	if (nullish(value.citation)) {
 		problems.push("example.citation is required: the one place that shows the practice done well");
 	} else {
@@ -861,7 +827,7 @@ function checkedEvidence(
 	problems: string[],
 ): NormalizedSubmission["evidence"] | undefined {
 	const sent = nullish(value) ? {} : value;
-	if (!isPlainRecord(sent)) {
+	if (!isRecord(sent)) {
 		problems.push("evidence must be an object with search, inapplicability or openQuestions");
 		return undefined;
 	}
@@ -926,7 +892,7 @@ function checkedOpenQuestions(
 	if (listed.length === 0) {
 		if (outcome === "COULD_NOT_DETERMINE") {
 			problems.push(
-				"an COULD_NOT_DETERMINE result must say what it could not settle: evidence.openQuestions lists each " +
+				"a COULD_NOT_DETERMINE result must say what it could not settle: evidence.openQuestions lists each " +
 					"open question with openQuestion and wouldSettleIt, and a citation where it is located",
 			);
 		}
@@ -963,7 +929,7 @@ export function normalizeSubmission(
 	notes: string[] = [],
 	sourceOf?: (sourcePath: string) => string | undefined,
 ): NormalizedSubmission {
-	if (!isPlainRecord(raw)) {
+	if (!isRecord(raw)) {
 		throw new Error("the arguments must be one result object");
 	}
 	const problems: string[] = [];
@@ -979,7 +945,7 @@ export function normalizeSubmission(
 		problems,
 		"explanation is required: say why the evidence supports this outcome",
 	);
-	let citations: NormalizedCitation[] | undefined;
+	let citations: Citation[] | undefined;
 	const sentCitations = nullish(sent.citations) ? [] : sent.citations;
 	if (
 		outcome !== undefined &&
@@ -1026,7 +992,7 @@ export function normalizeSubmission(
  * Every citation of a submission, in order: the result's, each problem's, the example's, then each
  * open question's. The objects are the submission's own, so a caller can repair a quote in place.
  */
-export function submissionCitations(submission: NormalizedSubmission): NormalizedCitation[] {
+export function submissionCitations(submission: NormalizedSubmission): Citation[] {
 	return [
 		...submission.citations,
 		...(submission.problems ?? []).flatMap((problem) => problem.citations),
@@ -1093,7 +1059,7 @@ export function validateEvidenceSources(
 }
 
 /** The checkout a quote of code is verified against: the reviewed one for the change, the cited one for a tree. */
-function checkoutOf(citation: NormalizedCitation, reviewedCheckout: string): string | undefined {
+function checkoutOf(citation: Citation, reviewedCheckout: string): string | undefined {
 	if (citation.sourceKind === DIFF_SOURCE) {
 		return reviewedCheckout;
 	}
@@ -1177,7 +1143,7 @@ export const CONVERSATION_THREAD = "context/conversation_thread.json";
  * Whether a citation lies inside a turn whose native account matches the frozen developer.
  */
 export function citesReviewedTurn(
-	citations: readonly NormalizedCitation[],
+	citations: readonly Citation[],
 	thread: string,
 	developerId: string,
 ): boolean {
@@ -1272,15 +1238,12 @@ const MISMATCH_EXCERPT_CHARS = 160;
 const COORDINATE_QUOTE_MAX_CHARS = 2000;
 
 /** Whether a citation is really in the sourceFile it names. */
-export function citationMatchesSourceFile(citation: NormalizedCitation, content: string): boolean {
+export function citationMatchesSourceFile(citation: Citation, content: string): boolean {
 	return describeCitationMismatch(citation, content) === null;
 }
 
 /** Why a citation does not match, in one phrase, or null when it does. */
-export function describeCitationMismatch(
-	citation: NormalizedCitation,
-	content: string,
-): string | null {
+export function describeCitationMismatch(citation: Citation, content: string): string | null {
 	const resolved = resolveQuote(citation, content);
 	return "mismatch" in resolved ? resolved.mismatch : null;
 }
@@ -1290,7 +1253,7 @@ export function describeCitationMismatch(
  * are replaced with source text; an omitted quote is filled from the supplied coordinates.
  */
 export function resolveQuote(
-	citation: NormalizedCitation,
+	citation: Citation,
 	content: string,
 ): ResolvedQuote | { mismatch: string } {
 	const resolved = resolveQuoteText(citation, content);
@@ -1303,7 +1266,7 @@ export function resolveQuote(
 
 /** Resolve plain captured text independently of a provider's source naming. */
 export function resolveCapturedText(
-	citation: NormalizedCitation,
+	citation: Citation,
 	content: string,
 ): ResolvedQuote | { mismatch: string } {
 	const quote = citation.quote.replace(/\r?\n$/u, "");
@@ -1349,7 +1312,7 @@ export function resolveCapturedText(
 }
 
 function resolveQuoteText(
-	citation: NormalizedCitation,
+	citation: Citation,
 	content: string,
 ): ResolvedQuote | { mismatch: string } {
 	const quote = citation.quote.replace(/\r?\n$/u, "");
@@ -1606,7 +1569,7 @@ function annotatedDiff(content: string): Map<string, Map<number, string>> | stri
 function readAtViewLines(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
 	citedLines: ReadonlyMap<number, string>,
-	citation: NormalizedCitation,
+	citation: Citation,
 	quoteLines: readonly string[] | null,
 ): ResolvedQuote | null {
 	const view = viewLines.get(lines);
@@ -1654,7 +1617,7 @@ function readAtViewLines(
  */
 function viewRangeOfOneFile(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
-	citation: NormalizedCitation,
+	citation: Citation,
 ): ResolvedQuote | null {
 	const view = viewLines.get(lines);
 	// A range past the view's last line names no line of it, however far it reaches.
@@ -1692,7 +1655,7 @@ function viewRangeOfOneFile(
  */
 function placedInDiff(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
-	citation: NormalizedCitation,
+	citation: Citation,
 	quote: string,
 ): ResolvedQuote | { mismatch: string } {
 	const how =

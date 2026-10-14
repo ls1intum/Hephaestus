@@ -7,13 +7,12 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Per-kind capability declaration validated at application-server startup: every declared {@link
- * Capability} must have a matching SPI bean for the same {@link IntegrationKind}, or {@code
- * IntegrationFrameworkBootstrap} fails fast.
+ * Per-kind capability declaration validated at application-server startup: every declared {@link Capability}
+ * must have a matching SPI bean for the same {@link IntegrationKind}, or {@code IntegrationFrameworkBootstrap}
+ * fails fast.
  *
- * <p>Capabilities describe plumbing — whether webhooks arrive, whether tokens refresh — and say
- * nothing about what the integration contributes to a practice review; that is the separate {@link
- * #reviewContribution()}.
+ * <p>Capabilities describe plumbing — whether webhooks arrive, whether tokens refresh — and say nothing about
+ * what the integration contributes to a practice review; that is the separate {@link #reviewContribution()}.
  */
 public interface IntegrationManifest {
     IntegrationKind kind();
@@ -24,7 +23,7 @@ public interface IntegrationManifest {
 
     /**
      * Must never be gated with {@code @ConditionalOnProperty}: a manifest is registered whether or
-     * not its vendor is enabled, so removing the bean would make that vendor's signals read as
+     * not its vendor is enabled, so removing the bean would make that vendor's item events read as
      * signals nothing in the build can raise. The flag instead governs only the wiring — credential
      * provider, subject parser, message handlers.
      */
@@ -33,26 +32,22 @@ public interface IntegrationManifest {
     }
 
     /**
-     * What this integration contributes to practice review. Has no default on purpose: an
-     * integration that contributes nothing must say {@link ReviewContribution#none()} explicitly,
-     * since inheriting silence is how an integration ends up ingesting events that never trigger
-     * anything.
+     * What this integration contributes to practice review. Has no default on purpose: an integration that
+     * contributes nothing must say {@link ReviewContribution#none()} explicitly, since inheriting silence
+     * is how an integration ends up ingesting events that never trigger anything.
      */
     ReviewContribution reviewContribution();
 
     /**
      * The roles this integration may name only in a later capture from the provider, after the
-     * occasion that concerns them is raised. Merge admission consults {@link AboutRole#MERGER} for
+     * item event that concerns them is raised. Merge admission consults {@link AboutRole#MERGER} for
      * merged work, holding its review until the merger is named; no other role is consulted.
      */
     default Set<AboutRole> rolesNamedAfterTheOccasion() {
         return Set.of();
     }
 
-    /**
-     * Whether a stored native review commit identifies the current work head; unknown without that
-     * authority.
-     */
+    /** Whether a stored native review commit identifies the current work head; unknown without that authority. */
     default String reviewCommitFor(@Nullable String recordedCommit, @Nullable String currentHead) {
         return "UNKNOWN";
     }
@@ -79,10 +74,7 @@ public interface IntegrationManifest {
             delivers = deepCopy(Objects.requireNonNullElse(delivers, Map.of()));
         }
 
-        /**
-         * An integration that takes no part in practice review — a content source, or not wired
-         * yet.
-         */
+        /** An integration that takes no part in practice review — a content source, or not wired yet. */
         public static ReviewContribution none() {
             return NONE;
         }

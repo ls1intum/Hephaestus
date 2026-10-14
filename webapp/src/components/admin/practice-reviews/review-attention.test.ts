@@ -39,12 +39,7 @@ describe("withheld classes", () => {
 	});
 });
 
-const counted = (
-	met: number,
-	notMet: number,
-	doesNotApply: number,
-	couldNotDetermine: number,
-) => ({
+const counted = (met: number, notMet: number, doesNotApply: number, couldNotDetermine: number) => ({
 	met,
 	notMet,
 	doesNotApply,

@@ -12,12 +12,12 @@ export interface IssueMetadata {
 
 /**
  * Where a captured sub-issue count came from: the provider's own rollup, or the child issues this
- * repository stored at capture. A capture from before the source was recorded carries none.
+ * repository stored at capture. A capture that records no source carries none.
  */
 export type SubIssueSource = "provider" | "children";
 
 /** The recorded source, or undefined for a missing or unrecognized one, which is never trusted as either. */
-export function subIssueSource(value: unknown): SubIssueSource | undefined {
+function subIssueSource(value: unknown): SubIssueSource | undefined {
 	return value === "provider" || value === "children" ? value : undefined;
 }
 

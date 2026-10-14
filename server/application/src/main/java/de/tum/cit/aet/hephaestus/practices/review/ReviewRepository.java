@@ -21,6 +21,11 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     Optional<Review> findByWorkspaceIdAndRequestKey(long workspaceId, UUID requestKey);
 
+    Optional<Review> findByWorkspaceIdAndEventId(long workspaceId, UUID eventId);
+
+    boolean existsByWorkspaceIdAndBatchIdAndItemIdAndStatusNot(
+            long workspaceId, UUID batchId, long itemId, ReviewStatus status);
+
     List<Review> findByWorkspaceIdAndBatchIdOrderByCreatedAtAsc(long workspaceId, UUID batchId);
 
     List<Review> findByWorkspaceIdAndItemIdOrderByOrderedAtDesc(long workspaceId, long itemId);

@@ -14,8 +14,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * AI SDK UIMessage shape served to the webapp. Parts are the JSONB array (or the legacy
- * fallback reconstruction); metadata is the per-turn {status, model, costUsd, …} object.
+ * AI SDK UIMessage shape served to the webapp. Parts are the JSONB array; metadata is the per-turn {status, model, costUsd, …} object.
  *
  * <p>Springdoc 2.x quirk: a {@code @Schema(type = "object")} override on a {@code Map} or
  * {@code List<Object>} field replaces the inferred type with the literal {@code type: string}
@@ -32,7 +31,7 @@ public record ChatMessageDTO(
         @Nullable UUID parentMessageId,
         String role,
 
-        @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-observation)."))
+        @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-result)."))
         List<Object> parts,
 
         @Nullable @Schema(description = "Per-turn metadata: status, model, costUsd, usage, …")
@@ -46,7 +45,6 @@ public record ChatMessageDTO(
      * objects for {@code parts} and a JSON object for {@code metadata}, both opaque from
      * Java's perspective.
      */
-    @SuppressWarnings("unchecked")
     public static ChatMessageDTO from(ChatMessage message, JsonNode effectiveParts, ObjectMapper mapper) {
         List<Object> parts = effectiveParts != null && effectiveParts.isArray()
                 ? mapper.convertValue(effectiveParts, new TypeReference<List<Object>>() {})
@@ -60,10 +58,7 @@ public record ChatMessageDTO(
                         ? new LinkedHashMap<>(
                                 mapper.convertValue(message.getMetadata(), new TypeReference<Map<String, Object>>() {}))
                         : new LinkedHashMap<>();
-        // Status was promoted to a real column in migration mentor-1071-add-status-column,
-        // but the webapp's generated client still reads it from `metadata.status`. Merge the
-        // column back into the metadata bag at the API boundary so the wire shape stays
-        // stable across the migration. The server-side reader-of-truth is now the column.
+
         metadata.put("status", message.getStatus().name());
         // `error` holds the server-side cause of an interrupted turn, which can name internal classes; it
         // stays in the row for diagnostics. The status above is what a reader needs.

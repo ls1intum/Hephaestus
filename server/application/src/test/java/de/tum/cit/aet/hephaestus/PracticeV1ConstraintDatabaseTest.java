@@ -124,8 +124,7 @@ class PracticeV1ConstraintDatabaseTest {
     }
 
     static TestDatabase prepared(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         PracticeV1CutoverMigrationTest.execute(database, """
             UPDATE result SET ended_at=now(),end_reason='REPLACED' WHERE workspace_id=992101 AND ended_at IS NULL;
             INSERT INTO review(id,workspace_id,item_id,kind,item_version,origin,status,ordered_at)

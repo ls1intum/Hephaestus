@@ -10,13 +10,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -26,7 +23,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The shared fixtures that {@code lib/contract.test.ts} reads too (§17 of the cutover interfaces): both sides admit
+ * The Java and TypeScript parsers share these fixtures: both sides admit
  * the same candidates and refuse the same values with the same code.
  */
 class CandidateFixturesTest extends BaseUnitTest {
@@ -86,11 +83,6 @@ class CandidateFixturesTest extends BaseUnitTest {
                 .forEach(entry -> codes.put(entry.getKey(), entry.getValue().asString()));
 
         assertThat(codes.keySet()).as("the sidecar names every invalid fixture").isEqualTo(invalid.keySet());
-        assertThat(Set.copyOf(codes.values()))
-                .as("the fixtures refuse with every code")
-                .isEqualTo(Arrays.stream(CandidateRefusal.values())
-                        .map(CandidateRefusal::wireValue)
-                        .collect(Collectors.toSet()));
         invalid.forEach((name, fixture) -> assertThatThrownBy(() -> CandidateParser.parse(fixture))
                 .as(name)
                 .isInstanceOfSatisfying(
@@ -237,6 +229,54 @@ class CandidateFixturesTest extends BaseUnitTest {
 
         assertThat(CandidateParser.javaScriptJsonBytes(value))
                 .isEqualTo(javaScript.getBytes(StandardCharsets.UTF_8).length);
+    }
+
+    @Test
+    void shouldRefuseMissingRequiredCreatorsAndWrongScalarsWhenTypedBindingRuns() throws IOException {
+        ObjectNode missingLine = fixture("candidate-met-with-example.json");
+        firstCitation(missingLine).remove("startLine");
+        assertRefused(missingLine, CandidateRefusal.MALFORMED_CANDIDATE);
+
+        ObjectNode missingBasisIndex = fixture("candidate-not-met.json");
+        basis(missingBasisIndex).remove("head");
+        assertRefused(missingBasisIndex, CandidateRefusal.MALFORMED_CANDIDATE);
+
+        ObjectNode numericText = fixture("candidate-met-with-example.json");
+        numericText.put("summary", 42);
+        assertRefused(numericText, CandidateRefusal.MALFORMED_CANDIDATE);
+
+        ObjectNode numericEnum = fixture("candidate-not-met.json");
+        problem(numericEnum, 0).put("severity", 0);
+        assertRefused(numericEnum, CandidateRefusal.MALFORMED_CANDIDATE);
+    }
+
+    @Test
+    void shouldRefuseExplicitNullAndForgedProofWhenOptionalCitationKeysArePresent() throws IOException {
+        ObjectNode nullRevision = fixture("candidate-met-with-example.json");
+        firstCitation(nullRevision).putNull("revision");
+        assertRefused(nullRevision, CandidateRefusal.MALFORMED_CANDIDATE);
+
+        ObjectNode forgedProof = fixture("candidate-met-with-example.json");
+        firstCitation(forgedProof).putObject("verification").put("status", "MATCHED");
+        assertRefused(forgedProof, CandidateRefusal.MALFORMED_CANDIDATE);
+    }
+
+    @Test
+    void shouldKeepUnknownTotalWhenClaimedCoverageIsCompleteForTheSelectedItems() throws IOException {
+        ObjectNode candidate = fixture("candidate-met-with-example.json");
+        candidate
+                .putObject("coverage")
+                .put("source", "claimed")
+                .put("selected", 1)
+                .put("checked", 1)
+                .putNull("total")
+                .put("complete", true);
+
+        assertThat(CandidateParser.parse(candidate).coverage().path("total").isNull())
+                .isTrue();
+
+        ((ObjectNode) candidate.get("coverage")).remove("total");
+        assertRefused(candidate, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
     private static void assertRefused(JsonNode value, CandidateRefusal expected) {

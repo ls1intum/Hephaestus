@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewOrder;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.review.ReviewServiceImpl;
 import de.tum.cit.aet.hephaestus.practices.review.dto.BoundModelSlotDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.FrozenModelDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewMethodDTO;
@@ -65,7 +64,9 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @ConditionalOnServerRole
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ScanReportService {
+    public static final Duration RETENTION = Duration.ofDays(400);
     private static final int READ_BATCH = 256;
     private final ReviewRepository reviews;
     private final ReviewPracticeRepository assignments;
@@ -92,7 +93,6 @@ public class ScanReportService {
         return report;
     }
 
-    @Transactional(readOnly = true)
     public FrozenScanReport recorded(Review review) {
         return review.getReport() == null
                 ? calculate(review, false)
@@ -107,7 +107,7 @@ public class ScanReportService {
 
     public boolean expired(Review review) {
         return (review.getCompletedAt() != null
-                        && !clock.instant().isBefore(review.getCompletedAt().plus(Duration.ofDays(400))))
+                        && !clock.instant().isBefore(review.getCompletedAt().plus(RETENTION)))
                 || (review.getReport() != null
                         && review.getReport().path("expired").asBoolean());
     }
@@ -261,7 +261,7 @@ public class ScanReportService {
                         0,
                         0,
                         Math.toIntExact(rs.getLong("withheld")),
-                        ReviewServiceImpl.terminal(review.getStatus()) ? Math.toIntExact(rs.getLong("pending")) : 0))
+                        review.getStatus().isTerminal() ? Math.toIntExact(rs.getLong("pending")) : 0))
                 .single();
         int children = Math.toIntExact(
                 jdbc.sql("SELECT COUNT(*) FROM review_item m JOIN problem p ON p.result_id=m.result_id AND"
@@ -359,7 +359,7 @@ public class ScanReportService {
                         changes.getOrDefault(ProblemBaselineState.ABSENT, 0)),
                 practiceReports,
                 reasons(review, ReviewItemState.WITHHELD),
-                ReviewServiceImpl.terminal(review.getStatus()) ? reasons(review, ReviewItemState.LISTED) : List.of(),
+                review.getStatus().isTerminal() ? reasons(review, ReviewItemState.LISTED) : List.of(),
                 removal,
                 false,
                 0,
@@ -501,7 +501,7 @@ public class ScanReportService {
                 .findByWorkspaceIdAndItemIdOrderByOrderedAtDesc(current.getWorkspaceId(), current.getItemId())
                 .stream()
                 .filter(r -> r.getKind() == ReviewKind.SCAN
-                        && ReviewServiceImpl.terminal(r.getStatus())
+                        && r.getStatus().isTerminal()
                         && !r.getId().equals(current.getId())
                         && new ReviewOrder(r.getOrderedAt(), r.getCreatedAt(), r.getId())
                                         .compareTo(new ReviewOrder(

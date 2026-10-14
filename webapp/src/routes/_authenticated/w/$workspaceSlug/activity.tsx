@@ -14,13 +14,11 @@ import {
 } from "@/components/activity/activity-search";
 import { ActivityDetailDrawer } from "@/components/activity/ActivityDetailDrawer";
 import { type ActivityAccount, ActivityPage } from "@/components/activity/ActivityPage";
-import type { OpenWorkReviewNow } from "@/components/activity/OpenWorkSections";
 import { workLogTitle } from "@/components/activity/work-log-markdown";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { buttonVariants } from "@/components/ui/button";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useActivityPerson, useActivityWork, useOpenWork } from "@/hooks/use-activity";
-import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { pageHead } from "@/lib/page-title";
 import { type ProviderType, toScmProviderType } from "@/lib/provider/provider-terms";
 import { useSearchState, carriedSearchParams } from "@/lib/search-params";
@@ -82,17 +80,6 @@ function Activity() {
 		enabled: scope.enabled && category !== undefined,
 	});
 
-	const review = useRequestPracticeReview(workspaceSlug);
-	// Only where practices review the work; a user view reads the member's page and never spends
-	// their workspace's budget.
-	const reviewNow: OpenWorkReviewNow | undefined =
-		userView === undefined && workspace?.practicesEnabled === true
-			? {
-					onReviewNow: (work) => review.ask(work.itemId),
-					requesting: review.asking,
-				}
-			: undefined;
-
 	return (
 		<>
 			<ActivityPage
@@ -108,7 +95,6 @@ function Activity() {
 				openWork={openWork}
 				overview={overview}
 				timeline={timeline}
-				reviewNow={reviewNow}
 			/>
 			<ActivityDetailDrawer
 				stack={login === undefined ? [] : detailStack}

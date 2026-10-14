@@ -377,13 +377,3 @@ export type MentorOutboundFrame =
 	| JsonRpcErrorResponse
 	| MentorEventNotification
 	| ServerCallbackRequest;
-
-/**
- * Everything the runner reads from stdin. Java never sends batches; the runner rejects top-level
- * arrays explicitly rather than dropping them silently.
- */
-export type MentorInboundFrame =
-	| MentorRequest
-	| FetchContextSuccessResponse
-	| LinkSuccessResponse
-	| ServerCallbackErrorResponse;

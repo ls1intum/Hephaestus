@@ -100,7 +100,7 @@ class ScanServiceTest extends BaseUnitTest {
     void rejectsAnIncompleteListingWithoutRecordingInventory() {
         var review = review();
         when(lister.list(any())).thenReturn(new ItemPage(List.of(), null, false, null));
-        assertThatThrownBy(() -> service(10).enumerate(review)).isInstanceOf(ScanService.EnumerationFailure.class);
+        assertThatThrownBy(() -> service(10).prepare(review)).isInstanceOf(ScanService.EnumerationFailure.class);
         verifyNoInteractions(writer, store);
     }
 
@@ -108,7 +108,7 @@ class ScanServiceTest extends BaseUnitTest {
     void rejectsForeignWorkspaceItemsBeforeAnyWrite() {
         var review = review();
         when(lister.list(any())).thenReturn(new ItemPage(List.of(listed(99, "src/A.java")), null, true, null));
-        assertThatThrownBy(() -> service(10).enumerate(review)).isInstanceOf(ScanService.EnumerationFailure.class);
+        assertThatThrownBy(() -> service(10).prepare(review)).isInstanceOf(ScanService.EnumerationFailure.class);
         verifyNoInteractions(writer, store);
     }
 
@@ -117,7 +117,7 @@ class ScanServiceTest extends BaseUnitTest {
         var review = review();
         when(lister.list(any()))
                 .thenReturn(new ItemPage(List.of(listed(1, "a.txt"), listed(1, "b.txt")), null, true, null));
-        assertThatThrownBy(() -> service(1).enumerate(review)).isInstanceOf(ScanService.EnumerationFailure.class);
+        assertThatThrownBy(() -> service(1).prepare(review)).isInstanceOf(ScanService.EnumerationFailure.class);
         verifyNoInteractions(writer, store);
     }
 
@@ -134,7 +134,10 @@ class ScanServiceTest extends BaseUnitTest {
         var version = new ItemVersion("blob:one:context", null);
         when(versions.compose(file, Objects.requireNonNull(review.version()), List.of("pom.xml")))
                 .thenReturn(version);
-        service(10).enumerate(review);
+        var service = service(10);
+        var prepared = service.prepare(review);
+        verifyNoInteractions(store);
+        service.record(review, prepared);
         verify(store).inventory(1, review.id(), List.of(3L, 4L), true);
         verify(store).list(1, review.id(), 31, List.of(new ScanListedItem(file, version)), true);
     }

@@ -92,6 +92,13 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
     @Test
     void shouldFailClosedWhenChoiceIsRequiredAndDeveloperIsUnknown() {
         when(preferences.forDeveloper(1L, null)).thenReturn(new MemberAiPreferences.Decision(true, null));
+        var binding = ready(DataHandlingTier.IN_HOUSE);
+        var reference = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 8L, 9L, 1L);
+        lenient()
+                .when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
+                .thenReturn(List.of(binding));
+        lenient().when(models.connectionRef(binding)).thenReturn(reference);
+        lenient().when(models.dataHandlingTier(reference)).thenReturn(Optional.of(DataHandlingTier.IN_HOUSE));
         assertThat(routing.binding(1L, AgentPurpose.PRACTICE_REVIEW, null)).isEmpty();
         verifyNoInteractions(bindings, models);
     }

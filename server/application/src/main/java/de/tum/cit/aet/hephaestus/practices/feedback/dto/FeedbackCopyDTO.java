@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback.dto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
@@ -53,7 +54,10 @@ public record FeedbackCopyDTO(
         FeedbackStopReason stopReason,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        String lastError) {
+        String lastError,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        FeedbackCopyReadback readback) {
 
     public static FeedbackCopyDTO from(FeedbackCopy copy) {
         return new FeedbackCopyDTO(
@@ -72,6 +76,7 @@ public record FeedbackCopyDTO(
                 copy.getChatMessageId(),
                 copy.getPostedAt(),
                 copy.getStopReason(),
-                copy.getLastError());
+                copy.getLastError(),
+                copy.getReadback());
     }
 }

@@ -93,7 +93,7 @@ public class CatalogAdoptionService {
         int position = 0;
         for (CatalogGroupPracticeActionDTO action : plan.actions()) {
             if (action.action() == CatalogGroupPracticeAction.MOVE_TO_GROUP) {
-                practiceService.placePractice(context, action.slug(), slug, position++);
+                practiceService.movePractice(context, action.slug(), slug, position++);
                 moved.add(practiceService.getPractice(context, action.slug()));
             } else if (action.action() == CatalogGroupPracticeAction.ADD) {
                 position++;

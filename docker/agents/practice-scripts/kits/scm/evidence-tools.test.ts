@@ -15,8 +15,8 @@ function tree() {
 	const asked: unknown[] = [];
 	const files: FileTree = {
 		revision: "a".repeat(40),
-		read: async (path) => {
-			asked.push({ read: path });
+		read: async (path, options = {}) => {
+			asked.push({ read: path, ...options });
 			if (path === "logo.png") {
 				return { status: "BINARY" };
 			}
@@ -24,9 +24,17 @@ function tree() {
 				throw new UnratedError("unavailable", "the read failed");
 			}
 			const text = FILES[path];
-			return text === undefined
-				? { status: "ABSENT" }
-				: { status: "FOUND", text, truncated: path === "src/large.ts" };
+			if (text === undefined) {
+				return { status: "ABSENT" };
+			}
+			const lines = text.split("\n");
+			const start = options.offsetLine ?? 1;
+			const end = start - 1 + (options.maxLines ?? lines.length);
+			return {
+				status: "FOUND",
+				text: lines.slice(start - 1, end).join("\n"),
+				truncated: end < lines.length,
+			};
 		},
 		list: async (glob) => {
 			asked.push({ list: glob });
@@ -69,7 +77,7 @@ void describe("the read tools of an agent", () => {
 		);
 	});
 	void test("readFile numbers the lines of a file, bounds them, and names what it cannot show", async () => {
-		const { files } = tree();
+		const { files, asked } = tree();
 		const read = async (input: { path: string; startLine?: number; endLine?: number }) =>
 			run(files, "readFile", input);
 		assert.equal(
@@ -81,7 +89,12 @@ void describe("the read tools of an agent", () => {
 		const large = await read({ path: "src/large.ts", startLine: 50 });
 		assert.ok(typeof large === "string");
 		assert.match(large, /^50: line 50\n/u);
-		assert.match(large, /\n249: line 249\n\(the file is cut at the read limit\)$/u);
+		assert.match(
+			large,
+			/\n249: line 249\n\(more lines follow; read them with a later startLine\)$/u,
+		);
+		// Only the shown lines are read, so the host's receipt claims no more than the agent saw.
+		assert.deepEqual(asked.at(-1), { read: "src/large.ts", offsetLine: 50, maxLines: 200 });
 		assert.equal(await read({ path: "absent.ts" }), "absent.ts is not a file of the repository");
 		assert.equal(await read({ path: "logo.png" }), "logo.png is a binary file");
 		// A read that fails stops the agent: it is never shown as an absent file.

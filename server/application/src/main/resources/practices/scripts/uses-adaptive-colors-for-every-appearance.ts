@@ -1,10 +1,3 @@
-import { scm, type FileTree } from "../kits/scm/index.ts";
-import {
-	countLabel,
-	sampleNote,
-	scanOccurrences,
-	type SourcePattern,
-} from "../kits/scm/source-scan.ts";
 // Finds each color expression that the change adds inside SwiftUI view types, under the first shape
 // that its text shows. For a named asset color, it reads from the colorset if the color has a dark
 // appearance. A shape is spelling, not a type: `.green` given to `foregroundStyle` is SwiftUI's
@@ -12,6 +5,13 @@ import {
 // defines is what its definition says. Only the shapes whose spelling fixes the kind are counted as
 // literal or adaptive. The review classifies the rest, and reads the role of each color from the
 // modifier chain.
+import { scm, type FileTree } from "../kits/scm/index.ts";
+import {
+	countLabel,
+	sampleNote,
+	scanOccurrences,
+	type SourcePattern,
+} from "../kits/scm/source-scan.ts";
 import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
 import { isJsonObject } from "../lib/core/json.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";

@@ -11,8 +11,8 @@ public record AnsweredPracticeDTO(
         @NonNull @Schema(description = "The practice left out")
         String practiceSlug,
 
-        @NonNull @Schema(description = "The practice revision the earlier answer was made under")
-        Long revisionId,
+        @NonNull @Schema(description = "The practice version the earlier answer was made under")
+        Long practiceVersionId,
 
         @NonNull @Schema(description = "The completed review whose result answers it")
         UUID reviewId) {}

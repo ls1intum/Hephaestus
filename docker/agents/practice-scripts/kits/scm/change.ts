@@ -55,13 +55,9 @@ function changedFiles(value: unknown): ChangedFile[] {
 
 /**
  * The commits from base to head, in no promised order, as the server staged them in the context
- * (`commits.json` in the task-declared context); empty when the record was not captured.
+ * (`commits.json` in the task-declared context). Null means a missing or malformed capture; an empty
+ * array is a captured empty range.
  */
-export async function readCommits(evidence: Pick<Evidence, "record">): Promise<ChangeCommit[]> {
-	return (await readCapturedCommits(evidence)) ?? [];
-}
-
-/** Null means missing or malformed capture; an empty array is a captured empty range. */
 export async function readCapturedCommits(
 	evidence: Pick<Evidence, "record">,
 ): Promise<ChangeCommit[] | null> {

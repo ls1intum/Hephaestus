@@ -17,7 +17,7 @@ import type {
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { ROUTER_SEARCH } from "@/lib/router-search";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { unauthenticatedUser } from "@/mocks/handlers";
 import { server } from "@/mocks/server";
 import { routeTree } from "@/routeTree.gen";
@@ -637,9 +637,7 @@ describe("a signed-in person who is not a member", () => {
 				);
 			}),
 			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("other")])),
-			http.get("*/workspaces/other/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 42, userLogin: "ada", userName: "Ada" }),
-			),
+			http.get("*/workspaces/other/members/me", () => HttpResponse.json(ownMembership("MEMBER"))),
 			http.get("*/user/public-activity/workspaces/acme/onboarding", () =>
 				HttpResponse.json({ seen: answers.length > 0, visible: !hidden }),
 			),
@@ -758,7 +756,7 @@ describe("a member", () => {
 				HttpResponse.json([workspaceListItem("acme", { publishesPublicActivity: true })]),
 			),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 42, userLogin: "ada", userName: "Ada" }),
+				HttpResponse.json(ownMembership("MEMBER")),
 			),
 			http.get("*/user/public-activity/workspaces/acme/onboarding", () =>
 				HttpResponse.json({ seen, visible: true }),
@@ -784,7 +782,7 @@ describe("a member", () => {
 		server.use(
 			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 42, userLogin: "ada", userName: "Ada" }),
+				HttpResponse.json(ownMembership("MEMBER")),
 			),
 			http.get("*/user/public-activity/workspaces/acme/onboarding", () => {
 				asked();

@@ -25,14 +25,14 @@ public final class PracticeScriptInputs {
             ReviewAssignmentSnapshot assignment,
             JsonNode item,
             Instant startedAt,
-            @Nullable JsonNode event,
             @Nullable JsonNode previous) {
         if (!review.id().equals(assignment.id().reviewId())
                 || assignment.item().workspaceId() != review.workspaceId()) {
             throw new IllegalArgumentException("The assignment does not belong to this review");
         }
         var root = mapper.createObjectNode();
-        root.put("contractVersion", 3).put("kind", assignment.item().kind().value());
+        root.put("contractVersion", SandboxLayout.PRACTICE_CONTRACT_VERSION)
+                .put("kind", assignment.item().kind().value());
         root.set("item", item.deepCopy());
         var definition = assignment.practice().definition();
         if (review.kind() == ReviewKind.SCAN || definition.about() == null) root.putNull("about");
@@ -60,11 +60,10 @@ public final class PracticeScriptInputs {
             reference.put("path", assignment.item().path());
         if (review.kind() == ReviewKind.ITEM && assignment.version().baseVersion() != null)
             scope.put("baseVersion", assignment.version().baseVersion());
-        var operation = root.putObject("review")
+        root.putObject("review")
                 .put("id", review.id().toString())
                 .put("origin", review.origin().name())
                 .put("startedAt", startedAt.toString());
-        if (event != null) operation.set("event", event.deepCopy());
         root.set("previous", previous == null ? mapper.nullNode() : previous.deepCopy());
         return Map.of(
                 SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + assignment.practiceSlug() + ".inputs.json",

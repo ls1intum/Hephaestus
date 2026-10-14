@@ -20,7 +20,7 @@ import org.springframework.stereotype.Component;
 public class ScanMembershipQuery {
     private final JdbcClient jdbc;
 
-    public List<ScanReportCursor> items(
+    public List<ItemKey> items(
             Review review, @Nullable ScanReportCursor after, int size, ScanQueryService.ItemFilter filter) {
         var where = new StringBuilder(" WHERE m.workspace_id=:ws AND m.review_id=:scan ");
         var params = params(review, size);
@@ -46,20 +46,25 @@ public class ScanMembershipQuery {
             params.put("lastPractice", after.practiceId());
             params.put("lastItem", after.itemId());
         }
-        return jdbc.sql("SELECT COALESCE(i.path,'') AS path,m.practice_id,m.item_id FROM review_item m JOIN review v"
-                        + " ON v.id=m.review_id AND v.workspace_id=m.workspace_id JOIN item i ON i.id=m.item_id"
-                        + " AND i.workspace_id=m.workspace_id JOIN practice p ON p.id=m.practice_id AND"
+        return jdbc.sql("SELECT COALESCE(i.path,'') AS path,m.practice_id,m.item_id,m.result_id, (SELECT count(*) FROM"
+                        + " problem child WHERE child.workspace_id=m.workspace_id AND child.result_id=m.result_id)"
+                        + " AS problem_count FROM review_item m JOIN review v ON v.id=m.review_id AND"
+                        + " v.workspace_id=m.workspace_id JOIN item i ON i.id=m.item_id AND"
+                        + " i.workspace_id=m.workspace_id JOIN practice p ON p.id=m.practice_id AND"
                         + " p.workspace_id=m.workspace_id LEFT JOIN result r ON r.id=m.result_id AND"
                         + " r.workspace_id=m.workspace_id"
                         + where + " ORDER BY COALESCE(i.path,''),m.practice_id,m.item_id LIMIT :limit")
                 .params(params)
-                .query((rs, n) -> new ScanReportCursor(
-                        review.getId(),
-                        rs.getString("path"),
-                        rs.getLong("practice_id"),
-                        rs.getLong("item_id"),
-                        0,
-                        null))
+                .query((rs, n) -> new ItemKey(
+                        new ScanReportCursor(
+                                review.getId(),
+                                rs.getString("path"),
+                                rs.getLong("practice_id"),
+                                rs.getLong("item_id"),
+                                0,
+                                null),
+                        rs.getObject("result_id", UUID.class),
+                        rs.getInt("problem_count")))
                 .list();
     }
 
@@ -211,6 +216,8 @@ public class ScanMembershipQuery {
             params.put(key, value);
         }
     }
+
+    public record ItemKey(ScanReportCursor cursor, @Nullable UUID resultId, int problemCount) {}
 
     public record ProblemKey(
             ScanReportCursor cursor,

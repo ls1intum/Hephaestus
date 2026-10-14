@@ -56,8 +56,8 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     /**
      * Finds a repository by its full name with the organization eagerly fetched.
      */
-    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE"
-            + " r.nameWithOwner = :nameWithOwner")
+    @Query(
+            "SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE r.nameWithOwner = :nameWithOwner")
     Optional<Repository> findByNameWithOwnerWithOrganization(@Param("nameWithOwner") String nameWithOwner);
 
     /**

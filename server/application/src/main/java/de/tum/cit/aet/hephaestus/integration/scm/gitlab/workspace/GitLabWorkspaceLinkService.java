@@ -41,10 +41,9 @@ public class GitLabWorkspaceLinkService {
     }
 
     /**
-     * Whether this scope may apply a destructive diff to a shared repository's rows: it monitors
-     * the repository, which lies inside the group it may write per {@link #groupWriteProvider}.
-     * Callers check again inside the write, since a listing can outlast a monitor, a connection or
-     * a link.
+     * Whether this scope may apply a destructive diff to a shared repository's rows: it monitors the repository,
+     * which lies inside the group it may write per {@link #groupWriteProvider}. Callers check again inside the write,
+     * since a listing can outlast a monitor, a connection or a link.
      */
     @Transactional(readOnly = true)
     public boolean mayWriteRepository(long scopeId, Repository repository) {
@@ -89,9 +88,8 @@ public class GitLabWorkspaceLinkService {
     }
 
     /**
-     * The connected instance under which this scope writes the group at {@code groupPath}, while it
-     * may per {@link #mayWriteGroup} or the group is not synced yet and is this unlinked
-     * workspace's own; empty otherwise.
+     * The connected instance under which this scope writes the group at {@code groupPath}, while it may per
+     * {@link #mayWriteGroup} or the group is not synced yet and is this unlinked workspace's own; empty otherwise.
      */
     @Transactional(readOnly = true)
     public Optional<IdentityProvider> groupWriteProvider(long scopeId, String groupPath) {
@@ -113,10 +111,9 @@ public class GitLabWorkspaceLinkService {
     }
 
     /**
-     * Whether a scope may write an organization's roster and teams: it is connected to the
-     * organization's instance and linked to it, or unlinked at its path while no other workspace
-     * is. Another workspace on the same group reads it with its own, possibly narrower,
-     * credentials, and what those miss proves nothing.
+     * Whether a scope may write an organization's roster and teams: it is connected to the organization's instance
+     * and linked to it, or unlinked at its path while no other workspace is. Another workspace on the same group reads
+     * it with its own, possibly narrower, credentials, and what those miss proves nothing.
      */
     @Transactional(readOnly = true)
     public boolean mayWriteGroup(long scopeId, Organization organization) {
@@ -162,7 +159,7 @@ public class GitLabWorkspaceLinkService {
                     if (workspaceRepository.existsByOrganizationId(org.getId())
                             && !workspaceRepository.existsByIdAndOrganizationId(workspace.getId(), org.getId())) {
                         log.warn(
-                                "Organization already linked to another workspace:" + " orgId={}, workspaceId={}",
+                                "Organization already linked to another workspace: orgId={}, workspaceId={}",
                                 org.getId(),
                                 workspace.getId());
                         return;
@@ -175,7 +172,7 @@ public class GitLabWorkspaceLinkService {
                                 workspaceRepository.save(current);
                                 workspace.setOrganizationId(org.getId());
                                 log.info(
-                                        "Linked organization to workspace:" + " orgId={}, workspaceId={}",
+                                        "Linked organization to workspace: orgId={}, workspaceId={}",
                                         org.getId(),
                                         current.getId());
                             });

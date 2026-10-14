@@ -1,21 +1,18 @@
 import { HttpResponse, http, type JsonBodyType } from "msw";
-import type { z } from "zod";
 
 import type {
 	AccountRef,
 	ItemRef,
 	Practice,
 	PracticeDefinition,
-	Problem,
 	ScanCounts,
 	ScanDetail,
 	ScanReport,
+	ScanReportItemsPage,
+	ScanReportProblem,
+	ScanReportProblemsPage,
 	ScanSummary,
 } from "@/api/types.gen";
-import type {
-	scanItemsPageSchema,
-	scanProblemsPageSchema,
-} from "@/components/admin/practice-scans/scan-report-schemas";
 import type { Wire } from "@/lib/dates";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 
@@ -156,13 +153,9 @@ export function wireReport(
 	};
 }
 
-export type WireItemsPage = z.input<typeof scanItemsPageSchema>;
-export type WireProblemsPage = z.input<typeof scanProblemsPageSchema>;
-type ReadProblem = WireProblemsPage["content"][number];
-/** A problem as the server writes it, with the fields the report reads and the ones it does not. */
-export type WireProblem = Omit<ReadProblem, "problem"> & {
-	problem: ReadProblem["problem"] & Pick<Problem, "position" | "key">;
-};
+export type WireItemsPage = Wire<ScanReportItemsPage>;
+export type WireProblemsPage = Wire<ScanReportProblemsPage>;
+export type WireProblem = Wire<ScanReportProblem>;
 
 const entry = (fileId: string, path: string, practiceSlug: string) => ({
 	item: wireFile(fileId, path),
@@ -213,8 +206,18 @@ export const ITEMS_PAGE: WireItemsPage = {
 			reasonDescription: "SOMETHING_THE_PAGE_DOES_NOT_KNOW",
 			lastResult: {
 				id: "r-0",
+				reviewId: "0b0b0b0b-1111-4222-8333-444455556666",
+				item: wireFile("903", "webapp/src/main.tsx"),
+				practiceSlug: "comment-quality",
+				practiceName: "Comments explain why",
+				origin: "SCHEDULE",
 				outcome: "MET",
+				severity: null,
 				summary: "Comments say why the retry waits.",
+				problems: [],
+				currentness: "STALE",
+				markedIncorrectAt: null,
+				acceptedAt: null,
 				recordedAt: "2026-09-20T09:10:00Z",
 			},
 		},
@@ -248,11 +251,24 @@ export function wireProblem(
 			resultId: "r-1",
 			position: 0,
 			key: null,
+			basis: null,
 			severity: "MAJOR",
 			summary,
 			explanation: null,
 			nextStep: null,
-			citations: [{ path: "server/src/ScanService.java", startLine: 42, endLine: 48 }],
+			citations: [
+				{
+					sourceKind: "scm.file",
+					sourcePath: null,
+					path: "server/src/ScanService.java",
+					startLine: 42,
+					endLine: 48,
+					side: null,
+					quote: null,
+					revision: null,
+					verification: null,
+				},
+			],
 		},
 		resultId: "r-1",
 		item: wireFile("901", "server/src/ScanService.java"),
@@ -364,7 +380,14 @@ export function adminHandlers() {
 export function scanPage(scans: Wire<ScanSummary>[]) {
 	return {
 		content: scans,
-		page: { number: 0, size: 20, totalElements: scans.length, totalPages: 1 },
+		empty: scans.length === 0,
+		first: true,
+		last: true,
+		number: 0,
+		numberOfElements: scans.length,
+		size: 20,
+		totalElements: scans.length,
+		totalPages: 1,
 	};
 }
 

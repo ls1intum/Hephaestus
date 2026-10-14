@@ -6,39 +6,31 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 
 import {
-	cancelScanMutation,
 	getScanOptions,
 	getScanQueryKey,
 	getScanReportOptions,
 	getScanReportQueryKey,
-	listScanReportItemsInfiniteQueryKey,
+	listScanReportItemsInfiniteOptions,
 	listScanReportItemsQueryKey,
-	listScanReportProblemsInfiniteQueryKey,
+	listScanReportProblemsInfiniteOptions,
 	listScanReportProblemsQueryKey,
 	listScansQueryKey,
+	updateScanStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
-import { exportScanSarif, listScanReportItems, listScanReportProblems } from "@/api/sdk.gen";
+import { exportScanSarif } from "@/api/sdk.gen";
+import type { ScanReportItem, ScanReportProblem } from "@/api/types.gen";
 import { isActiveScan, SCAN_POLL_MS } from "@/components/admin/practice-scans/scan-display";
 import type { ScanListState } from "@/components/admin/practice-scans/scan-list-state";
-import {
-	type ScanItemEntry,
-	type ScanItemsPage,
-	scanItemsPageSchema,
-	type ScanProblemEntry,
-	type ScanProblemsPage,
-	scanProblemsPageSchema,
-} from "@/components/admin/practice-scans/scan-report-schemas";
 import type { ScanAction, ScanReportState } from "@/components/admin/practice-scans/ScanReportPage";
 import type { ProblemBaselineState } from "@/components/practice-vocabulary/scan-baseline-defs";
 import type { ScanEntryStatus } from "@/components/practice-vocabulary/scan-entry-defs";
 
+import { useInvalidateOnSettle } from "./use-invalidate-on-settle";
+
 /** The report lists' page size: the server's default, named so a test can count on it. */
 export const SCAN_REPORT_PAGE_SIZE = 50;
-
-const FIRST_PAGE: string | undefined = undefined;
 
 export interface ScanReportFilters {
 	baseline?: ProblemBaselineState;
@@ -47,10 +39,14 @@ export interface ScanReportFilters {
 
 export interface ScanReportData {
 	state: ScanReportState;
-	problems: ScanListState<ScanProblemEntry>;
-	files: ScanListState<ScanItemEntry>;
+	problems: ScanListState<ScanReportProblem>;
+	files: ScanListState<ScanReportItem>;
 	cancel: ScanAction;
 	exportSarif: ScanAction;
+}
+
+function nextCursor(page: { hasNext: boolean; nextCursor: string | null }) {
+	return page.hasNext ? (page.nextCursor ?? undefined) : undefined;
 }
 
 function listState<TPage extends { content: readonly TEntry[]; hasNext: boolean }, TEntry>(
@@ -114,63 +110,32 @@ export function useScanReport(
 	const reportStatus = reportQuery.data?.scan.status;
 	const listsPoll = reportStatus !== undefined && isActiveScan(reportStatus) ? SCAN_POLL_MS : false;
 
-	const problemsOptions = {
-		path,
-		query: { size: SCAN_REPORT_PAGE_SIZE, baselineState: filters.baseline },
-	};
 	const problemsQuery = useInfiniteQuery({
-		queryKey: listScanReportProblemsInfiniteQueryKey(problemsOptions),
-		queryFn: async ({ pageParam }): Promise<ScanProblemsPage> => {
-			const { data } = await listScanReportProblems({
-				...problemsOptions,
-				query: { ...problemsOptions.query, cursor: pageParam },
-				throwOnError: true,
-			});
-			return scanProblemsPageSchema.parse(data);
-		},
-		initialPageParam: FIRST_PAGE,
-		getNextPageParam: (page) => (page.hasNext ? (page.nextCursor ?? undefined) : undefined),
+		...listScanReportProblemsInfiniteOptions({
+			path,
+			query: { size: SCAN_REPORT_PAGE_SIZE, baselineState: filters.baseline },
+		}),
+		initialPageParam: { path, query: { cursor: undefined } },
+		getNextPageParam: nextCursor,
 		refetchInterval: listsPoll,
 	});
-
-	const itemsOptions = {
-		path,
-		query: { size: SCAN_REPORT_PAGE_SIZE, status: filters.fileStatus },
-	};
 	const itemsQuery = useInfiniteQuery({
-		queryKey: listScanReportItemsInfiniteQueryKey(itemsOptions),
-		queryFn: async ({ pageParam }): Promise<ScanItemsPage> => {
-			const { data } = await listScanReportItems({
-				...itemsOptions,
-				query: { ...itemsOptions.query, cursor: pageParam },
-				throwOnError: true,
-			});
-			return scanItemsPageSchema.parse(data);
-		},
-		initialPageParam: FIRST_PAGE,
-		getNextPageParam: (page) => (page.hasNext ? (page.nextCursor ?? undefined) : undefined),
+		...listScanReportItemsInfiniteOptions({
+			path,
+			query: { size: SCAN_REPORT_PAGE_SIZE, status: filters.fileStatus },
+		}),
+		initialPageParam: { path, query: { cursor: undefined } },
+		getNextPageParam: nextCursor,
 		refetchInterval: listsPoll,
 	});
 
 	// The lists stop polling with the report, so the answer that made an active scan terminal is
 	// followed by one more read of each list: without it they would keep the last page from while it
-	// ran. A scan that was terminal when the page opened needs no second read.
-	const active = reportStatus !== undefined && isActiveScan(reportStatus);
-	const sawActive = useRef(false);
-	useEffect(() => {
-		if (active) {
-			sawActive.current = true;
-			return;
-		}
-		if (reportStatus !== undefined && sawActive.current) {
-			sawActive.current = false;
-			const scan = { workspaceSlug, scanId };
-			void queryClient.invalidateQueries({ queryKey: listScanReportItemsQueryKey({ path: scan }) });
-			void queryClient.invalidateQueries({
-				queryKey: listScanReportProblemsQueryKey({ path: scan }),
-			});
-		}
-	}, [active, reportStatus, queryClient, workspaceSlug, scanId]);
+	// ran.
+	useInvalidateOnSettle(scanId, listsPoll !== false, [
+		listScanReportItemsQueryKey({ path }),
+		listScanReportProblemsQueryKey({ path }),
+	]);
 
 	const invalidateScan = () => {
 		void queryClient.invalidateQueries({ queryKey: getScanReportQueryKey({ path }) });
@@ -182,7 +147,7 @@ export function useScanReport(
 	};
 
 	const cancel = useMutation({
-		...cancelScanMutation(),
+		...updateScanStatusMutation(),
 		onSuccess: (detail) => {
 			queryClient.setQueryData(getScanQueryKey({ path }), detail);
 			invalidateScan();

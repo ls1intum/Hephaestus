@@ -266,8 +266,8 @@ function ScheduleRow({
 					disabled={isSaving}
 					onClick={() => onSetEnabled(schedule, !schedule.enabled)}
 				>
-					{schedule.enabled ? "Pause" : "Resume"}
-					<span className="sr-only"> checking {kindNoun}</span>
+					{schedule.enabled ? "Pause" : "Resume"}{" "}
+					<span className="sr-only">checking {kindNoun}</span>
 				</Button>
 				<Button
 					variant="outline"
@@ -276,12 +276,10 @@ function ScheduleRow({
 					aria-expanded={editing}
 					onClick={() => setEditing((open) => !open)}
 				>
-					Edit
-					<span className="sr-only"> the recurring check on {kindNoun}</span>
+					Edit <span className="sr-only">the recurring check on {kindNoun}</span>
 				</Button>
 				<Button variant="ghost" size="sm" disabled={isSaving} onClick={() => onDelete(schedule)}>
-					Delete
-					<span className="sr-only"> the recurring check on {kindNoun}</span>
+					Delete <span className="sr-only">the recurring check on {kindNoun}</span>
 				</Button>
 			</ItemActions>
 			{editing ? (

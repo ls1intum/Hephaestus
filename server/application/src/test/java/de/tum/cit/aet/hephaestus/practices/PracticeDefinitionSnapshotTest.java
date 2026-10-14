@@ -1,22 +1,22 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 class PracticeDefinitionSnapshotTest extends BaseUnitTest {
     @Test
     void shouldKeepOnlyVersionIdentityAndDigestWhenAnAuditSnapshotIsWritten() {
-        var version = mock(PracticeVersion.class);
-        when(version.getId()).thenReturn(17L);
-        when(version.getReviewDigest()).thenReturn("v6:" + "a".repeat(64));
+        var version = TestEntities.practiceVersion(
+                17,
+                1,
+                JsonMapper.builder().build().valueToTree(DefinitionTestFixtures.definition()),
+                "v6:" + "a".repeat(64));
         var practice = new Practice();
         practice.setSlug("private-script");
         practice.setKind(new ItemKind("scm.pull_request"));

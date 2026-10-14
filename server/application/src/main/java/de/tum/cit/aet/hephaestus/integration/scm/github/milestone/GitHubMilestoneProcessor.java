@@ -25,14 +25,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub milestones.
- *
- * <p>This service handles the conversion of GitHubMilestoneDTO to Milestone entities, persists
- * them, and publishes appropriate domain events.
- *
- * <p><b>Note on Milestone IDs:</b> GitHub's GraphQL API does not expose databaseId for milestones,
- * while webhooks do. To avoid duplicates, this processor always uses number-based lookup within a
- * repository (milestone numbers are unique per repository). When the real GitHub databaseId is
- * available from webhooks, it updates the entity ID accordingly.
+ * <p>
+ * This service handles the conversion of GitHubMilestoneDTO to Milestone entities,
+ * persists them, and publishes appropriate domain events.
+ * <p>
+ * <b>Note on Milestone IDs:</b>
+ * GitHub's GraphQL API does not expose databaseId for milestones, while webhooks do.
+ * To avoid duplicates, this processor always uses number-based lookup within a repository
+ * (milestone numbers are unique per repository). When the real GitHub databaseId is available
+ * from webhooks, it updates the entity ID accordingly.
  */
 @Service
 public class GitHubMilestoneProcessor {
@@ -57,14 +58,13 @@ public class GitHubMilestoneProcessor {
 
     /**
      * Process a GitHub milestone DTO and persist it as a Milestone entity.
-     *
-     * <p><b>IMPORTANT:</b> Always uses number-based lookup within the repository to find existing
-     * milestones. This ensures that milestones created via webhooks (with real GitHub databaseId)
-     * and milestones synced via GraphQL (which doesn't provide databaseId) are treated as the same
-     * entity.
-     *
-     * <p>When the real GitHub databaseId is available (from webhooks), it will be used as the
-     * entity ID and will replace any previously generated deterministic ID.
+     * <p>
+     * <b>IMPORTANT:</b> Always uses number-based lookup within the repository to find existing milestones.
+     * This ensures that milestones created via webhooks (with real GitHub databaseId) and milestones
+     * synced via GraphQL (which doesn't provide databaseId) are treated as the same entity.
+     * <p>
+     * When the real GitHub databaseId is available (from webhooks), it will be used as the entity ID
+     * and will replace any previously generated deterministic ID.
      *
      * @param dto the GitHub milestone DTO
      * @param repository the repository this milestone belongs to
@@ -182,11 +182,11 @@ public class GitHubMilestoneProcessor {
     }
 
     /**
-     * Generates a deterministic ID for milestones synced via GraphQL. GitHub's GraphQL API doesn't
-     * expose databaseId for milestones, so we generate a consistent ID based on the repository ID
-     * and milestone number.
-     *
-     * <p>The generated ID is negative to avoid collision with actual GitHub databaseIds.
+     * Generates a deterministic ID for milestones synced via GraphQL.
+     * GitHub's GraphQL API doesn't expose databaseId for milestones, so we generate
+     * a consistent ID based on the repository ID and milestone number.
+     * <p>
+     * The generated ID is negative to avoid collision with actual GitHub databaseIds.
      *
      * @param repositoryId the repository's database ID
      * @param milestoneNumber the milestone's number
@@ -205,10 +205,11 @@ public class GitHubMilestoneProcessor {
 
     /**
      * Delete a milestone by its ID.
-     *
-     * <p>IMPORTANT: Nullifies the milestone reference on all associated issues before deletion to
-     * maintain data integrity and prevent orphaned references. Uses direct database UPDATE to
-     * ensure ALL references are cleared, not just those loaded in the in-memory collection.
+     * <p>
+     * IMPORTANT: Nullifies the milestone reference on all associated issues
+     * before deletion to maintain data integrity and prevent orphaned references.
+     * Uses direct database UPDATE to ensure ALL references are cleared, not just
+     * those loaded in the in-memory collection.
      *
      * @param nativeId the milestone's native provider ID
      * @param context processing context with scope information
@@ -229,7 +230,7 @@ public class GitHubMilestoneProcessor {
                     // because the in-memory collection may be stale or not fully loaded.
                     int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
                     if (clearedCount > 0) {
-                        log.debug("Cleared milestone references from {} issues before" + " deletion", clearedCount);
+                        log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
                     }
 
                     milestoneRepository.delete(milestone);
@@ -242,11 +243,13 @@ public class GitHubMilestoneProcessor {
                 });
     }
 
-    /** Converts a GitHub API milestone state string to Milestone.State enum. */
+    /**
+     * Converts a GitHub API milestone state string to Milestone.State enum.
+     */
     private Milestone.State parseState(String state) {
         if (state == null) {
-            log.warn("Milestone state is null, defaulting to OPEN. This may indicate missing data in"
-                    + " webhook or GraphQL response.");
+            log.warn(
+                    "Milestone state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
             return Milestone.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {

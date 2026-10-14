@@ -1,7 +1,7 @@
 /**
  * Auth — Hephaestus-native authentication and identity.
  *
- * <p>Replaces the prior Keycloak federating-IdP setup with Spring Security 7 native auth: {@code
+ * <p>Spring Security 7 native auth: {@code
  * oauth2Login} federates to upstream IdPs (the instance-scoped {@code login_provider} rows —
  * GitHub, GitLab.com, self-hosted GitLab — see {@link
  * de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider}); on success we mint our own

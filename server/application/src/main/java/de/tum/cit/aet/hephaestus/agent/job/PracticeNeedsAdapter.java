@@ -45,9 +45,7 @@ class PracticeNeedsAdapter implements PracticeScriptSummaries {
                 .map(row -> summary(
                         row,
                         purpose -> unserved.computeIfAbsent(
-                                purpose,
-                                p -> routing.unservedTiers(
-                                        workspaceId, AgentPurpose.valueOf("PRACTICE_SCRIPT_" + p.name())))))
+                                purpose, p -> routing.unservedTiers(workspaceId, AgentPurpose.forSlot(p)))))
                 .toList();
     }
 

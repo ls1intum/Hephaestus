@@ -9,7 +9,7 @@ import {
 	LOADING_STATUS,
 	SLOW_LOAD_SHORT,
 } from "@/components/practices-across-the-workspace/across-workspace-copy";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { ACROSS_WORKSPACE } from "@/stories/practices-across-the-workspace-story-data";
 import { deferred, sleep } from "@/test/async";
@@ -35,7 +35,7 @@ beforeEach(() => {
 			HttpResponse.json([workspaceListItem("acme", { practicesEnabled: true })]),
 		),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("MEMBER")),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/workspace-overview", () =>
 			HttpResponse.json(ACROSS_WORKSPACE),

@@ -40,6 +40,8 @@ class NoMockingOwnedEntitiesTest {
             "Workspace",
             "PullRequest",
             "ReviewJob",
+            "Practice",
+            "PracticeVersion",
             "Commit",
             "Organization",
             "IdentityProvider",

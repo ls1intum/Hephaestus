@@ -65,8 +65,7 @@ public class ChatThread {
     private ThreadSurface surface = ThreadSurface.WEB;
 
     /**
-     * All messages in this thread. DB-side {@code ON DELETE CASCADE} (migration
-     * {@code mentor-1071-cascade-legacy-fks}) covers parent-delete propagation in a single
+     * All messages in this thread. DB-side {@code ON DELETE CASCADE} covers parent-delete propagation in a single
      * statement; the JPA-level cascade would issue N per-row DELETEs for nothing. We keep
      * {@code orphanRemoval} for collection-mutation semantics.
      */

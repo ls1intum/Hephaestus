@@ -1,132 +1,91 @@
-import { CopyCheckIcon, FileQuestionIcon } from "lucide-react";
-
-import type {
-	AgentJob,
-	ReviewLineage,
-	ReviewLineageFeedback,
-	ReviewLineageMoment,
-	ReviewLineageResult,
-} from "@/api/types.gen";
+import type { ItemEvent, ReviewDetail, ReviewRef } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
-import { REVIEW_RUN_MARKER_DEFS } from "@/components/practice-vocabulary/review-run-marker-defs";
 import {
-	REPLACED_REVIEW_STATUS,
 	REVIEW_STATUS_DEFS,
+	REVIEW_STOP_REASON_SENTENCES,
+	type ReviewStatus,
 } from "@/components/practice-vocabulary/review-status-defs";
 
-import { holdReasonCopy } from "./job-utils";
-import { type NumberedResult, numberedResults } from "./lineage-chain";
-import { reviewMoments, type TraceNode } from "./review-trace";
+import {
+	countOf,
+	type LineageFeedback,
+	type LineageRecords,
+	type LineageResult,
+	type NumberedResult,
+	numberedResults,
+} from "./lineage-chain";
+import { chainReview, ownResults, type TraceNode } from "./review-trace";
 
 /**
- * How the review ran, in the words of its step: "Review completed", "Review on hold". The page knows
- * the job and says more than the chain's three states can: a hold, a timeout, a cancellation, and a
- * run that assessed nothing because the evidence was missing or an earlier review had answered.
+ * How the review ran, in the words of its step: "Review complete", "Review failed". The review's
+ * own read adds what the graph does not hold: why it stopped and which practices it withheld.
  */
 export interface ReviewStepState {
 	def: StatusDef;
-	/** "Review completed". */
+	/** "Review complete". */
 	title: string;
-	/** One line under it, where the state needs one: why it waits, why it assessed nothing. */
+	/** One line under it, where the review recorded why it stopped. */
 	note?: string;
-	/** The review did not get as far as observing, so an empty result step says why. */
-	assessedNothing?: string;
+	/** Why an empty result step is empty. */
+	assessedNothing: string;
 }
 
-const NOTHING_ASSESSED: StatusDef = {
-	label: "Nothing assessed",
-	icon: FileQuestionIcon,
-	badgeVariant: "warning",
-	description: "No model ran, because the evidence it needed was missing or unreadable.",
-};
-
-const ANSWERED_EARLIER: StatusDef = {
-	label: "Answered by an earlier review",
-	icon: CopyCheckIcon,
-	badgeVariant: "outline",
-	description:
-		"No model ran, because an earlier review had answered every practice on the same code.",
+const ASSESSED_NOTHING: Record<ReviewStatus, string> = {
+	QUEUED: "The review has not started, so it has recorded nothing yet.",
+	RUNNING: "Results appear as the review reaches each practice.",
+	COMPLETE: "The review ran to the end and recorded no result.",
+	PARTIAL: "The review closed before it recorded a result.",
+	FAILED: "The review stopped before it recorded a result.",
+	CANCELLED: "The review was cancelled before it recorded a result.",
 };
 
 export function reviewStepState(
-	review: NonNullable<ReviewLineage["review"]>,
-	outcome: AgentJob["reviewOutcome"] | undefined,
+	review: ReviewRef,
+	detail?: Pick<ReviewDetail, "stopReason" | "practices">,
 ): ReviewStepState {
-	const { phase, holdReason } = review;
-	if (phase === "QUEUED" && holdReason !== undefined && holdReason.length > 0) {
-		return {
-			def: REVIEW_RUN_MARKER_DEFS.ON_HOLD,
-			title: "Review on hold",
-			note: holdReasonCopy(holdReason).label,
-			assessedNothing: "The review waits on its hold, so it has observed nothing yet.",
-		};
-	}
-	if (phase === "COMPLETED" && outcome === "INSUFFICIENT_EVIDENCE") {
-		return {
-			def: NOTHING_ASSESSED,
-			title: "Review completed",
-			note: "Nothing assessed: the evidence it needed was missing or unreadable",
-			assessedNothing:
-				"No practice was judged. This is not a review that looked and found nothing.",
-		};
-	}
-	if (phase === "COMPLETED" && outcome === "COALESCED") {
-		return {
-			def: ANSWERED_EARLIER,
-			title: "Review completed",
-			note: "An earlier review had answered every practice on the same code",
-			assessedNothing: "This review assessed nothing anew. The earlier review holds the answers.",
-		};
-	}
-	if (phase === "COMPLETED" && outcome === "SUPERSEDED") {
-		return {
-			def: REPLACED_REVIEW_STATUS,
-			title: "Review replaced",
-			note: "A newer review of the same work replaced it while it waited",
-			assessedNothing: "This review assessed nothing. The newer review carries its practices.",
-		};
-	}
-	const def = REVIEW_STATUS_DEFS[phase];
-	const assessedNothing: Partial<Record<AgentJob["status"], string>> = {
-		QUEUED: "The review has not started, so it has observed nothing yet.",
-		RUNNING: "Results appear as the review reaches each practice.",
-		COMPLETED: "The review ran to the end and recorded no result.",
-		FAILED: "The review stopped before it recorded a result.",
-		TIMED_OUT: "The review ran out of time before it recorded a result.",
-		CANCELLED: "The review was canceled before it recorded a result.",
-	};
+	const def = REVIEW_STATUS_DEFS[review.status];
+	const stopReason = detail?.stopReason ?? null;
+	const withheld =
+		detail?.practices.filter((practice) => practice.status === "WITHHELD").length ?? 0;
 	return {
 		def,
 		title: `Review ${def.label.toLowerCase()}`,
-		assessedNothing: assessedNothing[phase],
+		note: stopReason === null ? undefined : REVIEW_STOP_REASON_SENTENCES[stopReason],
+		// A withheld practice records its reason and no result, so an empty step says that and
+		// never reads as a review that looked and saw nothing.
+		assessedNothing:
+			withheld > 0
+				? `${countOf(withheld, "practice was", "practices were")} withheld with a recorded reason, so no result stands for ${withheld === 1 ? "it" : "them"}.`
+				: ASSESSED_NOTHING[review.status],
 	};
 }
 
 /** The four stages the rail reads in, so no step is anonymous. */
-export type TraceStage = "trigger" | "review" | "feedback" | "effect";
-
-export const TRACE_STAGES: readonly TraceStage[] = ["trigger", "review", "feedback", "effect"];
+export type TraceStage = "start" | "review" | "feedback" | "effect";
 
 export const TRACE_STAGE_LABELS: Record<TraceStage, string> = {
-	trigger: "Trigger",
+	start: "Started by",
 	review: "Review",
 	feedback: "Feedback",
 	effect: "Effect",
 };
 
 /**
- * One step on the rail. The work heads the rail and has no time. The moment that started the
- * review is the start; what happened before it folds into one "Before this review" step. The
- * review, a later moment folded into it and its results are the review stage. The feedback,
- * the merge where it fell after the start and the line of siblings are the feedback stage. The end
- * of the record's path is the effect.
+ * One step on the rail. What started the review heads it: the event on the work, or the review's
+ * origin where no event did. The review and its results are the review stage. The feedback and the
+ * line of siblings are the feedback stage. The end of the record's path is the effect.
  */
 export type RailItem =
-	| { kind: "moment"; key: string; at: Date; moment: ReviewLineageMoment }
-	| { kind: "review"; key: "review"; at: Date }
+	| {
+			kind: "start";
+			key: "start";
+			at: Date;
+			origin: ReviewRef["origin"];
+			event: ItemEvent | undefined;
+	  }
+	| { kind: "review"; key: "review"; at: Date | undefined }
 	| { kind: "results"; key: "results"; at: Date | undefined }
-	| { kind: "feedback"; key: string; at: Date; feedback: ReviewLineageFeedback }
-	| { kind: "before"; key: "before"; at: undefined; items: RailItem[] }
+	| { kind: "feedback"; key: string; at: Date | undefined; feedback: LineageFeedback }
 	| {
 			kind: "siblings";
 			key: "siblings";
@@ -141,27 +100,15 @@ export interface RailStage {
 	items: RailItem[];
 }
 
-const RANK: Record<RailItem["kind"], number> = {
-	before: -1,
-	moment: 0,
-	review: 1,
-	results: 2,
-	feedback: 3,
-	siblings: 4,
-	end: 5,
-};
-
 /**
- * When this review's story starts: the moment on the work that started it, or the review itself
- * where no moment names it.
+ * When this review's story starts: the event that started it, or the review itself where no event
+ * did.
  */
-export function traceStart(lineage: ReviewLineage): Date | undefined {
-	for (const entry of reviewMoments(lineage)) {
-		if (entry.kind === "moment" && entry.moment.startedReview) {
-			return entry.moment.occurredAt;
-		}
-	}
-	return lineage.review?.createdAt;
+export function traceStart(
+	review: ReviewRef | undefined,
+	startedBy: ItemEvent | null | undefined,
+): Date | undefined {
+	return startedBy?.occurredAt ?? review?.createdAt;
 }
 
 /** The siblings the simple story folds into one line. */
@@ -170,105 +117,59 @@ export interface StorySiblings {
 	feedback: number;
 }
 
-/**
- * The rail's steps by stage, each stage in time order. `feedback` is what the story tells in full;
- * `siblings`, where any, is the one line that counts the rest.
- */
-export function storyRail(
-	lineage: ReviewLineage,
-	feedback: readonly ReviewLineageFeedback[],
-	siblings?: StorySiblings,
-): RailStage[] {
-	const start = traceStart(lineage)?.getTime();
-	const before: RailItem[] = [];
-	const staged: Record<TraceStage, RailItem[]> = {
-		trigger: [],
-		review: [],
-		feedback: [],
-		effect: [],
-	};
-	const earlier = (at: Date) => start !== undefined && at.getTime() < start;
-	// The rail reads in time order across its stages: a moment folded into the review after its
-	// first piece of feedback was written sits among the feedback, so the times never run back.
-	const firstFeedback = earliest(
-		feedback.map((entry) => entry.createdAt).filter((at) => !earlier(at)),
-	)?.getTime();
-	const inReviewStage = (at: Date) => firstFeedback === undefined || at.getTime() <= firstFeedback;
-
-	for (const entry of reviewMoments(lineage)) {
-		if (entry.kind !== "moment") {
-			if (entry.kind === "review-started") {
-				staged.review.push({ kind: "review", key: "review", at: entry.at });
-			}
-			continue;
-		}
-		const { moment } = entry;
-		const item: RailItem = {
-			kind: "moment",
-			key: `moment:${moment.kind}:${moment.occurredAt.toISOString()}`,
-			at: moment.occurredAt,
-			moment,
-		};
-		if (moment.startedReview) {
-			staged.trigger.push(item);
-		} else if (earlier(moment.occurredAt)) {
-			before.push(item);
-		} else if (moment.joinedReview && inReviewStage(moment.occurredAt)) {
-			staged.review.push(item);
-		} else {
-			staged.feedback.push(item);
-		}
-	}
-	if (lineage.review === undefined) {
-		// No review to stand on: its step says the record is gone.
-		staged.review.push({ kind: "review", key: "review", at: new Date(0) });
-	}
-	const reviewId = lineage.review?.id;
-	const own = lineage.results.filter(
-		(entry) => reviewId === undefined || entry.agentJobId === reviewId,
-	);
-	staged.review.push({
-		kind: "results",
-		key: "results",
-		at: earliest(own.map((entry) => entry.observedAt)),
-	});
-	for (const entry of feedback) {
-		const item: RailItem = {
-			kind: "feedback",
-			key: `feedback:${entry.id}`,
-			at: entry.createdAt,
-			feedback: entry,
-		};
-		(earlier(entry.createdAt) ? before : staged.feedback).push(item);
-	}
-	if (siblings !== undefined && siblings.results + siblings.feedback > 0) {
-		staged.feedback.push({ kind: "siblings", key: "siblings", at: undefined, ...siblings });
-	}
-	staged.effect.push({ kind: "end", key: "end", at: undefined });
-	if (before.length > 0) {
-		staged.trigger.unshift({
-			kind: "before",
-			key: "before",
-			at: undefined,
-			items: inTimeOrder(before),
-		});
-	}
-	return TRACE_STAGES.map((stage) => ({
-		stage,
-		items: stage === "trigger" ? staged.trigger : inTimeOrder(staged[stage]),
-	}));
+export interface StoryRailOptions {
+	/** The event that started the review, from the review's own read. */
+	startedBy?: ItemEvent | null;
+	siblings?: StorySiblings;
 }
 
-/** A step with no time of its own keeps its place by kind: results first, the siblings last. */
-function inTimeOrder(items: readonly RailItem[]): RailItem[] {
-	return [...items].sort((a, b) => {
-		const at = a.at?.getTime();
-		const bt = b.at?.getTime();
-		if (at !== undefined && bt !== undefined && at !== bt) {
-			return at - bt;
-		}
-		return RANK[a.kind] - RANK[b.kind];
-	});
+/**
+ * The rail's steps by stage. `feedback` is what the story tells in full, in the order it is given;
+ * `siblings`, where any, is the one line that counts the rest. The graph records no time a piece of
+ * feedback was written, so a piece steps at its delivery or at no time.
+ */
+export function storyRail(
+	records: LineageRecords,
+	feedback: readonly LineageFeedback[],
+	{ startedBy, siblings }: StoryRailOptions = {},
+): RailStage[] {
+	const review = chainReview(records);
+	const start: RailItem[] =
+		review === undefined
+			? []
+			: [
+					{
+						kind: "start",
+						key: "start",
+						at: startedBy?.occurredAt ?? review.createdAt,
+						origin: review.origin,
+						event: startedBy ?? undefined,
+					},
+				];
+	const reviewStage: RailItem[] = [
+		// No review to stand on: its step says the record is gone.
+		{ kind: "review", key: "review", at: review?.createdAt },
+		{
+			kind: "results",
+			key: "results",
+			at: earliest(ownResults(records).map((entry) => entry.recordedAt)),
+		},
+	];
+	const feedbackStage: RailItem[] = feedback.map((entry) => ({
+		kind: "feedback",
+		key: `feedback:${entry.id}`,
+		at: entry.deliveredAt ?? undefined,
+		feedback: entry,
+	}));
+	if (siblings !== undefined && siblings.results + siblings.feedback > 0) {
+		feedbackStage.push({ kind: "siblings", key: "siblings", at: undefined, ...siblings });
+	}
+	return [
+		{ stage: "start", items: start },
+		{ stage: "review", items: reviewStage },
+		{ stage: "feedback", items: feedbackStage },
+		{ stage: "effect", items: [{ kind: "end", key: "end", at: undefined }] },
+	];
 }
 
 function earliest(times: readonly Date[]): Date | undefined {
@@ -281,77 +182,40 @@ function earliest(times: readonly Date[]): Date | undefined {
 	return first;
 }
 
-/**
- * Who wrote a piece the chain lists, where it is not the chain's own review. Feedback composed before
- * the review started is an earlier review's; any other is a later one's.
- */
-export function writtenBy(
-	feedback: Pick<ReviewLineageFeedback, "agentJobId" | "createdAt">,
-	review: ReviewLineage["review"],
-): "an earlier review" | "a later review" | undefined {
-	if (review === undefined || feedback.agentJobId === review.id) {
-		return undefined;
-	}
-	return feedback.createdAt.getTime() < review.createdAt.getTime()
-		? "an earlier review"
-		: "a later review";
-}
-
 /** A result another review recorded: one this review did not ask again, since that one had answered. */
 export function answeredEarlier(
-	result: Pick<ReviewLineageResult, "agentJobId">,
-	review: ReviewLineage["review"],
+	result: Pick<LineageResult, "reviewId">,
+	review: ReviewRef | undefined,
 ): boolean {
-	return review !== undefined && result.agentJobId !== review.id;
+	return review !== undefined && result.reviewId !== review.id;
 }
 
 /**
- * The story around the record the reader came from. A review or the work tells the whole review. An
- * result tells the feedback written from it, and a piece of feedback tells itself and the
- * pieces it replaced or that replaced it; every other piece is a sibling, behind one line.
+ * The story around the record the reader came from. A review or the work tells the whole review. A
+ * result tells the feedback written from it, and a piece of feedback tells itself; every other piece
+ * is a sibling, behind one line.
  */
 export interface StoryFocus {
-	/** The pieces the story tells in full, in time order. */
-	shown: ReviewLineageFeedback[];
+	/** The pieces the story tells in full, by letter. */
+	shown: LineageFeedback[];
 	/** The rest of the review's pieces, behind "N other pieces of feedback". */
-	siblings: ReviewLineageFeedback[];
+	siblings: LineageFeedback[];
 }
 
 export function storyFeedback(
-	lineage: ReviewLineage,
+	records: Pick<LineageRecords, "feedback">,
 	here: TraceNode | undefined,
 	expanded: boolean,
 ): StoryFocus {
-	const byTime = [...lineage.feedback].sort(
-		(a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
-	);
-	if (expanded || here === undefined || here.kind === "work" || here.kind === "review") {
-		return { shown: byTime, siblings: [] };
+	const byLetter = [...records.feedback].sort(letterOrder);
+	if (expanded || (here?.kind !== "result" && here?.kind !== "feedback")) {
+		return { shown: byLetter, siblings: [] };
 	}
-	if (here.kind === "results" || here.kind === "end" || here.kind === "moment") {
-		return { shown: byTime, siblings: [] };
-	}
-	const told = new Set<string>();
-	if (here.kind === "result") {
-		for (const entry of byTime) {
-			if (entry.practiceResultIds.includes(here.id)) {
-				told.add(entry.id);
-			}
-		}
-	} else {
-		const self = byTime.find((entry) => entry.id === here.id);
-		if (self !== undefined) {
-			told.add(self.id);
-			for (const id of [self.replacesId, self.replacedById]) {
-				if (id !== undefined) {
-					told.add(id);
-				}
-			}
-		}
-	}
+	const told = (entry: LineageFeedback) =>
+		here.kind === "result" ? entry.basis.includes(here.id) : entry.id === here.id;
 	return {
-		shown: byTime.filter((entry) => told.has(entry.id)),
-		siblings: byTime.filter((entry) => !told.has(entry.id)),
+		shown: byLetter.filter(told),
+		siblings: byLetter.filter((entry) => !told(entry)),
 	};
 }
 
@@ -361,21 +225,29 @@ export function storyFeedback(
  * them.
  */
 export function storyResults(
-	lineage: ReviewLineage,
+	records: Pick<LineageRecords, "results">,
 	here: TraceNode | undefined,
-	full: ReviewLineage = lineage,
+	full: Pick<LineageRecords, "results"> = records,
 ) {
-	const shown = new Set(lineage.results.map((entry) => entry.id));
+	const shown = new Set(records.results.map((entry) => entry.id));
 	const numbered = numberedResults(full.results).filter((entry) => shown.has(entry.result.id));
 	const self =
 		here?.kind === "result" ? numbered.find((entry) => entry.result.id === here.id) : undefined;
 	return { numbered, self };
 }
 
-/** The feedback letter, "A" to "Z" and then "AA", in the order the pieces were written. */
-export function feedbackLetters(feedback: readonly ReviewLineageFeedback[]): Map<string, string> {
-	const byTime = [...feedback].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-	return new Map(byTime.map((entry, index) => [entry.id, letterAt(index)]));
+/**
+ * The order of the feedback letters. The graph records no time a piece was written, so the order
+ * rests on the id alone: a piece keeps its letter in every trace of its review.
+ */
+function letterOrder(a: LineageFeedback, b: LineageFeedback): number {
+	return a.id.localeCompare(b.id, "en");
+}
+
+/** The feedback letter, "A" to "Z" and then "AA". */
+export function feedbackLetters(feedback: readonly LineageFeedback[]): Map<string, string> {
+	const byLetter = [...feedback].sort(letterOrder);
+	return new Map(byLetter.map((entry, index) => [entry.id, letterAt(index)]));
 }
 
 function letterAt(index: number): string {
@@ -385,10 +257,10 @@ function letterAt(index: number): string {
 
 /** The results a piece of feedback rests on that the chain lists, by number. */
 export function sourcesOf(
-	feedback: Pick<ReviewLineageFeedback, "practiceResultIds">,
+	feedback: Pick<LineageFeedback, "basis">,
 	numbered: readonly NumberedResult[],
 ): NumberedResult[] {
 	return numbered
-		.filter((entry) => feedback.practiceResultIds.includes(entry.result.id))
+		.filter((entry) => feedback.basis.includes(entry.result.id))
 		.sort((a, b) => a.number - b.number);
 }

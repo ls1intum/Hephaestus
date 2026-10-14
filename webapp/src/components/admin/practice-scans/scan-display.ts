@@ -1,4 +1,5 @@
 import type { ItemRef, ScanSummary } from "@/api/types.gen";
+import { accountName } from "@/components/admin/users/account-labels";
 import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import {
 	isActiveReview,
@@ -10,8 +11,6 @@ import { NOT_REVIEWED_SENTENCE } from "@/components/practice-vocabulary/scan-ent
 import { itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
-import { requesterName } from "./scan-report-schemas";
-
 /** How often an active scan is read again. A terminal scan is not polled. */
 export const SCAN_POLL_MS = 5000;
 
@@ -19,7 +18,9 @@ export const isActiveScan = (status: ScanSummary["status"]) => isActiveReview(st
 
 /** Who started a scan: the person, or, when none is recorded, what started it. */
 export function scanStartedBy(scan: Pick<ScanSummary, "requestedBy" | "origin">): string {
-	return requesterName(scan.requestedBy) ?? REVIEW_ORIGIN_DEFS[scan.origin].label;
+	return scan.requestedBy === null
+		? REVIEW_ORIGIN_DEFS[scan.origin].label
+		: accountName(scan.requestedBy);
 }
 
 /**

@@ -115,7 +115,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .isForbidden()
                 .expectBody(Void.class);
 
-        assertThat(workspaceRepository.count()).isZero();
+        assertThat(workspaceRepository.findByWorkspaceSlug("unauthenticated")).isEmpty();
     }
 
     @Test
@@ -144,7 +144,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
                 .isCreated()
                 .expectBody(Void.class);
 
-        assertThat(workspaceRepository.count()).isEqualTo(1);
+        assertThat(workspaceRepository.findByWorkspaceSlug("mentor-space")).isPresent();
     }
 
     @Test
@@ -430,7 +430,7 @@ class WorkspaceControllerIntegrationTest extends AbstractWorkspaceIntegrationTes
         assertThat(problem.getTitle()).isEqualTo("Workspace slug conflict");
         assertThat(problem.getDetail()).contains("duplicate-space");
 
-        assertThat(workspaceRepository.count()).isEqualTo(1);
+        assertThat(workspaceRepository.findByWorkspaceSlug("duplicate-space")).isPresent();
     }
 
     @Test

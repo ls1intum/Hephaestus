@@ -23,7 +23,6 @@ final class ReviewJobTelemetry {
     enum Phase {
         QUEUE("queue"),
         EXECUTION("execution"),
-        DELIVERY("delivery"),
         TOTAL("total");
 
         private final String tag;
@@ -35,8 +34,6 @@ final class ReviewJobTelemetry {
 
     enum ResultOutcome {
         STARTED("started"),
-        DELIVERED("delivered"),
-        DELIVERY_FAILED("failed"),
         COMPLETED("completed"),
         FAILED("failed"),
         TIMED_OUT("timed_out"),
@@ -105,18 +102,6 @@ final class ReviewJobTelemetry {
         return tracer.withSpan(span);
     }
 
-    static void queued(ReviewJob job) {
-        log.atInfo()
-                .addKeyValue("event.name", "agent.job.queued")
-                .addKeyValue(StructuredLogKeys.JOB_ID, job.getId())
-                .addKeyValue(StructuredLogKeys.WORKSPACE_ID, job.getWorkspaceId())
-                .addKeyValue("review.id", job.getReviewId())
-                .addKeyValue("job.phase", Phase.QUEUE.tag)
-                .addKeyValue("job.outcome", "queued")
-                .addKeyValue("duration.ms", 0)
-                .log("Agent job lifecycle transition");
-    }
-
     void transition(ReviewJob job, String event, Phase phase, ResultOutcome outcome, Duration duration) {
         log.atInfo()
                 .addKeyValue("event.name", event)
@@ -165,7 +150,7 @@ final class ReviewJobTelemetry {
     }
 
     static Duration age(ReviewJob job) {
-        Instant createdAt = job.getAvailableAt();
+        Instant createdAt = job.getSubmittedAt();
         if (createdAt == null) return Duration.ZERO;
         Duration age = Duration.between(createdAt, Instant.now());
         return age.isNegative() ? Duration.ZERO : age;

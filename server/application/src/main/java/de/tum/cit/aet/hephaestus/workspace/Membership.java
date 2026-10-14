@@ -90,9 +90,11 @@ public class Membership {
         private static final long serialVersionUID = 1L;
 
         @Nullable
+        @Column(name = "workspace_id", nullable = false)
         private Long workspaceId;
 
         @Nullable
+        @Column(name = "account_id", nullable = false)
         private Long accountId;
     }
 

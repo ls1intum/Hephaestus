@@ -2,28 +2,21 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeGuidance;
-import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
-import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
-import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
-import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -37,23 +30,6 @@ public final class RuntimeReviewTestData {
 
     private RuntimeReviewTestData() {}
 
-    public static PracticeDefinition definition(@Nullable AboutRole about, @Nullable String script) {
-        return new PracticeDefinition(
-                "Clear names",
-                new ReviewOn(List.of(), Map.of()),
-                null,
-                about,
-                new PracticeReads(
-                        "2.0.0",
-                        List.of(new PracticeReadSource(new SourceKind("docs.document.core"), ReadNeed.REQUIRED))),
-                new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
-                "Use clear names.",
-                script,
-                null,
-                true,
-                new PracticeGuidance(null, null, null, null, null));
-    }
-
     public static ReviewAssignmentSnapshot assignment(@Nullable Long developer, @Nullable String script) {
         var method = new ReviewMethod(
                 1,
@@ -65,7 +41,21 @@ public final class RuntimeReviewTestData {
                         new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
                         new BoundModelSlot("reranking", ModelKind.RERANKING, null)));
         var practice = new PinnedPractice(
-                31, 32, definition(developer == null ? null : AboutRole.AUTHOR, script), "a".repeat(64), method);
+                31,
+                32,
+                DefinitionTestFixtures.withAbout(
+                        DefinitionTestFixtures.withLineNotes(
+                                DefinitionTestFixtures.withReviewOn(
+                                        DefinitionTestFixtures.definition(
+                                                new ItemKind("docs.document"),
+                                                "Clear names",
+                                                "Use clear names.",
+                                                script),
+                                        new ReviewOn(List.of(), Map.of())),
+                                true),
+                        developer == null ? null : AboutRole.AUTHOR),
+                "a".repeat(64),
+                method);
         return new ReviewAssignmentSnapshot(
                 new ReviewAssignmentId(REVIEW, 31, 2),
                 ITEM,

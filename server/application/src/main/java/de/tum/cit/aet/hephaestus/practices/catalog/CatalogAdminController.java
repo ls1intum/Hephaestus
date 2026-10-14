@@ -15,14 +15,13 @@ import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeReleaseProposalDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeGroupsRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.SetCatalogStatusRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
-import java.net.URI;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +36,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/admin/practice-catalog")
@@ -54,7 +54,8 @@ public class CatalogAdminController {
     @GetMapping
     @Operation(operationId = "getInstanceCatalog")
     public ResponseEntity<CatalogDTO> get() {
-        return ResponseEntity.ok().eTag(catalog.effectiveCatalog().etag()).body(catalog.view());
+        var effective = catalog.effectiveCatalog();
+        return ResponseEntity.ok().eTag(effective.etag()).body(catalog.view(effective));
     }
 
     @GetMapping("/definition-options")
@@ -76,39 +77,45 @@ public class CatalogAdminController {
     }
 
     @PostMapping("/practices")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "createCatalogPractice")
     public ResponseEntity<CatalogPracticeDTO> createPractice(@RequestBody @Valid CatalogPracticeInputDTO input) {
-        return ResponseEntity.created(URI.create("/api/admin/practice-catalog/practices/" + input.slug()))
-                .body(catalog.practiceView(catalog.putPractice(input.slug(), input, true, null)));
+        return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
+                        .path("/{slug}")
+                        .buildAndExpand(input.slug())
+                        .toUri())
+                .body(catalog.practiceView(catalog.createPractice(input)));
     }
 
     @PutMapping("/practices/{slug}")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "updateCatalogPractice")
     public CatalogPracticeDTO updatePractice(
             @PathVariable String slug,
             @RequestBody @Valid CatalogPracticeInputDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.practiceView(catalog.putPractice(slug, input, false, precondition(ifMatch)));
+        return catalog.practiceView(catalog.updatePractice(slug, input, precondition(ifMatch)));
     }
 
     @PostMapping("/groups")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_GROUP")
     @Operation(operationId = "createCatalogGroup")
     public ResponseEntity<CatalogGroupDTO> createGroup(@RequestBody @Valid CatalogGroupInputDTO input) {
-        return ResponseEntity.created(URI.create("/api/admin/practice-catalog/groups/" + input.slug()))
-                .body(catalog.groupView(catalog.putGroup(input.slug(), input, true, null)));
+        return ResponseEntity.created(ServletUriComponentsBuilder.fromCurrentRequest()
+                        .path("/{slug}")
+                        .buildAndExpand(input.slug())
+                        .toUri())
+                .body(catalog.groupView(catalog.createGroup(input)));
     }
 
     @PutMapping("/groups/{slug}")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_GROUP")
     @Operation(operationId = "updateCatalogGroup")
     public CatalogGroupDTO updateGroup(
             @PathVariable String slug,
             @RequestBody @Valid CatalogGroupInputDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        return catalog.groupView(catalog.putGroup(slug, input, false, precondition(ifMatch)));
+        return catalog.groupView(catalog.updateGroup(slug, input, precondition(ifMatch)));
     }
 
     @GetMapping("/practices/{slug}/release")
@@ -118,7 +125,7 @@ public class CatalogAdminController {
     }
 
     @PutMapping("/practices/{slug}/release")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "acceptCatalogPracticeRelease")
     public CatalogPracticeDTO accept(
             @PathVariable String slug,
@@ -128,7 +135,7 @@ public class CatalogAdminController {
     }
 
     @DeleteMapping("/practices/{slug}/release")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "declineCatalogPracticeRelease")
     public CatalogPracticeDTO decline(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
@@ -136,7 +143,7 @@ public class CatalogAdminController {
     }
 
     @PatchMapping("/practices/{slug}/status")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "setCatalogPracticeStatus")
     public CatalogPracticeDTO practiceStatus(
             @PathVariable String slug,
@@ -147,7 +154,7 @@ public class CatalogAdminController {
     }
 
     @DeleteMapping("/practices/{slug}/override")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "resetCatalogPractice")
     public CatalogPracticeDTO practiceReset(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
@@ -156,7 +163,7 @@ public class CatalogAdminController {
     }
 
     @PutMapping("/practices/{slug}/override/acknowledgement")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
     @Operation(operationId = "acknowledgeCatalogPractice")
     public CatalogPracticeDTO practiceAcknowledge(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
@@ -165,7 +172,7 @@ public class CatalogAdminController {
     }
 
     @PatchMapping("/groups/{slug}/status")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_GROUP")
     @Operation(operationId = "setCatalogGroupStatus")
     public CatalogDTO groupStatus(
             @PathVariable String slug,
@@ -176,7 +183,7 @@ public class CatalogAdminController {
     }
 
     @DeleteMapping("/groups/{slug}/override")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_GROUP")
     @Operation(operationId = "resetCatalogGroup")
     public CatalogGroupDTO groupReset(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
@@ -185,7 +192,7 @@ public class CatalogAdminController {
     }
 
     @PutMapping("/groups/{slug}/override/acknowledgement")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE_GROUP")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_GROUP")
     @Operation(operationId = "acknowledgeCatalogGroup")
     public CatalogGroupDTO groupAcknowledge(
             @PathVariable String slug, @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
@@ -213,14 +220,14 @@ public class CatalogAdminController {
         return catalog.view();
     }
 
-    @PatchMapping("/practices/{slug}/placement")
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CURATED_PRACTICE")
-    @Operation(operationId = "placeCatalogPractice")
-    public CatalogDTO place(
+    @PatchMapping("/practices/{slug}/group")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "CATALOG_PRACTICE")
+    @Operation(operationId = "moveCatalogPractice")
+    public CatalogDTO move(
             @PathVariable String slug,
-            @RequestBody @Valid PlacePracticeRequestDTO input,
+            @RequestBody @Valid MovePracticeRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
-        catalog.place(slug, input.groupSlug(), input.position(), precondition(ifMatch));
+        catalog.move(slug, input.groupSlug(), input.position(), precondition(ifMatch));
         return catalog.view();
     }
 

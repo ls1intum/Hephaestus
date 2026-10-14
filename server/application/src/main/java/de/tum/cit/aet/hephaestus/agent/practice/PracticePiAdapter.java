@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -99,20 +98,12 @@ public class PracticePiAdapter {
     record BoundModel(
             String protocol, String modelId, @Nullable ReasoningEffort reasoningEffort) {}
 
-    /**
-     * The direct models file, by slot. The runner rejects the whole file for one unknown protocol,
-     * and a pre-catalog snapshot can hold one, so a model on such a protocol has no entry.
-     */
     private static Map<String, BoundModel> boundModels(Map<ModelKind, FrozenModel> models) {
         Map<String, BoundModel> bound = new LinkedHashMap<>();
-        models.forEach((kind, model) -> {
-            if (LlmApiProtocol.parse(model.apiProtocol()).isPresent()) {
-                bound.put(
-                        kind.name().toLowerCase(Locale.ROOT),
-                        new BoundModel(model.apiProtocol(), model.upstreamModelId(), model.reasoningEffort()));
-            }
-        });
-        return bound;
+        models.forEach((kind, model) -> bound.put(
+                kind.name().toLowerCase(Locale.ROOT),
+                new BoundModel(model.apiProtocol().wire(), model.upstreamModelId(), model.reasoningEffort())));
+        return Map.copyOf(bound);
     }
 
     private byte[] toJson(Map<String, BoundModel> models) {

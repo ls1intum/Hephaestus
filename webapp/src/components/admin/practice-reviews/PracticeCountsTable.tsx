@@ -2,7 +2,7 @@ import { ScanSearchIcon, TriangleAlertIcon } from "lucide-react";
 import { useState } from "react";
 
 import { cn } from "cn";
-import type { PracticeReviewCounts } from "@/api/types.gen";
+import type { ReviewPracticeCounts } from "@/api/types.gen";
 import { STALE } from "@/components/activity/activity-tones";
 import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
@@ -15,7 +15,7 @@ import {
 	type RecordTableColumn,
 	RecordTableSkeleton,
 } from "@/components/practice-vocabulary/RecordTable";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
 import { Badge } from "@/components/ui/badge";
 import {
 	Empty,
@@ -66,10 +66,10 @@ export interface PracticeCountsFilter {
 }
 
 /** The groups of the practices the table counts, as the Group filter offers them. */
-function groupOptions(rows: readonly PracticeReviewCounts[]): FacetOption[] {
+function groupOptions(rows: readonly ReviewPracticeCounts[]): FacetOption[] {
 	const options: FacetOption[] = [];
 	for (const row of rows) {
-		if (row.group && !options.some((option) => option.value === row.group?.slug)) {
+		if (row.group !== null && !options.some((option) => option.value === row.group?.slug)) {
 			options.push({ value: row.group.slug, label: row.group.name });
 		}
 	}
@@ -80,6 +80,9 @@ const SKELETON_ROWS = 4;
 
 /** The heads, each one line: the outcome's own word, and the long meaning in the head's (i). */
 const NOT_MET = OUTCOME_DEFS.NOT_MET.label;
+const DOES_NOT_APPLY = OUTCOME_DEFS.DOES_NOT_APPLY.label;
+const COULD_NOT_DETERMINE = OUTCOME_DEFS.COULD_NOT_DETERMINE.label;
+const MARKED_INCORRECT = RESULT_MARK_DEFS.INCORRECT;
 const DELIVERED = "Feedback delivered";
 
 /**
@@ -98,11 +101,11 @@ const COLUMN_INFO = {
 	results:
 		"Every result the reviews recorded about this practice in the range: met, not met, does not apply and could not determine.",
 	notMet: "The results of this practice whose outcome was not met, out of all its results.",
-	notApplicable: `The results where the practice did not apply to the work, out of all its results. From ${minimumResults} results, a practice where ${Math.round(neverAppliesShare * 100)} % or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
-	undetermined: `The results where the review could not decide, out of all its results. From ${minimumResults} results, a practice where ${Math.round(oftenUndecidedShare * 100)} % or more could not be determined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
-	markedIncorrect: `The results an admin marked incorrect, out of all its results. They keep their outcome too. ${MARKED_INCORRECT_DEF.note}`,
+	doesNotApply: `The results where the practice did not apply to the work, out of all its results. From ${minimumResults} results, a practice where ${Math.round(neverAppliesShare * 100)} % or more do not apply is marked "${PRACTICE_MARKER_DEFS.NEVER_APPLIES.label}".`,
+	couldNotDetermine: `The results where the review could not decide, out of all its results. From ${minimumResults} results, a practice where ${Math.round(oftenUndecidedShare * 100)} % or more could not be determined is marked "${PRACTICE_MARKER_DEFS.OFTEN_UNDECIDED.label}".`,
+	markedIncorrect: `The results an admin marked incorrect, out of all its results. They keep their outcome too. ${MARKED_INCORRECT.note}`,
 	feedbackDelivered:
-		"The feedback about this practice that reached the developer, in full or in part, out of all the feedback composed about it in the range: delivered, waiting, withheld or failed. A piece replaced by a newer one is not counted.",
+		"The feedback about this practice that reached the developer, out of all the feedback composed about it in the range: delivered, waiting, withheld, rejected or failed. A piece replaced by a newer one is not counted.",
 } as const;
 
 export type PracticeSort = "ATTENTION" | "BUSIEST";
@@ -133,7 +136,7 @@ const STACKED_FULL_WIDTH =
  * (`feedbackComposed`). Each column's (i) says how its count is reached. By default the
  * practices that need a look lead, each with one marker: one that mostly does not apply here costs
  * reviews and tells nobody much, and one that is often undecided may lack the evidence it needs
- * (`review-attention-thresholds.ts`). The most results marked incorrect, then undetermined,
+ * (`review-attention-thresholds.ts`). The most results marked incorrect, then could not determine,
  * follow, then the rest busiest first; the reader can sort the whole table busiest first, and the
  * choice is kept in the URL with the filters. It is drawn as the Reviews table is, without the
  * days: a practice's row opens its sheet, and as an overview, not a stream, it has no Track or
@@ -170,7 +173,7 @@ export function PracticeCountsTable({ state, practices, filter }: PracticeCounts
 	const inGroups = recorded?.filter(
 		(counts) =>
 			activeGroups.length === 0 ||
-			(counts.group !== undefined && activeGroups.includes(counts.group.slug)),
+			(counts.group !== null && activeGroups.includes(counts.group.slug)),
 	);
 	const turnedOff = (inGroups ?? []).filter((counts) =>
 		isTurnedOff(counts.practiceSlug, practices),
@@ -197,27 +200,19 @@ export function PracticeCountsTable({ state, practices, filter }: PracticeCounts
 			info: <ColumnInfo label={NOT_MET}>{COLUMN_INFO.notMet}</ColumnInfo>,
 		},
 		{
-			label: OUTCOME_DEFS.NOT_APPLICABLE.label,
+			label: DOES_NOT_APPLY,
 			className: COUNT_COLUMN,
-			info: (
-				<ColumnInfo label={OUTCOME_DEFS.NOT_APPLICABLE.label}>
-					{COLUMN_INFO.notApplicable}
-				</ColumnInfo>
-			),
+			info: <ColumnInfo label={DOES_NOT_APPLY}>{COLUMN_INFO.doesNotApply}</ColumnInfo>,
 		},
 		{
-			label: OUTCOME_DEFS.UNDETERMINED.label,
+			label: COULD_NOT_DETERMINE,
 			className: COUNT_COLUMN,
-			info: (
-				<ColumnInfo label={OUTCOME_DEFS.UNDETERMINED.label}>{COLUMN_INFO.undetermined}</ColumnInfo>
-			),
+			info: <ColumnInfo label={COULD_NOT_DETERMINE}>{COLUMN_INFO.couldNotDetermine}</ColumnInfo>,
 		},
 		{
-			label: MARKED_INCORRECT_DEF.label,
+			label: MARKED_INCORRECT.label,
 			className: COUNT_COLUMN,
-			info: (
-				<ColumnInfo label={MARKED_INCORRECT_DEF.label}>{COLUMN_INFO.markedIncorrect}</ColumnInfo>
-			),
+			info: <ColumnInfo label={MARKED_INCORRECT.label}>{COLUMN_INFO.markedIncorrect}</ColumnInfo>,
 		},
 		{
 			label: DELIVERED,
@@ -312,9 +307,9 @@ function TotalsRow({ totals }: { totals: PracticeTotals }) {
 	const cells: [string, number, number?][] = [
 		["Results", totals.results],
 		[NOT_MET, totals.notMet, totals.results],
-		[OUTCOME_DEFS.NOT_APPLICABLE.label, totals.notApplicable, totals.results],
-		[OUTCOME_DEFS.UNDETERMINED.label, totals.undetermined, totals.results],
-		[MARKED_INCORRECT_DEF.label, totals.markedIncorrect, totals.results],
+		[DOES_NOT_APPLY, totals.doesNotApply, totals.results],
+		[COULD_NOT_DETERMINE, totals.couldNotDetermine, totals.results],
+		[MARKED_INCORRECT.label, totals.markedIncorrect, totals.results],
 		[DELIVERED, totals.feedbackDelivered, totals.feedbackComposed],
 	];
 	return (
@@ -362,9 +357,9 @@ function StackedColumnInfo() {
 					lines={[
 						{ term: "Number of results", text: COLUMN_INFO.results },
 						{ term: NOT_MET, text: COLUMN_INFO.notMet },
-						{ term: OUTCOME_DEFS.NOT_APPLICABLE.label, text: COLUMN_INFO.notApplicable },
-						{ term: OUTCOME_DEFS.UNDETERMINED.label, text: COLUMN_INFO.undetermined },
-						{ term: MARKED_INCORRECT_DEF.label, text: COLUMN_INFO.markedIncorrect },
+						{ term: DOES_NOT_APPLY, text: COLUMN_INFO.doesNotApply },
+						{ term: COULD_NOT_DETERMINE, text: COLUMN_INFO.couldNotDetermine },
+						{ term: MARKED_INCORRECT.label, text: COLUMN_INFO.markedIncorrect },
 						{ term: DELIVERED, text: COLUMN_INFO.feedbackDelivered },
 					]}
 				/>
@@ -386,13 +381,13 @@ function ColumnInfo({ label, children }: { label: string; children: string }) {
  * The one marker a practice earns, beside its name on the same line, its reason with the numbers
  * read out and on hover.
  */
-function Marker({ counts }: { counts: PracticeReviewCounts }) {
-	const found = practiceMarker(counts.practiceResults);
+function Marker({ counts }: { counts: ReviewPracticeCounts }) {
+	const found = practiceMarker(counts.results);
 	if (found === undefined) {
 		return null;
 	}
 	const def = PRACTICE_MARKER_DEFS[found.marker];
-	const reason = def.reason(found.part, found.whole);
+	const reason = def.reason(found.count, found.whole);
 	return (
 		<Badge variant="outline" title={reason} data-marker={found.marker} className="shrink-0">
 			<TriangleAlertIcon aria-hidden />
@@ -402,8 +397,8 @@ function Marker({ counts }: { counts: PracticeReviewCounts }) {
 	);
 }
 
-function PracticeCountsRow({ counts }: { counts: PracticeReviewCounts }) {
-	const results = slotsTotal(resultSlots(counts.practiceResults));
+function PracticeCountsRow({ counts }: { counts: ReviewPracticeCounts }) {
+	const results = slotsTotal(resultSlots(counts.results));
 	return (
 		<PracticeTableRow
 			className={STACKED_FULL_WIDTH}
@@ -417,7 +412,7 @@ function PracticeCountsRow({ counts }: { counts: PracticeReviewCounts }) {
 			    truncates, with the whole of it on hover, and the marker stays beside it. */}
 			<TableCell className={cn(OPEN_ROW_BAR, "@2xl:w-full @2xl:max-w-0")}>
 				<span className="flex min-w-0 items-center gap-2">
-					{counts.group && (
+					{counts.group !== null && (
 						<GroupPill
 							size="sm"
 							slug={counts.group.slug}
@@ -437,16 +432,16 @@ function PracticeCountsRow({ counts }: { counts: PracticeReviewCounts }) {
 				<Count value={results} />
 			</TableCell>
 			<TableCell numeric data-label={NOT_MET} className={COUNT_CELL}>
-				<Count value={counts.practiceResults.notMet} of={results} />
+				<Count value={counts.results.notMet} of={results} />
 			</TableCell>
-			<TableCell numeric data-label={OUTCOME_DEFS.NOT_APPLICABLE.label} className={COUNT_CELL}>
-				<Count value={counts.practiceResults.notApplicable} of={results} />
+			<TableCell numeric data-label={DOES_NOT_APPLY} className={COUNT_CELL}>
+				<Count value={counts.results.doesNotApply} of={results} />
 			</TableCell>
-			<TableCell numeric data-label={OUTCOME_DEFS.UNDETERMINED.label} className={COUNT_CELL}>
-				<Count value={counts.practiceResults.undetermined} of={results} />
+			<TableCell numeric data-label={COULD_NOT_DETERMINE} className={COUNT_CELL}>
+				<Count value={counts.results.couldNotDetermine} of={results} />
 			</TableCell>
-			<TableCell numeric data-label={MARKED_INCORRECT_DEF.label} className={COUNT_CELL}>
-				<Count value={counts.practiceResultsInvalidated} of={results} />
+			<TableCell numeric data-label={MARKED_INCORRECT.label} className={COUNT_CELL}>
+				<Count value={counts.resultsMarkedIncorrect} of={results} />
 			</TableCell>
 			<TableCell numeric data-label={DELIVERED} className={COUNT_CELL}>
 				<Count

@@ -4,12 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContract;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
@@ -30,7 +29,7 @@ class PracticeDefinitionOptionsServiceTest extends BaseUnitTest {
     @Test
     void shouldUseTheRegisteredProviderAndConnectedCoverageForEventOptions() {
         var items = mock(PracticeItemOptions.class);
-        var sources = mock(SourceCatalogRegistry.class);
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
         var catalog = mock(SourceCatalog.class);
         var coverage = mock(ItemEventCoverage.class);
         var descriptor = mock(ItemDescriptor.class);
@@ -63,7 +62,7 @@ class PracticeDefinitionOptionsServiceTest extends BaseUnitTest {
     @Test
     void shouldKeepScanOnlySourcesOutOfTheParentItemReadOptions() {
         var registry = new ClasspathSourceCatalogRegistry(JsonMapper.builder().build(), Clock.systemUTC());
-        var tree = registry.requireSource(registry.current().version(), new SourceKind("scm.repository.tree"));
+        var tree = registry.requireSource(new SourceKind("scm.repository.tree"));
         var fileOnly = new SourceContract(
                 new SourceKind("custom.file.content"),
                 tree.displayName(),
@@ -81,7 +80,7 @@ class PracticeDefinitionOptionsServiceTest extends BaseUnitTest {
                 tree.erasurePolicy(),
                 tree.useDecisionIds(),
                 tree.citation());
-        var sources = mock(SourceCatalogRegistry.class);
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
         when(sources.current()).thenReturn(new SourceCatalog(registry.current().version(), List.of(fileOnly)));
         var items = mock(PracticeItemOptions.class);
         when(items.all()).thenReturn(List.of(new PullRequestItemDescriptor()));

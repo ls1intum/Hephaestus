@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -23,7 +23,7 @@ public final class EvidenceSnapshotFixtures {
     public static ObjectNode snapshot(ObjectMapper mapper, String itemKind) {
         ObjectNode snapshot = mapper.createObjectNode();
         ObjectNode manifest = snapshot.putObject("manifest");
-        manifest.put("contractVersion", SourceCatalogRegistry.CURRENT_VERSION.value());
+        manifest.put("contractVersion", ClasspathSourceCatalogRegistry.CURRENT_VERSION.value());
         manifest.put("catalogDigest", "0".repeat(64));
         manifest.put("itemKind", itemKind);
         manifest.put("capturedAt", CAPTURED_AT);

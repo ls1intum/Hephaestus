@@ -1,7 +1,8 @@
 import { CircleAlert, Copy, ShieldCheck } from "lucide-react";
 
 import { cn } from "cn";
-import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
+import type { PracticeDefinitionOptions } from "@/api/types.gen";
+import type { PracticeAdoptionPreview } from "@/components/admin/practices/catalog-adoption";
 import { PRACTICE_SETUP_LEVEL_LABELS } from "@/components/admin/practices/practice-search";
 import { PracticeDefinitionPreview } from "@/components/admin/practices/PracticeDefinitionPreview";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
@@ -39,7 +40,7 @@ import { FEEDBACK_MODE_DESCRIPTIONS } from "@/lib/practice-feedback-mode";
 import { hasText } from "@/lib/text";
 
 export type PracticeAdoptionState = PanelState<{
-	preview: CatalogPracticePreview;
+	preview: PracticeAdoptionPreview;
 	definitionOptions: PracticeDefinitionOptions;
 	action: "idle" | "adding" | "stale";
 }>;
@@ -209,7 +210,7 @@ function PracticeAdoptionPlaceholder({
 	);
 }
 
-function GroupOutcome({ preview }: { preview: CatalogPracticePreview }) {
+function GroupOutcome({ preview }: { preview: PracticeAdoptionPreview }) {
 	return (
 		<Item variant="muted" size="sm" role="listitem">
 			<ItemMedia variant="icon">
@@ -225,7 +226,7 @@ function GroupOutcome({ preview }: { preview: CatalogPracticePreview }) {
 				<ItemTitle>{groupTitle(preview)}</ItemTitle>
 				{hasText(preview.group.definition?.description) && (
 					<ItemDescription className="line-clamp-none">
-						{preview.group.definition?.description}
+						{preview.group.definition.description}
 					</ItemDescription>
 				)}
 			</ItemContent>
@@ -233,7 +234,7 @@ function GroupOutcome({ preview }: { preview: CatalogPracticePreview }) {
 	);
 }
 
-function FeedbackModeOutcome({ preview }: { preview: CatalogPracticePreview }) {
+function FeedbackModeOutcome({ preview }: { preview: PracticeAdoptionPreview }) {
 	return (
 		// No bare icon beside the badge: the badge already renders the registry's icon, and the
 		// same mark twice in one row reads as two facts.
@@ -250,7 +251,7 @@ function FeedbackModeOutcome({ preview }: { preview: CatalogPracticePreview }) {
 	);
 }
 
-function groupTitle(preview: CatalogPracticePreview): string {
+function groupTitle(preview: PracticeAdoptionPreview): string {
 	if (preview.group.disposition === "UNASSIGNED") {
 		return "Stay unassigned";
 	}

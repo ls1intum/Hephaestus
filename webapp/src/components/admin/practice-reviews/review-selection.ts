@@ -20,15 +20,23 @@ export type ReviewSelection =
 
 export type ReviewSelectionKind = ReviewSelection["kind"];
 
-/** A workspace item or account id: a positive decimal, never a provider's own number. */
+/**
+ * A workspace item or account id: a positive decimal, never a provider's own number. A link written
+ * outside the app, such as the browser extension's, carries it bare, which the router reads as a
+ * number; either way it reads back as the decimal string.
+ */
 export const positiveIdParam = z
-	.string()
-	.regex(/^[1-9]\d{0,18}$/u)
+	.union([z.string(), z.number().int()])
+	.transform(String)
+	.pipe(z.string().regex(/^[1-9]\d{0,18}$/u))
 	.optional()
 	.catch(undefined);
 
-/** A review, result, problem or feedback id. */
-export const uuidParam = z.uuid().optional().catch(undefined);
+/**
+ * A review, result, problem or feedback id. Shaped as a UUID, as the server parses one: any
+ * version, so `z.guid()` rather than the RFC-strict `z.uuid()`.
+ */
+export const uuidParam = z.guid().optional().catch(undefined);
 
 /**
  * The selection's part of any route's search, read loosely: a row reads it from whichever route
@@ -82,9 +90,9 @@ export function readScopedRecord(scope: RecordScope): ReviewSelection | undefine
 }
 
 /** The search that makes `selection` the only one; `undefined` clears it. */
-export function selectionSearch(selection: ReviewSelection | undefined): Required<{
-	[K in keyof RecordScope]: RecordScope[K] | undefined;
-}> {
+export function selectionSearch(selection: ReviewSelection | undefined): {
+	[K in keyof Required<RecordScope>]: Required<RecordScope>[K] | undefined;
+} {
 	return {
 		selected: selection === undefined ? undefined : true,
 		reviewId:

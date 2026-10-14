@@ -21,7 +21,7 @@ import {
 	type ProviderConfig,
 	registerHephaestusProvider,
 } from "../../../main/resources/agent/pi-provider.ts";
-import { isRecord } from "../../../main/resources/agent/pi-result-normalize.ts";
+import { isRecord } from "../../../main/resources/agent/pi-text.ts";
 
 const PREFIX = "Review this captured work.\n\nShared work description and diff.\n\n";
 const JOB = "10000000-0000-4000-8000-000000000001";

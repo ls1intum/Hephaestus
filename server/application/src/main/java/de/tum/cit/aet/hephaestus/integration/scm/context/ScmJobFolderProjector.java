@@ -53,10 +53,9 @@ public class ScmJobFolderProjector implements WorkspaceScmProjection {
     }
 
     /**
-     * One query per selected family for the whole repository, each read to its end before the next
-     * starts. Records arrive family by family, each in work-number then row order. Every file holds
-     * the same lines in the same order as when each piece of work was read on its own; only the
-     * order in which files are first written differs.
+     * One query per selected family for the whole repository, each read to its end before the next starts. Records
+     * arrive family by family, each in work-number then row order. Every file holds the same lines in the same order
+     * as when each piece of work was read on its own; only the order in which files are first written differs.
      */
     @Override
     public void forEachRecord(
@@ -107,9 +106,7 @@ public class ScmJobFolderProjector implements WorkspaceScmProjection {
         return (pull ? "pulls/" : "issues/") + number + "/";
     }
 
-    /**
-     * Hephaestus's own notes are not part of the work under review, so they never enter the folder.
-     */
+    /** Hephaestus's own notes are not part of the work under review, so they never enter the folder. */
     private void comments(
             Stream<ScmJobFolderRepository.WorkPart> comments,
             String file,
@@ -154,7 +151,7 @@ public class ScmJobFolderProjector implements WorkspaceScmProjection {
             if (id.isIntegralNumber() && id.asLong() > 0) {
                 var user = users.findById(id.asLong())
                         .orElseThrow(() -> new ItemCaptureException(
-                                ItemCaptureCode.CAPTURE_FAILED, "Copied SCM author identity is" + " unavailable"));
+                                ItemCaptureCode.CAPTURE_FAILED, "Copied SCM author identity is unavailable"));
                 personCopies.recordIdentity(new PersonCopyIdentity(
                         user.getProvider().getType().name(),
                         user.getProvider().getServerUrl(),

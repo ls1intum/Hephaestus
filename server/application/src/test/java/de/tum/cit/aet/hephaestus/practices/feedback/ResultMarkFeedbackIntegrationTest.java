@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
@@ -16,6 +17,9 @@ class ResultMarkFeedbackIntegrationTest extends AbstractFeedbackIntegrationTest 
 
     @Autowired
     FeedbackStoreService store;
+
+    @Autowired
+    ResultMarkService marks;
 
     @Test
     void shouldWithholdUnsentFeedbackWithoutEndingItsResultOnAnIncorrectMark() {
@@ -51,5 +55,33 @@ class ResultMarkFeedbackIntegrationTest extends AbstractFeedbackIntegrationTest 
         store.marked(new ResultMarkChanged(
                 UUID.randomUUID(), workspace.getId(), result.getId(), ResultMarkKind.ACCEPTED, false, AT));
         assertThat(feedback.findById(parent.getId()).orElseThrow().getState()).isEqualTo(FeedbackState.READY);
+    }
+
+    @Test
+    void shouldKeepFeedbackReadyWhenAnAcceptedMarkIsRemoved() {
+        var parent = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
+        var result = negativeResult();
+        bind(parent, result);
+        var mark = marks.create(
+                workspace.getId(), result.getId(), ResultMarkKind.ACCEPTED, developerId, "This tradeoff is accepted");
+        assertThat(feedback.findById(parent.getId()).orElseThrow().getState()).isEqualTo(FeedbackState.READY);
+        marks.remove(workspace.getId(), result.getId(), mark.getId(), developerId, "Reconsider the tradeoff");
+        assertThat(feedback.findById(parent.getId()).orElseThrow().getState()).isEqualTo(FeedbackState.READY);
+        assertThat(results.findById(result.getId()).orElseThrow().getEndedAt()).isNull();
+    }
+
+    @Test
+    void shouldKeepFeedbackWithheldWhenItsModeIsOffBeforeIncorrectMarkRemoval() {
+        var parent = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
+        var result = negativeResult();
+        bind(parent, result);
+        var mark = marks.create(
+                workspace.getId(), result.getId(), ResultMarkKind.INCORRECT, developerId, "The basis is incorrect");
+        jdbc.update(
+                "UPDATE practice SET feedback_mode='OFF' WHERE workspace_id=? AND id=?",
+                workspace.getId(),
+                result.getPracticeId());
+        marks.remove(workspace.getId(), result.getId(), mark.getId(), developerId, "The basis is verified");
+        assertThat(feedback.findById(parent.getId()).orElseThrow().getState()).isEqualTo(FeedbackState.WITHHELD);
     }
 }

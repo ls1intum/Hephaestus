@@ -6,7 +6,6 @@ import type {
 	PracticeDefinition,
 	PracticeGroup,
 	PracticeReleaseProposal,
-	PracticeReviewSettings,
 	PracticeVersion,
 	ReviewBatch,
 	ReviewSchedule,
@@ -27,38 +26,6 @@ export const mockAdmin: AccountRef = {
 	status: "ACTIVE",
 	identities: [{ provider: "GITHUB", login: "ada", displayName: "Ada Lovelace", avatarUrl: null }],
 };
-
-export function mockReviewSettings(
-	overrides: Partial<PracticeReviewSettings> = {},
-): PracticeReviewSettings {
-	return {
-		etag: '"0"',
-		generatedPaths: {},
-		revision: "0",
-		cooldownMinutes: 30,
-		cooldownMinutesOverride: null,
-		defaultFeedbackMode: "APPROVE_FIRST",
-		defaultFeedbackModeOverride: null,
-		deliverToMerged: true,
-		deliverToMergedOverride: null,
-		deliveryStatus: "ACTIVE",
-		reviewScope: {
-			repositories: "ALL",
-			people: "ALL",
-			selectedRepositories: [],
-			accountIds: [],
-		},
-		scopeSummary: {
-			monitoredRepositories: 3,
-			selectedRepositories: 3,
-			eligiblePeople: 8,
-			selectedPeople: 8,
-			recentReviewVolume: 42,
-			estimateWindowDays: 30,
-		},
-		...overrides,
-	};
-}
 
 export function reviewSchedule(overrides: Partial<ReviewSchedule> = {}): ReviewSchedule {
 	return {
@@ -312,15 +279,6 @@ export const mockScriptedPractice = mockPracticeOf({
 			"## Commit Discipline\n\nEach commit message must:\n- Start with a type prefix (feat, fix, refactor, etc.)\n- Have a descriptive subject (not just issue numbers)\n- Reference the related issue",
 		script: practiceScript(),
 	}),
-});
-
-/** A catalog practice this workspace changed, then declined the catalog's next version of. */
-export const mockEditedHerePractice = mockPracticeOf({
-	id: "8",
-	slug: "explain-the-change",
-	catalogOrigin: catalogOrigin("explain-the-change", "EDITED_HERE", ["CRITERIA"]),
-	version: { number: 3 },
-	definition: definitionOf({ name: "Explain the change", criteria: "Our criteria" }),
 });
 
 export const mockGroups: PracticeGroup[] = [

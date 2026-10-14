@@ -86,8 +86,7 @@ public class DocumentItemDescriptor implements ItemDescriptor {
                 List.of(
                         new ReviewLimitation(
                                 "DESCRIBED_SYSTEM_NOT_OBSERVED",
-                                "Document evidence does not establish whether the system it describes behaves as"
-                                        + " written."),
+                                "Document evidence does not establish whether the system it describes behaves as written."),
                         new ReviewLimitation(
                                 "READERSHIP_NOT_OBSERVED",
                                 "The mirrored document does not establish whether anyone read it or relied on it.")),

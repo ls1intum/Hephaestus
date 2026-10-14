@@ -1,10 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.PracticeTrendDTO;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendOpportunityDTO;
-import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -14,21 +10,14 @@ import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 
 /** Complete internal trend result; developer-facing DTOs intentionally omit its scalar posterior diagnostics. */
 public final class PracticeTrend {
 
-    private final String slug;
-    private final TrendScope scope;
     private final TrendDirection direction;
     private final TrendSupport support;
-    /** Absent while the evidence is not comparable — the accessors below say the same. */
-    private final @Nullable OutcomeVector currentOutcomes;
-
-    private final @Nullable OutcomeVector previousOutcomes;
     private final List<EvidenceOpportunity> opportunities;
 
     /**
@@ -41,28 +30,16 @@ public final class PracticeTrend {
     private final BetaPosterior.@Nullable Difference difference;
 
     PracticeTrend(
-            String slug,
-            TrendScope scope,
             TrendDirection direction,
             TrendSupport support,
-            @Nullable OutcomeVector currentOutcomes,
-            @Nullable OutcomeVector previousOutcomes,
             List<EvidenceOpportunity> opportunities,
             Map<Long, ItemKind> reviewedWork,
             BetaPosterior.@Nullable Difference difference) {
-        this.slug = slug;
-        this.scope = scope;
         this.direction = direction;
         this.support = support;
-        this.currentOutcomes = currentOutcomes;
-        this.previousOutcomes = previousOutcomes;
         this.opportunities = List.copyOf(opportunities);
         this.reviewedWork = Map.copyOf(reviewedWork);
         this.difference = difference;
-    }
-
-    public String slug() {
-        return slug;
     }
 
     public TrendDirection direction() {
@@ -182,20 +159,6 @@ public final class PracticeTrend {
         }
     }
 
-    TrendScope scope() {
-        return scope;
-    }
-
-    @Nullable
-    OutcomeVector currentOutcomes() {
-        return currentOutcomes;
-    }
-
-    @Nullable
-    OutcomeVector previousOutcomes() {
-        return previousOutcomes;
-    }
-
     List<EvidenceOpportunity> opportunities() {
         return opportunities;
     }
@@ -206,31 +169,5 @@ public final class PracticeTrend {
 
     BetaPosterior.@Nullable Difference difference() {
         return difference;
-    }
-
-    public PracticeTrendDTO toDto() {
-        return new PracticeTrendDTO(
-                slug,
-                scope,
-                direction,
-                TrendSupportDTO.from(support),
-                OutcomeVectorDTO.from(currentOutcomes),
-                OutcomeVectorDTO.from(previousOutcomes),
-                IntStream.range(0, opportunities.size())
-                        .mapToObj(index -> {
-                            EvidenceOpportunity opportunity = opportunities.get(index);
-                            return new TrendOpportunityDTO(
-                                    index,
-                                    opportunity.occurredAt(),
-                                    opportunity.itemKind(),
-                                    Long.toString(opportunity.itemId()),
-                                    new OutcomeVectorDTO(
-                                            opportunity.outcomes().met(),
-                                            opportunity.outcomes().notMet(),
-                                            opportunity.outcomes().doesNotApply(),
-                                            opportunity.outcomes().couldNotDetermine()),
-                                    opportunity.bundle());
-                        })
-                        .toList());
     }
 }

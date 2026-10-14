@@ -270,7 +270,12 @@ export function gapLabel(from: Date, to: Date): string {
 	return `${to.getTime() < from.getTime() ? "−" : "+"}${durationBetween(from, to)}`;
 }
 
-const OUTCOME_ORDER: readonly Outcome[] = ["NOT_MET", "MET", "COULD_NOT_DETERMINE", "DOES_NOT_APPLY"];
+const OUTCOME_ORDER: readonly Outcome[] = [
+	"NOT_MET",
+	"MET",
+	"COULD_NOT_DETERMINE",
+	"DOES_NOT_APPLY",
+];
 
 /** The results by verdict, worst first, with the zeroes left out. */
 export function verdictCounts(
@@ -325,9 +330,12 @@ export function numberedResults(results: readonly LineageResult[]): NumberedResu
  * Not-met results that led to no feedback. A met result, or one that does not apply or could not
  * be determined, rarely leads to feedback, so it is no loss.
  */
-export function silentNotMet(records: Pick<LineageRecords, "results" | "feedback">): LineageResult[] {
+export function silentNotMet(
+	records: Pick<LineageRecords, "results" | "feedback">,
+): LineageResult[] {
 	return records.results.filter(
-		(result) => result.outcome === "NOT_MET" && feedbackOf(records.feedback, result.id).length === 0,
+		(result) =>
+			result.outcome === "NOT_MET" && feedbackOf(records.feedback, result.id).length === 0,
 	);
 }
 

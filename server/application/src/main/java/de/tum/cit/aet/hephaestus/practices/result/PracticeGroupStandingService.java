@@ -11,13 +11,12 @@ import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
+import de.tum.cit.aet.hephaestus.practices.result.trend.TrendSupport;
 import de.tum.cit.aet.hephaestus.practices.spi.GuidanceSource;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -41,31 +40,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class PracticeGroupStandingService {
 
-    /** Evidence cap: enough to make a standing inspectable, not an exhaustive log. */
     private static final int MAX_GROUP_EVIDENCE_ITEMS = 5;
 
     private final PracticeStandingService practiceStandingService;
     private final PracticeTrendService practiceTrendService;
     private final Clock clock;
 
-    /**
-     * One standing per requested group, rolled up from the practice standings of the same developer snapshot
-     * the per-practice surface renders. Results are loaded once and partitioned in memory rather than
-     * queried per practice.
-     *
-     * <p>With nothing displayable the standing reports why, as {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED},
-     * instead of one undifferentiated empty state.
-     */
     @Transactional(readOnly = true)
     public List<PracticeGroupStandingDTO> getGroupStandings(Long workspaceId, List<PracticeGroup> groups) {
         return summarize(groups, practiceStandingService.getStandingSnapshot(workspaceId));
     }
 
-    /**
-     * The group standings rolled up from one practice snapshot, as of whatever moment that snapshot is. Pure
-     * over the snapshot, which already carries the workspace it was read for; the caller holds the
-     * transaction the snapshot's lazy associations are read in.
-     */
     public List<PracticeGroupStandingDTO> summarize(
             List<PracticeGroup> groups, PracticeStandingService.StandingSnapshot snapshot) {
         Map<String, List<PracticeStandingDTO>> cardsByGroup = cardsByGroup(snapshot.dtos());
@@ -145,19 +130,9 @@ public class PracticeGroupStandingService {
                         Objects.requireNonNull(practices.get(card.slug())).share()))
                 .average()
                 .orElseThrow();
-        return switch (StandingScale.classify(groupShare)) {
-            case STRENGTH -> PracticeStanding.STRENGTH;
-            case MIXED -> PracticeStanding.MIXED;
-            case DEVELOPING -> PracticeStanding.DEVELOPING;
-            case NOT_OBSERVED, NO_OPPORTUNITY ->
-                throw new IllegalStateException("StandingScale only classifies verdicts");
-        };
+        return StandingScale.classify(groupShare);
     }
 
-    /**
-     * Problems lead because they explain the action-oriented standing. A mixed standing always reserves one
-     * of the five evidence slots for a strength, so the payload cannot say MIXED while showing only one side.
-     */
     private static List<PracticeStandingResultDTO> groupEvidence(
             List<PracticeStandingDTO> cards, boolean hasProblems, boolean hasStrengths) {
         List<PracticeStandingResultDTO> problems =
@@ -175,7 +150,6 @@ public class PracticeGroupStandingService {
                 .toList();
     }
 
-    /** Group-level direction and provenance, derived from the same visible evidence as its standing. */
     private record GroupSignal(
             @Nullable TrendDirection direction,
             @Nullable TrendSupportDTO trendSupport,
@@ -185,12 +159,6 @@ public class PracticeGroupStandingService {
         private static final GroupSignal NONE = new GroupSignal(null, null, null, null, List.of());
     }
 
-    /**
-     * One signal per group that has evidence or eligible practices. Only an eligible practice's trend joins
-     * the group's; the evidence stays unfiltered on purpose: a practice review is no longer admitted for still
-     * has results worth showing, and the feedback span is still dated by them. Its VERDICT is what it has
-     * stopped casting, and the standing beside this already excludes it.
-     */
     private Map<String, GroupSignal> groupSignals(PracticeStandingService.StandingSnapshot snapshot) {
         Map<String, List<ResultView>> evidenceByGroup = new LinkedHashMap<>();
         Map<String, List<PracticeTrend>> trendsByGroup = new LinkedHashMap<>();
@@ -226,7 +194,6 @@ public class PracticeGroupStandingService {
                     .min(Instant::compareTo)
                     .orElse(null);
             PracticeTrend direction = practiceTrendService.calculateGroup(
-                    groupSlug,
                     snapshot.eligiblePracticesByGroup().getOrDefault(groupSlug, List.of()),
                     trendsByGroup.getOrDefault(groupSlug, List.of()));
             signals.put(
@@ -234,19 +201,15 @@ public class PracticeGroupStandingService {
                     new GroupSignal(
                             direction.direction(),
                             TrendSupportDTO.from(direction.support()),
-                            oldest == null ? null : inclusiveUtcDaySpan(oldest, now),
+                            oldest == null
+                                    ? null
+                                    : Math.min(
+                                            PracticeTrendService.LOOKBACK_DAYS,
+                                            TrendSupport.inclusiveUtcDaySpan(oldest, now)),
                             oldest,
                             sourceCounts(evidence)));
         }
         return signals;
-    }
-
-    private static int inclusiveUtcDaySpan(Instant oldest, Instant newest) {
-        long calendarDays = ChronoUnit.DAYS.between(
-                        oldest.atZone(ZoneOffset.UTC).toLocalDate(),
-                        newest.atZone(ZoneOffset.UTC).toLocalDate())
-                + 1;
-        return (int) Math.max(1, Math.min(PracticeStandingService.LOOKBACK_DAYS, calendarDays));
     }
 
     private static List<FeedbackSourceCountDTO> sourceCounts(List<ResultView> evidence) {

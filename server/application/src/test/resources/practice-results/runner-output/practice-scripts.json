@@ -29,14 +29,14 @@
 			"practiceSlug": "ui-scope",
 			"program": {
 				"kind": "custom",
-				"digest": "d763bcc927a042f9abe1940074662e09814ad5af706f8d94808ffcef505d691b"
+				"digest": "eefcf35286f64c4ca3b8a8c06695ce13dd5e7ecb0867f96afd173fc3af9c7ce3"
 			},
 			"models": [
 				{
 					"slot": "chat",
 					"need": "optional",
 					"bound": false,
-					"notRated": {}
+					"failures": {}
 				}
 			],
 			"status": "ok",
@@ -56,15 +56,15 @@
 			"durationMs": 0
 		},
 		{
-			"practiceSlug": "zz-legacy",
+			"practiceSlug": "zz-invalid-meta",
 			"program": {
 				"kind": "custom",
-				"digest": "c0ad25ea7f33450cbe4dfa34988d76040c94b2b24ba42e9ffef131417d4262a2"
+				"digest": "8f8d7b6df22142ab0f49de96062cf1064ed13d9fc7b4b6389f04add1e4290966"
 			},
 			"models": [],
 			"status": "failed",
 			"stopReason": "invalid-program",
-			"error": "This practice script uses the retired leads contract (meta.version). Accept the practice's catalog update, or rewrite run() to return a result, for example return ctx.review({ leads }).",
+			"error": "meta: Unrecognized key: \"limits\"",
 			"calls": {
 				"review": 0,
 				"chat": 0,

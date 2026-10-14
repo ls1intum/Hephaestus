@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.Collection;
@@ -36,7 +36,9 @@ public class ReviewGate {
         if (!Objects.equals(workspace.getId(), item.item().workspaceId()))
             throw new IllegalArgumentException("The item belongs to another workspace.");
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
-            return new GateDecision.Skip("The workspace is inactive.", ItemEventReason.WORKSPACE_INACTIVE);
+            return new GateDecision.Skip("The workspace is inactive.", ReviewRequestReason.WORKSPACE_INACTIVE);
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled()))
+            return new GateDecision.Skip("Practice reviews are disabled.", ReviewRequestReason.PRACTICES_DISABLED);
         var matched = practices
                 .findByWorkspaceIdAndKind(workspace.getId(), item.item().kind())
                 .stream()
@@ -44,7 +46,7 @@ public class ReviewGate {
                 .filter(p -> runnable(p, item.state(), origin, event))
                 .toList();
         if (matched.isEmpty())
-            return new GateDecision.Skip("No practice can review this item.", ItemEventReason.NO_ACTIVE_PRACTICE);
+            return new GateDecision.Skip("No practice can review this item.", ReviewRequestReason.NO_ACTIVE_PRACTICE);
         return new GateDecision.Run(
                 workspace, matched, workspace.getReviewSettings().getRolloutRevision(), origin);
     }

@@ -143,7 +143,7 @@ Thus, the operator stops every runtime role and active attempt, makes a verified
 Rollback after the contraction is a restore of that backup with the previous release, never an old binary on the new schema.
 
 The release ships a `.migration` fragment that gives these steps to the operator.
-[Practice model cutover before 1.0](#practice-model-cutover-before-10) is the approved instance.
+[Practice model cutover](#practice-model-cutover) is the approved instance.
 
 CI enforces 1 and 2 mechanically (see below). 3 is a review responsibility. The sole archival
 transition is the verified v0.77.4 baseline: archived files remain byte-identical and test-only.
@@ -229,37 +229,16 @@ The baseline integration suite proves these properties in both `dev` and `prod`:
 
 - [Liquibase documentation](https://docs.liquibase.com/) for change set syntax.
 
-## Practice model cutover before 1.0
+## Practice model cutover
 
-The maintainer approved one single-release contraction for the entire practice model.
-Released changelogs remain immutable.
-This branch's one changelog transforms the complete released schema directly to the final model.
-It creates no intermediate result or problem schema.
-
-The atomic cutover preserves retained verdict IDs, practice versions, accounts and feedback relationships.
-Separate cards retain their original bodies, responses and identifiers.
-Provider write keys and receipts remain exact. Migrated delivery is never posted again.
-Historical unknown visibility stays Unconfirmed.
-Unknown proof stays historical evidence version 0 and cannot enter strict new admission or reuse.
-
-The database recomputes derived practice digests from each recorded definition.
-Missing historical fields remain missing.
-A digest change does not prove that an earlier positive measurement met the complete standard.
-New active contracts arrive through appended practice versions.
-
-Membership uses accounts. Roster sync can create unclaimed human accounts, but never bot accounts.
-Account absorption preserves verified identities, existing authority, scope selections and restrictive delivery choices.
-Current-result ranking preserves the newest claim, including marked claims.
-Marks affect eligibility and open counts, not the result's end time.
-
-The new runtime cannot resume earlier contract jobs.
-The migration cancels retained queued or running work with CONTRACT_CHANGED and keeps its proof and write receipts.
-Already-terminal execution stays recorded as it occurred.
-Fresh reviews use current versions and new review identities.
+Release 1.0 applies one approved single-release contraction for the practice model.
+One changelog transforms the complete released schema directly to the final model.
+[ADR 0056](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0056-one-practice-model-for-items-and-scans.md) owns the decision.
+The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns what the upgrade preserves.
 
 ## Prove the released-state upgrade
 
-Seed the schema at the complete released changelog tail before the branch changelog.
+Seed the schema at the complete released changelog tail before the cutover changelog.
 Use realistic results, unclaimed people, disabled identities, separate cards and uncertain provider writes.
 Run Liquibase, without Hibernate creating the final schema.
 Assert preserved IDs, tenant relationships, exact receipts, actor redaction and current-claim order.
@@ -271,12 +250,4 @@ The generated ERD must come from the final migrated schema.
 
 ## Upgrade and recovery
 
-The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the release procedure.
-Drain active work, stop every runtime role and verify a database backup before migration.
-Upgrade all runtime roles, agent image, webapp, browser extension and custom clients together.
-Rollback restores the verified backup with the previous release.
-Old binaries cannot use the migrated database.
-
-A developer database that applied an earlier push of this unreleased changelog requires `vp run dev:reset`.
-This deletes local database data.
-Released installations use the forward migration and backup procedure, not a reset.
+The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the release procedure and rollback.

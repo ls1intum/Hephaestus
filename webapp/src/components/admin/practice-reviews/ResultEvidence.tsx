@@ -74,7 +74,7 @@ function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
 						className="overflow-hidden rounded-lg border"
 					>
 						<CitationHeader citation={citation} locator={def.locator} />
-						{citation.quoteRedacted ? (
+						{citation.quote === null ? (
 							<RedactedQuote />
 						) : (
 							<pre className="overflow-x-auto p-3 text-xs break-words whitespace-pre-wrap">
@@ -89,25 +89,28 @@ function EvidenceSourceSection({ group }: { group: EvidenceSourceGroup }) {
 }
 
 /** The part of a citation that says where its passage sits. */
-interface CitationPlace {
-	sourceKind: string;
-	path: string;
-	startLine?: number;
-	endLine?: number;
-	side?: EvidenceCitation["side"];
-}
+type CitationPlace = Pick<
+	EvidenceCitation,
+	"sourceKind" | "path" | "startLine" | "endLine" | "side"
+>;
 
-/** Where a passage sits: a file coordinate for code, the object's name for anything else. */
-export function citationLocation(citation: CitationPlace): string {
-	const { startLine } = citation;
-	return evidenceSourceDef(citation.sourceKind).locator === "code" && startLine !== undefined
-		? codeCitationLocator({ ...citation, startLine })
-		: citation.path;
+/**
+ * Where a passage sits: a file coordinate for code, the object's name for anything else. None for
+ * a citation recorded without a place.
+ */
+export function citationLocation(citation: CitationPlace): string | undefined {
+	const { path, startLine, endLine } = citation;
+	if (path === null) {
+		return undefined;
+	}
+	return evidenceSourceDef(citation.sourceKind).locator === "code" && startLine !== null
+		? codeCitationLocator({ path, startLine, endLine: endLine ?? undefined })
+		: path;
 }
 
 /** Which side of the diff a code passage is on, if the citation names one. */
 export function citationSide(citation: CitationPlace): string | undefined {
-	return evidenceSourceDef(citation.sourceKind).locator === "code" && citation.side !== undefined
+	return evidenceSourceDef(citation.sourceKind).locator === "code" && citation.side !== null
 		? DIFF_SIDE_LABELS[citation.side]
 		: undefined;
 }
@@ -120,12 +123,15 @@ function CitationHeader({
 	locator: EvidenceSourceGroup["def"]["locator"];
 }) {
 	const side = citationSide(citation);
+	const location = citationLocation(citation);
 	return (
 		<div className="flex flex-wrap items-center gap-2 border-b bg-muted/50 px-3 py-2">
-			{locator === "code" ? (
-				<code className="min-w-0 text-xs break-all">{codeCitationLocator(citation)}</code>
+			{locator === "code" && location !== undefined ? (
+				<code className="min-w-0 text-xs break-all">{location}</code>
 			) : (
-				<p className="min-w-0 text-xs break-words text-muted-foreground">{citation.path}</p>
+				<p className="min-w-0 text-xs break-words text-muted-foreground">
+					{location ?? "Location not recorded"}
+				</p>
 			)}
 			{side !== undefined && (
 				<Badge variant="outline" className="shrink-0">
@@ -153,7 +159,7 @@ function RedactedQuote() {
 function citationKey(citation: EvidenceCitation): string {
 	return [
 		citation.sourceKind,
-		citation.artifactPath,
+		citation.sourcePath,
 		citation.path,
 		citation.revision,
 		citation.side,

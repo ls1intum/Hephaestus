@@ -14,19 +14,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * Opens a batch for every schedule schedule that has come due.
- *
- * <p>Every other way into the review path waits for an event, a reconciliation, a person asking, or an
- * admin scoping a batch — so an item nothing ever announced would otherwise have no ledger row at
- * all, making "we never looked" indistinguishable from "we looked and declined". A workspace with a
- * schedule gets a row for every item in the window either way.
- *
- * <p>Deliberately thin: it selects due rows, hands each to {@link ReviewScheduleBatchOpener}, and logs.
- * The pacing, budget checks, cursor and per-item isolation belong to {@code ReviewBatchDriver}.
- * The scheduler lock prevents two replicas from opening the same due schedule. Both would otherwise
- * enumerate and price a scope before the batch-under-way check settled it.
- */
 @ConditionalOnServerRole
 @Component
 @ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
@@ -35,7 +22,6 @@ public class ReviewScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewScheduler.class);
 
-    /** Each schedule becomes a batch the driver paces; pulling in more would just queue on a saturated driver. */
     private static final int MAX_SCHEDULES_PER_TICK = 20;
 
     private final ReviewScheduleRepository scheduleRepository;
@@ -46,7 +32,6 @@ public class ReviewScheduler {
         this.opener = opener;
     }
 
-    /** The cadence a schedule keeps is its own {@code nextRunAt}; this only has to notice one has passed. */
     @Scheduled(fixedDelay = 5, initialDelay = 3, timeUnit = TimeUnit.MINUTES)
     @SchedulerLock(name = "review-schedule-scheduler", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     public void tick() {

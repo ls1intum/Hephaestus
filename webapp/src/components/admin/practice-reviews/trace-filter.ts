@@ -1,7 +1,7 @@
 import type { ReviewLineage } from "@/api/types.gen";
 
-import { silentNotMet } from "./lineage-chain";
-import { feedbackLost } from "./trace-verdict";
+import { type LineageRecords, lineageRecords, silentNotMet } from "./lineage-chain";
+import { feedbackLoss } from "./trace-bottleneck";
 
 /**
  * What a trace shows of its chain: everything, only the feedback, only what was lost on the way,
@@ -32,7 +32,7 @@ export function parseTraceFilter(value: string): TraceFilter {
 /** The practices a trace can be narrowed to: those its results answered, by name. */
 export function tracePractices(lineage: ReviewLineage): { slug: string; name: string }[] {
 	const practices = new Map<string, string>();
-	for (const result of lineage.results) {
+	for (const result of lineageRecords(lineage).results) {
 		practices.set(result.practiceSlug, result.practiceName);
 	}
 	return [...practices.entries()]
@@ -46,53 +46,76 @@ export function hiddenByFilter(filter: TraceFilter): string {
 }
 
 /**
- * The chain a filter leaves. The work, the moment that started the review and the review stay on
- * every one, so the rail still reads from its start; what is left out is said by its counts being
- * gone, never as more records not listed.
+ * The graph a filter leaves. The item, the reviews and the record the graph was asked for stay on
+ * every one, so the rail still reads from its start. A result keeps its problems.
  *
  * - Only feedback: every piece of feedback, and no result.
- * - Only losses: feedback whose path ends lost, as its end step says (withheld, rejected, replaced,
- *   failed, withdrawn), and the not-met results that led to no feedback, with the results
- *   the lost feedback was written from. Feedback still on its way is not lost yet.
+ * - Only losses: feedback whose path ends lost (withheld, rejected, replaced, failed, withdrawn),
+ *   and the not-met results that led to no feedback, with the results the lost feedback was
+ *   written from. Feedback still on its way is not lost yet.
  * - One practice: its results, and the feedback written from any of them.
  */
 export function filteredLineage(lineage: ReviewLineage, filter: TraceFilter): ReviewLineage {
 	if (filter.kind === "all") {
 		return lineage;
 	}
-	const startingMoments = lineage.workMoments.filter(
-		(moment) => moment.startedReview || moment.joinedReview,
+	const records = lineageRecords(lineage);
+	const { results, feedback } = kept(records, filter);
+	const keptResults = new Set(
+		lineage.nodes
+			.filter((node) => node.result !== null && results.has(node.result.id))
+			.map((node) => node.id),
 	);
-	const narrowed = {
+	const problems = new Set(
+		lineage.edges.filter((edge) => keptResults.has(edge.from)).map((edge) => edge.to),
+	);
+	const nodes = lineage.nodes.filter(
+		(node) =>
+			node.id === lineage.rootId ||
+			node.kind === "ITEM" ||
+			node.kind === "REVIEW" ||
+			(node.result !== null && results.has(node.result.id)) ||
+			(node.feedback !== null && feedback.has(node.feedback.id)) ||
+			(node.kind === "PROBLEM" && problems.has(node.id)),
+	);
+	const ids = new Set(nodes.map((node) => node.id));
+	return {
 		...lineage,
-		moreResults: 0,
-		moreFeedback: 0,
-		workMoments: startingMoments,
+		nodes,
+		edges: lineage.edges.filter((edge) => ids.has(edge.from) && ids.has(edge.to)),
 	};
+}
+
+const ids = (entries: readonly { id: string }[]) => new Set(entries.map((entry) => entry.id));
+
+/** The ids of the results and the feedback a filter keeps. */
+function kept(
+	records: LineageRecords,
+	filter: Exclude<TraceFilter, { kind: "all" }>,
+): { results: ReadonlySet<string>; feedback: ReadonlySet<string> } {
 	switch (filter.kind) {
 		case "feedback": {
-			return { ...narrowed, results: [] };
+			return { results: new Set(), feedback: ids(records.feedback) };
 		}
 		case "losses": {
-			const lost = lineage.feedback.filter(feedbackLost);
-			const behind = new Set(lost.flatMap((feedback) => feedback.practiceResultIds));
-			const silent = new Set(silentNotMet(lineage).map((result) => result.id));
+			const lost = records.feedback.filter((entry) => feedbackLoss(entry) !== undefined);
+			const behind = new Set(lost.flatMap((entry) => entry.basis));
+			const silent = ids(silentNotMet(records));
 			return {
-				...narrowed,
-				feedback: lost,
-				results: lineage.results.filter((result) => behind.has(result.id) || silent.has(result.id)),
+				results: ids(
+					records.results.filter((result) => behind.has(result.id) || silent.has(result.id)),
+				),
+				feedback: ids(lost),
 			};
 		}
 		case "practice": {
-			const results = lineage.results.filter(
-				(result) => result.practiceSlug === filter.practiceSlug,
+			const results = ids(
+				records.results.filter((result) => result.practiceSlug === filter.practiceSlug),
 			);
-			const ids = new Set(results.map((result) => result.id));
 			return {
-				...narrowed,
 				results,
-				feedback: lineage.feedback.filter((feedback) =>
-					feedback.practiceResultIds.some((id) => ids.has(id)),
+				feedback: ids(
+					records.feedback.filter((entry) => entry.basis.some((id) => results.has(id))),
 				),
 			};
 		}

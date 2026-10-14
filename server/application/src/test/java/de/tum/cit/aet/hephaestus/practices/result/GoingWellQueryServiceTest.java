@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -41,12 +42,14 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
                             now.minusSeconds((i + 1) * 86400L),
                             new ItemKind("scm.pull_request"),
                             ResultOutcome.MET);
-                    view.result().setEvidenceVersion((short) 1);
-                    view.result().setSummary("The work meets the practice.");
-                    view.result().setExplanation("The captured work supports the result.");
-                    view.result().setEvidence(json.createObjectNode());
-                    view.result().setCoverage(json.createObjectNode());
-                    return view;
+                    var proof = view.result().toBuilder()
+                            .evidenceVersion((short) 1)
+                            .summary("The work meets the practice.")
+                            .explanation("The captured work supports the result.")
+                            .evidence(json.createObjectNode())
+                            .coverage(json.createObjectNode())
+                            .build();
+                    return new ResultView(proof, view.practice(), view.version(), view.review(), view.item());
                 })
                 .toList();
     }
@@ -55,7 +58,7 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
         when(developer.currentDeveloperId()).thenReturn(Optional.of(7L));
         when(standings.standingWindow()).thenReturn(4);
         var trends = new PracticeTrendService(new TrendProperties(), clock);
-        var trend = trends.calculatePractice("test-practice", rows, trends.horizon());
+        var trend = trends.calculatePractice(rows, trends.horizon());
         var dto = new PracticeStandingDTO(
                 "test-practice",
                 "Testing",
@@ -101,16 +104,32 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
 
     @Test
     void unverifiableProofDoesNotSupportARecurringClaim() {
-        var proof = proofs(3);
-        proof.getFirst().result().setEvidenceVersion((short) 0);
+        var proof = new ArrayList<>(proofs(3));
+        var view = proof.getFirst();
+        proof.set(
+                0,
+                new ResultView(
+                        view.result().toBuilder().evidenceVersion((short) 0).build(),
+                        view.practice(),
+                        view.version(),
+                        view.review(),
+                        view.item()));
         eligible(proof);
         assertThat(query.own(1)).isEmpty();
     }
 
     @Test
     void aPastLapseStartsANewSequenceOfSupportingWork() {
-        var proof = proofs(7);
-        proof.get(4).result().setOutcome(ResultOutcome.NOT_MET);
+        var proof = new ArrayList<>(proofs(7));
+        var view = proof.get(4);
+        proof.set(
+                4,
+                new ResultView(
+                        view.result().toBuilder().outcome(ResultOutcome.NOT_MET).build(),
+                        view.practice(),
+                        view.version(),
+                        view.review(),
+                        view.item()));
         eligible(proof);
         var strength = query.own(1).getFirst();
         assertThat(strength.workCount()).isEqualTo(4);

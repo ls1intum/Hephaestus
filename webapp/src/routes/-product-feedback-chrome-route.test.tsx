@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SurveyInvitation } from "@/api/types.gen";
 import { surveyInvitation } from "@/components/product-feedback/fixtures";
 import type { Wire } from "@/lib/dates";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { unauthenticatedUser } from "@/mocks/handlers";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -30,7 +30,7 @@ describe("survey invitations in the app chrome", () => {
 				HttpResponse.json([workspaceListItem("acme", { displayName: "Acme" })]),
 			),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 42, userLogin: "ada", userName: "Ada" }),
+				HttpResponse.json(ownMembership("MEMBER")),
 			),
 			http.put("*/workspaces/acme/product-feedback/surveys/:id/invitation", ({ params }) => {
 				acknowledgements.push(String(params.id));

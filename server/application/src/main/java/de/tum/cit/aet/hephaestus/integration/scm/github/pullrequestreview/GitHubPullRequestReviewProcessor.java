@@ -30,17 +30,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub pull request reviews.
- *
- * <p>This service handles the conversion of GitHubReviewDTO to PullRequestReview entities, persists
- * them, and publishes appropriate domain events.
- *
- * <p><b>Design Principles:</b>
- *
+ * <p>
+ * This service handles the conversion of GitHubReviewDTO to PullRequestReview entities,
+ * persists them, and publishes appropriate domain events.
+ * <p>
+ * <b>Design Principles:</b>
  * <ul>
- *   <li>Single processing path for all data sources (sync and webhooks)
- *   <li>Idempotent operations via upsert pattern
- *   <li>Domain events published for reactive feature development
- *   <li>Works exclusively with DTOs for complete field coverage
+ * <li>Single processing path for all data sources (sync and webhooks)</li>
+ * <li>Idempotent operations via upsert pattern</li>
+ * <li>Domain events published for reactive feature development</li>
+ * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
  */
 @Service
@@ -66,11 +65,10 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
     /**
      * Process a GitHub review DTO and persist it as a PullRequestReview entity.
-     *
-     * <p>This overload requires the parent PR to already exist in the database. For webhook
-     * processing where the parent might not exist, use {@link
-     * #processWithParentCreation(GitHubPullRequestReviewEventDTO.GitHubReviewDTO,
-     * GitHubPullRequestDTO, ProcessingContext)} instead.
+     * <p>
+     * This overload requires the parent PR to already exist in the database.
+     * For webhook processing where the parent might not exist, use
+     * {@link #processWithParentCreation(GitHubPullRequestReviewEventDTO.GitHubReviewDTO, GitHubPullRequestDTO, ProcessingContext)} instead.
      *
      * @param dto the GitHub review DTO
      * @param prId the database ID of the pull request this review belongs to
@@ -95,21 +93,20 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a GitHub review DTO and persist it as a PullRequestReview entity, creating a minimal
-     * parent PR entity if it doesn't exist.
-     *
-     * <p>This method solves the message ordering problem where review webhooks arrive before the
-     * parent PR webhook. Instead of failing and retrying, we create a minimal parent entity from
-     * the webhook's embedded PR data. The full entity will be updated later when the proper PR
-     * webhook arrives or during GraphQL sync.
-     *
-     * <p><b>Why this approach?</b>
-     *
+     * Process a GitHub review DTO and persist it as a PullRequestReview entity,
+     * creating a minimal parent PR entity if it doesn't exist.
+     * <p>
+     * This method solves the message ordering problem where review webhooks arrive
+     * before the parent PR webhook. Instead of failing and retrying, we create
+     * a minimal parent entity from the webhook's embedded PR data. The full entity
+     * will be updated later when the proper PR webhook arrives or during GraphQL sync.
+     * <p>
+     * <b>Why this approach?</b>
      * <ul>
-     *   <li>GitHub sends pull_request_review events with embedded PR data
-     *   <li>The webhook includes PR id, number, title, body, state, etc.
-     *   <li>Creating a stub entity is better than losing data or retrying indefinitely
-     *   <li>The stub will be hydrated by the PR webhook or scheduled sync
+     *   <li>GitHub sends pull_request_review events with embedded PR data</li>
+     *   <li>The webhook includes PR id, number, title, body, state, etc.</li>
+     *   <li>Creating a stub entity is better than losing data or retrying indefinitely</li>
+     *   <li>The stub will be hydrated by the PR webhook or scheduled sync</li>
      * </ul>
      *
      * @param dto the GitHub review DTO
@@ -143,7 +140,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             pr = createMinimalPullRequest(prDto, context);
             if (pr == null) {
                 log.warn(
-                        "Skipped review processing: reason=failedToCreateParent, prNumber={}," + " reviewId={}",
+                        "Skipped review processing: reason=failedToCreateParent, prNumber={}, reviewId={}",
                         prDto.number(),
                         dto.id());
                 return null;
@@ -153,7 +150,9 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         return processReviewInternal(dto, pr, context);
     }
 
-    /** Internal method that processes a review given a resolved parent PR. */
+    /**
+     * Internal method that processes a review given a resolved parent PR.
+     */
     private @Nullable PullRequestReview processReviewInternal(
             GitHubPullRequestReviewEventDTO.GitHubReviewDTO dto, PullRequest pr, @NonNull ProcessingContext context) {
         return reviewRepository
@@ -266,8 +265,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
         if (reviewDataOpt.isPresent()) {
             var reviewData = reviewDataOpt.get();
             log.debug(
-                    "Publishing ReviewSubmitted event: reviewId={}, state={}, scopeId={},"
-                            + " authorId={}, repositoryId={}",
+                    "Publishing ReviewSubmitted event: reviewId={}, state={}, scopeId={}, authorId={}, repositoryId={}",
                     reviewData.id(),
                     reviewData.state(),
                     context.scopeId(),
@@ -276,7 +274,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             eventPublisher.publishEvent(new ScmDomainEvent.ReviewSubmitted(reviewData, EventContext.from(context)));
         } else {
             log.warn(
-                    "ReviewData.from() returned empty - no event published: reviewId={}, prId={}," + " prIsNull={}",
+                    "ReviewData.from() returned empty - no event published: reviewId={}, prId={}, prIsNull={}",
                     saved.getId(),
                     saved.getPullRequest() != null ? saved.getPullRequest().getId() : "null",
                     saved.getPullRequest() == null);
@@ -287,8 +285,8 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
     private PullRequestReview.State mapState(String state) {
         if (state == null) {
-            log.warn("Review state is null, using UNKNOWN. This may indicate missing data in webhook"
-                    + " or GraphQL response.");
+            log.warn(
+                    "Review state is null, using UNKNOWN. This may indicate missing data in webhook or GraphQL response.");
             return PullRequestReview.State.UNKNOWN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {
@@ -308,16 +306,15 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
     /**
      * Creates a minimal PullRequest entity from webhook data.
-     *
-     * <p>This method is called when a review webhook arrives before the parent PR exists. We create
-     * a "stub" entity with the data available in the webhook payload. The full entity will be
-     * populated later by the proper PR webhook or GraphQL sync.
-     *
-     * <p><b>Hydration Strategy:</b> Stubs rely on natural hydration through:
-     *
+     * <p>
+     * This method is called when a review webhook arrives before the parent PR exists.
+     * We create a "stub" entity with the data available in the webhook payload. The full
+     * entity will be populated later by the proper PR webhook or GraphQL sync.
+     * <p>
+     * <b>Hydration Strategy:</b> Stubs rely on natural hydration through:
      * <ol>
-     *   <li>The pull_request webhook (typically arrives within seconds)
-     *   <li>The scheduled GraphQL sync (safety net for missed webhooks)
+     *   <li>The pull_request webhook (typically arrives within seconds)</li>
+     *   <li>The scheduled GraphQL sync (safety net for missed webhooks)</li>
      * </ol>
      *
      * @param dto the PR DTO from the webhook payload
@@ -378,19 +375,20 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
 
         PullRequest saved = prRepository.save(pr);
         log.info(
-                "Created stub PullRequest from review webhook (will be hydrated by PR webhook or"
-                        + " sync): prId={}, prNumber={}, repoName={}",
+                "Created stub PullRequest from review webhook (will be hydrated by PR webhook or sync): prId={}, prNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
         return saved;
     }
 
-    /** Converts a GitHub API state string to Issue.State enum. */
+    /**
+     * Converts a GitHub API state string to Issue.State enum.
+     */
     private Issue.State convertState(String state) {
         if (state == null) {
-            log.warn("PR state is null when creating stub from review webhook, defaulting to OPEN. "
-                    + "This may indicate missing data in webhook payload.");
+            log.warn(
+                    "PR state is null when creating stub from review webhook, defaulting to OPEN. This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {
@@ -398,8 +396,7 @@ public class GitHubPullRequestReviewProcessor extends BaseGitHubProcessor {
             case "CLOSED" -> Issue.State.CLOSED;
             case "MERGED" -> Issue.State.MERGED;
             default -> {
-                log.warn(
-                        "Unknown PR state '{}' when creating stub from review webhook, defaulting" + " to OPEN", state);
+                log.warn("Unknown PR state '{}' when creating stub from review webhook, defaulting to OPEN", state);
                 yield Issue.State.OPEN;
             }
         };

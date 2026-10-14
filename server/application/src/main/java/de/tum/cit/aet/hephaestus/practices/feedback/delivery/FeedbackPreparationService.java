@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
+import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackPreparedEvent;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
@@ -21,7 +22,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.time.Clock;
 import java.time.Instant;
@@ -121,15 +121,26 @@ public class FeedbackPreparationService {
                 support = selection.evidence();
                 var prior = selection.previous();
                 var decision = composition.pageDecision(primary, support, selection, clock.instant());
-                if (decision != PracticePageDecision.ADMIT || ids.stream().anyMatch(id -> !authorizedIds.contains(id)))
-                    reason = decision == PracticePageDecision.PRACTICE_REQUIRES_APPROVAL
-                            ? FeedbackStopReason.PRACTICE_REQUIRES_APPROVAL
-                            : FeedbackStopReason.NOTHING_NEW;
+                reason = switch (decision.decision()) {
+                    case ADMIT ->
+                        ids.stream().anyMatch(id -> !authorizedIds.contains(id))
+                                ? FeedbackStopReason.EVIDENCE_NOT_PERMITTED
+                                : reason;
+                    case FEEDBACK_OFF -> FeedbackStopReason.FEEDBACK_OFF;
+                    case GATE_REFUSED -> Objects.requireNonNull(decision.stopReason());
+                    case NO_EVIDENCE -> FeedbackStopReason.NO_EVIDENCE;
+                    case UNCORROBORATED -> FeedbackStopReason.UNCORROBORATED;
+                    case BACKFILL_HELD -> FeedbackStopReason.BACKFILL_QUIET;
+                    case UNATTRIBUTABLE_SUBJECT -> FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
+                    case RECENTLY_SURFACED -> FeedbackStopReason.NOTHING_NEW;
+                    case PRACTICE_REQUIRES_APPROVAL -> FeedbackStopReason.PRACTICE_REQUIRES_APPROVAL;
+                };
                 if (prior.isPresent() && !prior.get().id().equals(draft.id())) {
                     if (prior.get().isOpen()) replacesId = prior.get().id();
-                    else if (support.stream()
-                            .noneMatch(row ->
-                                    row.getRecordedAt().isAfter(prior.get().nextEvidenceSince(Instant.EPOCH))))
+                    else if (reason == null
+                            && support.stream()
+                                    .noneMatch(row -> row.getRecordedAt()
+                                            .isAfter(prior.get().nextEvidenceSince(Instant.EPOCH))))
                         reason = FeedbackStopReason.NOTHING_NEW;
                 }
             }
@@ -139,6 +150,7 @@ public class FeedbackPreparationService {
                 var decision = composition.conversationDecision(snapshot, result);
                 if (decision != ConversationDecision.ADMIT) {
                     reason = switch (decision) {
+                        case FEEDBACK_OFF -> FeedbackStopReason.FEEDBACK_OFF;
                         case BACKFILL_QUIET -> FeedbackStopReason.BACKFILL_QUIET;
                         case PRACTICE_REQUIRES_APPROVAL -> FeedbackStopReason.PRACTICE_REQUIRES_APPROVAL;
                         case HAS_INLINE_ANCHOR, ALREADY_DELIVERED_ON_WORK -> FeedbackStopReason.NOTHING_NEW;
@@ -154,13 +166,12 @@ public class FeedbackPreparationService {
             if (support.stream()
                     .anyMatch(row -> row.getPracticeVersionId() == null
                             || row.getEvidenceVersion() != 1
-                            || versions.findById(row.getPracticeVersionId())
-                                    .filter(version -> version.getWorkspaceId() == draft.workspaceId()
-                                            && AboutRole.AUTHOR
-                                                    .name()
-                                                    .equals(version.getDefinition()
-                                                            .path("about")
-                                                            .asString()))
+                            || versions.findByIdAndWorkspaceId(row.getPracticeVersionId(), draft.workspaceId())
+                                    .filter(version -> AboutRole.AUTHOR
+                                            .name()
+                                            .equals(version.getDefinition()
+                                                    .path("about")
+                                                    .asString()))
                                     .isEmpty())) reason = FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
             if (body != null
                     && repeated.repeats(draft.workspaceId(), snapshot.item().itemId(), draft.developerId(), body))
@@ -178,7 +189,7 @@ public class FeedbackPreparationService {
                         .stream()
                         .map(row -> row.getId())
                         .toList());
-        if (!suppressed.isEmpty())
+        if (reason == null && !suppressed.isEmpty())
             reason = suppressed.containsValue(FeedbackStopReason.REACTED_DISAGREE)
                     ? FeedbackStopReason.REACTED_DISAGREE
                     : FeedbackStopReason.REACTED_NOT_APPLICABLE;

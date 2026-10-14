@@ -234,7 +234,7 @@ validate(
 /** A bundled practice, as far as the script/practice pairing below is concerned. */
 interface BundledPractice {
 	readonly slug: string;
-	readonly practiceScript: string | undefined;
+	readonly scriptResource: string | undefined;
 }
 
 const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
@@ -244,13 +244,13 @@ const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
 			(practice, index) => {
 				const entry = `${groupLabel} practices[${index}]`;
 				const record = asRecord(practice, entry);
-				const script = record.practiceScript;
+				const script = record.scriptResource;
 				return {
 					slug: asString(record.slug, `${entry}.slug`),
-					practiceScript:
+					scriptResource:
 						script === undefined || script === null
 							? undefined
-							: asString(script, `${entry}.practiceScript`),
+							: asString(script, `${entry}.scriptResource`),
 				};
 			},
 		);
@@ -269,13 +269,13 @@ const practiceScripts = new Set(
 );
 const referencedPracticeScripts = new Set<string>();
 for (const practice of practices) {
-	if (practice.practiceScript === undefined) {
+	if (practice.scriptResource === undefined) {
 		continue;
 	}
 	// The loader checks the script exists. Nothing checks it belongs to the practice that names it,
 	// and a script named after a slug is the only thing that keeps the pair findable from either side.
 	const expected = `${practiceScriptResourcePrefix}${practice.slug}.ts`;
-	if (practice.practiceScript !== expected) {
+	if (practice.scriptResource !== expected) {
 		throw new Error(
 			`default-catalog.json practice '${practice.slug}' must name its practice script '${expected}'`,
 		);

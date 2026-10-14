@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.domain;
 
-import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackRetentionSweeper;
 import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.Collection;
@@ -132,8 +131,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
     @Modifying
     @Transactional
     @Query(
-            value = "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_slack_user_id ="
-                    + " :slackUserId",
+            value =
+                    "DELETE FROM slack_message WHERE workspace_id = :workspaceId AND author_slack_user_id = :slackUserId",
             nativeQuery = true)
     int deleteByWorkspaceIdAndAuthorSlackUserId(
             @Param("workspaceId") long workspaceId, @Param("slackUserId") String slackUserId);
@@ -156,8 +155,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      *
      * @return one projection row per channel that has at least one stored message
      */
-    @Query("SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m "
-            + "WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId")
+    @Query(
+            "SELECT m.slackChannelId AS slackChannelId, COUNT(m) AS itemCount FROM SlackMessage m WHERE m.workspaceId = :workspaceId GROUP BY m.slackChannelId")
     List<ChannelItemCount> countGroupedByChannelId(@Param("workspaceId") long workspaceId);
 
     /** Projection for {@link #countGroupedByChannelId}. */
@@ -230,9 +229,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      */
     @Modifying
     @Transactional
-    @Query("UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now "
-            + "WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs "
-            + "AND m.deletedAt IS NULL")
+    @Query(
+            "UPDATE SlackMessage m SET m.text = :text, m.editedAt = :now WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :slackChannelId AND m.slackTs = :slackTs AND m.deletedAt IS NULL")
     int applyEdit(
             @Param("workspaceId") Long workspaceId,
             @Param("slackChannelId") String slackChannelId,
@@ -280,8 +278,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
             @Param("threadTs") String threadTs);
 
     /** Agent-owned {@code ConversationCandidateSource} SPI: count of non-tombstoned turns in one thread, workspace-pinned. */
-    @Query("SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId "
-            + "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL")
+    @Query(
+            "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL")
     long countLiveTurns(
             @Param("workspaceId") long workspaceId,
             @Param("channelId") String channelId,
@@ -292,9 +290,8 @@ public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long
      * {@code slack_ts} is strictly greater than {@code watermark} (lexicographic — the same Slack-{@code ts}
      * ordering invariant {@link SlackThreadRepository#upsertOnMessage} relies on), workspace-pinned.
      */
-    @Query("SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId "
-            + "AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL "
-            + "AND m.slackTs > :watermark")
+    @Query(
+            "SELECT COUNT(m) FROM SlackMessage m WHERE m.workspaceId = :workspaceId AND m.slackChannelId = :channelId AND (m.slackThreadTs = :threadTs OR m.slackTs = :threadTs) AND m.deletedAt IS NULL AND m.slackTs > :watermark")
     long countLiveTurnsSince(
             @Param("workspaceId") long workspaceId,
             @Param("channelId") String channelId,

@@ -33,9 +33,10 @@ const accepted = wirePractice({
 });
 
 beforeEach(() => {
+	// Before the setup handlers, whose own release inbox is empty.
 	server.use(
-		...practiceSetupHandlers(),
 		http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([proposal])),
+		...practiceSetupHandlers(),
 	);
 });
 

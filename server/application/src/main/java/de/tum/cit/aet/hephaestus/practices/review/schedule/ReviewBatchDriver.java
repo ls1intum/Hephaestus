@@ -17,10 +17,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.HttpStatus;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 
 @Component
 @ConditionalOnServerRole
@@ -42,8 +40,8 @@ public class ReviewBatchDriver {
     @Scheduled(fixedDelay = 120000, initialDelay = 120000)
     @SchedulerLock(name = "review-batch-driver", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
     public void tick() {
-        for (var batch : batches.findByStatusIn(
-                List.of(ReviewBatchStatus.RUNNING, ReviewBatchStatus.PAUSED), PageRequest.ofSize(5))) {
+        for (var batch :
+                batches.findByStatusOrderByUpdatedAtAscIdAsc(ReviewBatchStatus.RUNNING, PageRequest.ofSize(5))) {
             try {
                 advance(batch);
             } catch (RuntimeException failure) {
@@ -86,13 +84,6 @@ public class ReviewBatchDriver {
             batches.save(batch);
             return;
         }
-        batch.setStatus(ReviewBatchStatus.RUNNING);
-        batch.setPauseReason(null);
-
-        if (scan
-                && reviews.existsByWorkspaceIdAndKindAndStatusIn(
-                        batch.getWorkspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
-            return;
         var ids = scope.next(
                 batch.getWorkspaceId(), batch.getId(), batch.getCursorItemId(), scan ? 1 : properties.batchSize());
         if (ids.isEmpty()) {
@@ -103,22 +94,19 @@ public class ReviewBatchDriver {
         }
         for (long itemId : ids) {
             try {
-                if (submitter.offer(batch, itemId) == ReviewBatchSubmitter.SubmissionOutcome.SUBMITTED)
-                    batch.setSubmittedCount(batch.getSubmittedCount() + 1);
-                else batch.setSkippedCount(batch.getSkippedCount() + 1);
-            } catch (ResponseStatusException failure) {
-                if (scan
-                        && failure.getStatusCode().equals(HttpStatus.CONFLICT)
-                        && reviews.existsByWorkspaceIdAndKindAndStatusIn(
-                                batch.getWorkspaceId(),
-                                ReviewKind.SCAN,
-                                List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING))) {
-                    batch.setUpdatedAt(clock.instant());
-                    batches.save(batch);
-                    return;
+                switch (submitter.offer(batch, itemId)) {
+                    case ReviewBatchSubmitter.SubmissionOutcome.Submitted ignored ->
+                        batch.setSubmittedCount(batch.getSubmittedCount() + 1);
+                    case ReviewBatchSubmitter.SubmissionOutcome.Skipped ignored ->
+                        batch.setSkippedCount(batch.getSkippedCount() + 1);
+                    case ReviewBatchSubmitter.SubmissionOutcome.Paused paused -> {
+                        batch.setStatus(ReviewBatchStatus.PAUSED);
+                        batch.setPauseReason(paused.reason());
+                        batch.setUpdatedAt(clock.instant());
+                        batches.save(batch);
+                        return;
+                    }
                 }
-                log.warn("Could not request review for item {} in batch {}", itemId, batch.getId(), failure);
-                batch.setFailedCount(batch.getFailedCount() + 1);
             } catch (RuntimeException failure) {
                 log.warn("Could not request review for item {} in batch {}", itemId, batch.getId(), failure);
                 batch.setFailedCount(batch.getFailedCount() + 1);

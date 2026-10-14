@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.evidence;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Objects;
 import java.util.Set;
 
@@ -12,8 +13,8 @@ public record SourceContract(
         Set<String> itemKinds,
         boolean defaultRequirement,
         SourceAuthority authority,
-        IdentityPolicy identityPolicy,
-        CompletenessPolicy completenessPolicy,
+        @JsonProperty("identity") IdentityPolicy identityPolicy,
+        @JsonProperty("completeness") CompletenessPolicy completenessPolicy,
         RequiredCaptureQuality requiredQuality,
         PrivacyClass privacyClass,
         Set<SourceAbsenceState> supportedAbsenceStates,

@@ -23,15 +23,16 @@ BEGIN
  SELECT pg_get_constraintdef(oid) INTO source_check FROM pg_constraint
  WHERE conrelid='config_audit_event'::regclass AND conname='ck_config_audit_event_entity_type' AND contype='c' AND convalidated;
  IF source_check IS NULL THEN RAISE EXCEPTION 'released audit entity-type constraint is missing or unvalidated'; END IF;
- target_check:=replace(replace(source_check,'''REVIEW_BACKFILL_RUN''','''REVIEW_BATCH'''),'''REVIEW_SWEEP_SCHEDULE''','''REVIEW_SCHEDULE''');
+ target_check:=replace(replace(replace(replace(source_check,'''REVIEW_BACKFILL_RUN''','''REVIEW_BATCH'''),'''REVIEW_SWEEP_SCHEDULE''','''REVIEW_SCHEDULE'''),'''CURATED_PRACTICE''','''CATALOG_PRACTICE'''),'''CURATED_PRACTICE_GROUP''','''CATALOG_GROUP''');
  IF guard_mode IN('O','R','A') THEN ALTER TABLE config_audit_event DISABLE TRIGGER trg_config_audit_event_block_mutation; END IF;
  IF target_check IS DISTINCT FROM source_check THEN
   ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
   EXECUTE 'ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type '||target_check||' NOT VALID';
  END IF;
  UPDATE config_audit_event SET entity_type=CASE entity_type
-  WHEN 'REVIEW_BACKFILL_RUN' THEN 'REVIEW_BATCH' WHEN 'REVIEW_SWEEP_SCHEDULE' THEN 'REVIEW_SCHEDULE' END
- WHERE entity_type IN('REVIEW_BACKFILL_RUN','REVIEW_SWEEP_SCHEDULE');
+  WHEN 'REVIEW_BACKFILL_RUN' THEN 'REVIEW_BATCH' WHEN 'REVIEW_SWEEP_SCHEDULE' THEN 'REVIEW_SCHEDULE'
+  WHEN 'CURATED_PRACTICE' THEN 'CATALOG_PRACTICE' WHEN 'CURATED_PRACTICE_GROUP' THEN 'CATALOG_GROUP' END
+ WHERE entity_type IN('REVIEW_BACKFILL_RUN','REVIEW_SWEEP_SCHEDULE','CURATED_PRACTICE','CURATED_PRACTICE_GROUP');
  ALTER TABLE config_audit_event VALIDATE CONSTRAINT ck_config_audit_event_entity_type;
  CASE guard_mode
   WHEN 'O' THEN ALTER TABLE config_audit_event ENABLE TRIGGER trg_config_audit_event_block_mutation;
@@ -824,7 +825,6 @@ CREATE TABLE catalog_entry (
   CONSTRAINT ck_catalog_entry_type CHECK (entry_type IN ('PRACTICE','GROUP')),
   CONSTRAINT ck_catalog_entry_kind CHECK (((entry_type='GROUP' OR definition IS NULL)=(kind IS NULL)) AND
     (kind IS NULL OR kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$')),
-  CONSTRAINT ck_catalog_entry_pair CHECK ((definition IS NULL) = (base IS NULL)),
   CONSTRAINT ck_catalog_entry_definition CHECK (definition IS NULL OR jsonb_typeof(definition) = 'object'),
   CONSTRAINT ck_catalog_entry_base CHECK (base IS NULL OR jsonb_typeof(base) = 'object'),
   CONSTRAINT ck_catalog_entry_position CHECK (position IS NULL OR position >= 0),
@@ -1016,6 +1016,7 @@ CREATE TABLE review_job (
   id uuid PRIMARY KEY,
   review_id uuid NOT NULL,
   workspace_id bigint NOT NULL,
+  submitted_at timestamptz NOT NULL,
   status varchar(20) NOT NULL DEFAULT 'QUEUED',
   attempt integer NOT NULL DEFAULT 0,
   processing_status varchar(16) NOT NULL DEFAULT 'NONE',
@@ -1032,7 +1033,6 @@ CREATE TABLE review_job (
   exit_code integer,
   error_message text,
   cancellation_reason varchar(32),
-  delivery_attempts smallint NOT NULL DEFAULT 0,
   conversation_prepared_at timestamptz,
   practice_page_prepared_at timestamptz,
   public_review_digest varchar(64),
@@ -1053,7 +1053,7 @@ CREATE TABLE review_job (
   CONSTRAINT sfk_review_job_review FOREIGN KEY(review_id, workspace_id) REFERENCES review(id, workspace_id) ON DELETE CASCADE,
   CONSTRAINT ck_review_job_status CHECK(status IN ('QUEUED','RUNNING','COMPLETED','FAILED','TIMED_OUT','CANCELLED')),
   CONSTRAINT ck_review_job_processing CHECK(processing_status IN ('NONE','PENDING','DONE','FAILED')),
-  CONSTRAINT ck_review_job_attempt CHECK(attempt >= 0 AND delivery_attempts >= 0),
+  CONSTRAINT ck_review_job_attempt CHECK(attempt >= 0),
   CONSTRAINT ck_review_job_admission CHECK((admission_attempt IS NULL) = (admission_digest IS NULL)),
   CONSTRAINT ck_review_job_input CHECK(jsonb_typeof(input)='object'),
   CONSTRAINT ck_review_job_config CHECK(jsonb_typeof(config_snapshot)='object')
@@ -1784,15 +1784,14 @@ INSERT INTO practice_version(id,workspace_id,practice_id,number,definition,creat
  FROM _cutover_old_practice p JOIN _cutover_initial_version i ON i.practice_id=p.id AND i.unbound CROSS JOIN _cutover_clock c;
 INSERT INTO catalog_entry(entry_type,slug,kind,definition,base,position,excluded_at,created_at,updated_at,version)
 SELECT 'PRACTICE',o.slug,CASE WHEN o.name IS NOT NULL THEN pg_temp.cutover_authored_kind(o.applies_to,o.signals,o.subject,b.kind) END,
- CASE WHEN o.name IS NOT NULL THEN pg_temp.cutover_columns(to_jsonb(o)) END,
+ CASE WHEN o.name IS NOT NULL THEN jsonb_build_object('groupSlug',o.group_slug,'definition',pg_temp.cutover_columns(to_jsonb(o))) END,
  CASE WHEN o.name IS NOT NULL THEN COALESCE(CASE WHEN o.based_on_digest=b.old_catalog_digest THEN jsonb_build_object('kind',CASE WHEN b.old_definition->>'subject'='REVIEWER' THEN 'scm.pull_request_review' ELSE pg_temp.cutover_kind(b.kind) END,'groupSlug',b.old_definition->'groupSlug','definition',b.definition) END,
- CASE WHEN o.adopted_base IS NOT NULL THEN pg_temp.cutover_catalog(o.adopted_base,COALESCE(o.applies_to,b.kind),o.adopted_base->>'groupSlug') END,
- jsonb_build_object('kind',pg_temp.cutover_authored_kind(o.applies_to,o.signals,o.subject,b.kind),'groupSlug',o.group_slug,'definition',pg_temp.cutover_columns(to_jsonb(o)))) END,
+ CASE WHEN o.adopted_base IS NOT NULL AND o.adopted_base<>'{}'::jsonb THEN pg_temp.cutover_catalog(o.adopted_base,COALESCE(o.applies_to,b.kind),o.adopted_base->>'groupSlug') END) END,
  o.position,o.retired_at,o.created_at,o.updated_at,o.version
 FROM _cutover_old_curated_practice_override o LEFT JOIN _cutover_bundle b ON b.entry_type='PRACTICE' AND b.slug=o.slug;
 INSERT INTO catalog_entry(entry_type,slug,definition,base,position,excluded_at,created_at,updated_at,version)
 SELECT 'GROUP',o.slug,CASE WHEN o.name IS NOT NULL THEN jsonb_build_object('name',o.name,'description',o.description,'icon',o.icon,'color',o.color) END,
- CASE WHEN o.name IS NOT NULL THEN COALESCE(CASE WHEN o.based_on_digest=b.old_catalog_digest THEN b.definition END,jsonb_build_object('name',o.name,'description',o.description,'icon',o.icon,'color',o.color)) END,
+ CASE WHEN o.name IS NOT NULL AND o.based_on_digest=b.old_catalog_digest THEN b.definition END,
  o.position,o.retired_at,o.created_at,o.updated_at,o.version FROM _cutover_old_curated_group_override o LEFT JOIN _cutover_bundle b ON b.entry_type='GROUP' AND b.slug=o.slug;
 DO $$ BEGIN
  IF EXISTS(SELECT 1 FROM catalog_entry WHERE entry_type='PRACTICE' AND definition IS NOT NULL AND kind IS NULL) THEN RAISE EXCEPTION 'local catalog kind cannot be resolved'; END IF;
@@ -2074,16 +2073,16 @@ SELECT j.id,j.workspace_id,t.item_id,'ITEM',
 FROM _cutover_old_agent_job j JOIN _job_transition t ON t.id=j.id
 LEFT JOIN _cutover_old_public_review_completion p ON p.job_id=j.id AND p.workspace_id=j.workspace_id CROSS JOIN _cutover_clock c;
 
-INSERT INTO review_job(id,review_id,workspace_id,status,attempt,processing_status,available_at,hold_reason,worker_id,
+INSERT INTO review_job(id,review_id,workspace_id,submitted_at,status,attempt,processing_status,available_at,hold_reason,worker_id,
  idempotency_key,trace_id,job_token_hash,input,config_snapshot,capture,output,exit_code,error_message,cancellation_reason,
- delivery_attempts,conversation_prepared_at,practice_page_prepared_at,public_review_digest,admission_attempt,admission_digest,
+ conversation_prepared_at,practice_page_prepared_at,public_review_digest,admission_attempt,admission_digest,
  llm_calls,llm_input_tokens,llm_output_tokens,llm_reasoning_tokens,llm_cache_read_tokens,llm_cache_write_tokens,
  started_at,execution_started_at,completed_at)
-SELECT j.id,j.id,j.workspace_id,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'CANCELLED' ELSE j.status END,j.retry_count,
+SELECT j.id,j.id,j.workspace_id,j.created_at,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'CANCELLED' ELSE j.status END,j.retry_count,
  CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'DONE' ELSE CASE j.delivery_status WHEN 'PENDING' THEN 'FAILED' WHEN 'DELIVERED' THEN 'DONE' WHEN 'FAILED' THEN 'FAILED' ELSE 'NONE' END END,
  j.available_at,j.hold_reason,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN NULL ELSE j.worker_id END,j.idempotency_key,j.trace_id,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN NULL ELSE j.job_token_hash END,jsonb_build_object('reviewId',j.id,'itemId',r.item_id::text),j.config_snapshot,
  j.evidence_snapshot-'reviewedWork'-'practices'-'answeredPractices',j.output,j.exit_code,j.error_message,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'CONTRACT_CHANGED' ELSE CASE WHEN j.cancellation_reason IN('DRAIN_GRACEFUL','DRAIN_IMMEDIATE','BUDGET_EXHAUSTED','MODEL_UNAVAILABLE','MEMBER_AI_DECLINED','PERSON_DATA_ERASED','CANCELLED_BY_ADMIN','CANCELLED_BY_REQUESTER','CONTRACT_CHANGED') THEN j.cancellation_reason END END,
- j.delivery_attempts,j.in_chat_prepared_at,j.in_app_prepared_at,p.review_digest,
+ j.in_chat_prepared_at,j.in_app_prepared_at,p.review_digest,
  COALESCE(p.admission_attempt,NULLIF(j.metadata->>'observation_admission_attempt','')::integer),
  COALESCE(p.admission_digest,NULLIF(j.metadata->>'observation_admission_digest','')),
  COALESCE(j.llm_total_calls,0),COALESCE(j.llm_total_input_tokens,0),COALESCE(j.llm_total_output_tokens,0),
@@ -2095,7 +2094,7 @@ LEFT JOIN _cutover_old_public_review_completion p ON p.job_id=j.id AND p.workspa
 
 UPDATE review r SET checks=jsonb_build_object('MIGRATION',jsonb_build_object(
  'jobStatus',j.status,'processingStatus',j.delivery_status,'triggerMode',j.practice_trigger_mode,
- 'cancellationReason',j.cancellation_reason)) FROM _cutover_old_agent_job j WHERE j.id=r.id;
+ 'cancellationReason',j.cancellation_reason,'deliveryAttempts',j.delivery_attempts)) FROM _cutover_old_agent_job j WHERE j.id=r.id;
 INSERT INTO review_composition_basis(job_id,workspace_id,admission_attempt,admission_digest,basis_digest,basis_version,copy_id,expires_at,payload)
 SELECT job_id,workspace_id,admission_attempt,admission_digest,basis_digest,basis_version,copy_id,expires_at,payload FROM _cutover_old_review_composition_basis;
 ALTER TABLE llm_usage_event ADD COLUMN review_id uuid,ADD COLUMN search_units bigint NOT NULL DEFAULT 0,ADD COLUMN unreported_calls integer NOT NULL DEFAULT 0;

@@ -8,13 +8,11 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackResponseDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import io.swagger.v3.oas.annotations.Hidden;
 import jakarta.validation.Valid;
 import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,7 +24,6 @@ import org.springframework.web.server.ResponseStatusException;
 @ConditionalOnWorkerRole
 @RequestMapping("/internal/llm")
 @Hidden
-@PreAuthorize("isAuthenticated()")
 public class ResultAdmissionController {
     private final ResultAdmissionService admission;
 
@@ -70,18 +67,12 @@ public class ResultAdmissionController {
     }
 
     private static ResultAdmissionService.AdmissionIdentity attemptOf(Authentication authentication) {
-        if (!(authentication.getPrincipal() instanceof ProxyRouting routing)) {
+        if (!(authentication.getPrincipal() instanceof ProxyIdentity identity) || identity.job() == null)
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Review job credential required");
-        }
-        var attempt = routing.attempt();
-        var workspaceId = routing.workspaceId();
-        if (attempt == null || attempt.sourceType() != UsageSourceType.REVIEW_JOB || workspaceId == null) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Review job credential required");
-        }
-        String workerId = attempt.workerId();
+        var job = identity.job();
+        var workerId = identity.workerId();
         if (workerId == null)
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Review worker credential required");
-        return new ResultAdmissionService.AdmissionIdentity(
-                attempt.sourceId(), workspaceId, attempt.number(), workerId);
+        return new ResultAdmissionService.AdmissionIdentity(job.jobId(), job.workspaceId(), job.attempt(), workerId);
     }
 }

@@ -24,6 +24,9 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
     CatalogService catalog;
 
     @Autowired
+    PracticeReviewDigest digest;
+
+    @Autowired
     PracticeVersionService versions;
 
     @Autowired
@@ -48,8 +51,10 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         var practice = service.setFeedbackMode(ctx, source.slug(), FeedbackMode.OFF);
         var pinned = practice.getCurrentVersion();
         var recordedDefinition = versions.definitionOf(pinned);
-        var offeredDefinition = DefinitionTestFixtures.rename(recordedDefinition, "Accepted catalog name");
-        catalog.putPractice(
+        var offeredDefinition = DefinitionTestFixtures.withCriteria(
+                DefinitionTestFixtures.rename(recordedDefinition, "Accepted catalog name"),
+                "Each change states its purpose and its verified result.");
+        catalog.updatePractice(
                 source.slug(),
                 new CatalogPracticeInputDTO(
                         source.slug(),
@@ -57,14 +62,21 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                         source.effective().groupSlug(),
                         offeredDefinition,
                         source.position()),
-                false,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         var proposal = releases.get(ctx, source.slug());
+        assertThat(proposal.offeredDigest())
+                .isEqualTo(digest.of(offeredDefinition))
+                .isNotEqualTo(digest.of(recordedDefinition))
+                .isNotEqualTo(proposal.etag());
         var accepted = releases.accept(
                 ctx,
                 source.slug(),
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(proposal.etag())),
-                Map.of(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED));
+                Map.of(
+                        PracticeDefinitionField.NAME,
+                        PracticeReleaseChoice.OFFERED,
+                        PracticeDefinitionField.CRITERIA,
+                        PracticeReleaseChoice.OFFERED));
         var current = service.getPractice(ctx, source.slug());
         assertThat(accepted.getCurrentVersion().getId()).isNotEqualTo(pinned.getId());
         assertThat(current.getCurrentVersion().getId())
@@ -95,7 +107,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         var existing = service.getPractice(WorkspaceContext.fromWorkspace(workspace, Set.of(), null), source.slug());
         var first = existing.getCurrentVersion();
         var changed = DefinitionTestFixtures.rename(source.effective().definition(), "Updated catalog name");
-        catalog.putPractice(
+        catalog.updatePractice(
                 source.slug(),
                 new CatalogPracticeInputDTO(
                         source.slug(),
@@ -103,7 +115,6 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                         source.effective().groupSlug(),
                         changed,
                         source.position()),
-                false,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
         service.setFeedbackMode(ctx, source.slug(), FeedbackMode.OFF);
@@ -116,7 +127,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 .isEqualTo(catalog.practice(source.slug()).effective());
         assertThat(releases.list(ctx))
                 .noneMatch(release -> release.practiceSlug().equals(source.slug()));
-        service.placePractice(ctx, source.slug(), null, 0);
+        service.movePractice(ctx, source.slug(), null, 0);
         assertThat(service.getPractice(ctx, source.slug()).getGroup()).isNull();
         var declinedProposal = releases.get(ctx, source.slug());
         assertThatThrownBy(() -> releases.reset(ctx, source.slug(), null))

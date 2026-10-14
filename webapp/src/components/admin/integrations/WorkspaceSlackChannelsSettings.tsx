@@ -171,7 +171,7 @@ export function WorkspaceSlackChannelsSettings({
 											swallow(
 												onRegisterChannel({
 													slackChannelId: c.slackChannelId,
-													channelName: c.channelName,
+													channelName: c.channelName ?? undefined,
 												}),
 											)
 										}

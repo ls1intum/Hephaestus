@@ -49,7 +49,7 @@ const READS_OF_FEEDBACK_RESPONSES: ReadonlySet<string> = new Set([
 	"getOwnPracticePageFeedback",
 	"getOwnFeedbackResponse",
 	"getOwnFeedbackResolutionCounts",
-	"getPracticeProfileOverview",
+	"getOwnPracticeProfileOverview",
 	"listOwnGroupReviews",
 	"listOwnReviews",
 	"getOwnReview",

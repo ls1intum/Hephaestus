@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { resultOutcomeDef, resultSeverity } from "./ReviewBadges";
 
 describe("result severity", () => {
-	it.each(["MET", "NOT_APPLICABLE", "UNDETERMINED"] as const)(
+	it.each(["MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const)(
 		"does not show severity for %s",
 		(outcome) => {
 			expect(resultSeverity({ outcome, severity: "CRITICAL" })).toBeUndefined();
@@ -21,6 +21,6 @@ describe("result outcome", () => {
 	});
 	it("says the outcome alone where no problem is counted", () => {
 		expect(resultOutcomeDef("NOT_MET", undefined).label).toBe("Not met");
-		expect(resultOutcomeDef("UNDETERMINED", 0).label).toBe("Could not determine");
+		expect(resultOutcomeDef("COULD_NOT_DETERMINE", 0).label).toBe("Could not determine");
 	});
 });

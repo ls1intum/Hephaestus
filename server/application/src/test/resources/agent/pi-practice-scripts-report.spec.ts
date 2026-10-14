@@ -6,7 +6,7 @@ import { test } from "node:test";
 
 import {
 	executionReportSchema,
-	LEGACY_CONTRACT_ERROR,
+	NOT_A_DEFINITION_ERROR,
 	parseCandidate,
 	REASONS,
 	type ExecutionReport,
@@ -53,7 +53,7 @@ const slugOf = (i: number) => `p-${String(i).padStart(3, "0")}`;
 
 /** A file of the fixtures that the server's tests share: `practice-results/`. */
 const sharedFixture = (name: string): unknown =>
-	JSON.parse(readFileSync(path.join(import.meta.dirname, "contract-v3", name), "utf8"));
+	JSON.parse(readFileSync(path.join(import.meta.dirname, "../practice-results", name), "utf8"));
 
 /**
  * `PiResultParserPracticeScriptReportTest` and `lib/contract.test.ts` read the same shared fixture, so a field
@@ -209,24 +209,24 @@ void test("a failed program's error is reported as the line that the server keep
 	assert.equal(errors.size, cases.length + 1);
 });
 
-void test("a program in the retired leads contract is reported with its whole error", () => {
-	assert.ok(LEGACY_CONTRACT_ERROR.length <= PRACTICE_SCRIPT_ERROR_MAX_CHARS);
+void test("a program that is not a practice script is reported with its whole error", () => {
+	assert.ok(NOT_A_DEFINITION_ERROR.length <= PRACTICE_SCRIPT_ERROR_MAX_CHARS);
 	const report = parsed(
 		executionReport([
 			[
-				"retired",
+				"not-a-script",
 				outcome({
 					program: { kind: "custom", digest: "0".repeat(64) },
 					status: "failed",
 					stopReason: "invalid-program",
-					error: LEGACY_CONTRACT_ERROR,
+					error: NOT_A_DEFINITION_ERROR,
 					calls: noCalls,
 				}),
 			],
 		]),
 	);
 	assert.partialDeepStrictEqual(report.practices, [
-		{ status: "failed", stopReason: "invalid-program", error: LEGACY_CONTRACT_ERROR },
+		{ status: "failed", stopReason: "invalid-program", error: NOT_A_DEFINITION_ERROR },
 	]);
 });
 

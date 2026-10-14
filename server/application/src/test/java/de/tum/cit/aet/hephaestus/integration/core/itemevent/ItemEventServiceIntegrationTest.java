@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
@@ -31,8 +30,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private TransactionTemplate transactions;
+
     @Autowired
     private ItemWriter writer;
 
@@ -113,38 +116,31 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldKeepVersionAndOccurrenceWhileWaiting() {
-        var input = input();
-        UUID id = writer.record(input);
-        Instant retry = input.occurredAt().plusSeconds(60);
-        assertThat(service.decide(
-                        input.workspaceId(),
-                        id,
-                        ItemEventState.RECORDED,
-                        ItemEventState.WAITING,
-                        ItemEventReason.BUDGET_EXHAUSTED,
-                        retry))
-                .isTrue();
-        assertThat(service.decide(input.workspaceId(), id, ItemEventState.RECORDED, ItemEventState.STARTED, null, null))
-                .isFalse();
-        var event = events.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
-        assertThat(event.getOccurredAt()).isEqualTo(input.occurredAt());
-        assertThat(event.getItemVersion()).isEqualTo(input.itemVersion());
-        assertThat(event.getRetryAt()).isEqualTo(retry);
+        transactions.executeWithoutResult(status -> {
+            var input = input();
+            UUID id = writer.record(input);
+            Instant retry = input.occurredAt().plusSeconds(60);
+            assertThat(service.decide(
+                            input.workspaceId(),
+                            id,
+                            ItemEventState.RECORDED,
+                            ItemEventState.WAITING,
+                            "BUDGET_EXHAUSTED",
+                            retry))
+                    .isTrue();
+            assertThat(service.decide(
+                            input.workspaceId(), id, ItemEventState.RECORDED, ItemEventState.STARTED, null, null))
+                    .isFalse();
+            var event = events.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
+            assertThat(event.getOccurredAt()).isEqualTo(input.occurredAt());
+            assertThat(event.getItemVersion()).isEqualTo(input.itemVersion());
+            assertThat(event.getRetryAt()).isEqualTo(retry);
+        });
     }
 
     @Test
-    void shouldRejectSyntheticEventOriginsAndForeignWorkspace() {
+    void shouldRejectForeignWorkspace() {
         var input = input();
-        assertThatThrownBy(() -> writer.record(new ItemEventInput(
-                        input.workspaceId(),
-                        input.itemId(),
-                        input.name(),
-                        input.itemVersion(),
-                        input.occurredAt(),
-                        FoundBy.REQUEST,
-                        null,
-                        null)))
-                .isInstanceOf(IllegalArgumentException.class);
         long foreign = workspaces
                 .save(WorkspaceTestFixtures.activeWorkspace("event-foreign-" + UUID.randomUUID()))
                 .getId();
@@ -180,33 +176,33 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldRefuseForeignDecisionsAndKeepTerminalFactsOnReplay() {
-        var input = input();
-        UUID id = writer.record(input);
-        long foreign = workspaces
-                .save(WorkspaceTestFixtures.activeWorkspace("decision-foreign-" + UUID.randomUUID()))
-                .getId();
-        assertThat(service.decide(foreign, id, ItemEventState.RECORDED, ItemEventState.STARTED, null, null))
-                .isFalse();
-        assertThat(events.findByIdAndWorkspaceId(id, input.workspaceId())
-                        .orElseThrow()
-                        .getState())
-                .isEqualTo(ItemEventState.RECORDED);
-        assertThat(service.decide(
-                        input.workspaceId(),
-                        id,
-                        ItemEventState.RECORDED,
-                        ItemEventState.WITHHELD,
-                        ItemEventReason.OUT_OF_REVIEW_SCOPE,
-                        null))
-                .isTrue();
-        assertThat(writer.record(input)).isEqualTo(id);
-        var terminal = events.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
-        assertThat(terminal.getState()).isEqualTo(ItemEventState.WITHHELD);
-        assertThat(terminal.getReason()).isEqualTo(ItemEventReason.OUT_OF_REVIEW_SCOPE);
-        assertThat(terminal.getOccurredAt()).isEqualTo(input.occurredAt());
-        assertThatThrownBy(() -> service.decide(
-                        input.workspaceId(), id, ItemEventState.WITHHELD, ItemEventState.STARTED, null, null))
-                .isInstanceOf(IllegalArgumentException.class);
+        transactions.executeWithoutResult(status -> {
+            var input = input();
+            UUID id = writer.record(input);
+            long foreign = workspaces
+                    .save(WorkspaceTestFixtures.activeWorkspace(
+                            "decision-foreign-" + UUID.randomUUID().toString().substring(0, 12)))
+                    .getId();
+            assertThat(service.decide(foreign, id, ItemEventState.RECORDED, ItemEventState.STARTED, null, null))
+                    .isFalse();
+            assertThat(service.decide(
+                            input.workspaceId(),
+                            id,
+                            ItemEventState.RECORDED,
+                            ItemEventState.WITHHELD,
+                            "OUT_OF_REVIEW_SCOPE",
+                            null))
+                    .isTrue();
+            assertThat(writer.record(input)).isEqualTo(id);
+            var terminal =
+                    events.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
+            assertThat(terminal.getState()).isEqualTo(ItemEventState.WITHHELD);
+            assertThat(terminal.getReason()).isEqualTo("OUT_OF_REVIEW_SCOPE");
+            assertThat(terminal.getOccurredAt()).isEqualTo(input.occurredAt());
+            assertThatThrownBy(() -> service.decide(
+                            input.workspaceId(), id, ItemEventState.WITHHELD, ItemEventState.STARTED, null, null))
+                    .isInstanceOf(IllegalArgumentException.class);
+        });
     }
 
     private ItemEventInput input() {

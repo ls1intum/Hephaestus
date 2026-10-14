@@ -25,8 +25,9 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub-side adapter that lets workspace lifecycle code (activation, post-install provisioning)
- * drive a full GraphQL sync without importing {@link GitHubDataSyncService} directly.
+ * GitHub-side adapter that lets workspace lifecycle code (activation, post-install
+ * provisioning) drive a full GraphQL sync without importing
+ * {@link GitHubDataSyncService} directly.
  *
  * <p>{@link GitHubDataSyncService} (and, for the same reason, {@link SyncTargetProvider}) is
  * consumed via {@link ObjectProvider} because there is a known circular reference between the sync
@@ -37,8 +38,8 @@ import org.springframework.stereotype.Component;
  * rest of this class. Active-connection writes never bypass {@link SyncJobService}; if the control
  * plane is unavailable, the sync is skipped rather than run unfenced.
  *
- * <p>{@link WorkspaceRepositoryMonitorService} injects every {@link WorkspaceDataSyncTrigger}, so
- * this class looks it up lazily too.
+ * <p>{@link WorkspaceRepositoryMonitorService} injects every {@link WorkspaceDataSyncTrigger}, so this
+ * class looks it up lazily too.
  */
 @Component
 public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger {
@@ -93,12 +94,12 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
     }
 
     /**
-     * A GitHub App workspace first reconciles its monitored repositories with the installation,
-     * then runs the full sync if {@code fullSync} is set. Both steps run in one {@code
-     * RECONCILIATION}/{@code LIFECYCLE} job, because the reconciliation can remove monitors of
-     * repositories that the installation no longer covers. The monitor transaction commits before
-     * the sync starts, so the sync and the scope consumer see the reconciled monitors. A GitHub PAT
-     * workspace, or a workspace without an active connection, keeps the default behavior.
+     * A GitHub App workspace first reconciles its monitored repositories with the installation, then runs the
+     * full sync if {@code fullSync} is set. Both steps run in one {@code RECONCILIATION}/{@code LIFECYCLE} job,
+     * because the reconciliation can remove monitors of repositories that the installation no longer covers.
+     * The monitor transaction commits before the sync starts, so the sync and the scope consumer see the
+     * reconciled monitors.
+     * A GitHub PAT workspace, or a workspace without an active connection, keeps the default behavior.
      */
     @Override
     public void syncOnStartup(long workspaceId, boolean fullSync) {
@@ -150,7 +151,7 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                     body);
         } catch (SyncJobConflictException e) {
             log.info(
-                    "Skipped lifecycle sync: reason=activeJobAlready, workspaceId={}," + " activeJobId={}",
+                    "Skipped lifecycle sync: reason=activeJobAlready, workspaceId={}, activeJobId={}",
                     workspaceId,
                     e.activeJob().getId());
         }
@@ -171,7 +172,7 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
         SyncJobService syncJobService = syncJobServiceProvider.getIfAvailable();
         if (connectionRepository == null || syncJobService == null) {
             log.warn(
-                    "Skipped single-target sync: reason=controlPlaneUnavailable, workspaceId={}," + " syncTargetId={}",
+                    "Skipped single-target sync: reason=controlPlaneUnavailable, workspaceId={}, syncTargetId={}",
                     target.scopeId(),
                     target.id());
             return;
@@ -181,7 +182,7 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                         target.scopeId(), IntegrationKind.GITHUB, IntegrationState.ACTIVE);
         if (connection.isEmpty()) {
             log.debug(
-                    "Skipped single-target sync: reason=noActiveConnection, workspaceId={}," + " syncTargetId={}",
+                    "Skipped single-target sync: reason=noActiveConnection, workspaceId={}, syncTargetId={}",
                     target.scopeId(),
                     target.id());
             return;
@@ -208,8 +209,7 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                     handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target));
         } catch (SyncJobConflictException e) {
             log.info(
-                    "Skipped single-target sync: reason=activeJobAlready, workspaceId={},"
-                            + " syncTargetId={}, activeJobId={}",
+                    "Skipped single-target sync: reason=activeJobAlready, workspaceId={}, syncTargetId={}, activeJobId={}",
                     target.scopeId(),
                     target.id(),
                     e.activeJob().getId());

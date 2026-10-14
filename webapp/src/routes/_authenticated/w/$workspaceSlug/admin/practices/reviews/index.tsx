@@ -9,11 +9,7 @@ import {
 } from "@/components/admin/practice-reviews/remembered-range";
 import { rangeScope } from "@/components/admin/practice-reviews/review-outcomes";
 import { ALL_TIME, reviewRangeStart } from "@/components/admin/practice-reviews/review-range";
-import {
-	clearedScope,
-	readScope,
-	scopeSearch,
-} from "@/components/admin/practice-reviews/review-scope";
+import { clearedScope, readScope } from "@/components/admin/practice-reviews/review-scope";
 import { overviewSearchSchema } from "@/components/admin/practice-reviews/review-search";
 import { ReviewScopeFilters } from "@/components/admin/practice-reviews/ReviewScopeFilters";
 import { reviewRunningTone } from "@/components/admin/practices/review/review-readiness";
@@ -83,9 +79,7 @@ function PracticeReviewOverviewRoute() {
 				tab="overview"
 				scope={readScope(search)}
 				onChange={(patch) => {
-					void setSearch((previous) => ({ ...previous, ...scopeSearch("overview", patch) }), {
-						replace: true,
-					});
+					void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 				}}
 				onClear={() => {
 					void setSearch((previous) => ({ ...previous, ...clearedScope() }), { replace: true });

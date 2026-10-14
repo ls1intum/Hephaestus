@@ -41,6 +41,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * An item kind that exists nowhere in {@code src/main}, driven through the real machinery —
@@ -114,7 +115,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
                 .thenReturn(List.of(
                         practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED)));
         PracticeItemEventCoverage practiceCoverage = new PracticeItemEventCoverage(
-                splitCoverage(), new PracticeItemOptions(FixtureIntegration.itemCatalog()), repository);
+                splitCoverage(), new PracticeItemOptions(FixtureIntegration.itemCatalog()), repository,new JsonMapper());
 
         assertThat(practiceCoverage.dormantBindings(WORKSPACE_ID)).isEmpty();
     }
@@ -179,7 +180,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         PracticeRepository repository = mock(PracticeRepository.class);
         when(repository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practices));
         return new PracticeItemEventCoverage(
-                coverage(connected), new PracticeItemOptions(FixtureIntegration.itemCatalog()), repository);
+                coverage(connected), new PracticeItemOptions(FixtureIntegration.itemCatalog()), repository,new JsonMapper());
     }
 
     private static Practice practiceBoundTo(ItemEventName... events) {

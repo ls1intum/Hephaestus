@@ -74,8 +74,8 @@ public class RepositoryTreeContentSource {
             personCopies.recordRepository(metadata.repositoryId());
         }
         Map<String, Path> onDisk = Map.of(
-                "repos/reviewed/" + ".git/HEAD", snapshot.stagingDir().resolve(".git/HEAD"),
-                "repos/reviewed/" + ".git/hephaestus-captured-refs",
+                "repos/reviewed/.git/HEAD", snapshot.stagingDir().resolve(".git/HEAD"),
+                "repos/reviewed/.git/hephaestus-captured-refs",
                         snapshot.stagingDir().resolve(".git/hephaestus-captured-refs"));
         // Excluded entries must not license an absence claim about the complete repository.
         SourceCompleteness completeness =

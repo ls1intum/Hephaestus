@@ -10,6 +10,7 @@ public final class ScmItemEvents {
     public static final ItemKind ISSUE = new ItemKind("scm.issue");
     public static final ItemKind REPOSITORY = new ItemKind("scm.repository");
     public static final ItemKind FILE = new ItemKind("scm.file");
+    public static final Set<ItemKind> ALL = Set.of(ISSUE, PULL_REQUEST, PULL_REQUEST_REVIEW, REPOSITORY, FILE);
     public static final ItemEventName PULL_REQUEST_OPENED = new ItemEventName("scm.pull_request.opened");
     public static final ItemEventName PULL_REQUEST_READY = new ItemEventName("scm.pull_request.ready");
     public static final ItemEventName PULL_REQUEST_SYNCHRONIZED = new ItemEventName("scm.pull_request.synchronized");

@@ -21,7 +21,8 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewExecutionHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.DefaultReviewExecutionHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
@@ -110,18 +111,18 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
             return bindings.findByWorkspaceIdAndPurposeAndDataHandlingTier(
                     selected.getWorkspaceId(),
                     AgentPurpose.PRACTICE_REVIEW,
-                    Objects.requireNonNull(snapshot.dataHandlingTier()));
+                    Objects.requireNonNull(snapshot.model().dataHandlingTier()));
         });
         var budgets = mock(LlmBudgetService.class);
         when(budgets.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
         var metrics = new SimpleMeterRegistry();
-        // Hold dispatched sandbox work outside this test: admission, locks and RUNNING rows are real.
+        var assignmentSnapshots = mock(ReviewJobAssignments.class);
+        when(assignmentSnapshots.load(any())).thenReturn(List.of(RuntimeReviewTestData.assignment(null, null)));
+        // Hold sandbox work outside this test: admission, locks and RUNNING rows are real.
         executor = new ReviewJobExecutor(
                 properties,
                 jobs,
-                policy,
-                mock(ReviewExecutionHandler.class),
-                mock(ReviewJobAssignments.class),
+                mock(DefaultReviewExecutionHandler.class),
                 mock(PracticePiAdapter.class),
                 mock(WorkerJwtIssuer.class),
                 mock(SandboxManager.class),
@@ -133,11 +134,23 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                 new ReviewJobTelemetry(metrics, Tracer.NOOP),
                 mock(LlmUsageRecorder.class),
                 mock(PracticeScriptRunRecorder.class),
-                budgets,
                 admission,
                 Optional.empty(),
                 Optional.empty(),
-                mock(ReviewMethodVerifier.class));
+                new ReviewJobClaimService(
+                        jobs,
+                        policy,
+                        mock(ReviewMethodVerifier.class),
+                        assignmentSnapshots,
+                        transactions,
+                        mapper,
+                        metrics,
+                        new PracticeReviewRefusalMetrics(metrics),
+                        budgets,
+                        admission,
+                        new ReviewJobTelemetry(metrics, Tracer.NOOP),
+                        Optional.empty()),
+                new ReviewJobRecovery(jobs, properties, mapper, mock(LlmUsageRecorder.class), Optional.empty()));
     }
 
     @Test
@@ -155,7 +168,8 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
             var firstClaim = threads.submit(() -> executor.processJob(first.getId()));
             var secondClaim = threads.submit(() -> executor.processJob(second.getId()));
             assertThat(List.of(firstClaim.get(30, TimeUnit.SECONDS), secondClaim.get(30, TimeUnit.SECONDS)))
-                    .containsExactlyInAnyOrder(true, false);
+                    .containsExactlyInAnyOrder(
+                            ReviewJobExecutor.StartOutcome.STARTED, ReviewJobExecutor.StartOutcome.SKIPPED);
         }
         assertThat(jobs.findAllById(List.of(first.getId(), second.getId())))
                 .extracting(ReviewJob::getStatus)
@@ -163,7 +177,7 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
 
         doReturn(true).when(policy).permitsReview(any());
         var cloudJob = queued(cloud);
-        assertThat(executor.processJob(cloudJob.getId())).isTrue();
+        assertThat(executor.processJob(cloudJob.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
         assertThat(jobs.findById(cloudJob.getId()))
                 .get()
                 .extracting(ReviewJob::getStatus)
@@ -174,13 +188,13 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
     void shouldKeepRunningOccupancyWhenTheSlotsModelIsReassigned() {
         var binding = binding(DataHandlingTier.IN_HOUSE);
         var running = queued(binding);
-        assertThat(executor.processJob(running.getId())).isTrue();
+        assertThat(executor.processJob(running.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
 
         var replacement = model(DataHandlingTier.IN_HOUSE);
         binding.setInstanceModel(replacement);
         binding = bindings.saveAndFlush(binding);
         var queued = queued(binding);
-        assertThat(executor.processJob(queued.getId())).isFalse();
+        assertThat(executor.processJob(queued.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
         assertThat(jobs.findById(queued.getId()))
                 .get()
                 .extracting(ReviewJob::getStatus)
@@ -188,19 +202,19 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldCountHistoricalSnapshotsAgainstOnlyTheUndeclaredSlot() {
+    void shouldCountAnUndeclaredModelAgainstOnlyTheUndeclaredSlot() {
         var binding = binding(DataHandlingTier.UNDECLARED);
         var historical = queued(binding);
         var snapshot = (ObjectNode) historical.getConfigSnapshot();
-        snapshot.remove("dataHandlingTier");
+        ((ObjectNode) snapshot.get("model")).remove("dataHandlingTier");
         historical.setConfigSnapshot(snapshot);
         historical.setStatus(ReviewJobStatus.RUNNING);
         jobs.saveAndFlush(historical);
 
-        assertThat(executor.processJob(queued(binding).getId())).isFalse();
+        assertThat(executor.processJob(queued(binding).getId())).isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
         assertThat(executor.processJob(
                         queued(binding(DataHandlingTier.IN_HOUSE)).getId()))
-                .isTrue();
+                .isEqualTo(ReviewJobExecutor.StartOutcome.STARTED);
     }
 
     @Test
@@ -210,7 +224,7 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
         var routedElsewhere = binding(DataHandlingTier.CLOUD);
         doReturn(Optional.of(routedElsewhere)).when(policy).binding(any(ReviewJob.class));
 
-        assertThat(executor.processJob(job.getId())).isFalse();
+        assertThat(executor.processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
         assertThat(jobs.findById(job.getId()))
                 .get()
                 .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)

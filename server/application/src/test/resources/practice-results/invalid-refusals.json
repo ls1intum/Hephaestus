@@ -1,12 +1,10 @@
 {
 	"invalid-met-with-problems.json": "outcome_problem_mismatch",
-	"invalid-severity-below-worst-problem.json": "severity_below_worst_problem",
 	"invalid-met-incomplete-coverage.json": "met_coverage_incomplete",
 	"invalid-undetermined-without-open-question.json": "warrant_outcome_mismatch",
 	"invalid-example-on-not-applicable.json": "example_outcome_mismatch",
 	"invalid-basis-citation-out-of-range.json": "basis_citation_out_of_range",
 	"invalid-leads-return.json": "malformed_candidate",
-	"invalid-severity-on-met.json": "severity_outcome_mismatch",
 	"invalid-met-without-citations.json": "result_citations_required",
 	"invalid-host-coverage-complete-with-truncated-read.json": "coverage_inconsistent",
 	"invalid-example-overlaps-problem.json": "example_overlaps_problem",
@@ -16,16 +14,11 @@
 	"invalid-claimed-coverage-checks-more-than-selected.json": "coverage_inconsistent",
 	"invalid-empty-open-questions.json": "malformed_candidate",
 	"invalid-search-consulted-nothing.json": "malformed_candidate",
-	"invalid-diff-citation-without-side.json": "malformed_candidate",
-	"invalid-side-off-diff.json": "malformed_candidate",
-	"invalid-revision-off-tree.json": "malformed_candidate",
 	"invalid-citation-ends-before-it-starts.json": "malformed_candidate",
 	"invalid-unknown-key.json": "malformed_candidate",
 	"invalid-null-severity.json": "malformed_candidate",
 	"invalid-problem-key-not-slug.json": "malformed_candidate",
 	"invalid-summary-two-lines.json": "malformed_candidate",
 	"invalid-count-over-bound.json": "malformed_candidate",
-	"invalid-criterion-quote-over-bound.json": "malformed_candidate",
-	"invalid-code-citation-in-git-dir.json": "malformed_candidate",
-	"invalid-diff-citation-outside-repository.json": "malformed_candidate"
+	"invalid-criterion-quote-over-bound.json": "malformed_candidate"
 }

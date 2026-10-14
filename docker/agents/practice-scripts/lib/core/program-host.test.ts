@@ -14,9 +14,7 @@ import { stagePracticeScripts } from "../../stage.ts";
 import { MODEL_CONCURRENCY } from "./concurrency.ts";
 import {
 	executionEntrySchema,
-	LEGACY_CONTRACT_ERROR,
-	legacyContractError,
-	RETIRED_FORM_ERROR,
+	NOT_A_DEFINITION_ERROR,
 	type Candidate,
 	type ReviewOptions,
 	type SlotModels,
@@ -166,7 +164,6 @@ async function run(ws: Workspace, slug: string, options: RunOptions = {}) {
 		{
 			slug,
 			inputs: read.inputs,
-			criteria: "Each added TODO names the issue that tracks it.",
 			files: {
 				head: { revision: HEAD },
 				change: { base: BASE, head: HEAD, files: new Map(CHANGE) },
@@ -770,15 +767,6 @@ void describe("a program that gives no result", () => {
 		assert.equal(outcome.error, "the change was not captured");
 	});
 
-	void test("one that returns leads fails as an invalid result with the legacy contract error", async () => {
-		const ws = await workspace({ "no-candidate": await fixture("no-candidate") });
-		const { outcome } = await run(ws, "no-candidate");
-		assert.equal(outcome.status, "failed");
-		assert.equal(outcome.stopReason, "invalid-candidate");
-		assert.equal(outcome.error, LEGACY_CONTRACT_ERROR);
-		reportEntry("no-candidate", outcome);
-	});
-
 	void test("one that returns a value the contract refuses fails as an invalid result, with its refusal code", async () => {
 		const ws = await workspace({
 			uncited: program(
@@ -795,25 +783,11 @@ void describe("a program that gives no result", () => {
 		);
 	});
 
-	void test("one whose meta names the retired contract fails as an invalid program with the legacy error", async () => {
-		const ws = await workspace({
-			legacy: program(
-				"definePracticeScript",
-				`{ meta: { version: 1, kinds: {} }, run: async () => ({ leads: [] }) }`,
-			),
-		});
-		const { outcome } = await run(ws, "legacy");
-		assert.equal(outcome.status, "failed");
-		assert.equal(outcome.stopReason, "invalid-program");
-		assert.equal(outcome.error, legacyContractError("version"));
-		assert.deepEqual(outcome.models, []);
-	});
-
-	void test("one in the retired positional form fails as an invalid program", async () => {
-		const ws = await workspace({ positional: "export default () => ({ leads: [] });\n" });
+	void test("one whose default export is not a practice script fails as an invalid program", async () => {
+		const ws = await workspace({ positional: "export default () => ({ outcome: 'MET' });\n" });
 		const { outcome } = await run(ws, "positional");
 		assert.equal(outcome.status, "failed");
-		assert.equal(outcome.error, RETIRED_FORM_ERROR);
+		assert.equal(outcome.error, NOT_A_DEFINITION_ERROR);
 		assert.equal(outcome.stopReason, "invalid-program");
 	});
 });

@@ -13,7 +13,7 @@ import { durationText } from "@/lib/dates";
 
 import { type CardFigure, FigureCaption, FigureRow } from "./CardFigures";
 import { OVERVIEW_TYPE } from "./overview-type-scale";
-import { type OutcomeScope, type ReviewListTarget, scopeSearch } from "./review-outcomes";
+import type { ReviewListTarget } from "./review-outcomes";
 import type { ReviewCountState } from "./review-states";
 import {
 	REVIEW_STAGES,
@@ -36,8 +36,6 @@ export interface FinishedInRange {
 export interface ReviewTimeCardProps {
 	workspaceSlug: string;
 	state: ReviewTimingState;
-	/** The range as the lists' day filters, so the card opens the reviews it measured. */
-	scope: OutcomeScope;
 	/** The range by name, the part's caption: "Last 30 days". */
 	label: string;
 	/** What the time was measured over: "in the last 30 days". */
@@ -61,7 +59,6 @@ export interface ReviewTimeCardProps {
 export function ReviewTimeCard({
 	workspaceSlug,
 	state,
-	scope,
 	label,
 	during,
 	finished,
@@ -107,12 +104,7 @@ export function ReviewTimeCard({
 				{label}
 			</FigureCaption>
 			{body}
-			<RangeFigures
-				workspaceSlug={workspaceSlug}
-				scope={scope}
-				timing={timing}
-				finished={finished}
-			/>
+			<RangeFigures workspaceSlug={workspaceSlug} timing={timing} finished={finished} />
 		</div>
 	);
 }
@@ -237,17 +229,15 @@ function TimeFigures({ timing, during }: { timing: ReviewTiming; during: string 
 }
 
 /**
- * The range's figures in one line: the reviews that finished, and, when there are any, the pieces of
- * feedback lost to the merge and the reviews that finished after it, each a link to what it counts.
+ * The range's figures in one line: the reviews that finished, a link to them, and, when there are
+ * any, the pieces of feedback lost to the merge and the reviews that finished after it.
  */
 function RangeFigures({
 	workspaceSlug,
-	scope,
 	timing,
 	finished,
 }: {
 	workspaceSlug: string;
-	scope: OutcomeScope;
 	timing: ReviewTiming | undefined;
 	finished: FinishedInRange | undefined;
 }) {
@@ -259,31 +249,11 @@ function RangeFigures({
 	if (lost > 0) {
 		figures.push({ key: "lost", term: "lost to merge", value: lost });
 	}
-	// Every review that finished after the merge, the ones the merge started too, so the figure is
-	// the number of rows its link opens; the (i) says how many the merge started.
+	// Every review that finished after the merge, the ones the merge started too; the (i) says how
+	// many the merge started. The reviews list cannot filter by it, so the count opens nothing.
 	const afterMerge = timing?.finishedAfterMerge ?? 0;
 	if (afterMerge > 0) {
-		figures.push({
-			key: "late",
-			term: "finished after merge",
-			value: (
-				<InlineLink
-					tone="count"
-					aria-label={`${afterMerge} ${afterMerge === 1 ? "review" : "reviews"} finished after the merge`}
-					render={
-						<ReviewListLink
-							workspaceSlug={workspaceSlug}
-							destination={{
-								list: "runs",
-								search: { ...scopeSearch(scope, "runs"), finishedAfterMerge: true },
-							}}
-						/>
-					}
-				>
-					{afterMerge}
-				</InlineLink>
-			),
-		});
+		figures.push({ key: "late", term: "finished after merge", value: afterMerge });
 	}
 	const stale = finished?.state.status === "ready" && finished.state.stale;
 	return (

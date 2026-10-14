@@ -633,7 +633,7 @@ class IssueContentSourceTest extends BaseUnitTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns(boolean tombstoned) {
+    void shouldReportUnavailableThenAllowCaptureWhenItemReturns(boolean tombstoned) {
         var artifact = richIssue();
         var pinned = request(sampleMetadata(), artifact);
         clearInvocations(issueCommentRepository);

@@ -54,8 +54,8 @@ public record OutlineCollectionDTO(
         Long documentCount,
 
         @Schema(
-                description = "Documents upstream reported for this collection at the last enumeration (coverage"
-                        + " denominator)")
+                description =
+                        "Documents upstream reported for this collection at the last enumeration (coverage denominator)")
         @Nullable
         Integer documentsUpstream,
 

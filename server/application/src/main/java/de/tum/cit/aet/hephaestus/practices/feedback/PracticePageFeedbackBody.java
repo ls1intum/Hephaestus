@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import org.jspecify.annotations.Nullable;
 
-/** The stored Markdown layout for a practice-page headline, body and next step. */
+/** Stores and reads the composed headline, guidance and next step. */
 public final class PracticePageFeedbackBody {
 
     static final String HEADLINE_PREFIX = "### ";
@@ -10,7 +10,6 @@ public final class PracticePageFeedbackBody {
 
     private PracticePageFeedbackBody() {}
 
-    /** The stored body for one composed message. */
     public static String render(String headline, String message, String nextStep) {
         return (HEADLINE_PREFIX
                 + oneLine(headline)
@@ -21,10 +20,6 @@ public final class PracticePageFeedbackBody {
                 + oneLine(nextStep));
     }
 
-    /**
-     * The headline, or {@code null} for a body this class did not write. Null is the honest answer: a
-     * caller that invented one would be putting words in the composer's mouth.
-     */
     public static @Nullable String headlineOf(@Nullable String body) {
         if (body == null) {
             return null;
@@ -37,10 +32,6 @@ public final class PracticePageFeedbackBody {
         return headline.isEmpty() ? null : headline;
     }
 
-    /**
-     * The way of working to try next, or {@code null} for a body this class did not write — the same honesty as
-     * {@link #headlineOf}. Read off the last line, where {@link #render} puts it.
-     */
     public static @Nullable String nextStepOf(@Nullable String body) {
         if (body == null) {
             return null;
@@ -53,11 +44,6 @@ public final class PracticePageFeedbackBody {
         return nextStep.isEmpty() ? null : nextStep;
     }
 
-    /**
-     * The process-level message on its own: below the headline and above the next step, each dropped
-     * only when this class wrote it. A reader gets the three parts separately and never splits the
-     * body itself.
-     */
     public static String messageOf(@Nullable String body) {
         if (body == null) {
             return "";
@@ -74,7 +60,6 @@ public final class PracticePageFeedbackBody {
         return stripped;
     }
 
-    /** Newlines in a heading would break the layout the reader relies on; collapse them once, here. */
     private static String oneLine(String text) {
         return text.strip().replace('\r', ' ').replace('\n', ' ').strip();
     }

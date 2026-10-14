@@ -2,7 +2,7 @@ import type { ReviewResult } from "@/api/types.gen";
 import type { StatusDef } from "@/components/common/status-def";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { OUTCOME_DEFS, resultVerdict } from "@/components/practice-vocabulary/outcome-defs";
-import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
+import { REVIEW_ORIGIN_DEFS } from "@/components/practice-vocabulary/review-origin-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { StatusLabel } from "@/components/practice-vocabulary/StatusTooltip";
 
@@ -37,7 +37,7 @@ export function ResultOutcome({ result, problems }: ResultOutcomeProps) {
 	);
 }
 
-/** The states a badge is kept for: what failed, was withheld, was disputed or needs a look. */
+/** The states a badge is kept for: what failed, was withheld, was marked incorrect or needs a look. */
 export function isExceptionStatus(def: StatusDef): boolean {
 	return def.badgeVariant === "destructive" || def.badgeVariant === "warning";
 }
@@ -63,13 +63,13 @@ export function resultSeverity(
 }
 
 /**
- * LIVE renders nothing: naming the ordinary case buries the others. The others are plain words, not
+ * EVENT renders nothing: naming the ordinary case buries the others. The others are plain words, not
  * a badge: an origin is a fact about the record, not something that went wrong. The words are the
  * registry's, so the operator's console and the developer's own surface name an origin alike.
  */
 export function ResultOriginNote({ origin }: { origin: ReviewResult["origin"] }) {
-	if (origin === "LIVE") {
+	if (origin === "EVENT") {
 		return null;
 	}
-	return <span>{RESULT_ORIGIN_DEFS[origin].label}</span>;
+	return <span>{REVIEW_ORIGIN_DEFS[origin].label}</span>;
 }

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context;
 
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
@@ -27,13 +27,13 @@ public class WorkspaceContextBuilder {
     private static final Logger log = LoggerFactory.getLogger(WorkspaceContextBuilder.class);
     private final List<ContentSource> mentorSources;
     private final List<ItemSource> itemSources;
-    private final SourceCatalogRegistry catalogs;
+    private final ClasspathSourceCatalogRegistry catalogs;
     private final JobFolderIndexBuilder manifests;
 
     public WorkspaceContextBuilder(
             List<ContentSource> mentorSources,
             List<ItemSource> itemSources,
-            SourceCatalogRegistry catalogs,
+            ClasspathSourceCatalogRegistry catalogs,
             JobFolderIndexBuilder manifests) {
         var sorted = new ArrayList<>(mentorSources);
         AnnotationAwareOrderComparator.sort(sorted);
@@ -69,7 +69,7 @@ public class WorkspaceContextBuilder {
 
     public PreparedEvidence prepare(ItemSnapshot item, CaptureRequest request) {
         var matching = itemSources.stream()
-                .filter(source -> source.kind().equals(item.item().kind()) && source.supports(item.item()))
+                .filter(source -> source.supports(item.item()))
                 .toList();
         if (matching.size() != 1)
             throw new IllegalStateException("The item must have exactly one installed capture source");
@@ -80,12 +80,11 @@ public class WorkspaceContextBuilder {
                     .toList()) {
                 var version = catalogs.current().version();
                 if (!version.value().equals(request.sourceContractVersion())
-                        || !catalogs.requireSource(version, kind)
+                        || !catalogs.requireSource(kind)
                                 .appliesTo(item.item().kind().value())) {
                     throw new IllegalArgumentException("The requested source contract does not match the item");
                 }
-                var contribution = catalogs.isSourceUsePermitted(
-                                version, kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
+                var contribution = catalogs.isSourceUsePermitted(kind, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
                         ? matching.getFirst()
                                 .capture(
                                         item,

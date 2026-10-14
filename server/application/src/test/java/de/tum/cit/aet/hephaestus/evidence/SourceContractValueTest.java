@@ -186,7 +186,7 @@ class SourceContractValueTest {
     }
 
     @Test
-    void shouldRejectNonCanonicalArtifactPaths() {
+    void shouldRejectNonCanonicalFilePaths() {
         for (String path : List.of("foo/..", "foo/../bar", "./foo", "foo\\bar")) {
             assertThatIllegalArgumentException()
                     .isThrownBy(() -> new CapturedSource(path, "application/json", "a".repeat(64), 1));
@@ -194,7 +194,7 @@ class SourceContractValueTest {
     }
 
     @Test
-    void shouldRejectDuplicateArtifactPathsInACapture() {
+    void shouldRejectDuplicateFilePathsInACapture() {
         CapturedSource first = new CapturedSource("context.json", "application/json", "a".repeat(64), 1);
         CapturedSource second = new CapturedSource("context.json", "application/json", "b".repeat(64), 2);
 

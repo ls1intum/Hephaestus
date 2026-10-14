@@ -64,7 +64,10 @@ class CandidateContractSyncTest extends BaseUnitTest {
                 .containsExactlyElementsOf(Arrays.stream(CandidateRefusal.values())
                         .filter(value -> value != CandidateRefusal.BASIS_STATE_UNSUPPORTED
                                 && value != CandidateRefusal.BASIS_REVISION_UNSUPPORTED
-                                && value != CandidateRefusal.QUOTE_UNVERIFIED)
+                                && value != CandidateRefusal.QUOTE_UNVERIFIED
+                                && value != CandidateRefusal.SOURCE_UNAVAILABLE
+                                && value != CandidateRefusal.BASIS_WITNESS_MISSING
+                                && value != CandidateRefusal.DUTY_QUOTE_UNVERIFIED)
                         .map(CandidateRefusal::wireValue)
                         .toList());
     }

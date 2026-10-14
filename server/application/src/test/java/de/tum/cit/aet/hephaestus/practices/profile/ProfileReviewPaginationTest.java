@@ -106,24 +106,28 @@ class ProfileReviewPaginationTest extends BaseUnitTest {
             var ids = rows.stream().map(r -> r.getId()).toList();
             return data.stream().filter(v -> ids.contains(v.result().getId())).toList();
         });
-        when(presentation.list(any(), eq(true))).thenAnswer(i -> {
-            ResultView v = i.getArgument(0);
-            var r = v.result();
-            return new ResultListDTO(
-                    r.getId(),
-                    r.getReviewId(),
-                    v.item(),
-                    v.practice().getSlug(),
-                    "Practice",
-                    r.getOutcome(),
-                    null,
-                    null,
-                    ReviewOrigin.EVENT,
-                    r.getRecordedAt(),
-                    Currentness.CURRENT,
-                    null,
-                    null,
-                    List.of());
+        when(presentation.lists(eq(1L), anyCollection(), any())).thenAnswer(i -> {
+            Collection<ResultView> selected = i.getArgument(1);
+            return selected.stream()
+                    .map(v -> {
+                        var r = v.result();
+                        return new ResultListDTO(
+                                r.getId(),
+                                r.getReviewId(),
+                                v.item(),
+                                v.practice().getSlug(),
+                                "Practice",
+                                r.getOutcome(),
+                                null,
+                                null,
+                                ReviewOrigin.EVENT,
+                                r.getRecordedAt(),
+                                Currentness.CURRENT,
+                                null,
+                                null,
+                                List.of());
+                    })
+                    .toList();
         });
         when(presentation.ownFeedback(any())).thenReturn(List.of());
         when(reviews.ref(any())).thenAnswer(i -> {

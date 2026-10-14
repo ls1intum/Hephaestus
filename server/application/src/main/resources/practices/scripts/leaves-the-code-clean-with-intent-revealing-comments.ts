@@ -1,3 +1,7 @@
+// Finds residue that the change adds: debug output, TODO markers, notes about the editing session,
+// template placeholders and near-empty new files. A table of debug-output calls for each language,
+// keyed by the file extension, finds the debug output. Each lead is a place to read; the review
+// decides if it is residue or a deliberate line.
 import { scm } from "../kits/scm/index.ts";
 import {
 	occurrences,
@@ -6,10 +10,6 @@ import {
 	occurrenceLead,
 	sortOccurrenceLeads,
 } from "../kits/scm/occurrences.ts";
-// Finds residue that the change adds: debug output, TODO markers, notes about the editing session,
-// template placeholders and near-empty new files. A table of debug-output calls for each language,
-// keyed by the file extension, finds the debug output. Each lead is a place to read; the review
-// decides if it is residue or a deliberate line.
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {

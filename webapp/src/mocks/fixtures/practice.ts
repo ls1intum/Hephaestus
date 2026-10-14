@@ -66,26 +66,6 @@ export const mockIssueReviewFields = {
 	},
 } satisfies ReviewFields;
 
-export const mockConversationReviewFields = {
-	reviewOn: { events: ["chat.thread.settled"], state: {} },
-	about: "AUTHOR",
-	appliesWhen: null,
-	reads: {
-		contract: SOURCE_CONTRACT,
-		sources: [{ source: "slack.conversation.thread", need: "REQUIRED" }],
-	},
-} satisfies ReviewFields;
-
-export const mockDocumentReviewFields = {
-	reviewOn: { events: ["docs.document.published", "docs.document.updated"], state: {} },
-	about: "AUTHOR",
-	appliesWhen: null,
-	reads: {
-		contract: SOURCE_CONTRACT,
-		sources: [{ source: "docs.document.core", need: "REQUIRED" }],
-	},
-} satisfies ReviewFields;
-
 /** A source with every need on offer and no citation coordinates; the catalog's common case. */
 function readSource(source: string, label: string): ReadSourceOption {
 	return {
@@ -350,5 +330,4 @@ function itemTypeOf(kind: string): PracticeItemTypeOption {
 
 export const mockPullRequestItemType = itemTypeOf("scm.pull_request");
 export const mockIssueItemType = itemTypeOf("scm.issue");
-export const mockConversationItemType = itemTypeOf("chat.thread");
 export const mockDocumentItemType = itemTypeOf("docs.document");

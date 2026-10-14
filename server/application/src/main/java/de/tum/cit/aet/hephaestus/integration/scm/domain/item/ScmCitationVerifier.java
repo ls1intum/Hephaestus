@@ -75,8 +75,7 @@ public class ScmCitationVerifier implements CitationVerifier {
             if (!code(citation)) {
                 if (citation.side() != CitationSide.NEW || citation.revision() != null)
                     refused.add(refusal(
-                            citation.index(),
-                            "This SCM record does not support a repository revision or base" + " side"));
+                            citation.index(), "This SCM record does not support a repository revision or base side"));
                 continue;
             }
             if (head == null || !safePath(citation.path())) {
@@ -112,7 +111,7 @@ public class ScmCitationVerifier implements CitationVerifier {
                     || (oldest != null && code(oldest) && !basisRevision(oldest, CitationSide.OLD, base))) {
                 refused.add(refusal(
                         basis.headCitation(),
-                        "The problem basis cites another repository revision than the" + " reviewed change"));
+                        "The problem basis cites another repository revision than the reviewed change"));
             }
         }
         return List.copyOf(refused);

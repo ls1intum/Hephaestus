@@ -124,7 +124,7 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
     }
 
     @Test
-    void shouldKeepTheVerifiedOwnerWhenLoginsCollideAndDenyAccessWhenItsLinkIsDisabled() {
+    void shouldKeepTheAccountMembershipWhenLoginsCollideOrItsProviderLinkIsDisabled() {
         persistUser("shared-login");
         var provider = ensureGitLabProvider();
         var providerId = provider.getId();
@@ -133,6 +133,7 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var workspace = createWorkspace("identity-http", "Identity", "identity", AccountType.ORG, owner);
         workspace.setPublicActivityEnabled(false);
         workspaces.saveAndFlush(workspace);
+        connectActivitySource(workspace, provider);
         people.claim(new PersonIdentity(providerId, owner.getNativeId().toString(), null));
         var account = accounts.findById(accountId(owner)).orElseThrow();
         var accountId = account.getId();
@@ -150,8 +151,8 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.userId")
-                .isEqualTo(owner.getId());
+                .jsonPath("$.account.id")
+                .isEqualTo(Long.toString(accountId));
 
         owner.setLogin("renamed-login");
         userRepository.saveAndFlush(owner);
@@ -163,9 +164,9 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.userId")
-                .isEqualTo(owner.getId())
-                .jsonPath("$.userLogin")
+                .jsonPath("$.account.id")
+                .isEqualTo(Long.toString(accountId))
+                .jsonPath("$.account.identities[0].login")
                 .isEqualTo("renamed-login");
 
         link.setDisabledAt(Instant.now());
@@ -175,8 +176,12 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 .headers(headers -> headers.setBearerAuth(token))
                 .exchange()
                 .expectStatus()
-                .isUnauthorized()
-                .expectBody(Void.class);
+                .isOk()
+                .expectBody()
+                .jsonPath("$.account.id")
+                .isEqualTo(Long.toString(accountId))
+                .jsonPath("$.account.identities.length()")
+                .isEqualTo(0);
         assertThat(identities.findActiveByAccountId(accountId)).isEmpty();
         assertThat(accounts.findById(accountId)).isPresent();
     }
@@ -230,8 +235,10 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.userId")
-                .isEqualTo(firstActor.getId())
+                .jsonPath("$.account.id")
+                .isEqualTo(Long.toString(accountId))
+                .jsonPath("$.account.identities[0].login")
+                .isEqualTo(firstActor.getLogin())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
     }

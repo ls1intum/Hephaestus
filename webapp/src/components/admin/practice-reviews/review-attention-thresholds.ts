@@ -1,8 +1,6 @@
 /**
- * Every threshold the overview's attention signals use, in one place, so no screen marks the same
- * figure at a different point. The values come from the research report "Admin Practice reviews:
- * which signals show where to look" (09.10.2026, sections 2 and 3.1), which set them against the
- * first course's data (intro course, 05.–08.10.2026).
+ * Every threshold the overview uses to mark what needs attention, in one place, so no screen marks
+ * the same figure at a different point.
  *
  * The overview's one colour rule: red means broken, and nothing else is coloured. A figure is red
  * when developers do not get their feedback and an admin can fix it now: feedback that failed to

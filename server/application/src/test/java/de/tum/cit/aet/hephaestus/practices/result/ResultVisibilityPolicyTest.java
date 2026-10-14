@@ -7,7 +7,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -22,6 +21,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -34,14 +34,16 @@ class ResultVisibilityPolicyTest {
     private final EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
     private final ResultMarkRepository marks = mock(ResultMarkRepository.class);
     private final PracticeRepository practices = mock(PracticeRepository.class);
-    private final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
+    private final ResultPracticeVersionRepository versions = mock(ResultPracticeVersionRepository.class);
     private final ResultVisibilityPolicy policy = new ResultVisibilityPolicy(authorization, marks, practices, versions);
     private final Practice practice = ReviewTestData.practice(1, 1, "test-practice");
 
     @BeforeEach
     void catalog() {
-        when(practices.findByWorkspaceId(1L)).thenReturn(List.of(practice));
-        when(versions.findAllById(ArgumentMatchers.any())).thenReturn(List.of(practice.getCurrentVersion()));
+        when(practices.findByWorkspaceIdAndIdIn(ArgumentMatchers.eq(1L), ArgumentMatchers.anyCollection()))
+                .thenReturn(List.of(practice));
+        when(versions.findByWorkspaceIdAndIdIn(ArgumentMatchers.eq(1L), ArgumentMatchers.any()))
+                .thenReturn(List.of(practice.getCurrentVersion()));
         when(marks.findByWorkspaceIdAndResultIdInAndRemovedAtIsNull(ArgumentMatchers.eq(1L), ArgumentMatchers.any()))
                 .thenReturn(List.of());
     }
@@ -66,7 +68,7 @@ class ResultVisibilityPolicyTest {
     @Test
     void archivedProofIsUnverifiableForNewClaims() {
         var r = result();
-        r.setEvidenceVersion((short) 0);
+        r = r.toBuilder().evidenceVersion((short) 0).build();
         assertThat(ResultVisibilityPolicy.currentness(r, practice.getCurrentVersion(), practice.getCurrentVersion()))
                 .isEqualTo(Currentness.UNVERIFIABLE);
         assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
@@ -122,7 +124,7 @@ class ResultVisibilityPolicyTest {
     @Test
     void foreignRowsAreNotSentForSourceAuthorization() {
         var r = result();
-        r.setWorkspaceId(2);
+        r = r.toBuilder().workspaceId(2).build();
         assertThat(policy.permitsHistory(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
     }
@@ -142,5 +144,23 @@ class ResultVisibilityPolicyTest {
                 .coverage(new JsonMapper().createObjectNode())
                 .recordedAt(Instant.parse("2026-08-01T00:00:00Z"))
                 .build();
+    }
+
+    @Test
+    void shouldWithholdUnverifiableProofFromHistoricalStandings() {
+        var missingSummary = result().toBuilder().summary(null).build();
+        when(authorization.permitsAll(
+                        ArgumentMatchers.eq(1L),
+                        ArgumentMatchers.any(),
+                        ArgumentMatchers.eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
+                .thenAnswer(call -> call.<List<Result>>getArgument(1).stream()
+                        .map(Result::getId)
+                        .collect(Collectors.toSet()));
+        assertThat(policy.permitsAt(
+                        1L,
+                        List.of(missingSummary),
+                        SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY,
+                        missingSummary.getRecordedAt().plusSeconds(1)))
+                .isEmpty();
     }
 }

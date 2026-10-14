@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
@@ -27,11 +28,13 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** Feeds scans through the existing serial queue; product locks and indexes remain the final fence. */
+@Slf4j
 @Component
 @ConditionalOnServerRole
 @ConditionalOnBooleanProperty(name = RuntimeRole.AGENT_ENABLED_PROPERTY)
 @RequiredArgsConstructor
 public class ScanDriver {
+    private static final int ACTIVE_SCAN_LIMIT = 20;
     private static final Set<ReviewJobStatus> ACTIVE = Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING);
     private final ReviewScanStore scans;
     private final ReviewService reviews;
@@ -49,17 +52,46 @@ public class ScanDriver {
     @WorkspaceAgnostic("Enumerates bounded active scan identities; each mutation carries its workspace")
     public void tick() {
         boolean enumerated = false;
-        for (var candidate : scans.active(20)) {
+        for (var candidate : scans.active(ACTIVE_SCAN_LIMIT)) {
             if (!candidate.inventoryRecorded()) {
                 if (enumerated) continue;
                 enumerated = true;
             }
             try {
-                transactions.executeWithoutResult(status -> advance(scans.lock(
-                        candidate.review().workspaceId(), candidate.review().id())));
+                if (!candidate.inventoryRecorded()) {
+                    boolean started = Boolean.TRUE.equals(transactions.execute(status -> {
+                        var state = scans.lock(
+                                candidate.review().workspaceId(),
+                                candidate.review().id());
+                        if (state.inventoryRecorded() || state.status().isTerminal()) return false;
+                        if (state.cancellationRequested()
+                                || !clock.instant().isBefore(state.createdAt().plus(limits.scanDeadline()))) {
+                            advance(state);
+                            return false;
+                        }
+                        return reviews.start(
+                                state.review().workspaceId(), state.review().id());
+                    }));
+                    if (!started) continue;
+                    var prepared = inventory.prepare(candidate.review());
+                    transactions.executeWithoutResult(status -> {
+                        var state = scans.lock(
+                                candidate.review().workspaceId(),
+                                candidate.review().id());
+                        if (state.status().isTerminal()) return;
+                        if (!state.cancellationRequested()
+                                && clock.instant().isBefore(state.createdAt().plus(limits.scanDeadline())))
+                            inventory.record(state.review(), prepared);
+                        advance(scans.lock(
+                                state.review().workspaceId(), state.review().id()));
+                    });
+                } else
+                    transactions.executeWithoutResult(status -> advance(scans.lock(
+                            candidate.review().workspaceId(), candidate.review().id())));
             } catch (ScanService.EnumerationFailure failure) {
                 closeAfterFailure(candidate, failure.reason());
             } catch (RuntimeException failure) {
+                log.warn("Scan {} advance failed", candidate.review().id(), failure);
                 closeAfterFailure(candidate, ReviewStopReason.ERROR);
             }
         }
@@ -84,18 +116,14 @@ public class ScanDriver {
             close(state, ReviewStatus.PARTIAL, ReviewStopReason.DEADLINE);
             return;
         }
-        if (!state.inventoryRecorded()) {
-            if (!reviews.start(review.workspaceId(), review.id())) return;
-            inventory.enumerate(review);
-            state = scans.lock(review.workspaceId(), review.id());
-        }
+        if (!state.inventoryRecorded()) return;
         if (!state.inventoryComplete()
                 || state.listedPracticeIds().size() != review.practices().size())
             throw new ScanService.EnumerationFailure(ReviewStopReason.ENUMERATION_FAILED);
-        var pending = scans.pending(review.workspaceId(), review.id(), 1000);
+        var pending = scans.pending(review.workspaceId(), review.id(), ScanService.PAGE_SIZE);
         var attempted = pending.stream().map(assignment -> assignment.id()).collect(Collectors.toSet());
         for (var assignment : pending) scans.reuse(review.workspaceId(), assignment.id());
-        pending = scans.pending(review.workspaceId(), review.id(), 1000);
+        pending = scans.pending(review.workspaceId(), review.id(), ScanService.PAGE_SIZE);
         if (pending.isEmpty()) {
             state = scans.lock(review.workspaceId(), review.id());
             boolean complete = state.judged() + state.reused() == state.listed() && state.withheld() == 0;
@@ -120,7 +148,7 @@ public class ScanDriver {
         } catch (ReviewJobStateConflictException changed) {
             close(state, ReviewStatus.PARTIAL, ReviewStopReason.MODEL_CHANGED);
             return;
-        } catch (IllegalStateException unavailable) {
+        } catch (ScanModelUnavailableException unavailable) {
             close(state, ReviewStatus.PARTIAL, ReviewStopReason.MODEL_UNAVAILABLE);
             return;
         }

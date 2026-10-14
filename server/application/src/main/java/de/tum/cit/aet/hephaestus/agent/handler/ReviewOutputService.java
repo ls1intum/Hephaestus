@@ -10,7 +10,8 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
@@ -27,8 +28,8 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,7 +49,7 @@ public class ReviewOutputService {
     private final ResultStore results;
     private final ReviewAssignmentStore assignmentStore;
     private final JobEvidenceFiles files;
-    private final SourceCatalogRegistry catalogs;
+    private final ClasspathSourceCatalogRegistry catalogs;
     private final ObjectMapper mapper;
 
     public ReviewOutputService(
@@ -57,7 +58,7 @@ public class ReviewOutputService {
             ResultStore results,
             ObjectMapper mapper,
             JobEvidenceFiles files,
-            SourceCatalogRegistry catalogs,
+            ClasspathSourceCatalogRegistry catalogs,
             ReviewAssignmentStore assignmentStore) {
         this.assignments = assignments;
         this.verifier = verifier;
@@ -83,7 +84,7 @@ public class ReviewOutputService {
         var resolvedManifest = files.registerReadReceipts(job, manifest, receipts, catalogs);
         var captured = CapturedEvidence.of(resolvedManifest);
         var admitted = new ArrayList<ResultCandidate>();
-        var withheld = mapper.createArrayNode();
+        var withheld = new LinkedHashMap<String, AdmissionResponseDTO.Withheld>();
         var seen = new HashSet<String>();
         var refusals = new ArrayList<WithheldAssignment>();
         for (var entry : submission.results()) {
@@ -101,28 +102,24 @@ public class ReviewOutputService {
             try {
                 candidate = CandidateParser.parse(entry.candidate());
             } catch (CandidateRefusedException refused) {
-                throw new ResultsRefusedException(
-                        refused.reasonCode(), Objects.requireNonNull(refused.getMessage()), refused);
+                refusals.add(new WithheldAssignment(
+                        assignment, refused.refusal(), Objects.requireNonNull(refused.getMessage())));
+                continue;
             }
             if (candidate.coverage().path("source").asString().equals("host")
                     && !candidate.coverage().path("receipts").equals(mapper.valueToTree(entry.readReceipts()))) {
-                throw new ResultsRefusedException(
-                        "coverage_inconsistent", "Host coverage differs from the submitted read receipts");
+                refusals.add(new WithheldAssignment(
+                        assignment,
+                        CandidateRefusal.COVERAGE_INCONSISTENT,
+                        "Host coverage differs from the submitted read receipts"));
+                continue;
             }
             try {
                 verifier.verifyCandidate(job, assignment, review.kind(), candidate, captured);
                 admitted.add(result(assignment, candidate));
             } catch (CandidateEvidenceVerifier.Unverified refusal) {
-                CandidateRefusal reason = Arrays.stream(CandidateRefusal.values())
-                        .filter(value -> value.wireValue().equals(refusal.reasonCode()))
-                        .findFirst()
-                        .orElseThrow(() ->
-                                new IllegalStateException("Unregistered candidate refusal: " + refusal.reasonCode()));
-                refusals.add(new WithheldAssignment(assignment, reason, Objects.requireNonNull(refusal.getMessage())));
-                withheld.addObject()
-                        .put("practiceSlug", entry.practiceSlug())
-                        .put("itemId", entry.itemId())
-                        .put("reason", refusal.reasonCode());
+                refusals.add(new WithheldAssignment(
+                        assignment, refusal.refusal(), Objects.requireNonNull(refusal.getMessage())));
             }
         }
         if (submission.results().isEmpty() || !seen.equals(pinned.keySet())) {
@@ -139,9 +136,15 @@ public class ReviewOutputService {
                     || !capture.equals(owned.getCapture())) {
                 throw new ResultAdmissionService.StaleAttemptException();
             }
-            for (var refusal : refusals)
+            for (var refusal : refusals) {
                 assignmentStore.withhold(
                         owned.getWorkspaceId(), refusal.assignment().id(), refusal.reason(), refusal.message());
+                var entry = new AdmissionResponseDTO.Withheld(
+                        refusal.assignment().practiceSlug(),
+                        Long.toString(refusal.assignment().item().itemId()),
+                        refusal.reason().wireValue());
+                withheld.put(entry.practiceSlug(), entry);
+            }
             var receipt = results.admit(
                     owned.getWorkspaceId(), owned.getReviewId(), owned.getId(), attempt, List.copyOf(admitted));
             for (var item : receipt.withheldItems()) {
@@ -150,20 +153,15 @@ public class ReviewOutputService {
                                 && value.item().itemId() == item.itemId())
                         .findFirst()
                         .orElseThrow(() -> new IllegalStateException("Admission withheld an unassigned item"));
-                boolean recorded = false;
-                for (var prior : withheld)
-                    if (prior.path("practiceSlug").asString().equals(assignment.practiceSlug())
-                            && prior.path("itemId").asString().equals(Long.toString(item.itemId()))) recorded = true;
-                if (!recorded)
-                    withheld.addObject()
-                            .put("practiceSlug", assignment.practiceSlug())
-                            .put("itemId", Long.toString(item.itemId()))
-                            .put("reason", item.reason());
+                withheld.putIfAbsent(
+                        assignment.practiceSlug(),
+                        new AdmissionResponseDTO.Withheld(
+                                assignment.practiceSlug(), Long.toString(item.itemId()), item.reason()));
             }
             ObjectNode retained = (ObjectNode) capture.deepCopy();
             retained.set("manifest", mapper.valueToTree(resolvedManifest));
             retained.set("readReceipts", mapper.valueToTree(receipts));
-            retained.set("withheld", withheld.deepCopy());
+            retained.set("withheld", mapper.valueToTree(withheld.values()));
             retained.set("admission", mapper.valueToTree(receipt));
             owned.setCapture(retained);
         };

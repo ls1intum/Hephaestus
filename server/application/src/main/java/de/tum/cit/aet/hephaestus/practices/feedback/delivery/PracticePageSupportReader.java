@@ -38,10 +38,7 @@ public class PracticePageSupportReader {
 
     @Transactional(readOnly = true)
     public Selection select(long workspaceId, long developerId, long practiceId, Instant now) {
-        var practice = practices
-                .findById(practiceId)
-                .filter(p -> p.getWorkspaceId() == workspaceId)
-                .orElseThrow();
+        var practice = practices.findByIdAndWorkspaceId(practiceId, workspaceId).orElseThrow();
         var prior = previous.find(workspaceId, developerId, practice.getSlug(), now);
         var window = now.minus(LOOKBACK);
         var since = prior.map(card -> card.nextEvidenceSince(window)).orElse(window);

@@ -333,9 +333,9 @@ Pending delivery blocks both passes. Practice results or feedback that reference
 1. Monitor the backlog.
 2. For individual requests, use verified person erasure.
 
-Artifact-source evidence retention
+Source evidence retention
 
-Retention separates durable verification results from temporary worker inputs. The [artifact-source governance decision](./artifact-source-governance.md) owns the retention and erasure boundaries. A digest is an integrity identifier, not authorization. Extended evaluation retention requires a separate approved purpose and tenant-safe authorization.
+Retention separates durable verification results from temporary worker inputs. The [source governance decision](./artifact-source-governance.md) owns the retention and erasure boundaries. A digest is an integrity identifier, not authorization. Extended evaluation retention requires a separate approved purpose and tenant-safe authorization.
 
 Webhook and integration-sync event transport buffer (NATS JetStream)
 
@@ -453,7 +453,7 @@ The same transition clears connection credentials atomically. Disconnection does
 
 Artifact-source copies
 
-Source, workspace, and person erasure must traverse artifact-source manifests, repository snapshots, citation verdicts, derived assessments, exports, and governed evaluation cases. Expiry/erasure may leave only a non-content typed tombstone and makes replay unavailable. Audit reproducibility never overrides erasure.
+Source, workspace, and person erasure must traverse source manifests, repository snapshots, citation verdicts, derived assessments, exports, and governed evaluation cases. Expiry/erasure may leave only a non-content typed tombstone and makes replay unavailable. Audit reproducibility never overrides erasure.
 
 Source-side content
 

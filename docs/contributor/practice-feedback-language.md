@@ -49,7 +49,8 @@ Use item only in contributor documentation, code and API contracts.
 | **Example** | An optional place in the work that a result cites to show the practice done well. |
 | **Open question** | A question about the work that the evidence cannot answer. It is never feedback. |
 | **Not reviewed** | A selected item/practice pair that a closed review did not judge or reuse. It is not an outcome. |
-| **Withheld** | The server did not admit a candidate result or deliver feedback. It records the reason. |
+| **Withheld result** | A candidate result that [admission](./practice-review-pipeline.mdx#admit-results) did not accept. It records the reason. |
+| **Withheld feedback** | Feedback that the server did not deliver. Its state is `WITHHELD` and its stop reason records why. |
 | **Mark** | An admin record that a result is incorrect or accepted. Removing the mark reverses it. |
 | **Marked incorrect** | A result that a workspace admin marked as wrong when made. It remains in history. |
 | **Accepted** | An admin record that excludes a result from open-problem lists. It does not change its outcome or cancel an incorrect mark. |
@@ -155,7 +156,7 @@ A decision to withdraw feedback does not change its results.
 Restore reverses the withdrawal if the feedback remains eligible.
 A disagreement does not change a result or a standing by itself.
 An admin can inspect it and mark a result incorrect.
-Removing a rating does not remove the developer's disagreement.
+Removing a usefulness answer does not remove the developer's disagreement.
 
 ## People and product surfaces
 
@@ -266,7 +267,7 @@ A workspace admin cannot grant another person's research consent.
 | **Runtime role** | Server, worker or webhook: the part of one application JAR that a container starts. |
 | **Server** | The service that handles application requests. |
 | **Worker** | The runtime role that executes reviews and mentor sessions. |
-| **Webhook** | A provider's HTTP request that reports an event. |
+| **Webhook** | A provider's HTTP request that reports an event. Also the runtime role that receives it. |
 | **API** | An interface for software calls. |
 | **UI** | The interface that a person uses. |
 | **Pull request** | A GitHub request to merge a branch. |

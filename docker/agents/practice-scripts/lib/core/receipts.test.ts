@@ -37,7 +37,7 @@ async function fixture(t: TestContext, files: Record<string, string> = DEFAULT_F
 
 void test("a complete file receipt records pinned identity, exact returned extent and content digest", async (t) => {
 	const { reader, counters } = await fixture(t);
-	await reader.answer({ op: "read", tree: "head", path: "a.ts" });
+	await reader.answer({ op: "read", path: "a.ts" });
 	assert.deepEqual(reader.readReceipts, [
 		{
 			sourceKind: "scm.repository.tree",
@@ -55,14 +55,14 @@ void test("a complete file receipt records pinned identity, exact returned exten
 
 void test("a later read settles truncation only after the returned extents cover the whole file", async (t) => {
 	const { reader, counters } = await fixture(t);
-	await reader.answer({ op: "read", tree: "head", path: "a.ts", offsetLine: 1, maxLines: 1 });
-	await reader.answer({ op: "read", tree: "head", path: "a.ts", offsetLine: 3, maxLines: 1 });
+	await reader.answer({ op: "read", path: "a.ts", offsetLine: 1, maxLines: 1 });
+	await reader.answer({ op: "read", path: "a.ts", offsetLine: 3, maxLines: 1 });
 	assert.equal(counters.truncatedReads, 1);
 	assert.equal(
 		reader.readReceipts.some((receipt) => receipt.status === "COMPLETE"),
 		false,
 	);
-	await reader.answer({ op: "read", tree: "head", path: "a.ts", offsetLine: 2, maxLines: 1 });
+	await reader.answer({ op: "read", path: "a.ts", offsetLine: 2, maxLines: 1 });
 	assert.equal(counters.truncatedReads, 0);
 	assert.equal(
 		reader.readReceipts.some(
@@ -75,10 +75,10 @@ void test("a later read settles truncation only after the returned extents cover
 
 void test("a citation does not prove a full file read, and repeated reads deduplicate receipts", async (t) => {
 	const { reader } = await fixture(t);
-	await reader.answer({ op: "cite", source: "tree", tree: "head", path: "a.ts", startLine: 2 });
+	await reader.answer({ op: "cite", source: "tree", path: "a.ts", startLine: 2 });
 	assert.deepEqual(reader.readReceipts, []);
-	await reader.answer({ op: "read", tree: "head", path: "a.ts" });
-	await reader.answer({ op: "read", tree: "head", path: "a.ts" });
+	await reader.answer({ op: "read", path: "a.ts" });
+	await reader.answer({ op: "read", path: "a.ts" });
 	assert.equal(reader.readReceipts.length, 1);
 });
 
@@ -147,7 +147,6 @@ void test("a claimed MET cannot manufacture the assigned scan file's complete re
 		{
 			slug: "fixture",
 			inputs,
-			criteria: "Review every line.",
 			files: { head: { revision: "a".repeat(40) }, change: null },
 			now: inputs.review.startedAt,
 			deadline: Date.now() + 10_000,

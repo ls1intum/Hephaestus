@@ -6,11 +6,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.MentorPracticeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -52,7 +52,7 @@ class MentorPracticeQueryServiceTest extends BaseUnitTest {
         practice.setSlug(slug);
         practice.setFeedbackMode(mode);
         practice.setGroup(group);
-        practice.setCurrentVersion(mock(PracticeVersion.class));
+        practice.setCurrentVersion(TestEntities.practiceVersion());
         return practice;
     }
 }

@@ -1,5 +1,5 @@
-import { isRecord } from "./pi-result-normalize.ts";
 import { isRetryableStatus, isTimeoutAbort, retrying } from "./pi-runner-retry.ts";
+import { isRecord } from "./pi-text.ts";
 
 export type FeedbackPreparation =
 	| { state: "PREPARED"; receipt: FeedbackPreparationReceipt }

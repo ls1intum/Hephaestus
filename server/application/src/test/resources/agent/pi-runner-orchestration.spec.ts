@@ -25,11 +25,13 @@ import {
 	addModelCall,
 	newModelCallTiming,
 } from "../../../main/resources/agent/pi-model-failure.ts";
-import { isRecord } from "../../../main/resources/agent/pi-result-normalize.ts";
+import { isRecord } from "../../../main/resources/agent/pi-text.ts";
 import { GOLDEN_INPUTS, PRACTICES_DIR } from "./golden-review-workspace.ts";
 
 // The runner reads /workspace and the environment at module scope, so each scenario is a child
 // process: this file re-enters itself with the SDK mocked and drives one review through it.
+
+import { codingAgentExports } from "./program-host-runner.ts";
 
 const LIB = nodePath.resolve(
 	import.meta.dirname,
@@ -1093,52 +1095,30 @@ if (scenario !== undefined && scenario !== "") {
 	};
 	mock.module("@earendil-works/pi-coding-agent", {
 		namedExports: {
-			defineTool: (tool: unknown) => tool,
-			estimateTokens: (message: { content: string }) => Math.ceil(message.content.length / 4),
-			createCodemodeExtension: () => () => undefined,
-			getAgentDir: () => cwd,
-			DefaultResourceLoader: class {
-				constructor(options: {
-					systemPrompt: string;
-					agentsFilesOverride: () => unknown;
-					extensionFactories?: unknown[];
-				}) {
+			...codingAgentExports(
+				cwd,
+				manager,
+				(options) => {
 					assert.ok(cwd !== undefined && cwd !== "");
-					// The measurement session's loader comes first; the review composition's own follows it.
 					const first = !existsSync(nodePath.join(cwd, "system-prompt.md"));
 					const privateComposition = options.systemPrompt.includes(
 						"Compose from admitted problems.",
 					);
-					let promptFile = "system-prompt.md";
-					if (!first) {
-						promptFile = privateComposition
+					const promptFile = first
+						? "system-prompt.md"
+						: privateComposition
 							? "private-system-prompt.md"
 							: "review-system-prompt.md";
-					}
 					writeFileSync(nodePath.join(cwd, promptFile), options.systemPrompt);
-					if (!first) {
+					if (!first)
 						record(`review-loader extensions=${String(options.extensionFactories?.length)}`);
-					}
+					assert.ok(options.agentsFilesOverride);
 					assert.deepEqual(options.agentsFilesOverride(), { agentsFiles: [] });
-				}
-				readonly loaded = Promise.resolve();
-				async reload() {
-					await this.loaded;
-				}
-			},
-			SettingsManager: { create: () => ({}) },
-			SessionManager: { create: () => manager, inMemory: () => manager, open: () => manager },
-			ModelRuntime: {
-				async create() {
-					if (scenario === "setup") {
-						now += PAST_SAFETY_MS;
-					}
-					return {
-						registerProvider: () => undefined,
-						getModel: () => ({ id: "test-model", contextWindow: 128_000, maxTokens: 16_384 }),
-					};
 				},
-			},
+				() => {
+					if (scenario === "setup") now += PAST_SAFETY_MS;
+				},
+			),
 			async createAgentSession(options: {
 				tools: string[];
 				customTools: CustomTool[];
@@ -1971,12 +1951,12 @@ if (scenario !== undefined && scenario !== "") {
 								// The composer's finishing prompt: the runner asks once more for the practices
 								// with a NOT_MET result, and a WITHHOLD is a recorded decision.
 								// Sent without basedOn: a WITHHOLD rests on its practice's NOT_MET result,
-								// found under the slug as any piece's slug is read.
+								// found under its exact slug.
 								const withheld = await tool("report_feedback").execute("f-9", {
 									feedback: [
 										{
 											destination: "PRACTICE_PAGE",
-											practiceSlug: " Test_Practice ",
+											practiceSlug: "test-practice",
 											action: "WITHHOLD",
 											withholdReason: "below_bar",
 										},
@@ -3365,7 +3345,9 @@ if (scenario !== undefined && scenario !== "") {
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition.json"),
 							JSON.stringify({
+								contractVersion: 3,
 								enabled: true,
+								minDistinctItems: 2,
 								destinations: {
 									PRACTICE_PAGE: { enabled: true, maxPieces: 1 },
 									ON_WORK: { enabled: true, maxPieces: 1 },
@@ -3994,7 +3976,7 @@ if (scenario !== undefined && scenario !== "") {
 							ran({ "second-practice": "ok", "test-practice": "ok" });
 							if (stage === "scope-ownership") {
 								// Each session's six refusals are its own practice's, and each result is bound to the
-								// practice of the session that submitted it, only after the v3 candidate is valid.
+								// practice of the session that submitted it, only after the candidate is valid.
 								for (const slug of ["test-practice", "second-practice"]) {
 									assert.match(
 										events.find((event) => event.startsWith(`own:${slug}:`)) ?? "",
@@ -4916,7 +4898,10 @@ for (const item of nullableCases) {
 							const pieceReply = events.find((event) => event.startsWith("support-items:")) ?? "";
 							if (mode === "cooldown") {
 								// The cooldown closes PRACTICE_PAGE; the composer cannot open it again, and the notes stand.
-								assert.match(pieceReply, /#1: PRACTICE_PAGE is not a lane this run may write for/u);
+								assert.match(
+									pieceReply,
+									/#1: PRACTICE_PAGE is not a destination this run may write for/u,
+								);
 								assert.match(
 									pieceReply,
 									/#2: stored a CONVERSATION piece for test-practice \(NEW\)/u,
@@ -4927,14 +4912,20 @@ for (const item of nullableCases) {
 								);
 							}
 							if (mode === "routing-missing") {
-								assert.match(pieceReply, /#2: CONVERSATION is not a lane this run may write for/u);
+								assert.match(
+									pieceReply,
+									/#2: CONVERSATION is not a destination this run may write for/u,
+								);
 								assert.match(
 									child.stderr,
 									/CONVERSATION closed for this run: routing missing or malformed/u,
 								);
 							}
 							if (mode === "mentor-unavailable") {
-								assert.match(pieceReply, /#2: CONVERSATION is not a lane this run may write for/u);
+								assert.match(
+									pieceReply,
+									/#2: CONVERSATION is not a destination this run may write for/u,
+								);
 								assert.match(
 									child.stderr,
 									/CONVERSATION closed for this run: no practice is routed to it/u,
@@ -5188,7 +5179,7 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-bare:")) ?? "",
-								/#1: CONVERSATION is not a lane this run may write for/u,
+								/#1: CONVERSATION is not a destination this run may write for/u,
 							);
 							const second = readFileSync(nodePath.join(cwd, "prompt-3.md"), "utf8");
 							// Private composition receives stable context anew, without measurement criteria or tool examples.
@@ -5707,7 +5698,7 @@ for (const item of nullableCases) {
 							// Both NOT_MET practices have an PRACTICE_PAGE card; a withholding uses no slot on its lane.
 							assert.match(
 								first,
-								/#3: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+								/#3: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\); 0\/1 used on that destination\./u,
 							);
 							const second = events.find((event) => event.startsWith("said-second:")) ?? "";
 							assert.match(
@@ -5717,7 +5708,7 @@ for (const item of nullableCases) {
 							// The refused grouping left the pair open; MET counterevidence owes no history.
 							assert.match(
 								second,
-								/#2: stored a CONVERSATION piece for second-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+								/#2: stored a CONVERSATION piece for second-practice \(WITHHOLD\); 0\/1 used on that destination\./u,
 							);
 							// test-practice's problem is on the diff: the open lane refuses even a withholding for it.
 							const inline = fixture === "compose-already-said-inline";
@@ -5725,7 +5716,7 @@ for (const item of nullableCases) {
 								second,
 								inline
 									? /#3: CONVERSATION cannot carry feedback about test-practice this run \(HAS_INLINE_ANCHOR\); write no piece for it there, not even a WITHHOLD\. Skipped\./u
-									: /#3: stored a CONVERSATION piece for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+									: /#3: stored a CONVERSATION piece for test-practice \(WITHHOLD\); 0\/1 used on that destination\./u,
 							);
 							const payload: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),

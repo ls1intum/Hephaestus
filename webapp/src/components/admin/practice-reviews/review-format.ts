@@ -1,4 +1,4 @@
-import type { ReviewSubject } from "@/api/types.gen";
+import type { ReviewDeveloper } from "@/api/types.gen";
 import { firstNonBlank } from "@/lib/text";
 
 /**
@@ -6,18 +6,9 @@ import { firstNonBlank } from "@/lib/text";
  * does not belong here: it goes in that enum's defs module under `@/components/practice-vocabulary`,
  * so the filter dropdown, the row badge and the detail header all read one entry.
  */
-export function subjectLabel(subject: ReviewSubject | undefined): string {
-	if (!subject) {
+export function developerLabel(developer: ReviewDeveloper | null): string {
+	if (!developer) {
 		return "Unavailable developer";
 	}
-	return firstNonBlank(subject.name, subject.login) ?? `#${subject.id}`;
-}
-
-/**
- * A stored revision without its scheme marker. The server keeps revisions as `sha~<commit>`,
- * `dig~<digest>` and so on (`RevisionScheme`), so a ledger row explains its own identity; a reader
- * wants the commit or digest itself.
- */
-export function revisionLabel(revision: string): string {
-	return revision.replace(/^[a-z]+~/u, "");
+	return firstNonBlank(developer.displayName, developer.providerLogin) ?? "Unnamed developer";
 }

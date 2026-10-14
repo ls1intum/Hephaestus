@@ -23,25 +23,25 @@ export function evidenceTools(tree: FileTree | null): ToolSet {
 				endLine: z.int().min(1).optional(),
 			}),
 			execute: async ({ path, startLine = 1, endLine }) => {
-				const file = await tree.read(path);
+				// Only the lines shown are read, so the receipt claims no more than the model saw.
+				const maxLines = Math.max(
+					1,
+					Math.min(endLine ?? Infinity, startLine + MAX_LINES - 1) - startLine + 1,
+				);
+				const file = await tree.read(path, { offsetLine: startLine, maxLines });
 				if (file.status === "ABSENT") {
 					return `${path} is not a file of the repository`;
 				}
 				if (file.status === "BINARY") {
 					return `${path} is a binary file`;
 				}
+				if (file.text === "") {
+					return "(no lines in that range)";
+				}
 				const lines = file.text.split("\n");
-				const last = Math.min(
-					endLine ?? startLine + MAX_LINES - 1,
-					startLine + MAX_LINES - 1,
-					lines.length,
-				);
-				const shown =
-					lines
-						.slice(startLine - 1, last)
-						.map((text, i) => `${startLine + i}: ${text}`)
-						.join("\n") || "(no lines in that range)";
-				return file.truncated ? `${shown}\n(the file is cut at the read limit)` : shown;
+				const shown = lines.map((text, i) => `${startLine + i}: ${text}`).join("\n");
+				const cut = file.truncated && (endLine ?? Infinity) >= startLine + lines.length;
+				return cut ? `${shown}\n(more lines follow; read them with a later startLine)` : shown;
 			},
 		}),
 		listFiles: tool({

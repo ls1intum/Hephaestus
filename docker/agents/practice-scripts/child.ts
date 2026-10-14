@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
 import { callLabel } from "./lib/core/call-label.ts";
-import { RETIRED_FORM_ERROR } from "./lib/core/contract.ts";
+import { NOT_A_DEFINITION_ERROR } from "./lib/core/contract.ts";
 import {
 	MAX_LABEL_CHARS,
 	type ChildJob,
@@ -163,7 +163,7 @@ try {
 	const mod: unknown = await import(pathToFileURL(job.modulePath).href);
 	const exported: unknown = isJsonObject(mod) ? mod.default : undefined;
 	if (!isPracticeScriptDefinition(exported)) {
-		throw new Error(RETIRED_FORM_ERROR);
+		throw new Error(NOT_A_DEFINITION_ERROR);
 	}
 	await postLast({ kind: "result", value: await runDefinition(job, exported) });
 } catch (error) {

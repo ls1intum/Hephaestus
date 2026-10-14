@@ -20,10 +20,10 @@ import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
 import de.tum.cit.aet.hephaestus.evidence.CitationCapabilities;
 import de.tum.cit.aet.hephaestus.evidence.CitationRequirement;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContract;
@@ -44,7 +44,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -63,30 +62,24 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     private static final String TEXT = "Before\nExact quote\nAfter\n";
     private final ReviewJob job = new ReviewJob();
     private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
-    private final SourceCatalogRegistry catalogs = mock(SourceCatalogRegistry.class);
+    private final ClasspathSourceCatalogRegistry catalogs = mock(ClasspathSourceCatalogRegistry.class);
     private final CitationVerifier domain = mock(CitationVerifier.class);
 
     private CandidateEvidenceVerifier verifier(String text) {
         job.setWorkspaceId(1);
         var policy = mock(SourceContract.class);
-        when(catalogs.requireSource(new SourceContractVersion("2.0.0"), SOURCE)).thenReturn(policy);
+        when(catalogs.requireSource(SOURCE)).thenReturn(policy);
         when(policy.appliesTo(KIND.value())).thenReturn(true);
         when(policy.citation())
                 .thenReturn(new CitationCapabilities(CitationRequirement.FORBIDDEN, CitationRequirement.FORBIDDEN));
-        when(catalogs.isSourceUsePermitted(
-                        new SourceContractVersion("2.0.0"), SOURCE, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+        when(catalogs.isSourceUsePermitted(SOURCE, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                 .thenReturn(true);
         when(domain.kinds()).thenReturn(Set.of(KIND));
         lenient().when(domain.verify(any())).thenReturn(List.of());
         lenient()
                 .when(files.verificationDirectory(job))
                 .thenReturn(new EvidenceDirectory("inputs/", Path.of("/tmp/citation-test")));
-        lenient()
-                .when(files.inspect(eq(job), eq("context/body.txt"), any(), any()))
-                .thenAnswer(invocation -> {
-                    JobEvidenceFiles.TextInspection<Object> read = invocation.getArgument(3);
-                    return Optional.ofNullable(read.inspect(new StringReader(text)));
-                });
+        lenient().when(files.readText(eq(job), eq("context/body.txt"), any())).thenReturn(Optional.of(text));
         return new CandidateEvidenceVerifier(files, catalogs, List.of(domain));
     }
 
@@ -142,7 +135,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
         verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured(true));
         assertThat(candidate.citations().getFirst().path("startLine").asInt()).isEqualTo(2);
         assertThat(candidate.citations().getFirst().path("verification").propertyNames())
-                .containsExactlyInAnyOrder("status", "artifactSha256", "quoteSha256");
+                .containsExactlyInAnyOrder("status", "itemSha256", "quoteSha256");
         var check = ArgumentCaptor.forClass(CitationCheck.class);
         verify(domain).verify(check.capture());
         assertThat(check.getValue().citations().getFirst().startLine()).isEqualTo(2);
@@ -161,7 +154,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     }
 
     @Test
-    void keepsTheDomainsRevisionRefusalDistinctFromGenericQuoteProof() {
+    void keepsTheDomainsVersionRefusalDistinctFromGenericQuoteProof() {
         var verifier = verifier(TEXT);
         lenient()
                 .when(domain.verify(any()))
@@ -171,6 +164,64 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
                         () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))
                 .isInstanceOfSatisfying(
                         CandidateEvidenceVerifier.Unverified.class,
-                        refusal -> assertThat(refusal.reasonCode()).isEqualTo("basis_revision_unsupported"));
+                        refusal ->
+                                assertThat(refusal.refusal()).isEqualTo(CandidateRefusal.BASIS_REVISION_UNSUPPORTED));
+    }
+
+    @Test
+    void shouldRecordSourceUnavailableWithoutClaimingTheQuoteIsFalse() {
+        var verifier = verifier(TEXT);
+        when(files.readText(eq(job), eq("context/body.txt"), any())).thenReturn(Optional.empty());
+        assertThatThrownBy(
+                        () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))
+                .isInstanceOfSatisfying(
+                        CandidateEvidenceVerifier.Unverified.class,
+                        refusal -> assertThat(refusal.refusal()).isEqualTo(CandidateRefusal.SOURCE_UNAVAILABLE));
+    }
+
+    private Candidate problem(String basis) {
+        return CandidateParser.parse(MAPPER.readTree("""
+            {"outcome":"NOT_MET","summary":"A document problem","explanation":"The captured words need a change",
+             "citations":[],"problems":[{"key":"document.problem","severity":"MAJOR","summary":"Improve the text",
+               "explanation":"The words do not meet the criterion","nextStep":"Rewrite the sentence",
+               "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
+                 "startLine":2,"endLine":2,"quote":"Exact quote"}],"basis":%s}],"evidence":{},
+             "coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+            """.formatted(basis)));
+    }
+
+    @Test
+    void shouldNameAMissingStateWitnessWithoutCallingItAnotherVersion() {
+        var verifier = verifier(TEXT);
+        assertThatThrownBy(() -> verifier.verifyCandidate(
+                        job, assignment(), ReviewKind.SCAN, problem("{\"type\":\"state\"}"), captured(true)))
+                .isInstanceOfSatisfying(
+                        CandidateEvidenceVerifier.Unverified.class,
+                        refusal -> assertThat(refusal.refusal()).isEqualTo(CandidateRefusal.BASIS_WITNESS_MISSING));
+    }
+
+    @Test
+    void shouldNameAnUnverifiedDutyQuoteWithoutCallingItAnOutcomeMismatch() {
+        var verifier = verifier(TEXT);
+        assertThatThrownBy(() -> verifier.verifyCandidate(
+                        job,
+                        RuntimeReviewTestData.assignment(5L, null),
+                        ReviewKind.ITEM,
+                        problem("{\"type\":\"duty\",\"criterionQuote\":\"Another required duty\"}"),
+                        captured(true)))
+                .isInstanceOfSatisfying(
+                        CandidateEvidenceVerifier.Unverified.class,
+                        refusal -> assertThat(refusal.refusal()).isEqualTo(CandidateRefusal.DUTY_QUOTE_UNVERIFIED));
+    }
+
+    @Test
+    void shouldRefuseAnUnknownSourceForItsCandidateInsteadOfFailingTheEnvelope() {
+        when(catalogs.requireSource(SOURCE)).thenThrow(new IllegalArgumentException("Unknown source"));
+        var verifier = new CandidateEvidenceVerifier(files, catalogs, List.of());
+        assertThatThrownBy(
+                        () -> verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate(), captured(true)))
+                .isInstanceOfSatisfying(
+                        CandidateEvidenceVerifier.Unverified.class,
+                        refusal -> assertThat(refusal.refusal()).isEqualTo(CandidateRefusal.MALFORMED_CANDIDATE));
     }
 }

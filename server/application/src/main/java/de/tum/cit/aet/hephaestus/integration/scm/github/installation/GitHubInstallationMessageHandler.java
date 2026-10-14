@@ -25,7 +25,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub installation webhook events and provisions scopes. */
+/**
+ * Handles GitHub installation webhook events and provisions scopes.
+ */
 @Component
 public class GitHubInstallationMessageHandler extends AbstractIntegrationMessageHandler<GitHubInstallationEventDTO> {
 
@@ -122,8 +124,7 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 boolean currentlySuspended = gitHubAppTokenService.isInstallationSuspended(installationId);
                 if (currentlySuspended) {
                     log.info(
-                            "Installation created event received but installation is currently"
-                                    + " suspended, marking suspended: installationId={}",
+                            "Installation created event received but installation is currently suspended, marking suspended: installationId={}",
                             installationId);
                     gitHubAppTokenService.markInstallationSuspended(installationId);
                     // Still create the workspace but don't activate it
@@ -136,7 +137,7 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 // Installation no longer exists on GitHub - do NOT create workspace for deleted
                 // installation
                 log.info(
-                        "Installation no longer exists on GitHub, skipping workspace creation:" + " installationId={}",
+                        "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
                         installationId);
                 return;
             } catch (RuntimeException e) {
@@ -144,8 +145,7 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 // Proceed with activation - if installation is truly suspended, token minting will
                 // fail fast
                 log.warn(
-                        "Could not verify installation status for created event, proceeding with"
-                                + " activation: installationId={}, error={}",
+                        "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
                         installationId,
                         e.getMessage());
             }
@@ -173,9 +173,9 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
     }
 
     /**
-     * Verify installation status via GitHub API and update workspace accordingly. This is the
-     * "webhook as trigger" pattern - we don't trust the webhook action, instead we verify the
-     * CURRENT state via API and update based on that.
+     * Verify installation status via GitHub API and update workspace accordingly.
+     * This is the "webhook as trigger" pattern - we don't trust the webhook action,
+     * instead we verify the CURRENT state via API and update based on that.
      */
     private void verifyAndUpdateInstallationStatus(Long installationId) {
         try {
@@ -198,8 +198,7 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
         } catch (RuntimeException e) {
             // Network errors or other transient issues - don't update status if we can't verify
             log.warn(
-                    "Failed to verify installation status via API, skipping status update:"
-                            + " installationId={}, error={}",
+                    "Failed to verify installation status via API, skipping status update: installationId={}, error={}",
                     installationId,
                     e.getMessage());
         }

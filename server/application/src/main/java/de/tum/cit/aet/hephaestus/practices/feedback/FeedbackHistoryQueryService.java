@@ -211,8 +211,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
         var facts = sourceAuthorization.custody(result);
         if (!sourceAuthorization.authorized(result, facts, purpose)) return Optional.empty();
         return practices
-                .findById(result.getPracticeId())
-                .filter(practice -> practice.getWorkspaceId() == result.getWorkspaceId())
+                .findByIdAndWorkspaceId(result.getPracticeId(), result.getWorkspaceId())
                 .map(practice -> new AuthorizedSupport(result.getId(), practice.getSlug(), facts));
     }
 

@@ -16,7 +16,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -35,7 +37,9 @@ public class ScanService {
     private final ScanProperties limits;
     private final Clock clock;
 
-    public void enumerate(ReviewSnapshot review) {
+    public static final int PAGE_SIZE = 1000;
+
+    public PreparedInventory prepare(ReviewSnapshot review) {
         var kinds = review.practices().stream()
                 .map(p -> Objects.requireNonNull(p.definition().scan()).itemKind())
                 .distinct()
@@ -60,7 +64,7 @@ public class ScanService {
         do {
             if (!clock.instant().isBefore(deadline)) throw new EnumerationFailure(ReviewStopReason.ENUMERATION_LIMIT);
             var page = matching.getFirst()
-                    .list(new ItemListRequest(review.item(), pinned, kinds.getFirst(), cursor, 1000));
+                    .list(new ItemListRequest(review.item(), pinned, kinds.getFirst(), cursor, PAGE_SIZE));
             if (page.reason() != null)
                 throw new EnumerationFailure(
                         "ENUMERATION_LIMIT".equals(page.reason())
@@ -93,11 +97,7 @@ public class ScanService {
         } while (true);
         List<ItemRef> files =
                 inventory.stream().map(entry -> writer.upsert(entry.item())).toList();
-        store.inventory(
-                review.workspaceId(),
-                review.id(),
-                files.stream().map(ItemRef::itemId).toList(),
-                true);
+        var selections = new LinkedHashMap<Long, List<ScanListedItem>>();
         var matcher = new AntPathMatcher("/");
         for (var practice : review.practices()) {
             var definition = Objects.requireNonNull(practice.definition().scan());
@@ -112,20 +112,37 @@ public class ScanService {
                             new ScanListedItem(file, composer.getFirst().compose(file, pinned, definition.context())));
                 }
             }
-            if (selected.isEmpty())
-                store.list(review.workspaceId(), review.id(), practice.practiceId(), List.of(), true);
+            selections.put(practice.practiceId(), List.copyOf(selected));
+        }
+        return new PreparedInventory(files, selections);
+    }
+
+    public void record(ReviewSnapshot review, PreparedInventory prepared) {
+        store.inventory(
+                review.workspaceId(),
+                review.id(),
+                prepared.files().stream().map(ItemRef::itemId).toList(),
+                true);
+        for (var selection : prepared.selections().entrySet()) {
+            var selected = selection.getValue();
+            if (selected.isEmpty()) store.list(review.workspaceId(), review.id(), selection.getKey(), List.of(), true);
             else
-                for (int offset = 0; offset < selected.size(); offset += 1000) {
-                    if (!clock.instant().isBefore(deadline))
-                        throw new EnumerationFailure(ReviewStopReason.ENUMERATION_LIMIT);
-                    int end = Math.min(offset + 1000, selected.size());
+                for (int offset = 0; offset < selected.size(); offset += PAGE_SIZE) {
+                    int end = Math.min(offset + PAGE_SIZE, selected.size());
                     store.list(
                             review.workspaceId(),
                             review.id(),
-                            practice.practiceId(),
+                            selection.getKey(),
                             selected.subList(offset, end),
                             end == selected.size());
                 }
+        }
+    }
+
+    public record PreparedInventory(List<ItemRef> files, Map<Long, List<ScanListedItem>> selections) {
+        public PreparedInventory {
+            files = List.copyOf(files);
+            selections = Map.copyOf(selections);
         }
     }
 

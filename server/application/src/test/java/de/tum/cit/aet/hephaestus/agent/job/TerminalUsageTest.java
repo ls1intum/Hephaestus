@@ -7,6 +7,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
@@ -276,20 +277,21 @@ class TerminalUsageTest extends BaseUnitTest {
         private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
         private final ConfigSnapshot snapshot = new ConfigSnapshot(
                 ConfigSnapshot.SCHEMA_VERSION,
-                "openai-completions",
-                "https://api.openai.com/v1",
-                "gpt-5",
+                new FrozenModel(
+                        LlmApiProtocol.OPENAI_COMPLETIONS,
+                        "https://api.openai.com/v1",
+                        "gpt-5",
+                        UsageFundingSource.INSTANCE,
+                        1L,
+                        2L,
+                        7L,
+                        null,
+                        null,
+                        null),
                 null,
                 null,
-                null,
-                UsageFundingSource.INSTANCE,
-                1L,
-                2L,
-                7L,
                 600,
                 false,
-                null,
-                null,
                 null);
 
         static Stream<Arguments> billable() {
@@ -328,7 +330,7 @@ class TerminalUsageTest extends BaseUnitTest {
             ConfigSnapshot withEmbedding = snapshot.withPracticeScript(Map.of(
                     ModelKind.EMBEDDING,
                     new FrozenModel(
-                            "openai-embeddings",
+                            LlmApiProtocol.OPENAI_EMBEDDINGS,
                             "https://models.example/v1",
                             "embedding",
                             UsageFundingSource.INSTANCE,

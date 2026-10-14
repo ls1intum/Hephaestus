@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ConversationEligibility;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageSupport;
@@ -97,19 +98,13 @@ public class FeedbackCompositionContextService {
                     .filter(row -> row.getPracticeId() == practiceId)
                     .findFirst()
                     .orElseThrow();
-            var practice = practices
-                    .findById(practiceId)
-                    .filter(p -> p.getWorkspaceId() == workspaceId)
-                    .orElseThrow();
+            var practice =
+                    practices.findByIdAndWorkspaceId(practiceId, workspaceId).orElseThrow();
             var selection = pageSupport.select(workspaceId, developer, practiceId, now);
-            var support = selection.evidence().stream()
-                    .filter(row -> gate.evaluateComposition(
-                                    review, developer, List.of(row), FeedbackDestination.PRACTICE_PAGE)
-                            .allowed())
-                    .toList();
+            var support = selection.evidence();
             var decision = pageDecision(about, support, selection, now);
             List<PracticePageSupport.Occurrence> occurrences = List.of();
-            if (decision == PracticePageDecision.ADMIT) {
+            if (decision.decision() == PracticePageDecision.ADMIT) {
                 var copied = new ArrayList<PracticePageSupport.Occurrence>();
                 for (var row : support) {
                     var entry = history.find(
@@ -143,7 +138,8 @@ public class FeedbackCompositionContextService {
                 }
                 if (!pageUnavailable) occurrences = List.copyOf(copied);
             }
-            page.add(new PracticePageSupport.PracticeSupport(practice.getSlug(), decision, occurrences));
+            page.add(new PracticePageSupport.PracticeSupport(
+                    practice.getSlug(), decision.decision(), decision.stopReason(), occurrences));
         }
         var routes = negatives.stream()
                 .map(row -> new ConversationEligibility.ResultDecision(row.getId(), conversationDecision(review, row)))
@@ -156,26 +152,45 @@ public class FeedbackCompositionContextService {
         return complete(now, page, routes);
     }
 
-    public PracticePageDecision pageDecision(
+    public record PageAdmission(
+            PracticePageDecision decision, @Nullable FeedbackStopReason stopReason) {}
+
+    public PageAdmission pageDecision(
             Result about, List<Result> support, PracticePageSupportReader.Selection selection, Instant now) {
-        if (role(about) == null) return PracticePageDecision.UNATTRIBUTABLE_SUBJECT;
-        if (gate.mode(about) == FeedbackMode.OFF) return PracticePageDecision.PRACTICE_REQUIRES_APPROVAL;
-        if (support.isEmpty()) return PracticePageDecision.NO_EVIDENCE;
-        if (support.stream()
-                .allMatch(row -> reviews.find(row.getWorkspaceId(), row.getReviewId())
-                        .map(r -> r.origin() == ReviewOrigin.BACKFILL)
-                        .orElse(true))) return PracticePageDecision.BACKFILL_HELD;
-        if (!pageRouter.supportsPattern(about, support)) return PracticePageDecision.UNCORROBORATED;
+        if (role(about) == null)
+            return new PageAdmission(
+                    PracticePageDecision.UNATTRIBUTABLE_SUBJECT, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE);
+        if (gate.mode(about) == FeedbackMode.OFF)
+            return new PageAdmission(PracticePageDecision.FEEDBACK_OFF, FeedbackStopReason.FEEDBACK_OFF);
+        if (!support.isEmpty()
+                && support.stream()
+                        .allMatch(row -> reviews.find(row.getWorkspaceId(), row.getReviewId())
+                                .map(r -> r.origin() == ReviewOrigin.BACKFILL)
+                                .orElse(true)))
+            return new PageAdmission(PracticePageDecision.BACKFILL_HELD, FeedbackStopReason.BACKFILL_QUIET);
+        var review = reviews.find(about.getWorkspaceId(), about.getReviewId()).orElseThrow();
+        var check = gate.evaluateComposition(
+                review,
+                Objects.requireNonNull(about.getDeveloperId()),
+                support.isEmpty() ? List.of(about) : support,
+                FeedbackDestination.PRACTICE_PAGE);
+        if (!check.allowed())
+            return new PageAdmission(PracticePageDecision.GATE_REFUSED, Objects.requireNonNull(check.reason()));
+        if (support.isEmpty())
+            return new PageAdmission(PracticePageDecision.NO_EVIDENCE, FeedbackStopReason.NO_EVIDENCE);
+        if (!pageRouter.supportsPattern(about, support))
+            return new PageAdmission(PracticePageDecision.UNCORROBORATED, FeedbackStopReason.UNCORROBORATED);
         if (selection
                 .previous()
                 .filter(card -> card.preparedAt().isAfter(now.minus(Duration.ofDays(14))))
-                .isPresent()) return PracticePageDecision.RECENTLY_SURFACED;
-        return PracticePageDecision.ADMIT;
+                .isPresent())
+            return new PageAdmission(PracticePageDecision.RECENTLY_SURFACED, FeedbackStopReason.NOTHING_NEW);
+        return new PageAdmission(PracticePageDecision.ADMIT, null);
     }
 
     public ConversationDecision conversationDecision(ReviewSnapshot review, Result result) {
         if (review.origin() == ReviewOrigin.BACKFILL) return ConversationDecision.BACKFILL_QUIET;
-        if (gate.mode(result) == FeedbackMode.OFF) return ConversationDecision.PRACTICE_REQUIRES_APPROVAL;
+        if (gate.mode(result) == FeedbackMode.OFF) return ConversationDecision.FEEDBACK_OFF;
         if (!"AUTHOR".equals(role(result))) return ConversationDecision.REVIEWER_DEFERRED;
         Long developer = result.getDeveloperId();
         if (developer == null
@@ -193,8 +208,7 @@ public class FeedbackCompositionContextService {
         Long versionId = result.getPracticeVersionId();
         return versionId == null
                 ? null
-                : versions.findById(versionId)
-                        .filter(v -> v.getWorkspaceId() == result.getWorkspaceId())
+                : versions.findByIdAndWorkspaceId(versionId, result.getWorkspaceId())
                         .map(v -> v.getDefinition().path("about"))
                         .filter(JsonNode::isString)
                         .map(JsonNode::asString)

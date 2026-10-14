@@ -2,15 +2,19 @@ import { formatDistanceStrict } from "date-fns";
 import type { ReviewJob, ReviewSummary } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
 import { ITEM_KIND } from "@/lib/item-kinds";
-import { hasText } from "@/lib/text";
 
-export type JobWait = { kind: "backoff" };
+export interface JobWait {
+	kind: "backoff";
+}
 
 /**
  * `null` for a job that is simply claimable: `availableAt` is in the past for almost every job, so a
  * "due …" line on every queued row would be noise.
  */
-export function jobWait(job: Pick<ReviewJob, "status" | "availableAt">, now: number): JobWait | null {
+export function jobWait(
+	job: Pick<ReviewJob, "status" | "availableAt">,
+	now: number,
+): JobWait | null {
 	if (job.status !== "QUEUED") {
 		return null;
 	}
@@ -57,12 +61,7 @@ const IN_PROGRESS = "In progress";
 const NOT_STARTED = "Not started";
 const NOT_RECORDED = "Not recorded";
 
-/** `undefined` when the boundary was never recorded, `null` when it was but cannot be read. */
-function instant(value: Parameters<typeof asDate>[0]): Date | null | undefined {
-	return value == null ? undefined : (asDate(value) ?? null);
-}
-
-function elapsed(from: Date | null | undefined, to: Date | null | undefined): string {
+function elapsed(from: Date | undefined, to: Date | undefined): string {
 	if (!from || !to || to.getTime() < from.getTime()) {
 		return NOT_RECORDED;
 	}
@@ -86,9 +85,9 @@ export function jobPhases(
 	if (job.status === "QUEUED") {
 		return { wait: IN_PROGRESS, execution: NOT_STARTED, retried };
 	}
-	const started = instant(job.startedAt);
-	const wait = elapsed(instant(job.availableAt), started);
+	const started = asDate(job.startedAt);
+	const wait = elapsed(asDate(job.availableAt), started);
 	const execution =
-		job.status === "RUNNING" ? IN_PROGRESS : elapsed(started, instant(job.completedAt));
+		job.status === "RUNNING" ? IN_PROGRESS : elapsed(started, asDate(job.completedAt));
 	return { wait, execution, retried };
 }

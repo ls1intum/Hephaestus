@@ -16,8 +16,7 @@ class PracticeV1FeedbackDigestDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepApprovalThroughFallbackAndBindThePreparedWordsAndSide(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         PracticeV1CutoverMigrationTest.execute(database, """
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_key,write_marker)
             VALUES('00000000-0000-0000-0000-000000997171',992101,'00000000-0000-0000-0000-000000992161',
@@ -55,8 +54,7 @@ class PracticeV1FeedbackDigestDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepShownChatWordsSeparateFromThePreparedBrief(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         var prepared =
                 PracticeV1CutoverMigrationTest.column(database, "SELECT feedback_content_digest('" + CHAT + "')");
         PracticeV1CutoverMigrationTest.execute(
@@ -72,8 +70,7 @@ class PracticeV1FeedbackDigestDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldHashAllPreparedPiecesInTheirInputOrder(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
         assertThat(PracticeV1CutoverMigrationTest.column(database, """
             SELECT feedback_package_digest(digests) FROM (VALUES
                 (1,ARRAY[]::text[]),

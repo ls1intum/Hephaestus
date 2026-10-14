@@ -1,13 +1,13 @@
+import type { ReviewFeedback } from "@/api/types.gen";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
-import type { DeliveryFacts } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { OPERATOR_WITHHELD_TEXT } from "@/components/practice-vocabulary/delivery-place-defs";
+import { ADMIN_WITHHELD_TEXT } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { hasText } from "@/lib/text";
 
 import { feedbackDisplayMarkdown } from "./feedback-display";
 
-export type FeedbackBodyFeedback = DeliveryFacts & { body?: string };
+export type FeedbackBodyFeedback = Pick<ReviewFeedback, "destination"> & { body: string | null };
 
 export interface FeedbackBodyProps {
 	feedback: FeedbackBodyFeedback;
@@ -16,9 +16,9 @@ export interface FeedbackBodyProps {
 
 export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 	const { body } = feedback;
-	const withheld = OPERATOR_WITHHELD_TEXT[feedback.channel];
+	const withheld = ADMIN_WITHHELD_TEXT[feedback.destination];
 
-	// A private place's text is never shown here, even when a caller passes one.
+	// A private destination's text is never shown here, even when a caller passes one.
 	if (withheld) {
 		return (
 			<Card flush className={className}>

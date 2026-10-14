@@ -13,4 +13,4 @@ public record SyncJobRequest(
         IntegrationKind kind,
         SyncJobType type,
         SyncJobTrigger trigger,
-        @Nullable Long triggeredByUserId) {}
+        @Nullable Long triggeredByAccountId) {}

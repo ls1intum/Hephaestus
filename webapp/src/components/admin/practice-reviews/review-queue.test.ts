@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import type { PracticeReviewQueue } from "@/api/types.gen";
+import type { ReviewQueue } from "@/api/types.gen";
 
+import { reviewItem } from "./fixtures";
 import {
 	oldestWaitSeconds,
 	perHourText,
@@ -13,12 +14,13 @@ import {
 
 const AS_OF = new Date("2026-10-07T12:00:00Z");
 
-const queue = (patch: Partial<PracticeReviewQueue> = {}): PracticeReviewQueue => ({
+const queue = (patch: Partial<ReviewQueue> = {}): ReviewQueue => ({
 	asOf: AS_OF,
 	running: 0,
 	activeWorkers: 0,
 	waiting: 0,
 	heldForBudget: 0,
+	oldestWaitingSince: null,
 	head: [],
 	finishedLastHour: 0,
 	finishedLastDay: 0,
@@ -48,8 +50,10 @@ describe("review queue", () => {
 
 	it("tells a hold from a wait", () => {
 		const item = {
-			id: "r",
-			target: { type: "scm.pull_request", title: "Work" },
+			reviewId: "r",
+			jobId: "j",
+			item: reviewItem,
+			developer: null,
 			since: AS_OF,
 		} as const;
 		expect(queueItemState({ ...item, status: "RUNNING", heldForBudget: false })).toBe("running");

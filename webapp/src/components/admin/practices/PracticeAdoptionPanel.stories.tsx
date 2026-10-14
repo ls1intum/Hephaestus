@@ -1,8 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
-import type { CatalogPracticePreview } from "@/api/types.gen";
 import { definitionOf, mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+import type { PracticeAdoptionPreview } from "@/components/admin/practices/catalog-adoption";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -12,7 +12,7 @@ import { expectGenuinelyDisabled } from "@/test/controls";
 import { practiceScript } from "./fixtures";
 import { PracticeAdoptionPanel, type PracticeAdoptionState } from "./PracticeAdoptionPanel";
 
-const preview: CatalogPracticePreview = {
+const preview: PracticeAdoptionPreview = {
 	slug: "describe-what-and-why",
 	kind: "scm.pull_request",
 	availability: "AVAILABLE",
@@ -144,7 +144,7 @@ export const UnassignedAndOff: Story = {
 			preview: {
 				...preview,
 				initialFeedbackMode: "OFF",
-				group: { disposition: "UNASSIGNED", slug: null, definition: null },
+				group: { disposition: "UNASSIGNED" },
 			},
 		}),
 	},

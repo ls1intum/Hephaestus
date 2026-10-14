@@ -87,7 +87,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
-public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
+public class MentorChatService implements MentorTurnRunner {
 
     private static final Logger log = LoggerFactory.getLogger(MentorChatService.class);
     private static final JsonNodeFactory NODES = JsonNodeFactory.instance;
@@ -119,7 +119,6 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private final ConversationFeedbackReceipts feedbackReceipts;
 
     /** The holder lets a disconnect abort a runner attached after lifecycle callbacks were registered. */
-    @Override
     public void start(MentorTurnRequest request, SseEmitter emitter) {
         MentorSseChannel channel = new MentorSseChannel(
                 request.workspaceId(), request.threadId(), emitter, objectMapper, runnerTimeoutScheduler.scheduler());

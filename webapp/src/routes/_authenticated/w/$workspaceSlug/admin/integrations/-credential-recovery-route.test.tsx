@@ -13,7 +13,7 @@ import type {
 	Workspace,
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -58,7 +58,7 @@ function mockConnection(kind: "GITHUB" | "GITLAB", installationId?: number) {
 		http.get("*/workspaces", () => HttpResponse.json([listed])),
 		http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(workspace)),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([entry])),
 		http.get("*/workspaces/:workspaceSlug/connections/7", () => HttpResponse.json(detail)),

@@ -1,15 +1,14 @@
 import { cn } from "cn";
-import type { ReviewSubject } from "@/api/types.gen";
+import type { ReviewDeveloper } from "@/api/types.gen";
 import { MemberAvatar } from "@/components/activity/MemberAvatar";
 import { hasText } from "@/lib/text";
 
-import { subjectLabel } from "./review-format";
+import { developerLabel } from "./review-format";
 
 export interface ReviewPersonProps {
-	person: ReviewSubject | undefined;
+	person: ReviewDeveloper | null;
 	/**
-	 * Says which person this is when a surface shows two — "To" and "About" on a piece of feedback
-	 * whose recipient is not its subject. Omitted everywhere only one person is in play, where a
+	 * Says which person this is when a surface shows two people. Omitted everywhere only one person is in play, where a
 	 * prefix would be reading out the column header.
 	 */
 	prefix?: string;
@@ -25,13 +24,13 @@ export function ReviewPerson({ person, prefix, className }: ReviewPersonProps) {
 				size="sm"
 				user={{
 					avatarUrl: person?.avatarUrl ?? "",
-					name: person?.name ?? "",
-					login: person?.login ?? "",
+					name: person?.displayName ?? "",
+					login: person?.providerLogin ?? "",
 				}}
 			/>
 			<span className="min-w-0 break-words">
 				{hasText(prefix) && <span className="text-muted-foreground">{prefix} </span>}
-				{subjectLabel(person)}
+				{developerLabel(person)}
 			</span>
 		</span>
 	);

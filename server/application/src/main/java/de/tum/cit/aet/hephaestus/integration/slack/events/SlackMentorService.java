@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
-import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSandboxPreparer;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
@@ -10,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityRes
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackStreamingMentorChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.onboarding.SlackOnboardingService;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
@@ -89,8 +89,7 @@ public class SlackMentorService {
                     channelId,
                     threadTs,
                     onboardingService.linkCtaBlocks(),
-                    "Heph cannot reply yet. Check that your Hephaestus account is active, linked to Slack, and a"
-                            + " member of this workspace.");
+                    "Heph cannot reply yet. Check that your Hephaestus account is active, linked to Slack, and a member of this workspace.");
             return;
         }
         long developerId = devOpt.get();

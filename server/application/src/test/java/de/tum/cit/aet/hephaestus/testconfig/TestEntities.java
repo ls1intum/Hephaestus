@@ -7,9 +7,17 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.time.Instant;
+import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
+import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Object-mother for the owned JPA {@code @Entity} POJOs used across unit tests. Constructing the
@@ -21,6 +29,8 @@ import org.jspecify.annotations.Nullable;
  * additional fields on the returned instance directly — the entity is fully mutable.
  */
 public final class TestEntities {
+
+    private static final AtomicLong VERSION_IDS = new AtomicLong(1);
 
     private TestEntities() {}
 
@@ -117,5 +127,25 @@ public final class TestEntities {
     /** An {@link ReviewJob} with no fields set (mutate as needed). */
     public static ReviewJob reviewJob() {
         return new ReviewJob();
+    }
+
+    public static PracticeVersion practiceVersion() {
+        return practiceVersion(
+                VERSION_IDS.getAndIncrement(),
+                1,
+                JsonMapper.builder().build().valueToTree(DefinitionTestFixtures.definition()),
+                "v6:" + "a".repeat(64));
+    }
+
+    /** Database-generated metadata is supplied explicitly for detached unit-test rows. */
+    public static PracticeVersion practiceVersion(long id, int number, JsonNode definition, String digest) {
+        var practice = new Practice();
+        practice.setWorkspace(workspace(1L));
+        var version = new PracticeVersion(practice, number, definition, null);
+        ReflectionTestUtils.setField(version, "id", id);
+        ReflectionTestUtils.setField(version, "name", definition.path("name").asString());
+        ReflectionTestUtils.setField(version, "reviewDigest", digest);
+        ReflectionTestUtils.setField(version, "createdAt", Instant.EPOCH);
+        return version;
     }
 }

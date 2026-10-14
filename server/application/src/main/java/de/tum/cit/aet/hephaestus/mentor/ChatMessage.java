@@ -14,6 +14,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Version;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,7 +42,11 @@ import tools.jackson.databind.JsonNode;
 @Entity
 @Table(
         name = "chat_message",
-        indexes = {@Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at")})
+        indexes = {@Index(name = "idx_chat_message_thread_created", columnList = "thread_id, created_at")},
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_chat_message_tenant",
+                        columnNames = {"id", "workspace_id"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -52,6 +57,17 @@ public class ChatMessage {
     @Id
     @EqualsAndHashCode.Include
     private UUID id;
+
+    @Column(name = "workspace_id", nullable = false, updatable = false)
+    private long workspaceId;
+
+    public void setThread(ChatThread thread) {
+        long scope = thread.getWorkspace().getId();
+        if (workspaceId != 0 && workspaceId != scope)
+            throw new IllegalArgumentException("A message cannot move to another workspace");
+        this.thread = thread;
+        this.workspaceId = scope;
+    }
 
     /**
      * Thread this message belongs to.

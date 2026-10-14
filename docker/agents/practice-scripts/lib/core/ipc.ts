@@ -27,9 +27,6 @@ export interface JobFiles {
 export interface ProgramJob {
 	slug: string;
 	inputs: PracticeInputs;
-	criteria: string;
-	/** The change since the previous review's head, when it is known. */
-	changeSince?: Map<string, DiffFile>;
 	files: JobFiles | null;
 	now: string;
 	/** Epoch milliseconds at which the practice's execution ends. */
@@ -43,11 +40,10 @@ export interface ChildJob extends ProgramJob {
 
 /** A governed read of the reviewed work, answered by the host from the pinned captures. */
 export type ReadRequest =
-	| { op: "read"; tree: "head" | "base"; path: string; offsetLine?: number; maxLines?: number }
-	| { op: "list"; tree: "head" | "base"; glob?: string }
+	| { op: "read"; path: string; offsetLine?: number; maxLines?: number }
+	| { op: "list"; glob?: string }
 	| {
 			op: "grep";
-			tree: "head" | "base";
 			pattern: string;
 			glob?: string;
 			maxResults?: number;
@@ -57,7 +53,6 @@ export type ReadRequest =
 	| {
 			op: "cite";
 			source: "tree";
-			tree: "head" | "base";
 			path: string;
 			startLine: number;
 			endLine?: number;
@@ -108,22 +103,19 @@ export const MAX_LABEL_CHARS = 200;
 export const MAX_IPC_MESSAGE_BYTES = 524_288;
 
 const callId = z.int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-const tree = z.enum(["head", "base"]);
 const lineNumber = z.int().min(1).max(2_147_483_647);
 const shortText = z.string().min(1).max(4096);
 
 const readRequestSchema = z.union([
 	z.strictObject({
 		op: z.literal("read"),
-		tree,
 		path: shortText,
 		offsetLine: lineNumber.optional(),
 		maxLines: lineNumber.optional(),
 	}),
-	z.strictObject({ op: z.literal("list"), tree, glob: shortText.optional() }),
+	z.strictObject({ op: z.literal("list"), glob: shortText.optional() }),
 	z.strictObject({
 		op: z.literal("grep"),
-		tree,
 		pattern: shortText,
 		glob: shortText.optional(),
 		maxResults: z.int().positive().max(1000).optional(),
@@ -133,7 +125,6 @@ const readRequestSchema = z.union([
 	z.strictObject({
 		op: z.literal("cite"),
 		source: z.literal("tree"),
-		tree,
 		path: shortText,
 		startLine: lineNumber,
 		endLine: lineNumber.optional(),

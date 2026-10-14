@@ -28,6 +28,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,7 @@ class LlmProxyService {
     private final ScanCallGuard scanCalls;
     private final ProxyRequestPolicy requestPolicy;
     private final Tracer tracer;
+    private final ProxyRoutingService routingService;
 
     LlmProxyService(
             Tracer tracer,
@@ -65,7 +67,8 @@ class LlmProxyService {
             ObjectMapper objectMapper,
             ProxyAccounting accounting,
             ProxyRequestPolicy requestPolicy,
-            ScanCallGuard scanCalls) {
+            ScanCallGuard scanCalls,
+            ProxyRoutingService routingService) {
         this.tracer = tracer;
         this.webClient = llmProxyWebClient;
         this.resolver = llmModelResolver;
@@ -73,6 +76,7 @@ class LlmProxyService {
         this.accounting = accounting;
         this.requestPolicy = requestPolicy;
         this.scanCalls = scanCalls;
+        this.routingService = routingService;
     }
 
     public @Nullable ResponseEntity<?> proxy(
@@ -80,7 +84,7 @@ class LlmProxyService {
             HttpServletResponse response,
             HttpHeaders incomingHeaders,
             byte @Nullable [] body) {
-        ProxyRouting routing = authenticatedRouting();
+        ProxyRouting routing = authenticatedRouting(request);
         ResponseEntity<String> rejected = validateSafeSurface(request);
         if (rejected != null) return rejected;
         LlmApiProtocol protocol = LlmApiProtocol.parse(routing.apiProtocol())
@@ -89,7 +93,7 @@ class LlmProxyService {
         if (routing.practiceScriptSlot() != null
                 || protocol == null
                 || !(PROXY_PATH_PREFIX + protocol.upstreamPath()).equals(request.getRequestURI())) {
-            return ResponseEntity.status(404).body("Not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ProblemDetail.forStatus(HttpStatus.NOT_FOUND));
         }
         if (body == null || body.length == 0) return ResponseEntity.badRequest().body("Request body is required");
         rejected = validateJsonObject(body);
@@ -108,7 +112,7 @@ class LlmProxyService {
             HttpServletResponse response,
             HttpHeaders incomingHeaders,
             byte @Nullable [] body) {
-        ProxyRouting routing = authenticatedRouting();
+        ProxyRouting routing = authenticatedRouting(request);
         ResponseEntity<String> rejected = validateSafeSurface(request);
         if (rejected != null) return rejected;
         ModelKind slot = routing.practiceScriptSlot();
@@ -116,7 +120,7 @@ class LlmProxyService {
                 .filter(parsed -> slot != null && parsed.serves(slot))
                 .orElse(null);
         if (slot == null || protocol == null) {
-            return ResponseEntity.status(404).body("Not found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ProblemDetail.forStatus(HttpStatus.NOT_FOUND));
         }
         String slotPath =
                 JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH + slot.name().toLowerCase(Locale.ROOT);
@@ -521,10 +525,10 @@ class LlmProxyService {
         return URI.create(baseUrl.strip().replaceAll("/+$", "") + protocol.upstreamPath());
     }
 
-    private ProxyRouting authenticatedRouting() {
+    private ProxyRouting authenticatedRouting(HttpServletRequest request) {
         var authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication instanceof JobTokenAuthentication tokenAuthentication) {
-            return tokenAuthentication.getPrincipal();
+            return routingService.resolve(tokenAuthentication.getPrincipal(), request);
         }
         throw new IllegalStateException("Expected JobTokenAuthentication on security context");
     }

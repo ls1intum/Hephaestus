@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -73,14 +74,14 @@ public class ReviewRuntimeRepository {
               COUNT(*) FILTER (WHERE status='QUEUED' AND hold_reason IS NULL) waiting,
               MIN(available_at) FILTER (WHERE status='QUEUED' AND hold_reason IS NULL) oldest,
               COUNT(*) FILTER (WHERE status='QUEUED' AND hold_reason='BUDGET') held,
-              COUNT(*) FILTER (WHERE completed_at>=:hour AND completed_at<=:at) hour,
-              COUNT(*) FILTER (WHERE completed_at>=:day AND completed_at<=:at) day
+              COUNT(*) FILTER (WHERE completed_at>=:hour AND completed_at<=:at) completed_hour,
+              COUNT(*) FILTER (WHERE completed_at>=:day AND completed_at<=:at) completed_day
             FROM review_job WHERE workspace_id=:ws
             """)
                 .param("ws", workspaceId)
-                .param("at", asOf)
-                .param("hour", asOf.minusSeconds(3600))
-                .param("day", asOf.minusSeconds(86400))
+                .param("at", asOf.atOffset(ZoneOffset.UTC))
+                .param("hour", asOf.minusSeconds(3600).atOffset(ZoneOffset.UTC))
+                .param("day", asOf.minusSeconds(86400).atOffset(ZoneOffset.UTC))
                 .query((rs, n) -> new QueueCounts(
                         rs.getLong("running"),
                         rs.getLong("waiting"),
@@ -89,26 +90,17 @@ public class ReviewRuntimeRepository {
                                 : Objects.requireNonNull(rs.getTimestamp("oldest"))
                                         .toInstant(),
                         rs.getLong("held"),
-                        rs.getLong("hour"),
-                        rs.getLong("day")))
+                        rs.getLong("completed_hour"),
+                        rs.getLong("completed_day")))
                 .single();
     }
 
     @WorkspaceAgnostic("Counts the shared worker pool; the registry is not workspace-owned")
     public long liveWorkers(Instant asOf) {
         return jdbc.sql("SELECT COUNT(*) FROM worker_registry WHERE last_heartbeat>=:live")
-                .param("live", asOf.minus(AgentProperties.WORKER_LEASE_TTL))
+                .param("live", asOf.minus(AgentProperties.WORKER_LEASE_TTL).atOffset(ZoneOffset.UTC))
                 .query(Long.class)
                 .single();
-    }
-
-    public List<UUID> queueHead(long workspaceId, int headLimit) {
-        return jdbc.sql("SELECT id FROM review_job WHERE workspace_id=:ws AND status IN ('QUEUED','RUNNING') ORDER BY"
-                        + " available_at,id LIMIT :limit")
-                .param("ws", workspaceId)
-                .param("limit", headLimit)
-                .query((rs, n) -> Objects.requireNonNull(rs.getObject("id", UUID.class)))
-                .list();
     }
 
     public List<TimingJob> timingJobs(long workspaceId, List<UUID> reviewIds) {

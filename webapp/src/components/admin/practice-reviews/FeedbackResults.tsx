@@ -5,8 +5,8 @@ import type { ReviewFeedback } from "@/api/types.gen";
 import { statusToneClass } from "@/components/common/status-def";
 import { useNow } from "@/components/common/use-now";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
-import { ReviewRunWorkCell } from "@/components/practice-trace/ReviewRunDayTable";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { ReviewItemCell } from "@/components/practice-trace/ReviewDayTable";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-state-defs";
 import { FEEDBACK_LOCATION_DEFS } from "@/components/practice-vocabulary/feedback-location-defs";
 import { PracticeTableRow } from "@/components/practice-vocabulary/PracticeTable";
 import {
@@ -25,7 +25,7 @@ import { formatDayTime } from "@/lib/dates";
 
 import { RecordResults, type RecordResultsWords } from "./RecordResults";
 import { RecordRowActions, ROW_OPEN_COLUMN, rowActionsColumn } from "./RecordRowActions";
-import { subjectLabel } from "./review-format";
+import { developerLabel } from "./review-format";
 import { feedbackLevel } from "./review-levels";
 import { ReviewPerson } from "./ReviewPerson";
 import { useTracked } from "./use-tracked";
@@ -47,10 +47,10 @@ const LIST_LABEL = "Feedback";
 /** The heads of the Feedback table, which every row below fills. */
 export const FEEDBACK_COLUMNS: readonly RecordTableColumn[] = [
 	{ label: "Composed", className: "w-24 whitespace-nowrap" },
-	{ label: "Channel", className: "w-36" },
+	{ label: "Destination", className: "w-36" },
 	{ label: "Work" },
-	{ label: "Recipient", className: "w-44" },
-	{ label: "Outcome", className: "w-56" },
+	{ label: "Developer", className: "w-44" },
+	{ label: "Delivery", className: "w-56" },
 	rowActionsColumn(),
 	ROW_OPEN_COLUMN,
 ];
@@ -92,21 +92,20 @@ export interface FeedbackRowProps {
 }
 
 /**
- * What tells one row from the next without its text: where it went, who it was for and on which
- * work. "GitHub comment for Ada Lovelace on #1423".
+ * What tells one row from the next without its text: who it was for, on which work, and where it
+ * went, after the word "feedback": "for Ada Lovelace on #1423, on GitHub".
  */
 export function feedbackRowName(feedback: ReviewFeedback): string {
-	const location = FEEDBACK_LOCATION_DEFS[feedback.location].label;
-	const work = feedback.reviewedWork?.label;
-	const on = work === undefined ? "" : ` on ${work}`;
-	return `${location} for ${subjectLabel(feedback.recipient)}${on}`;
+	const location = FEEDBACK_LOCATION_DEFS[feedback.location].label.toLowerCase();
+	const on = feedback.item === null ? "" : ` on ${feedback.item.label}`;
+	return `for ${developerLabel(feedback.developer)}${on}, ${location}`;
 }
 
 /**
  * One piece of feedback, drawn as a review row is: the time, where it went, the work, who it was
- * for, and what became of it. Its text is on its sheet: a row is told apart by its time, channel,
- * work, recipient and outcome, which its accessible names say too. The outcome is its icon and label, and a
- * withheld row adds why, in the words the "Why withheld" filter offers, with the precise reason on
+ * for, and what became of it. Its text is on its sheet: a row is told apart by its time,
+ * destination, work, developer and delivery, which its accessible names say too. The delivery is
+ * its icon and label, and a withheld row adds why, in the words the "Why withheld" filter offers, with the precise reason on
  * hover. The whole row opens the feedback's sheet, and that is its one link; Track and Trace stand
  * in the actions column.
  */
@@ -115,22 +114,22 @@ export function FeedbackRow({ feedback }: FeedbackRowProps) {
 	const tracked = useTracked({ kind: "feedback", id: feedback.id });
 	const name = feedbackRowName(feedback);
 	const when = formatDayTime(feedback.createdAt, today);
-	const outcome = deliveryOutcome(feedback);
+	const delivery = deliveryOutcome(feedback);
 	const location = FEEDBACK_LOCATION_DEFS[feedback.location];
 	const LocationIcon = location.icon;
 	return (
 		<PracticeTableRow
 			link={{
 				text: "Open feedback",
-				name: `${name}, ${outcome.label}, ${when}`,
+				name: `Feedback ${name}, ${delivery.label}, ${when}`,
 				render: <DetailStackLink entry={feedbackLevel(feedback.id)} single />,
 			}}
 			variant={tracked ? "highlighted" : undefined}
 			action={
 				<RecordRowActions
 					record={{ kind: "feedback", id: feedback.id }}
-					agentJobId={feedback.agentJobId}
-					name={`feedback ${name}, ${outcome.label}, ${when}`}
+					reviewId={feedback.reviewId}
+					name={`feedback ${name}, ${delivery.label}, ${when}`}
 				/>
 			}
 		>
@@ -144,21 +143,21 @@ export function FeedbackRow({ feedback }: FeedbackRowProps) {
 					<span className="min-w-0 break-words">{location.label}</span>
 				</span>
 			</TableCell>
-			{feedback.reviewedWork === undefined ? (
+			{feedback.item === null ? (
 				<TableCell className="align-top text-xs text-muted-foreground">No reviewed work</TableCell>
 			) : (
-				<ReviewRunWorkCell work={feedback.reviewedWork} linked={false} />
+				<ReviewItemCell item={feedback.item} linked={false} />
 			)}
 			<TableCell className="align-top whitespace-normal">
-				<ReviewPerson person={feedback.recipient} />
+				<ReviewPerson person={feedback.developer} />
 			</TableCell>
 			<TableCell className="align-top whitespace-normal">
 				<span className="flex min-w-0 flex-col items-start gap-1">
-					<StatusLabel def={outcome} className="text-xs font-medium" />
-					{feedback.suppressionReason !== undefined && (
-						<span title={withholdingReasonSentence(feedback.suppressionReason)}>
+					<StatusLabel def={delivery} className="text-xs font-medium" />
+					{feedback.state === "WITHHELD" && feedback.stopReason !== null && (
+						<span title={withholdingReasonSentence(feedback.stopReason)}>
 							<StatusLabel
-								def={WITHHOLDING_FAMILY_DEFS[withholdingFamily(feedback.suppressionReason)]}
+								def={WITHHOLDING_FAMILY_DEFS[withholdingFamily(feedback.stopReason)]}
 								className="text-xs text-muted-foreground"
 							/>
 						</span>

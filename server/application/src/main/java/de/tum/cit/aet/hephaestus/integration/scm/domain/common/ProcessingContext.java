@@ -78,12 +78,16 @@ public record ProcessingContext(
                 scopeId, repository, provider, observedAt, correlationId, webhookAction, source, actorUserId);
     }
 
-    /** Returns the provider's database ID for use in upsert queries. */
+    /**
+     * Returns the provider's database ID for use in upsert queries.
+     */
     public @Nullable Long providerId() {
         return provider != null ? provider.getId() : null;
     }
 
-    /** Creates a context for scheduled sync operations. */
+    /**
+     * Creates a context for scheduled sync operations.
+     */
     public static ProcessingContext forSync(@Nullable Long scopeId, @Nullable Repository repository) {
         return new ProcessingContext(
                 scopeId,
@@ -96,15 +100,17 @@ public record ProcessingContext(
     }
 
     /**
-     * Creates a context for sync operations that are not repository-scoped (e.g.,
-     * organization-level project sync, team sync).
+     * Creates a context for sync operations that are not repository-scoped
+     * (e.g., organization-level project sync, team sync).
      */
     public static ProcessingContext forSync(@Nullable Long scopeId, IdentityProvider provider) {
         return new ProcessingContext(
                 scopeId, null, provider, Instant.now(), UUID.randomUUID().toString(), null, DataSource.GRAPHQL_SYNC);
     }
 
-    /** Creates a context for webhook event processing. */
+    /**
+     * Creates a context for webhook event processing.
+     */
     public static ProcessingContext forWebhook(@Nullable Long scopeId, Repository repository, String action) {
         return new ProcessingContext(
                 scopeId,
@@ -117,20 +123,24 @@ public record ProcessingContext(
     }
 
     /**
-     * Creates a context for webhook events that are not repository-scoped (e.g., organization-level
-     * project events).
+     * Creates a context for webhook events that are not repository-scoped
+     * (e.g., organization-level project events).
      */
     public static ProcessingContext forWebhook(@Nullable Long scopeId, IdentityProvider provider, String action) {
         return new ProcessingContext(
                 scopeId, null, provider, Instant.now(), UUID.randomUUID().toString(), action, DataSource.WEBHOOK);
     }
 
-    /** Checks if this processing was triggered by a webhook. */
+    /**
+     * Checks if this processing was triggered by a webhook.
+     */
     public boolean isWebhook() {
         return source == DataSource.WEBHOOK;
     }
 
-    /** Checks if this processing was triggered by a scheduled sync. */
+    /**
+     * Checks if this processing was triggered by a scheduled sync.
+     */
     public boolean isSync() {
         return source == DataSource.GRAPHQL_SYNC;
     }

@@ -1,16 +1,15 @@
 package de.tum.cit.aet.hephaestus.account.userview;
 
 import de.tum.cit.aet.hephaestus.core.UserViewRead;
+import de.tum.cit.aet.hephaestus.core.auth.validation.AccountId;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.CacheControl;
@@ -47,8 +46,7 @@ public class UserViewUsersController {
     @UserViewRead
     @Operation(summary = "Confirm access to a workspace user", operationId = "getUserViewUser")
     public ResponseEntity<UserViewAccountDTO> get(
-            WorkspaceContext workspace,
-            @PathVariable @Pattern(regexp = "^[1-9][0-9]*$") @DecimalMax("9223372036854775807") String accountId) {
+            WorkspaceContext workspace, @PathVariable @AccountId String accountId) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(users.requireAccount(workspace.id(), Long.parseLong(accountId)));

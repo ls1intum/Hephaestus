@@ -11,10 +11,8 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-/**
- * Per-kind capability declaration for GitHub. Disable with {@code
- * hephaestus.integration.github.enabled=false}.
- */
+/** Per-kind capability declaration for GitHub. Disable with
+ *  {@code hephaestus.integration.github.enabled=false}. */
 @Component
 public class GitHubManifest implements IntegrationManifest {
 

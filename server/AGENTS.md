@@ -68,8 +68,7 @@ Provider adapters own APIs, capture and delivery. Core imports neither provider 
 A practice Problem is distinct from HTTP ProblemDetail.
 Accounts own developer identity and choices. SCM users remain source mirrors.
 Erasure removes dependent proof and feedback before membership. It never makes personal proof anonymous.
-Both result marks preserve the current claim and its end time.
-The two owning [glossaries](../docs/contributor/practice-review-glossary.mdx) define all practice vocabulary.
+The [product vocabulary](../docs/contributor/practice-feedback-language.md) and the [review glossary](../docs/contributor/practice-review-glossary.mdx) define all practice vocabulary.
 
 ## Null-safety
 

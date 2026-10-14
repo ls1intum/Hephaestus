@@ -3,27 +3,33 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { focusManager } from "@tanstack/react-query";
 import { screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PracticeReviewQueue } from "@/api/types.gen";
+import type { ReviewQueue as ReviewQueueAnswer } from "@/api/types.gen";
 import {
 	busyReviewQueue,
 	idleReviewQueue,
 	practiceReviewOverview,
 } from "@/components/admin/practice-reviews/fixtures";
-import type * as ReviewQueue from "@/components/admin/practice-reviews/review-queue";
+import type * as ReviewQueueModule from "@/components/admin/practice-reviews/review-queue";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
+import { ObserverStub } from "@/test/observers";
 import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
 
 // A short poll, so the test watches several re-reads in real time instead of faking the clock
 // under the whole router.
 vi.mock("@/components/admin/practice-reviews/review-queue", async (importOriginal) => ({
-	...(await importOriginal<typeof ReviewQueue>()),
+	...(await importOriginal<typeof ReviewQueueModule>()),
 	QUEUE_POLL_MS: 100,
 }));
 
 vi.setConfig({ testTimeout: 30_000 });
+
+// jsdom has no IntersectionObserver, and the lists load their next page as their end scrolls into view.
+beforeEach(() => {
+	vi.stubGlobal("IntersectionObserver", ObserverStub);
+});
 
 const OVERVIEW = "/w/acme/admin/practices/reviews";
 
@@ -34,12 +40,9 @@ const quietOverview = {
 };
 
 /** Answers each read of the queue with the next answer, the last one for good, and counts the reads. */
-function serveQueue(...answers: PracticeReviewQueue[]) {
+function serveQueue(...answers: ReviewQueueAnswer[]) {
 	let reads = 0;
 	server.use(
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/overview", () =>
 			HttpResponse.json(quietOverview),
 		),
@@ -86,14 +89,7 @@ describe("practice review queue on the overview", () => {
 		const queue = serveQueue(busyReviewQueue);
 		renderRouteAtWithRouter(OVERVIEW);
 
-		// Queried afresh: the card is drawn anew once the overview is in.
-		await waitFor(
-			() =>
-				expect(screen.getByRole("region", { name: "The queue" }).textContent).toContain(
-					"5 waiting",
-				),
-			ROUTE_RENDER_WAIT,
-		);
+		await screen.findByRole("link", { name: /^See all/u }, ROUTE_RENDER_WAIT);
 		await waitFor(() => expect(queue.reads()).toBeGreaterThan(1), ROUTE_RENDER_WAIT);
 
 		focusManager.setFocused(false);

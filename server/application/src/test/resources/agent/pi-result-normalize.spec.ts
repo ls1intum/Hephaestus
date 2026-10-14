@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
+	type Citation,
 	type Outcome,
 	OUTCOMES,
 	parseCandidate,
@@ -14,9 +15,8 @@ import {
 	citesReviewedTurn,
 	describeCitationMismatch,
 	MAX_SUMMARY_CHARS,
-	type NormalizedCitation,
 	normalizeCitation,
-	normalizePracticeSlug,
+	trimmedSlug,
 	normalizeSubmission,
 	resolveQuote,
 	resolveCapturedText,
@@ -80,7 +80,7 @@ function onlyCitation<T extends object>(citations: readonly T[]): T {
 }
 
 /** The result citation of a normalized submission that cites one place. */
-function normalizedCitation(citation = citationFixture()): NormalizedCitation {
+function normalizedCitation(citation = citationFixture()): Citation {
 	return onlyCitation(normalizeSubmission(citing(citation)).citations);
 }
 
@@ -366,11 +366,11 @@ void test("an example belongs only to a MET or NOT_MET result", () => {
 void test("an COULD_NOT_DETERMINE result records each open question it could not settle", () => {
 	assert.match(
 		refusal({ ...resultOf("COULD_NOT_DETERMINE"), evidence: {} }),
-		/^an COULD_NOT_DETERMINE result must say what it could not settle: evidence\.openQuestions lists each open question/u,
+		/^a COULD_NOT_DETERMINE result must say what it could not settle: evidence\.openQuestions lists each open question/u,
 	);
 	assert.match(
 		refusal({ ...resultOf("COULD_NOT_DETERMINE"), evidence: { openQuestions: [] } }),
-		/^an COULD_NOT_DETERMINE result must say what it could not settle/u,
+		/^a COULD_NOT_DETERMINE result must say what it could not settle/u,
 	);
 	assert.match(
 		refusal({
@@ -583,11 +583,9 @@ void test("the wire contract rejects outcome aliases and text coerced from numbe
 	assert.match(refusal(baseSubmission({ summary: 1234 })), /summary is required/u);
 });
 
-void test("practice slugs normalize to one canonical identity", () => {
-	assert.equal(
-		normalizePracticeSlug("writes_focused_pull_requests"),
-		normalizePracticeSlug(" WRITES-FOCUSED-PULL-REQUESTS "),
-	);
+void test("a slug is read as sent, apart from surrounding space: a near miss names no other practice", () => {
+	assert.equal(trimmedSlug(" writes-focused-pull-requests "), "writes-focused-pull-requests");
+	assert.equal(trimmedSlug("writes_focused_pull_requests"), "writes_focused_pull_requests");
 });
 
 void test("a correction to severity or explanation is not an exact retry", () => {
@@ -795,7 +793,9 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 void test("the server's live harnesses stage the checkout a quote of the change is verified against", () => {
 	// LiveWorkRecordsTest pins this index from the harness that stages the live reviews.
 	const { availableSourceKinds, sourceFileSources } = folderCitationIndex(
-		JSON.parse(readFileSync(new URL("contract-v3/live-manifest.json", import.meta.url), "utf8")),
+		JSON.parse(
+			readFileSync(new URL("../practice-results/live-manifest.json", import.meta.url), "utf8"),
+		),
 	);
 	const cited = citationFixture({ sourcePath: "context/change.json", path: "src/cart.ts" });
 	const submission = normalizeSubmission(
@@ -1157,7 +1157,7 @@ const serializedFields = (values: string[]) =>
 	values.map((value, index) => `    "text" : ${value}${index < values.length - 1 ? "," : ""}`);
 
 /** A citation of the pull request's title, quoting what the test says it quotes. */
-const cite = (quote: string): NormalizedCitation => ({
+const cite = (quote: string): Citation => ({
 	sourceKind: "scm.pull-request.core",
 	sourcePath: "inputs/context/core.md",
 	path: "title",
@@ -1261,7 +1261,7 @@ void test("a quote is recorded as the sourceFile spells it: JSON escapes and non
 });
 
 void test("spacing reads as spacing only where the quote has some, and line breaks stay line breaks", () => {
-	const line: NormalizedCitation = {
+	const line: Citation = {
 		sourceKind: "scm.linked-work-items",
 		sourcePath: "inputs/context/issue.json",
 		path: "inputs/context/issue.json",
@@ -1339,7 +1339,7 @@ void test("a quote of many indented lines resolves promptly, and so does a near 
 		"}",
 	].join("\n");
 	const quote = ['  "text" : [ {', ...block, "  }, {", ...block, "  } ]"].join("\n");
-	const citation: NormalizedCitation = {
+	const citation: Citation = {
 		sourceKind: "scm.review-threads",
 		sourcePath: "threads.json",
 		path: "threads.json",
@@ -1391,7 +1391,7 @@ void test("a range of the diff view past its last line names no line of it", () 
 });
 
 void test("a quote from the other side of the change is refused, however it is written", () => {
-	const citation: NormalizedCitation = {
+	const citation: Citation = {
 		...normalizedCitation(),
 		side: "NEW",
 		startLine: 47,
@@ -1592,7 +1592,7 @@ void test("a file the diff shows without numbered lines is refused with what to 
 });
 
 void test("removed-line citations use old-side coordinates", () => {
-	const citation: NormalizedCitation = {
+	const citation: Citation = {
 		...normalizedCitation(),
 		side: "OLD",
 		startLine: 8,
@@ -1702,7 +1702,7 @@ void test("live practice fixture permits a citation of its planted credential", 
 });
 
 void test("a serialized-source quote at the wrong lines is recorded where it occurs, when that is one place", () => {
-	const citation: NormalizedCitation = {
+	const citation: Citation = {
 		sourceKind: "scm.pull-request.core",
 		sourcePath: "inputs/context/metadata.json",
 		path: "inputs/context/metadata.json",
@@ -1839,7 +1839,7 @@ const THREAD = `{
 }
 `;
 
-function threadCitation(line: number): NormalizedCitation {
+function threadCitation(line: number): Citation {
 	return {
 		...normalizedCitation(),
 		sourceKind: "slack.conversation.thread",

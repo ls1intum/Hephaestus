@@ -2,8 +2,8 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
 import {
-	getPracticeReviewOverviewOptions,
-	listPracticeReviewResultsInfiniteOptions,
+	getReviewOverviewOptions,
+	listReviewResultsInfiniteOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { PracticeResultsSummary } from "@/components/admin/practice-reviews/PracticeResultsSummary";
 import { ResultsListPage } from "@/components/admin/practice-reviews/ResultsListPage";
@@ -44,7 +44,7 @@ function ResultsListRoute() {
 	};
 
 	const resultsQueryResult = useInfiniteQuery({
-		...listPracticeReviewResultsInfiniteOptions({
+		...listReviewResultsInfiniteOptions({
 			path: { workspaceSlug },
 			query: resultsQuery(search, REVIEW_PAGE_SIZE),
 		}),
@@ -96,7 +96,7 @@ function PracticeSummaryRead({
 }) {
 	const window = dateWindowQuery(search);
 	const query = useQuery({
-		...getPracticeReviewOverviewOptions({
+		...getReviewOverviewOptions({
 			path: { workspaceSlug },
 			// A list with no first day has no date limit, so its counts reach back to the first review.
 			query: {

@@ -109,7 +109,6 @@ class FeedbackSendServiceTest {
         attempt(FeedbackCopyState.WRITE_STARTED);
         when(writer.findExistingSummary(eq(target), any())).thenReturn(new SummaryLookup(LookupPresence.UNKNOWN, null));
         sender.send(1, id);
-        sender.send(1, id);
         verify(writer, never()).postSummary(any(), any());
         verify(transactions, never()).absent(anyLong(), any(), anyString(), any());
     }

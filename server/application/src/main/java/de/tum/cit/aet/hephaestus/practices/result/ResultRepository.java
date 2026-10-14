@@ -27,6 +27,9 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
 
     List<Result> findByWorkspaceIdAndItemIdOrderByRecordedAtDescIdDesc(long workspaceId, long itemId);
 
+    List<Result> findByWorkspaceIdAndItemIdInAndEndedAtIsNullAndDeveloperIdIsNull(
+            long workspaceId, Collection<Long> itemIds);
+
     List<Result> findByWorkspaceIdAndIdIn(long workspaceId, Collection<UUID> ids);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -53,17 +56,6 @@ public interface ResultRepository extends JpaRepository<Result, UUID> {
     int endCurrent(
             @Param("workspaceId") long workspaceId,
             @Param("itemId") long itemId,
-            @Param("reason") ResultEndReason reason,
-            @Param("at") Instant at);
-
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("""
-        UPDATE Result r SET r.endedAt = :at, r.endReason = :reason
-        WHERE r.workspaceId = :workspaceId AND r.id = :id AND r.endedAt IS NULL
-        """)
-    int endById(
-            @Param("workspaceId") long workspaceId,
-            @Param("id") UUID id,
             @Param("reason") ResultEndReason reason,
             @Param("at") Instant at);
 

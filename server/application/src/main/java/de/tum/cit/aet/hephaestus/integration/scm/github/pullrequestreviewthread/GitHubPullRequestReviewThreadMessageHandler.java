@@ -20,7 +20,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub pull_request_review_thread webhook events. */
+/**
+ * Handles GitHub pull_request_review_thread webhook events.
+ */
 @Component
 public class GitHubPullRequestReviewThreadMessageHandler
         extends AbstractIntegrationMessageHandler<GitHubPullRequestReviewThreadEventDTO> {
@@ -53,10 +55,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
         this.transactionTemplate = transactionTemplate;
     }
 
-    /**
-     * The payload's pull request carries review requests, which are dated by when Hephaestus
-     * received them.
-     */
+    /** The payload's pull request carries review requests, which are dated by when Hephaestus received them. */
     @Override
     protected void dispatchEvent(GitHubPullRequestReviewThreadEventDTO event, Instant arrivedAt) {
         transactionTemplate.executeWithoutResult(status -> handle(event, arrivedAt));
@@ -81,7 +80,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
         Long threadId = threadDto.getFirstCommentId();
 
         log.debug(
-                "Received pull_request_review_thread event: action={}, prNumber={}, threadId={}," + " repoName={}",
+                "Received pull_request_review_thread event: action={}, prNumber={}, threadId={}, repoName={}",
                 event.action(),
                 prDto.number(),
                 threadId,
@@ -105,8 +104,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
                 // process.
                 if (threadId == null) {
                     log.warn(
-                            "Skipped pull_request_review_thread event: reason=noCommentsInThread,"
-                                    + " action={}, prNumber={}, repoName={}",
+                            "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
                             event.action(),
                             prDto.number(),
                             event.repository() != null
@@ -127,8 +125,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
                 // process.
                 if (threadId == null) {
                     log.warn(
-                            "Skipped pull_request_review_thread event: reason=noCommentsInThread,"
-                                    + " action={}, prNumber={}, repoName={}",
+                            "Skipped pull_request_review_thread event: reason=noCommentsInThread, action={}, prNumber={}, repoName={}",
                             event.action(),
                             prDto.number(),
                             event.repository() != null
@@ -140,8 +137,7 @@ public class GitHubPullRequestReviewThreadMessageHandler
             }
             default ->
                 log.debug(
-                        "Skipped pull_request_review_thread event: reason=unhandledAction," + " action={}",
-                        event.action());
+                        "Skipped pull_request_review_thread event: reason=unhandledAction, action={}", event.action());
         }
     }
 }

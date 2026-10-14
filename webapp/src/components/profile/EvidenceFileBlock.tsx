@@ -73,9 +73,9 @@ export function EvidenceFileBlock({ location }: EvidenceFileBlockProps) {
 				{locatedByLine && change === undefined && lineRange !== undefined && (
 					<span className="shrink-0 font-mono text-xs text-muted-foreground">{lineRange}</span>
 				)}
-				{hasText(location.revision) && (
+				{hasText(location.commit) && (
 					<p className="min-w-0 basis-full text-xs break-all text-muted-foreground">
-						Commit <code>{location.revision}</code>
+						Commit <code>{location.commit}</code>
 					</p>
 				)}
 			</figcaption>

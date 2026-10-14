@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
@@ -37,7 +37,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
     private final HistoryCustodyQuery custody;
     private final ResultRepository results;
     private final JsonMapper json;
-    private final SourceCatalogRegistry sources;
+    private final ClasspathSourceCatalogRegistry sources;
     private final PersonProcessingSuppression suppression;
     private final PersonIdentityResolver people;
     private final AccountIdentityQuery identities;
@@ -108,9 +108,7 @@ public class ResultSourceAuthorization implements ResultProofAccess {
             for (var citation : citations)
                 if (!citation.path("sourceKind").isString()
                         || !sources.isSourceUsePermitted(
-                                sources.current().version(),
-                                new SourceKind(citation.path("sourceKind").asString()),
-                                purpose)) return false;
+                                new SourceKind(citation.path("sourceKind").asString()), purpose)) return false;
         } catch (IllegalArgumentException unavailable) {
             return false;
         }

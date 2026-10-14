@@ -26,8 +26,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 class ReviewBatchDriverTest extends BaseUnitTest {
     final ReviewBatchRepository batches = mock(ReviewBatchRepository.class);
@@ -89,7 +87,7 @@ class ReviewBatchDriverTest extends BaseUnitTest {
         batch.setPauseReason(null);
         batch.setCursorItemId(5L);
         when(scope.next(1, batch.getId(), 5L, 2)).thenReturn(List.of(6L));
-        when(submitter.offer(batch, 6)).thenReturn(ReviewBatchSubmitter.SubmissionOutcome.SUBMITTED);
+        when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
         driver.advance(batch);
         assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.RUNNING);
         assertThat(batch.getPauseReason()).isNull();
@@ -101,7 +99,7 @@ class ReviewBatchDriverTest extends BaseUnitTest {
     void oneFailedItemDoesNotStopTheNextTarget() {
         when(scope.next(1, batch.getId(), null, 2)).thenReturn(List.of(1L, 2L));
         when(submitter.offer(batch, 1)).thenThrow(new IllegalStateException("unavailable"));
-        when(submitter.offer(batch, 2)).thenReturn(ReviewBatchSubmitter.SubmissionOutcome.SUBMITTED);
+        when(submitter.offer(batch, 2)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
         driver.advance(batch);
         assertThat(batch.getFailedCount()).isOne();
         assertThat(batch.getSubmittedCount()).isOne();
@@ -145,14 +143,30 @@ class ReviewBatchDriverTest extends BaseUnitTest {
                         ArgumentMatchers.eq(1L),
                         ArgumentMatchers.eq(ReviewKind.SCAN),
                         ArgumentMatchers.anyCollection()))
-                .thenReturn(false, false, true);
+                .thenReturn(false);
         when(scope.next(1, batch.getId(), null, 1)).thenReturn(List.of(6L));
         when(submitter.offer(batch, 6))
-                .thenThrow(new ResponseStatusException(HttpStatus.CONFLICT, "A scan is already active"));
+                .thenReturn(
+                        new ReviewBatchSubmitter.SubmissionOutcome.Paused(ReviewBatchPauseReason.SCAN_ALREADY_ACTIVE));
         driver.advance(batch);
         assertThat(batch.getCursorItemId()).isNull();
         assertThat(batch.getFailedCount()).isZero();
         assertThat(batch.getSubmittedCount()).isZero();
-        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.RUNNING);
+        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.PAUSED);
+        assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.SCAN_ALREADY_ACTIVE);
+    }
+
+    @Test
+    void shouldRetainTheNextItemWhenBudgetIsExhaustedPartwayThroughATick() {
+        when(scope.next(1, batch.getId(), null, 2)).thenReturn(List.of(1L, 2L));
+        when(submitter.offer(batch, 1)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
+        when(submitter.offer(batch, 2))
+                .thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Paused(ReviewBatchPauseReason.BUDGET_EXHAUSTED));
+        driver.advance(batch);
+        assertThat(batch.getCursorItemId()).isEqualTo(1L);
+        assertThat(batch.getSubmittedCount()).isOne();
+        assertThat(batch.getFailedCount()).isZero();
+        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.PAUSED);
+        assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
     }
 }

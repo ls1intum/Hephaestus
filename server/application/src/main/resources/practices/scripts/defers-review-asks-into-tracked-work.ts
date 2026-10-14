@@ -1,3 +1,8 @@
+// Finds each ask that a reviewer made, one lead each, with what the record shows beside it: if the
+// change touches the file of the ask, if the author replied and if the reply names an issue, if the
+// reviewer had a later word on it or approved after it, and if the thread was marked resolved. The
+// review decides for each ask if it was addressed, deferred into tracked work, waived or merged past.
+// The RESOLVED mark of a thread tells who clicked it, not what happened to the ask.
 import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import { issueNumberReferences } from "../kits/scm/references.ts";
 import {
@@ -10,11 +15,6 @@ import {
 	readReviewThreads,
 	reviewerCommentRows,
 } from "../kits/scm/review.ts";
-// Finds each ask that a reviewer made, one lead each, with what the record shows beside it: if the
-// change touches the file of the ask, if the author replied and if the reply names an issue, if the
-// reviewer had a later word on it or approved after it, and if the thread was marked resolved. The
-// review decides for each ask if it was addressed, deferred into tracked work, waived or merged past.
-// The RESOLVED mark of a thread tells who clicked it, not what happened to the ask.
 import { factsOf } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

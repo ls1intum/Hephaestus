@@ -1,3 +1,6 @@
+// Finds the merge as the record holds it, with the review decision of the provider, and each captured
+// review decision placed against the time of the merge. The last decision of each reviewer is a lead
+// of its own. The order of the leads does not show that the decision history is complete.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	decisionLeads,
@@ -7,9 +10,6 @@ import {
 	readReviewThreads,
 	reviewsMergedWork,
 } from "../kits/scm/review.ts";
-// Finds the merge as the record holds it, with the review decision of the provider, and each captured
-// review decision placed against the time of the merge. The last decision of each reviewer is a lead
-// of its own. The order of the leads does not show that the decision history is complete.
 import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
 import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";

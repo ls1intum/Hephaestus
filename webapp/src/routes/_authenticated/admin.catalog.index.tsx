@@ -277,19 +277,11 @@ function AdminCatalogPage() {
 						onGroupStatusSettled(group.slug, offered),
 					)
 				}
-				onReorderGroups={(slugs) =>
-					reorderGroups.mutate({
-						headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-						body: { slugs },
-					})
-				}
-				onResetOrder={() =>
-					resetOrder.mutate({ headers: { "If-Match": `"${catalogQuery.data.etag}"` } })
-				}
+				onReorderGroups={(slugs) => reorderGroups.mutate({ body: { slugs } })}
+				onResetOrder={() => resetOrder.mutate({})}
 				onPlacePractice={(practiceSlug, groupSlug, position) =>
 					placePractice.mutate({
 						path: { slug: practiceSlug },
-						headers: { "If-Match": `"${catalogQuery.data.etag}"` },
 						body: { groupSlug, position },
 					})
 				}

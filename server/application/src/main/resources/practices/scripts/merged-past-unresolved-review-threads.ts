@@ -1,3 +1,6 @@
+// Finds the merge as the record holds it, and each review thread that the record does not show as
+// resolved by the merge. Each thread lead tells where the thread is anchored, when it was opened and
+// if the provider calls it outdated. The review reads each thread against the merge.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	candidateThreads,
@@ -10,9 +13,6 @@ import {
 	threadLead,
 } from "../kits/scm/review.ts";
 import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
-// Finds the merge as the record holds it, and each review thread that the record does not show as
-// resolved by the merge. Each thread lead tells where the thread is anchored, when it was opened and
-// if the provider calls it outdated. The review reads each thread against the merge.
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export const LABELS = {

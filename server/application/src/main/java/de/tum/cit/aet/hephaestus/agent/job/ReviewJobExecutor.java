@@ -1,13 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
-import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
-import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
+import de.tum.cit.aet.hephaestus.agent.handler.DefaultReviewExecutionHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.handler.ReviewExecutionHandler;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
@@ -28,13 +25,9 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
@@ -42,10 +35,8 @@ import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.PracticeReviewRefusalMetrics;
 import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
-import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
-import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -59,10 +50,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -128,13 +117,6 @@ public class ReviewJobExecutor {
 
     private static final String MDC_JOB_ID = StructuredLogKeys.JOB_ID;
     private static final String MDC_JOB_TYPE = "agent.jobType";
-    private static final int MAX_ERROR_MESSAGE_LENGTH = 4000;
-    // How long a claim-blocked job waits before the poll loop re-evaluates the cap.
-    private static final Duration BUDGET_HOLD_INTERVAL = Duration.ofHours(1);
-    // Measured from submission, not from when the hold started: what goes stale is the work the job
-    // would produce, and bounding the hold instead would let short repeated holds run forever.
-    private static final Duration BUDGET_HOLD_MAX_JOB_AGE = Duration.ofDays(7);
-
     /**
      * When the terminal accounting write is worth re-attempting. NOT the same question as
      * {@link #isRetryableExecutionFailure}, which requeues the whole JOB — conflating the two would charge
@@ -165,11 +147,10 @@ public class ReviewJobExecutor {
             .build();
 
     private final AgentProperties agentProperties;
+    private final ReviewJobClaimService claims;
+    private final ReviewJobRecovery recovery;
     private final ReviewJobRepository jobRepository;
-    private final ReviewMemberAiPolicy memberAiPolicy;
-    private final ReviewMethodVerifier methods;
-    private final ReviewExecutionHandler handler;
-    private final ReviewJobAssignments assignments;
+    private final DefaultReviewExecutionHandler handler;
     private final PracticePiAdapter practiceAgent;
     private final WorkerJwtIssuer workerJwtIssuer;
 
@@ -181,7 +162,6 @@ public class ReviewJobExecutor {
     private final PracticeReviewRefusalMetrics practiceReviewRefusalMetrics;
     private final LlmUsageRecorder usageRecorder;
     private final PracticeScriptRunRecorder practiceScriptRuns;
-    private final LlmBudgetService llmBudgetService;
     private final @Nullable LlmAdmissionService llmAdmissionService;
 
     // RetryTemplate, not @Retryable: both wrap private methods called from inside this class, and a
@@ -189,8 +169,6 @@ public class ReviewJobExecutor {
     private final RetryTemplate terminalPersistRetries = retryTemplate(TERMINAL_PERSIST_POLICY);
     private final RetryTemplate requeueRetries = retryTemplate(REQUEUE_REJECTED_CLAIM_POLICY);
 
-    private final Counter concurrencyRejected;
-    private final Timer claimLatency;
     private final Counter infraRetryRequeued;
     private final ReviewJobTelemetry jobTelemetry;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -202,8 +180,6 @@ public class ReviewJobExecutor {
     private final Optional<WorkerCapacityState> capacityState;
     /** Null only when the worker role is off; stamped on claimed jobs to fence terminal writes. */
     private final @Nullable String workerId;
-    /** Poll-thread-owned, hence unsynchronized. */
-    private boolean lastClaimPoolRejected;
 
     /** Stages a writer continuing an admitted review; without it such an attempt fails as unrecoverable. */
     private @Nullable ReviewCompositionContinuation compositionContinuation;
@@ -217,9 +193,7 @@ public class ReviewJobExecutor {
     public ReviewJobExecutor(
             AgentProperties agentProperties,
             ReviewJobRepository jobRepository,
-            ReviewMemberAiPolicy memberAiPolicy,
-            ReviewExecutionHandler handler,
-            ReviewJobAssignments assignments,
+            DefaultReviewExecutionHandler handler,
             PracticePiAdapter practiceAgent,
             WorkerJwtIssuer workerJwtIssuer,
             SandboxManager sandboxManager,
@@ -231,17 +205,16 @@ public class ReviewJobExecutor {
             ReviewJobTelemetry jobTelemetry,
             LlmUsageRecorder usageRecorder,
             PracticeScriptRunRecorder practiceScriptRuns,
-            LlmBudgetService llmBudgetService,
             @Nullable LlmAdmissionService llmAdmissionService,
             Optional<WorkerCapacityState> capacityState,
             Optional<WorkerProperties> workerProperties,
-            ReviewMethodVerifier methods) {
+            ReviewJobClaimService claims,
+            ReviewJobRecovery recovery) {
         this.agentProperties = agentProperties;
+        this.claims = claims;
+        this.recovery = recovery;
         this.jobRepository = jobRepository;
-        this.memberAiPolicy = memberAiPolicy;
-        this.methods = methods;
         this.handler = handler;
-        this.assignments = assignments;
         this.practiceAgent = practiceAgent;
         this.workerJwtIssuer = workerJwtIssuer;
         this.sandboxManager = sandboxManager;
@@ -253,17 +226,10 @@ public class ReviewJobExecutor {
         this.jobTelemetry = jobTelemetry;
         this.usageRecorder = usageRecorder;
         this.practiceScriptRuns = practiceScriptRuns;
-        this.llmBudgetService = llmBudgetService;
         this.llmAdmissionService = llmAdmissionService;
         this.capacityState = capacityState;
         this.workerId = workerProperties.map(WorkerProperties::resolvedWorkerId).orElse(null);
 
-        this.concurrencyRejected = Counter.builder(AgentMetrics.AGENT_JOB_CONCURRENCY_REJECTED)
-                .description("Jobs rejected due to concurrency limits")
-                .register(meterRegistry);
-        this.claimLatency = Timer.builder(AgentMetrics.AGENT_JOB_CLAIM_LATENCY)
-                .description("Time between a job becoming available (available_at) and being claimed")
-                .register(meterRegistry);
         this.infraRetryRequeued = Counter.builder(AgentMetrics.AGENT_JOB_INFRA_RETRY_REQUEUED)
                 .description("Jobs requeued (not failed) after a retryable preparation or infrastructure failure")
                 .register(meterRegistry);
@@ -381,45 +347,11 @@ public class ReviewJobExecutor {
         return settledAll && stopped;
     }
 
-    /** Settles one job under its ownership fence; true only if a transition made here won. */
     private boolean settleForDrain(UUID jobId, ReviewJobCancellationReason reason) {
-        ReviewCompositionContinuation continuing = compositionContinuation;
-        if (continuing != null) continuing.holdRecoveryCustody();
-        ReviewJob job = jobRepository.lockById(jobId).orElse(null);
-        if (job == null) return false;
-        // BEFORE requeuing: the requeue zeroes the accumulators, so a later read bills zero.
-        ReviewJobLlmUsage drainCounts = job.getExecutionStartedAt() != null
-                ? jobRepository.findLlmUsageById(jobId).orElse(null)
-                : null;
-        int updated = workerId != null ? requeueOrphanWithRotation(jobId, workerId, job.getAttempt()) : 0;
-        // An attempt whose results were admitted is never measured again: the requeue refused it. Its
-        // public writer continues from the original inputs if its admission kept them; otherwise it ends here.
-        if (updated == 0 && workerId != null) {
-            updated = continuing != null ? requeueForComposition(continuing, job, workerId) : 0;
-        }
-        if (updated == 0 && workerId != null) {
-            updated = jobRepository.failAdmittedOwnedBy(
-                    jobId,
-                    workerId,
-                    job.getAttempt(),
-                    Instant.now(),
-                    ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
-        }
-        if (updated > 0) {
-            if (job.getExecutionStartedAt() != null) {
-                billTerminatedJob(job, "worker draining", drainCounts);
-            }
-            return true;
-        }
-        int cancelled = workerId != null
-                ? jobRepository.transitionToCancelledOwnedBy(
-                        jobId, Instant.now(), "worker draining", reason, Set.of(ReviewJobStatus.RUNNING), workerId)
-                : jobRepository.transitionToCancelled(
-                        jobId, Instant.now(), "worker draining", reason, Set.of(ReviewJobStatus.RUNNING));
-        if (cancelled > 0 && job.getExecutionStartedAt() != null) {
-            billTerminatedJob(job, "worker draining");
-        }
-        return cancelled > 0;
+        if (workerId == null) return false;
+        ReviewJob job = jobRepository.findById(jobId).orElse(null);
+        return job != null
+                && recovery.recover(jobId, workerId, job.getAttempt(), reason) != ReviewJobRecovery.Outcome.NONE;
     }
 
     /**
@@ -503,7 +435,7 @@ public class ReviewJobExecutor {
                     continue;
                 }
 
-                boolean anyDispatched = false;
+                boolean anyStarted = false;
                 boolean poolRejected = false;
                 for (UUID jobId : candidates) {
                     if (!running.get()) {
@@ -512,18 +444,13 @@ public class ReviewJobExecutor {
                     if (poolRejected) {
                         break;
                     }
-                    lastClaimPoolRejected = false;
-                    if (processJob(jobId)) {
-                        if (lastClaimPoolRejected) {
-                            poolRejected = true;
-                        } else {
-                            anyDispatched = true;
-                        }
-                    }
+                    StartOutcome outcome = processJob(jobId);
+                    poolRejected = outcome == StartOutcome.POOL_REJECTED;
+                    anyStarted |= outcome == StartOutcome.STARTED;
                 }
                 // Busy-spin protection: without this backoff, an all-skipped batch re-queries immediately
                 // and a saturated pool claims-then-requeues in a tight loop, hammering the DB.
-                if (!anyDispatched || poolRejected) {
+                if (!anyStarted || poolRejected) {
                     sleepPollInterval();
                 }
             } catch (Exception e) {
@@ -571,37 +498,41 @@ public class ReviewJobExecutor {
     }
 
     /**
-     * @return true if the job was claimed and dispatched. Anything else leaves it QUEUED for the next
-     *     poll, except the {@link ClaimOutcome}s {@link #claimJob} has already cancelled outright.
+     * Starts one admitted attempt, or reports why this poll did not start it.
      */
-    boolean processJob(UUID jobId) {
-        ClaimAttempt attempt;
+    enum StartOutcome {
+        SKIPPED,
+        STARTED,
+        POOL_REJECTED
+    }
+
+    StartOutcome processJob(UUID jobId) {
+        ReviewJobClaimService.ClaimAttempt attempt;
         try {
-            attempt = claimJob(jobId);
+            attempt = claims.claimJob(jobId);
         } catch (CannotAcquireLockException e) {
             log.debug("Lock timeout during claim for job {}, will retry on next poll", jobId);
-            return false;
+            return StartOutcome.SKIPPED;
         } catch (Exception e) {
             log.warn("Claim failed for job {}, will retry on next poll: {}", jobId, e.getMessage());
-            return false;
+            return StartOutcome.SKIPPED;
         }
-        if (attempt instanceof TerminalClaim terminal) {
+        if (attempt instanceof ReviewJobClaimService.TerminalClaim terminal) {
             jobTelemetry.terminal(terminal.job(), terminal.status(), ReviewJobTelemetry.age(terminal.job()));
-            return false;
+            return StartOutcome.SKIPPED;
         }
-        if (!(attempt instanceof ClaimResult claim)) {
-            return false;
+        if (!(attempt instanceof ReviewJobClaimService.ClaimResult claim)) {
+            return StartOutcome.SKIPPED;
         }
         // Counted after the claim commits, never inside its transaction: a failed commit rolls the row
         // back to QUEUED and no execution then runs to release the count. Since the count is the hard
         // claim bound, one leaked entry would retire a slot for this worker's lifetime.
         localRunningJobs.add(jobId);
         capacityState.ifPresent(WorkerCapacityState::claimReview);
-        dispatchExecution(jobId, claim);
-        return true;
+        return startExecution(jobId, claim);
     }
 
-    private void dispatchExecution(UUID jobId, ClaimResult claim) {
+    private StartOutcome startExecution(UUID jobId, ReviewJobClaimService.ClaimResult claim) {
         try {
             inFlight.register();
             sandboxExecutor.execute(() -> {
@@ -611,14 +542,15 @@ public class ReviewJobExecutor {
                     inFlight.arriveAndDeregister();
                 }
             });
+            return StartOutcome.STARTED;
         } catch (RejectedExecutionException e) {
             inFlight.arriveAndDeregister();
-            lastClaimPoolRejected = true;
             log.warn(
                     "Sandbox executor rejected claimed job {} (pool smaller than configured worker capacity?) —"
                             + " requeuing",
                     jobId);
             requeueRejectedClaim(jobId);
+            return StartOutcome.POOL_REJECTED;
         }
     }
 
@@ -691,8 +623,8 @@ public class ReviewJobExecutor {
     }
 
     /** Runs on the sandbox executor, not the poll thread. */
-    private void runClaimedJob(UUID jobId, ClaimResult claim) {
-        ReviewJob job = claim.job;
+    private void runClaimedJob(UUID jobId, ReviewJobClaimService.ClaimResult claim) {
+        ReviewJob job = claim.job();
         var executionSpan = jobTelemetry.startExecution(job);
         var executionScope = jobTelemetry.executionScope(executionSpan);
         MDC.put(StructuredLogKeys.TRACE_ID, executionSpan.context().traceId());
@@ -702,15 +634,16 @@ public class ReviewJobExecutor {
                 Boolean.TRUE.equals(executionSpan.context().sampled()) ? "01" : "00");
         MDC.put(MDC_JOB_ID, jobId.toString());
         MDC.put(StructuredLogKeys.WORKSPACE_ID, Long.toString(job.getWorkspaceId()));
-        MDC.put(MDC_JOB_TYPE, assignments.load(job).getFirst().item().kind().value());
+        MDC.put(MDC_JOB_TYPE, claim.itemKind());
         Instant startTime = Instant.now();
         String metricOutcome = "unknown";
+        ReviewJobStatus recordedTerminal = null;
         boolean sandboxExecutionStarted = false;
         // The stage belongs to this run, including failures before input preparation begins.
         var preparationStage = new AtomicReference<>(PreparationFailure.Stage.RUN_SETUP);
         PreparedJobInputs stagedInputs = null;
         try {
-            Duration queueDuration = Duration.between(job.getAvailableAt(), job.getStartedAt());
+            Duration queueDuration = Duration.between(job.getSubmittedAt(), job.getStartedAt());
             jobTelemetry.transition(
                     job,
                     "agent.job.started",
@@ -718,7 +651,7 @@ public class ReviewJobExecutor {
                     ReviewJobTelemetry.ResultOutcome.STARTED,
                     queueDuration);
 
-            PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot, preparationStage);
+            PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot(), preparationStage);
             stagedInputs = preparedSandbox.stagedInputs();
             SandboxSpec sandboxSpec = preparedSandbox.spec();
             // Past this boundary provider usage may exist even if execute() throws, so it is persisted
@@ -731,43 +664,11 @@ public class ReviewJobExecutor {
                 return;
             }
             sandboxExecutionStarted = true;
-            SandboxResult result = sandboxManager.execute(sandboxSpec);
-            AgentResult agentResult = practiceAgent.parseResult(result);
-
-            // Two exits say the run could not reach something it needed, rather than anything about the
-            // reviewed work: the review finished and could not admit it, because the sandbox holds an
-            // address the server has since moved away from; or no practice was reached at all because
-            // every model call went unanswered. Neither leaves anything to deliver, and neither is a
-            // fact a second attempt would repeat. Past the retry cap both fall through and terminalize.
-            String unreachable = unreachableReason(result.exitCode());
-            if (unreachable != null && requeueForAnotherAttempt(jobId, job, unreachable, true)) {
-                metricOutcome = "REQUEUED";
-                log.warn(
-                        "Requeuing job {} ({}): nothing it measured can be delivered from here (attempt {})",
-                        jobId,
-                        unreachable,
-                        job.getAttempt() + 1);
-                return;
-            }
-
-            ReviewJobStatus terminalStatus = completeJob(jobId, agentResult, result);
-            metricOutcome = terminalStatus != null ? terminalStatus.name() : "unknown";
-            ReviewCompositionContinuation kept = compositionContinuation;
-            if (terminalStatus != null
-                    && !Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING).contains(terminalStatus)
-                    && kept != null) {
-                // Its result is recorded: no writer reads the original inputs again. The retention sweep removes
-                // what a failure here leaves.
-                try {
-                    kept.forget(job);
-                } catch (RuntimeException e) {
-                    log.warn("Could not remove original composition inputs: jobId={}", jobId, e);
-                }
-            }
-
-            log.info("Agent job completed: jobId={}, duration={}", jobId, Duration.between(startTime, Instant.now()));
+            recordedTerminal = executePrepared(jobId, job, sandboxSpec);
+            metricOutcome = recordedTerminal == null ? "REQUEUED_OR_OWNERSHIP_LOST" : recordedTerminal.name();
         } catch (SandboxCancelledException e) {
-            metricOutcome = handleCancellation(jobId, job) ? ReviewJobStatus.CANCELLED.name() : "OWNERSHIP_LOST";
+            recordedTerminal = handleCancellation(jobId, job) ? ReviewJobStatus.CANCELLED : null;
+            metricOutcome = recordedTerminal != null ? recordedTerminal.name() : "OWNERSHIP_LOST";
         } catch (WorkspaceBudgetExceededException e) {
             ObjectNode output = objectMapper
                     .createObjectNode()
@@ -779,82 +680,118 @@ public class ReviewJobExecutor {
             metricOutcome = updated != null && updated == 1 ? "WORKSPACE_BUDGET_EXCEEDED" : "OWNERSHIP_LOST";
             if (updated != null && updated == 1) {
                 recordPracticeReviewRefusal("workspace_budget_exceeded");
-                jobTelemetry.terminal(job, ReviewJobStatus.COMPLETED, ReviewJobTelemetry.age(job));
+                recordedTerminal = ReviewJobStatus.FAILED;
             }
         } catch (InsufficientEvidenceException e) {
-            // The evidence it carries was never staged for an attempt, so nothing else releases it.
-            try (PreparedJobInputs refused = e.preparedInputs()) {
-                persistRefusedEvidence(jobId, job.getAttempt(), refused);
-                ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
-                Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
-                        jobId, workerId, job.getAttempt(), Instant.now(), output));
-                if (updated != null && updated == 1) {
-                    recordPracticeReviewRefusal("insufficient_evidence");
-                    // The metric outcome names the refusal; the lifecycle contract records the committed
-                    // terminal state as COMPLETED.
-                    metricOutcome = "INSUFFICIENT_EVIDENCE";
-                    jobTelemetry.terminal(job, ReviewJobStatus.COMPLETED, ReviewJobTelemetry.age(job));
-                    log.info(
-                            "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
-                            jobId);
-                } else {
-                    metricOutcome = "OWNERSHIP_LOST";
-                }
-            } catch (Exception persistenceFailure) {
-                metricOutcome = handleExecutionFailure(
-                        jobId,
-                        job,
-                        persistenceFailure,
-                        false,
-                        PreparationFailure.of(PreparationFailure.Stage.PROVENANCE, persistenceFailure));
-            }
+            ExecutionOutcome refusal = persistEvidenceRefusal(jobId, job, e);
+            metricOutcome = refusal.metricOutcome();
+            recordedTerminal = refusal.terminal();
         } catch (TerminalPersistenceException e) {
             // Provider work already completed. Leave RUNNING for the zombie sweeper to terminalize
-            // and account as UNPRICED; never execute the provider a second time.
+            // and account from proxy counts; never execute the provider a second time.
             log.error("Terminal job persistence failed after provider completion: jobId={}", jobId, e);
             metricOutcome = "PERSISTENCE_FAILED";
         } catch (Exception e) {
-            metricOutcome = handleExecutionFailure(
+            FailureOutcome failure = handleExecutionFailure(
                     jobId,
                     job,
                     e,
                     sandboxExecutionStarted,
                     sandboxExecutionStarted ? null : PreparationFailure.of(preparationStage.get(), e));
+            metricOutcome = failure.name();
+            recordedTerminal = failure.terminal();
         } finally {
-            // Admission and delivery are done by now, so the attempt's evidence can be retired: deleted
-            // once its results were admitted, kept for the cleanup grace otherwise.
-            if (stagedInputs != null) {
-                stagedInputs.close();
+            try {
+                recordAttemptOutcome(job, claim.itemKind(), metricOutcome, recordedTerminal, startTime, stagedInputs);
+            } finally {
+                releaseCapacity();
+                localRunningJobs.remove(jobId);
+                MDC.remove(MDC_JOB_ID);
+                MDC.remove(StructuredLogKeys.WORKSPACE_ID);
+                MDC.remove(MDC_JOB_TYPE);
+                MDC.remove(StructuredLogKeys.TRACE_ID);
+                MDC.remove(StructuredLogKeys.SPAN_ID);
+                MDC.remove(StructuredLogKeys.TRACE_FLAGS);
+                executionSpan.tag("hephaestus.job.outcome", metricOutcome);
+                executionScope.close();
+                executionSpan.end();
             }
-            Duration executionDuration = Duration.between(startTime, Instant.now());
-            recordExecutionDuration(
-                    assignments.load(job).getFirst().item().kind().value(), metricOutcome, executionDuration);
-            jobTelemetry.record(ReviewJobTelemetry.Phase.EXECUTION, executionDuration);
-            ReviewJobStatus terminalStatus = terminalStatus(metricOutcome);
-            if (terminalStatus != null) {
-                jobTelemetry.terminal(job, terminalStatus, ReviewJobTelemetry.age(job));
-            }
-            releaseCapacity();
-            localRunningJobs.remove(jobId);
-            MDC.remove(MDC_JOB_ID);
-            MDC.remove(StructuredLogKeys.WORKSPACE_ID);
-            MDC.remove(MDC_JOB_TYPE);
-            MDC.remove(StructuredLogKeys.TRACE_ID);
-            MDC.remove(StructuredLogKeys.SPAN_ID);
-            MDC.remove(StructuredLogKeys.TRACE_FLAGS);
-            executionSpan.tag("hephaestus.job.outcome", metricOutcome);
-            executionScope.close();
-            executionSpan.end();
         }
     }
 
-    private static @Nullable ReviewJobStatus terminalStatus(String outcome) {
-        try {
-            ReviewJobStatus status = ReviewJobStatus.valueOf(outcome);
-            return !Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING).contains(status) ? status : null;
-        } catch (IllegalArgumentException ignored) {
+    private void recordAttemptOutcome(
+            ReviewJob job,
+            String itemKind,
+            String metricOutcome,
+            @Nullable ReviewJobStatus terminal,
+            Instant startTime,
+            @Nullable PreparedJobInputs stagedInputs) {
+        if (stagedInputs != null) stagedInputs.close();
+        Duration duration = Duration.between(startTime, Instant.now());
+        recordExecutionDuration(itemKind, metricOutcome, duration);
+        jobTelemetry.record(ReviewJobTelemetry.Phase.EXECUTION, duration);
+        if (terminal != null) jobTelemetry.terminal(job, terminal, ReviewJobTelemetry.age(job));
+    }
+
+    private record ExecutionOutcome(
+            String metricOutcome, @Nullable ReviewJobStatus terminal) {}
+
+    private ExecutionOutcome persistEvidenceRefusal(UUID jobId, ReviewJob job, InsufficientEvidenceException e) {
+        // The evidence it carries was never staged for an attempt, so nothing else releases it.
+        try (PreparedJobInputs refused = e.preparedInputs()) {
+            persistRefusedEvidence(jobId, job.getAttempt(), refused);
+            ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
+            Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
+                    jobId, workerId, job.getAttempt(), Instant.now(), output));
+            if (updated != null && updated == 1) {
+                recordPracticeReviewRefusal("insufficient_evidence");
+                return new ExecutionOutcome("INSUFFICIENT_EVIDENCE", ReviewJobStatus.FAILED);
+            } else {
+                return new ExecutionOutcome("OWNERSHIP_LOST", null);
+            }
+        } catch (Exception persistenceFailure) {
+            FailureOutcome failure = handleExecutionFailure(
+                    jobId,
+                    job,
+                    persistenceFailure,
+                    false,
+                    PreparationFailure.of(PreparationFailure.Stage.PROVENANCE, persistenceFailure));
+            return new ExecutionOutcome(failure.name(), failure.terminal());
+        }
+    }
+
+    private @Nullable ReviewJobStatus executePrepared(UUID jobId, ReviewJob job, SandboxSpec sandboxSpec) {
+        SandboxResult result = sandboxManager.execute(sandboxSpec);
+        AgentResult agentResult = practiceAgent.parseResult(result);
+
+        // Two exits say the run could not reach something it needed, rather than anything about the
+        // reviewed work: the review finished and could not admit it, because the sandbox holds an
+        // address the server has since moved away from; or no practice was reached at all because
+        // every model call went unanswered. Neither leaves anything to deliver, and neither is a
+        // fact a second attempt would repeat. Past the retry cap both fall through and terminalize.
+        String unreachable = unreachableReason(result.exitCode());
+        if (unreachable != null && requeueForAnotherAttempt(job, true)) {
+            log.warn(
+                    "Requeuing job {} ({}): nothing it measured can be delivered from here (attempt {})",
+                    jobId,
+                    unreachable,
+                    job.getAttempt() + 1);
             return null;
         }
+
+        ReviewJobStatus terminalStatus = persistTerminalState(jobId, agentResult, result);
+        ReviewCompositionContinuation kept = compositionContinuation;
+        if (terminalStatus != null && kept != null) {
+            // Its result is recorded: no writer reads the original inputs again. The retention sweep removes
+            // what a failure here leaves.
+            try {
+                kept.forget(job);
+            } catch (RuntimeException e) {
+                log.warn("Could not remove original composition inputs: jobId={}", jobId, e);
+            }
+        }
+
+        return terminalStatus;
     }
 
     /** Package-private: the zombie sweeper reuses it when it restores a reaped job's trace context. */
@@ -890,7 +827,6 @@ public class ReviewJobExecutor {
     private PreparedSandbox prepareSandboxSpec(
             UUID jobId, ReviewJob job, ConfigSnapshot snapshot, AtomicReference<PreparationFailure.Stage> stage) {
         stage.set(PreparationFailure.Stage.INPUTS);
-        ReviewExecutionHandler handler = this.handler;
 
         ReviewJob preparedJob = jobRepository.findById(jobId).orElse(job);
         // A continuing writer captures nothing: it is staged from its admission's original inputs, and the job keeps
@@ -914,11 +850,11 @@ public class ReviewJobExecutor {
                     workerJwtIssuer.issueForJobUntil(jobId, job.getWorkspaceId(), job.getAttempt(), tokenExpiry);
             stage.set(PreparationFailure.Stage.SPEC);
             PracticeAgentRequest adapterRequest = new PracticeAgentRequest(
-                    snapshot.apiProtocol(),
-                    snapshot.upstreamModelId(),
+                    snapshot.model().apiProtocol().wire(),
+                    snapshot.model().upstreamModelId(),
                     snapshot.contextWindow(),
                     snapshot.maxOutputTokens(),
-                    snapshot.reasoningEffort(),
+                    snapshot.model().reasoningEffort(),
                     jobToken,
                     snapshot.timeoutSeconds(),
                     snapshot.practiceScriptModels());
@@ -926,7 +862,6 @@ public class ReviewJobExecutor {
             PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
             SandboxSpec sandboxSpec = buildSandboxSpec(
                     jobId,
-                    Map.of(),
                     preparedInputs.filesOnDisk(),
                     preparedInputs.directories(),
                     agentSpec,
@@ -1037,15 +972,13 @@ public class ReviewJobExecutor {
 
     private static SandboxSpec buildSandboxSpec(
             UUID jobId,
-            Map<String, byte[]> handlerFiles,
             Map<String, Path> handlerFilesOnDisk,
             List<EvidenceDirectory> handlerDirectories,
             PracticeSandboxSpec agentSpec,
             ConfigSnapshot snapshot,
             Instant workDeadline,
             int attempt) {
-        Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
-        allInputFiles.putAll(agentSpec.inputFiles());
+        Map<String, byte[]> allInputFiles = new HashMap<>(agentSpec.inputFiles());
         Map<String, String> environment = new HashMap<>(agentSpec.environment());
         environment.put("SANDBOX_WORK_DEADLINE_MS", Long.toString(workDeadline.toEpochMilli()));
 
@@ -1119,20 +1052,7 @@ public class ReviewJobExecutor {
      *     message instead of the failure's own, and the closed stage and kind reach telemetry
      * @return the {@code agent.job.execution.duration} outcome tag
      */
-    private String handleExecutionFailure(
-            UUID jobId,
-            ReviewJob job,
-            Exception e,
-            boolean sandboxExecutionStarted,
-            @Nullable PreparationFailure preparation) {
-        String outcome = settleExecutionFailure(jobId, job, e, sandboxExecutionStarted, preparation);
-        if (preparation != null) {
-            jobTelemetry.preparationFailed(job, preparation, outcome);
-        }
-        return outcome;
-    }
-
-    private String settleExecutionFailure(
+    private FailureOutcome handleExecutionFailure(
             UUID jobId,
             ReviewJob job,
             Exception e,
@@ -1142,24 +1062,29 @@ public class ReviewJobExecutor {
             Thread.currentThread().interrupt();
         }
 
-        String errorMessage = preparation == null ? truncateErrorMessage(e.getMessage()) : preparation.message();
+        String errorMessage = preparation != null
+                ? preparation.message()
+                : e instanceof SandboxInfrastructureException
+                        ? "The sandbox infrastructure failed during execution."
+                        : e instanceof IOException
+                                ? "A file or network operation failed during execution."
+                                : e instanceof InterruptedException
+                                        ? "The worker interrupted execution."
+                                        : "The job failed during execution.";
         if (preparation == null) {
             log.error("Agent job failed: jobId={}, error={}", jobId, errorMessage, e);
         }
 
         if (workerId != null && isRetryableExecutionFailure(e)) {
             int currentRetryCount = job.getAttempt();
-            if (requeueForAnotherAttempt(
-                    jobId,
-                    job,
-                    e instanceof ReviewSourceNotReadyException ? "source-not-ready" : "infra-failure",
-                    sandboxExecutionStarted)) {
+            if (requeueForAnotherAttempt(job, sandboxExecutionStarted)) {
                 log.warn(
                         "Requeuing job {} after retryable preparation or infrastructure failure (attempt {}): {}",
                         jobId,
                         currentRetryCount + 1,
                         errorMessage);
-                return "REQUEUED";
+                if (preparation != null) jobTelemetry.preparationFailed(job, preparation, "REQUEUED");
+                return FailureOutcome.REQUEUED;
             }
             log.warn(
                     "Job {} hit a retryable failure but could not be requeued (retry cap exhausted or fence lost) —"
@@ -1186,7 +1111,20 @@ public class ReviewJobExecutor {
             if (updated > 0 && sandboxExecutionStarted) billTerminatedJob(job, "execution failure");
             return updated;
         });
-        return failed != null && failed > 0 ? ReviewJobStatus.FAILED.name() : "OWNERSHIP_LOST";
+        String outcome = failed != null && failed > 0 ? ReviewJobStatus.FAILED.name() : "OWNERSHIP_LOST";
+        if (preparation != null) jobTelemetry.preparationFailed(job, preparation, outcome);
+        return failed != null && failed > 0 ? FailureOutcome.FAILED : FailureOutcome.OWNERSHIP_LOST;
+    }
+
+    private enum FailureOutcome {
+        REQUEUED,
+        FAILED,
+        OWNERSHIP_LOST;
+
+        @Nullable
+        ReviewJobStatus terminal() {
+            return this == FAILED ? ReviewJobStatus.FAILED : null;
+        }
     }
 
     /**
@@ -1215,16 +1153,6 @@ public class ReviewJobExecutor {
     }
 
     /**
-     * Whether this job's results reached the server after all — the admission committed and only
-     * its answer was lost. Repeating the review would submit a different payload against the digest the
-     * job already carries, which the admission refuses, so an attempt that got this far is finished
-     * even though its runner could not tell.
-     */
-    private static boolean practiceResultsAdmitted(ReviewJob job) {
-        return ResultAdmissionService.isAdmitted(job);
-    }
-
-    /**
      * Hands the job back to the queue for another attempt, billing what this attempt already spent.
      * The usage read happens inside the same transaction and before the requeue, which zeroes the
      * accumulators — a later read would bill zero.
@@ -1233,300 +1161,12 @@ public class ReviewJobExecutor {
      * @return whether the job is queued again; false means the retry cap is spent or the fence is
      *     lost, and the caller owns the terminal outcome
      */
-    private boolean requeueForAnotherAttempt(UUID jobId, ReviewJob job, String reason, boolean bill) {
-        if (workerId == null) {
-            return false;
-        }
-        int currentRetryCount = job.getAttempt();
-        Integer updated = transactionTemplate.execute(status -> {
-            // Under the same row lock the admission takes, so the two decisions serialize: a review
-            // whose results reached the server is finished, whatever its sandbox went on to do.
-            // Running it again would submit a different payload against the digest the job already
-            // carries, which the admission refuses — a second attempt could only lose what the first
-            // recorded.
-            ReviewJob locked = jobRepository.lockById(jobId).orElse(null);
-            if (locked != null && practiceResultsAdmitted(locked)) {
-                log.info("Not requeuing job {}: its results already reached this server", jobId);
-                return 0;
-            }
-            ReviewJobLlmUsage attempts =
-                    bill ? jobRepository.findLlmUsageById(jobId).orElse(null) : null;
-            int rows = requeueOrphanWithRotation(jobId, workerId, currentRetryCount);
-            if (rows == 0) {
-                // The fence is lost: this row belongs to another attempt now, and nothing this one has
-                // to say about itself may be written over it.
-                return 0;
-            }
-            if (bill) {
-                billTerminatedJob(job, reason + " retry (attempt " + (currentRetryCount + 1) + ")", attempts);
-            }
-            return rows;
-        });
-        if (updated == null || updated == 0) {
-            return false;
-        }
+    private boolean requeueForAnotherAttempt(ReviewJob job, boolean bill) {
+        if (workerId == null) return false;
+        Boolean updated = transactionTemplate.execute(status -> recovery.retryUnadmitted(job, workerId, bill));
+        if (!Boolean.TRUE.equals(updated)) return false;
         infraRetryRequeued.increment();
         return true;
-    }
-
-    /**
-     * The current retry count sizes the backoff only — the UPDATE's own {@code attempt <
-     *     max-retries} WHERE clause is the authoritative cap, so a stale read here cannot let a job
-     *     requeue past it
-     */
-    private int requeueForComposition(ReviewCompositionContinuation continuing, ReviewJob job, String owningWorkerId) {
-        int currentRetryCount = job.getAttempt();
-        int attemptNumber = currentRetryCount + 1;
-        Instant now = Instant.now();
-        String newToken = ReviewJob.generateJobToken();
-        return continuing.requeue(
-                job,
-                owningWorkerId,
-                new ReviewJobRepository.CompositionRequeue(
-                        currentRetryCount,
-                        agentProperties.maxRetries(),
-                        now,
-                        now.plus(ReviewJobBackoff.compute(attemptNumber)),
-                        newToken,
-                        ReviewJob.computeTokenHash(newToken)));
-    }
-
-    private int requeueOrphanWithRotation(UUID jobId, String owningWorkerId, int currentRetryCount) {
-        int attemptNumber = currentRetryCount + 1;
-        Instant availableAt = Instant.now().plus(ReviewJobBackoff.compute(attemptNumber));
-        String newToken = ReviewJob.generateJobToken();
-        String newTokenHash = ReviewJob.computeTokenHash(newToken);
-        return jobRepository.requeueOrphan(
-                jobId, owningWorkerId, agentProperties.maxRetries(), availableAt, newTokenHash);
-    }
-
-    /** What one claim attempt produced: either a claimed job or the reason there is none. */
-    private sealed interface ClaimAttempt {}
-
-    private enum ClaimOutcome implements ClaimAttempt {
-        ALREADY_CLAIMED,
-        CONCURRENCY_FULL,
-        BUDGET_HELD,
-    }
-
-    private record ClaimResult(ReviewJob job, ConfigSnapshot snapshot) implements ClaimAttempt {}
-
-    private record TerminalClaim(ReviewJob job, ReviewJobStatus status) implements ClaimAttempt {}
-
-    private @Nullable ClaimAttempt claimJob(UUID jobId) {
-        return transactionTemplate.execute(status -> {
-            Optional<ReviewJob> locked = jobRepository.findByIdQueuedForUpdateSkipLocked(jobId, Instant.now());
-            if (locked.isEmpty()) {
-                log.debug("Job already claimed or not QUEUED: jobId={}", jobId);
-                return ClaimOutcome.ALREADY_CLAIMED;
-            }
-
-            ReviewJob job = locked.get();
-
-            if (memberAiPolicy.isProcessingSuppressed(job)) {
-                job.setStatus(ReviewJobStatus.CANCELLED);
-                job.setCompletedAt(Instant.now());
-                job.setErrorMessage("A personal-data erasure request blocks this job.");
-                job.setCancellationReason(ReviewJobCancellationReason.PERSON_DATA_ERASED);
-                jobRepository.save(job);
-                recordPracticeReviewRefusal("person_data_erased");
-                return new TerminalClaim(job, ReviewJobStatus.CANCELLED);
-            }
-
-            // Queued again after its results were admitted: a new attempt would capture the work
-            // anew, and its citations would not be the ones the admission verified. Its earlier attempt
-            // was billed when it was requeued, and nothing has run since. Only a writer continuing from
-            // the admission's kept inputs is claimed, under every check below.
-            if (ResultAdmissionService.isAdmitted(job) && !ResultAdmissionService.isContinuation(job)) {
-                job.setStatus(ReviewJobStatus.FAILED);
-                job.setCompletedAt(Instant.now());
-                job.setErrorMessage(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
-                jobRepository.save(job);
-                return new TerminalClaim(job, ReviewJobStatus.FAILED);
-            }
-
-            if (!memberAiPolicy.permitsReview(job)) {
-                job.setStatus(ReviewJobStatus.CANCELLED);
-                job.setCompletedAt(Instant.now());
-                job.setErrorMessage("The developer has not enabled AI practice reviews in this workspace.");
-                job.setCancellationReason(ReviewJobCancellationReason.MEMBER_AI_DECLINED);
-                jobRepository.save(job);
-                recordPracticeReviewRefusal("member_ai_declined");
-                return new TerminalClaim(job, ReviewJobStatus.CANCELLED);
-            }
-
-            LlmBudgetBlockReason blockReason =
-                    llmBudgetService.decide(job.getWorkspaceId()).forFunding(claimedFundingSource(job));
-            if (blockReason != LlmBudgetBlockReason.NONE) {
-                return holdOrCancelOverBudget(job, blockReason);
-            }
-
-            // Live-revalidate the catalog binding immediately before RUNNING. Submit-time behaviour
-            // stays frozen; only availability/grants and the price are refreshed, and a changed binding
-            // is refused rather than silently switching the queued job to another model.
-            AgentPurpose purpose = AgentPurpose.PRACTICE_REVIEW;
-            WorkspaceAgentBinding binding = memberAiPolicy.binding(job).orElse(null);
-            if (binding == null) {
-                return refuseUnavailableModel(job);
-            }
-            ConfigSnapshot snapshot;
-            try {
-                ConfigSnapshot submitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-                methods.require(assignments.load(job).getFirst().practice().method(), "review", binding);
-                if (Objects.requireNonNullElse(submitted.dataHandlingTier(), DataHandlingTier.UNDECLARED)
-                        != binding.getDataHandlingTier()) return refuseUnavailableModel(job);
-                if (llmAdmissionService != null) {
-                    var admitted = llmAdmissionService.admit(binding);
-                    if (!submitted.model().isAdmittedAs(admitted)) {
-                        return refuseUnavailableModel(job);
-                    }
-                    snapshot = submitted
-                            .withPriceSnapshot(
-                                    submitted.priceSnapshot() == null ? admitted.price() : submitted.priceSnapshot())
-                            .withPracticeScript(
-                                    admitPracticeScript(job, submitted.practiceScript(), llmAdmissionService));
-                } else {
-                    snapshot = submitted;
-                }
-            } catch (IllegalStateException | ReviewJobStateConflictException e) {
-                return refuseUnavailableModel(job);
-            }
-
-            // Admission holds this slot's binding row lock until the RUNNING transition commits.
-            {
-                long runningCount = jobRepository.countRunningByWorkspaceIdAndDataHandlingTier(
-                        job.getWorkspaceId(), binding.getDataHandlingTier());
-                if (runningCount >= binding.getMaxConcurrentJobs()) {
-                    concurrencyRejected.increment();
-                    log.info(
-                            "Concurrency limit reached: jobId={}, workspaceId={}, purpose={}, running={}, max={}",
-                            jobId,
-                            job.getWorkspaceId(),
-                            purpose,
-                            runningCount,
-                            binding.getMaxConcurrentJobs());
-                    return ClaimOutcome.CONCURRENCY_FULL;
-                }
-            }
-
-            Instant claimedAt = Instant.now();
-            // A job held for a future availableAt has no queue latency to record — it was waiting on
-            // the clock, not on a worker.
-            if (!job.getAvailableAt().isAfter(claimedAt)) {
-                claimLatency.record(Duration.between(job.getAvailableAt(), claimedAt));
-            }
-            job.setStatus(ReviewJobStatus.RUNNING);
-            job.setStartedAt(claimedAt);
-            job.setExecutionStartedAt(null);
-            // The hold is over — clear its marker so it never outlives the hold it describes. A stale
-            // 'BUDGET' marker would survive onto a later crash-retry requeue, and a cap raise would
-            // then fast-forward a backoff that has nothing to do with the budget.
-            job.setHoldReason(null);
-            job.setWorkerId(workerId); // owner for cancel routing, orphan recovery, terminal-write fencing
-            job.setConfigSnapshot(snapshot.toJson(objectMapper));
-            jobRepository.save(job);
-
-            return new ClaimResult(job, snapshot);
-        });
-    }
-
-    /**
-     * Re-admits each model for practice scripts frozen at submit and freezes its price, as for the review's own
-     * model. A model that no longer resolves to the same catalog row, or that has no usable price, drops
-     * out of this job. The review still runs without it.
-     */
-    private @Nullable Map<ModelKind, FrozenModel> admitPracticeScript(
-            ReviewJob job, @Nullable Map<ModelKind, FrozenModel> submitted, LlmAdmissionService admission) {
-        if (submitted == null) {
-            return null;
-        }
-        Map<ModelKind, FrozenModel> admitted = new EnumMap<>(ModelKind.class);
-        for (AgentPurpose purpose : AgentPurpose.practiceScript()) {
-            FrozenModel slot = submitted.get(purpose.kind());
-            if (slot == null) {
-                continue;
-            }
-            DataHandlingTier tier = Objects.requireNonNullElse(slot.dataHandlingTier(), DataHandlingTier.UNDECLARED);
-            Optional<FrozenModel> priced = memberAiPolicy
-                    .practiceScriptBinding(job, purpose)
-                    .filter(binding -> binding.getDataHandlingTier() == tier)
-                    .map(binding -> {
-                        methods.require(
-                                assignments.load(job).getFirst().practice().method(),
-                                purpose.kind().name().toLowerCase(Locale.ROOT),
-                                binding);
-                        return binding;
-                    })
-                    .flatMap(admission::admitIfAvailable)
-                    .filter(slot::isAdmittedAs)
-                    .map(model -> slot.withPriceSnapshot(
-                            slot.priceSnapshot() == null ? model.price() : slot.priceSnapshot()));
-            if (priced.isPresent()) {
-                admitted.put(purpose.kind(), priced.get());
-            } else {
-                throw new IllegalStateException("A frozen direct model is no longer available");
-            }
-        }
-        return admitted.isEmpty() ? null : admitted;
-    }
-
-    /**
-     * The budget is re-checked at claim even though submit already gated, because a workspace can
-     * pre-queue jobs faster than the cap updates. It is never re-checked past this point — there is no
-     * mid-execution kill on budget alone.
-     *
-     * <p>Held rather than cancelled: a month rollover or a raised cap clears the block without the job
-     * having failed, so {@code attempt} stays untouched. The age bound is what keeps that from
-     * being unbounded when neither ever happens.
-     */
-    private ClaimAttempt holdOrCancelOverBudget(ReviewJob job, LlmBudgetBlockReason blockReason) {
-        Instant now = Instant.now();
-        boolean tooOldToHold = job.getAvailableAt() != null
-                && Duration.between(job.getAvailableAt(), now).compareTo(BUDGET_HOLD_MAX_JOB_AGE) > 0;
-        if (tooOldToHold) {
-            job.setStatus(ReviewJobStatus.CANCELLED);
-            job.setCompletedAt(now);
-            job.setErrorMessage("Cancelled. The monthly AI budget is exceeded, and this job is more than "
-                    + BUDGET_HOLD_MAX_JOB_AGE.toDays()
-                    + " days old.");
-            job.setCancellationReason(ReviewJobCancellationReason.BUDGET_EXHAUSTED);
-            jobRepository.save(job);
-            log.info(
-                    "Cancelling claim — over budget and older than {} days: jobId={}, workspaceId={}, blockReason={}",
-                    BUDGET_HOLD_MAX_JOB_AGE.toDays(),
-                    job.getId(),
-                    job.getWorkspaceId(),
-                    blockReason);
-            recordPracticeReviewRefusal("budget_exhausted");
-            meterRegistry.counter(AgentMetrics.AGENT_JOB_BUDGET_REFUSED).increment();
-            return new TerminalClaim(job, ReviewJobStatus.CANCELLED);
-        }
-        job.setAvailableAt(now.plus(BUDGET_HOLD_INTERVAL));
-        // Marks this as a budget hold specifically, so raising the cap can release it at once instead
-        // of leaving the admin to wait out BUDGET_HOLD_INTERVAL.
-        job.setHoldReason(ReviewJob.HOLD_REASON_BUDGET);
-        jobRepository.save(job);
-        log.info(
-                "Holding claim — monthly LLM budget {}: jobId={}, workspaceId={}, retryAt={}",
-                blockReason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (cap set)",
-                job.getId(),
-                job.getWorkspaceId(),
-                job.getAvailableAt());
-        meterRegistry.counter(AgentMetrics.AGENT_JOB_BUDGET_HELD).increment();
-        return ClaimOutcome.BUDGET_HELD;
-    }
-
-    private ClaimAttempt refuseUnavailableModel(ReviewJob job) {
-        String message = "The configured model is not available.";
-        job.setStatus(ReviewJobStatus.CANCELLED);
-        job.setCompletedAt(Instant.now());
-        job.setErrorMessage(message);
-        job.setCancellationReason(ReviewJobCancellationReason.MODEL_UNAVAILABLE);
-        jobRepository.save(job);
-        meterRegistry.counter(AgentMetrics.AGENT_JOB_MODEL_REFUSED).increment();
-        recordPracticeReviewRefusal("model_unavailable");
-        log.info("Refusing claim — configured model unavailable: jobId={}", job.getId());
-        return new TerminalClaim(job, ReviewJobStatus.CANCELLED);
     }
 
     private void recordPracticeReviewRefusal(String reason) {
@@ -1549,17 +1189,6 @@ public class ReviewJobExecutor {
                 ? jobRepository.transitionStatusOwnedBy(
                         jobId, status, now, error, Set.of(ReviewJobStatus.RUNNING), workerId)
                 : jobRepository.transitionStatus(jobId, status, now, error, Set.of(ReviewJobStatus.RUNNING));
-    }
-
-    private @Nullable ReviewJobStatus completeJob(UUID jobId, AgentResult agentResult, SandboxResult sandboxResult) {
-        // A lost ownership fence must not deliver another attempt's result.
-        ReviewJobStatus terminalStatus = persistTerminalState(jobId, agentResult, sandboxResult);
-        if (terminalStatus != null) {
-            return terminalStatus;
-        } else {
-            log.info("Skipping delivery: job no longer owned/RUNNING (requeued or cancelled): jobId={}", jobId);
-            return null;
-        }
     }
 
     /**
@@ -1588,7 +1217,7 @@ public class ReviewJobExecutor {
         }
         if (agentResult != null && agentResult.output() != null) {
             Object rawOutput = agentResult.output().get("rawOutput");
-            if (rawOutput instanceof String raw && !raw.isBlank() && practiceResultsAdmitted(job)) {
+            if (rawOutput instanceof String raw && !raw.isBlank() && ResultAdmissionService.isAdmitted(job)) {
                 log.info(
                         "Agent exited with code {} after result admission — continuing delivery",
                         sandboxResult.exitCode());
@@ -1686,11 +1315,11 @@ public class ReviewJobExecutor {
             // Use the ledger totals: the runner may omit usage details counted by the proxy.
             if (runnerUsage != null && runnerUsage.totalCalls() > 0) {
                 freshJob.setLlmCalls(usage.totalCalls());
-                freshJob.setLlmInputTokens(clampToInt(usage.inputTokens()));
-                freshJob.setLlmOutputTokens(clampToInt(usage.outputTokens()));
-                freshJob.setLlmReasoningTokens(clampToInt(usage.reasoningTokens()));
-                freshJob.setLlmCacheReadTokens(clampToInt(usage.cacheReadTokens()));
-                freshJob.setLlmCacheWriteTokens(clampToInt(usage.cacheWriteTokens()));
+                freshJob.setLlmInputTokens(Math.clamp(usage.inputTokens(), 0, Integer.MAX_VALUE));
+                freshJob.setLlmOutputTokens(Math.clamp(usage.outputTokens(), 0, Integer.MAX_VALUE));
+                freshJob.setLlmReasoningTokens(Math.clamp(usage.reasoningTokens(), 0, Integer.MAX_VALUE));
+                freshJob.setLlmCacheReadTokens(Math.clamp(usage.cacheReadTokens(), 0, Integer.MAX_VALUE));
+                freshJob.setLlmCacheWriteTokens(Math.clamp(usage.cacheWriteTokens(), 0, Integer.MAX_VALUE));
             }
             // Provider output is telemetry only. The admitted snapshot is authoritative identity.
 
@@ -1743,24 +1372,8 @@ public class ReviewJobExecutor {
         }
     }
 
-    /**
-     * A job whose purpose or binding is gone yields {@code null}, which
-     * {@link LlmBudgetDecision#forFunding} judges against BOTH caps: an unattributable job must not be
-     * a way around either one.
-     */
-    private @Nullable UsageFundingSource claimedFundingSource(ReviewJob job) {
-        AgentPurpose purpose = AgentPurpose.PRACTICE_REVIEW;
-        if (purpose == null) {
-            return null;
-        }
-        return memberAiPolicy
-                .binding(job)
-                .map(WorkspaceAgentBinding::getFundingSource)
-                .orElse(null);
-    }
-
     private LlmPriceSnapshot admittedPrice(ConfigSnapshot snapshot) {
-        if (snapshot.priceSnapshot() != null) return snapshot.priceSnapshot();
+        if (snapshot.model().priceSnapshot() != null) return snapshot.model().priceSnapshot();
         if (llmAdmissionService != null) {
             throw new IllegalStateException("Started job has no admitted LLM price snapshot");
         }
@@ -1773,21 +1386,7 @@ public class ReviewJobExecutor {
      * A missing price is billed UNPRICED, matching {@link ReviewJobZombieSweeper}'s reaper.
      */
     private LlmPriceSnapshot terminalPriceOrUnpriced(ConfigSnapshot snapshot) {
-        LlmPriceSnapshot price = snapshot.priceSnapshot();
+        LlmPriceSnapshot price = snapshot.model().priceSnapshot();
         return price != null ? price : LlmPriceSnapshot.unpricedInstance();
-    }
-
-    /** Runs outside any transaction — it calls external APIs. */
-    private static String truncateErrorMessage(@Nullable String message) {
-        if (message == null) {
-            return "Unknown error";
-        }
-        return message.length() > MAX_ERROR_MESSAGE_LENGTH
-                ? message.substring(0, MAX_ERROR_MESSAGE_LENGTH) + "... [truncated]"
-                : message;
-    }
-
-    private static int clampToInt(long value) {
-        return (int) Math.min(Integer.MAX_VALUE, Math.max(0, value));
     }
 }

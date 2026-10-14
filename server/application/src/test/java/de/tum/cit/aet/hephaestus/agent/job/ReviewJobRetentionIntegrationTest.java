@@ -109,6 +109,27 @@ class ReviewJobRetentionIntegrationTest extends BaseIntegrationTest {
         original.forEach((path, bytes) -> assertThat(decoded.get(path)).containsExactly(bytes));
     }
 
+    @Test
+    @Transactional
+    void shouldKeepPendingOutputAndStripThenDeleteOnlyFinishedDelivery() {
+        Workspace workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("payload-retention"));
+        var pending = oldTerminalJob(workspace);
+        pending.setProcessingStatus(ProcessingStatus.PENDING);
+        pending.setOutput(objectMapper.createObjectNode().put("receipt", "needed"));
+        var finished = oldTerminalJob(workspace);
+        finished.setOutput(objectMapper.createObjectNode().put("receipt", "delivered"));
+        jobRepository.saveAllAndFlush(List.of(pending, finished));
+        Instant cutoff = Instant.now().minus(Duration.ofDays(90));
+        jobRepository.stripTerminalPayloads(cutoff, 500);
+        assertThat(jobRepository.findById(pending.getId()).orElseThrow().getOutput())
+                .isNotNull();
+        assertThat(jobRepository.findById(finished.getId()).orElseThrow().getOutput())
+                .isNull();
+        jobRepository.deleteUnreferencedTerminalRowsOlderThan(cutoff, 500);
+        assertThat(jobRepository.findById(pending.getId())).isPresent();
+        assertThat(jobRepository.findById(finished.getId())).isEmpty();
+    }
+
     private ReviewCompositionBasis basis(ReviewJob job, Instant expiresAt) {
         var basis = new ReviewCompositionBasis();
         basis.setJobId(job.getId());

@@ -26,22 +26,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab merge request webhook events.
- *
- * <p>Routes to {@link GitLabMergeRequestProcessor} based on the action:
- *
+ * <p>
+ * Routes to {@link GitLabMergeRequestProcessor} based on the action:
  * <ul>
- *   <li>{@code open} / {@code update} → {@link GitLabMergeRequestProcessor#process}
- *   <li>{@code close} → {@link GitLabMergeRequestProcessor#processClosed}
- *   <li>{@code reopen} → {@link GitLabMergeRequestProcessor#processReopened}
- *   <li>{@code merge} → {@link GitLabMergeRequestProcessor#processMerged}
- *   <li>{@code approved} / {@code approval} → {@link GitLabMergeRequestProcessor#processApproved}
- *   <li>{@code unapproved} / {@code unapproval} → {@link
- *       GitLabMergeRequestProcessor#processUnapproved}
+ *   <li>{@code open} / {@code update} → {@link GitLabMergeRequestProcessor#process}</li>
+ *   <li>{@code close} → {@link GitLabMergeRequestProcessor#processClosed}</li>
+ *   <li>{@code reopen} → {@link GitLabMergeRequestProcessor#processReopened}</li>
+ *   <li>{@code merge} → {@link GitLabMergeRequestProcessor#processMerged}</li>
+ *   <li>{@code approved} / {@code approval} → {@link GitLabMergeRequestProcessor#processApproved}</li>
+ *   <li>{@code unapproved} / {@code unapproval} → {@link GitLabMergeRequestProcessor#processUnapproved}</li>
  * </ul>
- *
- * Each pair is one person's act; the two names only say whether the merge request's approval rules
- * were met afterwards. An {@code unapproved} or {@code unapproval} marked {@code system} is GitLab
- * resetting approvals after a push instead.
+ * Each pair is one person's act; the two names only say whether the merge request's approval rules were met
+ * afterwards. An {@code unapproved} or {@code unapproval} marked {@code system} is GitLab resetting approvals after a
+ * push instead.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -50,8 +47,8 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
     private static final Logger log = LoggerFactory.getLogger(GitLabMergeRequestMessageHandler.class);
 
     /**
-     * The events after which the merge request is read: its head, status or approvals can have
-     * moved, or, on a merge, the hook left who merged it and when unsaid.
+     * The events after which the merge request is read: its head, status or approvals can have moved, or, on a merge,
+     * the hook left who merged it and when unsaid.
      */
     private static final Set<GitLabEventAction> READS_READINESS = EnumSet.of(
             GitLabEventAction.OPEN,
@@ -96,24 +93,21 @@ public class GitLabMergeRequestMessageHandler extends AbstractIntegrationMessage
     private record Stored(ProcessingContext context, GitLabMergeRequestProcessor.StoredVersion version) {}
 
     /**
-     * The event is stored in the short transaction. GitLab's webhook carries none of the merge
-     * request's readiness — its merge status, head pipeline and approvals — so after an event that
-     * can move them GitLab is read for this one merge request, outside the transaction, and what it
-     * said is recorded in a second short one where the delivery may still write to the project as
-     * stored now ({@link GitLabWebhookContextResolver#mayStillWrite}) and the answer still
-     * describes the stored head ({@link GitLabMergeRequestProcessor#applyReadiness}). A failed read
-     * records nothing: the facts stay as the event left them, unknown where it moved the head,
-     * until the next event or sync. After a merge the same read records who merged it, when and the
-     * merge commit where the hook named none of them ({@link
-     * GitLabMergeRequestProcessor#applyTerminalFacts}), and only then, in the same second
-     * transaction and under the same project check, is the merge offered for review ({@link
-     * GitLabMergeRequestProcessor#offerMerge}) — also when the read failed, so that a merger it
-     * could not name holds the review pending instead of dropping it. An opened or updated merge
-     * request also has the issues it closes read from GitLab — the webhook stores the {@code
-     * updated_at} the sync later compares against, so the sync would not read them for this change.
-     * An update also has its discussions' resolution read ({@link
-     * GitLabDiscussionSyncService#readThreadResolutions}) and recorded under the same check: GitLab
-     * documents an update for all threads becoming resolved, and the hook itself names no thread.
+     * The event is stored in the short transaction. GitLab's webhook carries none of the merge request's readiness —
+     * its merge status, head pipeline and approvals — so after an event that can move them GitLab is read for this
+     * one merge request, outside the transaction, and what it said is recorded in a second short one where the
+     * delivery may still write to the project as stored now ({@link GitLabWebhookContextResolver#mayStillWrite}) and
+     * the answer still describes the stored head ({@link GitLabMergeRequestProcessor#applyReadiness}). A failed read
+     * records nothing: the facts stay as the event left them, unknown where it moved the head, until the next event or
+     * sync. After a merge the same read records who merged it, when and the merge commit where the hook named none of
+     * them ({@link GitLabMergeRequestProcessor#applyTerminalFacts}), and only then, in the same second transaction and
+     * under the same project check, is the merge offered for review ({@link GitLabMergeRequestProcessor#offerMerge}) —
+     * also when the read failed, so that a merger it could not name holds the review pending instead of dropping it.
+     * An opened or updated merge request also has the issues it closes read from GitLab — the webhook stores the
+     * {@code updated_at} the sync later compares against, so the sync would not read them for this change. An update
+     * also has its discussions' resolution read ({@link GitLabDiscussionSyncService#readThreadResolutions}) and
+     * recorded under the same check: GitLab documents an update for all threads becoming resolved, and the hook
+     * itself names no thread.
      */
     @Override
     protected void dispatchEvent(GitLabMergeRequestEventDTO event, Instant arrivedAt) {

@@ -74,7 +74,8 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
         var other = data.scenario();
         assertThat(results.findByIdAndWorkspaceId(r.getId(), other.workspace().getId()))
                 .isEmpty();
-        assertThat(results.endById(other.workspace().getId(), r.getId(), ResultEndReason.WORK_CHANGED, Instant.now()))
+        assertThat(results.endCurrent(
+                        other.workspace().getId(), r.getItemId(), ResultEndReason.WORK_CHANGED, Instant.now()))
                 .isZero();
         assertThat(results.findById(r.getId()).orElseThrow().getEndedAt()).isNull();
     }
@@ -102,9 +103,10 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
     void endIsIdempotentAndHistoryRemains() {
         var at = Instant.now();
         var r = data.result(scenario, ResultOutcome.MET, at);
-        assertThat(results.endById(r.getWorkspaceId(), r.getId(), ResultEndReason.WORK_CHANGED, at.plusSeconds(1)))
+        assertThat(results.endCurrent(
+                        r.getWorkspaceId(), r.getItemId(), ResultEndReason.WORK_CHANGED, at.plusSeconds(1)))
                 .isOne();
-        assertThat(results.endById(r.getWorkspaceId(), r.getId(), ResultEndReason.REPLACED, at.plusSeconds(2)))
+        assertThat(results.endCurrent(r.getWorkspaceId(), r.getItemId(), ResultEndReason.REPLACED, at.plusSeconds(2)))
                 .isZero();
         assertThat(results.findById(r.getId()).orElseThrow().getEndReason()).isEqualTo(ResultEndReason.WORK_CHANGED);
         assertThat(results.findByWorkspaceIdAndReviewIdOrderByRecordedAtAscIdAsc(r.getWorkspaceId(), r.getReviewId()))

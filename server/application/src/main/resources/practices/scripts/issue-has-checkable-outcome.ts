@@ -1,8 +1,8 @@
+// Counts the task-list items in the issue body and reads the labels and the type of the issue.
+// The review decides if any of the text is a finish line.
 import { scm, expectKind } from "../kits/scm/index.ts";
 import { bodyFact, classifyIssue } from "../kits/scm/issue-classification.ts";
 import { checkableItems } from "../kits/scm/review.ts";
-// Counts the task-list items in the issue body and reads the labels and the type of the issue.
-// The review decides if any of the text is a finish line.
 import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 

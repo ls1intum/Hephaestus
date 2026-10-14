@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * @param stateOverrides capture states only the collector can establish, such as evidence withheld for consent
- *     or an artifact absent upstream. The manifest otherwise infers absence from missing files, which cannot
+ *     or an item absent upstream. The manifest otherwise infers absence from missing files, which cannot
  *     distinguish an empty source from one that was not permitted to be read.
  * @param filesOnDisk content staged by path instead of retained in byte arrays. The attempt folder receives a
  *     read-only copy, which is streamed into the workspace archive.

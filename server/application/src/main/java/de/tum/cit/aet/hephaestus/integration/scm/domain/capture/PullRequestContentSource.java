@@ -327,8 +327,7 @@ public class PullRequestContentSource {
     /**
      * The pull request's work record, {@code context/metadata.json}, as the practice runner reads
      * it ({@code WORK_RECORDS["scm.pull_request"]} in {@code lib/contract.ts}): the words the job
-     * was admitted with and the status the mirror last synced. Test harnesses that stage a review
-     * build their record here too, so that one shape reaches the runner.
+     * was admitted with and the status the mirror last synced.
      */
     public static ObjectNode workRecord(PullRequest pullRequest, ScmCapturedWork work, @Nullable Instant admittedAt) {
         ObjectNode result = JsonNodeFactory.instance.objectNode();

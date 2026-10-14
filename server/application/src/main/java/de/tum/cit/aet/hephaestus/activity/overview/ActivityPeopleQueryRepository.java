@@ -327,7 +327,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
                     + PUBLIC_REPOSITORY_CONDITION + " AND " + PUBLIC_MONITOR + """
                     )) AND (EXISTS (
                         SELECT 1 FROM workspace w JOIN organization o ON o.id = w.organization_id
-                        WHERE w.id = :workspace AND o.kind = 'HIDE_PUBLIC' AND o.team_key = '' AND o.provider_id = r.provider_id) OR EXISTS (
+                        WHERE w.id = :workspace AND o.provider_id = r.provider_id) OR EXISTS (
                         SELECT 1 FROM activity_event e WHERE e.workspace_id = :workspace AND e.repository_id = r.id))
                     ORDER BY r.name_with_owner
                     """,

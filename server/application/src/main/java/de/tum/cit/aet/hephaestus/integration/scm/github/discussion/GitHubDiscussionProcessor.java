@@ -32,16 +32,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub Discussions.
- *
- * <p>This service handles the conversion of GitHubDiscussionDTO to Discussion entities, persists
- * them, and manages related entities (categories, labels).
- *
- * <p><b>Design Principles:</b>
- *
+ * <p>
+ * This service handles the conversion of GitHubDiscussionDTO to Discussion entities,
+ * persists them, and manages related entities (categories, labels).
+ * <p>
+ * <b>Design Principles:</b>
  * <ul>
- *   <li>Single processing path for all data sources (sync and webhooks)
- *   <li>Idempotent operations via upsert pattern
- *   <li>Categories are resolved or created before the discussion
+ * <li>Single processing path for all data sources (sync and webhooks)</li>
+ * <li>Idempotent operations via upsert pattern</li>
+ * <li>Categories are resolved or created before the discussion</li>
  * </ul>
  */
 @Slf4j
@@ -68,11 +67,11 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
     /**
      * Process a GitHub discussion DTO and persist it as a Discussion entity.
+     * <p>
+     * Uses atomic upsert to prevent race conditions when concurrent threads
+     * (e.g., sync and webhook) process the same discussion.
      *
-     * <p>Uses atomic upsert to prevent race conditions when concurrent threads (e.g., sync and
-     * webhook) process the same discussion.
-     *
-     * @param dto the discussion DTO
+     * @param dto     the discussion DTO
      * @param context the processing context with repository information
      * @return the created or updated Discussion entity, or null if processing failed
      */
@@ -104,7 +103,7 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
                     && dto.updatedAt() != null
                     && !dto.updatedAt().isAfter(existing.getUpdatedAt())) {
                 log.debug(
-                        "Skipped stale discussion update: discussionId={}, existingUpdatedAt={}," + " dtoUpdatedAt={}",
+                        "Skipped stale discussion update: discussionId={}, existingUpdatedAt={}, dtoUpdatedAt={}",
                         existing.getId(),
                         existing.getUpdatedAt(),
                         dto.updatedAt());
@@ -189,10 +188,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a deleted discussion event. Removes the discussion from the database and publishes a
-     * DiscussionDeleted domain event.
+     * Process a deleted discussion event.
+     * Removes the discussion from the database and publishes a DiscussionDeleted domain event.
      *
-     * @param dto the discussion DTO (used to locate the discussion)
+     * @param dto     the discussion DTO (used to locate the discussion)
      * @param context the processing context
      */
     @Transactional
@@ -215,10 +214,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a closed discussion event. Publishes a DiscussionClosed domain event in addition to
-     * the standard update.
+     * Process a closed discussion event.
+     * Publishes a DiscussionClosed domain event in addition to the standard update.
      *
-     * @param dto the discussion DTO
+     * @param dto     the discussion DTO
      * @param context the processing context
      * @return the updated Discussion entity, or null if processing failed
      */
@@ -235,10 +234,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a reopened discussion event. Publishes a DiscussionReopened domain event in addition
-     * to the standard update.
+     * Process a reopened discussion event.
+     * Publishes a DiscussionReopened domain event in addition to the standard update.
      *
-     * @param dto the discussion DTO
+     * @param dto     the discussion DTO
      * @param context the processing context
      * @return the updated Discussion entity, or null if processing failed
      */
@@ -254,10 +253,10 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process an answered discussion event. Publishes a DiscussionAnswered domain event in addition
-     * to the standard update.
+     * Process an answered discussion event.
+     * Publishes a DiscussionAnswered domain event in addition to the standard update.
      *
-     * @param dto the discussion DTO
+     * @param dto     the discussion DTO
      * @param context the processing context
      * @return the updated Discussion entity, or null if processing failed
      */
@@ -279,12 +278,12 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
 
     /**
      * Find or create a discussion category using atomic upsert.
-     *
-     * <p>Categories use the node ID (String) as the primary key since GitHub's GraphQL API doesn't
-     * expose databaseId for DiscussionCategory.
-     *
-     * <p>Uses atomic upsert to prevent race conditions when concurrent threads (e.g., sync and
-     * webhook) try to create the same category simultaneously.
+     * <p>
+     * Categories use the node ID (String) as the primary key since GitHub's GraphQL
+     * API doesn't expose databaseId for DiscussionCategory.
+     * <p>
+     * Uses atomic upsert to prevent race conditions when concurrent threads
+     * (e.g., sync and webhook) try to create the same category simultaneously.
      */
     @Nullable
     private DiscussionCategory findOrCreateCategory(GitHubDiscussionCategoryDTO dto, Repository repository) {
@@ -312,7 +311,9 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         return categoryRepository.findById(dto.nodeId()).orElse(null);
     }
 
-    /** Computes which fields changed between the old and new discussion state. */
+    /**
+     * Computes which fields changed between the old and new discussion state.
+     */
     private Set<String> computeChangedFields(Discussion oldDiscussion, Discussion newDiscussion) {
         Set<String> changedFields = new HashSet<>();
 
@@ -353,7 +354,9 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         return changedFields;
     }
 
-    /** Convert state reason string to Discussion.StateReason enum. */
+    /**
+     * Convert state reason string to Discussion.StateReason enum.
+     */
     private Discussion.@Nullable StateReason convertStateReason(@Nullable String stateReason) {
         if (stateReason == null) {
             return null;
@@ -367,7 +370,9 @@ public class GitHubDiscussionProcessor extends BaseGitHubProcessor {
         };
     }
 
-    /** Convert lock reason string to Discussion.LockReason enum. */
+    /**
+     * Convert lock reason string to Discussion.LockReason enum.
+     */
     private Discussion.@Nullable LockReason convertLockReason(@Nullable String lockReason) {
         if (lockReason == null) {
             return null;

@@ -14,11 +14,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 class PracticeV1FreshInstallDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
-    void shouldInstallTheFinalSchemaFromTheReleasedPrefixAndProductionCutover(String context) throws Exception {
+    void shouldInstallTheFinalSchemaWhenTheDatabaseIsEmpty(String context) throws Exception {
         var database = PostgreSQLTestContainer.createDatabase(
                 "practice_v1_fresh_" + UUID.randomUUID().toString().replace("-", ""));
-        PracticeV1CutoverMigrationTest.release(database, context);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
+        PostgreSQLTestContainer.migrateDatabase(database, context);
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/assert-migrated.sql"))) {
             PracticeV1CutoverMigrationTest.execute(database, new String(input.readAllBytes(), StandardCharsets.UTF_8));

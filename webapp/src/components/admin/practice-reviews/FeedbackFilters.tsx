@@ -99,11 +99,8 @@ export function FeedbackFilters({
 	const state = listFacet("Delivery", STATE_OPTIONS, search.state, (values) =>
 		onPatch({ state: nonEmpty(values) }),
 	);
-	const destination = listFacet(
-		"Destination",
-		DESTINATION_OPTIONS,
-		search.destination,
-		(values) => onPatch({ destination: nonEmpty(values) }),
+	const destination = listFacet("Destination", DESTINATION_OPTIONS, search.destination, (values) =>
+		onPatch({ destination: nonEmpty(values) }),
 	);
 	const withheld = listFacet(
 		"Why withheld",

@@ -1,4 +1,4 @@
-import { isRecord } from "./pi-result-normalize.ts";
+import { isRecord } from "./pi-text.ts";
 import type { CitationCapabilities } from "./work/practice-scripts/lib/core/contract.ts";
 
 export interface CitableText {

@@ -7,7 +7,6 @@ import { LABELS } from "./fixtures/every-slot.ts";
 import { parseDiff } from "./kits/scm/diff-parser.ts";
 import { MODEL_CONCURRENCY } from "./lib/core/concurrency.ts";
 import {
-	legacyContractError,
 	MODEL_SLOT_CAPS,
 	PRACTICE_SCRIPT_PRACTICE_HEADER,
 	type BoundModels,
@@ -167,7 +166,6 @@ async function runSource(
 			{
 				slug,
 				inputs: read.inputs,
-				criteria: "",
 				files: {
 					head: { revision: HEAD },
 					change: { base: BASE, head: HEAD, files: new Map(CHANGE) },
@@ -862,24 +860,4 @@ export default definePracticeScript({
 		assert.match(outcome.error ?? "", /^meta: models\.decision /u);
 		assert.deepEqual(outcome.models, []);
 	});
-
-	for (const key of ["version", "kinds", "tokens"] as const) {
-		void test(`a program whose meta names the retired ${key} fails with the legacy contract error`, async () => {
-			const runs = await runSource(
-				`import {definePracticeScript,generateText} from "../lib/core/practice-script.ts";
-export default definePracticeScript({
-	meta: { ${key}: ${key === "kinds" ? "{}" : "1"} },
-	run: async () => ({ leads: [] }),
-});
-`,
-				{},
-				undefined,
-				{ slugs: ["legacy"] },
-			);
-			const outcome = runs.get("legacy")?.outcome;
-			assert.equal(outcome?.status, "failed");
-			assert.equal(outcome.stopReason, "invalid-program");
-			assert.equal(outcome.error, legacyContractError(key));
-		});
-	}
 });

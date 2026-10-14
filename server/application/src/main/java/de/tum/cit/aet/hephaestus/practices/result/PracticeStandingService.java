@@ -43,8 +43,6 @@ import tools.jackson.databind.json.JsonMapper;
 @RequiredArgsConstructor
 public class PracticeStandingService {
 
-    public static final int LOOKBACK_DAYS = 90;
-
     private static final int MAX_FEEDBACK_PER_PRACTICE = 5;
     /**
      * Per-opportunity weight decay, newest first. Derived rather than picked: two problem-free pieces of reviewed work
@@ -128,52 +126,6 @@ public class PracticeStandingService {
                 .toList();
     }
 
-    /**
-     * Every given developer's standings now, over the evidence observed from {@code since}, read off one scan of the
-     * workspace rather than one query per developer, with the practices review is admitted for. A developer with no
-     * evidence in the span gets the snapshot of someone nothing reached: every eligible practice silent.
-     *
-     * <p>The same classification as {@link #getStandingSnapshots}, minus the delivered guidance: a reader of the
-     * workspace as a whole sees counts, never what anyone was told.
-     */
-    public WorkspaceStandings getWorkspaceStandingSnapshots(Long workspaceId, Set<Long> developerIds, Instant since) {
-        // First, so the practices every result points at are already loaded when the gate reads them.
-        Eligibility eligibility = eligibility(workspaceId);
-        List<ResultView> latest = developerIds.isEmpty()
-                ? List.of()
-                : resultViewQuery.views(
-                        workspaceId, resultReadQuery.forDevelopersSince(workspaceId, developerIds, since, true));
-        Set<UUID> visible = visibilityPolicy.permitsAll(
-                workspaceId,
-                latest.stream().map(ResultView::result).toList(),
-                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        Map<Long, List<ResultView>> byDeveloper = latest.stream()
-                .collect(Collectors.groupingBy(view -> view.result().getDeveloperId()));
-        Map<Long, StandingSnapshot> snapshots = new LinkedHashMap<>();
-        for (Long developerId : developerIds) {
-            snapshots.put(
-                    developerId,
-                    snapshot(byDeveloper.getOrDefault(developerId, List.of()), visible, eligibility, Map.of(), since));
-        }
-        return new WorkspaceStandings(snapshots, catalogOrder(eligibility));
-    }
-
-    /**
-     * Every given developer's standings as their practice profile shows them now: read over the profile's own
-     * look-back, from the trend horizon, so a developer's standing here is the one their profile shows.
-     */
-    public WorkspaceStandings getCurrentWorkspaceStandingSnapshots(Long workspaceId, Set<Long> developerIds) {
-        return getWorkspaceStandingSnapshots(workspaceId, developerIds, practiceTrendService.horizon());
-    }
-
-    /**
-     * Several developers' snapshots, and the practices review is admitted for in the workspace today per group slug,
-     * each group's in catalog order: the same list whoever asks, so a reader's own evidence never adds a practice or
-     * reorders one.
-     */
-    public record WorkspaceStandings(
-            Map<Long, StandingSnapshot> byDeveloper, Map<String, List<Practice>> eligiblePracticesByGroup) {}
-
     /** The visible rows of {@code narrowed}, per practice slug. */
     private static Map<String, List<ResultView>> visibleByPractice(List<ResultView> narrowed, Set<UUID> visible) {
         Map<String, List<ResultView>> byPractice = new LinkedHashMap<>();
@@ -185,21 +137,6 @@ public class PracticeStandingService {
             }
         }
         return byPractice;
-    }
-
-    private static Map<String, List<Practice>> catalogOrder(Eligibility eligibility) {
-        Map<String, List<Practice>> byGroup = new LinkedHashMap<>();
-        eligibility.practices().stream()
-                .sorted(Comparator.comparingInt(Practice::getPosition)
-                        .thenComparing(p -> p.getCurrentVersion().getName()))
-                .forEach(practice -> {
-                    PracticeGroup group = practice.getGroup();
-                    if (group != null) {
-                        byGroup.computeIfAbsent(group.getSlug(), slug -> new ArrayList<>())
-                                .add(practice);
-                    }
-                });
-        return byGroup;
     }
 
     /** The practices review is admitted for in the workspace today, and their slugs per group slug. */
@@ -258,7 +195,7 @@ public class PracticeStandingService {
             PracticeEvidence evidence = group.isEmpty() ? null : PracticeEvidence.classify(group);
             List<ResultView> observed = evidence == null ? List.of() : evidence.observed();
             List<ResultView> liveRuns = liveByPractice.getOrDefault(slug, List.of());
-            PracticeTrend trend = practiceTrendService.calculatePractice(slug, liveRuns, since);
+            PracticeTrend trend = practiceTrendService.calculatePractice(liveRuns, since);
             Double share = evidence != null && evidence.hasStanding() ? standingShare(evidence, trend, since) : null;
             PracticeStandingDTO dto = evidence != null && share != null
                     ? toStanding(evidence, trend, deliveredGuidance, share)

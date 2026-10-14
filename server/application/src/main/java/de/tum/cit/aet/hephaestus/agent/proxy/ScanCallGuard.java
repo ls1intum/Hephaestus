@@ -6,9 +6,9 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.scan.ScanBudget;
+import de.tum.cit.aet.hephaestus.agent.scan.ScanModelUnavailableException;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -37,7 +37,6 @@ public class ScanCallGuard {
     private final ReviewJobRepository jobs;
     private final ReviewSnapshotQuery reviews;
     private final ScanBudget budget;
-    private final PracticeReviewProperties limits;
     private final SandboxGatewayProperties gateway;
     private final ObjectMapper mapper;
     // Active leases and their waiters hold strong references; idle locks can be reclaimed without evicting a live
@@ -70,7 +69,7 @@ public class ScanCallGuard {
             BigDecimal inFlight;
             try {
                 inFlight = budget.inFlight(job, snapshot);
-            } catch (IllegalStateException unavailable) {
+            } catch (ScanModelUnavailableException unavailable) {
                 throw refused();
             }
             String slot = route.practiceScriptSlot() == null
@@ -95,15 +94,15 @@ public class ScanCallGuard {
             if (maximumOutput <= 0
                     || maximumInput <= 0
                     || body.length > Math.min(gateway.maxRequestBytes(), maximumInput)) throw refused();
-            requireTextOnly(mapper.readTree(body));
-            long output = requestedOutput(body, maximumOutput);
+            var request = mapper.readTree(body);
+            requireTextOnly(request);
+            long output = requestedOutput(request, maximumOutput);
             BigDecimal next =
                     ScanBudget.cost(model.priceSnapshot(), body.length, output).setScale(6, RoundingMode.CEILING);
             if (!spent.priced() || spent.cost().add(inFlight).add(next).compareTo(cap) > 0) throw refused();
             if (route.practiceScriptSlot() == null
                     && job.getLlmCalls()
-                            >= (long) Math.max(3, job.getInput().assignments().size()) * limits.practiceModelCalls())
-                throw refused();
+                            >= budget.callCap(job.getInput().assignments().size())) throw refused();
             return Optional.of(new Lease(lock));
         } catch (RuntimeException | Error failure) {
             lock.unlock();
@@ -111,8 +110,7 @@ public class ScanCallGuard {
         }
     }
 
-    private long requestedOutput(byte[] body, long limit) {
-        var request = mapper.readTree(body);
+    private static long requestedOutput(JsonNode request, long limit) {
         long requested = limit;
         for (String field : List.of("max_tokens", "max_completion_tokens", "max_output_tokens")) {
             if (!request.has(field)) continue;

@@ -22,5 +22,8 @@ export function useScopeRecordFilter(
 	) {
 		return undefined;
 	}
-	return { facet: read.selection.kind, name: read.filterName };
+	return {
+		facet: read.selection.kind,
+		name: read.filterName,
+	};
 }

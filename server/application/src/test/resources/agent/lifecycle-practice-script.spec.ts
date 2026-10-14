@@ -761,8 +761,8 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	assert.equal(keyOf(none.label), "no-checkable-outcome");
 	assert.equal(none.facts?.subIssuesTotal, 0);
 	// A capture that recorded no source claims neither.
-	for (const legacy of [story, subIssues, totalOnly, none, unrecognized]) {
-		assert.equal(Object.hasOwn(legacy.facts ?? {}, "subIssuesSource"), false);
+	for (const incomplete of [story, subIssues, totalOnly, none, unrecognized]) {
+		assert.equal(Object.hasOwn(incomplete.facts ?? {}, "subIssuesSource"), false);
 	}
 	assert.equal(unrecognized.facts?.subIssuesCompleted, 2);
 	assert.equal(provider.facts?.subIssuesSource, "provider");

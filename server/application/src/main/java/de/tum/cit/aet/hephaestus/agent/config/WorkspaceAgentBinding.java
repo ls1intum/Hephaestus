@@ -70,8 +70,8 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
 
     /**
      * The slot this row fills: the bound model's derived tier must equal it, except that the
-     * {@code UNDECLARED} slot accepts any model. {@code UNDECLARED} is the legacy slot for members with
-     * no choice, never a fallback for a member who chose.
+     * {@code UNDECLARED} slot accepts any model. {@code UNDECLARED} is the slot for members with
+     * no choice, and does not override an explicit member choice.
      */
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'UNDECLARED'")

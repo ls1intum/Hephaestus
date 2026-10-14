@@ -8,8 +8,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test;
 class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     @Test
     void keepsVerifiedDeliveryIndependentOfRuntimeJobRetention() {
-        var sources = mock(SourceCatalogRegistry.class);
+        var sources = mock(ClasspathSourceCatalogRegistry.class);
         var access = mock(CitedSourceAccess.class);
         var catalog = mock(SourceCatalog.class);
         when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));
@@ -35,11 +35,11 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                 .build();
         when(access.permits(1, result.getId(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .thenReturn(true);
-        when(sources.isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+        when(sources.isSourceUsePermitted(any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
                 .thenReturn(true);
         assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .containsExactly(result.getId());
-        result.setEvidenceVersion((short) 0);
+        result = result.toBuilder().evidenceVersion((short) 0).build();
         assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isEmpty();
         when(access.permits(1, result.getId(), SourceUsePurpose.CONVERSATIONAL_MENTORING))

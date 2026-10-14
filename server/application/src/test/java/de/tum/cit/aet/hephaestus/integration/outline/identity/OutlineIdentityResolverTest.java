@@ -14,7 +14,6 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -48,17 +47,16 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
                 .thenReturn(Optional.of(PROVIDER_ID));
     }
 
-    private static AccountMembershipQuery.MembershipView membership(long workspaceId, @Nullable Long memberId) {
-        return new AccountMembershipQuery.MembershipView(workspaceId, "ws", "Workspace", "MEMBER", memberId);
+    private static AccountMembershipQuery.MembershipView membership(long workspaceId) {
+        return new AccountMembershipQuery.MembershipView(workspaceId, "ws", "Workspace", "MEMBER");
     }
 
     @Test
-    @DisplayName("a linked author with membership in the workspace resolves to the view's member id")
+    @DisplayName("an exact linked account resolves only with membership in the workspace")
     void happyPath_resolvesMemberId() {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
                 .thenReturn(Optional.of(ACCOUNT_ID));
-        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID, ACCOUNT_ID)));
+        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID)).thenReturn(List.of(membership(WORKSPACE_ID)));
 
         Optional<Long> memberId = resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT);
 
@@ -84,19 +82,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
                 .thenReturn(Optional.of(ACCOUNT_ID));
         when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID + 1, 555L)));
-
-        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
-                .isEmpty();
-    }
-
-    @Test
-    @DisplayName("a membership view without a member id resolves to empty rather than a bogus attribution")
-    void membershipWithoutMemberId_resolvesEmpty() {
-        when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, TEAM_ID))
-                .thenReturn(Optional.of(ACCOUNT_ID));
-        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID, null)));
+                .thenReturn(List.of(membership(WORKSPACE_ID + 1)));
 
         assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
                 .isEmpty();
@@ -116,8 +102,7 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     @Test
     void shouldResolveAnExactDefaultTeamIdentityWhenTheProviderHasNoTeamKey() {
         when(accountIdentityQuery.resolveAccountId(PROVIDER_ID, SUBJECT, null)).thenReturn(Optional.of(ACCOUNT_ID));
-        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(membership(WORKSPACE_ID, ACCOUNT_ID)));
+        when(workspaceMembershipQuery.membershipsForAccount(ACCOUNT_ID)).thenReturn(List.of(membership(WORKSPACE_ID)));
         assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, null, SUBJECT))
                 .contains(ACCOUNT_ID);
         verify(accountIdentityQuery).resolveAccountId(PROVIDER_ID, SUBJECT, null);

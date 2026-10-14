@@ -32,8 +32,6 @@ const COUNT_READ = {
 	refetchInterval: () => (sessionRetriesQueries() ? COUNT_REFRESH_MS : false),
 } as const;
 
-const pagedTotal = (page: { page?: { totalElements: number } }) => page.page?.totalElements;
-
 /**
  * How many reviews, results, problems and pieces of feedback each tab lists under the shared scope (the
  * developer, groups, practices, dates and the tracked record), read as the total of a one-row page of
@@ -46,17 +44,17 @@ export function useReviewTabCounts(workspaceSlug: string, scope: ReviewScopeSear
 	const reviews = useQuery({
 		...listReviewsOptions({ path, query: reviewsQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,
-		select: pagedTotal,
+		select: (page) => page.totalElements,
 	});
 	const results = useQuery({
 		...listReviewResultsOptions({ path, query: resultsQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,
-		select: pagedTotal,
+		select: (page) => page.totalElements,
 	});
 	const problems = useQuery({
 		...listReviewProblemsOptions({ path, query: problemsQuery(scope, COUNT_PAGE) }),
 		...COUNT_READ,
-		select: pagedTotal,
+		select: (page) => page.totalElements,
 	});
 	const feedback = useQuery({
 		...listReviewFeedbackOptions({ path, query: feedbackQuery(scope, COUNT_PAGE) }),

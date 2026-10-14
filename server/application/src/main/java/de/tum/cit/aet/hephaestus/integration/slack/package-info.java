@@ -48,12 +48,6 @@
             // The Slack mentor adapter (integration.slack.mentor) runs a turn via the narrow MentorTurnRunner
             // port and streams through MentorChannel (propagate pulls in UIMessageChunk + MentorTurnRequest).
             "agent::mentor-chat",
-            // SlackConversationNudgeService listens to the practices-published ConversationFeedbackPreparedEvent (a
-            // type-level named interface: only the event record is exposed).
-            "practices::conversation-nudge",
-            // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the
-            // chat.thread-derived
-            // results/feedback via the practices-owned ConversationFeedbackErasure port (one-way edge, no cycle).
             "practices::spi",
         })
 @org.jspecify.annotations.NullMarked

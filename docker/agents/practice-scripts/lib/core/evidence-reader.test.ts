@@ -125,7 +125,6 @@ void test("a problem and example resolve to the same code across diff and tree c
 	const head = await reader.answer({
 		op: "cite",
 		source: "tree",
-		tree: "head",
 		path: "src/cart.ts",
 		startLine: 3,
 	});
@@ -139,7 +138,6 @@ void test("a problem and example resolve to the same code across diff and tree c
 	const headAtTwo = await reader.answer({
 		op: "cite",
 		source: "tree",
-		tree: "head",
 		path: "src/cart.ts",
 		startLine: 2,
 	});
@@ -150,7 +148,6 @@ void test("a problem and example resolve to the same code across diff and tree c
 	const elsewhere = await other.answer({
 		op: "cite",
 		source: "tree",
-		tree: "head",
 		path: "src/cart.ts",
 		startLine: 3,
 	});
@@ -179,7 +176,7 @@ void test("a problem and example resolve to the same code across diff and tree c
 void describe("reads of the head tree", () => {
 	void test("a file is FOUND with its text, a binary file is BINARY, and a missing path is ABSENT", async (t) => {
 		const { reader, receipts } = await captures(t);
-		const read = async (file: string) => reader.answer({ op: "read", tree: "head", path: file });
+		const read = async (file: string) => reader.answer({ op: "read", path: file });
 		assert.deepEqual(await read("src/cart.ts"), {
 			status: "FOUND",
 			text: "export class Cart {\n  // increment the item count by one\n  count += 1;\n}\n",
@@ -196,7 +193,7 @@ void describe("reads of the head tree", () => {
 	void test("a file larger than one read is cut, and the read says so and counts as cut", async (t) => {
 		const { reader, repo, receipts } = await captures(t);
 		await writeFile(path.join(repo, "large.txt"), "x".repeat(MAX_READ_BYTES + 10));
-		const large = await reader.answer({ op: "read", tree: "head", path: "large.txt" });
+		const large = await reader.answer({ op: "read", path: "large.txt" });
 		assert.ok(large.status === "FOUND");
 		assert.equal(large.truncated, true);
 		assert.equal(large.text.length, MAX_READ_BYTES);
@@ -207,36 +204,29 @@ void describe("reads of the head tree", () => {
 		const { reader, repo, receipts } = await captures(t);
 		// A link to itself cannot be resolved: the read fails, and the file is not proved absent.
 		await symlink("loop.txt", path.join(repo, "loop.txt"));
-		await unrated(reader.answer({ op: "read", tree: "head", path: "loop.txt" }), "refused");
+		await unrated(reader.answer({ op: "read", path: "loop.txt" }), "refused");
 		assert.deepEqual(receipts, { reads: 1, truncatedReads: 0, failedReads: 1 });
 	});
 
 	void test("a path outside the tree is refused, also through a link", async (t) => {
 		const { reader, receipts } = await captures(t);
 		await unrated(
-			reader.answer({ op: "read", tree: "head", path: "../secret.txt" }),
+			reader.answer({ op: "read", path: "../secret.txt" }),
 			"refused",
 			/outside the captured source|repository path|symlink/u,
 		);
-		await unrated(reader.answer({ op: "read", tree: "head", path: "link.txt" }), "refused");
+		await unrated(reader.answer({ op: "read", path: "link.txt" }), "refused");
 		assert.deepEqual(receipts, { reads: 2, truncatedReads: 0, failedReads: 2 });
 	});
 
-	void test("the base tree is not available yet, and work without a tree has none", async (t) => {
-		const { reader, sources, receipts } = await captures(t);
-		await unrated(
-			reader.answer({ op: "read", tree: "base", path: "src/cart.ts" }),
-			"unavailable",
-			/base tree/u,
-		);
-		await unrated(reader.answer({ op: "list", tree: "base" }), "unavailable");
+	void test("work without a tree has none to read", async (t) => {
+		const { sources } = await captures(t);
 		const treeless = new EvidenceReader({ ...sources, repo: null }, noReceipts());
 		await unrated(
-			treeless.answer({ op: "read", tree: "head", path: "src/cart.ts" }),
+			treeless.answer({ op: "read", path: "src/cart.ts" }),
 			"unavailable",
 			/no captured file tree/u,
 		);
-		assert.deepEqual(receipts, { reads: 2, truncatedReads: 0, failedReads: 2 });
 	});
 });
 
@@ -248,7 +238,6 @@ void describe("listings and searches", () => {
 			await writeFile(path.join(repo, "visible.txt"), "unique-match\nunique-match\n");
 			const result = await reader.answer({
 				op: "grep",
-				tree: "head",
 				pattern: "unique-match",
 				maxResults: 1,
 				...(glob === undefined ? {} : { glob }),
@@ -263,8 +252,8 @@ void describe("listings and searches", () => {
 		const { reader, receipts } = await captures(t);
 		const signal = AbortSignal.abort(new UnratedError("cancelled", "the attempt ended"));
 		for (const request of [
-			{ op: "read", tree: "head", path: "src/cart.ts" },
-			{ op: "grep", tree: "head", pattern: "count" },
+			{ op: "read", path: "src/cart.ts" },
+			{ op: "grep", pattern: "count" },
 		] as const) {
 			await assert.rejects(reader.answer(request, signal), /the attempt ended/u);
 		}
@@ -272,7 +261,7 @@ void describe("listings and searches", () => {
 	});
 	void test("a listing leaves out the repository's .git folder, and a long one is cut and says so", async (t) => {
 		const { reader, repo, receipts } = await captures(t);
-		assert.deepEqual(await reader.answer({ op: "list", tree: "head", glob: "src/**" }), {
+		assert.deepEqual(await reader.answer({ op: "list", glob: "src/**" }), {
 			paths: ["src/cart.ts"],
 			truncated: false,
 		});
@@ -287,7 +276,7 @@ void describe("listings and searches", () => {
 				writeFile(path.join(repo, "many", `${i}.txt`), ""),
 			),
 		);
-		const many = await reader.answer({ op: "list", tree: "head", glob: "many/**" });
+		const many = await reader.answer({ op: "list", glob: "many/**" });
 		assert.equal(many.truncated, true);
 		assert.equal(many.paths.length, 5000);
 		assert.deepEqual(receipts, { reads: 3, truncatedReads: 1, failedReads: 0 });
@@ -298,7 +287,6 @@ void describe("listings and searches", () => {
 		await writeFile(path.join(repo, "src", "total.ts"), "count\ncount\n");
 		const found = await reader.answer({
 			op: "grep",
-			tree: "head",
 			pattern: "count \\+=",
 			glob: "*.ts",
 		});
@@ -308,7 +296,6 @@ void describe("listings and searches", () => {
 		});
 		const bounded = await reader.answer({
 			op: "grep",
-			tree: "head",
 			pattern: "count",
 			glob: "*.ts",
 			fixedString: true,
@@ -326,9 +313,9 @@ void test("a search and a read leave out the repository's .git folder, as a list
 		path.join(repo, ".git", "config"),
 		"url = https://token@example.org/team/project\n",
 	);
-	const found = await reader.answer({ op: "grep", tree: "head", pattern: "token@" });
+	const found = await reader.answer({ op: "grep", pattern: "token@" });
 	assert.deepEqual(found.matches, []);
-	await assert.rejects(reader.answer({ op: "read", tree: "head", path: ".git/config" }), {
+	await assert.rejects(reader.answer({ op: "read", path: ".git/config" }), {
 		name: "UnratedError",
 		reason: "refused",
 	});
@@ -360,7 +347,6 @@ void describe("citations", () => {
 			await reader.answer({
 				op: "cite",
 				source: "tree",
-				tree: "head",
 				path: "src/cart.ts",
 				startLine: 2,
 				endLine: 3,
@@ -424,7 +410,6 @@ void describe("citations", () => {
 			reader.answer({
 				op: "cite",
 				source: "tree",
-				tree: "head",
 				path: "src/cart.ts",
 				startLine: 3,
 				endLine: 2,
@@ -436,7 +421,6 @@ void describe("citations", () => {
 			reader.answer({
 				op: "cite",
 				source: "tree",
-				tree: "head",
 				path: "src/cart.ts",
 				startLine: 40,
 			}),
@@ -447,7 +431,6 @@ void describe("citations", () => {
 			reader.answer({
 				op: "cite",
 				source: "tree",
-				tree: "head",
 				path: "src/absent.ts",
 				startLine: 1,
 			}),
@@ -458,7 +441,6 @@ void describe("citations", () => {
 			reader.answer({
 				op: "cite",
 				source: "tree",
-				tree: "head",
 				path: "src/cart.ts",
 				startLine: 1,
 				endLine: 300,
@@ -486,16 +468,6 @@ void describe("citations", () => {
 			"error",
 			/not a captured source/u,
 		);
-		await unrated(
-			reader.answer({
-				op: "cite",
-				source: "tree",
-				tree: "base",
-				path: "src/cart.ts",
-				startLine: 1,
-			}),
-			"unavailable",
-		);
 		const unchanged = new EvidenceReader({ ...sources, change: null }, noReceipts());
 		await unrated(
 			unchanged.answer({
@@ -515,7 +487,7 @@ void test("a byte limit inside a valid UTF-8 character remains truncation, not a
 	const { reader, sources, receipts } = await captures(t);
 	assert.ok(sources.repo !== null);
 	await writeFile(path.join(sources.repo, "utf8.ts"), `${"x".repeat(MAX_READ_BYTES - 1)}😀`);
-	const result = await reader.answer({ op: "read", tree: "head", path: "utf8.ts" });
+	const result = await reader.answer({ op: "read", path: "utf8.ts" });
 	assert.ok(result.status === "FOUND");
 	assert.equal(result.truncated, true);
 	assert.equal(result.text.length, MAX_READ_BYTES - 1);

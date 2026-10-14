@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.review.ReviewServiceImpl;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.CreateReviewBatchRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.ReviewBatchDTO;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.UpdateReviewBatchStatusRequestDTO;
@@ -131,7 +130,7 @@ public class ReviewBatchService {
             throw new ReviewBatchConflictException("This batch has ended.");
         if (next == ReviewBatchStatus.PAUSED || next == ReviewBatchStatus.CANCELLED) {
             for (var review : reviews.findByWorkspaceIdAndBatchIdOrderByCreatedAtAsc(context.id(), id)) {
-                if (review.getKind() == ReviewKind.SCAN && !ReviewServiceImpl.terminal(review.getStatus())) {
+                if (review.getKind() == ReviewKind.SCAN && !review.getStatus().isTerminal()) {
                     if (next == ReviewBatchStatus.PAUSED)
                         batch.setCursorItemId(
                                 targets.findByWorkspaceIdAndBatchIdOrderByItemIdAsc(context.id(), id).stream()
@@ -144,7 +143,7 @@ public class ReviewBatchService {
             }
         }
         batch.setStatus(next);
-        batch.setPauseReason(next == ReviewBatchStatus.PAUSED ? ReviewBatchPauseReason.WORKSPACE_UNAVAILABLE : null);
+        batch.setPauseReason(next == ReviewBatchStatus.PAUSED ? ReviewBatchPauseReason.PAUSED_BY_ADMIN : null);
         batch.setUpdatedAt(clock.instant());
         if (next == ReviewBatchStatus.RUNNING) {
             if (batch.getStartedAt() == null) batch.setStartedAt(clock.instant());

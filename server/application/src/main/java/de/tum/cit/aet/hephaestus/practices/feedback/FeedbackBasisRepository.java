@@ -1,7 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -110,25 +116,25 @@ public interface FeedbackBasisRepository extends JpaRepository<FeedbackBasis, UU
     Optional<PolicyRow> policy(@Param("workspaceId") long workspaceId, @Param("developerId") long developerId);
 
     interface PolicyRow {
-        String getWorkspaceStatus();
+        WorkspaceStatus getWorkspaceStatus();
 
         boolean getEnabled();
 
-        String getDeliveryStatus();
+        PracticeDeliveryStatus getDeliveryStatus();
 
         long getRolloutRevision();
 
-        String getPeopleScope();
+        ReviewScopeMode getPeopleScope();
 
         boolean getSelected();
 
         @Nullable
         Instant getLeftAt();
 
-        String getAccountStatus();
+        Account.Status getAccountStatus();
 
         @Nullable
-        String getAiChoice();
+        AiChoice getAiChoice();
 
         boolean getDeliveryEnabled();
     }
@@ -151,6 +157,25 @@ public interface FeedbackBasisRepository extends JpaRepository<FeedbackBasis, UU
     interface SuppressedProblem {
         UUID getId();
 
-        String getResolution();
+        FeedbackResolution getResolution();
     }
+
+    @WorkspaceAgnostic("Verified account absorption defers both owner-specific person-equality constraints")
+    @Modifying
+    @Query(
+            value = "SET CONSTRAINTS"
+                    + " sfk_feedback_basis_result_person,sfk_feedback_basis_feedback_person"
+                    + " DEFERRED",
+            nativeQuery = true)
+    void deferDeveloperConstraints();
+
+    @WorkspaceAgnostic(
+            "Verified account absorption validates both person-equality constraints before source" + " cleanup")
+    @Modifying
+    @Query(
+            value = "SET CONSTRAINTS"
+                    + " sfk_feedback_basis_result_person,sfk_feedback_basis_feedback_person"
+                    + " IMMEDIATE",
+            nativeQuery = true)
+    void validateDeveloperConstraints();
 }

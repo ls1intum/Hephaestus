@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultView;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.PracticeGroupTrendDTO;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -15,13 +13,14 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class PracticeTrendService {
+    public static final int LOOKBACK_DAYS = 90;
 
     private final TrendProperties properties;
     private final Clock clock;
 
     /** The start of today's trend horizon, which is the practice profile's look-back. */
     public Instant horizon() {
-        return clock.instant().minus(PracticeStandingService.LOOKBACK_DAYS, ChronoUnit.DAYS);
+        return clock.instant().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
     }
 
     /**
@@ -33,8 +32,8 @@ public class PracticeTrendService {
     }
 
     /** One practice's trend over its evidence observed from {@code since}; insufficient over none. */
-    public PracticeTrend calculatePractice(String practiceSlug, List<ResultView> evidence, Instant since) {
-        return PracticeTrendCalculator.calculatePractice(practiceSlug, evidence, since, properties);
+    public PracticeTrend calculatePractice(List<ResultView> evidence, Instant since) {
+        return PracticeTrendCalculator.calculatePractice(evidence, since, properties);
     }
 
     /** {@link PracticeTrend#recentMetShare} over a practice's requested and backfilled work alone. */
@@ -44,15 +43,7 @@ public class PracticeTrendService {
     }
 
     public PracticeTrend calculateGroup(
-            String groupSlug, Collection<String> eligiblePracticeSlugs, Collection<PracticeTrend> practiceTrends) {
-        return GroupTrendAggregator.aggregate(groupSlug, eligiblePracticeSlugs, practiceTrends, properties);
-    }
-
-    /** The group's trend and the trends it aggregates: one per eligible practice, in the practices' order. */
-    public PracticeGroupTrendDTO detail(
-            String groupSlug, Collection<String> eligiblePracticeSlugs, List<PracticeTrend> practiceTrends) {
-        PracticeTrend group = calculateGroup(groupSlug, eligiblePracticeSlugs, practiceTrends);
-        return new PracticeGroupTrendDTO(
-                group.toDto(), practiceTrends.stream().map(PracticeTrend::toDto).toList());
+            Collection<String> eligiblePracticeSlugs, Collection<PracticeTrend> practiceTrends) {
+        return GroupTrendAggregator.aggregate(eligiblePracticeSlugs, practiceTrends, properties);
     }
 }

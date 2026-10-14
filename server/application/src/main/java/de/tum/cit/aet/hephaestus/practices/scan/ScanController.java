@@ -92,7 +92,10 @@ public class ScanController {
             WorkspaceContext context, @PathVariable UUID scanId, @Valid @RequestBody CancelScanRequestDTO request) {
         var detail = query.cancel(context.id(), scanId);
         return ResponseEntity.status(
-                        detail.status() == ReviewStatus.QUEUED || detail.status() == ReviewStatus.RUNNING ? 202 : 200)
+                        detail.summary().status() == ReviewStatus.QUEUED
+                                        || detail.summary().status() == ReviewStatus.RUNNING
+                                ? 202
+                                : 200)
                 .body(detail);
     }
 

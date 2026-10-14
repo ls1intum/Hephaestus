@@ -149,7 +149,7 @@ public class ReviewAssignmentStoreService implements ReviewAssignmentStore {
     private void recordWithheld(
             long workspaceId, ReviewAssignmentId id, String reason, String message, boolean terminalFailure) {
         var review = reviews.lockByIdAndWorkspaceId(id.reviewId(), workspaceId).orElseThrow();
-        if (ReviewServiceImpl.terminal(review.getStatus())
+        if (review.getStatus().isTerminal()
                 || (!terminalFailure
                         && review.getChecks().path("cancellationRequested").asBoolean()))
             throw new IllegalStateException("This review no longer accepts withholding.");

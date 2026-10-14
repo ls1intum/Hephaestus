@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
+import org.springframework.data.domain.Limit;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Publishes runtime rows and retained ledger spend without reading product persistence. */
@@ -102,10 +103,11 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
         if (headLimit < 0 || headLimit > 100) throw new IllegalArgumentException("Invalid queue head limit");
         var totals = runtime.queueCounts(workspaceId, asOf);
         long workers = runtime.liveWorkers(asOf);
-        var head = runtime.queueHead(workspaceId, headLimit).stream()
-                .map(nullableId -> {
-                    var id = Objects.requireNonNull(nullableId);
-                    var job = jobs.findByIdAndWorkspaceId(id, workspaceId).orElseThrow();
+        var queued = headLimit == 0 ? List.<ReviewJob>of() : jobs.findByWorkspaceIdAndStatusInOrderByAvailableAtAscIdAsc(
+                workspaceId, Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING), Limit.of(headLimit));
+        var head = queued.stream()
+                .map(job -> {
+                    var id = job.getId();
                     var people = job.getInput().assignments().stream()
                             .flatMap(assignmentId -> assignments.find(workspaceId, assignmentId).stream())
                             .map(a -> a.developerId())

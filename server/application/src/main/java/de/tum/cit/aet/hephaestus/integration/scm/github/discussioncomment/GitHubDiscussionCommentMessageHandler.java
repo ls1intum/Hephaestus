@@ -21,11 +21,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub discussion_comment webhook events.
- *
- * <p>Processes: created, edited, deleted
- *
- * <p>This handler processes the parent discussion first to ensure it exists before attaching
- * comments, similar to how issue comments are handled.
+ * <p>
+ * Processes: created, edited, deleted
+ * <p>
+ * This handler processes the parent discussion first to ensure it exists
+ * before attaching comments, similar to how issue comments are handled.
  */
 @Slf4j
 @Component
@@ -57,8 +57,7 @@ public class GitHubDiscussionCommentMessageHandler
     }
 
     /**
-     * Discussion-comment webhook events are skipped when {@code
-     * hephaestus.sync.discussions.enabled=false}.
+     * Discussion-comment webhook events are skipped when {@code hephaestus.sync.discussions.enabled=false}.
      */
     @Override
     public boolean isEnabled() {
@@ -76,7 +75,7 @@ public class GitHubDiscussionCommentMessageHandler
         }
 
         log.debug(
-                "Received discussion_comment event: action={}, discussionNumber={}, commentId={}," + " repoName={}",
+                "Received discussion_comment event: action={}, discussionNumber={}, commentId={}, repoName={}",
                 event.action(),
                 discussionDto.number(),
                 commentDto.getDatabaseId(),
@@ -95,7 +94,7 @@ public class GitHubDiscussionCommentMessageHandler
             Discussion discussion = discussionProcessor.process(discussionDto, context);
             if (discussion == null) {
                 log.warn(
-                        "Failed to process parent discussion: discussionNumber={}, skipping" + " comment",
+                        "Failed to process parent discussion: discussionNumber={}, skipping comment",
                         discussionDto.number());
                 return;
             }

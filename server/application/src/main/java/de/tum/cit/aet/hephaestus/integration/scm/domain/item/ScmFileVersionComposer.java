@@ -44,7 +44,7 @@ public class ScmFileVersionComposer implements ScanItemVersions {
                 .filter(e -> e.path().equals(item.path()))
                 .findFirst()
                 .orElseThrow(() -> new ItemCaptureException(
-                        ItemCaptureCode.ITEM_REMOVED, "Assigned file is unavailable at the pinned" + " commit"));
+                        ItemCaptureCode.ITEM_REMOVED, "Assigned file is unavailable at the pinned commit"));
         return versions.version(
                 entry.path(), entry.objectId(), entry.mode(), context, inventory, containerVersion.value());
     }

@@ -35,19 +35,19 @@ public class ReviewScheduleBatchOpener {
     public ReviewScheduleOutcome openDueRun(UUID scheduleId, Instant now) {
         var schedule = schedules.findById(scheduleId).orElseThrow();
         if (!schedule.isEnabled()) return ReviewScheduleOutcome.SKIPPED_DISABLED;
+        schedule.setNextRunAt(now.plus(schedule.getCadence().interval()));
+        schedule.setLastRunAt(now);
+        schedule.setUpdatedAt(now);
         var workspace = workspaces.findById(schedule.getWorkspaceId()).orElse(null);
         if (workspace == null || workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
             return ReviewScheduleOutcome.SKIPPED_WORKSPACE_UNAVAILABLE;
         if (batches.existsByWorkspaceIdAndStatusIn(
                 schedule.getWorkspaceId(), List.of(ReviewBatchStatus.RUNNING, ReviewBatchStatus.PAUSED)))
-            return ReviewScheduleOutcome.SKIPPED_CAMPAIGN_UNDER_WAY;
+            return ReviewScheduleOutcome.SKIPPED_BATCH_UNDER_WAY;
         if (schedule.getKind().equals("scm.repository")
                 && reviews.existsByWorkspaceIdAndKindAndStatusIn(
                         schedule.getWorkspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
-            return ReviewScheduleOutcome.SKIPPED_CAMPAIGN_UNDER_WAY;
-        schedule.setNextRunAt(now.plus(schedule.getCadence().interval()));
-        schedule.setLastRunAt(now);
-        schedule.setUpdatedAt(now);
+            return ReviewScheduleOutcome.SKIPPED_BATCH_UNDER_WAY;
         Instant
                 from =
                         schedule.getLookbackDays() == null
@@ -76,9 +76,6 @@ public class ReviewScheduleBatchOpener {
                 .build();
         batches.saveAndFlush(batch);
         batchService.freezeTargets(batch, selected);
-        schedule.setNextRunAt(now.plus(schedule.getCadence().interval()));
-        schedule.setLastRunAt(now);
-        schedule.setUpdatedAt(now);
         return ReviewScheduleOutcome.OPENED;
     }
 

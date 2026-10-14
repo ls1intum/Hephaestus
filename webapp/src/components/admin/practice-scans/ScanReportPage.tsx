@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { AlertCircleIcon, ArrowLeftIcon, DownloadIcon, InfoIcon, OctagonXIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-import type { ScanDetail, ScanReport } from "@/api/types.gen";
+import type { ScanDetail, ScanReport, ScanReportItem, ScanReportProblem } from "@/api/types.gen";
 import {
 	PracticeTabsList,
 	PracticeTabsRail,
@@ -36,7 +36,6 @@ import {
 	withheldSentence,
 } from "./scan-display";
 import type { ScanListState } from "./scan-list-state";
-import type { ScanItemEntry, ScanProblemEntry } from "./scan-report-schemas";
 import { ScanCounts } from "./ScanCounts";
 import { ScanItemTable } from "./ScanItemTable";
 import { ScanPracticeTable } from "./ScanPracticeTable";
@@ -61,10 +60,10 @@ export interface ScanReportPageProps {
 	state: ScanReportState;
 	tab: ScanReportTab;
 	onTabChange: (tab: ScanReportTab) => void;
-	problems: ScanListState<ScanProblemEntry>;
+	problems: ScanListState<ScanReportProblem>;
 	problemFilter: ProblemBaselineState | undefined;
 	onProblemFilterChange: (filter: ProblemBaselineState | undefined) => void;
-	files: ScanListState<ScanItemEntry>;
+	files: ScanListState<ScanReportItem>;
 	fileFilter: ScanEntryStatus | undefined;
 	onFileFilterChange: (filter: ScanEntryStatus | undefined) => void;
 	cancel: ScanAction;

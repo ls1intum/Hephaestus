@@ -5,6 +5,6 @@ public enum FeedbackDecisionReason {
     MISSING_CONTEXT,
     UNHELPFUL,
     DUPLICATE,
-    INAPPROPRIATE_PLACEMENT,
+    INAPPROPRIATE_LOCATION,
     OTHER;
 }

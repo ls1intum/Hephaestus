@@ -44,12 +44,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitLab issues.
- *
- * <p>Handles conversion of GitLab issue data (from webhooks and GraphQL sync) to Issue entities.
- * Follows the same patterns as {@link
- * de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcessor}.
- *
- * <p>Confidential issues are skipped entirely (not stored in the database).
+ * <p>
+ * Handles conversion of GitLab issue data (from webhooks and GraphQL sync) to Issue entities.
+ * Follows the same patterns as {@link de.tum.cit.aet.hephaestus.integration.scm.github.issue.GitHubIssueProcessor}.
+ * <p>
+ * Confidential issues are skipped entirely (not stored in the database).
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -150,15 +149,14 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     /**
      * Tombstones an already-mirrored <em>public</em> snapshot of an issue that has flipped to
-     * confidential. GitLab keeps confidential issues server-side and its webhooks stop carrying
-     * their content, but a copy we ingested while the issue was still public would otherwise linger
-     * — a stale, now-restricted public copy of the data. {@link #process} correctly refuses to
-     * (re)store a confidential issue; this closes the complementary gap by removing any row stored
-     * before the flip.
+     * confidential. GitLab keeps confidential issues server-side and its webhooks stop carrying their
+     * content, but a copy we ingested while the issue was still public would otherwise linger — a stale,
+     * now-restricted public copy of the data. {@link #process} correctly refuses to (re)store a
+     * confidential issue; this closes the complementary gap by removing any row stored before the flip.
      *
-     * <p>Uses the same soft-delete tombstone the upstream-deletion sweep uses (sets {@code
-     * deletedAt}, so the row drops out of every {@code deletedAt IS NULL} live query). Idempotent:
-     * a no-op when nothing is stored or the row is already tombstoned.
+     * <p>Uses the same soft-delete tombstone the upstream-deletion sweep uses (sets {@code deletedAt}, so
+     * the row drops out of every {@code deletedAt IS NULL} live query). Idempotent: a no-op when nothing
+     * is stored or the row is already tombstoned.
      *
      * @return {@code true} if a live row was tombstoned by this call
      */
@@ -185,14 +183,13 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Handles an {@code action=update} issue event. Persists the issue, publishes one {@link
-     * ScmDomainEvent.IssueUpdated} carrying what the webhook's {@code changes} diff says moved and
-     * which stored dates it refined, then one {@link ScmDomainEvent.IssueLabeled} per newly-added
-     * label — GitLab has no native "labeled" action, so this is how the activity feed reaches
-     * parity with GitHub. An update that moved only attributes the shared domain has no field name
-     * for (due date, weight, time tracking) publishes nothing: the mirror is refreshed either way,
-     * and an event with an empty diff would tell every consumer that something changed while naming
-     * nothing.
+     * Handles an {@code action=update} issue event. Persists the issue, publishes one
+     * {@link ScmDomainEvent.IssueUpdated} carrying what the webhook's {@code changes} diff says moved and
+     * which stored dates it refined, then one {@link ScmDomainEvent.IssueLabeled} per newly-added label — GitLab has no native
+     * "labeled" action, so this is how the activity feed reaches parity with GitHub. An update that
+     * moved only attributes the shared domain has no field name for (due date, weight, time tracking)
+     * publishes nothing: the mirror is refreshed either way, and an event with an empty diff would tell
+     * every consumer that something changed while naming nothing.
      */
     @Transactional
     @Nullable
@@ -232,13 +229,17 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return issue;
     }
 
-    /** Label data extracted from GraphQL response for sync processing. */
+    /**
+     * Label data extracted from GraphQL response for sync processing.
+     */
     public record SyncLabelData(
             @Nullable String globalId,
             @Nullable String title,
             @Nullable String color) {}
 
-    /** Assignee data extracted from GraphQL response for sync processing. */
+    /**
+     * Assignee data extracted from GraphQL response for sync processing.
+     */
     public record SyncAssigneeData(
             @Nullable String globalId,
             @Nullable String username,
@@ -247,7 +248,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
             @Nullable String webUrl,
             @Nullable Boolean bot) {}
 
-    /** All data needed to sync a single GitLab issue from GraphQL. */
+    /**
+     * All data needed to sync a single GitLab issue from GraphQL.
+     */
     public record SyncIssueData(
             @Nullable String globalId,
             @Nullable String iid,
@@ -274,9 +277,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     /**
      * Process a GitLab issue from GraphQL sync.
-     *
-     * <p>Labels and assignees are resolved and persisted within this method's transaction boundary
-     * to avoid detached-entity issues.
+     * <p>
+     * Labels and assignees are resolved and persisted within this method's
+     * transaction boundary to avoid detached-entity issues.
      */
     @Transactional
     @Nullable
@@ -432,9 +435,7 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return changed;
     }
 
-    /**
-     * The opening and closing dates as stored; a refinement can arrive without a change of state.
-     */
+    /** The opening and closing dates as stored; a refinement can arrive without a change of state. */
     private static Set<String> changedDates(ScmEventPayload.IssueData previous, ScmEventPayload.IssueData current) {
         Set<String> changed = new HashSet<>();
         if (!Objects.equals(previous.createdAt(), current.createdAt())) changed.add("createdAt");
@@ -477,19 +478,19 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
 
     /**
      * Resolves the issue author from a webhook event.
-     *
-     * <p>GitLab webhook {@code user} is the <em>actor</em> (who triggered the event), not
-     * necessarily the issue author. The real author ID is in {@code object_attributes.author_id}.
-     *
-     * <p>Strategy:
-     *
+     * <p>
+     * GitLab webhook {@code user} is the <em>actor</em> (who triggered the event),
+     * not necessarily the issue author. The real author ID is in
+     * {@code object_attributes.author_id}.
+     * <p>
+     * Strategy:
      * <ol>
-     *   <li>If the actor's ID matches {@code author_id}, use the actor DTO (has full profile data)
-     *       to upsert the user.
-     *   <li>Otherwise look up the author by native ID from the database (works when the author was
-     *       previously synced).
-     *   <li>If not found, return {@code null} — the {@code COALESCE} in the upsert SQL will
-     *       preserve any existing author.
+     *   <li>If the actor's ID matches {@code author_id}, use the actor DTO
+     *       (has full profile data) to upsert the user.</li>
+     *   <li>Otherwise look up the author by native ID from the database
+     *       (works when the author was previously synced).</li>
+     *   <li>If not found, return {@code null} — the {@code COALESCE} in the
+     *       upsert SQL will preserve any existing author.</li>
      * </ol>
      */
     @Nullable
@@ -596,7 +597,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return issue;
     }
 
-    /** Maps GitLab issue state string to Issue.State enum. */
+    /**
+     * Maps GitLab issue state string to Issue.State enum.
+     */
     private static Issue.State convertState(@Nullable String state) {
         if (state == null) {
             return Issue.State.OPEN;
@@ -611,7 +614,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         };
     }
 
-    /** Updates labels from GraphQL sync data within the current transaction. */
+    /**
+     * Updates labels from GraphQL sync data within the current transaction.
+     */
     private boolean updateSyncLabels(
             @Nullable List<SyncLabelData> syncLabels, Collection<Label> currentLabels, Repository repository) {
         if (syncLabels == null) {
@@ -635,10 +640,10 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Maps a GitLab issue state + duplicate marker ({@code closedAsDuplicateOf} in GraphQL, {@code
-     * duplicated_to_id} in webhooks) to the denormalized {@code issue.state_reason} column.
-     *
-     * <p>Returns {@code null} for open issues.
+     * Maps a GitLab issue state + duplicate marker ({@code closedAsDuplicateOf} in GraphQL,
+     * {@code duplicated_to_id} in webhooks) to the denormalized {@code issue.state_reason} column.
+     * <p>
+     * Returns {@code null} for open issues.
      */
     @Nullable
     private static String resolveStateReason(Issue.State state, boolean duplicate) {
@@ -649,15 +654,16 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Resolves the GitLab issue type — the GraphQL {@code Issue.type} enum ({@code ISSUE}, {@code
-     * TASK}, …) or the webhook's {@code object_attributes.type} ({@code Issue}, {@code Task}, …) —
-     * to an {@code issue_type_id} FK for the repository's owning organization.
-     *
-     * <p>GitLab's GraphQL enum uses {@code SCREAMING_SNAKE_CASE}; the {@code IssueType} name column
-     * stores the human-readable form ({@code "Test Case"}). This method humanises the enum ({@code
-     * TEST_CASE} → {@code "Test Case"}) before a case-insensitive lookup. Returns {@code null} when
-     * the repository has no organization or when no matching issue type exists — the upsert
-     * COALESCE preserves any previously set FK.
+     * Resolves the GitLab issue type — the GraphQL {@code Issue.type} enum ({@code ISSUE}, {@code TASK}, …)
+     * or the webhook's {@code object_attributes.type} ({@code Issue}, {@code Task}, …) — to an
+     * {@code issue_type_id} FK for the repository's owning organization.
+     * <p>
+     * GitLab's GraphQL enum uses {@code SCREAMING_SNAKE_CASE}; the {@code IssueType}
+     * name column stores the human-readable form ({@code "Test Case"}). This method
+     * humanises the enum ({@code TEST_CASE} → {@code "Test Case"}) before a
+     * case-insensitive lookup. Returns {@code null} when the repository has no
+     * organization or when no matching issue type exists — the upsert COALESCE
+     * preserves any previously set FK.
      */
     @Nullable
     private String resolveIssueTypeId(@Nullable String typeName, Repository repository) {
@@ -687,8 +693,8 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Converts a GitLab GraphQL {@code IssueType} enum value ({@code TEST_CASE}) to the
-     * human-readable form stored in {@code issue_type.name} ({@code "Test Case"}).
+     * Converts a GitLab GraphQL {@code IssueType} enum value ({@code TEST_CASE})
+     * to the human-readable form stored in {@code issue_type.name} ({@code "Test Case"}).
      */
     private static String humaniseTypeName(String enumValue) {
         String[] parts = enumValue.split("_", -1);
@@ -704,7 +710,9 @@ public class GitLabIssueProcessor extends BaseGitLabProcessor {
         return sb.toString();
     }
 
-    /** Updates assignees from GraphQL sync data within the current transaction. */
+    /**
+     * Updates assignees from GraphQL sync data within the current transaction.
+     */
     private boolean updateSyncAssignees(
             @Nullable List<SyncAssigneeData> syncAssignees, Set<User> currentAssignees, Long providerId) {
         if (syncAssignees == null) {

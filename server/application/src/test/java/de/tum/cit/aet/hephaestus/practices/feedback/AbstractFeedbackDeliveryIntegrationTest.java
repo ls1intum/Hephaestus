@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReadback;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateReceipt;
@@ -264,8 +263,7 @@ public abstract class AbstractFeedbackDeliveryIntegrationTest extends AbstractFe
         }
 
         @Override
-        public CopyWriteResult postImmutablePackage(
-                FeedbackTarget target, List<LineNote> notes, CopyReadback readback, CopyWriteFence fence) {
+        public CopyWriteResult postImmutablePackage(FeedbackTarget target, List<LineNote> notes, CopyWriteFence fence) {
             var receipts = new ArrayList<CopyReceipt>();
             var withheld = new ArrayList<UUID>();
             for (var note : notes) {
@@ -295,8 +293,7 @@ public abstract class AbstractFeedbackDeliveryIntegrationTest extends AbstractFe
         }
 
         @Override
-        public @Nullable List<CopyReceipt> findPosted(
-                FeedbackTarget target, List<LineNote> notes, CopyReadback readback) {
+        public @Nullable List<CopyReceipt> findPosted(FeedbackTarget target, List<LineNote> notes) {
             if (this.readback == LookupPresence.UNKNOWN) return null;
             return notes.stream()
                     .filter(note -> physical.containsKey(note.copyId()))

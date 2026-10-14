@@ -108,8 +108,8 @@ public class LlmModelResolver {
                 && model.getWorkspace().getId().equals(workspaceId);
     }
 
-    private static IllegalStateException unavailable() {
-        return new IllegalStateException("The configured model is not available");
+    private static LlmModelUnavailableException unavailable() {
+        return new LlmModelUnavailableException("The configured model is not available");
     }
 
     @Transactional(readOnly = true)

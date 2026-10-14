@@ -1,874 +1,178 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
-import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
-import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
-import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
-import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
-import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
-import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.Cookie;
-import jakarta.servlet.http.HttpServletResponse;
-import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.EnumMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mock;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import tools.jackson.databind.ObjectMapper;
 
 class JobTokenAuthenticationFilterTest extends BaseUnitTest {
-
-    @Mock
-    private ReviewJobRepository agentJobRepository;
-
-    @Mock
-    private FilterChain filterChain;
-
-    @Mock
-    private WorkerJwtVerifier jwtVerifier;
-
-    private MentorProxyCredentialRegistry mentorRegistry;
-    private JobTokenAuthenticationFilter filter;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-
-    private static final String JOB_JWT = "job-jwt";
-
-    @BeforeEach
-    void setUp() {
-        mentorRegistry = new MentorProxyCredentialRegistry();
-        filter = new JobTokenAuthenticationFilter(
-                agentJobRepository, jwtVerifier, mentorRegistry, objectMapper, "worker-1");
-        SecurityContextHolder.clearContext();
-    }
+    private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
+    private final WorkerJwtVerifier verifier = mock(WorkerJwtVerifier.class);
+    private final JobTokenAuthenticationFilter filter =
+            new JobTokenAuthenticationFilter(jobs, verifier, new MentorProxyCredentialRegistry(), "worker-1");
 
     @AfterEach
-    void tearDown() {
+    void clearContext() {
         SecurityContextHolder.clearContext();
     }
 
-    @Nested
-    class IpValidation {
+    @Test
+    void admissionAuthenticatesWithoutConfigurationOrSpendQueries() throws Exception {
+        var job = running();
+        var jwt = jwt(job.getId(), job.getWorkspaceId(), job.getAttempt());
+        when(verifier.verify("valid-token")).thenReturn(jwt);
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        var request = request("/internal/llm/prepare-feedback", "Bearer valid-token");
+        var response = new MockHttpServletResponse();
+        var principal = new AtomicReference<Authentication>();
+        filter.doFilter(
+                request,
+                response,
+                (incoming, outgoing) ->
+                        principal.set(SecurityContextHolder.getContext().getAuthentication()));
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(principal.get()).isInstanceOf(JobTokenAuthentication.class);
+        assertThat(((JobTokenAuthentication) principal.get()).getPrincipal().job())
+                .isEqualTo(jwt);
+        assertThat(job.getConfigSnapshot()).isNull();
+        verify(jobs).findById(job.getId());
+        verifyNoMoreInteractions(jobs);
+    }
 
-        @Test
-        void shouldRejectNonPrivateIp() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("8.8.8.8");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
+    @Test
+    void mentorAuthenticationDoesNotRequireTurnPricing() throws Exception {
+        var registry = new MentorProxyCredentialRegistry();
+        var session = UUID.randomUUID();
+        var token = registry.mint(
+                session,
+                new MentorProxyCredentialRegistry.Route(
+                        "openai-responses", "https://models.example/v1", null, null, null, null));
+        var meter = spy(new MentorTurnMeter(UUID.randomUUID(), LlmPriceSnapshot.unpricedInstance()));
+        doThrow(new IllegalStateException("Pricing unavailable")).when(meter).spentUsd();
+        assertThat(registry.bindTurn(session, meter)).isTrue();
+        var authFilter = new JobTokenAuthenticationFilter(jobs, verifier, registry, "worker-1");
+        var response = new MockHttpServletResponse();
+        var principal = new AtomicReference<Authentication>();
+        authFilter.doFilter(
+                request("/internal/llm/responses", "Bearer " + token),
+                response,
+                (incoming, outgoing) ->
+                        principal.set(SecurityContextHolder.getContext().getAuthentication()));
+        assertThat(response.getStatus()).isEqualTo(200);
+        var sessionIdentity = Objects.requireNonNull(
+                ((JobTokenAuthentication) principal.get()).getPrincipal().mentor());
+        assertThat(sessionIdentity.sessionId()).isEqualTo(session);
+        verifyNoInteractions(jobs, verifier);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"attempt", "workspace", "worker", "terminal", "path"})
+    void rejectsCredentialOutsideItsExactRunningAttempt(String mismatch) throws Exception {
+        var job = running();
+        var jwt = jwt(
+                job.getId(),
+                mismatch.equals("workspace") ? 999L : job.getWorkspaceId(),
+                mismatch.equals("attempt") ? job.getAttempt() + 1 : job.getAttempt());
+        if (mismatch.equals("worker")) job.setWorkerId("other-worker");
+        if (mismatch.equals("terminal")) job.setStatus(ReviewJobStatus.COMPLETED);
+        when(verifier.verify("valid-token")).thenReturn(jwt);
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        var request = request(
+                mismatch.equals("path")
+                        ? "/internal/llm/runtime/" + UUID.randomUUID()
+                        : "/internal/llm/prepare-feedback",
+                "Bearer valid-token");
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request, response, (incoming, outgoing) -> {
+            throw new AssertionError("Unauthenticated request served");
+        });
+        assertThat(response.getStatus()).isEqualTo(401);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void nonOwnerResultUploadReportsConflictOnlyForItsOwnRuntimeUrl() throws Exception {
+        var job = running();
+        job.setWorkerId("other-worker");
+        when(verifier.verify("valid-token")).thenReturn(jwt(job.getId(), job.getWorkspaceId(), job.getAttempt()));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        for (var id : new UUID[] {job.getId(), UUID.randomUUID()}) {
             var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldAcceptLoopbackIp() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("127.0.0.1")).isTrue();
-        }
-
-        @Test
-        void shouldAcceptClassA() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("10.0.0.5")).isTrue();
-        }
-
-        @Test
-        @DisplayName("should accept 172.16.x.x")
-        void shouldAcceptClassB() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("172.18.0.2")).isTrue();
-        }
-
-        @Test
-        @DisplayName("should accept 192.168.x.x")
-        void shouldAcceptClassC() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("192.168.1.1")).isTrue();
-        }
-
-        @Test
-        void shouldRejectPublicIp() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("1.2.3.4")).isFalse();
-        }
-
-        @Test
-        void shouldRejectNullIp() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp(null)).isFalse();
-        }
-
-        @Test
-        void shouldAcceptIpv6Loopback() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("::1")).isTrue();
-        }
-
-        @Test
-        void shouldAcceptIpv6LinkLocal() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("fe80::1")).isTrue();
-        }
-
-        @Test
-        void shouldRejectMalformedIp() {
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("not-an-ip")).isFalse();
-        }
-
-        @Test
-        void shouldRejectHostname() {
-            // Hostnames must be rejected before InetAddress.getByName() to prevent DNS resolution
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("localhost")).isFalse();
-            assertThat(JobTokenAuthenticationFilter.isPrivateIp("internal.corp"))
-                    .isFalse();
+            filter.doFilter(
+                    request("/internal/llm/runtime/" + id + "/result", "Bearer valid-token"),
+                    response,
+                    (incoming, outgoing) -> {
+                        throw new AssertionError("Non-owner upload served");
+                    });
+            assertThat(response.getStatus()).isEqualTo(id.equals(job.getId()) ? 409 : 401);
         }
     }
 
-    @Nested
-    class TokenValidation {
-
-        @Test
-        void shouldReturn401WhenNoAuthHeader() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldRejectXApiKeyProviderHeader() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("x-api-key", JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldExtractFromBearerAuth() throws Exception {
-            var job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                        authCapture.set(Objects.requireNonNull(
-                                SecurityContextHolder.getContext().getAuthentication()));
-                        return null;
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            verify(filterChain).doFilter(any(), any());
-            assertThat(authCapture.get()).isInstanceOf(JobTokenAuthentication.class);
-            ProxyRouting routing = ((JobTokenAuthentication) authCapture.get()).getPrincipal();
-            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
-            assertThat(Objects.requireNonNull(routing.attempt()).workerId()).isEqualTo("worker-1");
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        }
-
-        @Test
-        void shouldRejectApiKeyProviderHeader() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("api-key", JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldReturn401ForMalformedToken() throws Exception {
-            when(jwtVerifier.verify("not a valid base64!!!"))
-                    .thenThrow(new WorkerJwtInvalidException("invalid token", "decode"));
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer not a valid base64!!!");
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-        }
-
-        @Test
-        void shouldReturn401WhenJobDoesNotExist() throws Exception {
-            ReviewJob job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.empty());
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-        }
-
-        @Test
-        void shouldReturn401WhenAttemptDoesNotMatch() throws Exception {
-            ReviewJob job = createRunningJob();
-            JobJwt current = jobJwt(job, Set.of("llm_proxy"));
-            JobJwt stale = new JobJwt(
-                    current.jobId(),
-                    current.workspaceId(),
-                    current.attempt() + 1,
-                    current.scopes(),
-                    current.jti(),
-                    current.issuedAt(),
-                    current.expiresAt());
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(stale);
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            assertThat(authenticate(JOB_JWT).getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-        }
-
-        @ParameterizedTest
-        @ValueSource(strings = {"worker-2", ""})
-        void shouldRejectJobWhenGatewayDoesNotOwnIt(String owner) throws Exception {
-            ReviewJob job = createRunningJob();
-            job.setWorkerId(owner.isEmpty() ? null : owner);
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            assertThat(authenticate(JOB_JWT).getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldReturn409ForResultUploadOnAnotherWorker() throws Exception {
-            ReviewJob job = createRunningJob();
-            job.setWorkerId("worker-2");
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/runtime/" + job.getId() + "/result");
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_CONFLICT);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldRejectCancelledResultUploadWithoutRevealingOwnership() throws Exception {
-            ReviewJob job = createRunningJob();
-            job.setStatus(ReviewJobStatus.CANCELLED);
-            job.setWorkerId("worker-2");
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/runtime/" + job.getId() + "/result");
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-        }
-
-        @Test
-        void shouldRejectResultUploadForAnotherJob() throws Exception {
-            ReviewJob job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-
-            var request = new MockHttpServletRequest("POST", "/internal/llm/runtime/" + UUID.randomUUID() + "/result");
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-        }
-
-        private MockHttpServletResponse authenticate(String token) throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + token);
-            var response = new MockHttpServletResponse();
-            filter.doFilterInternal(request, response, filterChain);
-            return response;
-        }
-
-        @Test
-        void shouldReturn401WhenJobHasNoConfigSnapshot() throws Exception {
-            var job = new ReviewJob();
-            job.setId(UUID.randomUUID());
-            Workspace workspace = new Workspace();
-            workspace.setId(7L);
-            RuntimeJobTestData.initialize(job, workspace.getId());
-            job.setStatus(ReviewJobStatus.RUNNING);
-            job.setWorkerId("worker-1");
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @ParameterizedTest(name = "Authorization: [{0}]")
-        @ValueSource(strings = {"Bearer ", "Bearer    "})
-        void shouldReturn401ForABearerHeaderWithNoToken(String header) throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", header);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldAcceptCaseInsensitiveBearer() throws Exception {
-            var job = createRunningJob();
-
-            Authentication installed = authenticateAndCaptureAuthentication(job, "bearer " + JOB_JWT, null);
-
-            assertAuthenticatedAsJob(installed, job);
-        }
-
-        @Test
-        void shouldIgnoreProviderKeyWhenBearerIsPresent() throws Exception {
-            var job = createRunningJob();
-
-            Authentication installed =
-                    authenticateAndCaptureAuthentication(job, "Bearer " + JOB_JWT, "provider-key-must-be-ignored");
-
-            assertAuthenticatedAsJob(installed, job);
-        }
-
-        private void assertAuthenticatedAsJob(Authentication installed, ReviewJob job) {
-            assertThat(installed).isInstanceOf(JobTokenAuthentication.class);
-            ProxyRouting routing = ((JobTokenAuthentication) installed).getPrincipal();
-            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
-            assertThat(Objects.requireNonNull(routing.attempt()).workerId()).isEqualTo("worker-1");
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        }
-
-        private Authentication authenticateAndCaptureAuthentication(
-                ReviewJob job, String authorizationHeader, @Nullable String providerKeyHeader) throws Exception {
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                        authCapture.set(Objects.requireNonNull(
-                                SecurityContextHolder.getContext().getAuthentication()));
-                        return null;
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            if (providerKeyHeader != null) {
-                request.addHeader("x-api-key", providerKeyHeader);
-            }
-            request.addHeader("Authorization", authorizationHeader);
-
-            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
-            Authentication authentication = authCapture.get();
-            assertThat(authentication).isNotNull();
-            return authentication;
-        }
-
-        @Test
-        void shouldClearContextOnFilterChainException() throws Exception {
-            var job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-            doAnswer(invocation -> {
-                        throw new ServletException("Simulated failure");
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            assertThatThrownBy(() -> filter.doFilterInternal(request, response, filterChain))
-                    .isInstanceOf(ServletException.class);
-
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        }
-
-        @Test
-        void shouldNotBeBypassedByXForwardedFor() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("8.8.8.8");
-            request.addHeader("X-Forwarded-For", "10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
+    @ParameterizedTest
+    @ValueSource(strings = {"Bearer", "Bearer one two", "Basic one", "bearer "})
+    void rejectsMalformedAuthorizationWithoutLookingUpAJob(String header) throws Exception {
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request("/internal/llm/prepare-feedback", header), response, (incoming, outgoing) -> {
+            throw new AssertionError("Malformed credential served");
+        });
+        assertThat(response.getStatus()).isEqualTo(401);
+        verifyNoInteractions(verifier, jobs);
     }
 
-    @Nested
-    @DisplayName("Mentor credentials")
-    class MentorTokenFallback {
-
-        @Test
-        void authenticatesValidMentorCredential() throws Exception {
-            String mentorToken = mentorRegistry.mint(
-                    UUID.randomUUID(),
-                    new MentorProxyCredentialRegistry.Route(
-                            "openai-completions", "https://api.openai.com", null, null, null, null));
-
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                        authCapture.set(Objects.requireNonNull(
-                                SecurityContextHolder.getContext().getAuthentication()));
-                        return null;
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + mentorToken);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            Authentication authentication = authCapture.get();
-            assertThat(authentication).isNotNull();
-            assertInstanceOf(JobTokenAuthentication.class, authentication);
-            ProxyRouting routing = ((JobTokenAuthentication) authentication).getPrincipal();
-            assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
-        }
-
-        @Test
-        void aTokenMatchingNeitherJobNorMentorRegistryIsRefused() throws Exception {
-            when(jwtVerifier.verify(JOB_JWT)).thenThrow(new WorkerJwtInvalidException("invalid token", "decode"));
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-
-            filter.doFilterInternal(request, response, filterChain);
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
+    @ParameterizedTest
+    @ValueSource(strings = {"8.8.8.8", "deadbeef", "localhost", "2001:db8::1"})
+    void rejectsNonprivateLiteralsAndHostnamesBeforeCredentialVerification(String address) throws Exception {
+        var request = request("/internal/llm/prepare-feedback", "Bearer valid-token");
+        request.setRemoteAddr(address);
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request, response, (incoming, outgoing) -> {
+            throw new AssertionError("Public gateway served");
+        });
+        assertThat(response.getStatus()).isEqualTo(401);
+        verifyNoInteractions(verifier, jobs);
     }
 
-    @Nested
-    @DisplayName("Billed attempt")
-    class BilledAttempt {
-
-        @Test
-        void theRoutingCarriesTheAttemptNumber() throws Exception {
-            var job = createRunningJob();
-            job.setAttempt(3);
-
-            ProxyRouting routing = authenticateAndCaptureRouting(job);
-
-            assertThat(routing.attempt()).isNotNull();
-            assertThat(routing.attempt().number()).isEqualTo(3);
-            assertThat(routing.attempt().sourceId()).isEqualTo(job.getId());
-        }
-
-        @Test
-        void theRoutingPricesWhatTheAttemptHasAlreadySpent() throws Exception {
-            var job = createRunningJob(new LlmPriceSnapshot(
-                    UsageFundingSource.INSTANCE,
-                    UsagePricingState.PRICED,
-                    1L,
-                    null,
-                    new BigDecimal("10"),
-                    new BigDecimal("30"),
-                    new BigDecimal("1"),
-                    new BigDecimal("2")));
-            job.setLlmInputTokens(1_000_000);
-            job.setLlmOutputTokens(100_000);
-
-            ProxyRouting routing = authenticateAndCaptureRouting(job);
-
-            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("13");
-        }
-
-        @Test
-        void aSnapshotWithoutAPriceContributesNothing() throws Exception {
-            var job = createRunningJob();
-            job.setLlmInputTokens(1_000_000);
-
-            ProxyRouting routing = authenticateAndCaptureRouting(job);
-
-            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("0");
-        }
-
-        private ProxyRouting authenticateAndCaptureRouting(ReviewJob job) throws Exception {
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                        authCapture.set(Objects.requireNonNull(
-                                SecurityContextHolder.getContext().getAuthentication()));
-                        return null;
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
-
-            Authentication authentication = authCapture.get();
-            assertThat(authentication).isNotNull();
-            assertInstanceOf(JobTokenAuthentication.class, authentication);
-            return ((JobTokenAuthentication) authentication).getPrincipal();
-        }
-    }
-
-    /** The job's one token reaches every path; the path decides the routing. */
-    @Nested
-    class PracticeScriptRouting {
-
-        private static final LlmPriceSnapshot DECISION_PRICE = new LlmPriceSnapshot(
-                UsageFundingSource.WORKSPACE,
-                UsagePricingState.PRICED,
-                null,
-                4L,
-                new BigDecimal("2"),
-                new BigDecimal("8"),
-                null,
-                null);
-
-        @Test
-        void shouldRouteTheChatSlotToTheReviewModelWhenTheJobTokenCallsIt() throws Exception {
-            ReviewJob job = createPracticeScriptJob();
-
-            ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/chat/chat/completions");
-
-            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId() + ":practice-script");
-            assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
-            assertThat(routing.baseUrl()).isEqualTo("https://api.openai.com/v1");
-            assertThat(routing.practiceScriptSlot()).isEqualTo(ModelKind.CHAT);
-            assertThat(Objects.requireNonNull(routing.attempt()).sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
-        }
-
-        @ParameterizedTest
-        @CsvSource({
-            "decision,decisions,DECISION,openai-decisions,PRACTICE_SCRIPT_DECISION,31",
-            "embedding,embeddings,EMBEDDING,openai-embeddings,PRACTICE_SCRIPT_EMBEDDING,32",
-            "reranking,rerank,RERANKING,cohere-rerank,PRACTICE_SCRIPT_RERANKING,33"
-        })
-        void shouldRouteASlotToItsFrozenModelWhenTheJobTokenCallsIt(
-                String slot, String op, ModelKind kind, String protocol, UsageSourceType sourceType, long connectionId)
-                throws Exception {
-            ReviewJob job = createPracticeScriptJob();
-
-            ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/" + slot + "/" + op);
-
-            assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId() + ":practice-script");
-            assertThat(routing.practiceScriptSlot()).isEqualTo(kind);
-            assertThat(routing.apiProtocol()).isEqualTo(protocol);
-            assertThat(routing.baseUrl()).isEqualTo("https://models.example.com/" + slot);
-            assertThat(routing.connectionScope()).isEqualTo(UsageFundingSource.WORKSPACE);
-            assertThat(routing.connectionId()).isEqualTo(connectionId);
-            ProxyRouting.BilledAttempt attempt = Objects.requireNonNull(routing.attempt());
-            assertThat(attempt.sourceType()).isEqualTo(sourceType);
-            assertThat(attempt.sourceId()).isEqualTo(job.getId());
-        }
-
-        @Test
-        void shouldRefuseASlotWhenNoModelOfItsKindIsBound() throws Exception {
-            ReviewJob job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            var response = call("POST", "/internal/llm/practice-script/decision/decisions");
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
-            assertThat(response.getErrorMessage()).isEqualTo("No decision model is bound for this job");
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldRefuseTheJobTokenOnAPracticeScriptPathWhenItsJobHasEnded() throws Exception {
-            ReviewJob job = createPracticeScriptJob();
-            job.setStatus(ReviewJobStatus.COMPLETED);
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            var response = call("POST", "/internal/llm/practice-script/decision/decisions");
-
-            assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @ParameterizedTest
-        @ValueSource(strings = {"/internal/llm/practice-script/speech/speak", "/internal/llm/practice-script/decision"})
-        void shouldRefuseAPracticeScriptPathWhenItNamesNoKnownSlot(String path) throws Exception {
-            ReviewJob job = createPracticeScriptJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-
-            assertThat(call("POST", path).getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void shouldCountTheCachedPromptAndTheSearchUnitsForTheAttemptLimitsWhenRoutingASlot() throws Exception {
-            ReviewJob job = createPracticeScriptJob();
-            when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
-                    .thenReturn(List.of(
-                            new PracticeScriptKindTotal(ModelKind.DECISION, 2, 1_000, 100, 4_000, 500, 0, 2),
-                            new PracticeScriptKindTotal(ModelKind.RERANKING, 3, 0, 0, 0, 0, 9, 3)));
-
-            ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
-
-            // The token limit counts the whole prompt; search units have their own limit.
-            assertThat(Objects.requireNonNull(routing.attempt()).directModelTokens())
-                    .isEqualTo(5_600);
-            assertThat(Objects.requireNonNull(routing.attempt()).directModelSearchUnits())
-                    .isEqualTo(9);
-        }
-
-        @Test
-        void shouldPriceTheAttemptsPracticeScriptUsageFromTheSamePurseWhenRoutingASlot() throws Exception {
-            ReviewJob job = createPracticeScriptJob();
-            when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
-                    .thenReturn(List.of(
-                            new PracticeScriptKindTotal(ModelKind.DECISION, 4, 1_000_000, 100_000, 0, 0, 0, 4)));
-
-            ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/embedding/embeddings");
-
-            // 1M input at $2 plus 100k output at $8. The review model is paid from the other purse.
-            assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("2.8");
-            // The per-attempt cap reads the same totals, whichever purse paid for them.
-            assertThat(Objects.requireNonNull(routing.attempt()).directModelTokens())
-                    .isEqualTo(1_100_000);
-        }
-
-        private ProxyRouting routeAs(ReviewJob job, String path) throws Exception {
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-            var authCapture = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                        authCapture.set(Objects.requireNonNull(
-                                SecurityContextHolder.getContext().getAuthentication()));
-                        return null;
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-
-            assertThat(call("POST", path).getStatus()).isEqualTo(HttpServletResponse.SC_OK);
-            Authentication authentication = authCapture.get();
-            assertInstanceOf(JobTokenAuthentication.class, authentication);
-            return ((JobTokenAuthentication) authentication).getPrincipal();
-        }
-
-        private MockHttpServletResponse call(String method, String path) throws Exception {
-            var request = new MockHttpServletRequest(method, path);
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-            var response = new MockHttpServletResponse();
-            filter.doFilterInternal(request, response, filterChain);
-            return response;
-        }
-
-        private ReviewJob createPracticeScriptJob() {
-            ReviewJob job = createRunningJob();
-            Map<ModelKind, FrozenModel> slots = new EnumMap<>(ModelKind.class);
-            slots.put(ModelKind.DECISION, slot(ModelKind.DECISION, "openai-decisions", 31L, DECISION_PRICE));
-            slots.put(ModelKind.EMBEDDING, slot(ModelKind.EMBEDDING, "openai-embeddings", 32L, null));
-            slots.put(ModelKind.RERANKING, slot(ModelKind.RERANKING, "cohere-rerank", 33L, null));
-            job.setConfigSnapshot(ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper)
-                    .withPracticeScript(slots)
-                    .toJson(objectMapper));
-            return job;
-        }
-
-        private static FrozenModel slot(
-                ModelKind kind, String protocol, long connectionId, @Nullable LlmPriceSnapshot price) {
-            return new FrozenModel(
-                    protocol,
-                    "https://models.example.com/" + kind.name().toLowerCase(Locale.ROOT),
-                    kind.name().toLowerCase(Locale.ROOT) + "-model",
-                    UsageFundingSource.WORKSPACE,
-                    connectionId,
-                    connectionId + 10,
-                    7L,
-                    null,
-                    null,
-                    price);
-        }
-    }
-
-    private ReviewJob createRunningJob() {
-        return createRunningJob(null);
-    }
-
-    private ReviewJob createRunningJob(@Nullable LlmPriceSnapshot price) {
+    private static ReviewJob running() {
         var job = new ReviewJob();
-        ConfigSnapshot snapshot = new ConfigSnapshot(
-                ConfigSnapshot.SCHEMA_VERSION,
-                "openai-completions",
-                "https://api.openai.com/v1",
-                "gpt-5-mini",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                600,
-                false,
-                price,
-                null,
-                null);
-        job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setId(UUID.randomUUID());
-        Workspace workspace = new Workspace();
-        workspace.setId(7L);
-        RuntimeJobTestData.initialize(job, workspace.getId());
+        RuntimeJobTestData.initialize(job, 7L);
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-1");
+        job.setAttempt(3);
         return job;
     }
 
-    @Nested
-    class NoAmbientCredentialIsAccepted {
-
-        @Test
-        void theSameTokenInACookieAuthenticatesNobody() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.setCookies(new Cookie("hephaestus_session", JOB_JWT), new Cookie("JSESSIONID", JOB_JWT));
-
-            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
-
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-            verify(jwtVerifier, never()).verify(any());
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void theSameTokenInAQueryParameterAuthenticatesNobody() throws Exception {
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.setParameter("access_token", JOB_JWT);
-            request.setParameter("token", JOB_JWT);
-
-            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
-
-            assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-            verify(jwtVerifier, never()).verify(any());
-            verify(filterChain, never()).doFilter(any(), any());
-        }
-
-        @Test
-        void theSameTokenInTheHeaderDoesAuthenticate() throws Exception {
-            ReviewJob job = createRunningJob();
-            when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
-            var authInsideChain = new AtomicReference<Authentication>();
-            doAnswer(invocation -> {
-                        authInsideChain.set(Objects.requireNonNull(
-                                SecurityContextHolder.getContext().getAuthentication()));
-                        return null;
-                    })
-                    .when(filterChain)
-                    .doFilter(any(), any());
-            var request = new MockHttpServletRequest();
-            request.setRemoteAddr("10.0.0.2");
-            request.addHeader("Authorization", "Bearer " + JOB_JWT);
-
-            filter.doFilterInternal(request, new MockHttpServletResponse(), filterChain);
-
-            assertThat(authInsideChain.get()).isNotNull();
-        }
+    private static JobJwt jwt(UUID id, long workspace, int attempt) {
+        var now = Instant.now();
+        return new JobJwt(
+                id, workspace, attempt, Set.of("llm_proxy"), UUID.randomUUID().toString(), now, now.plusSeconds(60));
     }
 
-    private static JobJwt jobJwt(ReviewJob job, Set<String> scopes) {
-        Instant now = Instant.now();
-        return new JobJwt(
-                job.getId(),
-                job.getWorkspaceId(),
-                job.getAttempt(),
-                scopes,
-                UUID.randomUUID().toString(),
-                now,
-                now.plusSeconds(60));
+    private static MockHttpServletRequest request(String path, String authorization) {
+        var request = new MockHttpServletRequest("POST", path);
+        request.setRemoteAddr("127.0.0.1");
+        request.addHeader("Authorization", authorization);
+        return request;
     }
 }

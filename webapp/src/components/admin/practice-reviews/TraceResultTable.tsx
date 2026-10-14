@@ -1,22 +1,27 @@
 import { ChevronRightIcon } from "lucide-react";
-import { use } from "react";
-import { resultSummary } from "./result-words";
 
 import { cn } from "cn";
-import type { ReviewLineage, ReviewLineageResult } from "@/api/types.gen";
+import type { ReviewLineage } from "@/api/types.gen";
 import type { BadgeVariant } from "@/components/common/status-def";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
-import { DEVELOPER_RESPONSE_DEFS } from "@/components/practice-vocabulary/result-dispute-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { Button } from "@/components/ui/button";
 import { hasText } from "@/lib/text";
 
-import { countOf, type NumberedResult, verdictSummary } from "./lineage-chain";
+import {
+	countOf,
+	feedbackOf,
+	type LineageRecords,
+	type LineageResult,
+	lineageRecords,
+	type NumberedResult,
+	verdictSummary,
+} from "./lineage-chain";
 import { answeredEarlier, reviewStepState } from "./lineage-story";
 import { LineageResultChip } from "./LineageResultChip";
-import { LineageTimes, OffPathNote, Step, StepTime, ToneIcon } from "./LineageStep";
-import { sameTraceNode, type TraceNode } from "./review-trace";
+import { OffPathNote, Step, StepTime, ToneIcon } from "./LineageStep";
+import { resultSummary } from "./result-words";
+import { chainReview, sameTraceNode, type TraceNode } from "./review-trace";
 import { hiddenByFilter, type TraceFilter } from "./trace-filter";
 import { type RailStepProps, StoryNode, offPath, useStory } from "./TraceStoryNode";
 import { CellLabel, TRACE_ROW_CELLS, TRACE_ROW_MAIN, TraceTable, traceRowGrid } from "./TraceTable";
@@ -64,23 +69,21 @@ export function ResultsStep({
 	here,
 	previous,
 	at,
-	reviewOutcome,
 	othersOpen,
 	onOthersOpenChange,
 }: RailStepProps & { at: Date | undefined }) {
-	const { display } = useStory();
-	const total = lineage.results.length + lineage.moreResults;
-	const earlier = numbered.filter(({ result }) => answeredEarlier(result, lineage.review));
-	const marked = numbered.filter(({ result }) => result.invalidated).length;
+	const { display, review: detail } = useStory();
+	const records = lineageRecords(lineage);
+	const review = chainReview(records);
+	const total = records.results.length;
+	const earlier = numbered.filter(({ result }) => answeredEarlier(result, review));
 	const empty = total === 0;
+	// The detail the page read speaks for this review only.
 	const nothing =
-		lineage.review === undefined
+		review === undefined
 			? undefined
-			: reviewStepState(lineage.review, reviewOutcome).assessedNothing;
-	const extras = [
-		earlier.length > 0 ? `${earlier.length} answered by an earlier review` : undefined,
-		marked > 0 ? `${marked} marked incorrect` : undefined,
-	].filter(hasText);
+			: reviewStepState(review, detail?.id === review.id ? detail : undefined).assessedNothing;
+	const extras = earlier.length > 0 ? [`${earlier.length} answered by an earlier review`] : [];
 	const inTable = new Set(rows.map(({ result }) => result.id));
 	const dotted = numbered.filter(({ result }) => !inTable.has(result.id));
 	const shownRows =
@@ -112,7 +115,7 @@ export function ResultsStep({
 	return (
 		<Step
 			dot={{
-				tone: empty ? "outline" : worstTone(lineage.results),
+				tone: empty ? "outline" : worstTone(records.results),
 				hollow: empty,
 				here: here?.kind === "result" || here?.kind === "results",
 			}}
@@ -135,7 +138,8 @@ export function ResultsStep({
 									<ResultRow
 										key={entry.result.id}
 										entry={entry}
-										lineage={lineage}
+										records={records}
+										review={review?.id}
 										letters={letters}
 										muted={offPath(traced, { kind: "result", id: entry.result.id })}
 									/>
@@ -170,11 +174,7 @@ export function ResultsStep({
 										)}
 										{dotted.map(({ result, number }) => (
 											<li key={result.id}>
-												<ResultDot
-													result={result}
-													number={number}
-													disputed={disputedFrom(result.id, lineage)}
-												/>
+												<ResultDot result={result} number={number} />
 											</li>
 										))}
 									</ul>
@@ -208,7 +208,8 @@ function ResultsHead({
 	nothing: string | undefined;
 	extras: readonly string[];
 }) {
-	const wholeTotal = full.results.length + full.moreResults;
+	const whole = lineageRecords(full).results;
+	const wholeTotal = whole.length;
 	const filtered = filter.kind !== "all";
 	if (wholeTotal === 0) {
 		return (
@@ -226,7 +227,7 @@ function ResultsHead({
 	}
 	return (
 		<>
-			<span className="block font-medium">{`It recorded ${verdictSummary(full)}.`}</span>
+			<span className="block font-medium">{`It recorded ${verdictSummary(whole)}.`}</span>
 			{shown !== undefined && <span className="block text-muted-foreground">{shown}</span>}
 			{total > 0 && extras.length > 0 && (
 				<span className="block text-muted-foreground">{extras.join(" · ")}</span>
@@ -235,8 +236,8 @@ function ResultsHead({
 	);
 }
 
-function worstTone(results: readonly ReviewLineageResult[]): BadgeVariant {
-	for (const outcome of ["NOT_MET", "MET", "UNDETERMINED", "NOT_APPLICABLE"] as const) {
+function worstTone(results: readonly LineageResult[]): BadgeVariant {
+	for (const outcome of ["NOT_MET", "MET", "COULD_NOT_DETERMINE", "DOES_NOT_APPLY"] as const) {
 		if (results.some((entry) => entry.outcome === outcome)) {
 			return OUTCOME_DEFS[outcome].badgeVariant;
 		}
@@ -244,29 +245,8 @@ function worstTone(results: readonly ReviewLineageResult[]): BadgeVariant {
 	return "outline";
 }
 
-/**
- * Whether the developer disputes a piece of feedback written from the result, as the
- * Results list's "Developer response" filter reads it. Only that they dispute it: their rating
- * and notes are never part of the chain.
- */
-function disputedFrom(practiceResultId: string, lineage: ReviewLineage): boolean {
-	return lineage.feedback.some(
-		(feedback) =>
-			feedback.practiceResultIds.includes(practiceResultId) && feedback.response?.disputed === true,
-	);
-}
-
 /** One result as its dot, which brings it into view and opens its sheet. */
-function ResultDot({
-	result,
-	number,
-	disputed,
-}: {
-	result: ReviewLineageResult;
-	number: number;
-	/** Whether the developer disputes feedback written from it. */
-	disputed: boolean;
-}) {
+function ResultDot({ result, number }: { result: LineageResult; number: number }) {
 	const context = useStory();
 	const node: TraceNode = { kind: "result", id: result.id };
 	const chip = (
@@ -281,9 +261,7 @@ function ResultDot({
 	// The outcome in words too, so a dot is never told by its colour alone.
 	const facts = [
 		OUTCOME_DEFS[result.outcome].label,
-		result.severity && SEVERITY_DEFS[result.severity].label.toLowerCase(),
-		disputed ? "disputed" : undefined,
-		result.invalidated ? "marked incorrect" : undefined,
+		result.severity === null ? undefined : SEVERITY_DEFS[result.severity].label.toLowerCase(),
 	].filter(hasText);
 	const title = `${number} · ${facts.join(", ")}: ${resultSummary(result)}`;
 	if (open === undefined) {
@@ -308,14 +286,13 @@ function ResultDot({
 	);
 }
 
-/** The letters of the pieces of feedback written from a result, in the order they were written. */
+/** The letters of the pieces of feedback written from a result, in letter order. */
 function fedLetters(
-	practiceResultId: string,
-	lineage: ReviewLineage,
+	resultId: string,
+	records: LineageRecords,
 	letters: ReadonlyMap<string, string>,
 ): string[] {
-	return lineage.feedback
-		.filter((feedback) => feedback.practiceResultIds.includes(practiceResultId))
+	return feedbackOf(records.feedback, resultId)
 		.map((feedback) => letters.get(feedback.id))
 		.filter(hasText)
 		.sort((a, b) => a.length - b.length || a.localeCompare(b));
@@ -324,28 +301,28 @@ function fedLetters(
 /**
  * One result as a row of the review stage's table: its number in its verdict's colour, its
  * practice and summary, the outcome, the severity, the pieces of feedback written from it by letter,
- * and when it was observed. A correction, a dispute or an earlier review's answer stands under the
- * summary.
+ * and when it was recorded. An earlier review's answer stands under the summary.
  */
 function ResultRow({
 	entry,
-	lineage,
+	records,
+	review,
 	letters,
 	muted,
 }: {
 	entry: NumberedResult;
-	lineage: ReviewLineage;
+	records: LineageRecords;
+	/** The id of the trace's review, which says whether an earlier review answered the result. */
+	review: string | undefined;
 	letters: ReadonlyMap<string, string>;
 	muted: boolean;
 }) {
 	const { display } = useStory();
 	const { result, number } = entry;
 	const outcome = OUTCOME_DEFS[result.outcome];
-	const severity = result.severity && SEVERITY_DEFS[result.severity];
-	const earlier = answeredEarlier(result, lineage.review);
-	const disputed = disputedFrom(result.id, lineage);
-	const fed = fedLetters(result.id, lineage, letters);
-	const flagged = result.invalidated || disputed || earlier;
+	const severity = result.severity === null ? undefined : SEVERITY_DEFS[result.severity];
+	const earlier = review !== undefined && result.reviewId !== review;
+	const fed = fedLetters(result.id, records, letters);
 	return (
 		<li data-muted={muted} className={cn(muted && "text-muted-foreground")}>
 			<OffPathNote muted={muted} />
@@ -364,50 +341,22 @@ function ResultRow({
 				<span className={TRACE_ROW_CELLS}>
 					<span className={TRACE_ROW_MAIN}>
 						<span className="block font-medium break-words">{result.practiceName}</span>
-						<span
-							className={cn(
-								"block break-words text-muted-foreground",
-								result.invalidated && "line-through",
-							)}
-						>
-							{resultSummary(result)}
-						</span>
-						{flagged && (
-							<span className="flex flex-wrap items-center gap-x-2 text-muted-foreground">
-								{result.invalidated && (
-									<span className="inline-flex flex-wrap items-center gap-x-1 font-medium text-foreground">
-										<ToneIcon def={MARKED_INCORRECT_DEF} className="size-3" />
-										{MARKED_INCORRECT_DEF.label}
-										{result.markedIncorrectAt && (
-											<LabeledRailTime
-												label="at"
-												at={result.markedIncorrectAt}
-												className="font-normal text-muted-foreground"
-											/>
-										)}
-									</span>
-								)}
-								{disputed && (
-									<span className="inline-flex items-center gap-1 font-medium text-foreground">
-										<ToneIcon def={DEVELOPER_RESPONSE_DEFS.DISPUTED} className="size-3" />
-										{DEVELOPER_RESPONSE_DEFS.DISPUTED.label}
-									</span>
-								)}
-								{earlier && <span>Answered by an earlier review</span>}
-							</span>
+						<span className="block break-words text-muted-foreground">{resultSummary(result)}</span>
+						{earlier && (
+							<span className="block text-muted-foreground">Answered by an earlier review</span>
 						)}
 					</span>
 					<span className="inline-flex items-center gap-1">
 						<ToneIcon def={outcome} className="size-3" />
 						{outcome.label}
 					</span>
-					{severity ? (
+					{severity === undefined ? (
+						<span aria-hidden className="hidden @lg:block" />
+					) : (
 						<span className="inline-flex items-center gap-1">
 							<ToneIcon def={severity} className="size-3" />
 							{severity.label}
 						</span>
-					) : (
-						<span aria-hidden className="hidden @lg:block" />
 					)}
 					<span>
 						{fed.length > 0 ? (
@@ -425,31 +374,11 @@ function ResultRow({
 					{display.times && (
 						<span className="text-muted-foreground @lg:text-right">
 							<CellLabel>Recorded</CellLabel>
-							<StepTime at={result.observedAt} />
+							<StepTime at={result.recordedAt} />
 						</span>
 					)}
 				</span>
 			</StoryNode>
 		</li>
-	);
-}
-
-/** "Recorded 3:37 pm": a time inside a step with what it is the time of, so two never read alike. */
-function LabeledRailTime({
-	label,
-	at,
-	className,
-}: {
-	label: string;
-	at: Date;
-	className?: string;
-}) {
-	if (!use(LineageTimes)) {
-		return null;
-	}
-	return (
-		<span className={className}>
-			{label} <StepTime at={at} />
-		</span>
 	);
 }

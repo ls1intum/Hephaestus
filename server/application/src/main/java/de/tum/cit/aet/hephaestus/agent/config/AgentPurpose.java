@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelSlot;
 import java.util.Arrays;
 import java.util.List;
 
@@ -31,6 +32,15 @@ public enum AgentPurpose {
     /** The kind of model that this purpose calls. */
     public ModelKind kind() {
         return kind;
+    }
+
+    public static AgentPurpose forSlot(ModelSlot slot) {
+        return switch (slot) {
+            case CHAT -> PRACTICE_REVIEW;
+            case DECISION -> PRACTICE_DECISION;
+            case EMBEDDING -> PRACTICE_EMBEDDING;
+            case RERANKING -> PRACTICE_RERANKING;
+        };
     }
 
     public boolean accepts(LlmApiProtocol protocol) {

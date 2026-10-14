@@ -30,6 +30,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ConversationDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheck;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticePageDecision;
@@ -41,6 +42,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -52,6 +54,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
@@ -73,7 +77,11 @@ class FeedbackCompositionContextServiceTest {
     final ItemRef item = new ItemRef(1, 3, new ItemKind("scm.pull_request"), 42L, null, null);
     final PinnedPractice pin = mock(PinnedPractice.class);
     final PracticeDefinition definition = mock(PracticeDefinition.class);
-    final PracticeVersion version = mock(PracticeVersion.class);
+    final PracticeVersion version = TestEntities.practiceVersion(
+            8,
+            1,
+            new JsonMapper().readTree("{\"criteria\":\"Use clear names.\",\"about\":\"AUTHOR\"}"),
+            "v6:" + "a".repeat(64));
     final FeedbackCompositionContextService service = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -102,13 +110,11 @@ class FeedbackCompositionContextServiceTest {
         when(reviews.find(1, reviewId)).thenReturn(Optional.of(snapshot));
         when(reviews.find(1, historical.getReviewId())).thenReturn(Optional.of(snapshot));
         when(results.findByWorkspaceIdAndIdIn(1, List.of(current.getId()))).thenReturn(List.of(current));
-        var practice = mock(Practice.class);
-        when(practice.getWorkspaceId()).thenReturn(1L);
-        when(practice.getSlug()).thenReturn("focused-tests");
-        when(practices.findById(5L)).thenReturn(Optional.of(practice));
-        when(version.getWorkspaceId()).thenReturn(1L);
-        when(version.getDefinition()).thenReturn(new JsonMapper().readTree("{\"about\":\"AUTHOR\"}"));
-        when(versions.findById(8L)).thenReturn(Optional.of(version));
+        var practice = new Practice();
+        practice.setWorkspace(TestEntities.workspace(1L));
+        practice.setSlug("focused-tests");
+        when(practices.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(practice));
+        when(versions.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(version));
         var check = mock(FeedbackCheck.class);
         when(check.allowed()).thenReturn(true);
         when(gate.evaluateComposition(any(), anyLong(), anyList(), any())).thenReturn(check);
@@ -168,16 +174,31 @@ class FeedbackCompositionContextServiceTest {
                 .isEqualTo(ConversationDecision.ADMIT);
     }
 
-    @Test
-    void shouldWithholdPatternWordsWhenOnlyOneItemRemainsAuthorized() {
+    @ParameterizedTest
+    @EnumSource(
+            value = FeedbackStopReason.class,
+            names = {"DELIVERY_OFF", "NO_AI", "PERSON_SUPPRESSED", "WORKSPACE_DELIVERY_PAUSED"})
+    void shouldPreserveTheGateRefusalInsteadOfClaimingMissingEvidence(FeedbackStopReason reason) {
         var refusal = mock(FeedbackCheck.class);
-        when(gate.evaluateComposition(snapshot, 7, List.of(historical), FeedbackDestination.PRACTICE_PAGE))
+        when(refusal.reason()).thenReturn(reason);
+        when(gate.evaluateComposition(snapshot, 7, List.of(current, historical), FeedbackDestination.PRACTICE_PAGE))
                 .thenReturn(refusal);
         var page = Objects.requireNonNull(
                 service.read(1, reviewId, List.of(current.getId())).practicePageSupport());
-        assertThat(page.practices().getFirst().decision()).isEqualTo(PracticePageDecision.UNCORROBORATED);
+        assertThat(page.practices().getFirst().decision()).isEqualTo(PracticePageDecision.GATE_REFUSED);
+        assertThat(page.practices().getFirst().stopReason()).isEqualTo(reason);
         assertThat(page.practices().getFirst().occurrences()).isEmpty();
         verifyNoInteractions(history);
+    }
+
+    @Test
+    void shouldReportNoEvidenceOnlyWhenTheAuthorizedSelectionIsEmpty() {
+        when(support.select(1, 7, 5, now))
+                .thenReturn(new PracticePageSupportReader.Selection(Optional.empty(), List.of()));
+        var page = Objects.requireNonNull(
+                service.read(1, reviewId, List.of(current.getId())).practicePageSupport());
+        assertThat(page.practices().getFirst().decision()).isEqualTo(PracticePageDecision.NO_EVIDENCE);
+        assertThat(page.practices().getFirst().stopReason()).isEqualTo(FeedbackStopReason.NO_EVIDENCE);
     }
 
     @Test
@@ -192,12 +213,14 @@ class FeedbackCompositionContextServiceTest {
 
     @Test
     void shouldRequireOneAttributedDeveloperAndRejectForeignReviewIds() {
-        current.setDeveloperId(null);
+        var unattributed = current.toBuilder().developerId(null).build();
+        when(results.findByWorkspaceIdAndIdIn(1, List.of(current.getId()))).thenReturn(List.of(unattributed));
         assertThat(Objects.requireNonNull(service.read(1, reviewId, List.of(current.getId()))
                                 .practicePageSupport())
                         .state())
                 .isEqualTo(PracticePageSupport.State.UNAVAILABLE);
-        current.setReviewId(UUID.randomUUID());
+        var foreign = current.toBuilder().reviewId(UUID.randomUUID()).build();
+        when(results.findByWorkspaceIdAndIdIn(1, List.of(current.getId()))).thenReturn(List.of(foreign));
         assertThatThrownBy(() -> service.read(1, reviewId, List.of(current.getId())))
                 .isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(history, mentor);
@@ -218,12 +241,13 @@ class FeedbackCompositionContextServiceTest {
     @Test
     void shouldKeepFeedbackOffReviewerAndNaturalAnchorReasonsDistinct() {
         when(gate.mode(current)).thenReturn(FeedbackMode.OFF);
-        assertThat(service.conversationDecision(snapshot, current))
-                .isEqualTo(ConversationDecision.PRACTICE_REQUIRES_APPROVAL);
+        assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.FEEDBACK_OFF);
         when(gate.mode(current)).thenReturn(FeedbackMode.AUTOMATIC);
-        when(version.getDefinition()).thenReturn(new JsonMapper().readTree("{\"about\":\"REVIEWER\"}"));
+        when(versions.findByIdAndWorkspaceId(8L, 1L))
+                .thenReturn(Optional.of(TestEntities.practiceVersion(
+                        8, 1, new JsonMapper().readTree("{\"about\":\"REVIEWER\"}"), "v6:" + "a".repeat(64))));
         assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.REVIEWER_DEFERRED);
-        when(version.getDefinition()).thenReturn(new JsonMapper().readTree("{\"about\":\"AUTHOR\"}"));
+        when(versions.findByIdAndWorkspaceId(8L, 1L)).thenReturn(Optional.of(version));
         when(definition.lineNotes()).thenReturn(true);
         var descriptor = mock(ItemDescriptor.class);
         when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.LINE_NOTE));
@@ -245,6 +269,22 @@ class FeedbackCompositionContextServiceTest {
         var page = Objects.requireNonNull(
                 service.read(1, reviewId, List.of(current.getId())).practicePageSupport());
         assertThat(page.practices().getFirst().decision()).isEqualTo(PracticePageDecision.RECENTLY_SURFACED);
+        assertThat(page.practices().getFirst().occurrences()).isEmpty();
+        verifyNoInteractions(history);
+    }
+
+    @Test
+    void shouldKeepConsentWithholdingWhenTheSupportReaderReturnsNoWords() {
+        when(support.select(1, 7, 5, now))
+                .thenReturn(new PracticePageSupportReader.Selection(Optional.empty(), List.of()));
+        var refusal = mock(FeedbackCheck.class);
+        when(refusal.reason()).thenReturn(FeedbackStopReason.NO_AI);
+        when(gate.evaluateComposition(snapshot, 7, List.of(current), FeedbackDestination.PRACTICE_PAGE))
+                .thenReturn(refusal);
+        var page = Objects.requireNonNull(
+                service.read(1, reviewId, List.of(current.getId())).practicePageSupport());
+        assertThat(page.practices().getFirst().decision()).isEqualTo(PracticePageDecision.GATE_REFUSED);
+        assertThat(page.practices().getFirst().stopReason()).isEqualTo(FeedbackStopReason.NO_AI);
         assertThat(page.practices().getFirst().occurrences()).isEmpty();
         verifyNoInteractions(history);
     }

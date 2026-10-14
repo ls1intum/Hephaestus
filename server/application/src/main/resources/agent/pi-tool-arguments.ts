@@ -1,4 +1,4 @@
-import { isRecord } from "./pi-result-normalize.ts";
+import { isRecord } from "./pi-text.ts";
 
 /** Decode only JSON containers. Invalid text and scalar values stay unchanged for validation. */
 function container(value: unknown, kind: "object" | "array"): unknown {

@@ -65,10 +65,9 @@ public class GitLabPipelineMessageHandler extends AbstractIntegrationMessageHand
     }
 
     /**
-     * Records the pipeline Hephaestus received at {@code arrivedAt}, where nothing observed later
-     * is stored: a delayed hook does not put back a status the pipeline or a later read has since
-     * replaced. Runs in the caller's transaction, which holds each merge request's row while it
-     * compares.
+     * Records the pipeline Hephaestus received at {@code arrivedAt}, where nothing observed later is stored: a
+     * delayed hook does not put back a status the pipeline or a later read has since replaced. Runs in the caller's
+     * transaction, which holds each merge request's row while it compares.
      */
     void handle(GitLabPipelineEventDTO event, Instant arrivedAt) {
         var pipeline = event.objectAttributes();

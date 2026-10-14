@@ -20,7 +20,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles all GitHub issue webhook events. */
+/**
+ * Handles all GitHub issue webhook events.
+ */
 @Component
 public class GitHubIssueMessageHandler extends AbstractIntegrationMessageHandler<GitHubIssueEventDTO> {
 

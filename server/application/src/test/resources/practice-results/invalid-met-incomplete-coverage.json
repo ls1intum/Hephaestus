@@ -5,7 +5,7 @@
 	"citations": [
 		{
 			"sourceKind": "scm.pull-request.diff",
-			"artifactPath": "context/change.json",
+			"sourcePath": "context/change.json",
 			"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 			"side": "NEW",
 			"startLine": 72,
@@ -16,7 +16,7 @@
 	"example": {
 		"citation": {
 			"sourceKind": "scm.pull-request.diff",
-			"artifactPath": "context/change.json",
+			"sourcePath": "context/change.json",
 			"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 			"side": "NEW",
 			"startLine": 18,
@@ -27,7 +27,9 @@
 	},
 	"evidence": {
 		"search": {
-			"consulted": ["scm.pull-request.diff"],
+			"consulted": [
+				"scm.pull-request.diff"
+			],
 			"lookedFor": "added comments that restate the code, mislead, or comment out code",
 			"boundary": "every added line of the three changed files"
 		}
@@ -43,8 +45,11 @@
 				"what": "lines of the retry policy beyond the read limit",
 				"count": 1,
 				"reason": "truncated",
-				"units": ["src/main/java/com/acme/billing/export/ExportRetryPolicy.java"]
+				"items": [
+					"src/main/java/com/acme/billing/export/ExportRetryPolicy.java"
+				]
 			}
-		]
+		],
+		"receipts": []
 	}
 }

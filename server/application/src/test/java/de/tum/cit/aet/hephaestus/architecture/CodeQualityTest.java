@@ -47,7 +47,6 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * All thresholds are defined in ArchitectureTestConstants.
  *
- * Thresholds: ArchitectureTestConstants.
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
     private static final Map<String, Integer> CONTRACT_INTERFACE_METHODS = Map.of(
@@ -75,10 +74,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // Full provider-lifecycle orchestrators with broad ConnectionService usage —
                     // splitting them further scatters related logic without reducing coupling.
                     "GitLabWorkspaceInitializationService",
-                    "WorkspaceRepositoryMonitorService",
-                    // Admits one submission in one transaction and answers it with the stored results and their
-                    // problems, the composition basis and the in-app and conversation routing it decided.
-                    "ResultAdmissionService");
+                    "WorkspaceRepositoryMonitorService");
 
             ArchRule rule = classes()
                     .that()

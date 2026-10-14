@@ -47,7 +47,7 @@ public class DocumentCaptureSource implements ContentSource {
     /** URLs carry no retrieval signal (slugs/hosts pollute the term set) — stripped before tokenizing. */
     private static final Pattern URL_NOISE = Pattern.compile("https?://\\S+");
 
-    /** Splits artifact text into candidate terms; everything non-alphanumeric is markdown/punctuation noise. */
+    /** Splits item text into candidate terms; everything non-alphanumeric is markdown/punctuation noise. */
     private static final Pattern NON_TERM = Pattern.compile("[^\\p{L}\\p{Nd}]+");
 
     /** Per-document body excerpt fed to the mentor; keeps the single JSON file bounded. */
@@ -171,7 +171,7 @@ public class DocumentCaptureSource implements ContentSource {
 
     /**
      * Distinct keywords from the artifact title + body, {@code OR}-joined for {@code websearch_to_tsquery}:
-     * unquoted websearch terms are ANDed, which over-constrains any real artifact text to zero matches, so
+     * unquoted websearch terms are ANDed, which over-constrains any real item text to zero matches, so
      * relevance has to come from {@code ts_rank} over OR'd terms instead. URLs and sub-3-char tokens carry
      * no signal and are dropped; empty when nothing survives.
      */

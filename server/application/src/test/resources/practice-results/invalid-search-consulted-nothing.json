@@ -5,7 +5,7 @@
 	"citations": [
 		{
 			"sourceKind": "scm.pull-request.diff",
-			"artifactPath": "context/change.json",
+			"sourcePath": "context/change.json",
 			"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 			"side": "NEW",
 			"startLine": 72,
@@ -16,7 +16,7 @@
 	"example": {
 		"citation": {
 			"sourceKind": "scm.pull-request.diff",
-			"artifactPath": "context/change.json",
+			"sourcePath": "context/change.json",
 			"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 			"side": "NEW",
 			"startLine": 18,
@@ -37,6 +37,7 @@
 		"reads": 6,
 		"truncatedReads": 0,
 		"failedReads": 0,
-		"complete": true
+		"complete": true,
+		"receipts": []
 	}
 }

@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 import { errorText } from "./pi-error-text.ts";
-import { hasText } from "./pi-text.ts";
+import { hasText, isRecord } from "./pi-text.ts";
 
 /** One chat model as {@link ModelRuntime.registerProvider} takes it; the extension-facing type omits sampling. */
 export type RegisteredModel = Extract<
@@ -75,10 +75,6 @@ export const PROVIDER_CONFIG_FILENAME = "pi-provider.json";
 export const DEFAULT_WORKSPACE_ROOT = "/workspace";
 const DEFAULT_CONTEXT_WINDOW = 128_000;
 const DEFAULT_MAX_TOKENS = 16_384;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null;
-}
 
 function positiveInteger(value: unknown): boolean {
 	return typeof value === "number" && Number.isInteger(value) && value > 0;

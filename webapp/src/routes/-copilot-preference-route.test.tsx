@@ -7,7 +7,7 @@ import { getMemberOnboardingQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceOnboarding } from "@/api/types.gen";
 import type { ChatMessage } from "@/lib/types";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { renderRouteAtWithRouter, ROUTE_RENDER_WAIT } from "@/test/router-harness";
 
@@ -21,7 +21,7 @@ function mockCopilot(preference: WorkspaceOnboarding) {
 		// The account carries no flags: the copilot follows the workspace and the member's AI choice.
 		http.get("*/user/features", () => HttpResponse.json({})),
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "MEMBER", userId: 20, userLogin: "ada" }),
+			HttpResponse.json(ownMembership("MEMBER")),
 		),
 		http.get("*/workspaces/:workspaceSlug/onboarding/me", () => HttpResponse.json(preference)),
 		http.get("*/workspaces/:workspaceSlug/mentor/threads", () => HttpResponse.json([])),

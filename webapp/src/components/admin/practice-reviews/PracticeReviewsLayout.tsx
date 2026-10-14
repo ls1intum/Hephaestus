@@ -11,19 +11,19 @@ import { carriedScope, type ReviewScopeSearch } from "./review-scope";
 
 const SECTIONS = [
 	{ to: "/w/$workspaceSlug/admin/practices/reviews", label: "Overview", tab: "overview" },
-	{ to: "/w/$workspaceSlug/admin/practices/reviews/runs", label: "Reviews", tab: "runs" },
+	{ to: "/w/$workspaceSlug/admin/practices/reviews/runs", label: "Reviews", tab: "reviews" },
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/results", label: "Results", tab: "results" },
 	{
 		to: "/w/$workspaceSlug/admin/practices/reviews/observations",
 		label: "Problems",
-		tab: "observations",
+		tab: "problems",
 	},
 	{ to: "/w/$workspaceSlug/admin/practices/reviews/feedback", label: "Feedback", tab: "feedback" },
 ] as const;
 
 /** How many each list tab holds under the shared scope; a tab whose count is not known yet is left out. */
 export type ReviewTabCounts = Partial<
-	Record<"runs" | "results" | "observations" | "feedback", number>
+	Record<"reviews" | "results" | "problems" | "feedback", number>
 >;
 
 const COUNT_FORMAT = new Intl.NumberFormat("en-US");
@@ -89,7 +89,7 @@ export function PracticeReviewsLayout({
 												params={{ workspaceSlug }}
 												// Every tab keeps the shared scope: a person, practices, a date range and the
 												// selection. A tab's own facets stay behind.
-												search={(previous: ReviewScopeSearch) => carriedScope(tab, previous)}
+												search={(previous: ReviewScopeSearch) => carriedScope(previous)}
 												activeOptions={{ exact: true, includeSearch: false }}
 											/>
 										}

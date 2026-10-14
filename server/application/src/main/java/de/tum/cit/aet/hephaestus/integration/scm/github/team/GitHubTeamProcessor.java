@@ -20,7 +20,9 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Processor for GitHub teams. */
+/**
+ * Processor for GitHub teams.
+ */
 @Service
 public class GitHubTeamProcessor {
 
@@ -139,10 +141,11 @@ public class GitHubTeamProcessor {
 
     /**
      * Delete a team by its ID.
-     *
-     * <p>IMPORTANT: Clears all associated memberships and repository permissions before deletion.
-     * While cascade REMOVE handles the deletion automatically, clearing the collections ensures no
-     * stale references remain in the persistence context.
+     * <p>
+     * IMPORTANT: Clears all associated memberships and repository permissions
+     * before deletion. While cascade REMOVE handles the deletion automatically,
+     * clearing the collections ensures no stale references remain in the
+     * persistence context.
      *
      * @param nativeId the team's native provider ID
      * @param context processing context with scope information
@@ -170,7 +173,9 @@ public class GitHubTeamProcessor {
                 });
     }
 
-    /** Check if the exception is a team slug unique constraint violation. */
+    /**
+     * Check if the exception is a team slug unique constraint violation.
+     */
     private boolean isSlugConflict(DataIntegrityViolationException e) {
         String message = e.getMessage();
         if (message == null) {
@@ -182,10 +187,11 @@ public class GitHubTeamProcessor {
 
     /**
      * Handle a slug conflict by finding the conflicting team and resolving it.
-     *
-     * <p>When a team is renamed, another team can take the old slug. This method: 1. Finds the team
-     * with the conflicting slug 2. Updates that team's slug and name to a placeholder 3. Retries
-     * the save for the new team
+     * <p>
+     * When a team is renamed, another team can take the old slug. This method:
+     * 1. Finds the team with the conflicting slug
+     * 2. Updates that team's slug and name to a placeholder
+     * 3. Retries the save for the new team
      *
      * @return the saved team, or null if unable to resolve
      */
@@ -214,7 +220,7 @@ public class GitHubTeamProcessor {
         // Rename the old team to free up the slug
         String renamedSlug = "RENAMED_" + oldTeam.getId();
         log.info(
-                "Freeing up team slug for renamed team: oldTeamId={}, oldSlug={}, newSlug={}," + " newTeamId={}",
+                "Freeing up team slug for renamed team: oldTeamId={}, oldSlug={}, newSlug={}, newTeamId={}",
                 oldTeam.getId(),
                 teamSlug,
                 renamedSlug,

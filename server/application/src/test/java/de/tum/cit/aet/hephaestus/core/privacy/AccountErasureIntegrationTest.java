@@ -255,8 +255,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 fixture.administratorId(), null, List.of(new PersonIdentity(fixture.providerId(), "42", null)));
         jdbc.update(
                 "UPDATE feedback_copy SET"
-                    + " state='POSTED',posted_at=CURRENT_TIMESTAMP,external_ref='note-99',external_url='https://privacy-gitlab.example.com/team/repo/-/merge_requests/19#note_99'"
-                    + " WHERE feedback_id=?",
+                        + " state='POSTED',posted_at=CURRENT_TIMESTAMP,external_ref='note-99',external_url='https://privacy-gitlab.example.com/team/repo/-/merge_requests/19#note_99'"
+                        + " WHERE feedback_id=?",
                 fixture.feedbackId());
         assertThatThrownBy(() -> personData.export(preview.request().getId()))
                 .isInstanceOf(ResponseStatusException.class)

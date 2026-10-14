@@ -37,7 +37,6 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
 import org.springframework.http.HttpStatus;
@@ -62,7 +61,7 @@ public class ResultStoreService implements ResultStore {
     private final ResultRepository results;
     private final ProblemRepository problems;
     private final ResultMarkRepository marks;
-    private final ObjectProvider<ResultMarkService> marking;
+    private final ResultMarkService marking;
     private final ResultProofMapper proof;
     private final JdbcClient jdbc;
     private final JsonMapper json;
@@ -288,7 +287,7 @@ public class ResultStoreService implements ResultStore {
 
     @Override
     public UUID mark(long workspaceId, UUID resultId, ResultMarkKind kind, long actorId, String reason) {
-        return marking.getObject()
+        return marking
                 .create(workspaceId, resultId, kind, actorId, reason)
                 .getId();
     }
@@ -300,7 +299,7 @@ public class ResultStoreService implements ResultStore {
                     .filter(m -> m.getWorkspaceId() == workspaceId)
                     .orElseThrow();
             var active = mark.getRemovedAt() == null;
-            marking.getObject().remove(workspaceId, mark.getResultId(), markId, actorId, reason);
+            marking.remove(workspaceId, mark.getResultId(), markId, actorId, reason);
             return active;
         }));
     }

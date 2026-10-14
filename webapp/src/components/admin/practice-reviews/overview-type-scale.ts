@@ -15,7 +15,7 @@ export const OVERVIEW_TYPE = {
 	heroNoun: "text-sm text-muted-foreground",
 	/** The main figure set against the period before, and other one-line asides under it. */
 	aside: "text-xs text-muted-foreground",
-	/** A group's caption inside a card: "Delivered by channel". */
+	/** A group's caption inside a card: "Delivered by location". */
 	caption: "text-xs font-medium text-muted-foreground",
 	/** A figure's label: "Waiting", "On GitHub". */
 	label: "text-sm text-muted-foreground",

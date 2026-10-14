@@ -40,8 +40,7 @@ public class ConversationCaptureSource implements ContentSource {
     @Override
     @Transactional(readOnly = true)
     public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
-        MentorContextRequest req = request;
-        ObjectNode payload = projection.buildPayload(req.workspaceId(), req.developerId());
+        ObjectNode payload = projection.buildPayload(request.workspaceId(), request.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
         } catch (JacksonException e) {

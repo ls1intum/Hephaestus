@@ -23,6 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
@@ -108,7 +109,10 @@ public class PracticeProfileReviewService {
     private ProfileReviewDTO dto(List<ResultView> v) {
         return new ProfileReviewDTO(
                 reviews.ref(v.getFirst().review()),
-                v.stream().map(r -> presentation.list(r, true)).toList(),
+                presentation.lists(
+                        v.getFirst().result().getWorkspaceId(),
+                        v,
+                        v.stream().map(r -> r.result().getId()).collect(Collectors.toSet())),
                 v.stream()
                         .flatMap(r -> presentation.ownFeedback(r.result()).stream())
                         .distinct()

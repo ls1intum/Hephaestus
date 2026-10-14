@@ -1,12 +1,12 @@
-import { blockExtents } from "../kits/scm/declarations.ts";
-import { scm } from "../kits/scm/index.ts";
-import { isTestPath } from "../kits/scm/languages.ts";
-import { occurrences, selectedSources, selectedOccurrences } from "../kits/scm/occurrences.ts";
 // Finds the selected lines that spell a crash operator that the author wrote, in all languages: a force
 // unwrap, `try!`, a force cast or an abort. Each lead tells if the line is inside a preview block or in
 // a test file. A lead matches spelling on one line. It does not know the type of the operand, where the
 // value came from, or what bounds it, so the review decides which leads are lapses. The input practice
 // owns implicit traps, such as a subscript or an integer division. To add a language, add a row.
+import { blockExtents } from "../kits/scm/declarations.ts";
+import { scm } from "../kits/scm/index.ts";
+import { isTestPath } from "../kits/scm/languages.ts";
+import { occurrences, selectedSources, selectedOccurrences } from "../kits/scm/occurrences.ts";
 import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

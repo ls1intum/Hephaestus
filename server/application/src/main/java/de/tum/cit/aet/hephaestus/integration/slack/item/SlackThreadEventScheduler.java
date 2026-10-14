@@ -12,19 +12,20 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Component
 @ConditionalOnServerRole
+@ConditionalOnBooleanProperty(value = "hephaestus.integration.slack.conversation-ingest.enabled", matchIfMissing = true)
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackThreadEventScheduler {
     private static final int MIN_TURNS = 4;
@@ -36,7 +37,7 @@ public class SlackThreadEventScheduler {
     private final SlackThreadRepository threads;
     private final ReviewService reviews;
     private final TransactionTemplate transactions;
-    private final boolean enabled;
+    private final Clock clock;
 
     public SlackThreadEventScheduler(
             SlackConversationCandidateSource candidates,
@@ -45,14 +46,14 @@ public class SlackThreadEventScheduler {
             SlackThreadRepository threads,
             ReviewService reviews,
             TransactionTemplate transactions,
-            @Value("${hephaestus.integration.slack.conversation-ingest.enabled:true}") boolean enabled) {
+            Clock clock) {
         this.candidates = candidates;
         this.source = source;
         this.items = items;
         this.threads = threads;
         this.reviews = reviews;
         this.transactions = transactions;
-        this.enabled = enabled;
+        this.clock = clock;
     }
 
     @Scheduled(cron = "0 */5 * * * *")
@@ -63,14 +64,13 @@ public class SlackThreadEventScheduler {
 
     @WorkspaceAgnostic("Cross-workspace Slack source discovery writes an explicit workspace on every item and event")
     public long sweepNow() {
-        if (!enabled) return 0;
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         long offered = 0;
         for (var candidate : candidates.settledCandidates(MIN_TURNS)) {
             Long last = SlackTs.toEpochMicros(candidate.lastTs());
             if (last == null
-                    || Instant.ofEpochSecond(last / 1_000_000L, last % 1_000_000L * 1_000L)
-                            .isAfter(now.minusSeconds(QUIESCENCE_MINUTES * 60L))) continue;
+                    || Instant.EPOCH.plus(last, ChronoUnit.MICROS).isAfter(now.minusSeconds(QUIESCENCE_MINUTES * 60L)))
+                continue;
             if (candidates.liveTurnCount(candidate.workspaceId(), candidate.channelId(), candidate.threadTs())
                             < MIN_TURNS
                     || candidates.liveTurnCountSince(
@@ -100,22 +100,19 @@ public class SlackThreadEventScheduler {
         return offered;
     }
 
-    @TransactionalEventListener
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @ApplicationModuleListener
     public void onReviewRequested(ReviewRequested event) {
-        transactions.executeWithoutResult(status -> reviews.find(event.workspaceId(), event.reviewId())
-                .ifPresent(review -> {
-                    if (!ThreadEvents.THREAD.equals(review.item().kind()) || review.version() == null) return;
-                    Long sourceId = review.item().sourceId();
-                    if (sourceId == null) return;
-                    source.current(review.item())
-                            .filter(current -> current.version().equals(review.version()))
-                            .ifPresent(current -> threads.findByWorkspaceIdAndId(event.workspaceId(), sourceId)
-                                    .ifPresent(thread -> {
-                                        String lastTs = thread.getLastTs();
-                                        if (lastTs != null)
-                                            candidates.markReviewed(event.workspaceId(), sourceId, lastTs);
-                                    }));
-                }));
+        reviews.find(event.workspaceId(), event.reviewId()).ifPresent(review -> {
+            if (!ThreadEvents.THREAD.equals(review.item().kind()) || review.version() == null) return;
+            Long sourceId = review.item().sourceId();
+            if (sourceId == null) return;
+            source.current(review.item())
+                    .filter(current -> current.version().equals(review.version()))
+                    .ifPresent(current -> threads.findByWorkspaceIdAndId(event.workspaceId(), sourceId)
+                            .ifPresent(thread -> {
+                                String lastTs = thread.getLastTs();
+                                if (lastTs != null) candidates.markReviewed(event.workspaceId(), sourceId, lastTs);
+                            }));
+        });
     }
 }

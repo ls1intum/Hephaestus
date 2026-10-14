@@ -160,6 +160,7 @@ class ReviewGateTest {
         var ws = new Workspace();
         ws.setId(1L);
         ws.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        ws.getFeatures().setPracticesEnabled(true);
         return ws;
     }
 

@@ -30,15 +30,6 @@ export const ITEM_KIND_FILTER_OPTIONS = FILTERABLE_ITEM_KINDS.map((kind) => ({
 }));
 
 /**
- * The same list with the "no filter" choice at its head. "ALL" is a value rather than an absent one
- * because a Base UI `Select` must hold one, and it is the sentinel the URL already carries.
- */
-export const ITEM_KIND_FILTER_ITEMS: { value: string; label: string }[] = [
-	{ value: "ALL", label: "All work" },
-	...ITEM_KIND_FILTER_OPTIONS,
-];
-
-/**
  * The same list for {@link FilterToggle}. "All" is shortened on screen to fit the row, so the full
  * name is restored for a screen reader (WCAG 2.2 SC 2.5.3).
  */

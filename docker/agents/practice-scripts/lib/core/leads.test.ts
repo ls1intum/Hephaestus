@@ -95,7 +95,7 @@ void describe("the leads of a review input", () => {
 				resolveLeads([{ at: { file, line: 1 }, label: "Git file" }], given),
 				/which its source does not hold/u,
 			);
-			await assert.rejects(reader.answer({ op: "read", tree: "head", path: file }), {
+			await assert.rejects(reader.answer({ op: "read", path: file }), {
 				name: "UnratedError",
 				reason: "refused",
 			});
@@ -167,32 +167,6 @@ void describe("the leads of a review input", () => {
 				'  {"body": "Please split this"}',
 				"",
 			],
-		);
-	});
-
-	void test("a lead on a line that the change since the previous review added is marked", async (t) => {
-		const { sources: given } = await sources(t);
-		const since = parseDiff(
-			[
-				"diff --git a/src/cart.ts b/src/cart.ts",
-				"--- a/src/cart.ts",
-				"+++ b/src/cart.ts",
-				"@@ -2,1 +2,2 @@",
-				" x",
-				"+  count += 1;",
-			].join("\n"),
-		);
-		const resolved = await resolveLeads(
-			[
-				{ at: { change: "src/cart.ts", line: 2 }, label: "Old." },
-				{ at: { change: "src/cart.ts", line: 3 }, label: "New." },
-			],
-			given,
-			since,
-		);
-		assert.deepEqual(
-			resolved.map((lead) => lead.newSinceLastReview),
-			[undefined, true],
 		);
 	});
 
@@ -271,8 +245,8 @@ const leadAt = (label: string, line: number): QuotedLead => ({
 	quote: `line ${String(line)}`,
 });
 
-const render = (options: ReviewOptions, leads: readonly QuotedLead[] = [], since = false) =>
-	renderReviewInput(options, leads, "context", FULL_INPUT, since);
+const render = (options: ReviewOptions, leads: readonly QuotedLead[] = []) =>
+	renderReviewInput(options, leads, "context", FULL_INPUT);
 
 void describe("the section of a review input", () => {
 	void test("long directions and many leads cannot push the not-rated lines out, and the cut names the full input", () => {
@@ -367,10 +341,8 @@ void describe("the section of a review input", () => {
 					at: { change: "src/cart.ts", line: 2 },
 					label: "New.",
 					quote: "x",
-					newSinceLastReview: true,
 				},
 			],
-			true,
 		);
 		assert.equal(
 			section,
@@ -378,13 +350,12 @@ void describe("the section of a review input", () => {
 				"- Read the change.",
 				"",
 				"**Leads:**",
-				"1 of 3 leads point at lines added since the last review of this practice, each marked (new).",
 				"- A comment.",
 				'  - at `context/comments.json:2`: `{"body": "x"}` [replies=0]',
 				"- Code.",
 				"  - at `src/cart.ts:3-4` at cccccccccccc: `a`",
 				"- New.",
-				"  - at `src/cart.ts` [L2] (new): `x`",
+				"  - at `src/cart.ts` [L2]: `x`",
 				"",
 				"**Facts:**",
 				"- comments = 2",

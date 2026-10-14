@@ -78,7 +78,7 @@ describe("feedbackOpeningLine", () => {
 
 const MARKER = "<!-- hephaestus:practice-review:0b7d3c2e-8f14-4a6b-9c5d-2e1f0a3b4c5d -->";
 const DISCLOSURE =
-	"<sub>Practice review &middot; Model. This feedback is AI-generated and can be inaccurate. Answer or dispute it in [Hephaestus](https://example.com/respond).</sub>";
+	"<sub>Practice review &middot; Model. This feedback is AI-generated and can be inaccurate. Answer or disagree in [Hephaestus](https://example.com/respond).</sub>";
 const SETTINGS = "<sub>[Why you see this and how to stop it](https://example.com/settings)</sub>";
 
 describe("feedbackDisplayMarkdown", () => {
@@ -86,7 +86,7 @@ describe("feedbackDisplayMarkdown", () => {
 		expect(
 			feedbackDisplayMarkdown(`${MARKER}\nKeep it focused.\n\n---\n${DISCLOSURE}\n${SETTINGS}\n`),
 		).toBe(
-			"Keep it focused.\n\n---\nPractice review &middot; Model. This feedback is AI-generated and can be inaccurate. Answer or dispute it in [Hephaestus](https://example.com/respond).\n[Why you see this and how to stop it](https://example.com/settings)\n",
+			"Keep it focused.\n\n---\nPractice review &middot; Model. This feedback is AI-generated and can be inaccurate. Answer or disagree in [Hephaestus](https://example.com/respond).\n[Why you see this and how to stop it](https://example.com/settings)\n",
 		);
 	});
 

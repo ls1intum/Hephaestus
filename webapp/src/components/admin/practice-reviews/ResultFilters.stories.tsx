@@ -1,49 +1,20 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
-import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 
-import { practiceGroups, workspaceMembers, workspacePractices } from "./fixtures";
-import {
-	clearedResultFacets,
-	groupFacetOptions,
-	ResultFilters,
-	type PracticeFacetOption,
-	practiceFacetOptions,
-} from "./ResultFilters";
+import { practiceGroups, workspacePractices } from "./fixtures";
+import { clearedResultFacets, ResultFilters } from "./ResultFilters";
 import { clearedScope } from "./review-scope";
 import type { ResultsSearch } from "./review-search";
-import type { ReviewPeople } from "./ReviewPersonFacet";
-
-const PEOPLE: ReviewPeople = {
-	options: workspaceMembers.map((member) => ({
-		userId: member.userId,
-		label: member.userName ?? `#${member.userId}`,
-		secondary: member.userLogin,
-	})),
-	capped: false,
-	isLoading: false,
-	isError: false,
-};
-const GROUPS: FacetSource = {
-	options: groupFacetOptions(practiceGroups),
-	isLoading: false,
-	isError: false,
-};
-const PRACTICES: FacetSource<PracticeFacetOption> = {
-	options: practiceFacetOptions(workspacePractices, practiceGroups),
-	isLoading: false,
-	isError: false,
-};
+import { STORY_GROUPS, STORY_PEOPLE, STORY_PRACTICES } from "./story-scope-sources";
 
 /** The facets a search always names, each unset. */
 const UNFILTERED = {
 	outcome: undefined,
-
 	severity: undefined,
-	origin: undefined,
+	disagreed: undefined,
 } satisfies ResultsSearch;
 
 const meta = {
@@ -56,9 +27,9 @@ const meta = {
 		onPatch: fn(),
 		onReset: fn(),
 		onClearScope: fn(),
-		groups: GROUPS,
-		practices: PRACTICES,
-		people: PEOPLE,
+		groups: STORY_GROUPS,
+		practices: STORY_PRACTICES,
+		people: STORY_PEOPLE,
 		total: 12,
 	},
 	// Controlled: `selected` on every facet comes back through the same `search` the choice is
@@ -109,7 +80,7 @@ export const FilteredCountReadsDifferently: Story = {
 	},
 };
 
-/** Severity and origin sit in the row with the other facets, with no toggle to open first. */
+/** Severity and disagreement sit in the row with the other facets, with no toggle to open first. */
 export const ReportsAChosenSeverity: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(canvas.queryByRole("button", { name: /More filters/u })).toBeNull();
@@ -180,7 +151,7 @@ export const UnassessedStatuses: Story = {
 	args: {
 		search: {
 			...UNFILTERED,
-			outcome: ["NOT_APPLICABLE", "UNDETERMINED"],
+			outcome: ["DOES_NOT_APPLY", "COULD_NOT_DETERMINE"],
 		},
 	},
 	play: async ({ canvas, userEvent }) => {
@@ -228,7 +199,7 @@ export const AnOutcomeFromTheOverview: Story = {
 export const OnlyResultsMarkedIncorrect: Story = {
 	args: {
 		search: {
-			invalidated: true,
+			markedIncorrect: true,
 			...UNFILTERED,
 		},
 		total: 1,
@@ -240,36 +211,35 @@ export const OnlyResultsMarkedIncorrect: Story = {
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Clear marked incorrect filter (Only)" }),
 		);
-		await expect(args.onPatch).toHaveBeenCalledWith({ invalidated: undefined });
+		await expect(args.onPatch).toHaveBeenCalledWith({ markedIncorrect: undefined });
 		await expect(canvas.queryByTitle("Marked incorrect: Only")).not.toBeInTheDocument();
 		await expect(canvas.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
 	},
 };
 
 /**
- * A requested or backfilled review chose its work rather than meeting it as it arrived, so an
- * operator reading a mix separates them. Live is offered too, though no row badges it.
+ * A developer's disagreement is read off the result's feedback. Choosing one side filters by it, and
+ * choosing both is no filter at all.
  */
-export const ReportsAChosenOrigin: Story = {
+export const ReportsAChosenDisagreement: Story = {
 	play: async ({ args, canvas, userEvent }) => {
-		await userEvent.click(canvas.getByRole("combobox", { name: "Origin" }));
-		const listbox = await screen.findByRole("listbox", { name: "Origin options" });
-		await within(listbox).findByRole("option", { name: /Live/u });
-		await userEvent.click(await within(listbox).findByRole("option", { name: /Backfilled/u }));
-		await expect(args.onPatch).toHaveBeenCalledWith({ origin: ["BACKFILL"] });
+		await userEvent.click(canvas.getByRole("combobox", { name: "Disagreement" }));
+		const listbox = await screen.findByRole("listbox", { name: "Disagreement options" });
+		await userEvent.click(await within(listbox).findByRole("option", { name: /Disagreed/u }));
+		await expect(args.onPatch).toHaveBeenCalledWith({ disagreed: true });
 	},
 };
 
-/** An applied origin is a filter like any other: a pill below `sm`, and something Reset clears. */
-export const AnOriginOnAPhone: Story = {
-	args: { search: { ...UNFILTERED, origin: ["MANUAL"] }, total: 2 },
+/** An applied disagreement is a filter like any other: a pill below `sm`, and something Reset clears. */
+export const ADisagreementOnAPhone: Story = {
+	args: { search: { ...UNFILTERED, disagreed: false }, total: 2 },
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
 	play: async ({ args, canvas, userEvent }) => {
 		canvas.getByText("2 results match your filters.");
-		await canvas.findByTitle("Origin: Requested");
+		await canvas.findByTitle("Disagreement: No disagreement");
 		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
 		await expect(args.onReset).toHaveBeenCalledTimes(1);
-		await expect(canvas.queryByTitle("Origin: Requested")).not.toBeInTheDocument();
+		await expect(canvas.queryByTitle("Disagreement: No disagreement")).not.toBeInTheDocument();
 	},
 };
 
@@ -290,7 +260,7 @@ export const ScopeCarriedFromAnotherTab: Story = {
 		search: {
 			...UNFILTERED,
 			outcome: ["NOT_MET"],
-			subjectUserId: PEOPLE.options[0]?.userId,
+			developerId: STORY_PEOPLE.options[0]?.accountId,
 			practiceSlug: [workspacePractices[0]?.slug ?? ""],
 			from: "2026-09-01",
 			to: "2026-09-10",
@@ -301,7 +271,7 @@ export const ScopeCarriedFromAnotherTab: Story = {
 		const scope = canvas.getByRole("group", { name: "Applies to every tab" });
 		await expect(
 			within(scope).getByRole("combobox", { name: /^Developer(?::|$)/u }),
-		).toHaveTextContent(PEOPLE.options[0]?.label ?? "");
+		).toHaveTextContent(STORY_PEOPLE.options[0]?.label ?? "");
 		await expect(within(scope).getByRole("button", { name: /Recorded/u })).toHaveTextContent(
 			"1 Sep – 10 Sep 2026",
 		);
@@ -310,7 +280,7 @@ export const ScopeCarriedFromAnotherTab: Story = {
 		await expect(args.onReset).toHaveBeenCalledTimes(1);
 		await expect(
 			within(scope).getByRole("combobox", { name: /^Developer(?::|$)/u }),
-		).toHaveTextContent(PEOPLE.options[0]?.label ?? "");
+		).toHaveTextContent(STORY_PEOPLE.options[0]?.label ?? "");
 
 		await userEvent.click(within(scope).getByRole("button", { name: "Clear scope" }));
 		await expect(args.onClearScope).toHaveBeenCalledTimes(1);
@@ -341,8 +311,8 @@ export const AGroupNarrowsThePractices: Story = {
 export const TurnedOffPracticesHidden: Story = {
 	args: {
 		practices: {
-			...PRACTICES,
-			options: PRACTICES.options.map((option) =>
+			...STORY_PRACTICES,
+			options: STORY_PRACTICES.options.map((option) =>
 				option.value === "thin-controllers" ? { ...option, turnedOff: true } : option,
 			),
 		},
@@ -362,8 +332,8 @@ export const ChosenTurnedOffPracticeStays: Story = {
 	args: {
 		search: { ...UNFILTERED, practiceSlug: ["thin-controllers"] },
 		practices: {
-			...PRACTICES,
-			options: PRACTICES.options.map((option) =>
+			...STORY_PRACTICES,
+			options: STORY_PRACTICES.options.map((option) =>
 				option.value === "thin-controllers" ? { ...option, turnedOff: true } : option,
 			),
 		},

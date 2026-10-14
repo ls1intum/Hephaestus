@@ -52,8 +52,8 @@ public final class ScmFeedbackFixtures {
         });
     }
 
-    public static UUID copyId(@Nullable String key) {
-        return UUID.nameUUIDFromBytes((key == null ? "no-key" : key).getBytes(StandardCharsets.UTF_8));
+    public static UUID copyId(String key) {
+        return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
     }
 
     public static SummaryContent summary(String body, @Nullable String marker) {
@@ -61,8 +61,8 @@ public final class ScmFeedbackFixtures {
                 copyId(body + marker), body, copyId(body + marker).toString(), marker);
     }
 
-    public static LineNote line(FeedbackAnchor anchor, String body, @Nullable String marker, @Nullable String key) {
-        return new LineNote(copyId(key), anchor, body, key == null ? "no-key" : key, marker);
+    public static LineNote line(FeedbackAnchor anchor, String body, String marker, String key) {
+        return new LineNote(copyId(key), anchor, body, key, marker);
     }
 
     public static FeedbackAnchor anchor(String path, int line) {

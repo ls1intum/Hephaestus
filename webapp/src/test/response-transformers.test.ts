@@ -21,7 +21,7 @@ describe("generated SDK response transformers", () => {
 		);
 
 		const { data } = await adminListAuthEvents();
-		const occurredAt = data?.content?.[0]?.occurredAt;
+		const occurredAt = data?.content[0]?.occurredAt;
 
 		// Not `instanceof` alone: a transformer that fabricated `new Date()` would satisfy that while
 		// losing the instant the server sent.
@@ -34,8 +34,8 @@ describe("generated SDK response transformers", () => {
 
 		const { data } = await listReviewBatches({ path: { workspaceSlug: "acme" } });
 
-		expect(data?.content?.[0]?.from).toBeInstanceOf(Date);
-		expect(data?.content?.[0]?.createdAt).toBeInstanceOf(Date);
+		expect(data?.content[0]?.from).toBeInstanceOf(Date);
+		expect(data?.content[0]?.createdAt).toBeInstanceOf(Date);
 	});
 
 	it("leaves a null date null rather than the epoch", async () => {
@@ -48,7 +48,7 @@ describe("generated SDK response transformers", () => {
 
 		// `new Date(null)` is 1 January 1970, which renders as a real instant instead of the em dash a
 		// screen shows for "not yet". The transformer must skip the field.
-		expect(data?.content?.[0]?.finishedAt).toBeNull();
+		expect(data?.content[0]?.finishedAt).toBeNull();
 	});
 
 	it("revives a review's completion only when the server recorded it", async () => {

@@ -1430,7 +1430,7 @@ export interface ReviewPractice {
 	name: string;
 	whyItMatters?: string;
 	knownLimitations: readonly string[];
-	/** Which revision of the practice was staged: it identifies the standard, not that the standard or the work changed. */
+	/** Which practice version was staged: it identifies the standard, not that the standard or the work changed. */
 	versionId?: string;
 }
 

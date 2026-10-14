@@ -25,7 +25,7 @@ public final class CitationVerification {
         for (JsonNode citation : citations) {
             JsonNode verdict = citation.path("verification");
             if (!"VERIFIED".equals(verdict.path("status").asString())
-                    || !verdict.path("artifactSha256").asString().matches(SHA256_HEX)
+                    || !verdict.path("itemSha256").asString().matches(SHA256_HEX)
                     || !verdict.path("quoteSha256").asString().matches(SHA256_HEX)
                     || !citation.path("quote").isString()) return false;
             String quoteDigest = utf8Digest(citation.path("quote").asString());

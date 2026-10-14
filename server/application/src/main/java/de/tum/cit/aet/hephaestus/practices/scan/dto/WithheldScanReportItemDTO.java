@@ -14,8 +14,7 @@ public record WithheldScanReportItemDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = "WITHHELD")
         String status,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String reason,
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String reasonDescription)
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String reason)
         implements ScanReportItemDTO {
     public WithheldScanReportItemDTO {
         if (!"WITHHELD".equals(status)) {

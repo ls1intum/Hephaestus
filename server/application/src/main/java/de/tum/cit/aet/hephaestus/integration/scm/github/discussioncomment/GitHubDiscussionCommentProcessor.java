@@ -29,12 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub Discussion Comments.
- *
- * <p>This service handles the conversion of GitHubDiscussionCommentDTO to DiscussionComment
- * entities.
- *
- * <p>Discussion comments can be top-level comments or replies to other comments. Reply threading is
- * handled via the parentComment relationship, resolved by node ID.
+ * <p>
+ * This service handles the conversion of GitHubDiscussionCommentDTO to DiscussionComment entities.
+ * <p>
+ * Discussion comments can be top-level comments or replies to other comments.
+ * Reply threading is handled via the parentComment relationship, resolved by node ID.
  */
 @Slf4j
 @Service
@@ -58,9 +57,9 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
     /**
      * Process a GitHub discussion comment DTO and persist it as a DiscussionComment entity.
      *
-     * @param dto the discussion comment DTO
+     * @param dto        the discussion comment DTO
      * @param discussion the parent discussion entity
-     * @param context the processing context
+     * @param context    the processing context
      * @return the created or updated DiscussionComment entity, or null if processing failed
      */
     @Transactional
@@ -142,12 +141,12 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Delete a discussion comment by its database ID.
-     *
-     * <p>This method is the single entry point for discussion comment deletion, following the
-     * pattern where all data mutations are handled by processors.
+     * <p>
+     * This method is the single entry point for discussion comment deletion,
+     * following the pattern where all data mutations are handled by processors.
      *
      * @param commentDto the comment DTO containing the ID to delete
-     * @param context the processing context for event publishing
+     * @param context    the processing context for event publishing
      */
     @Transactional
     public void processDeleted(GitHubDiscussionCommentDTO commentDto, ProcessingContext context) {
@@ -180,11 +179,11 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Resolve reply threading after all comments have been created.
+     * <p>
+     * This method should be called after processing all comments to establish
+     * parent-child relationships based on the replyToNodeId.
      *
-     * <p>This method should be called after processing all comments to establish parent-child
-     * relationships based on the replyToNodeId.
-     *
-     * @param comment the comment to update
+     * @param comment       the comment to update
      * @param parentComment the parent comment (if this is a reply)
      */
     @Transactional
@@ -196,7 +195,9 @@ public class GitHubDiscussionCommentProcessor extends BaseGitHubProcessor {
         }
     }
 
-    /** Convert author association string to AuthorAssociation enum. */
+    /**
+     * Convert author association string to AuthorAssociation enum.
+     */
     @Nullable
     private AuthorAssociation convertAuthorAssociation(@Nullable String association) {
         if (association == null) {

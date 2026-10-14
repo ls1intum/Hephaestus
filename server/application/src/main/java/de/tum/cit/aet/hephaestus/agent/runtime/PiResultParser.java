@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelSlot;
@@ -81,12 +82,7 @@ public class PiResultParser {
         addWatchdogState(output, sandboxResult.outputFiles().get("watchdog-killed.json"));
         AgentResult.LlmUsage usage = parseUsage(sandboxResult.outputFiles().get("usage.json"));
         addRunnerDebug(output, sandboxResult.outputFiles().get("runner-debug.json"));
-        addPracticeCoverage(output, sandboxResult.outputFiles().get("practice-coverage.json"));
-        // Before the result-file branches below, which early-return: the composition stage's output is
-        // independent of whether the review's own results parsed, and losing it because the results
-        // were malformed would silently couple two things that must not be coupled.
-        addComposedFeedback(output, sandboxResult.outputFiles().get(SandboxLayout.FEEDBACK_FILENAME));
-
+        addPracticeCoverage(sandboxResult.outputFiles().get("practice-coverage.json"));
         // A malformed primary result is the run's answer; the review-state backup stands in only for a missing one.
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile == null) {
@@ -122,7 +118,7 @@ public class PiResultParser {
         return null;
     }
 
-    void addPracticeCoverage(Map<String, Object> output, byte @Nullable [] coverageFile) {
+    void addPracticeCoverage(byte @Nullable [] coverageFile) {
         if (coverageFile == null || coverageFile.length == 0) return;
         try {
             JsonNode coverage = objectMapper.readTree(coverageFile);
@@ -132,7 +128,6 @@ public class PiResultParser {
             if (!validCoverage(eligible, evaluated, outcomes)) {
                 throw new IllegalArgumentException("invalid practice coverage");
             }
-            output.put("practiceCoverage", objectMapper.treeToValue(coverage, Object.class));
             eligiblePractices.record(eligible);
             evaluatedPractices.record(evaluated);
             if (eligible > 0) practiceCoverageRatio.record((double) evaluated / eligible);
@@ -171,43 +166,45 @@ public class PiResultParser {
             return null;
         }
         try {
-            JsonNode usageNode = objectMapper.readTree(usageFile);
-            int totalCalls = usageNode.path("totalCalls").asInt(0);
-            if (totalCalls <= 0) {
-                return null;
-            }
-            String model =
-                    usageNode.path("model").isString() ? usageNode.path("model").asString() : null;
-            Integer inputTokens =
-                    usageNode.has("inputTokens") ? usageNode.path("inputTokens").asInt(0) : null;
-            Integer outputTokens = usageNode.has("outputTokens")
-                    ? usageNode.path("outputTokens").asInt(0)
-                    : null;
-            Integer cacheReadTokens = usageNode.has("cacheReadTokens")
-                    ? usageNode.path("cacheReadTokens").asInt(0)
-                    : null;
-            Integer cacheWriteTokens = usageNode.has("cacheWriteTokens")
-                    ? usageNode.path("cacheWriteTokens").asInt(0)
-                    : null;
-            // Populated from the responses-path shape's `output_tokens_details.reasoning_tokens` when the
-            // upstream model reports it; absent for chat/completions-only models.
-            Integer reasoningTokens = usageNode.has("reasoningTokens")
-                    ? usageNode.path("reasoningTokens").asInt(0)
-                    : null;
-            Double costUsd =
-                    usageNode.has("costUsd") ? usageNode.path("costUsd").asDouble(0.0) : null;
+            UsageFile usage = objectMapper
+                    .readerFor(UsageFile.class)
+                    .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                    .with(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES)
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readValue(usageFile);
+            if (usage.totalCalls() <= 0) return null;
             return new AgentResult.LlmUsage(
-                    model,
-                    inputTokens,
-                    outputTokens,
-                    reasoningTokens,
-                    cacheReadTokens,
-                    cacheWriteTokens,
-                    costUsd,
-                    totalCalls);
-        } catch (JacksonException e) {
+                    usage.model(),
+                    usage.inputTokens(),
+                    usage.outputTokens(),
+                    usage.reasoningTokens(),
+                    usage.cacheReadTokens(),
+                    usage.cacheWriteTokens(),
+                    usage.costUsd(),
+                    usage.totalCalls());
+        } catch (JacksonException | IllegalArgumentException e) {
             recordFailure("usage", e);
             return null;
+        }
+    }
+
+    private record UsageFile(
+            @Nullable String model,
+            @Nullable Integer inputTokens,
+            @Nullable Integer outputTokens,
+            @Nullable Integer reasoningTokens,
+            @Nullable Integer cacheReadTokens,
+            @Nullable Integer cacheWriteTokens,
+            @Nullable Double costUsd,
+            int totalCalls) {
+        @JsonCreator
+        UsageFile {
+            for (Integer tokens :
+                    Arrays.asList(inputTokens, outputTokens, reasoningTokens, cacheReadTokens, cacheWriteTokens))
+                if (tokens != null && tokens < 0) throw new IllegalArgumentException("Usage cannot be negative");
+            if (costUsd != null && (!Double.isFinite(costUsd) || costUsd < 0))
+                throw new IllegalArgumentException("Usage cost must be finite and non-negative");
+            if (totalCalls < 0) throw new IllegalArgumentException("Usage calls cannot be negative");
         }
     }
 
@@ -219,22 +216,6 @@ public class PiResultParser {
             output.put("runnerDebug", objectMapper.readValue(runnerDebugFile, Object.class));
         } catch (JacksonException e) {
             recordFailure("runner_debug", e);
-        }
-    }
-
-    /**
-     * Surfaces the feedback-composition stage's payload under {@code feedback}, for each lane's producer to
-     * read off the job. Best-effort like its siblings: a malformed payload costs the surfaces one cycle's
-     * messages and costs the review nothing.
-     */
-    void addComposedFeedback(Map<String, Object> output, byte @Nullable [] feedbackFile) {
-        if (feedbackFile == null || feedbackFile.length == 0) {
-            return;
-        }
-        try {
-            output.put("feedback", objectMapper.readValue(feedbackFile, Object.class));
-        } catch (JacksonException e) {
-            recordFailure("composed_feedback", e);
         }
     }
 
@@ -258,7 +239,7 @@ public class PiResultParser {
             return null;
         }
         Map<String, Object> assembled = new LinkedHashMap<>();
-        assembled.put("contractVersion", 3);
+        assembled.put("contractVersion", SandboxLayout.PRACTICE_CONTRACT_VERSION);
         assembled.put("results", practiceResults);
         return objectMapper.writeValueAsBytes(assembled);
     }

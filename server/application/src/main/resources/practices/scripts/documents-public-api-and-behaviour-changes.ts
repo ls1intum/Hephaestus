@@ -1,11 +1,11 @@
-import { isCommentLine } from "../kits/scm/declarations.ts";
-import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index.ts";
-import { languageOf } from "../kits/scm/languages.ts";
 // Finds two facts that a hunk alone does not show: if a manifest of the repository declares a library
 // or framework product, and if each declaration that the change adds is exported or internal. Neither
 // fact settles the public surface. An app without a library product can still expose an HTTP,
 // configuration or wire contract to other consumers, which the review investigates. A Swift
 // declaration without a modifier is internal, not public. To add a language, add a row.
+import { isCommentLine } from "../kits/scm/declarations.ts";
+import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index.ts";
+import { languageOf } from "../kits/scm/languages.ts";
 import { noMatchDirections } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 

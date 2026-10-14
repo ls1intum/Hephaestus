@@ -101,6 +101,15 @@ describe("practice review search", () => {
 		expect(onePracticeQuery({})).toBeUndefined();
 	});
 
+	it("sends a group only when the filter holds exactly one", () => {
+		expect(resultsQuery(resultsSearchSchema.parse({ groupSlug: ["core"] }), 25).groupSlug).toBe(
+			"core",
+		);
+		expect(
+			resultsQuery(resultsSearchSchema.parse({ groupSlug: ["core", "docs"] }), 25).groupSlug,
+		).toBeUndefined();
+	});
+
 	it("reads only a valid item id and UUID record ids", () => {
 		const search = problemsSearchSchema.parse({
 			itemId: "0",

@@ -101,8 +101,8 @@ public class ReviewAdmissionData {
                         scenario.practice().getId(),
                         scenario.item().getId())));
         jdbc.sql("INSERT INTO"
-            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,available_at,started_at)"
-            + " VALUES(:id,:review,:ws,'RUNNING',0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at)")
+            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at)"
+            + " VALUES(:id,:review,:ws,'RUNNING',0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:at)")
                 .param("id", job)
                 .param("review", review.getId())
                 .param("ws", review.getWorkspaceId())

@@ -103,7 +103,7 @@ public class FeedbackResponseService {
         long disagree = 0;
         long notApplicable = 0;
         for (var row : counts) {
-            switch (FeedbackResolution.valueOf(row.getResolution())) {
+            switch (row.getResolution()) {
                 case ADDRESSED -> addressed = row.getCount();
                 case DISAGREE -> disagree = row.getCount();
                 case NOT_APPLICABLE -> notApplicable = row.getCount();

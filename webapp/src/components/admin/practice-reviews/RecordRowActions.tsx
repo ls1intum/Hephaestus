@@ -62,7 +62,9 @@ export interface RecordRowActionsProps {
 	/** The row's record, which Track makes the selection and Trace opens the trace of. */
 	record: RecordRef;
 	/** The review the record came from, where the row knows it: tracking narrows to it at once. */
-	agentJobId?: string;
+	reviewId?: string;
+	/** The result a problem row belongs to: tracking a problem tracks its result. */
+	resultId?: string;
 	/** The record, after "Track" and "Trace" in the accessible names, so every row's pair differs. */
 	name: string;
 	/** A new review of the row's work, requested: the third action, on rows that name a piece of work. */
@@ -75,8 +77,14 @@ export interface RecordRowActionsProps {
  * tracks the record too, so the tables behind the trace show what it shows. Neither opens the row:
  * the row itself opens the record's sheet. Request review asks for a new review of the row's work.
  */
-export function RecordRowActions({ record, agentJobId, name, request }: RecordRowActionsProps) {
-	const selection = recordSelection(record, agentJobId);
+export function RecordRowActions({
+	record,
+	reviewId,
+	resultId,
+	name,
+	request,
+}: RecordRowActionsProps) {
+	const selection = recordSelection(record, { reviewId, resultId });
 	return (
 		// `relative z-10` lifts them over a list row's stretched link. Each is the app's default icon
 		// button, 32 px, apart enough that a press meant for one never lands on its neighbour.

@@ -23,7 +23,7 @@ export interface RecordRef {
 	id: string;
 }
 
-const uuid = z.uuid();
+const uuid = z.guid();
 const itemId = z.string().regex(/^[1-9]\d{0,18}$/u);
 
 /**

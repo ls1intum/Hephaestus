@@ -2,9 +2,16 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryType;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.SetFeedbackModeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
@@ -18,6 +25,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -29,6 +37,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Autowired
     PracticeVersionService versions;
+
+    @Autowired
+    CatalogService catalog;
 
     @Test
     @WithAdminUser
@@ -211,6 +222,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     @Test
     @WithMentorUser
     void shouldRefuseAdminDefinitionReadsForANonmember() {
+        persistUser("mentor");
         var owner = persistUser("wire-owner");
         var workspace = createWorkspace("wire-private", "Private", "wire-private-org", AccountType.ORG, owner);
         client.get()
@@ -352,5 +364,88 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .expectStatus()
                 .isNotModified()
                 .expectBody(Void.class);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldExposeExcludedInstanceDefinitionsForAdminComparison() {
+        var owner = persistUser("admin");
+        var workspace = createWorkspace("catalog-comparison", "Comparison", "comparison-org", AccountType.ORG, owner);
+        String slug = "comparison-" + UUID.randomUUID();
+        var entry = catalog.createPractice(
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
+        catalog.setExcluded(
+                CatalogEntryType.PRACTICE,
+                slug,
+                true,
+                EntityTagPrecondition.parse(EntityTagPrecondition.format(entry.etag())));
+        client.get()
+                .uri("/workspaces/{workspace}/practice-catalog/practices/{slug}", workspace.getWorkspaceSlug(), slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.definition.criteria")
+                .isEqualTo(DefinitionTestFixtures.definition().criteria())
+                .jsonPath("$.excluded")
+                .isEqualTo(true)
+                .jsonPath("$.offered")
+                .isEqualTo(false);
+        persistUser("mentor");
+        client.get()
+                .uri("/workspaces/{workspace}/practice-catalog/practices/{slug}", workspace.getWorkspaceSlug(), slug)
+                .headers(headers -> headers.setBearerAuth("mock-jwt-token-for-mentor-user"))
+                .exchange()
+                .expectStatus()
+                .isForbidden()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldMoveAPracticeWithoutChangingItsPinnedVersion() {
+        var owner = persistUser("admin");
+        var workspace = createWorkspace("wire-move", "Move", "move-org", AccountType.ORG, owner);
+        var created = client.post()
+                .uri("/workspaces/{workspace}/practices", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreatePracticeRequestDTO(
+                        "move-practice", "scm.pull_request", DefinitionTestFixtures.definition(), null, null))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+        var version = Objects.requireNonNull(created).currentVersion().id();
+        client.post()
+                .uri("/workspaces/{workspace}/practice-groups", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreatePracticeGroupRequestDTO(
+                        "move-group", "Moved practices", null, null, null, null, true))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(Void.class);
+        client.patch()
+                .uri("/workspaces/{workspace}/practices/move-practice/group", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new MovePracticeRequestDTO("move-group", 0))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].slug")
+                .isEqualTo("move-practice")
+                .jsonPath("$[0].groupSlug")
+                .isEqualTo("move-group")
+                .jsonPath("$[0].position")
+                .isEqualTo(0)
+                .jsonPath("$[0].currentVersion.id")
+                .isEqualTo(version);
     }
 }

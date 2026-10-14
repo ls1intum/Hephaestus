@@ -4,41 +4,35 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { after, test } from "node:test";
 
-import { executionReportSchema } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
-import { PRACTICES_DIR } from "./golden-review-workspace.ts";
+import {
+	compositionRequestSchema,
+	executionReportSchema,
+} from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
+import { AUTHENTICATION_CRITERION, PRACTICES_DIR } from "./golden-review-workspace.ts";
 import {
 	directProgram,
 	field,
 	readJsonFile,
 	runRunner,
 	stagePractices,
+	INVALID_META_PROGRAM,
 } from "./program-host-runner.ts";
 
 // The runner's output files for the server's own tests. One real run, with the Pi SDK mocked, admits a built-in
-// practice through its review session and a custom program's direct result, and fails a retired program.
+// practice through its review session and a custom program's direct result, and fails a program whose meta is invalid.
 // `RunnerOutputAdmissionIntegrationTest` admits these files and records the report on the server. Set
 // UPDATE_RUNNER_OUTPUT=1 to write them again after a change to what the runner writes.
 
-const OUTPUT = nodePath.join(import.meta.dirname, "contract-v3/runner-output");
+const OUTPUT = nodePath.join(import.meta.dirname, "../practice-results/runner-output");
 const UPDATE = process.env.UPDATE_RUNNER_OUTPUT === "1";
 
 /** The criterion the practices are staged with, as `stagePractices` writes it. */
-const CRITERION = "Added authentication calls use checked(), not insecure().";
-
-/** A program written for the retired leads contract. */
-const LEGACY_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
-export default definePracticeScript({
-	meta: { version: 1, kinds: { call: "An added call." } },
-	async run() {
-		return { leads: [] };
-	},
-});
-`;
+const CRITERION = AUTHENTICATION_CRITERION;
 
 const PRACTICES = [
 	{ slug: "auth-review" },
 	{ slug: "ui-scope", program: directProgram() },
-	{ slug: "zz-legacy", program: LEGACY_PROGRAM },
+	{ slug: "zz-invalid-meta", program: INVALID_META_PROGRAM },
 ] as const;
 
 const cwd = mkdtempSync(nodePath.join(tmpdir(), "pi-runner-server-contract-"));
@@ -173,4 +167,13 @@ void test("the server's runner output fixtures are what this run wrote", () => {
 			`${name}: run with UPDATE_RUNNER_OUTPUT=1 to write it again`,
 		);
 	}
+});
+
+// `FeedbackCompositionInputsTest` asserts that the server writes exactly these bytes.
+void test("the runner reads the composition request the server stages", () => {
+	const request: unknown = JSON.parse(
+		readFileSync(nodePath.join(import.meta.dirname, "feedback-composition-request.json"), "utf8"),
+	);
+
+	assert.deepEqual(compositionRequestSchema.parse(request), request);
 });

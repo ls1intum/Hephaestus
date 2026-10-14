@@ -8,8 +8,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Combines a practice group's per-practice trends into one direction.
@@ -23,7 +21,6 @@ final class GroupTrendAggregator {
     private GroupTrendAggregator() {}
 
     static PracticeTrend aggregate(
-            String groupSlug,
             Collection<String> eligiblePracticeSlugs,
             Collection<PracticeTrend> practiceTrends,
             TrendProperties properties) {
@@ -41,10 +38,8 @@ final class GroupTrendAggregator {
                     .min()
                     .orElse(properties.getBundleSize() + properties.getMinBundleSize());
             return new PracticeTrend(
-                    groupSlug,
-                    TrendScope.GROUP,
                     TrendDirection.INSUFFICIENT_EVIDENCE,
-                    TrendSupportFactory.forGroup(
+                    TrendSupport.forGroup(
                             properties,
                             standingWork,
                             previous,
@@ -55,8 +50,6 @@ final class GroupTrendAggregator {
                             0,
                             eligiblePracticeSlugs.size(),
                             trail),
-                    null,
-                    null,
                     trail,
                     reviewedWork,
                     null);
@@ -66,10 +59,8 @@ final class GroupTrendAggregator {
         TrendDirection direction = classifyNormal(
                 pooled.mean(), pooled.variance(), properties.getRopeHalfWidth(), properties.getCredibilityThreshold());
         return new PracticeTrend(
-                groupSlug,
-                TrendScope.GROUP,
                 direction,
-                TrendSupportFactory.forGroup(
+                TrendSupport.forGroup(
                         properties,
                         distinctOpportunityCount(comparable, TrendBundle.CURRENT),
                         distinctOpportunityCount(comparable, TrendBundle.PREVIOUS),
@@ -80,8 +71,6 @@ final class GroupTrendAggregator {
                         comparable.size(),
                         eligiblePracticeSlugs.size(),
                         trail),
-                summed(comparable, PracticeTrend::currentOutcomes),
-                summed(comparable, PracticeTrend::previousOutcomes),
                 trail,
                 reviewedWork,
                 null);
@@ -106,11 +95,6 @@ final class GroupTrendAggregator {
         return new Pooled(weightedMean / totalPrecision, standardDeviation * standardDeviation);
     }
 
-    private static OutcomeVector summed(
-            List<PracticeTrend> trends, Function<PracticeTrend, @Nullable OutcomeVector> axis) {
-        return trends.stream().map(axis).filter(Objects::nonNull).reduce(OutcomeVector.EMPTY, OutcomeVector::plus);
-    }
-
     private static TrendDirection classifyNormal(double mean, double variance, double rope, double threshold) {
         double standardDeviation = Math.sqrt(variance);
         double above = 1.0 - normalCdf((rope - mean) / standardDeviation);
@@ -132,11 +116,11 @@ final class GroupTrendAggregator {
     }
 
     /**
-     * One entry per artifact the group saw, whichever of its practices saw it.
+     * One entry per item the group saw, whichever of its practices saw it.
      *
      * <p>Two practices reviewing the same pull request is one piece of reviewed work to a reader, so their outcomes are
      * summed into a single point rather than drawn twice. The merged point takes the stronger bundle of the
-     * two: an artifact that is current evidence for any practice is current evidence for the group.
+     * two: an item that is current evidence for any practice is current evidence for the group.
      */
     private static List<EvidenceOpportunity> mergedTrail(Collection<PracticeTrend> trends, int bundleSize) {
         Map<Long, EvidenceOpportunity> combined = new LinkedHashMap<>();

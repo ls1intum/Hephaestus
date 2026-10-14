@@ -40,18 +40,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Unified processor for GitHub pull requests.
- *
- * <p>This service handles the conversion of GitHubPullRequestDTO to PullRequest entities, persists
- * them, and publishes appropriate domain events. It's used by both the GraphQL sync service and
- * webhook handlers.
- *
- * <p><b>Design Principles:</b>
- *
+ * <p>
+ * This service handles the conversion of GitHubPullRequestDTO to PullRequest
+ * entities,
+ * persists them, and publishes appropriate domain events. It's used by both
+ * the GraphQL sync service and webhook handlers.
+ * <p>
+ * <b>Design Principles:</b>
  * <ul>
- *   <li>Single processing path for all data sources (sync and webhooks)
- *   <li>Idempotent operations via upsert pattern
- *   <li>Domain events published for reactive feature development
- *   <li>Works exclusively with DTOs for complete field coverage
+ * <li>Single processing path for all data sources (sync and webhooks)</li>
+ * <li>Idempotent operations via upsert pattern</li>
+ * <li>Domain events published for reactive feature development</li>
+ * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
  */
 @Service
@@ -87,14 +87,14 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a GitHub pull request DTO and persist it as a PullRequest entity. Publishes
-     * appropriate domain events based on what changed.
-     *
-     * <p>Uses atomic upsert to prevent race conditions when concurrent threads (e.g., multiple NATS
-     * consumers or webhook handlers) process the same PR.
-     *
-     * <p>Uses (repository_id, issue_type, number) as the canonical uniqueness constraint. Lookup is
-     * by (repository_id, number) via the PullRequest typed query.
+     * Process a GitHub pull request DTO and persist it as a PullRequest entity.
+     * Publishes appropriate domain events based on what changed.
+     * <p>
+     * Uses atomic upsert to prevent race conditions when concurrent threads
+     * (e.g., multiple NATS consumers or webhook handlers) process the same PR.
+     * <p>
+     * Uses (repository_id, issue_type, number) as the canonical uniqueness constraint.
+     * Lookup is by (repository_id, number) via the PullRequest typed query.
      *
      * @return the processed PullRequest, or null if the repository context is missing
      */
@@ -107,9 +107,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     /**
      * Internal method that handles pull request processing.
      *
-     * @param emitLifecycleOnCreate whether to emit lifecycle events (PullRequestClosed/Merged) for
-     *     PRs that arrive already in a terminal state. Set to false when called from
-     *     processClosed() which emits its own events.
+     * @param emitLifecycleOnCreate whether to emit lifecycle events (PullRequestClosed/Merged)
+     *                              for PRs that arrive already in a terminal state. Set to false
+     *                              when called from processClosed() which emits its own events.
      */
     @Nullable
     private PullRequest processInternal(
@@ -149,7 +149,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
                 promotedFromIssue = true;
                 isNew = false;
                 log.info(
-                        "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}," + " number={}",
+                        "Corrected issue_type from ISSUE to PULL_REQUEST: repositoryId={}, number={}",
                         repository.getId(),
                         dto.number());
             }
@@ -312,9 +312,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Full PR payloads carry the canonical PR id; comment stubs carry a different issue-resource
-     * id. The existing provider-native-id constraint refuses collisions without merging internal
-     * rows.
+     * Full PR payloads carry the canonical PR id; comment stubs carry a different issue-resource id.
+     * The existing provider-native-id constraint refuses collisions without merging internal rows.
      */
     private static boolean adoptCanonicalNativeId(PullRequest pr, long canonicalId, Long providerId) {
         if (!providerId.equals(pr.getProvider().getId())) {
@@ -359,9 +358,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * The other facts only the GraphQL sync reads — the head's check rollup, the review decision
-     * and the merge state. A webhook payload carries none of them (null) and leaves the record as
-     * it is; a sync row carries them whether or not the core row moved.
+     * The other facts only the GraphQL sync reads — the head's check rollup, the review decision and the
+     * merge state. A webhook payload carries none of them (null) and leaves the record as it is; a sync
+     * row carries them whether or not the core row moved.
      *
      * @return whether anything changed
      */
@@ -386,10 +385,7 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return changed;
     }
 
-    /**
-     * Only the GraphQL sync reads what a pull request closes; a webhook payload carries none and
-     * keeps the record.
-     */
+    /** Only the GraphQL sync reads what a pull request closes; a webhook payload carries none and keeps the record. */
     private boolean replaceClosingIssues(
             GitHubPullRequestDTO dto, PullRequest pr, Repository repository, ProcessingContext context) {
         return context.isSync()
@@ -408,8 +404,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Computes which scalar fields changed between the old and new PR state. Relationship changes
-     * (labels, assignees, reviewers) are tracked separately.
+     * Computes which scalar fields changed between the old and new PR state.
+     * Relationship changes (labels, assignees, reviewers) are tracked separately.
      */
     private Set<String> computeChangedFields(PullRequest oldPr, PullRequest newPr) {
         Set<String> changedFields = new HashSet<>();
@@ -448,7 +444,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return changedFields;
     }
 
-    /** Process a closed event. */
+    /**
+     * Process a closed event.
+     */
     @Transactional
     @Nullable
     public PullRequest processClosed(GitHubPullRequestDTO dto, ProcessingContext context) {
@@ -472,7 +470,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return pr;
     }
 
-    /** Process a reopened event. */
+    /**
+     * Process a reopened event.
+     */
     @Transactional
     @Nullable
     public PullRequest processReopened(GitHubPullRequestDTO dto, ProcessingContext context) {
@@ -486,7 +486,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return pr;
     }
 
-    /** Process a ready_for_review event. */
+    /**
+     * Process a ready_for_review event.
+     */
     @Transactional
     @Nullable
     public PullRequest processReadyForReview(GitHubPullRequestDTO dto, ProcessingContext context) {
@@ -500,7 +502,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return pr;
     }
 
-    /** Process a converted_to_draft event. */
+    /**
+     * Process a converted_to_draft event.
+     */
     @Transactional
     @Nullable
     public PullRequest processConvertedToDraft(GitHubPullRequestDTO dto, ProcessingContext context) {
@@ -514,7 +518,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return pr;
     }
 
-    /** Process a synchronize event (new commits pushed). */
+    /**
+     * Process a synchronize event (new commits pushed).
+     */
     @Transactional
     @Nullable
     public PullRequest processSynchronize(GitHubPullRequestDTO dto, ProcessingContext context) {
@@ -528,7 +534,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return pr;
     }
 
-    /** Process a labeled event. */
+    /**
+     * Process a labeled event.
+     */
     @Transactional
     @Nullable
     public PullRequest processLabeled(GitHubPullRequestDTO dto, GitHubLabelDTO labelDto, ProcessingContext context) {
@@ -548,7 +556,9 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
         return pr;
     }
 
-    /** Process an unlabeled event. */
+    /**
+     * Process an unlabeled event.
+     */
     @Transactional
     @Nullable
     public PullRequest processUnlabeled(GitHubPullRequestDTO dto, GitHubLabelDTO labelDto, ProcessingContext context) {
@@ -570,8 +580,8 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
 
     private Issue.State convertState(@Nullable String state) {
         if (state == null) {
-            log.warn("PR state is null, defaulting to OPEN. This may indicate missing data in"
-                    + " webhook or GraphQL response.");
+            log.warn(
+                    "PR state is null, defaulting to OPEN. This may indicate missing data in webhook or GraphQL response.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {
@@ -586,12 +596,12 @@ public class GitHubPullRequestProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Upserts the merge commit when GraphQL data provides full merge commit metadata. This
-     * piggybacks on data already fetched in the PR query (flat fields on Commit type) so it costs
-     * zero additional rate limit points.
-     *
-     * <p>After upserting the commit, links it to the PR in the commit_pull_request join table so
-     * that the association is established immediately (not deferred to enrichment).
+     * Upserts the merge commit when GraphQL data provides full merge commit metadata.
+     * This piggybacks on data already fetched in the PR query (flat fields on Commit type)
+     * so it costs zero additional rate limit points.
+     * <p>
+     * After upserting the commit, links it to the PR in the commit_pull_request join table
+     * so that the association is established immediately (not deferred to enrichment).
      */
     private void upsertMergeCommit(GitHubPullRequestDTO dto, Repository repository, ProcessingContext context) {
         var info = dto.mergeCommitInfo();

@@ -24,22 +24,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles projects_v2_status_update webhook events.
- *
- * <p>This handler processes status update create, edit, and delete events. Status updates track
- * project health with ON_TRACK, AT_RISK, OFF_TRACK statuses.
- *
  * <p>
- *
+ * This handler processes status update create, edit, and delete events.
+ * Status updates track project health with ON_TRACK, AT_RISK, OFF_TRACK statuses.
+ * <p>
  * <h2>Supported Owner Types</h2>
- *
- * <p>Status updates belong to projects which can be owned by organizations, repositories, or users.
+ * <p>
+ * Status updates belong to projects which can be owned by organizations, repositories, or users.
  * This handler supports all three owner types:
- *
  * <ul>
- *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.
- *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").
- *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated with a
- *       monitored workspace/scope.
+ *   <li><b>ORGANIZATION:</b> Most common. Scope resolved via organization login.</li>
+ *   <li><b>REPOSITORY:</b> Scope resolved via repository fullName (e.g., "owner/repo").</li>
+ *   <li><b>USER:</b> Currently logged and skipped - user-level projects are not associated
+ *       with a monitored workspace/scope.</li>
  * </ul>
  */
 @Slf4j
@@ -75,8 +72,7 @@ public class GitHubProjectStatusUpdateMessageHandler
     }
 
     /**
-     * Projects V2 status-update webhook events are skipped when {@code
-     * hephaestus.sync.projects.enabled=false}.
+     * Projects V2 status-update webhook events are skipped when {@code hephaestus.sync.projects.enabled=false}.
      */
     @Override
     public boolean isEnabled() {
@@ -96,9 +92,7 @@ public class GitHubProjectStatusUpdateMessageHandler
 
         String projectNodeId = payload.projectNodeId();
         if (projectNodeId == null) {
-            log.warn(
-                    "Skipped projects_v2_status_update event: reason=missingProjectNodeId," + " action={}",
-                    event.action());
+            log.warn("Skipped projects_v2_status_update event: reason=missingProjectNodeId, action={}", event.action());
             return;
         }
 
@@ -107,7 +101,7 @@ public class GitHubProjectStatusUpdateMessageHandler
         String ownerIdentifier = event.getOwnerIdentifier();
 
         log.debug(
-                "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}," + " owner={}",
+                "Received projects_v2_status_update event: action={}, nodeId={}, ownerType={}, owner={}",
                 event.action(),
                 payload.nodeId() != null ? sanitizeForLog(payload.nodeId()) : "unknown",
                 ownerType,
@@ -117,7 +111,7 @@ public class GitHubProjectStatusUpdateMessageHandler
         Long scopeId = resolveScopeId(event, ownerType);
         if (scopeId == null) {
             log.debug(
-                    "Skipped projects_v2_status_update event: reason=noAssociatedScope," + " ownerType={}, owner={}",
+                    "Skipped projects_v2_status_update event: reason=noAssociatedScope, ownerType={}, owner={}",
                     ownerType,
                     sanitizeForLog(ownerIdentifier));
             return;
@@ -126,7 +120,7 @@ public class GitHubProjectStatusUpdateMessageHandler
         Project project = projectRepository.findByNodeId(projectNodeId).orElse(null);
         if (project == null) {
             log.warn(
-                    "Skipped projects_v2_status_update event: reason=projectNotFound," + " projectNodeId={}, action={}",
+                    "Skipped projects_v2_status_update event: reason=projectNotFound, projectNodeId={}, action={}",
                     sanitizeForLog(projectNodeId),
                     event.action());
             return;
@@ -149,9 +143,9 @@ public class GitHubProjectStatusUpdateMessageHandler
 
     /**
      * Converts the webhook payload to a GitHubProjectStatusUpdateDTO.
-     *
-     * <p>The webhook payload uses different field names and formats than the DTO, so we need to
-     * transform the data appropriately.
+     * <p>
+     * The webhook payload uses different field names and formats than the DTO,
+     * so we need to transform the data appropriately.
      */
     private GitHubProjectStatusUpdateDTO convertToDto(GitHubProjectStatusUpdateEventDTO.StatusUpdatePayload payload) {
         LocalDate startDate = parseDate(payload.startDate());
@@ -173,7 +167,9 @@ public class GitHubProjectStatusUpdateMessageHandler
                 updatedAt);
     }
 
-    /** Parses a date string in ISO format (YYYY-MM-DD). */
+    /**
+     * Parses a date string in ISO format (YYYY-MM-DD).
+     */
     private @Nullable LocalDate parseDate(String dateStr) {
         if (dateStr == null || dateStr.isBlank()) {
             return null;
@@ -186,7 +182,9 @@ public class GitHubProjectStatusUpdateMessageHandler
         }
     }
 
-    /** Parses an instant string in ISO format. */
+    /**
+     * Parses an instant string in ISO format.
+     */
     private @Nullable Instant parseInstant(String instantStr) {
         if (instantStr == null || instantStr.isBlank()) {
             return null;
@@ -201,16 +199,15 @@ public class GitHubProjectStatusUpdateMessageHandler
 
     /**
      * Resolves the scope ID based on the owner type.
-     *
-     * <p>Resolution strategies:
-     *
+     * <p>
+     * Resolution strategies:
      * <ul>
-     *   <li>ORGANIZATION: Look up by organization login
-     *   <li>REPOSITORY: Look up by repository fullName
-     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)
+     *   <li>ORGANIZATION: Look up by organization login</li>
+     *   <li>REPOSITORY: Look up by repository fullName</li>
+     *   <li>USER: Not supported - returns null (user projects aren't associated with workspaces)</li>
      * </ul>
      *
-     * @param event the webhook event
+     * @param event     the webhook event
      * @param ownerType the detected owner type
      * @return the scope ID, or null if not found or not supported
      */
@@ -236,7 +233,7 @@ public class GitHubProjectStatusUpdateMessageHandler
                 // User-level projects are not associated with a monitored workspace
                 // Log at info level since this is a known limitation
                 log.info(
-                        "User-owned project status update detected - not currently supported:" + " sender={}",
+                        "User-owned project status update detected - not currently supported: sender={}",
                         event.sender() != null ? sanitizeForLog(event.sender().login()) : "unknown");
                 yield null;
             }

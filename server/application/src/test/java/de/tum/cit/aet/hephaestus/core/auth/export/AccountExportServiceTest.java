@@ -81,7 +81,7 @@ class AccountExportServiceTest extends BaseUnitTest {
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("notification_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", ACCOUNT_ID)));
+                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", "MEMBER")));
         when(preferencesQuery.preferencesForAccount(ACCOUNT_ID))
                 .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(!participating, false)));
 
@@ -99,7 +99,7 @@ class AccountExportServiceTest extends BaseUnitTest {
 
         ExportBundle bundle = assembler.assemble(ACCOUNT_ID);
 
-        assertThat(bundle.schemaVersion()).isEqualTo(ExportBundle.SCHEMA_VERSION);
+        assertThat(bundle.schemaVersion()).isEqualTo("2.0");
         assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID.toString());
         assertThat(bundle.account().primaryEmail()).isEqualTo("ada@example.com");
         assertThat(bundle.identities()).singleElement().satisfies(i -> {

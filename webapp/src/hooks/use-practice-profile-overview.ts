@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 
-import { getPracticeProfileOverviewOptions } from "@/api/@tanstack/react-query.gen";
+import { getOwnPracticeProfileOverviewOptions } from "@/api/@tanstack/react-query.gen";
 import { queryLoadState } from "@/components/common/panel-state";
 import { EMPTY_OVERVIEW } from "@/components/practice-profile/compose-overview";
 
@@ -17,7 +17,7 @@ export const PRACTICE_PROFILE_POLL_MS = 60_000;
  */
 export function usePracticeProfileOverview(workspaceSlug: string) {
 	const query = useQuery({
-		...getPracticeProfileOverviewOptions({ path: { workspaceSlug } }),
+		...getOwnPracticeProfileOverviewOptions({ path: { workspaceSlug } }),
 		refetchInterval: PRACTICE_PROFILE_POLL_MS,
 	});
 	return { overview: query.data ?? EMPTY_OVERVIEW, state: queryLoadState(query) };

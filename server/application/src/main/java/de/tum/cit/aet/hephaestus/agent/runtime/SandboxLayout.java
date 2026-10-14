@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import java.time.Duration;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -13,6 +14,9 @@ import java.util.regex.Pattern;
 public final class SandboxLayout {
 
     private SandboxLayout() {}
+
+    public static final int PRACTICE_CONTRACT_VERSION = 3;
+    public static final String SOURCE_CONTRACT_VERSION = ClasspathSourceCatalogRegistry.CURRENT_VERSION_VALUE;
 
     /** Container workspace root. */
     public static final String WORKSPACE_ROOT = "/workspace";

@@ -26,10 +26,17 @@ describe("the typical review", () => {
 	it("measures to the end of the review where no review commented, without To developer", () => {
 		const typical = typicalReview({
 			...practiceReviewTiming,
-			total: { count: 0 },
-			totalShares: undefined,
+			total: { count: 0, medianSeconds: null, p90Seconds: null },
+			totalShares: null,
 			finished: { count: 4, medianSeconds: 600, p90Seconds: 900 },
-			finishedShares: { asked: 0, queue: 0.1, preparation: 0.1, model: 0.8, runUnsplit: 0 },
+			finishedShares: {
+				asked: 0,
+				queue: 0.1,
+				preparation: 0.1,
+				model: 0.8,
+				runUnsplit: 0,
+				posted: null,
+			},
 		});
 		expect(typical?.until).toBe("end");
 		expect(typical?.timing.medianSeconds).toBe(600);
@@ -44,10 +51,17 @@ describe("the typical review", () => {
 	it("shows the run of older reviews apart, unsplit, only where the range has some", () => {
 		const typical = typicalReview({
 			...practiceReviewTiming,
-			total: { count: 0 },
-			totalShares: undefined,
+			total: { count: 0, medianSeconds: null, p90Seconds: null },
+			totalShares: null,
 			finished: { count: 4, medianSeconds: 600, p90Seconds: 900 },
-			finishedShares: { asked: 0, queue: 0.1, preparation: 0.1, model: 0.5, runUnsplit: 0.3 },
+			finishedShares: {
+				asked: 0,
+				queue: 0.1,
+				preparation: 0.1,
+				model: 0.5,
+				runUnsplit: 0.3,
+				posted: null,
+			},
 		});
 		expect(parts(typical)).toStrictEqual([
 			["Until asked", 0],
@@ -62,10 +76,10 @@ describe("the typical review", () => {
 		expect(
 			typicalReview({
 				...practiceReviewTiming,
-				total: { count: 0 },
-				totalShares: undefined,
-				finished: { count: 0 },
-				finishedShares: undefined,
+				total: { count: 0, medianSeconds: null, p90Seconds: null },
+				totalShares: null,
+				finished: { count: 0, medianSeconds: null, p90Seconds: null },
+				finishedShares: null,
 			}),
 		).toBeUndefined();
 	});

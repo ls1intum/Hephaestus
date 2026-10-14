@@ -5,8 +5,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAbsorptionContributor;
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
@@ -24,8 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class PeopleRegistryService implements PeopleRegistry {
     private final AccountRepository accounts;
     private final IdentityRepository identities;
-    private final AccountAbsorptionService absorption;
-    private final PersonDataWriteFence writeFence;
+    private final List<AccountAbsorptionContributor> contributors;
     private final IdentityKeyLock identityKeys;
 
     @Override
@@ -37,9 +36,7 @@ public class PeopleRegistryService implements PeopleRegistry {
         if (!existing.isEmpty()) {
             var row = existing.getFirst();
             if (row.getDisabledAt() != null) throw conflict("This identity is disabled.");
-            var account = accounts.findByIdForUpdate(
-                            Objects.requireNonNull(row.getAccount().getId()))
-                    .orElseThrow(() -> conflict("This account is unavailable."));
+            var account = lockedOwner(row);
             if (account.getStatus() == Account.Status.DELETING || account.getStatus() == Account.Status.DELETED)
                 throw conflict("This account is being erased.");
             return Objects.requireNonNull(account.getId());
@@ -64,9 +61,7 @@ public class PeopleRegistryService implements PeopleRegistry {
         var row = identities.findByExactKey(identity.providerId(), identity.subject(), teamKey(identity)).stream()
                 .findFirst()
                 .orElseThrow(() -> conflict("This identity has no account to claim."));
-        var account = accounts.findByIdForUpdate(
-                        Objects.requireNonNull(row.getAccount().getId()))
-                .orElseThrow(() -> conflict("This account is unavailable."));
+        var account = lockedOwner(row);
         if (account.getStatus() == Account.Status.UNCLAIMED) account.setStatus(Account.Status.ACTIVE);
         if (account.getStatus() != Account.Status.ACTIVE) throw conflict("This account cannot sign in.");
         row.setDisabledAt(null);
@@ -79,14 +74,52 @@ public class PeopleRegistryService implements PeopleRegistry {
     @Override
     @Transactional
     public void absorbUnclaimed(long claimedAccountId, long unclaimedAccountId) {
-        absorption.absorb(claimedAccountId, unclaimedAccountId);
+        if (claimedAccountId == unclaimedAccountId) return;
+        var sourceIdentities = identities.findByAccount_Id(unclaimedAccountId);
+        if (sourceIdentities.isEmpty()) throw conflict("The unclaimed account has no identity.");
+        var sourceKeys = sourceIdentities.stream()
+                .map(i -> new PersonIdentity(
+                        i.getProviderId(),
+                        i.getProviderUserKey(),
+                        i.getTeamKey().isEmpty() ? null : i.getTeamKey()))
+                .toList();
+        identityKeys.holdAndLock(sourceKeys);
+        var first = accounts.findByIdForUpdate(Math.min(claimedAccountId, unclaimedAccountId))
+                .orElseThrow(() -> conflict("This account is unavailable."));
+        var second = accounts.findByIdForUpdate(Math.max(claimedAccountId, unclaimedAccountId))
+                .orElseThrow(() -> conflict("This account is unavailable."));
+        var target = claimedAccountId < unclaimedAccountId ? first : second;
+        var source = claimedAccountId < unclaimedAccountId ? second : first;
+        if (source.getStatus() != Account.Status.UNCLAIMED
+                || (target.getStatus() != Account.Status.ACTIVE && target.getStatus() != Account.Status.SUSPENDED))
+            throw conflict("Only an unclaimed account can be absorbed by its verified owner.");
+        for (var contributor : contributors) contributor.beforeAbsorb(claimedAccountId, unclaimedAccountId);
+        for (var contributor : contributors) contributor.absorb(claimedAccountId, unclaimedAccountId);
+        accounts.flush();
+        for (var contributor : contributors) contributor.afterAbsorb(claimedAccountId, unclaimedAccountId);
+        for (var contributor : contributors.reversed()) contributor.finish(claimedAccountId, unclaimedAccountId);
+        target.setFeedbackDeliveryEnabled(target.isFeedbackDeliveryEnabled() && source.isFeedbackDeliveryEnabled());
+        target.setPublicActivityVisible(target.isPublicActivityVisible() && source.isPublicActivityVisible());
+        var sourceChoiceAt = source.getAiChoiceAt();
+        var targetChoiceAt = target.getAiChoiceAt();
+        if (sourceChoiceAt != null && (targetChoiceAt == null || sourceChoiceAt.isAfter(targetChoiceAt))) {
+            target.setAiChoice(source.getAiChoice());
+            target.setAiChoiceAt(sourceChoiceAt);
+        }
+        accounts.save(target);
+        accounts.delete(source);
+    }
+
+    private Account lockedOwner(Identity identity) {
+        long ownerId =
+                identities.findOwnerId(identity.getId()).orElseThrow(() -> conflict("This account is unavailable."));
+        var account = accounts.findByIdForUpdate(ownerId).orElseThrow(() -> conflict("This account is unavailable."));
+        identity.setAccount(account);
+        return account;
     }
 
     private void lockIdentity(PersonIdentity identity) {
-        if (identity.providerId() <= 0 || identity.subject().isBlank())
-            throw new IllegalArgumentException("An exact provider identity is required");
-        if (!writeFence.holdForWrite(List.of(identity))) throw conflict("This identity is being erased.");
-        identityKeys.lock(List.of(identity));
+        identityKeys.holdAndLock(List.of(identity));
     }
 
     private static String teamKey(PersonIdentity identity) {

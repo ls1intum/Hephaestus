@@ -112,8 +112,8 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         workspace.setId(1L);
         lenient().when(workspaces.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         when(memberships.membershipsForAccount(10L))
-                .thenReturn(List.of(
-                        new AccountMembershipQuery.MembershipView(1L, "engineering", "Engineering", "MEMBER", 20L)));
+                .thenReturn(
+                        List.of(new AccountMembershipQuery.MembershipView(1L, "engineering", "Engineering", "MEMBER")));
         var membership = new Membership();
         membership.setWorkspace(workspace);
         lenient().when(members.findByWorkspace_IdAndAccount_Id(1L, 10L)).thenReturn(Optional.of(membership));

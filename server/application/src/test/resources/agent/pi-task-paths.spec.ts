@@ -70,7 +70,7 @@ void test("ignores additive metadata without relaxing required path validation",
 void test("accepts the envelope produced by the Java task writer, at the version the runner supports", () => {
 	assert.equal(SUPPORTED_SCHEMA_VERSION, 6);
 	const envelope: unknown = JSON.parse(
-		readFileSync(new URL("contract-v3/task.json", import.meta.url), "utf8"),
+		readFileSync(new URL("../task-fixtures/practice-review.json", import.meta.url), "utf8"),
 	);
 	assert.ok(typeof envelope === "object" && envelope !== null);
 	assert.equal(taskPaths(envelope).contextRoot, Reflect.get(envelope, "contextRoot"));

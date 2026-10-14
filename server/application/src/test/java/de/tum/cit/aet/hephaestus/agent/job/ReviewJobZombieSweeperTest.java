@@ -13,7 +13,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
@@ -87,31 +89,32 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
         sweeper = new ReviewJobZombieSweeper(
                 jobRepository,
                 workerRegistryRepository,
-                AGENT_PROPS,
                 objectMapper,
                 transactionTemplate,
                 usageRecorder,
                 meterRegistry,
-                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP));
+                new ReviewJobTelemetry(meterRegistry, Tracer.NOOP),
+                new ReviewJobRecovery(jobRepository, AGENT_PROPS, objectMapper, usageRecorder, Optional.empty()));
     }
 
     private ConfigSnapshot admittedSnapshot(int timeoutSeconds) {
         return new ConfigSnapshot(
                         ConfigSnapshot.SCHEMA_VERSION,
-                        "openai-completions",
-                        "https://api.openai.com/v1",
-                        "test-model",
+                        new FrozenModel(
+                                LlmApiProtocol.OPENAI_COMPLETIONS,
+                                "https://api.openai.com/v1",
+                                "test-model",
+                                UsageFundingSource.INSTANCE,
+                                1L,
+                                1L,
+                                null,
+                                null,
+                                null,
+                                null),
                         null,
-                        null,
-                        null,
-                        UsageFundingSource.INSTANCE,
-                        1L,
-                        1L,
                         null,
                         timeoutSeconds,
                         false,
-                        null,
-                        null,
                         null)
                 .withPriceSnapshot(new LlmPriceSnapshot(
                         UsageFundingSource.INSTANCE,
@@ -210,15 +213,14 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
         void requeuesOrphanedJob() {
             UUID jobId = UUID.randomUUID();
             when(jobRepository.findOrphanedRunningJobs(any(), anyLong())).thenReturn(List.of(orphan(jobId, 7L, 0)));
-            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any(), any()))
+            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any()))
                     .thenReturn(1);
             ReviewJob persistedJob = orphanedJob(jobId, 7L, 0);
             when(jobRepository.lockById(jobId)).thenReturn(Optional.of(persistedJob));
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository)
-                    .requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any(), any());
+            verify(jobRepository).requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count())
                     .isEqualTo(1d);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
@@ -233,26 +235,27 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
         void recoversJobWithoutPriceSnapshot() {
             UUID jobId = UUID.randomUUID();
             when(jobRepository.findOrphanedRunningJobs(any(), anyLong())).thenReturn(List.of(orphan(jobId, 7L, 0)));
-            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), anyInt(), any(), any()))
+            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), anyInt(), any()))
                     .thenReturn(1);
             ReviewJob legacyJob = orphanedJob(jobId, 7L, 0);
             ConfigSnapshot snapshot = ConfigSnapshot.fromJson(legacyJob.getConfigSnapshot(), objectMapper);
             legacyJob.setConfigSnapshot(new ConfigSnapshot(
                             snapshot.schemaVersion(),
-                            snapshot.apiProtocol(),
-                            snapshot.baseUrl(),
-                            snapshot.upstreamModelId(),
+                            new FrozenModel(
+                                    snapshot.model().apiProtocol(),
+                                    snapshot.model().baseUrl(),
+                                    snapshot.model().upstreamModelId(),
+                                    snapshot.model().connectionScope(),
+                                    snapshot.model().connectionId(),
+                                    snapshot.model().modelId(),
+                                    snapshot.model().workspaceId(), // The snapshot has no admission price.
+                                    null,
+                                    snapshot.model().reasoningEffort(),
+                                    null),
                             snapshot.contextWindow(),
                             snapshot.maxOutputTokens(),
-                            snapshot.reasoningEffort(),
-                            snapshot.connectionScope(),
-                            snapshot.connectionId(),
-                            snapshot.modelId(),
-                            snapshot.workspaceId(),
                             snapshot.timeoutSeconds(),
                             snapshot.allowInternet(),
-                            null, // The snapshot has no admission price.
-                            null,
                             null)
                     .toJson(objectMapper));
             when(jobRepository.lockById(jobId)).thenReturn(Optional.of(legacyJob));
@@ -271,14 +274,13 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
         void skipsWhenRequeueRaced() {
             UUID jobId = UUID.randomUUID();
             when(jobRepository.findOrphanedRunningJobs(any(), anyLong())).thenReturn(List.of(orphan(jobId, 7L, 0)));
-            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any(), any()))
+            when(jobRepository.requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any()))
                     .thenReturn(0); // another replica won
             when(jobRepository.lockById(jobId)).thenReturn(Optional.of(orphanedJob(jobId, 7L, 0)));
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository)
-                    .requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any(), any());
+            verify(jobRepository).requeueOrphan(eq(jobId), eq(DEAD_WORKER_ID), eq(AGENT_PROPS.maxRetries()), any());
             verify(jobRepository, never()).transitionStatus(any(), any(), any(), any(), any());
             verify(usageRecorder, never()).recordUnverifiable(any(), any());
             assertThat(meterRegistry.counter("agent.job.orphan.requeued").count())
@@ -304,7 +306,7 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
 
             sweeper.recoverOrphanedJobs();
 
-            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any(), any());
+            verify(jobRepository, never()).requeueOrphan(any(), any(), anyInt(), any());
             verify(jobRepository)
                     .transitionStatusOwnedBy(
                             eq(jobId),

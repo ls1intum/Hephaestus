@@ -12,8 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
 import de.tum.cit.aet.hephaestus.integration.scm.ScmPersonSourceIdentityContributor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import java.util.Objects;
@@ -31,7 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class ScmItemSourceAccess implements ItemSourceAccess {
     private final ScmItemAccess items;
     private final RepositoryRepository repositories;
-    private final IssueRepository issues;
+    private final ScmWorkLookup workLookup;
     private final PullRequestReviewRepository reviews;
     private final ScmRepositoryAccess access;
     private final ScmPersonSourceIdentityContributor contributors;
@@ -87,11 +85,9 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
             } else {
                 var parent = items.parent(item, ScmItemEvents.REPOSITORY);
                 if (!permitsItem(parent)) return false;
-                var work = issues.findByIdWithAuthorAndRepository(source);
+                var work = workLookup.find(item.kind(), source);
                 if (work.isEmpty()
                         || work.orElseThrow().getDeletedAt() != null
-                        || (work.orElseThrow() instanceof PullRequest)
-                                != item.kind().equals(ScmItemEvents.PULL_REQUEST)
                         || work.orElseThrow().getRepository() == null
                         || !Objects.equals(work.orElseThrow().getRepository().getId(), parent.sourceId())) return false;
             }

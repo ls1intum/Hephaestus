@@ -58,7 +58,7 @@ public class FileItemDescriptor implements ItemDescriptor {
         return new ReviewCapabilities(
                 List.of(new ReviewLimitation(
                         "RUNTIME_BEHAVIOR_NOT_OBSERVED",
-                        "Repository evidence does not establish behavior in a deployed" + " runtime.")),
+                        "Repository evidence does not establish behavior in a deployed runtime.")),
                 List.of(),
                 Set.of(),
                 Set.of(),

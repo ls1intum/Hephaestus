@@ -17,7 +17,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Processor for GitHub pull request review threads. */
+/**
+ * Processor for GitHub pull request review threads.
+ */
 @Service
 public class GitHubPullRequestReviewThreadProcessor {
 
@@ -33,8 +35,8 @@ public class GitHubPullRequestReviewThreadProcessor {
     }
 
     /**
-     * @param resolvedAt when the event says the thread was resolved — the only source of that
-     *     moment on GitHub, whose GraphQL thread carries none
+     * @param resolvedAt when the event says the thread was resolved — the only source of that moment
+     *     on GitHub, whose GraphQL thread carries none
      */
     @Transactional
     public boolean resolve(

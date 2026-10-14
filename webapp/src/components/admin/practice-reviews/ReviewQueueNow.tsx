@@ -151,13 +151,7 @@ function queueInfo(queue: ReviewQueue | undefined) {
 	];
 }
 
-function QueueFigures({
-	workspaceSlug,
-	queue,
-}: {
-	workspaceSlug: string;
-	queue: ReviewQueue;
-}) {
+function QueueFigures({ workspaceSlug, queue }: { workspaceSlug: string; queue: ReviewQueue }) {
 	const total = queueTotal(queue);
 	const rows = queue.head.slice(0, QUEUE_ROWS);
 	const oldest = oldestWaitSeconds(queue);
@@ -165,9 +159,7 @@ function QueueFigures({
 		{
 			key: "waiting",
 			term: "waiting",
-			value: (
-<span>{queue.waiting}</span>
-			),
+			value: <span>{queue.waiting}</span>,
 			none: queue.waiting === 0,
 		},
 		{
@@ -330,13 +322,7 @@ const QUEUE_CELL = "py-0.5 align-middle";
  * what room is left and truncates first, so the time is never cut off. A held review's time runs
  * from its request, since its hold points at the next check of the cap.
  */
-function QueueTable({
-	queue,
-	rows,
-}: {
-	queue: ReviewQueue;
-	rows: readonly ReviewQueueItem[];
-}) {
+function QueueTable({ queue, rows }: { queue: ReviewQueue; rows: readonly ReviewQueueItem[] }) {
 	return (
 		<table aria-label="First in the queue" className="w-full text-sm">
 			<thead>
@@ -382,9 +368,11 @@ function QueueRow({ queue, item }: { queue: ReviewQueue; item: ReviewQueueItem }
 			</td>
 			{/* `max-w-0` lets the cell shrink below its words, so the name truncates, not the row. */}
 			<td className={cn(QUEUE_CELL, "max-w-0 pr-4", OVERVIEW_TYPE.label)}>
-				<span className="block truncate">{item.developer
+				<span className="block truncate">
+					{item.developer
 						? (firstNonBlank(item.developer.displayName, item.developer.providerLogin) ?? "")
-						: ""}</span>
+						: ""}
+				</span>
 			</td>
 			<td className={cn(QUEUE_CELL, "pr-4 whitespace-nowrap", OVERVIEW_TYPE.label)}>
 				<span className="inline-flex items-center gap-1.5" title={def.label}>

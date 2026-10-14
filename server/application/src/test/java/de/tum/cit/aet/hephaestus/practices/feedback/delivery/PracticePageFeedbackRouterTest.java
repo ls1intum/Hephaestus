@@ -36,8 +36,7 @@ class PracticePageFeedbackRouterTest {
     @Test
     void shouldNotCountCleanWorkAsEvidenceOfARecurringProblem() {
         var a = result(1, 3);
-        var clean = result(2, 3);
-        clean.setOutcome(ResultOutcome.MET);
+        var clean = result(2, 3).toBuilder().outcome(ResultOutcome.MET).build();
         assertThat(new PracticePageFeedbackRouter().supportsPattern(a, List.of(a, clean)))
                 .isFalse();
     }
@@ -45,8 +44,7 @@ class PracticePageFeedbackRouterTest {
     @Test
     void shouldExcludeEndedSupport() {
         var a = result(1, 3);
-        var ended = result(2, 3);
-        ended.setEndedAt(Instant.EPOCH);
+        var ended = result(2, 3).toBuilder().endedAt(Instant.EPOCH).build();
         assertThat(new PracticePageFeedbackRouter().supportsPattern(a, List.of(a, ended)))
                 .isFalse();
     }

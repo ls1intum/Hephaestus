@@ -12,11 +12,12 @@ import org.springframework.data.repository.query.Param;
 public interface ItemRepository extends JpaRepository<Item, Long> {
     Optional<Item> findByIdAndWorkspaceId(long itemId, long workspaceId);
 
+    List<Item> findByWorkspaceIdAndIdIn(long workspaceId, List<Long> ids);
+
     List<Item> findByWorkspaceIdAndParentIdAndRemovedAtIsNull(long workspaceId, long parentId);
 
     @Query(
-            value = "SELECT * FROM item WHERE workspace_id = :workspaceId AND kind = :kind AND"
-                    + " source_id = :sourceId",
+            value = "SELECT * FROM item WHERE workspace_id = :workspaceId AND kind = :kind AND source_id = :sourceId",
             nativeQuery = true)
     Optional<Item> findSource(
             @Param("workspaceId") long workspaceId, @Param("kind") String kind, @Param("sourceId") long sourceId);
@@ -25,9 +26,8 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     @Modifying
     @Query(
-            value = "INSERT INTO item(workspace_id, kind, source_id, parent_id, path, created_at)"
-                    + " VALUES (:workspaceId, :kind, :sourceId, :parentId, :path, :at) ON"
-                    + " CONFLICT DO NOTHING",
+            value =
+                    "INSERT INTO item(workspace_id, kind, source_id, parent_id, path, created_at) VALUES (:workspaceId, :kind, :sourceId, :parentId, :path, :at) ON CONFLICT DO NOTHING",
             nativeQuery = true)
     int insertIfAbsent(
             @Param("workspaceId") long workspaceId,
@@ -38,12 +38,12 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
             @Param("at") Instant at);
 
     @Modifying
-    @Query("UPDATE Item i SET i.removedAt = :at WHERE i.workspaceId = :workspaceId AND i.id ="
-            + " :itemId AND i.removedAt IS NULL")
+    @Query(
+            "UPDATE Item i SET i.removedAt = :at WHERE i.workspaceId = :workspaceId AND i.id = :itemId AND i.removedAt IS NULL")
     int remove(@Param("workspaceId") long workspaceId, @Param("itemId") long itemId, @Param("at") Instant at);
 
     @Modifying
-    @Query("UPDATE Item i SET i.removedAt = NULL WHERE i.workspaceId = :workspaceId AND i.id ="
-            + " :itemId AND i.removedAt IS NOT NULL")
+    @Query(
+            "UPDATE Item i SET i.removedAt = NULL WHERE i.workspaceId = :workspaceId AND i.id = :itemId AND i.removedAt IS NOT NULL")
     int restore(@Param("workspaceId") long workspaceId, @Param("itemId") long itemId);
 }

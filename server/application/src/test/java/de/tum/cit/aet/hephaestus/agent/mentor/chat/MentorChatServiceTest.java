@@ -671,7 +671,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         preparer.prepare(WORKSPACE_ID, USER_ID);
 
         verify(interactiveSandboxService, never()).attach(any());
-        assertThat(proxyCredentialRegistry.validate(token)).isEmpty();
+        assertThat(proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve)).isEmpty();
     }
 
     @Test
@@ -1865,13 +1865,13 @@ class MentorChatServiceTest extends BaseUnitTest {
         sandbox.onSend = frame -> {
             if ("prompt".equals(frame.path("method").asString(""))) {
                 ProxyRouting.BilledAttempt attempt =
-                        proxyCredentialRegistry.validate(token).orElseThrow().attempt();
+                        proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt();
                 if (attempt != null) {
 
                     proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0, 0));
                 }
                 seen.set(Objects.requireNonNull(
-                        proxyCredentialRegistry.validate(token).orElseThrow().attempt()));
+                        proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt()));
             }
             scripted.accept(frame);
         };
@@ -1907,7 +1907,7 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(duringPrompt.get()).isNotNull();
         assertThat(duringPrompt.get().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
         assertThat(duringPrompt.get().spentUsd()).isEqualByComparingTo("1.00");
-        assertThat(proxyCredentialRegistry.validate(sessionToken).orElseThrow().attempt())
+        assertThat(proxyCredentialRegistry.authenticate(sessionToken).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt())
                 .isNull();
     }
 
@@ -1922,7 +1922,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
         assertThat(duringPrompt.get()).isNotNull();
-        assertThat(proxyCredentialRegistry.validate(sessionToken).orElseThrow().attempt())
+        assertThat(proxyCredentialRegistry.authenticate(sessionToken).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt())
                 .isNull();
     }
 

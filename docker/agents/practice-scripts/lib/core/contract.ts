@@ -17,27 +17,9 @@ import { z } from "zod";
 
 import { isJsonObject } from "./json.ts";
 
-/**
- * The error of a script whose default export is not a `definePracticeScript` definition, such as a
- * plain function: the form that scripts had before `definePracticeScript`.
- */
-export const RETIRED_FORM_ERROR =
-	"This script uses the retired positional form. Rewrite it with definePracticeScript.";
-
-/**
- * The error of a script written for the retired leads contract: its `meta` names a version, lead kinds
- * or a token ceiling, or its `run` returns leads. Nothing reads that form any more.
- */
-export const LEGACY_CONTRACT_ERROR =
-	"This practice script uses the retired leads contract (meta.version). Accept the practice's catalog update, or rewrite run() to return a result, for example return ctx.review({ leads }).";
-
-/** The keys of the retired `meta`, in the order the error names the first one present. */
-const LEGACY_META_KEYS = ["version", "kinds", "tokens"] as const;
-
-/** {@link LEGACY_CONTRACT_ERROR}, naming the retired key that the script used. */
-export function legacyContractError(key: (typeof LEGACY_META_KEYS)[number]): string {
-	return LEGACY_CONTRACT_ERROR.replace("(meta.version)", `(meta.${key})`);
-}
+/** The error of a script whose default export is not a `definePracticeScript` definition. */
+export const NOT_A_DEFINITION_ERROR =
+	"The script's default export is not a practice script. Write it with definePracticeScript.";
 
 /** A practice slug as the server writes it: `SandboxLayout.PRACTICE_SLUG`, anchored. */
 export const PRACTICE_SLUG = /^[a-z0-9][a-z0-9-]{0,63}$/u;
@@ -92,41 +74,30 @@ const line = (max: number) =>
 		.max(max)
 		.refine((text) => !/[\r\n]/u.test(text), "must be one line");
 
-/**
- * A practice program's `meta`: the direct models it needs, and nothing else. A key of the retired
- * leads contract is refused with {@link LEGACY_CONTRACT_ERROR} before this schema reads it.
- */
+/** A practice program's `meta`: the direct models it needs, and nothing else. */
 export const metaSchema = z.strictObject({
 	models: z.partialRecord(modelSlotSchema, needSchema).optional(),
 });
 export type ParsedMeta = z.infer<typeof metaSchema>;
 
-/** The retired key that a `meta` value carries, or undefined. */
-export function legacyMetaKey(meta: unknown): (typeof LEGACY_META_KEYS)[number] | undefined {
-	return isJsonObject(meta) ? LEGACY_META_KEYS.find((key) => Object.hasOwn(meta, key)) : undefined;
-}
-
-/** Parse a program's `meta`, or say why it is not one: a retired key, or a shape the contract does not name. */
-export function parseMeta(
-	meta: unknown,
-): { meta: ParsedMeta } | { error: string; legacy: boolean } {
-	const legacy = legacyMetaKey(meta);
-	if (legacy !== undefined) {
-		return { error: legacyContractError(legacy), legacy: true };
-	}
+/** Parse a program's `meta`, or say why it is not one. */
+export function parseMeta(meta: unknown): { meta: ParsedMeta } | { error: string } {
 	const parsed = metaSchema.safeParse(meta);
 	if (!parsed.success) {
 		const issue = parsed.error.issues[0];
 		return {
 			error: `meta: ${issue ? `${issue.path.join(".")} ${issue.message}`.trim() : "invalid"}`,
-			legacy: false,
 		};
 	}
 	return { meta: parsed.data };
 }
 
+/** The longest fact text, and the longest direction or lead label, that a review input carries. */
+export const FACT_CHARS = 200;
+export const DIRECTION_CHARS = 300;
+
 const scalar = z.union([
-	line(200),
+	line(FACT_CHARS),
 	z.number().refine(Number.isFinite, "must be finite"),
 	z.boolean(),
 ]);
@@ -361,6 +332,8 @@ export type Origin = (typeof ORIGINS)[number];
 export type AboutRole = (typeof ABOUT_ROLES)[number];
 export const decimalIdSchema = z.string().regex(/^[1-9][0-9]*$/u);
 const version = z.string().min(1).max(1024);
+/** A full commit id: the only revision a file location names, so it can never read as a git option. */
+export const commitIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
 export const kindSchema = z
 	.string()
 	.max(64)
@@ -390,6 +363,28 @@ const previousCitationSchema = z.strictObject({
 	endLine: z.int().min(1).max(2_147_483_647),
 	side: z.enum(["OLD", "NEW"]).optional(),
 	revision: version.optional(),
+});
+/** How much feedback one destination may carry in a run. */
+const destinationBoundsSchema = z.strictObject({
+	enabled: z.boolean(),
+	maxPieces: z.int().min(0).max(10),
+});
+/**
+ * The feedback composition request the server stages for an ITEM review that delivers somewhere
+ * (`FeedbackCompositionInputs`). An absent destination is closed.
+ */
+export const compositionRequestSchema = z.strictObject({
+	contractVersion: z.literal(3),
+	enabled: z.literal(true),
+	destinations: z.strictObject({
+		ON_WORK: destinationBoundsSchema.optional(),
+		PRACTICE_PAGE: destinationBoundsSchema.optional(),
+		CONVERSATION: destinationBoundsSchema.optional(),
+	}),
+	/** How many distinct items a pattern claim needs. */
+	minDistinctItems: z.int().min(2),
+	/** The copy forms an ON_WORK note may take on this item's integration. */
+	onWorkCopyForms: z.array(z.enum(["LINE_NOTE", "FILE_NOTE"])),
 });
 export const previousSchema = z.strictObject({
 	resultId: z.uuid(),
@@ -493,21 +488,7 @@ export type Outcome = (typeof OUTCOMES)[number];
  * A verified place in a captured source, in canonical coordinates. The quote is the exact text at
  * those lines; admission reads it again from the source.
  */
-export interface Citation {
-	/** Integration-neutral, e.g. "scm.pull-request.diff", "scm.repository.tree", "scm.pull-request.core". */
-	sourceKind: string;
-	/** The staged sourceFile, e.g. "context/change.json", "repos/reviewed/.git/HEAD", "context/metadata.json". */
-	sourcePath: string;
-	/** The repository path for code sources; the record path otherwise. */
-	path: string;
-	/** Source-catalog flags declare whether a side is required or permitted. */
-	side?: "OLD" | "NEW";
-	/** An opaque version whose syntax and permission the domain source owns. */
-	revision?: string;
-	startLine: number;
-	endLine: number;
-	quote: string;
-}
+export type Citation = z.infer<typeof citationShape>;
 
 export interface CitationIdentity {
 	source: string;
@@ -516,53 +497,19 @@ export interface CitationIdentity {
 
 type ResolveCitationIdentity = (citation: Citation) => CitationIdentity | undefined;
 /** What a search for something missing consulted, looked for, and did not cover. Consulted names source kinds. */
-export interface SearchWarrant {
-	consulted: NonEmpty<string>;
-	lookedFor: string;
-	boundary: string;
-}
-export interface InapplicabilityWarrant {
-	consulted: NonEmpty<string>;
-	prerequisite: string;
-	ruledOutBy: string;
-}
+export type SearchWarrant = z.infer<typeof searchShape>;
+export type InapplicabilityWarrant = z.infer<typeof inapplicabilityShape>;
 /** A real semantic question the evidence leaves open, located where it can be. */
-export interface OpenQuestion {
-	openQuestion: string;
-	wouldSettleIt: string;
-	citation?: Citation;
-}
+export type OpenQuestion = z.infer<typeof openQuestionShape>;
 /** One place of the work that shows the practice done well. */
-export interface Example {
-	citation: Citation;
-	note: string;
-}
+export type Example = z.infer<typeof exampleShape>;
 /** Why a problem is this work's: the indices name the problem's own citations. */
-export type ClaimBasis =
-	| { type: "introduced"; head: number; explanation: string }
-	| { type: "worsened"; base: number; head: number; explanation: string }
-	| { type: "duty"; criterionQuote: string; event: number; explanation: string }
-	| { type: "state"; explanation: string };
-export interface Problem {
-	/** Practice-slug shaped and unique within the candidate. */
-	key?: string;
-	severity: Severity;
-	/** One line. */
-	summary: string;
-	explanation: string;
-	citations: NonEmpty<Citation>;
-	basis: ClaimBasis;
-	nextStep?: string;
-}
+export type ClaimBasis = z.infer<typeof basisShape>;
+export type Problem = z.infer<typeof problemShape>;
 export const OMISSION_REASONS = ["selection", "truncated", ...REASONS, "cancelled"] as const;
 export type OmissionReason = (typeof OMISSION_REASONS)[number];
 /** What a program or a review did not cover, and why. */
-export interface Omission {
-	what: string;
-	count: number;
-	reason: OmissionReason;
-	items?: readonly string[];
-}
+export type Omission = z.infer<typeof omissionShape>;
 export type Completeness =
 	| { complete: true; omitted?: never }
 	| { complete: false; omitted: NonEmpty<Omission> };
@@ -667,10 +614,15 @@ export function isSafeRelativePath(path: string): boolean {
 
 const citationShape = z
 	.strictObject({
+		/** Integration-neutral, e.g. "scm.pull-request.diff", "scm.repository.tree", "scm.pull-request.core". */
 		sourceKind: z.string().min(1).max(4096),
+		/** The staged sourceFile, e.g. "context/change.json", "repos/reviewed/.git/HEAD", "context/metadata.json". */
 		sourcePath: z.string().min(1).max(4096),
+		/** The repository path for code sources; the record path otherwise. */
 		path: z.string().min(1).max(4096),
+		/** Source-catalog flags declare whether a side is required or permitted. */
 		side: z.enum(["OLD", "NEW"]).optional(),
+		/** An opaque version whose syntax and permission the domain source owns. */
 		revision: z.string().min(1).max(1024).optional(),
 		startLine: lineNumber,
 		endLine: lineNumber,
@@ -719,6 +671,7 @@ const basisShape = z.discriminatedUnion("type", [
 ]);
 const severityShape = z.enum(SEVERITIES);
 const problemShape = z.strictObject({
+	/** Practice-slug shaped and unique within the candidate. */
 	key: z.string().regex(PRACTICE_SLUG).optional(),
 	severity: severityShape,
 	summary: line(CANDIDATE_LIMITS.summaryChars),
@@ -775,24 +728,6 @@ const supersetShape = z.strictObject({
 	coverage: coverageShape,
 });
 type Superset = z.infer<typeof supersetShape>;
-
-const SEVERITY_RANK: Readonly<Record<Severity, number>> = {
-	CRITICAL: 3,
-	MAJOR: 2,
-	MINOR: 1,
-	TRIVIAL: 0,
-};
-
-/** The most severe of the problems' severities. */
-export function worstSeverity(problems: readonly { severity: Severity }[]): Severity | undefined {
-	let worst: Severity | undefined;
-	for (const { severity } of problems) {
-		if (worst === undefined || SEVERITY_RANK[severity] > SEVERITY_RANK[worst]) {
-			worst = severity;
-		}
-	}
-	return worst;
-}
 
 function nonEmpty<T>(items: readonly T[]): NonEmpty<T> | undefined {
 	const [first, ...rest] = items;
@@ -1111,7 +1046,7 @@ export const evidenceLocationSchema = z.union([
 		file: z.string().min(1),
 		line: lineNumber,
 		endLine: lineNumber.optional(),
-		revision: z.string().min(1).max(1024).optional(),
+		revision: commitIdSchema.optional(),
 	}),
 	z.strictObject({
 		record: z.string().min(1),
@@ -1125,7 +1060,7 @@ export const MAX_REVIEW_OPTIONS_BYTES = 262_144;
 const reviewLeadSchema = z.strictObject({
 	at: evidenceLocationSchema,
 	/** What the lead is, for the reviewer: one line. */
-	label: line(300),
+	label: line(DIRECTION_CHARS),
 	facts: factsSchema.optional(),
 });
 export type ReviewLead = z.infer<typeof reviewLeadSchema>;
@@ -1143,7 +1078,7 @@ export const reviewOptionsSchema = z.strictObject({
 	leads: listOf(reviewLeadSchema, REVIEW_LEAD_LIMIT).readonly().optional(),
 	facts: factsSchema.optional(),
 	/** Directions to the reviewer. The program's author writes them; reviewed text and model text belong in context. */
-	directions: listOf(line(300), 10).readonly().optional(),
+	directions: listOf(line(DIRECTION_CHARS), 10).readonly().optional(),
 	context: listOf(preparedContextSchema, 20).readonly().optional(),
 	limitations: listOf(omissionShape, CANDIDATE_LIMITS.omissions).readonly().optional(),
 });
@@ -1269,21 +1204,6 @@ export function validateCitationCapabilities(
 	}
 	return undefined;
 }
-export interface SubmittedResult {
-	practiceSlug: string;
-	itemId: string;
-	itemVersion: string;
-	candidate: Candidate;
-	readReceipts: readonly ReadReceipt[];
-}
-export interface AdmissionRequest {
-	contractVersion: 3;
-	reviewId: string;
-	jobId: string;
-	attempt: number;
-	results: readonly SubmittedResult[];
-}
-
 export function isDecimalId(value: unknown): value is string {
 	return decimalIdSchema.safeParse(value).success;
 }

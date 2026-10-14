@@ -43,17 +43,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub issue comments.
- *
- * <p>This service handles the conversion of GitHubCommentDTO to IssueComment entities, persists
- * them, and publishes appropriate domain events.
- *
- * <p><b>Design Principles:</b>
- *
+ * <p>
+ * This service handles the conversion of GitHubCommentDTO to IssueComment entities,
+ * persists them, and publishes appropriate domain events.
+ * <p>
+ * <b>Design Principles:</b>
  * <ul>
- *   <li>Single processing path for all data sources (sync and webhooks)
- *   <li>Idempotent operations via upsert pattern
- *   <li>Domain events published for reactive feature development
- *   <li>Works exclusively with DTOs for complete field coverage
+ * <li>Single processing path for all data sources (sync and webhooks)</li>
+ * <li>Idempotent operations via upsert pattern</li>
+ * <li>Domain events published for reactive feature development</li>
+ * <li>Works exclusively with DTOs for complete field coverage</li>
  * </ul>
  */
 @Service
@@ -84,14 +83,13 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Process a GitHub comment DTO and persist it as an IssueComment entity.
-     *
-     * <p>This overload requires the parent issue/PR to already exist in the database. For webhook
-     * processing where the parent might not exist, use {@link
-     * #processWithParentCreation(GitHubCommentDTO, GitHubIssueDTO, ProcessingContext)} instead.
+     * <p>
+     * This overload requires the parent issue/PR to already exist in the database.
+     * For webhook processing where the parent might not exist, use
+     * {@link #processWithParentCreation(GitHubCommentDTO, GitHubIssueDTO, ProcessingContext)} instead.
      *
      * @param dto the GitHub comment DTO
-     * @param issueNumber the issue number within the repository (natural key, consistent across all
-     *     sources)
+     * @param issueNumber the issue number within the repository (natural key, consistent across all sources)
      * @param context processing context with scope information (must contain repository)
      * @return the persisted IssueComment entity, or null if processing failed
      */
@@ -110,7 +108,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         Issue issue = findParent(context.repository(), issueNumber, context);
         if (issue == null) {
             log.warn(
-                    "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}," + " commentId={}",
+                    "Skipped comment processing: reason=parentNotFound, repoId={}, issueNumber={}, commentId={}",
                     context.repository().getId(),
                     issueNumber,
                     dto.id());
@@ -121,21 +119,20 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a GitHub comment DTO and persist it as an IssueComment entity, creating a minimal
-     * parent entity (Issue or PullRequest) if it doesn't exist.
-     *
-     * <p>This method solves the message ordering problem where comment webhooks arrive before the
-     * parent issue/PR webhook. Instead of failing and retrying, we create a minimal parent entity
-     * from the webhook's embedded issue data. The full entity will be updated later when the proper
-     * issue/PR webhook arrives or during GraphQL sync.
-     *
-     * <p><b>Why this approach?</b>
-     *
+     * Process a GitHub comment DTO and persist it as an IssueComment entity,
+     * creating a minimal parent entity (Issue or PullRequest) if it doesn't exist.
+     * <p>
+     * This method solves the message ordering problem where comment webhooks arrive
+     * before the parent issue/PR webhook. Instead of failing and retrying, we create
+     * a minimal parent entity from the webhook's embedded issue data. The full entity
+     * will be updated later when the proper issue/PR webhook arrives or during GraphQL sync.
+     * <p>
+     * <b>Why this approach?</b>
      * <ul>
-     *   <li>GitHub sends issue_comment events for both issues AND pull requests
-     *   <li>The webhook includes full issue data (id, number, title, body, state, etc.)
-     *   <li>For PRs, the issue.pull_request field is populated (minimal info)
-     *   <li>Creating a stub entity is better than losing data or retrying indefinitely
+     *   <li>GitHub sends issue_comment events for both issues AND pull requests</li>
+     *   <li>The webhook includes full issue data (id, number, title, body, state, etc.)</li>
+     *   <li>For PRs, the issue.pull_request field is populated (minimal info)</li>
+     *   <li>Creating a stub entity is better than losing data or retrying indefinitely</li>
      * </ul>
      *
      * @param dto the GitHub comment DTO
@@ -158,7 +155,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         if (issueDto.number() <= 0) {
             log.warn(
-                    "Skipped comment processing: reason=invalidIssueNumber, issueNumber={}," + " commentId={}",
+                    "Skipped comment processing: reason=invalidIssueNumber, issueNumber={}, commentId={}",
                     issueDto.number(),
                     dto.id());
             return null;
@@ -171,8 +168,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             issue = createMinimalParentEntityWithRetry(issueDto, context);
             if (issue == null) {
                 log.warn(
-                        "Skipped comment processing: reason=failedToCreateParent, repoId={},"
-                                + " issueNumber={}, commentId={}",
+                        "Skipped comment processing: reason=failedToCreateParent, repoId={}, issueNumber={}, commentId={}",
                         context.repository().getId(),
                         issueDto.number(),
                         dto.id());
@@ -183,7 +179,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         return processCommentInternal(dto, issue, context);
     }
 
-    /** Internal method that processes a comment given a resolved parent Issue/PR. */
+    /**
+     * Internal method that processes a comment given a resolved parent Issue/PR.
+     */
     private IssueComment processCommentInternal(GitHubCommentDTO dto, Issue issue, ProcessingContext context) {
         Long issueId = issue.getId();
         Long commentId = Objects.requireNonNull(dto.id());
@@ -256,11 +254,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Delete an issue comment by ID. Publishes a Deleted domain event.
-     *
-     * <p>IMPORTANT: For bidirectional @OneToMany with orphanRemoval=true, we must remove the
-     * comment from the parent Issue's collection before deleting to avoid TransientObjectException
-     * when Hibernate flushes the persistence context.
+     * Delete an issue comment by ID.
+     * Publishes a Deleted domain event.
+     * <p>
+     * IMPORTANT: For bidirectional @OneToMany with orphanRemoval=true,
+     * we must remove the comment from the parent Issue's collection before deleting
+     * to avoid TransientObjectException when Hibernate flushes the persistence context.
      *
      * @param commentId the ID of the comment to delete
      * @param context processing context
@@ -295,12 +294,12 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Creates a minimal Issue or PullRequest entity from webhook data, with retry on conflict.
-     *
-     * <p>This method handles the race condition where multiple threads might try to create the same
-     * parent entity concurrently. The database has a unique constraint on (repository_id,
-     * issue_type, number), so if another thread wins the race, our insert will fail with a
-     * constraint violation. In that case, we simply look up the entity that was created by the
-     * other thread.
+     * <p>
+     * This method handles the race condition where multiple threads might try to create
+     * the same parent entity concurrently. The database has a unique constraint on
+     * (repository_id, issue_type, number), so if another thread wins the race, our insert will fail
+     * with a constraint violation. In that case, we simply look up the entity that was
+     * created by the other thread.
      *
      * @param issueDto the issue DTO from the webhook payload
      * @param context the processing context with repository information
@@ -315,7 +314,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
             // Another thread created the entity first (unique constraint violation)
             // This is expected behavior in concurrent webhook processing
             log.debug(
-                    "Concurrent parent creation detected, looking up existing entity: repoId={}," + " issueNumber={}",
+                    "Concurrent parent creation detected, looking up existing entity: repoId={}, issueNumber={}",
                     repository.getId(),
                     issueDto.number());
             return findParent(repository, issueDto.number(), context);
@@ -323,10 +322,9 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * The stored parent of a comment on {@code number}. GitHub numbers issues and pull requests in
-     * one space per repository, so a stored pull request of this provider is the parent even where
-     * an issue row with the same number also exists; that issue row is the parent only without one.
-     * The issue row is not changed.
+     * The stored parent of a comment on {@code number}. GitHub numbers issues and pull requests in one space
+     * per repository, so a stored pull request of this provider is the parent even where an issue row with the
+     * same number also exists; that issue row is the parent only without one. The issue row is not changed.
      */
     private @Nullable Issue findParent(Repository repository, int number, ProcessingContext context) {
         Optional<PullRequest> pullRequest = pullRequestRepository
@@ -351,11 +349,11 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Moves one chunk of this repository's comments, ids in {@code (after, ceiling]}, from an issue
-     * row a stored pull request contradicts to that pull request. Its own transaction, and a bulk
-     * update that clears the persistence context, keep it apart from any managed parent and its
-     * orphan-removing comment collection. Comment ids, content, authors, times and the source rows
-     * stay; no comment event is published, as only the parent moved.
+     * Moves one chunk of this repository's comments, ids in {@code (after, ceiling]}, from an issue row a stored
+     * pull request contradicts to that pull request. Its own transaction, and a bulk update that clears the
+     * persistence context, keep it apart from any managed parent and its orphan-removing comment collection.
+     * Comment ids, content, authors, times and the source rows stay; no comment event is published, as only
+     * the parent moved.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public ParentRepair moveToCanonicalParents(long repositoryId, long after, long ceiling, int limit) {
@@ -369,19 +367,19 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Creates a minimal Issue or PullRequest entity from webhook data.
-     *
-     * <p>This method is called when a comment webhook arrives before the parent entity exists. We
-     * create a "stub" entity with the data available in the webhook payload. The full entity will
-     * be populated later by the proper issue/PR webhook or GraphQL sync.
-     *
-     * <p><b>Important:</b> We must determine whether to create an Issue or PullRequest based on the
-     * {@code issueDto.isPullRequest()} flag. GitHub numbers issues and pull requests in one space
-     * per repository, so if we create an Issue when it should be a PR, the later PR webhook will
-     * fail to update it (different entity type). The discriminator column prevents this.
-     *
-     * <p><b>Note:</b> This method may throw {@link DataIntegrityViolationException} if another
-     * thread creates the entity concurrently. Use {@link #createMinimalParentEntityWithRetry} for
-     * proper handling.
+     * <p>
+     * This method is called when a comment webhook arrives before the parent entity exists.
+     * We create a "stub" entity with the data available in the webhook payload. The full
+     * entity will be populated later by the proper issue/PR webhook or GraphQL sync.
+     * <p>
+     * <b>Important:</b> We must determine whether to create an Issue or PullRequest based
+     * on the {@code issueDto.isPullRequest()} flag. GitHub numbers issues and pull requests in one
+     * space per repository, so if we create an Issue when it should be a PR, the later PR webhook
+     * will fail to update it (different entity type). The discriminator column prevents this.
+     * <p>
+     * <b>Note:</b> This method may throw {@link DataIntegrityViolationException} if another
+     * thread creates the entity concurrently. Use {@link #createMinimalParentEntityWithRetry}
+     * for proper handling.
      *
      * @param issueDto the issue DTO from the webhook payload
      * @param context the processing context with repository information
@@ -411,12 +409,11 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Creates a minimal Issue entity from webhook data.
-     *
-     * <p><b>Hydration Strategy:</b> Stubs rely on natural hydration through:
-     *
+     * <p>
+     * <b>Hydration Strategy:</b> Stubs rely on natural hydration through:
      * <ol>
-     *   <li>The issues webhook (typically arrives within seconds)
-     *   <li>The scheduled GraphQL sync (safety net for missed webhooks)
+     *   <li>The issues webhook (typically arrives within seconds)</li>
+     *   <li>The scheduled GraphQL sync (safety net for missed webhooks)</li>
      * </ol>
      */
     private Issue createMinimalIssue(GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
@@ -424,8 +421,7 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         populateBaseIssueFields(issue, dto, repository, context);
         Issue saved = issueRepository.save(issue);
         log.info(
-                "Created stub Issue from comment webhook (will be hydrated by issue webhook or"
-                        + " sync): issueId={}, issueNumber={}, repoName={}",
+                "Created stub Issue from comment webhook (will be hydrated by issue webhook or sync): issueId={}, issueNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
@@ -434,26 +430,24 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
     /**
      * Creates a minimal PullRequest entity from webhook data.
-     *
-     * <p>Note: The issue_comment webhook for PRs contains limited PR-specific data, but enough to
-     * create a valid entity. PR-specific fields like additions, deletions, mergedAt, etc. will be
-     * populated by the pull_request webhook or GraphQL sync.
-     *
-     * <p>The comment payload describes the pull request as an issue resource, so the stub's native
-     * id is that issue id, not the pull request's own id. It is provisional: the next full pull
-     * request payload replaces it with the pull request's id and keeps the stub's internal id and
-     * comments.
-     *
-     * <p><b>Hydration Strategy:</b> Stubs are intentionally NOT eagerly fetched via API. Instead,
-     * they rely on natural hydration through:
-     *
+     * <p>
+     * Note: The issue_comment webhook for PRs contains limited PR-specific data,
+     * but enough to create a valid entity. PR-specific fields like additions,
+     * deletions, mergedAt, etc. will be populated by the pull_request webhook
+     * or GraphQL sync.
+     * <p>
+     * The comment payload describes the pull request as an issue resource, so the stub's native id is
+     * that issue id, not the pull request's own id. It is provisional: the next full pull request
+     * payload replaces it with the pull request's id and keeps the stub's internal id and comments.
+     * <p>
+     * <b>Hydration Strategy:</b> Stubs are intentionally NOT eagerly fetched via API.
+     * Instead, they rely on natural hydration through:
      * <ol>
-     *   <li>The pull_request webhook (typically arrives within seconds)
-     *   <li>The scheduled GraphQL sync (safety net for missed webhooks)
+     *   <li>The pull_request webhook (typically arrives within seconds)</li>
+     *   <li>The scheduled GraphQL sync (safety net for missed webhooks)</li>
      * </ol>
-     *
-     * This avoids complexity (async tasks, rate limit management, scope resolution) for marginal
-     * benefit since PR webhooks usually follow comment webhooks quickly.
+     * This avoids complexity (async tasks, rate limit management, scope resolution)
+     * for marginal benefit since PR webhooks usually follow comment webhooks quickly.
      */
     private PullRequest createMinimalPullRequest(GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
         PullRequest pr = new PullRequest();
@@ -470,15 +464,16 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
 
         PullRequest saved = pullRequestRepository.save(pr);
         log.info(
-                "Created stub PullRequest from comment webhook (will be hydrated by PR webhook or"
-                        + " sync): prId={}, prNumber={}, repoName={}",
+                "Created stub PullRequest from comment webhook (will be hydrated by PR webhook or sync): prId={}, prNumber={}, repoName={}",
                 saved.getId(),
                 saved.getNumber(),
                 repository.getNameWithOwner());
         return saved;
     }
 
-    /** Populates base Issue fields common to both Issue and PullRequest entities. */
+    /**
+     * Populates base Issue fields common to both Issue and PullRequest entities.
+     */
     private void populateBaseIssueFields(
             Issue issue, GitHubIssueDTO dto, Repository repository, ProcessingContext context) {
         issue.setNativeId(Objects.requireNonNull(dto.getDatabaseId()));
@@ -529,20 +524,20 @@ public class GitHubIssueCommentProcessor extends BaseGitHubProcessor {
         }
     }
 
-    /** Converts a GitHub API state string to Issue.State enum. */
+    /**
+     * Converts a GitHub API state string to Issue.State enum.
+     */
     private Issue.@Nullable State convertState(@Nullable String state) {
         if (state == null) {
-            log.warn("Issue state is null when creating stub from comment webhook, defaulting to"
-                    + " OPEN. This may indicate missing data in webhook payload.");
+            log.warn(
+                    "Issue state is null when creating stub from comment webhook, defaulting to OPEN. This may indicate missing data in webhook payload.");
             return Issue.State.OPEN;
         }
         return switch (state.toUpperCase(Locale.ROOT)) {
             case "OPEN" -> Issue.State.OPEN;
             case "CLOSED" -> Issue.State.CLOSED;
             default -> {
-                log.warn(
-                        "Unknown issue state '{}' when creating stub from comment webhook," + " defaulting to OPEN",
-                        state);
+                log.warn("Unknown issue state '{}' when creating stub from comment webhook, defaulting to OPEN", state);
                 yield Issue.State.OPEN;
             }
         };

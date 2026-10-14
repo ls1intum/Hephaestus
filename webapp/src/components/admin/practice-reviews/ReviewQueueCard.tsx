@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 
-import type { OutcomeScope } from "./review-outcomes";
 import { ReviewQueueNow, type ReviewQueueState } from "./ReviewQueueNow";
 import { type FinishedInRange, ReviewTimeCard, type ReviewTimingState } from "./ReviewTimeCard";
 
@@ -12,8 +11,6 @@ export interface ReviewQueueCardProps {
 	timing: ReviewTimingState;
 	/** The reviews of the range that finished, as the Reviews tile counts them. */
 	finished: FinishedInRange;
-	/** The range as the lists' day filters, so every figure opens the rows it counts. */
-	scope: OutcomeScope;
 	/** The range by name: "Last 30 days". */
 	label: string;
 	/** The range as words in a sentence: "in the last 30 days". */
@@ -31,7 +28,6 @@ export function ReviewQueueCard({
 	queue,
 	timing,
 	finished,
-	scope,
 	label,
 	during,
 }: ReviewQueueCardProps) {
@@ -46,7 +42,6 @@ export function ReviewQueueCard({
 						<ReviewTimeCard
 							workspaceSlug={workspaceSlug}
 							state={timing}
-							scope={scope}
 							label={label}
 							during={during}
 							finished={finished}

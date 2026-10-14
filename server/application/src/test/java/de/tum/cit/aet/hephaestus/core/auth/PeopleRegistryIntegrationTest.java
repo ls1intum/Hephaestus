@@ -114,7 +114,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldMergeOverlappingMembershipsAndRetainLatestChoiceWhenAnUnclaimedAccountIsLinked() {
         var targetIdentity = identity(null);
-        var sourceIdentity = identity(null);
+        var sourceIdentity = gitLabIdentity();
         long targetId = people.ensureHuman(targetIdentity, "Claimed developer");
         people.claim(targetIdentity);
         long sourceId = people.ensureHuman(sourceIdentity, "Roster developer");
@@ -145,6 +145,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
         rosterMember.setPublicActivitySeen(true);
         memberships.saveAndFlush(rosterMember);
         people.absorbUnclaimed(targetId, sourceId);
+        assertThat(people.claim(sourceIdentity)).isEqualTo(targetId);
         var merged = memberships
                 .findById(new Membership.Id(workspace.getId(), targetId))
                 .orElseThrow();
@@ -170,7 +171,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
         var targetIdentity = identity(null);
         long targetId = people.ensureHuman(targetIdentity, "Claimed developer");
         people.claim(targetIdentity);
-        long sourceId = people.ensureHuman(identity(null), "Roster developer");
+        long sourceId = people.ensureHuman(gitLabIdentity(), "Roster developer");
         var workspace = new Workspace();
         workspace.setWorkspaceSlug("claim-merge-" + UUID.randomUUID());
         workspace.setAccountType(AccountType.ORG);
@@ -226,7 +227,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
     void shouldKeepOneOwnerWhenTwoVerifiedLinksRaceToAbsorbTheSameUnclaimedAccount() throws Exception {
         var firstIdentity = identity(null);
         var secondIdentity = identity(null);
-        var sourceIdentity = identity(null);
+        var sourceIdentity = gitLabIdentity();
         long firstId = people.ensureHuman(firstIdentity, "First claimed developer");
         long secondId = people.ensureHuman(secondIdentity, "Second claimed developer");
         people.claim(firstIdentity);
@@ -300,6 +301,15 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
         assertThat(retained.getRole()).isEqualTo(Membership.WorkspaceRole.ADMIN);
         assertThat(retained.isHidden()).isTrue();
         assertThat(retained.isReviewSelected()).isTrue();
+    }
+
+    private PersonIdentity gitLabIdentity() {
+        var provider = providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
+                .orElseGet(() -> providers.saveAndFlush(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com")));
+        return new PersonIdentity(
+                Objects.requireNonNull(provider.getId()), UUID.randomUUID().toString(), null);
     }
 
     private PersonIdentity identity(@Nullable String team) {

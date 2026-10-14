@@ -8,7 +8,7 @@ public record CitationProofDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, allowableValues = "VERIFIED")
         String status,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String artifactSha256,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String itemSha256,
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String quoteSha256) {
     public CitationProofDTO {
         if (!"VERIFIED".equals(status)) {

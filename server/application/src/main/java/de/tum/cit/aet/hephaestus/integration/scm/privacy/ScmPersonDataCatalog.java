@@ -259,9 +259,7 @@ public class ScmPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "commit_file_change",
                         "commit_file_change",
-                        "t.commit_id IN (SELECT id FROM git_commit WHERE author_id = ANY(:users))"
-                                + " OR t.commit_id IN (SELECT commit_id FROM commit_contributor WHERE"
-                                + " user_id = ANY(:users) AND role IN ('AUTHOR','CO_AUTHOR'))",
+                        "t.commit_id IN (SELECT id FROM git_commit WHERE author_id = ANY(:users)) OR t.commit_id IN (SELECT commit_id FROM commit_contributor WHERE user_id = ANY(:users) AND role IN ('AUTHOR','CO_AUTHOR'))",
                         "id,filename,change_type,additions,deletions,changes,previous_filename,commit_id",
                         "id",
                         "",
@@ -311,9 +309,7 @@ public class ScmPersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "git_commit_authored_content",
                         "git_commit",
-                        "t.author_id = ANY(:users) OR t.id IN (SELECT commit_id FROM"
-                                + " commit_contributor WHERE user_id = ANY(:users) AND role IN"
-                                + " ('AUTHOR','CO_AUTHOR'))",
+                        "t.author_id = ANY(:users) OR t.id IN (SELECT commit_id FROM commit_contributor WHERE user_id = ANY(:users) AND role IN ('AUTHOR','CO_AUTHOR'))",
                         "id,sha,repository_id,message,message_body,authored_at,committed_at",
                         "id",
                         "message='',message_body=NULL",

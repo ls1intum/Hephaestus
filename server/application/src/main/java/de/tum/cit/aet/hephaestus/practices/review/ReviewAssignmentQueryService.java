@@ -22,6 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
     private final ReviewRepository reviews;
     private final ReviewPracticeRepository assignments;
@@ -33,7 +34,6 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
     private final JdbcClient jdbc;
 
     @Override
-    @Transactional(readOnly = true)
     public List<ReviewAssignmentId> executable(long workspaceId, UUID reviewId, long itemId) {
         return jdbc
                 .sql("SELECT m.practice_id FROM review_item m JOIN review r ON r.id=m.review_id AND"
@@ -53,7 +53,6 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public Optional<ReviewAssignmentSnapshot> find(long workspaceId, ReviewAssignmentId id) {
         var review = reviews.findByIdAndWorkspaceId(id.reviewId(), workspaceId);
         var assignment =

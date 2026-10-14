@@ -1,3 +1,5 @@
+// A program that uses every model slot, each optional, to prepare one review. Steps that do not
+// depend on each other start together, so a slow model costs only its own part.
 import {
 	scm,
 	addedComments,
@@ -7,8 +9,6 @@ import {
 	type AddedComment,
 	type DiffFile,
 } from "../kits/scm/index.ts";
-// A program that uses every model slot, each optional, to prepare one review. Steps that do not
-// depend on each other start together, so a slow model costs only its own part.
 import {
 	agent,
 	classify,
@@ -73,14 +73,14 @@ const meta = {
 /** The program reads the change of a pull request. */
 type Context = PracticeScriptContext<typeof meta.models>;
 
-/** What one part of the program prepared for the review. */
-interface Part {
+/** What one step of the program prepared for the review. */
+interface Preparation {
 	leads?: ReviewLead[];
 	unrated?: Omission[];
 	facts?: Facts;
 }
 
-async function commentKindLeads(ctx: Context, unmarked: AddedComment[]): Promise<Part> {
+async function commentKindLeads(ctx: Context, unmarked: AddedComment[]): Promise<Preparation> {
 	const { ratings, unrated } = await classify({
 		model: ctx.models.decision,
 		set: commentKinds,
@@ -100,7 +100,7 @@ async function commentKindLeads(ctx: Context, unmarked: AddedComment[]): Promise
 	return { leads, unrated };
 }
 
-async function mostUnfinished(ctx: Context, comments: AddedComment[]): Promise<Part> {
+async function mostUnfinished(ctx: Context, comments: AddedComment[]): Promise<Preparation> {
 	const { reranking } = ctx.models;
 	if (reranking === undefined || comments.length === 0) {
 		return {};
@@ -123,7 +123,7 @@ async function mostUnfinished(ctx: Context, comments: AddedComment[]): Promise<P
 	return comment === undefined ? {} : { leads: [{ at: comment.at, label: LABELS.mostUnfinished }] };
 }
 
-async function similarComments(ctx: Context, comments: AddedComment[]): Promise<Part> {
+async function similarComments(ctx: Context, comments: AddedComment[]): Promise<Preparation> {
 	const { embedding } = ctx.models;
 	if (embedding === undefined || comments.length < 2) {
 		return {};
@@ -151,7 +151,10 @@ async function similarComments(ctx: Context, comments: AddedComment[]): Promise<
 	};
 }
 
-async function changeKind(ctx: Context, change: ReadonlyMap<string, DiffFile>): Promise<Part> {
+async function changeKind(
+	ctx: Context,
+	change: ReadonlyMap<string, DiffFile>,
+): Promise<Preparation> {
 	const { chat } = ctx.models;
 	if (chat === undefined) {
 		return {};
@@ -170,7 +173,7 @@ async function changeKind(ctx: Context, change: ReadonlyMap<string, DiffFile>): 
 		: { unrated: [{ what: "kind of the change", count: 1, reason: kind.unrated }] };
 }
 
-async function declaration(ctx: Context): Promise<Part> {
+async function declaration(ctx: Context): Promise<Preparation> {
 	const { chat } = ctx.models;
 	if (chat === undefined) {
 		return {};

@@ -3,13 +3,11 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.time.Instant;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -30,13 +28,7 @@ class PracticeVersionServiceTest extends BaseUnitTest {
         var recorded = mapper.valueToTree(DefinitionTestFixtures.definition());
         var incomplete = (ObjectNode) recorded.deepCopy();
         incomplete.remove("about");
-        var version = mock(PracticeVersion.class);
-        when(version.getId()).thenReturn(9_007_199_254_740_993L);
-        when(version.getNumber()).thenReturn(3);
-        when(version.getDefinition()).thenReturn(incomplete);
-        when(version.getName()).thenReturn("Describe the change");
-        when(version.getReviewDigest()).thenReturn("v6:" + "a".repeat(64));
-        when(version.getCreatedAt()).thenReturn(Instant.EPOCH);
+        var version = TestEntities.practiceVersion(9_007_199_254_740_993L, 3, incomplete, "v6:" + "a".repeat(64));
         var view = service.view(version, null, null);
         assertThat(view.id()).isEqualTo("9007199254740993");
         assertThat(view.definitionAvailable()).isFalse();
@@ -54,8 +46,7 @@ class PracticeVersionServiceTest extends BaseUnitTest {
         var definition = (ObjectNode) mapper.valueToTree(DefinitionTestFixtures.definition());
         definition.putNull("about");
         assertThat(service.available(definition)).isTrue();
-        var version = mock(PracticeVersion.class);
-        when(version.getDefinition()).thenReturn(definition);
+        var version = TestEntities.practiceVersion(1L, 1, definition, "v6:" + "a".repeat(64));
         assertThat(service.definitionOf(version).about()).isNull();
     }
 
@@ -63,13 +54,7 @@ class PracticeVersionServiceTest extends BaseUnitTest {
     void shouldKeepIncompleteHistoricalSourceRequirementsUnavailableWithoutInventingAContract() {
         var recorded = (ObjectNode) mapper.valueToTree(DefinitionTestFixtures.definition());
         ((ObjectNode) recorded.path("reads")).putNull("contract");
-        var version = mock(PracticeVersion.class);
-        when(version.getId()).thenReturn(7L);
-        when(version.getNumber()).thenReturn(1);
-        when(version.getName()).thenReturn("Historical definition");
-        when(version.getDefinition()).thenReturn(recorded);
-        when(version.getReviewDigest()).thenReturn("v6:" + "a".repeat(64));
-        when(version.getCreatedAt()).thenReturn(Instant.EPOCH);
+        var version = TestEntities.practiceVersion(7L, 1, recorded, "v6:" + "a".repeat(64));
         var view = service.view(version, null, null);
         assertThat(view.definitionAvailable()).isFalse();
         var historical = Objects.requireNonNull(view.historicalDefinition());
@@ -89,13 +74,7 @@ class PracticeVersionServiceTest extends BaseUnitTest {
         scan.putArray("include").add("**/*.ts");
         scan.putArray("exclude");
         scan.putArray("context").add("**/*");
-        var version = mock(PracticeVersion.class);
-        when(version.getId()).thenReturn(8L);
-        when(version.getNumber()).thenReturn(2);
-        when(version.getName()).thenReturn("Recorded scan");
-        when(version.getDefinition()).thenReturn(recorded);
-        when(version.getReviewDigest()).thenReturn("v6:" + "b".repeat(64));
-        when(version.getCreatedAt()).thenReturn(Instant.EPOCH);
+        var version = TestEntities.practiceVersion(8L, 2, recorded, "v6:" + "b".repeat(64));
         var view = service.view(version, null, null);
         assertThat(view.definitionAvailable()).isFalse();
         var historical = Objects.requireNonNull(view.historicalDefinition());

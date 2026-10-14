@@ -13,13 +13,13 @@ import org.springframework.stereotype.Component;
 /**
  * GitLab connection lifecycle strategy.
  *
- * <p>A GitLab connection is provisioned when its workspace is created, which checks the instance
- * and the token first, so {@link #initiate} refuses to connect one on its own and {@link
- * #finalizeConnect} is never reached.
+ * <p>A GitLab connection is provisioned when its workspace is created, which checks the instance and the
+ * token first, so {@link #initiate} refuses to connect one on its own and {@link #finalizeConnect} is never
+ * reached.
  *
- * <p>{@link #prepareProviderTeardown} cannot revoke the PAT itself (GitLab PATs are revocable only
- * from the user's profile page — there is no third-party revoke API), but it DOES tear down the
- * group webhook we registered on connect, using the PAT it reads before the disconnect clears it.
+ * <p>{@link #prepareProviderTeardown} cannot revoke the PAT itself (GitLab PATs are revocable only from the
+ * user's profile page — there is no third-party revoke API), but it DOES tear down the group
+ * webhook we registered on connect, using the PAT it reads before the disconnect clears it.
  *
  * <p>Disconnect is GitLab's <b>only</b> erase trigger: unlike a GitHub App there is no vendor-side
  * uninstall signal for a PAT.
@@ -49,7 +49,7 @@ public class GitLabConnectionStrategy implements ConnectionStrategy {
     @Override
     public ConnectFinalization finalizeConnect(IntegrationRef ref, Map<String, String> callbackParams) {
         return new ConnectFinalization.Failed(
-                "GitLab has no vendor callback. You make a GitLab connection when you create a" + " GitLab workspace.");
+                "GitLab has no vendor callback. You make a GitLab connection when you create a GitLab workspace.");
     }
 
     @Override

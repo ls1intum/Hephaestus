@@ -15,7 +15,6 @@ import lombok.Builder;
 import lombok.Builder.Default;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
@@ -28,7 +27,6 @@ import org.jspecify.annotations.Nullable;
                     columnNames = {"id", "workspace_id"})
         })
 @Getter
-@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

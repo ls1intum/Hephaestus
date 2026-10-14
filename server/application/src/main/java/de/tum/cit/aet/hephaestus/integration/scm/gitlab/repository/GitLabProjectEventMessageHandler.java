@@ -26,13 +26,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab project webhook events for real-time repository lifecycle updates.
- *
- * <p>Processes {@code project_create}, {@code project_destroy}, {@code project_rename}, {@code
- * project_transfer} and {@code project_update} events that are normalized to the "project" event
- * key by the webhook receiver.
- *
- * <p>Group webhooks send create and destroy events. System hooks also send updates, renames and
- * transfers.
+ * <p>
+ * Processes {@code project_create}, {@code project_destroy}, {@code project_rename},
+ * {@code project_transfer} and {@code project_update} events that are normalized to the "project" event key
+ * by the webhook receiver.
+ * <p>
+ * Group webhooks send create and destroy events. System hooks also send updates, renames and transfers.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -217,7 +216,7 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
 
                             repositoryRepository.save(repo);
                             log.info(
-                                    "Updated repository from {} event: nativeId={}, oldPath={}," + " newPath={}",
+                                    "Updated repository from {} event: nativeId={}, oldPath={}, newPath={}",
                                     event.eventName(),
                                     nativeId,
                                     sanitizeForLog(oldPath),
@@ -230,7 +229,9 @@ public class GitLabProjectEventMessageHandler extends AbstractIntegrationMessage
                                 sanitizeForLog(Objects.requireNonNull(event.pathWithNamespace()))));
     }
 
-    /** Extracts the parent group path from a project's path_with_namespace. */
+    /**
+     * Extracts the parent group path from a project's path_with_namespace.
+     */
     @Nullable
     private static String extractGroupPath(@Nullable String pathWithNamespace) {
         if (pathWithNamespace == null || pathWithNamespace.isBlank()) {

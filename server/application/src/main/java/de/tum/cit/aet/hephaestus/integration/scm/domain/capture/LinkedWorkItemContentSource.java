@@ -72,8 +72,7 @@ public class LinkedWorkItemContentSource {
     static final String ITEMS_PREFIX = OUTPUT_PREFIX + "linked_work_items/";
 
     private static final String BODY_PROVENANCE =
-            "The body below is the issue's text as mirrored when this was captured; these dates are"
-                    + " the issue's, not when any line of it was written.";
+            "The body below is the issue's text as mirrored when this was captured; these dates are the issue's, not when any line of it was written.";
 
     /**
      * {@code #N} standing on its own. The leading boundary {@code (?<![\w/.-])} rejects a number

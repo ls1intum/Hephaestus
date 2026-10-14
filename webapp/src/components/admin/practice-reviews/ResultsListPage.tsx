@@ -61,7 +61,7 @@ export function ResultsListPage({
 	// Guarded on the filter being set, because that is the only condition under which the first row
 	// names the filtered person — unfiltered, row zero is whoever happens to sort first, and the facet
 	// would put a stranger's name on somebody else's id.
-	const filteredSubject = search.subjectUserId == null ? undefined : rows[0]?.subject;
+	const filteredDeveloper = search.developerId === undefined ? undefined : rows[0]?.developer;
 	const hasFilter = hasResultFilter(search);
 	const reset = () => onSearchChange(clearedResultFilters());
 	// The server sorts "Most actionable first" by outcome and severity, not by time.
@@ -79,7 +79,9 @@ export function ResultsListPage({
 				practices={practices}
 				people={people}
 				total={results.status === "ready" ? results.total : undefined}
-				subjectName={filteredSubject?.name ?? filteredSubject?.login}
+				subjectName={
+					filteredDeveloper?.displayName ?? filteredDeveloper?.providerLogin ?? undefined
+				}
 				record={record}
 			/>
 			{summary}

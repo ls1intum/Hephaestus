@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.response;
 
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -17,8 +18,6 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
     Optional<FeedbackResponse> findCurrent(
             @Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
 
-    List<FeedbackResponse> findByWorkspaceIdAndFeedbackIdOrderByCreatedAtDescIdDesc(long workspaceId, UUID feedbackId);
-
     @Query(value = """
         SELECT latest.resolution AS resolution, count(*) AS count FROM (
           SELECT DISTINCT ON (r.feedback_id) r.feedback_id, r.resolution
@@ -31,7 +30,7 @@ public interface FeedbackResponseRepository extends JpaRepository<FeedbackRespon
             @Param("workspaceId") long workspaceId, @Param("developerId") long developerId);
 
     interface ResolutionCount {
-        String getResolution();
+        FeedbackResolution getResolution();
 
         long getCount();
     }

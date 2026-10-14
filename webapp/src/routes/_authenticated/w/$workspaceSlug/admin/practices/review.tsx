@@ -340,7 +340,7 @@ function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
 	} else {
 		repositoryOptions = {
 			status: "ready",
-			options: (repositoriesQuery.data.content ?? []).map((repository) => ({
+			options: repositoriesQuery.data.content.map((repository) => ({
 				itemId: repository.id,
 				name: repository.label,
 			})),
@@ -494,7 +494,7 @@ function PastWorkSection({ workspaceSlug }: { workspaceSlug: string }) {
 	const batchesQuery = useQuery({
 		...listReviewBatchesOptions({ path: { workspaceSlug } }),
 		refetchInterval: (query) =>
-			query.state.data?.content?.some(
+			query.state.data?.content.some(
 				(batch) => batch.status === "RUNNING" || batch.status === "PAUSED",
 			) === true
 				? ACTIVE_BATCH_POLL_MS

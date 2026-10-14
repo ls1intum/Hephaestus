@@ -20,9 +20,6 @@ public record ListedScanReportItemDTO(
         String reason,
 
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
-        String reasonDescription,
-
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         ResultListDTO lastResult)
         implements ScanReportItemDTO {
     public ListedScanReportItemDTO {

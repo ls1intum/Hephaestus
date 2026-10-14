@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ReviewItemRepository extends JpaRepository<ReviewItem, ReviewItem.Id> {
+    List<ReviewItem> findByWorkspaceIdAndReviewIdAndItemIdIn(long workspaceId, UUID reviewId, Collection<Long> itemIds);
+
     Optional<ReviewItem> findByWorkspaceIdAndReviewIdAndPracticeIdAndItemId(
             long workspaceId, UUID reviewId, long practiceId, long itemId);
 

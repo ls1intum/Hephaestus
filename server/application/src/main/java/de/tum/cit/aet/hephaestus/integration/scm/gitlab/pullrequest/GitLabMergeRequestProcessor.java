@@ -55,9 +55,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Stores GitLab merge requests from webhooks and GraphQL sync as {@link PullRequest}s. An approval
- * is stored as an APPROVED {@link PullRequestReview} under a deterministic id that cannot collide
- * with a GitHub review id.
+ * Stores GitLab merge requests from webhooks and GraphQL sync as {@link PullRequest}s. An approval is stored as an
+ * APPROVED {@link PullRequestReview} under a deterministic id that cannot collide with a GitHub review id.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -101,8 +100,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     /**
      * Whether the sync has to read what the merge request closes: on first sight, and whenever the
-     * merge request moved since the stored record — the link set changes only with the merge
-     * request.
+     * merge request moved since the stored record — the link set changes only with the merge request.
      */
     @Transactional(readOnly = true)
     public boolean closingIssuesStale(Repository repository, int iid, @Nullable String updatedAt) {
@@ -114,9 +112,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * The version of merge request {@code iid} stored when a webhook's transaction ends: what a
-     * read made after it, outside that transaction, still has to describe. Empty when nothing is
-     * stored.
+     * The version of merge request {@code iid} stored when a webhook's transaction ends: what a read made after it,
+     * outside that transaction, still has to describe. Empty when nothing is stored.
      */
     @Transactional(readOnly = true)
     public Optional<StoredVersion> storedVersion(Repository repository, int iid) {
@@ -125,22 +122,18 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                 .map(pr -> new StoredVersion(pr.getHeadRefOid(), pr.getUpdatedAt()));
     }
 
-    /**
-     * A stored merge request's head and GitLab {@code updated_at}, as {@link #storedVersion}
-     * captured them.
-     */
+    /** A stored merge request's head and GitLab {@code updated_at}, as {@link #storedVersion} captured them. */
     public record StoredVersion(
             @Nullable String head, @Nullable Instant updatedAt) {}
 
     /**
-     * Replaces what the record says a merge request closes with GitLab's current statement, read
-     * from the closes-issues route after a webhook: the sync compares {@code updatedAt} against the
-     * value that webhook stored, so it would not read the links for this change. A statement read
-     * for {@code readFor} changes nothing once another event or a sync stored a newer version,
-     * which reads the links itself.
+     * Replaces what the record says a merge request closes with GitLab's current statement, read from
+     * the closes-issues route after a webhook: the sync compares {@code updatedAt} against the value
+     * that webhook stored, so it would not read the links for this change. A statement read for {@code readFor}
+     * changes nothing once another event or a sync stored a newer version, which reads the links itself.
      *
-     * <p>The accepted local update retains the initiating delivery's source and actor. Its event
-     * time follows {@link EventContext#from}, and its stored version still fences a late read.
+     * <p>The accepted local update retains the initiating delivery's source and actor. Its event time follows
+     * {@link EventContext#from}, and its stored version still fences a late read.
      */
     @Transactional
     public void replaceClosingIssues(
@@ -165,23 +158,20 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Records what GitLab said about merging merge request {@code iid}, read after a webhook with
-     * the read begun at {@code requestedAt}, where it still describes what is stored. Runs after
-     * the read, in its own transaction, with the merge request's row locked; the caller checks
-     * first that the delivery may still write.
+     * Records what GitLab said about merging merge request {@code iid}, read after a webhook with the read begun at
+     * {@code requestedAt}, where it still describes what is stored. Runs after the read, in its own transaction, with
+     * the merge request's row locked; the caller checks first that the delivery may still write.
      *
-     * <p>Mutable readiness is recorded only when GitLab names this repository's project and this
-     * merge request, both open or both merged, at the head stored now, and not at an older version:
-     * a push stored meanwhile is read again after its own event, and the answer never moves the
-     * head. The head pipeline is recorded as observed ({@link GitLabHeadPipeline}) under its own
-     * clock. The reviewers, approvals, review decision, mergeability and merge status — which
-     * follow the approvals — are recorded together, only when no hook or read received after {@code
-     * requestedAt} is stored ({@link PullRequest#takesReviewSnapshotAt}); mergeability and
-     * approvals stay unknown while GitLab is still settling them ({@link #isSettling}), and the
-     * approvals come only from a whole list. An older GraphQL version can date already-standing
-     * merged approvals only through {@link #recoverStandingApprovalDates}, without changing mutable
-     * readiness or membership. The diff base GitLab paired with that head is recorded under the
-     * same ordering as the reviews.
+     * <p>Mutable readiness is recorded only when GitLab names this repository's project and this merge request, both
+     * open or both merged, at the head stored now, and not at an older version: a push stored meanwhile is
+     * read again after its own event, and the answer never moves the head. The head pipeline is recorded as observed
+     * ({@link GitLabHeadPipeline}) under its own clock. The reviewers, approvals, review decision, mergeability and
+     * merge status — which follow the approvals — are recorded together, only when no hook or read received after
+     * {@code requestedAt} is stored ({@link PullRequest#takesReviewSnapshotAt}); mergeability and approvals stay unknown
+     * while GitLab is still settling them ({@link #isSettling}), and the approvals come only from a whole list.
+     * An older GraphQL version can date already-standing merged approvals only through
+     * {@link #recoverStandingApprovalDates}, without changing mutable readiness or membership. The diff base GitLab
+     * paired with that head is recorded under the same ordering as the reviews.
      *
      * @return whether the facts were recorded
      */
@@ -238,11 +228,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * A merged approval date can be read at the native material version even when GraphQL's second
-     * precision cannot order its mutable readiness against a millisecond webhook. Only
-     * already-standing rows are dated; the exact native version and content, current head and whole
-     * matching actor sets do not authorize membership changes. Missing native metadata or null
-     * description cannot bind this path; ordinary version-accepted reads are separate.
+     * A merged approval date can be read at the native material version even when GraphQL's second precision cannot
+     * order its mutable readiness against a millisecond webhook. Only already-standing rows are dated; the exact
+     * native version and content, current head and whole matching actor sets do not authorize membership changes.
+     * Missing native metadata or null description cannot bind this path; ordinary version-accepted reads are separate.
      */
     private boolean recoverStandingApprovalDates(
             PullRequest pr,
@@ -308,9 +297,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         return true;
     }
 
-    /**
-     * Why GitLab's answer does not describe the stored merge request, or {@code null} when it does.
-     */
+    /** Why GitLab's answer does not describe the stored merge request, or {@code null} when it does. */
     private static @Nullable String readinessMismatch(
             Repository repository,
             PullRequest pr,
@@ -335,12 +322,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Why GitLab's report of a merge is not about the merge of {@code pr}, or {@code null} when it
-     * is: this merge request, merged in GitLab and as stored, at the stored head, with the stored
-     * merge commit where both know one. No version is compared. A merged merge request's title or
-     * description can still change, but who merged it, when and into which commit are facts of the
-     * completed merge that do not; so they hold whatever version GitLab dated its report with.
-     * GitLab's GraphQL dates to the second what its webhooks date to the millisecond, so the report
+     * Why GitLab's report of a merge is not about the merge of {@code pr}, or {@code null} when it is: this merge
+     * request, merged in GitLab and as stored, at the stored head, with the stored merge commit where both know one.
+     * No version is compared. A merged merge request's title or description can still change, but who merged it, when
+     * and into which commit are facts of the completed merge that do not; so they hold whatever version GitLab dated
+     * its report with. GitLab's GraphQL dates to the second what its webhooks date to the millisecond, so the report
      * of a merge is dated before the merge hook it follows.
      */
     private static @Nullable String mergeMismatch(
@@ -365,9 +351,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Records what is unknown about the merge of {@code pr} from GitLab's report of it, which
-     * {@link #mergeMismatch} accepted: a merger, merge commit or merge time already stored stays,
-     * and one GitLab does not name stays unknown.
+     * Records what is unknown about the merge of {@code pr} from GitLab's report of it, which {@link #mergeMismatch}
+     * accepted: a merger, merge commit or merge time already stored stays, and one GitLab does not name stays unknown.
      *
      * @return whether anything was recorded
      */
@@ -413,15 +398,13 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Records who merged merge request {@code iid}, when, and the merge commit, read from GitLab
-     * after its merge hook where the hook named none of them. Runs after the read, in its own
-     * transaction, with the merge request's row locked; the caller checks first that the delivery
-     * may still write.
+     * Records who merged merge request {@code iid}, when, and the merge commit, read from GitLab after its merge hook
+     * where the hook named none of them. Runs after the read, in its own transaction, with the merge request's row
+     * locked; the caller checks first that the delivery may still write.
      *
-     * <p>Nothing is recorded unless GitLab's answer is about this repository's project and the
-     * stored merge ({@link #mergeMismatch}); its version is not compared. Only what is unknown is
-     * filled in, and only with what GitLab named: a merger or commit already stored stays, and one
-     * GitLab does not name stays unknown.
+     * <p>Nothing is recorded unless GitLab's answer is about this repository's project and the stored merge
+     * ({@link #mergeMismatch}); its version is not compared. Only what is unknown is filled in, and only with what
+     * GitLab named: a merger or commit already stored stays, and one GitLab does not name stays unknown.
      *
      * @return whether anything was recorded
      */
@@ -474,20 +457,15 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             @Nullable String publicEmail,
             @Nullable Boolean bot) {}
 
-    /**
-     * A reviewer in sync data, with GitLab's {@code MergeRequestReviewState} for them when it gave
-     * one.
-     */
+    /** A reviewer in sync data, with GitLab's {@code MergeRequestReviewState} for them when it gave one. */
     public record SyncReviewerData(
             SyncUserData user, @Nullable String reviewState) {}
 
     /**
      * @param approved GitLab's {@code approved}; null where the read did not capture it
-     * @param baseSha the diff base GitLab paired with {@code diffHeadSha}; null where the read did
-     *     not capture that pair
-     * @param closingIssueNumbers the iids of GitLab's closing candidates for the MR, from the REST
-     *     closes-issues route; null when this sync did not read them, which leaves the stored set
-     *     alone
+     * @param baseSha the diff base GitLab paired with {@code diffHeadSha}; null where the read did not capture that pair
+     * @param closingIssueNumbers the iids of GitLab's closing candidates for the MR, from the REST closes-issues route;
+     *     null when this sync did not read them, which leaves the stored set alone
      */
     public record SyncMergeRequestData(
             @Nullable String globalId,
@@ -541,17 +519,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     /**
      * Process a GitLab merge request webhook event (open/update).
-     *
-     * <p>Returns the existing entity if the webhook is stale (event's {@code updatedAt} is not
-     * newer than the stored value), changing at most its reviewers. This allows callers to still
-     * publish lifecycle events while preventing stale data from overwriting newer sync data or M:N
-     * relationships.
-     *
-     * <p>Detects draft-to-ready and ready-to-draft transitions on UPDATE events and emits {@link
-     * ScmDomainEvent.PullRequestReady} or {@link ScmDomainEvent.PullRequestDrafted}. GitLab does
-     * not send separate webhook actions for these transitions (unlike GitHub's {@code
-     * ready_for_review} and {@code converted_to_draft}), so we compare the stored draft state
-     * against the incoming value.
+     * <p>
+     * Returns the existing entity if the webhook is stale (event's {@code updatedAt}
+     * is not newer than the stored value), changing at most its reviewers. This allows callers
+     * to still publish lifecycle events while preventing stale data from
+     * overwriting newer sync data or M:N relationships.
+     * <p>
+     * Detects draft-to-ready and ready-to-draft transitions on UPDATE events
+     * and emits {@link ScmDomainEvent.PullRequestReady} or {@link ScmDomainEvent.PullRequestDrafted}.
+     * GitLab does not send separate webhook actions for these transitions (unlike GitHub's
+     * {@code ready_for_review} and {@code converted_to_draft}), so we compare the stored
+     * draft state against the incoming value.
      */
     @Transactional
     @Nullable
@@ -601,7 +579,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                         existing = pullRequestRepository.save(existing);
                     }
                     log.debug(
-                            "Skipped stale MR webhook: nativeId={}, existingUpdatedAt={}," + " eventUpdatedAt={}",
+                            "Skipped stale MR webhook: nativeId={}, existingUpdatedAt={}, eventUpdatedAt={}",
                             attrs.id(),
                             existing.getUpdatedAt(),
                             eventUpdatedAt);
@@ -715,8 +693,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Process a merged event: stores the merge and announces the close. The merge is offered for
-     * review by {@link #offerMerge}, after the read that follows the hook.
+     * Process a merged event: stores the merge and announces the close. The merge is offered for review by
+     * {@link #offerMerge}, after the read that follows the hook.
      */
     @Transactional
     @Nullable
@@ -738,13 +716,12 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Offers the merge of merge request {@code iid} for review, as a merge hook received in {@code
-     * context} reported it: after the hook was stored and the read after it recorded what it could,
-     * successful or not, in the caller's transaction under the delivery's still-active route. The
-     * merge request is read with its row locked and offered only while it is stored as merged, also
-     * when a sync stored it so first — that sync only recorded the merge, and this delivery is what
-     * may review it; the signal ledger settles a redelivery. A merger still unknown then holds the
-     * review pending rather than running it without them.
+     * Offers the merge of merge request {@code iid} for review, as a merge hook received in {@code context} reported
+     * it: after the hook was stored and the read after it recorded what it could, successful or not, in the caller's
+     * transaction under the delivery's still-active route. The merge request is read with its row locked and offered
+     * only while it is stored as merged, also when a sync stored it so first — that sync only recorded the merge, and
+     * this delivery is what may review it; the signal ledger settles a redelivery. A merger still unknown then holds
+     * the review pending rather than running it without them.
      *
      * @return whether the merge was offered
      */
@@ -762,11 +739,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Approval hooks refresh readiness; only the native approval snapshot owns current membership
-     * and dates. GitLab's asynchronous hook worker reloads the current merge request, so its head
-     * is not the approved revision (<a
-     * href="https://gitlab.com/gitlab-org/gitlab/-/blob/v19.4.1-ee/app/workers/merge_requests/execute_approval_hooks_worker.rb">provider
-     * source</a>).
+     * Approval hooks refresh readiness; only the native approval snapshot owns current membership and dates.
+     * GitLab's asynchronous hook worker reloads the current merge request, so its head is not the approved revision
+     * (<a href="https://gitlab.com/gitlab-org/gitlab/-/blob/v19.4.1-ee/app/workers/merge_requests/execute_approval_hooks_worker.rb">provider source</a>).
      */
     @Transactional
     @Nullable
@@ -774,10 +749,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         return refreshApprovals(event, context, "approval");
     }
 
-    /**
-     * Forgets the stored review decision for a later read to settle; an occasion of {@code kind}
-     * records no review.
-     */
+    /** Forgets the stored review decision for a later read to settle; an occasion of {@code kind} records no review. */
     private @Nullable PullRequest refreshApprovals(
             GitLabMergeRequestEventDTO event, ProcessingContext context, String kind) {
         PullRequest pr = processInternal(event, context);
@@ -796,15 +768,14 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Whether one person's approval act, or GitLab's reset, in {@code event} is about the merge
-     * request as stored now: the version it describes, GitLab's {@code updated_at}, is not older
-     * than the stored one, and the head it names is the stored head. A hook delayed past a later
-     * event still arrives after it, so when it came says nothing about either: a stored newer
-     * version was written by an event whose readiness read, or by a sync, that read the approvals
-     * after this act, and an act on another head is not about this one. A version equal to the
-     * stored one applies. A hook whose version cannot be read does not apply over a stored one; one
-     * that names no head is judged by its version alone. {@link #processInternal} returning the
-     * stored merge request says neither: it returns it for an older event too.
+     * Whether one person's approval act, or GitLab's reset, in {@code event} is about the merge request as stored now:
+     * the version it describes, GitLab's {@code updated_at}, is not older than the stored one, and the head it names is
+     * the stored head. A hook delayed past a later event still arrives after it, so when it came says nothing about
+     * either: a stored newer version was written by an event whose readiness read, or by a sync, that read the approvals
+     * after this act, and an act on another head is not about this one. A version equal to the stored one applies. A
+     * hook whose version cannot be read does not apply over a stored one; one that names no head is judged by its
+     * version alone. {@link #processInternal} returning the stored merge request says neither: it returns it for an
+     * older event too.
      */
     private static boolean actsOnStoredHead(GitLabMergeRequestEventDTO event, PullRequest pr) {
         var attrs = event.objectAttributes();
@@ -823,9 +794,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Withdrawal and reset hooks refresh readiness through the same native snapshot as approval
-     * hooks. A reset's actor is the pusher, and delayed withdrawal may follow a new approval;
-     * neither identifies whose approvals still stand.
+     * Withdrawal and reset hooks refresh readiness through the same native snapshot as approval hooks.
+     * A reset's actor is the pusher, and delayed withdrawal may follow a new approval; neither identifies
+     * whose approvals still stand.
      */
     @Transactional
     @Nullable
@@ -847,12 +818,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Records one read's review decision with the mergeability and merge status GitLab computed
-     * from the same approvals: the caller has accepted the read as the newest about the reviews
-     * ({@link PullRequest#takesReviewSnapshotAt}).
+     * Records one read's review decision with the mergeability and merge status GitLab computed from the same approvals:
+     * the caller has accepted the read as the newest about the reviews ({@link PullRequest#takesReviewSnapshotAt}).
      *
-     * @param mergeStateStatus the {@link MergeStateStatus} name, as {@link #mapDetailedMergeStatus}
-     *     gives it
+     * @param mergeStateStatus the {@link MergeStateStatus} name, as {@link #mapDetailedMergeStatus} gives it
      * @return whether anything changed
      */
     private static boolean recordReviewSnapshot(
@@ -871,11 +840,10 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Leaves what GitLab said about merging unknown: the review decision, and the mergeability and
-     * merge status that follow the approvals. For new commits, or an approval, withdrawal or reset
-     * of approvals. The approvals themselves stay as recorded — a project can keep them across a
-     * push, and a reset does not say whose went; the readiness read after the event, or the next
-     * sync, says which still stand.
+     * Leaves what GitLab said about merging unknown: the review decision, and the mergeability and merge status that
+     * follow the approvals. For new commits, or an approval, withdrawal or reset of approvals. The approvals themselves
+     * stay as recorded — a project can keep them across a push, and a reset does not say whose went; the readiness
+     * read after the event, or the next sync, says which still stand.
      *
      * @return whether anything changed
      */
@@ -889,8 +857,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Looks up the current state of an existing PR before processing a webhook event. Returns null
-     * if the PR does not exist yet.
+     * Looks up the current state of an existing PR before processing a webhook event.
+     * Returns null if the PR does not exist yet.
      */
     private Issue.@Nullable State getExistingState(GitLabMergeRequestEventDTO event, ProcessingContext context) {
         if (event.objectAttributes() == null || event.objectAttributes().iid() == null) {
@@ -907,8 +875,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     /**
      * Process a GitLab merge request from GraphQL sync.
      *
-     * @param context the sync of {@code context.repository()}, observed when it asked for the page
-     *     the merge request came from
+     * @param context the sync of {@code context.repository()}, observed when it asked for the page the merge request
+     *     came from
      */
     @Transactional
     @Nullable
@@ -983,8 +951,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
                         stored, data.diffHeadSha(), data.syncApprovers(), data.approvalRows(), context.observedAt());
             }
             log.debug(
-                    "Skipped merge request older than the stored one: iid={}, storedUpdatedAt={},"
-                            + " readUpdatedAt={}",
+                    "Skipped merge request older than the stored one: iid={}, storedUpdatedAt={}, readUpdatedAt={}",
                     data.iid(),
                     stored.getUpdatedAt(),
                     fetchedUpdatedAt);
@@ -1370,8 +1337,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * The authored fields this write changed, read off the stored row before and after it. GitLab's
-     * own {@code changes} object is not used: it may be empty, and a sync carries none at all.
+     * The authored fields this write changed, read off the stored row before and after it. GitLab's own
+     * {@code changes} object is not used: it may be empty, and a sync carries none at all.
      */
     private static Set<String> authoredChanges(
             @Nullable String previousTitle, @Nullable String previousBody, PullRequest pr) {
@@ -1400,19 +1367,16 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * The merge request's review decision from what its reviewers did, or none where the sync did
-     * not read that whole.
+     * The merge request's review decision from what its reviewers did, or none where the sync did not read that whole.
      *
-     * <p>A standing request for changes decides it, over any approval: GitLab's {@code
-     * REQUESTED_CHANGES} merge status where the project blocks merging on one (Premium), and a
-     * reviewer's {@code REQUESTED_CHANGES} review state on any tier. Otherwise it is approved only
-     * when someone approved and GitLab's {@code approved} says the approval rules are met: that
-     * flag alone is also true when a project requires no approval and nobody gave one (<a
-     * href="https://gitlab.com/gitlab-org/gitlab/-/blob/v18.4.0-ee/ee/app/models/approval_state.rb">approval_state.rb</a>).
-     * A reviewer or approver list GitLab did not return whole could hide either, so it leaves the
-     * decision unknown, as does an {@code approved} it did not return and a status GitLab is still
-     * settling ({@link #isSettling}). {@code approvalsRequired} is not read: GitLab's Community
-     * Edition schema has no such field.
+     * <p>A standing request for changes decides it, over any approval: GitLab's {@code REQUESTED_CHANGES} merge status
+     * where the project blocks merging on one (Premium), and a reviewer's {@code REQUESTED_CHANGES} review state on any
+     * tier. Otherwise it is approved only when someone approved and GitLab's {@code approved} says the approval rules
+     * are met: that flag alone is also true when a project requires no approval and nobody gave one
+     * (<a href="https://gitlab.com/gitlab-org/gitlab/-/blob/v18.4.0-ee/ee/app/models/approval_state.rb">approval_state.rb</a>).
+     * A reviewer or approver list GitLab did not return whole could hide either, so it leaves the decision unknown, as
+     * does an {@code approved} it did not return and a status GitLab is still settling ({@link #isSettling}).
+     * {@code approvalsRequired} is not read: GitLab's Community Edition schema has no such field.
      */
     private static @Nullable ReviewDecision reviewDecision(
             @Nullable String detailedMergeStatus,
@@ -1436,12 +1400,11 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Whether GitLab is still working out the merge request's status after a change: {@code
-     * checking} while it computes mergeability, {@code approvals_syncing} while it recomputes
-     * approvals after a push. Neither its mergeability nor its approvals are settled then.
+     * Whether GitLab is still working out the merge request's status after a change: {@code checking} while it
+     * computes mergeability, {@code approvals_syncing} while it recomputes approvals after a push. Neither its
+     * mergeability nor its approvals are settled then.
      *
-     * @see <a
-     *     href="https://docs.gitlab.com/api/merge_request_approvals/#prevent-approval-resets-in-automated-merge-requests">GitLab
+     * @see <a href="https://docs.gitlab.com/api/merge_request_approvals/#prevent-approval-resets-in-automated-merge-requests">GitLab
      *     merge request approvals API</a>
      */
     static boolean isSettling(@Nullable String detailedMergeStatus) {
@@ -1464,9 +1427,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * The status of a pipeline GitLab reported as one {@link CheckState}: a pipeline that has not
-     * finished is pending whatever stage it is in. A head with no pipeline has no status to map:
-     * {@link GitLabHeadPipeline} tells it apart from a pipeline that was not read.
+     * The status of a pipeline GitLab reported as one {@link CheckState}: a pipeline that has not finished is pending
+     * whatever stage it is in. A head with no pipeline has no status to map: {@link GitLabHeadPipeline} tells it apart
+     * from a pipeline that was not read.
      */
     public static CheckState mapPipelineStatus(String status) {
         return switch (status.toUpperCase(Locale.ROOT)) {
@@ -1480,18 +1443,18 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     /**
      * Generates a deterministic native ID for a GitLab approval review.
-     *
-     * <p>Layout: {@code [mrNativeId (31 bits)][userNativeId (32 bits)]}, with bit 63 cleared to
-     * guarantee a positive result.
-     *
-     * <p>Collision-free when MR native IDs fit in 31 bits ({@code <= Integer.MAX_VALUE}) and user
-     * native IDs fit in 32 bits. When either exceeds its safe range, collisions become possible due
-     * to bit truncation, and a warning is logged.
+     * <p>
+     * Layout: {@code [mrNativeId (31 bits)][userNativeId (32 bits)]}, with bit 63 cleared
+     * to guarantee a positive result.
+     * <p>
+     * Collision-free when MR native IDs fit in 31 bits ({@code <= Integer.MAX_VALUE})
+     * and user native IDs fit in 32 bits. When either exceeds its safe range,
+     * collisions become possible due to bit truncation, and a warning is logged.
      */
     public static long generateApprovalNativeId(long mrNativeId, long userNativeId) {
         if (mrNativeId > Integer.MAX_VALUE || userNativeId > Integer.MAX_VALUE) {
             log.warn(
-                    "Native IDs exceed safe range, review nativeId may collide: mrNativeId={}," + " userNativeId={}",
+                    "Native IDs exceed safe range, review nativeId may collide: mrNativeId={}, userNativeId={}",
                     mrNativeId,
                     userNativeId);
         }
@@ -1705,10 +1668,9 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
     }
 
     /**
-     * Where GitLab says {@code user}'s review stands. Where it sent no state, the stored one
-     * stands: see {@link GitLabMergeRequestReviewerDTO} for when a hook sends none, and a reviewer
-     * who lost access to the merge request has none in GraphQL. A state Hephaestus does not know
-     * clears the stored one.
+     * Where GitLab says {@code user}'s review stands. Where it sent no state, the stored one stands: see
+     * {@link GitLabMergeRequestReviewerDTO} for when a hook sends none, and a reviewer who lost access to the merge
+     * request has none in GraphQL. A state Hephaestus does not know clears the stored one.
      */
     private static RequestedReviewer.@Nullable ReviewState reviewState(
             @Nullable String sent, PullRequest pr, User user) {

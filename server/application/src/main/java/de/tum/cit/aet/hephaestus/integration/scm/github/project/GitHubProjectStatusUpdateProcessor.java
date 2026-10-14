@@ -16,7 +16,9 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Processor for GitHub Projects V2 status updates. */
+/**
+ * Processor for GitHub Projects V2 status updates.
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -80,7 +82,7 @@ public class GitHubProjectStatusUpdateProcessor {
         ProjectStatusUpdate statusUpdate = statusUpdateRepository
                 .findByNodeId(dto.nodeId())
                 .orElseThrow(() -> new IllegalStateException(
-                        "ProjectStatusUpdate not found after upsert:" + " nodeId=" + dto.nodeId()));
+                        "ProjectStatusUpdate not found after upsert: nodeId=" + dto.nodeId()));
 
         // Publish events
         EventContext eventContext = EventContext.from(context);

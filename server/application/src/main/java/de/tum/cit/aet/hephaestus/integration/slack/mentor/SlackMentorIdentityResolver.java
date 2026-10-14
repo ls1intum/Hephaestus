@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -70,7 +69,7 @@ public class SlackMentorIdentityResolver {
                 ? accountIdentityQuery.resolveActiveAccountId(slackProviderId, slackUserId, teamId)
                 : accountIdentityQuery.resolveAccountId(slackProviderId, slackUserId, teamId);
         return accountId.filter(id -> workspaceMembershipQuery.membershipsForAccount(id).stream()
-                .anyMatch(view -> view.workspaceId() == workspaceId && Objects.equals(view.accountId(), id)));
+                .anyMatch(view -> view.workspaceId() == workspaceId));
     }
 
     /** Resolves an outbound recipient through the account's provider subject and the connection's exact Slack team. */

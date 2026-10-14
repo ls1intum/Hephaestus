@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryWriter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackVisibilityService;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
@@ -50,6 +51,7 @@ public class PostedCopyCorrector {
                         copy.getFeedbackId(),
                         owner,
                         copy.getId(),
+                        null,
                         "The historical receipt cannot identify a safe provider update.");
                 continue;
             }
@@ -61,6 +63,7 @@ public class PostedCopyCorrector {
                             copy.getFeedbackId(),
                             owner,
                             copy.getId(),
+                            null,
                             "A newer piece of feedback owns this provider reference.");
                     continue;
                 }
@@ -115,7 +118,17 @@ public class PostedCopyCorrector {
                             copy.getFeedbackId(),
                             owner,
                             copy.getId(),
-                            "TRANSIENT: Correction receipt is unavailable.");
+                            FeedbackCopyReadback.TRANSIENT,
+                            " Correction receipt is unavailable.");
+            } else if (!remove && copy.getState() == FeedbackCopyState.RETRACTED) {
+                transactions.correctionError(
+                        copy.getWorkspaceId(),
+                        copy.getFeedbackId(),
+                        owner,
+                        copy.getId(),
+                        null,
+                        "Restoring a deleted anchored note is unsupported. The original receipt"
+                                + " remains retracted.");
             }
         }
     }
@@ -140,7 +153,8 @@ public class PostedCopyCorrector {
                     copy.getFeedbackId(),
                     owner,
                     copy.getId(),
-                    "TRANSIENT: Provider correction is not confirmed.");
+                    FeedbackCopyReadback.TRANSIENT,
+                    " Provider correction is not confirmed.");
     }
 
     private void unsupported(FeedbackCopy copy, String owner) {
@@ -149,6 +163,7 @@ public class PostedCopyCorrector {
                 copy.getFeedbackId(),
                 owner,
                 copy.getId(),
+                null,
                 "This provider cannot correct the posted copy.");
     }
 }

@@ -14,17 +14,20 @@
 			"citations": [],
 			"evidence": {
 				"search": {
-					"consulted": ["scm.pull-request.diff", "scm.repository.tree"],
+					"consulted": [
+						"scm.pull-request.diff",
+						"scm.repository.tree"
+					],
 					"lookedFor": "catch blocks and error callbacks that this pull request adds or changes and that drop the error",
 					"boundary": "every hunk of the three changed files; unchanged code only where a changed line calls it"
 				},
-				"undecidability": [
+				"openQuestions": [
 					{
 						"openQuestion": "Is an empty result here the documented contract for a missing invoice, or does it hide a failed lookup?",
 						"wouldSettleIt": "The contract of InvoiceRepository.findForExport, or a caller that treats an empty result as an error.",
 						"citation": {
 							"sourceKind": "scm.pull-request.diff",
-							"artifactPath": "context/change.json",
+							"sourcePath": "context/change.json",
 							"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 							"side": "NEW",
 							"startLine": 57,
@@ -47,7 +50,7 @@
 			"example": {
 				"citation": {
 					"sourceKind": "scm.pull-request.diff",
-					"artifactPath": "context/change.json",
+					"sourcePath": "context/change.json",
 					"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 					"side": "NEW",
 					"startLine": 52,
@@ -77,9 +80,12 @@
 						"what": "lines of the export client beyond the read limit",
 						"count": 1,
 						"reason": "truncated",
-						"units": ["src/main/java/com/acme/billing/export/client/ExportClient.java"]
+						"items": [
+							"src/main/java/com/acme/billing/export/client/ExportClient.java"
+						]
 					}
-				]
+				],
+				"receipts": []
 			},
 			"observations": [
 				{
@@ -98,7 +104,7 @@
 						{
 							"index": 0,
 							"sourceKind": "scm.pull-request.diff",
-							"artifactPath": "context/change.json",
+							"sourcePath": "context/change.json",
 							"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 							"side": "NEW",
 							"startLine": 88,
@@ -135,7 +141,7 @@
 						{
 							"index": 0,
 							"sourceKind": "scm.pull-request.diff",
-							"artifactPath": "context/change.json",
+							"sourcePath": "context/change.json",
 							"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 							"side": "NEW",
 							"startLine": 41,
@@ -171,7 +177,7 @@
 				{
 					"index": 0,
 					"sourceKind": "scm.pull-request.diff",
-					"artifactPath": "context/change.json",
+					"sourcePath": "context/change.json",
 					"path": "src/main/java/com/acme/billing/export/InvoiceExporter.java",
 					"side": "NEW",
 					"startLine": 72,
@@ -192,7 +198,9 @@
 			],
 			"evidence": {
 				"search": {
-					"consulted": ["scm.pull-request.diff"],
+					"consulted": [
+						"scm.pull-request.diff"
+					],
 					"lookedFor": "added comments that restate the code, mislead, or comment out code",
 					"boundary": "every added line of the three changed files"
 				}
@@ -200,7 +208,7 @@
 			"example": {
 				"citation": {
 					"sourceKind": "scm.pull-request.diff",
-					"artifactPath": "context/change.json",
+					"sourcePath": "context/change.json",
 					"path": "src/main/java/com/acme/billing/export/ExportRetryPolicy.java",
 					"side": "NEW",
 					"startLine": 18,
@@ -224,14 +232,15 @@
 				"reads": 6,
 				"truncatedReads": 0,
 				"failedReads": 0,
-				"complete": true
+				"complete": true,
+				"receipts": []
 			},
 			"observations": []
 		},
 		{
 			"practiceResultId": "b9e1d3f7-2a64-4c80-9f5b-6e7d1c2a3b58",
 			"practiceSlug": "makes-ui-accessible-by-default",
-			"outcome": "NOT_APPLICABLE",
+			"outcome": "DOES_NOT_APPLY",
 			"severity": null,
 			"summary": "The change adds or changes no user interface",
 			"explanation": "The pull request changes three Java files of the export service and its test. None of them is a view, template, stylesheet or UI component.",
@@ -241,7 +250,7 @@
 				{
 					"index": 0,
 					"sourceKind": "scm.pull-request.core",
-					"artifactPath": "context/metadata.json",
+					"sourcePath": "context/metadata.json",
 					"path": "context/metadata.json",
 					"startLine": 27,
 					"endLine": 27,
@@ -260,9 +269,12 @@
 			],
 			"evidence": {
 				"inapplicability": {
-					"consulted": ["scm.pull-request.core", "scm.pull-request.diff"],
-					"subject": "user interface views and components that the change adds or changes",
-					"ruledOutBy": "All three changed files are Java sources under src/main/java and src/test/java of the export service; the change adds or changes no view, template, stylesheet or component file."
+					"consulted": [
+						"scm.pull-request.core",
+						"scm.pull-request.diff"
+					],
+					"ruledOutBy": "All three changed files are Java sources under src/main/java and src/test/java of the export service; the change adds or changes no view, template, stylesheet or component file.",
+					"prerequisite": "user interface views and components that the change adds or changes"
 				}
 			},
 			"example": null,

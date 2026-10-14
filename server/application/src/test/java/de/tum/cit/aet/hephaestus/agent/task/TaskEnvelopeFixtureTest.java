@@ -12,10 +12,10 @@ import tools.jackson.databind.json.JsonMapper;
 /** JSON contract fixture shared with the TypeScript runner tests. */
 class TaskEnvelopeFixtureTest extends BaseUnitTest {
 
-    private static final String FIXTURE_PATH = "task-fixtures/v6/practice-review.json";
+    private static final String FIXTURE_PATH = "task-fixtures/practice-review.json";
 
     @Test
-    void matchesFixture() throws IOException {
+    void shouldMatchTheSharedEnvelopeWhenTheWriterSerializesAReview() throws IOException {
         JsonMapper mapper = JsonMapper.builder().build();
         TaskEnvelopeWriter writer = new TaskEnvelopeWriter(mapper);
 
@@ -24,7 +24,7 @@ class TaskEnvelopeFixtureTest extends BaseUnitTest {
                 UUID.fromString("00000000-0000-0000-0000-00000000abcd"),
                 0,
                 99L,
-                new Task("Review the pinned item. Read the staged inputs and submit contract v3 results."));
+                new Task("Review the pinned item. Read the staged inputs and submit results."));
 
         String actual = writer.writeAsString(envelope);
 

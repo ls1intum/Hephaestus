@@ -6,24 +6,14 @@ import {
 	useQueryClient,
 } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
 
-import {
-	listPracticeReviewsInfiniteOptions,
-	listPracticeReviewsOptions,
-	listTracedArtifactsInfiniteOptions,
-} from "@/api/@tanstack/react-query.gen";
-import { listPracticeReviews, type Options } from "@/api/sdk.gen";
-import type {
-	ListPracticeReviewsData,
-	PagedModelReviewRunSummary,
-	ReviewRunSummary,
-} from "@/api/types.gen";
+import { listReviewsInfiniteOptions, listReviewsOptions } from "@/api/@tanstack/react-query.gen";
+import { listReviews, type Options } from "@/api/sdk.gen";
+import type { ListReviewsData, PageResponseDtoReviewSummary, ReviewSummary } from "@/api/types.gen";
 import {
 	ACTIVE_REVIEW_POLL_SIZE,
 	ACTIVE_REVIEW_STATUSES,
 	isActiveReview,
-	isProcessingReview,
 	reconcileActiveRows,
 } from "@/components/admin/practice-reviews/active-review-rows";
 import { REVIEWABLE_ON_DEMAND } from "@/components/admin/practice-reviews/job-utils";
@@ -34,102 +24,76 @@ import {
 import {
 	ACTIVE_REVIEW_POLL_MS,
 	REVIEW_PAGE_SIZE,
-	listsWorkWithoutReview,
-	type RunsSearch,
-	runsQuery,
-	runsSearchSchema,
-	workWithoutReviewQuery,
+	type ReviewsSearch,
+	reviewsQuery,
+	reviewsSearchSchema,
 } from "@/components/admin/practice-reviews/review-search";
-import {
-	type RequestableWork,
-	ReviewRunsPage,
-} from "@/components/admin/practice-reviews/ReviewRunsPage";
-import { workRowKey } from "@/components/admin/practice-reviews/UnreviewedWorkRow";
+import { ReviewsPage } from "@/components/admin/practice-reviews/ReviewsPage";
+import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
 import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
 import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
-import { loadedPages, pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { loadedPages, springPageParams } from "@/runtime/tanstack-query/spring-page";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs",
 )({
-	validateSearch: runsSearchSchema,
+	validateSearch: reviewsSearchSchema,
 	head: practiceReviewsHead("Reviews"),
-	component: ReviewRunsRoute,
+	component: ReviewsRoute,
 });
 
-const sameWork = (a: RequestableWork | undefined, b: RequestableWork) =>
-	a !== undefined && a.artifactKind === b.artifactKind && a.artifactId === b.artifactId;
-
-function ReviewRunsRoute() {
+function ReviewsRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const search = Route.useSearch();
 	const setSearch = useSearchState();
-	const updateSearch = (patch: Partial<RunsSearch>) => {
+	const updateSearch = (patch: Partial<ReviewsSearch>) => {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
-	const withoutReview = listsWorkWithoutReview(search);
-	const reviewsQuery = useInfiniteQuery({
-		...listPracticeReviewsInfiniteOptions({
+	const reviewsResult = useInfiniteQuery({
+		...listReviewsInfiniteOptions({
 			path: { workspaceSlug },
-			query: runsQuery(search, REVIEW_PAGE_SIZE),
+			query: reviewsQuery(search, REVIEW_PAGE_SIZE),
 		}),
-		...pagedModelParams,
-		enabled: !withoutReview,
+		...springPageParams,
 	});
-	useActiveReviewPoll(workspaceSlug, search, reviewsQuery.data, !withoutReview);
-	const unreviewedOptions = listTracedArtifactsInfiniteOptions({
-		path: { workspaceSlug },
-		query: workWithoutReviewQuery(search, REVIEW_PAGE_SIZE),
-	});
-	const unreviewedQuery = useInfiniteQuery({
-		...unreviewedOptions,
-		...pagedModelParams,
-		enabled: withoutReview,
-	});
+	useActiveReviewPoll(workspaceSlug, search, reviewsResult.data);
 
-	// Every row asks for a review of its work. On the work without a review the row says a refusal
-	// inline, and a started review moves the work off that list, so it is read again once the ask
-	// settles; on the reviews a refusal is a toast and the hook refreshes the list.
-	const review = useRequestPracticeReview(workspaceSlug, { showsInline: () => withoutReview });
-	const queryClient = useQueryClient();
-	const asking = review.asking !== undefined;
-	const wasAsking = useRef(asking);
-	useEffect(() => {
-		const before = wasAsking.current;
-		wasAsking.current = asking;
-		if (before && !asking) {
-			void queryClient.invalidateQueries({ queryKey: unreviewedOptions.queryKey });
-		}
-	});
+	// Every row asks for a review of its work. A refusal is said once above the list, and the hook
+	// refreshes the list when a review starts.
+	const review = useRequestPracticeReview(workspaceSlug, { showsInline: () => true });
 	const record = useScopeRecordFilter(workspaceSlug, search);
 	const front = parsePracticeReviewLevels(search.detail).at(-1);
 
 	return (
-		<ReviewRunsPage
+		<ReviewsPage
 			search={search}
 			onSearchChange={updateSearch}
-			reviews={pagedListState(reviewsQuery, (row) => row.id)}
-			unreviewed={pagedListState(unreviewedQuery, workRowKey)}
-			workspaceSlug={workspaceSlug}
+			reviews={pagedListState(reviewsResult, (row) => row.id)}
 			requestReview={{
-				canRequest: (work) => REVIEWABLE_ON_DEMAND.has(work.artifactKind),
-				onRequest: (work) =>
-					review.ask({ artifactKind: work.artifactKind, artifactId: work.artifactId }),
-				isRequesting: (work) => sameWork(review.asking, work),
-				refusalFor: (work) =>
-					review.refusal !== undefined && sameWork(review.refusal.work, work) ? (
-						<TraceRefusalAlert
-							refusal={review.refusal.outcome}
-							workspaceSlug={workspaceSlug}
-							canAdminister
-						/>
-					) : undefined,
+				canRequest: (item) => REVIEWABLE_ON_DEMAND.has(item.kind),
+				onRequest: (itemId) => review.ask(itemId),
+				isRequesting: (itemId) => review.asking === itemId,
 			}}
+			refusal={
+				review.refusal && (
+					<TraceRefusalAlert
+						refusal={review.refusal.outcome}
+						fix={
+							review.refusal.outcome.reason !== null && (
+								<RefusalFixLink
+									workspaceSlug={workspaceSlug}
+									reason={review.refusal.outcome.reason}
+								/>
+							)
+						}
+					/>
+				)
+			}
 			groups={groups}
 			practices={practices}
 			people={people}
@@ -143,50 +107,30 @@ function ReviewRunsRoute() {
  * While a loaded review is queued or running, re-read only the active reviews under the same
  * filters, every few seconds: their rows change in place, and the loaded pages are read again once,
  * when a review starts or stops being active. Re-reading every loaded page on the timer cost one
- * request per page per tab. A stopped review whose results are still processed is followed the same
- * way until they are DELIVERED or FAILED.
+ * request per page per tab.
  */
 function useActiveReviewPoll(
 	workspaceSlug: string,
-	search: RunsSearch,
-	data: InfiniteData<PagedModelReviewRunSummary> | undefined,
-	enabled: boolean,
+	search: ReviewsSearch,
+	data: InfiniteData<PageResponseDtoReviewSummary> | undefined,
 ) {
-	const listQuery = runsQuery(search, REVIEW_PAGE_SIZE);
-	const listKey = listPracticeReviewsInfiniteOptions({
+	const listQuery = reviewsQuery(search, REVIEW_PAGE_SIZE);
+	const listKey = listReviewsInfiniteOptions({
 		path: { workspaceSlug },
 		query: listQuery,
 	}).queryKey;
-	const loaded = loadedPages(data).flatMap((page) => page.content ?? []);
-	// The active reviews the list's own filter keeps. A held review is queued, so "On hold" alone polls
-	// the held reviews, and beside listed statuses it adds them to the active ones among those.
-	const heldListed = listQuery.onHold === true;
-	const statuses = ACTIVE_REVIEW_STATUSES.filter((status) =>
-		listQuery.status === undefined ? !heldListed : listQuery.status.includes(status),
+	const loaded = loadedPages(data).flatMap((page) => page.content);
+	// The active reviews the list's own filter keeps.
+	const statuses = ACTIVE_REVIEW_STATUSES.filter(
+		(status) => listQuery.status === undefined || listQuery.status.includes(status),
 	);
 	useLoadedRowsPoll(listKey, {
-		polling: enabled && (statuses.length > 0 || heldListed) && loaded.some(isActiveReview),
+		polling: statuses.length > 0 && loaded.some(isActiveReview),
 		request: {
 			path: { workspaceSlug },
-			query: {
-				...listQuery,
-				status: statuses.length > 0 ? [...statuses] : undefined,
-				size: ACTIVE_REVIEW_POLL_SIZE,
-			},
+			query: { ...listQuery, status: [...statuses], size: ACTIVE_REVIEW_POLL_SIZE },
 		},
 		follows: isActiveReview,
-	});
-	// The API cannot ask for "active or still processing" in one read, so a stopped review whose
-	// results are still processed has its own poll, under the list's own filters.
-	const processingListed =
-		listQuery.resultProcessing === undefined || listQuery.resultProcessing.includes("PENDING");
-	useLoadedRowsPoll(listKey, {
-		polling: enabled && processingListed && loaded.some(isProcessingReview),
-		request: {
-			path: { workspaceSlug },
-			query: { ...listQuery, resultProcessing: ["PENDING"], size: ACTIVE_REVIEW_POLL_SIZE },
-		},
-		follows: isProcessingReview,
 	});
 }
 
@@ -202,39 +146,39 @@ function useLoadedRowsPoll(
 		follows,
 	}: {
 		polling: boolean;
-		request: Options<ListPracticeReviewsData>;
-		follows: (review: ReviewRunSummary) => boolean;
+		request: Options<ListReviewsData>;
+		follows: (review: ReviewSummary) => boolean;
 	},
 ) {
 	const queryClient = useQueryClient();
 	useQuery({
-		...listPracticeReviewsOptions(request),
+		...listReviewsOptions(request),
 		queryFn: async ({ signal }) => {
-			const { data: polled } = await listPracticeReviews({
+			const { data: polled } = await listReviews({
 				...request,
 				signal,
 				throwOnError: true,
 			});
-			const rows = polled.content ?? [];
+			const rows = polled.content;
 			const { updated, refetch } = reconcileActiveRows(
 				queryClient
-					.getQueryData<InfiniteData<PagedModelReviewRunSummary>>(listKey)
-					?.pages.flatMap((page) => page.content ?? []) ?? [],
+					.getQueryData<InfiniteData<PageResponseDtoReviewSummary>>(listKey)
+					?.pages.flatMap((page) => page.content) ?? [],
 				rows,
-				(polled.page?.totalElements ?? rows.length) <= rows.length,
+				polled.totalElements <= rows.length,
 				follows,
 			);
 			if (refetch) {
 				void queryClient.invalidateQueries({ queryKey: listKey, exact: true });
 			} else if (updated.size > 0) {
-				queryClient.setQueryData<InfiniteData<PagedModelReviewRunSummary>>(listKey, (current) =>
+				queryClient.setQueryData<InfiniteData<PageResponseDtoReviewSummary>>(listKey, (current) =>
 					current === undefined
 						? current
 						: {
 								...current,
 								pages: current.pages.map((page) => ({
 									...page,
-									content: page.content?.map((review) => updated.get(review.id) ?? review),
+									content: page.content.map((review) => updated.get(review.id) ?? review),
 								})),
 							},
 				);

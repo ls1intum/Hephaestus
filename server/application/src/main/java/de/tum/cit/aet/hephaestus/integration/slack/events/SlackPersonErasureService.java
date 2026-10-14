@@ -58,8 +58,7 @@ public class SlackPersonErasureService {
                 : conversationFeedbackErasure.eraseConversationFeedbackAboutUser(workspaceId, accountId);
         int messages = messagesBySlackId + messagesByAccountId;
         log.info(
-                "Slack person erasure: workspace={} account={} slackUser={} → messages={} threadsPruned={}"
-                        + " derivedRows={}",
+                "Slack person erasure: workspace={} account={} slackUser={} → messages={} threadsPruned={} derivedRows={}",
                 workspaceId,
                 accountId,
                 slackUserId,

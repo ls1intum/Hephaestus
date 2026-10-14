@@ -24,8 +24,7 @@ public class FeedbackCopyCleanupCustody {
             if (feedback.lockByIdAndWorkspaceId(id, workspaceId).isEmpty()) continue;
             for (var copy : copies.lockByFeedbackId(workspaceId, id)) {
                 boolean absent = copy.getState() == FeedbackCopyState.FAILED
-                        && copy.getLastError() != null
-                        && copy.getLastError().startsWith("ABSENT:");
+                        && copy.getReadback() == FeedbackCopyReadback.ABSENT;
                 if (!absent
                         && copy.getPostedAt() == null
                         && (copy.getWriteStartedAt() != null || copy.getState() == FeedbackCopyState.WRITE_STARTED))

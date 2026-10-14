@@ -43,9 +43,7 @@ public class GitLabSummaryWriter implements SummaryWriter {
      * Every note this adapter writes escapes them into inline code.
      */
     private static final Pattern GITLAB_SLASH_COMMAND = Pattern.compile(
-            "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|"
-                    + "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|"
-                    + "due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
+            "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|due|remove_due_date|weight|epic|copy_metadata|move|confidential|shrug|tableflip)\\b)",
             Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
 
     private final GitLabGraphQlClientProvider gitLabProvider;
@@ -331,8 +329,7 @@ public class GitLabSummaryWriter implements SummaryWriter {
                 cursor = next;
             } catch (RuntimeException e) {
                 log.debug(
-                        "Existing-summary dedup lookup failed (treated as unknown, not absent):"
-                                + " scopeId={}, error={}",
+                        "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
                         scopeId,
                         e.getMessage());
                 return SummaryLookup.unknown();

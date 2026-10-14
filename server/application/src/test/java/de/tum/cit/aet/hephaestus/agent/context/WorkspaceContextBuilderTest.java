@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -18,7 +18,10 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
     private WorkspaceContextBuilder builder(ContentSource... sources) {
         return new WorkspaceContextBuilder(
-                List.of(sources), List.of(), mock(SourceCatalogRegistry.class), mock(JobFolderIndexBuilder.class));
+                List.of(sources),
+                List.of(),
+                mock(ClasspathSourceCatalogRegistry.class),
+                mock(JobFolderIndexBuilder.class));
     }
 
     private ContentSource source(String path, byte[] bytes) {

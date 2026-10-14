@@ -26,13 +26,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Startup-time validation that every declared {@link Capability} has its required per-kind SPI
- * beans wired. Throws so misconfigurations surface immediately, not at the first request. Gated to
- * the application-server runtime role since worker pods intentionally wire only a subset of SPI
- * beans.
+ * Startup-time validation that every declared {@link Capability} has its required
+ * per-kind SPI beans wired. Throws so misconfigurations surface immediately, not at
+ * the first request. Gated to the application-server runtime role since worker pods
+ * intentionally wire only a subset of SPI beans.
  *
- * <p>Also the single place the review contract is enforced, via {@link ReviewContractValidator};
- * violations are collected before anything throws so an operator sees every problem in one message.
+ * <p>Also the single place the review contract is enforced, via {@link ReviewContractValidator}; violations
+ * are collected before anything throws so an operator sees every problem in one message.
  */
 @Component
 @ConditionalOnServerRole
@@ -173,8 +173,7 @@ public class IntegrationFrameworkBootstrap {
             violations.add(kind
                     + " declares capability "
                     + cap
-                    + " but the bootstrap has no enforcement rule for it — add a require()"
-                    + " branch");
+                    + " but the bootstrap has no enforcement rule for it — add a require() branch");
         }
     }
 

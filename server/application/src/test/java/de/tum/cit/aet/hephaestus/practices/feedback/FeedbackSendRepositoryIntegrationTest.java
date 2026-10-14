@@ -44,7 +44,7 @@ class FeedbackSendRepositoryIntegrationTest extends AbstractFeedbackIntegrationT
         var parent = piece(FeedbackDestination.ON_WORK, FeedbackState.UNCONFIRMED, null);
         var copy = summary(parent, FeedbackCopyState.WRITE_STARTED);
         assertThat(copies.retryAbsent(workspace.getId(), parent.getId())).isZero();
-        copies.recordAbsent(workspace.getId(), parent.getId(), copy.getId(), "ABSENT: exact readback");
+        copies.recordAbsent(workspace.getId(), parent.getId(), copy.getId(), "Exact readback");
         assertThat(copies.retryAbsent(workspace.getId(), parent.getId())).isEqualTo(1);
         assertThat(copies.beginWrite(workspace.getId(), parent.getId(), copy.getId(), AT.plusSeconds(30)))
                 .isEqualTo(1);

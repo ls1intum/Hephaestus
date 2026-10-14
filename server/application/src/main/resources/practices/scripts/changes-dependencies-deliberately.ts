@@ -1,4 +1,3 @@
-import { scm, expectKind, requireChange, type DiffFile, type FileTree } from "../kits/scm/index.ts";
 // Finds the changed lines of dependency manifests, for the review to judge if each dependency edit was
 // deliberate: an intended add, remove or bump with a fitting constraint. A careless edit loosens a pin,
 // drops a version, or leaves no lockfile. A table of manifests, keyed by the file name, covers all
@@ -15,6 +14,7 @@ import { scm, expectKind, requireChange, type DiffFile, type FileTree } from "..
 //   bumped        the same constraint shape with a different version
 // A manifest that spreads one dependency over several lines (Maven, XcodeGen) gets no such kind. Its
 // changed dependency lines are raw-manifest-line leads.
+import { scm, expectKind, requireChange, type DiffFile, type FileTree } from "../kits/scm/index.ts";
 import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/core/bounded-text.ts";
 import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
@@ -157,9 +157,9 @@ const ECOSYSTEMS: Ecosystem[] = [
 			if (NPM_NON_DEP_KEYS.has(name.toLowerCase())) {
 				return null;
 			}
-			// Per-line parsing can't tell a dependency block from scripts/engines/exports/resolutions/config —
-			// they all share the `"key": "value"` shape. Require the value to look like a version specifier so a
-			// `"build": "tsc"` line is not offered as a candidate at all.
+			// Only the changed lines are captured, not the base file, so a line's enclosing block is unknown:
+			// scripts, engines and dependencies share the `"key": "value"` shape. A value that is no version
+			// specifier, such as `"build": "tsc"`, is not a candidate.
 			if (!isVersionish(constraint)) {
 				return null;
 			}
@@ -333,17 +333,49 @@ function namedPaths(paths: readonly string[]): string {
 	return paths.length > PATHS_NAMED ? `${named} and ${paths.length - PATHS_NAMED} more` : named;
 }
 
-/** The paths of the checkout whose file name is one of `names`; none when the tree is unknown. */
-async function checkoutPaths(tree: FileTree | null, names: ReadonlySet<string>): Promise<string[]> {
-	const found: string[] = [];
+/**
+ * The paths of the checkout whose file name is one of `names`, and whether that list is the whole
+ * answer: it is not when the tree was not captured or a listing was cut.
+ */
+async function checkoutPaths(
+	tree: FileTree | null,
+	names: ReadonlySet<string>,
+): Promise<{ paths: string[]; complete: boolean }> {
 	if (tree === null) {
-		return found;
+		return { paths: [], complete: false };
 	}
+	const found: string[] = [];
+	let complete = true;
 	for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
-		const { paths } = await tree.list(`**/*.${ext}`);
+		const { paths, truncated } = await tree.list(`**/*.${ext}`);
 		found.push(...paths.filter((f) => names.has(basenameLower(f))));
+		complete &&= !truncated;
 	}
-	return found;
+	return { paths: found, complete };
+}
+
+/** What the review is told about lockfiles: where they are, or what is known of their absence. */
+function lockfileDirections(
+	checkout: { paths: string[]; complete: boolean },
+	touched: ReadonlySet<string>,
+): string[] {
+	if (checkout.paths.length > 0 || touched.size > 0) {
+		return [
+			oneLine(
+				`Lockfile-named file(s) in the checkout: ${checkout.paths.length === 0 ? "none" : namedPaths(checkout.paths)}; touched in this diff: ${touched.size === 0 ? "none" : namedPaths([...touched])}.`,
+				DIRECTION_CHARS,
+			),
+			"A lockfile answers for a changed manifest when the ecosystem resolves that manifest through it: beside it, or at a parent workspace root whose configuration includes it.",
+			"Read the paths and that configuration before expecting a matching update.",
+		];
+	}
+	return checkout.complete
+		? [
+				"No file with a lockfile name these ecosystems write was found in the checkout or touched in the diff — investigate whether the ecosystem expects a committed lockfile to make the resolved versions reproducible.",
+			]
+		: [
+				"No lockfile is touched in the diff. The checkout was not captured whole, so whether it holds a lockfile is unknown — read the repository before expecting one.",
+			];
 }
 
 export default definePracticeScript({
@@ -367,7 +399,7 @@ export default definePracticeScript({
 		const allLockfileNames = new Set(
 			ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
 		);
-		const checkoutLockfiles = await checkoutPaths(domain.files?.head ?? null, allLockfileNames);
+		const checkout = await checkoutPaths(domain.files?.head ?? null, allLockfileNames);
 
 		for (const [path, df] of change) {
 			const base = basenameLower(path);
@@ -461,7 +493,7 @@ export default definePracticeScript({
 			}
 		}
 
-		const lockfilePresent = checkoutLockfiles.length > 0 || touchedLockfiles.size > 0;
+		const lockfilePresent = checkout.paths.length > 0 || touchedLockfiles.size > 0;
 		const listed = leads.slice(0, 40);
 		const rawLinesListed = listed.filter(
 			(lead) => lead.label === LABELS["raw-manifest-line"],
@@ -488,20 +520,7 @@ export default definePracticeScript({
 					"A pom.xml coordinate may also be a build plugin or a parent/BOM rather than a dependency.",
 				);
 			}
-			if (lockfilePresent) {
-				directions.push(
-					oneLine(
-						`Lockfile-named file(s) in the checkout: ${checkoutLockfiles.length === 0 ? "none" : namedPaths(checkoutLockfiles)}; touched in this diff: ${touchedLockfiles.size === 0 ? "none" : namedPaths([...touchedLockfiles])}.`,
-						DIRECTION_CHARS,
-					),
-					"A lockfile answers for a changed manifest when the ecosystem resolves that manifest through it: beside it, or at a parent workspace root whose configuration includes it.",
-					"Read the paths and that configuration before expecting a matching update.",
-				);
-			} else {
-				directions.push(
-					"No file with a lockfile name these ecosystems write was found in the checkout or touched in the diff — investigate whether the ecosystem expects a committed lockfile to make the resolved versions reproducible.",
-				);
-			}
+			directions.push(...lockfileDirections(checkout, touchedLockfiles));
 		}
 
 		return ctx.review({
@@ -516,7 +535,9 @@ export default definePracticeScript({
 				unpairedManifestLines,
 				rawLinesListed,
 				lockfilesTouched: touchedLockfiles.size,
-				lockfilePresent: lockfilePresent ? 1 : 0,
+				...(lockfilePresent || checkout.complete
+					? { lockfilePresent: lockfilePresent ? 1 : 0 }
+					: {}),
 			},
 			directions,
 		});

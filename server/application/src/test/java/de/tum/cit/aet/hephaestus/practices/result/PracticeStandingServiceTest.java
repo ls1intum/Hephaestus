@@ -152,7 +152,18 @@ class PracticeStandingServiceTest {
         var prior = data.getFirst();
         prior.result().end(ResultEndReason.REPLACED, now.minusSeconds(1));
         add(2, ResultOutcome.MET);
-        data.getLast().result().setItemId(prior.result().getItemId());
+        var latest = data.getLast();
+        latest.review().setItemId(prior.result().getItemId());
+        data.set(
+                data.size() - 1,
+                new ResultView(
+                        latest.result().toBuilder()
+                                .itemId(prior.result().getItemId())
+                                .build(),
+                        latest.practice(),
+                        latest.version(),
+                        latest.review(),
+                        prior.item()));
         assertThat(card().toWorkOn()).isEmpty();
         assertThat(card().strengths()).hasSize(1);
     }

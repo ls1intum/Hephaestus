@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
-import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReadback;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyWriteFence;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyWriteResult;
@@ -85,12 +84,29 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldVerifyEachCopyMarkerAndIgnoreKeysQuotedEarlierInFeedback() {
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        var a = ScmFeedbackFixtures.line(
+                ScmFeedbackFixtures.anchor("src/Foo.java", 10, null),
+                "Quoted <!-- hephaestus-diff-note-ck=wrong -->",
+                "<!-- copy-a -->",
+                "copy-a");
+        var b = ScmFeedbackFixtures.line(
+                ScmFeedbackFixtures.anchor("src/Foo.java", 10, null), "Second note", "<!-- copy-b -->", "copy-b");
+        stubReviewThreads(List.of(thread("THREAD_a", "RC_a", authored(a)), thread("THREAD_b", "RC_b", authored(b))));
+        assertThat(channel.findPosted(githubTarget(), List.of(a, b)))
+                .extracting(CopyReceipt::externalRef)
+                .containsExactlyInAnyOrder("RC_a", "RC_b");
+        verify(client, never()).documentName("AddPullRequestReviewWithThreads");
+    }
+
+    @Test
     void shouldPostAFileAnchorAsAPinnedLinkAndReportItsActualForm() {
         var note = ScmFeedbackFixtures.line(
                 new FeedbackAnchor("src/a file.ts", null, null, null), "Explain this file.", MARKER, "file-copy");
         when(summaries.findExistingSummary(any(), any())).thenReturn(SummaryLookup.absent());
         when(summaries.postSummary(any(), any())).thenReturn(new SummaryHandle("IC_1", THREAD_URL));
-        var result = channel.postImmutablePackage(githubTarget(), List.of(note), CopyReadback.AUTHORED, fence);
+        var result = channel.postImmutablePackage(githubTarget(), List.of(note), fence);
         assertThat(result.receipts()).singleElement().satisfies(receipt -> {
             assertThat(receipt.acknowledged()).isTrue();
             assertThat(receipt.actualKind()).isEqualTo(CopyForm.FILE_NOTE);
@@ -107,7 +123,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
     void shouldNotCreateAFileCopyAfterUnknownReadback() {
         var note = ScmFeedbackFixtures.line(new FeedbackAnchor("a.ts", null, null, null), "Words", MARKER, "file-copy");
         when(summaries.findExistingSummary(any(), any())).thenReturn(SummaryLookup.unknown());
-        assertThat(channel.postImmutablePackage(githubTarget(), List.of(note), CopyReadback.AUTHORED, fence)
+        assertThat(channel.postImmutablePackage(githubTarget(), List.of(note), fence)
                         .receipts())
                 .singleElement()
                 .satisfies(receipt -> assertThat(receipt.writeMayHaveStarted()).isFalse());
@@ -119,12 +135,11 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
     void missingReviewedRevisionCannotCreateOrAcknowledgeInlineFeedback() {
         FeedbackTarget unpinned =
                 ScmFeedbackFixtures.target(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
-        assertThat(channel.postImmutablePackage(
-                                unpinned, List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED, fence)
+        assertThat(channel.postImmutablePackage(unpinned, List.of(item("fix", "result:a:0")), fence)
                         .receipts())
                 .singleElement()
                 .satisfies(receipt -> assertThat(receipt.disposition()).isEqualTo(CopyDisposition.FAILED));
-        assertThat(channel.findPosted(unpinned, List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED))
+        assertThat(channel.findPosted(unpinned, List.of(item("fix", "result:a:0"))))
                 .isNull();
         assertThat(fence.attempts).isEmpty();
         verify(gitHubProvider, never()).forScope(1L);
@@ -132,7 +147,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
 
     @Test
     void shouldRequestNothingForAnEmptyPackage() {
-        assertThat(channel.postImmutablePackage(githubTarget(), List.of(), CopyReadback.AUTHORED, fence)
+        assertThat(channel.postImmutablePackage(githubTarget(), List.of(), fence)
                         .receipts())
                 .isEmpty();
         assertThat(fence.attempts).isEmpty();
@@ -142,8 +157,8 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
     void shouldRequestNothingWhenTheExistingThreadsCannotBeRead() {
         when(gitHubProvider.forScope(1L)).thenThrow(new RuntimeException("provider unavailable"));
 
-        assertThatThrownBy(() -> channel.postImmutablePackage(
-                        githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED, fence))
+        assertThatThrownBy(
+                        () -> channel.postImmutablePackage(githubTarget(), List.of(item("fix", "result:a:0")), fence))
                 .isInstanceOf(FeedbackDeliveryException.class);
         assertThat(fence.attempts).isEmpty();
     }
@@ -153,8 +168,8 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
         stubReviewThreadPages(20, true);
 
-        assertThatThrownBy(() -> channel.postImmutablePackage(
-                        githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED, fence))
+        assertThatThrownBy(
+                        () -> channel.postImmutablePackage(githubTarget(), List.of(item("fix", "result:a:0")), fence))
                 .isInstanceOf(FeedbackDeliveryException.class);
         assertThat(fence.attempts).isEmpty();
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
@@ -165,7 +180,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
         stubReviewThreadPages(20, true);
 
-        assertThat(channel.findPosted(githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED))
+        assertThat(channel.findPosted(githubTarget(), List.of(item("fix", "result:a:0"))))
                 .isNull();
     }
 
@@ -174,7 +189,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
         stubReviewThreadPages(20, false);
 
-        assertThat(channel.findPosted(githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED))
+        assertThat(channel.findPosted(githubTarget(), List.of(item("fix", "result:a:0"))))
                 .isEmpty();
     }
 
@@ -182,12 +197,12 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
     void shouldReportEveryThreadUnsentWithoutRequestingWhenTheRateLimitIsCritical() {
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
 
-        CopyWriteResult result = channel.postImmutablePackage(
-                githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED, fence);
+        CopyWriteResult result =
+                channel.postImmutablePackage(githubTarget(), List.of(item("fix", "result:a:0")), fence);
 
-        assertThat(result.receipts()).singleElement().satisfies(signal -> {
-            assertThat(signal.acknowledged()).isFalse();
-            assertThat(signal.writeMayHaveStarted()).isFalse();
+        assertThat(result.receipts()).singleElement().satisfies(receipt -> {
+            assertThat(receipt.acknowledged()).isFalse();
+            assertThat(receipt.writeMayHaveStarted()).isFalse();
         });
         assertThat(fence.attempts).isEmpty();
     }
@@ -201,28 +216,25 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
                 "REVIEW_1",
                 List.of(
                         returned("RC_b", "observation:b:0", "https://github.com/owner/repo/pull/42#discussion_r222"),
-                        returned("RC_a", "observation:a:0", "https://github.com/owner/repo/pull/42#discussion_r111")));
+                        returned("RC_a", "result:a:0", "https://github.com/owner/repo/pull/42#discussion_r111")));
         ThreadsCaptor threads = captureThreads(addSpec);
 
         CopyWriteResult result = channel.postImmutablePackage(
-                githubTarget(),
-                List.of(item("fix-a", "observation:a:0"), item("fix-b", "observation:b:0")),
-                CopyReadback.AUTHORED,
-                fence);
+                githubTarget(), List.of(item("fix-a", "result:a:0"), item("fix-b", "observation:b:0")), fence);
 
         assertThat(fence.attempts)
                 .containsExactly(List.of(
-                        ScmFeedbackFixtures.copyId("observation:a:0").toString(),
+                        ScmFeedbackFixtures.copyId("result:a:0").toString(),
                         ScmFeedbackFixtures.copyId("observation:b:0").toString()));
-        assertThat(signalForKey(result, "observation:a:0")).satisfies(signal -> {
-            assertThat(signal.disposition()).isEqualTo(CopyDisposition.POSTED);
-            assertThat(signal.externalRef()).isEqualTo("RC_a");
+        assertThat(signalForKey(result, "result:a:0")).satisfies(receipt -> {
+            assertThat(receipt.disposition()).isEqualTo(CopyDisposition.POSTED);
+            assertThat(receipt.externalRef()).isEqualTo("RC_a");
 
-            assertThat(signal.externalUrl()).isEqualTo("https://github.com/owner/repo/pull/42#discussion_r111");
+            assertThat(receipt.externalUrl()).isEqualTo("https://github.com/owner/repo/pull/42#discussion_r111");
         });
         assertThat(signalForKey(result, "observation:b:0").externalRef()).isEqualTo("RC_b");
         assertThat(threads.bodies())
-                .containsExactly(posted(item("fix-a", "observation:a:0")), posted(item("fix-b", "observation:b:0")));
+                .containsExactly(posted(item("fix-a", "result:a:0")), posted(item("fix-b", "observation:b:0")));
     }
 
     @Test
@@ -234,31 +246,27 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         stubAddReview("REVIEW_1", List.of(Map.of("id", "RC_untagged", "url", THREAD_URL, "body", "fix-a"), withoutId));
 
         CopyWriteResult result = channel.postImmutablePackage(
-                githubTarget(),
-                List.of(item("fix-a", "observation:a:0"), item("fix-b", "observation:b:0")),
-                CopyReadback.AUTHORED,
-                fence);
+                githubTarget(), List.of(item("fix-a", "result:a:0"), item("fix-b", "observation:b:0")), fence);
 
         assertThat(result.receipts().stream().filter(CopyReceipt::acknowledged).count())
                 .isZero();
-        assertThat(result.receipts()).allSatisfy(signal -> {
-            assertThat(signal.acknowledged()).isFalse();
-            assertThat(signal.unconfirmed()).isTrue();
+        assertThat(result.receipts()).allSatisfy(receipt -> {
+            assertThat(receipt.acknowledged()).isFalse();
+            assertThat(receipt.unconfirmed()).isTrue();
         });
     }
 
     @Test
     void shouldLeaveEveryFencedThreadUnconfirmedWhenTheBatchAnswersWithErrorsOrIsLost() {
         stubPostable();
-        LineNote kept = item("fix-a", "observation:a:0");
+        LineNote kept = item("fix-a", "result:a:0");
         stubReviewThreads(List.of(thread("THREAD_a", "RC_a", authored(kept))));
         stubAddReviewWithErrors();
 
-        CopyWriteResult rejected = channel.postImmutablePackage(
-                githubTarget(), List.of(kept, item("fix-b", "observation:b:0")), CopyReadback.AUTHORED, fence);
+        CopyWriteResult rejected =
+                channel.postImmutablePackage(githubTarget(), List.of(kept, item("fix-b", "observation:b:0")), fence);
 
-        assertThat(signalForKey(rejected, "observation:a:0").disposition())
-                .isEqualTo(CopyDisposition.PRESERVED_EXISTING);
+        assertThat(signalForKey(rejected, "result:a:0").disposition()).isEqualTo(CopyDisposition.PRESERVED_EXISTING);
         assertThat(signalForKey(rejected, "observation:b:0").unconfirmed()).isTrue();
         assertThat(rejected.receipts().stream()
                         .filter(CopyReceipt::acknowledged)
@@ -271,33 +279,29 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         when(lost.execute()).thenReturn(Mono.error(new RuntimeException("connection reset")));
 
         CopyWriteResult unknown = channel.postImmutablePackage(
-                githubTarget(),
-                List.of(item("fix-b", "observation:b:0"), item("fix-c", "observation:c:0")),
-                CopyReadback.AUTHORED,
-                fence);
+                githubTarget(), List.of(item("fix-b", "observation:b:0"), item("fix-c", "observation:c:0")), fence);
 
         assertThat(unknown.receipts())
-                .allSatisfy(signal -> assertThat(signal.writeMayHaveStarted()).isTrue());
+                .allSatisfy(receipt -> assertThat(receipt.writeMayHaveStarted()).isTrue());
     }
 
     @Test
     void shouldPreserveAnAuthoredCopyThatIsOutdatedResolvedOrRepliedToWithoutAnyWrite() {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
-        LineNote kept = item("fix", "observation:a:0");
+        LineNote kept = item("fix", "result:a:0");
         Map<String, Object> thread = thread("THREAD_a", "RC_a", authored(kept));
         thread.put("isOutdated", true);
         thread.put("isResolved", true);
         addReply(thread, "Done, thanks!");
         stubReviewThreads(List.of(thread));
 
-        CopyWriteResult result =
-                channel.postImmutablePackage(githubTarget(), List.of(kept), CopyReadback.AUTHORED, fence);
+        CopyWriteResult result = channel.postImmutablePackage(githubTarget(), List.of(kept), fence);
 
-        assertThat(result.receipts()).singleElement().satisfies(signal -> {
-            assertThat(signal.disposition()).isEqualTo(CopyDisposition.PRESERVED_EXISTING);
-            assertThat(signal.externalRef()).isEqualTo("RC_a");
+        assertThat(result.receipts()).singleElement().satisfies(receipt -> {
+            assertThat(receipt.disposition()).isEqualTo(CopyDisposition.PRESERVED_EXISTING);
+            assertThat(receipt.externalRef()).isEqualTo("RC_a");
 
-            assertThat(signal.externalUrl()).isEqualTo(THREAD_URL);
+            assertThat(receipt.externalUrl()).isEqualTo(THREAD_URL);
         });
         assertThat(fence.attempts).isEmpty();
         verify(prNodeIdResolver, never()).resolve(any(Long.class), any(), any(), any(Integer.class));
@@ -320,23 +324,19 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         thread.put("startDiffSide", expectedSide);
         stubReviewThreads(List.of(thread));
 
-        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
+        assertThat(channel.findPosted(githubTarget(), List.of(kept)))
                 .singleElement()
                 .satisfies(copy -> assertThat(copy.externalRef()).isEqualTo("RC_range"));
 
         thread.put("startDiffSide", otherSide);
-        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
-                .isEmpty();
+        assertThat(channel.findPosted(githubTarget(), List.of(kept))).isEmpty();
         thread.remove("startDiffSide");
-        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
-                .isEmpty();
+        assertThat(channel.findPosted(githubTarget(), List.of(kept))).isEmpty();
         thread.put("startDiffSide", expectedSide);
         thread.put("diffSide", otherSide);
-        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
-                .isEmpty();
+        assertThat(channel.findPosted(githubTarget(), List.of(kept))).isEmpty();
         thread.remove("diffSide");
-        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
-                .isEmpty();
+        assertThat(channel.findPosted(githubTarget(), List.of(kept))).isEmpty();
         assertThat(fence.attempts).isEmpty();
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
     }
@@ -344,7 +344,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
     @Test
     void shouldNeitherAcknowledgeNorCreateNextToACopyThatIsNotExactlyItsOwn() {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
-        LineNote a = item("fix-a", "observation:a:0");
+        LineNote a = item("fix-a", "result:a:0");
         LineNote b = item("fix-b", "observation:b:0");
         LineNote c = item("fix-c", "observation:c:0");
         Map<String, Object> otherAuthor = authored(a);
@@ -358,37 +358,15 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
                 thread("THREAD_b", "RC_b", editedBody),
                 thread("THREAD_c", "RC_c", otherCommit)));
 
-        CopyWriteResult result =
-                channel.postImmutablePackage(githubTarget(), List.of(a, b, c), CopyReadback.AUTHORED, fence);
+        CopyWriteResult result = channel.postImmutablePackage(githubTarget(), List.of(a, b, c), fence);
 
-        assertThat(result.receipts()).allSatisfy(signal -> {
-            assertThat(signal.acknowledged()).isFalse();
-            assertThat(signal.writeMayHaveStarted()).isFalse();
+        assertThat(result.receipts()).allSatisfy(receipt -> {
+            assertThat(receipt.acknowledged()).isFalse();
+            assertThat(receipt.writeMayHaveStarted()).isFalse();
         });
         assertThat(fence.attempts).isEmpty();
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
-        assertThat(channel.findPosted(githubTarget(), List.of(a, b, c), CopyReadback.AUTHORED))
-                .isEmpty();
-    }
-
-    @Test
-    void shouldReadAHistoricalThreadBackOnlyByTheViewersCopyRenderedWithoutTheSharedMarker() {
-        when(gitHubProvider.forScope(1L)).thenReturn(client);
-        LineNote legacy = ScmFeedbackFixtures.line(
-                ScmFeedbackFixtures.anchor("src/Foo.java", 10, null),
-                "fix",
-                "<!-- hephaestus-diff-note -->",
-                "observation:a:0");
-        Map<String, Object> human = authored(legacy);
-        human.put("body", "fix\n" + ckTag("observation:a:0"));
-        human.put("viewerDidAuthor", false);
-        Map<String, Object> original = authored(legacy);
-        original.put("body", "fix\n" + ckTag("observation:a:0"));
-        stubReviewThreads(List.of(thread("THREAD_copy", "RC_copy", human), thread("THREAD_old", "RC_old", original)));
-
-        assertThat(channel.findPosted(githubTarget(), List.of(legacy), CopyReadback.SHARED))
-                .singleElement()
-                .satisfies(signal -> assertThat(signal.externalRef()).isEqualTo("RC_old"));
+        assertThat(channel.findPosted(githubTarget(), List.of(a, b, c))).isEmpty();
     }
 
     @Test
@@ -397,13 +375,13 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         Map<String, Object> unread = new HashMap<>(Map.of("id", "THREAD_x", "isOutdated", false, "isResolved", false));
         stubReviewThreadsPage(threadsPage(List.of(), null, null));
 
-        assertThatThrownBy(() -> channel.postImmutablePackage(
-                        githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED, fence))
+        assertThatThrownBy(
+                        () -> channel.postImmutablePackage(githubTarget(), List.of(item("fix", "result:a:0")), fence))
                 .isInstanceOf(FeedbackDeliveryException.class);
 
         stubReviewThreadsPage(threadsPage(List.of(unread), false, null));
-        assertThatThrownBy(() -> channel.postImmutablePackage(
-                        githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.SHARED, fence))
+        assertThatThrownBy(
+                        () -> channel.postImmutablePackage(githubTarget(), List.of(item("fix", "result:a:0")), fence))
                 .isInstanceOf(FeedbackDeliveryException.class);
         assertThat(fence.attempts).isEmpty();
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
@@ -415,17 +393,17 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         stubReviewThreads(List.of());
         fence.accept = false;
 
-        CopyWriteResult refused = channel.postImmutablePackage(
-                githubTarget(), List.of(item("fix", "observation:a:0")), CopyReadback.AUTHORED, fence);
+        CopyWriteResult refused =
+                channel.postImmutablePackage(githubTarget(), List.of(item("fix", "result:a:0")), fence);
 
         assertThat(refused.receipts())
                 .singleElement()
-                .satisfies(signal -> assertThat(signal.writeMayHaveStarted()).isFalse());
+                .satisfies(receipt -> assertThat(receipt.writeMayHaveStarted()).isFalse());
         doThrow(new OutboundEgressSuppressedException("github.post-inline-feedback"))
                 .when(egressGuard)
                 .requireDeliveryAllowed(anyString());
-        CopyWriteResult silenced = channel.postImmutablePackage(
-                githubTarget(), List.of(item("fix", "observation:b:0")), CopyReadback.AUTHORED, fence);
+        CopyWriteResult silenced =
+                channel.postImmutablePackage(githubTarget(), List.of(item("fix", "observation:b:0")), fence);
 
         assertThat(silenced.withheldCopyIds()).isNotEmpty();
         assertThat(silenced.withheldCopyIds()).containsExactly(ScmFeedbackFixtures.copyId("observation:b:0"));

@@ -17,15 +17,19 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.SubmittedResultDTO;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmissionReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -34,6 +38,7 @@ import java.util.List;
 import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
 
 class ReviewOutputServiceTest extends BaseUnitTest {
@@ -43,7 +48,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
     private final ResultStore results = mock(ResultStore.class);
     private final ReviewAssignmentStore membership = mock(ReviewAssignmentStore.class);
     private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
-    private final SourceCatalogRegistry catalogs = mock(SourceCatalogRegistry.class);
+    private final ClasspathSourceCatalogRegistry catalogs = mock(ClasspathSourceCatalogRegistry.class);
     private final ReviewJob job = RuntimeReviewTestData.job();
     private final ReviewOutputService service =
             new ReviewOutputService(assignments, verifier, results, mapper, files, catalogs, membership);
@@ -89,7 +94,8 @@ class ReviewOutputServiceTest extends BaseUnitTest {
 
     @Test
     void shouldWithholdAnUnverifiedPracticeThroughTheOneMembershipPort() {
-        doThrow(new CandidateEvidenceVerifier.Unverified("quote_unverified", "The text was unavailable", null))
+        doThrow(new CandidateEvidenceVerifier.Unverified(
+                        CandidateRefusal.QUOTE_UNVERIFIED, "The text was unavailable", null))
                 .when(verifier)
                 .verifyCandidate(eq(job), any(), eq(ReviewKind.ITEM), any(), any());
         when(results.admit(1, job.getReviewId(), job.getId(), 0, List.of()))
@@ -131,5 +137,47 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         job.setAttempt(1);
         assertThatThrownBy(() -> prepared.record(job)).isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
         verifyNoInteractions(results, membership);
+    }
+
+    @Test
+    void shouldKeepAnAdmissiblePracticeWhenAnotherCandidateBreaksItsContract() {
+        var first = RuntimeReviewTestData.assignment(5L, null);
+        var second = new ReviewAssignmentSnapshot(
+                new ReviewAssignmentId(job.getReviewId(), 41, 2),
+                first.item(),
+                first.version(),
+                first.developerId(),
+                "other-practice",
+                new PinnedPractice(
+                        41,
+                        42,
+                        first.practice().definition(),
+                        first.practice().reviewDigest(),
+                        first.practice().method()));
+        when(assignments.admissible(job)).thenReturn(List.of(first, second));
+        when(results.admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), any()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        var valid = submission("clear-names", "docs:one").results().getFirst();
+        var malformed = new SubmittedResultDTO("other-practice", "2", "docs:one", mapper.createObjectNode(), List.of());
+        var prepared = service.prepare(
+                job, new AdmissionRequestDTO(3, job.getReviewId(), job.getId(), 0, List.of(valid, malformed)));
+        prepared.record(job);
+        ArgumentCaptor<List<ResultCandidate>> admitted = ArgumentCaptor.captor();
+        verify(results).admit(eq(1L), eq(job.getReviewId()), eq(job.getId()), eq(0), admitted.capture());
+        assertThat(admitted.getValue())
+                .singleElement()
+                .satisfies(result -> assertThat(result.practiceId()).isEqualTo(31));
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("practiceSlug")
+                        .asString())
+                .isEqualTo("other-practice");
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("reason")
+                        .asString())
+                .isEqualTo("malformed_candidate");
     }
 }

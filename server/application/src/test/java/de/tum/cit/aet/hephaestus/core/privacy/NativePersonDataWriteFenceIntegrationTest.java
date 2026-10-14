@@ -23,7 +23,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -89,13 +88,7 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
         var other = users.saveAndFlush(TestUserFactory.createUser(84L, "other", provider));
         long targetAccountId = accountId(target);
         long otherAccountId = accountId(other);
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind)"
-                        + " VALUES (?,?,?,?,'ERASED')",
-                UUID.randomUUID(),
-                provider.getId(),
-                "42",
-                "");
+        databaseTestUtils.erase(Objects.requireNonNull(provider.getId()), "42", "");
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             assertThat(fence.holdForAccountWrites(List.of(otherAccountId, targetAccountId, otherAccountId, -1L)))
                     .containsExactly(otherAccountId);
@@ -108,13 +101,7 @@ class NativePersonDataWriteFenceIntegrationTest extends BaseIntegrationTest {
         databaseTestUtils.cleanDatabase();
         var original = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://late-alias.example.test"));
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind)"
-                        + " VALUES (?,?,?,?,'ERASED')",
-                UUID.randomUUID(),
-                original.getId(),
-                "42",
-                "");
+        databaseTestUtils.erase(Objects.requireNonNull(original.getId()), "42", "");
         var alias = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "HTTPS://LATE-ALIAS.EXAMPLE.TEST:443/"));
         var otherInstance = providers.saveAndFlush(

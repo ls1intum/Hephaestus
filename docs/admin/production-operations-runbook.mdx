@@ -446,7 +446,7 @@ entered erasure or its job capability has been revoked.
 
 The preview freezes delivery facts, not only row IDs.
 If a provider write starts or its result changes after inspection, export and erasure reject the stale preview.
-An unconfirmed write or legacy comment without an exact inspection locator stops the request and identifies its send or review.
+An unconfirmed write or a migrated comment without an exact inspection locator stops the request and identifies its send or review.
 The system does not treat it as never delivered.
 
 1. If the preview is stale, create a new preview before confirming removal again.
@@ -559,7 +559,8 @@ Deleting in-app data does not delete a provider comment. If external copies must
    ```sql
    SELECT f.id, f.review_id, f.item_id, f.destination,
           f.state, f.replaces_id, p.id AS copy_id,
-          p.kind, p.external_ref, p.external_url, p.chat_message_id,
+          p.kind, p.state AS copy_state, p.write_started_at, p.write_marker,
+          p.external_ref, p.external_url, p.chat_message_id,
           p.path, p.start_line, p.end_line, p.side, p.posted_at
    FROM feedback f
    LEFT JOIN feedback_copy p
@@ -579,8 +580,9 @@ Deleting in-app data does not delete a provider comment. If external copies must
 10. If provider inventory is inaccessible or ambiguous, record the gap.
 11. If provider inventory is inaccessible or ambiguous, keep removal incomplete.
 12. Follow replacement history.
-13. Check matching workspace/job rows in `feedback_send`.
-14. Include `delivered_external_ref`, `delivered_copies`, and `UNCERTAIN` partial writes not yet projected into the ledger.
+13. Check the `feedback_send` row for the feedback: `action`, `state`, `attempts`, and `last_error`.
+14. Treat each copy in `WRITE_STARTED` state and each `UNCERTAIN` send as a possible provider object, even without an `external_ref`.
+    If the copy has a `write_marker`, search the provider for it. The application appends it to the posted body.
 15. Before deletion, verify repository/project, item, provider account, author, and content against the provider.
 16. Never infer an API object type from a numeric ID alone.
 17. Use a separate authorized operator session to delete each confirmed provider object.

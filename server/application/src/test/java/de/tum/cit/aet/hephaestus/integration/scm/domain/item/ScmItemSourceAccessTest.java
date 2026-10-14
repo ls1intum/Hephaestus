@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.scm.ScmPersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -69,7 +68,7 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         when(fixture.items().parent(ref, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
         var issue = new Issue();
         issue.setRepository(fixture.repository());
-        when(fixture.issues().findByIdWithAuthorAndRepository(6L)).thenReturn(Optional.of(issue));
+        when(fixture.workLookup().find(ScmItemEvents.ISSUE, 6L)).thenReturn(Optional.of(issue));
         when(fixture.contributors().identitiesForSource(1, "scm.issue", 6))
                 .thenReturn(List.of(new PersonIdentity(7, "author", null), new PersonIdentity(7, "commenter", null)));
         when(fixture.suppression().isSuppressed(7, "author", null)).thenReturn(false);
@@ -106,7 +105,7 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
     private Fixture fixture() {
         var items = mock(ScmItemAccess.class);
         var repositories = mock(RepositoryRepository.class);
-        var issues = mock(IssueRepository.class);
+        var workLookup = mock(ScmWorkLookup.class);
         var reviews = mock(PullRequestReviewRepository.class);
         var access = mock(ScmRepositoryAccess.class);
         var contributors = mock(ScmPersonSourceIdentityContributor.class);
@@ -119,14 +118,15 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         lenient().when(items.parent(FILE, ScmItemEvents.REPOSITORY)).thenReturn(ROOT);
         lenient().when(repositories.findById(3L)).thenReturn(Optional.of(repository));
         var service = new ScmItemSourceAccess(
-                items, repositories, issues, reviews, access, contributors, suppression, identities, accounts);
-        return new Fixture(service, items, issues, access, contributors, suppression, identities, accounts, repository);
+                items, repositories, workLookup, reviews, access, contributors, suppression, identities, accounts);
+        return new Fixture(
+                service, items, workLookup, access, contributors, suppression, identities, accounts, repository);
     }
 
     private record Fixture(
             ScmItemSourceAccess service,
             ScmItemAccess items,
-            IssueRepository issues,
+            ScmWorkLookup workLookup,
             ScmRepositoryAccess access,
             ScmPersonSourceIdentityContributor contributors,
             PersonProcessingSuppression suppression,

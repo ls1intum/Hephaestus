@@ -74,6 +74,9 @@ public class ReviewJob {
     @Column(name = "processing_status", nullable = false, length = 16)
     private ProcessingStatus processingStatus = ProcessingStatus.NONE;
 
+    @Column(name = "submitted_at", nullable = false, updatable = false)
+    private Instant submittedAt;
+
     @Column(name = "available_at", nullable = false)
     private Instant availableAt;
 
@@ -123,10 +126,6 @@ public class ReviewJob {
     @Enumerated(EnumType.STRING)
     @Column(name = "cancellation_reason", length = 32)
     private @Nullable ReviewJobCancellationReason cancellationReason;
-
-    @ColumnDefault("0")
-    @Column(name = "delivery_attempts", nullable = false)
-    private short deliveryAttempts = 0;
 
     @Column(name = "conversation_prepared_at")
     private @Nullable Instant conversationPreparedAt;
@@ -180,7 +179,8 @@ public class ReviewJob {
     public void prePersist() {
         if (id == null) id = UUID.randomUUID();
         if (traceId == null) traceId = UUID.randomUUID().toString().replace("-", "");
-        if (availableAt == null) availableAt = Instant.now();
+        if (submittedAt == null) submittedAt = Instant.now();
+        if (availableAt == null) availableAt = submittedAt;
         Objects.requireNonNull(reviewId, "reviewId");
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(configSnapshot, "configSnapshot");
@@ -190,11 +190,7 @@ public class ReviewJob {
         }
     }
 
-    public static @Nullable String holdWhileQueued(ReviewJobStatus status, @Nullable String holdReason) {
-        return status == ReviewJobStatus.QUEUED ? holdReason : null;
-    }
-
-    /** The claim keeps plaintext only in memory and persists its hash. */
+    /** Generates an unpredictable credential for a sandbox session. */
     public static String generateJobToken() {
         byte[] bytes = new byte[TOKEN_BYTES];
         SECURE_RANDOM.nextBytes(bytes);

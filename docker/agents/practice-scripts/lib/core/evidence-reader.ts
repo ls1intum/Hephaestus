@@ -295,10 +295,7 @@ export class EvidenceReader {
 		}
 	}
 
-	#repo(tree: "head" | "base"): string {
-		if (tree === "base") {
-			throw new UnratedError("unavailable", "the base tree was not captured");
-		}
+	#repo(): string {
 		if (this.#sources.repo === null) {
 			throw new UnratedError("unavailable", "this work has no captured file tree");
 		}
@@ -312,7 +309,7 @@ export class EvidenceReader {
 	): Promise<ReadValues[keyof ReadValues]> {
 		switch (request.op) {
 			case "read": {
-				const repo = this.#repo(request.tree);
+				const repo = this.#repo();
 				if (
 					this.#sources.permittedPaths !== undefined &&
 					!this.#sources.permittedPaths.has(request.path)
@@ -400,7 +397,7 @@ export class EvidenceReader {
 				}
 			}
 			case "list": {
-				const repo = this.#repo(request.tree);
+				const repo = this.#repo();
 				const all = globFilesSync(request.glob ?? "**", repo).filter(
 					(file) =>
 						file !== ".git" &&
@@ -413,7 +410,7 @@ export class EvidenceReader {
 				};
 			}
 			case "grep": {
-				const repo = this.#repo(request.tree);
+				const repo = this.#repo();
 				const maxResults = request.maxResults ?? DEFAULT_GREP_RESULTS;
 				// One match more than asked tells a search that was cut from one that found exactly the bound.
 				const matches = await grep(
@@ -493,7 +490,7 @@ export class EvidenceReader {
 		const end = request.endLine ?? request.startLine;
 		switch (request.source) {
 			case "tree": {
-				const repo = this.#repo(request.tree);
+				const repo = this.#repo();
 				if (
 					this.#sources.permittedPaths !== undefined &&
 					!this.#sources.permittedPaths.has(request.path)

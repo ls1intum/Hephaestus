@@ -399,7 +399,7 @@ Each holds one or more of these:
 - `@keyframes`.
 - A generated `::before`.
 - A `clip-path`.
-- A grid whose positioned descendants override at a breakpoint.
+- A grid whose descendants override their `grid-row` or `grid-column` at a breakpoint.
 - `HephIcon`'s size, which a container's `[&_svg]:size-4` would outrank as a utility.
 
 Anything that a utility can express stays a utility.

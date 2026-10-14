@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.scan;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUnavailableException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier;
@@ -24,6 +25,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /** Reserves the finite worst cost before the single next file job enters the queue. */
@@ -41,25 +43,30 @@ public class ScanBudget {
     private final PracticeReviewProperties limits;
 
     public boolean permits(ScanExecutionSnapshot scan, List<ReviewAssignmentSnapshot> selected) {
-        var job = new ReviewJob();
-        job.setId(UUID.randomUUID());
-        job.setReviewId(scan.review().id());
-        job.setWorkspaceId(scan.review().workspaceId());
-        job.setInput(new ReviewJobInput(
-                selected.getFirst().item().itemId(),
-                selected.stream().map(ReviewAssignmentSnapshot::id).toList()));
-        var binding = policy.binding(job)
-                .orElseThrow(() -> new IllegalStateException("The frozen scan model is unavailable"));
+        try {
+            return permitsModel(scan, selected);
+        } catch (LlmModelUnavailableException unavailable) {
+            throw new ScanModelUnavailableException("The frozen scan model is unavailable");
+        }
+    }
+
+    private boolean permitsModel(ScanExecutionSnapshot scan, List<ReviewAssignmentSnapshot> selected) {
+        var workspaceId = scan.review().workspaceId();
+        var reviewId = scan.review().id();
+        var assignmentIds = selected.stream().map(ReviewAssignmentSnapshot::id).toList();
+        var binding = policy.binding(workspaceId, reviewId, assignmentIds)
+                .orElseThrow(() -> new ScanModelUnavailableException("The frozen scan model is unavailable"));
         methods.require(selected.getFirst().practice().method(), "review", binding);
         var review = admission.admit(binding);
-        if (monthly.decide(job.getWorkspaceId()).blocks(review.price().fundingSource())) return false;
-        var calls = Math.multiplyExact((long) Math.max(3, selected.size()), limits.practiceModelCalls());
+        if (monthly.decide(workspaceId).blocks(review.price().fundingSource())) return false;
+        var calls = callCap(selected.size());
         Integer contextWindow = review.resolved().contextWindow();
-        if (contextWindow == null) throw new IllegalStateException("A budgeted scan requires a bounded model context");
+        if (contextWindow == null)
+            throw new ScanModelUnavailableException("A budgeted scan requires a bounded model context");
         int input = contextWindow;
         var output = Objects.requireNonNullElse(review.resolved().maxOutputTokens(), input);
         if (input <= 0 || output <= 0)
-            throw new IllegalStateException("The frozen scan model has no finite token bound");
+            throw new ScanModelUnavailableException("The frozen scan model has no finite token bound");
         BigDecimal estimate = cost(
                         review.price(),
                         Math.multiplyExact(calls, Math.min(input, gateway.maxRequestBytes())),
@@ -71,31 +78,40 @@ public class ScanBudget {
             boolean present = selected.getFirst().practice().method().models().stream()
                     .anyMatch(slot -> slot.kind() == purpose.kind() && slot.model() != null);
             if (!present) continue;
-            var directBinding = policy.practiceScriptBinding(job, purpose)
-                    .orElseThrow(() -> new IllegalStateException("A frozen direct scan model is unavailable"));
+            var directBinding = policy.practiceScriptBinding(workspaceId, reviewId, assignmentIds, purpose)
+                    .orElseThrow(() -> new ScanModelUnavailableException("A frozen direct scan model is unavailable"));
             methods.require(
                     selected.getFirst().practice().method(),
                     purpose.kind().name().toLowerCase(Locale.ROOT),
                     directBinding);
             var model = admission.admit(directBinding);
-            if ("cohere-rerank".equals(model.resolved().apiProtocol())
+            if (LlmApiProtocol.COHERE_RERANK.wire().equals(model.resolved().apiProtocol())
                     && model.price().pricingState() != UsagePricingState.NO_CHARGE)
-                throw new IllegalStateException("A token price cannot reserve billed search units");
-            if (monthly.decide(job.getWorkspaceId()).blocks(model.price().fundingSource())) return false;
+                throw new ScanModelUnavailableException("A token price cannot reserve billed search units");
+            if (monthly.decide(workspaceId).blocks(model.price().fundingSource())) return false;
             directRate = directRate.max(rate(model.price()));
-            long context = Objects.requireNonNull(
-                    model.resolved().contextWindow(), "A budgeted direct model requires a bounded context");
+            long context = boundedContext(model.resolved().contextWindow());
             long maxOutput = Objects.requireNonNullElse(model.resolved().maxOutputTokens(), Math.toIntExact(context));
             if (context <= 0 || maxOutput <= 0)
-                throw new IllegalStateException("The direct model has no finite token bound");
+                throw new ScanModelUnavailableException("The direct model has no finite token bound");
             directOvershoot =
                     Math.max(directOvershoot, Math.addExact(Math.min(context, gateway.maxRequestBytes()), maxOutput));
         }
         estimate = estimate.add(directRate
                 .multiply(BigDecimal.valueOf(Math.addExact(limits.directModelTokensPerAttempt(), directOvershoot)))
                 .movePointLeft(6));
-        var spent = spent(job.getWorkspaceId(), job.getReviewId());
+        var spent = spent(workspaceId, reviewId);
         return spent.priced() && spent.cost().add(estimate).compareTo(scan.budgetUsd()) <= 0;
+    }
+
+    public long callCap(int practices) {
+        return Math.multiplyExact((long) Math.max(3, practices), limits.practiceModelCalls());
+    }
+
+    private static long boundedContext(@Nullable Integer context) {
+        if (context == null || context <= 0)
+            throw new ScanModelUnavailableException("A budgeted direct model requires a bounded context");
+        return context;
     }
 
     public ReviewRuntimeRepository.Spend spent(long workspaceId, UUID reviewId) {
@@ -105,7 +121,7 @@ public class ScanBudget {
     public static BigDecimal cost(LlmPriceSnapshot price, long input, long output) {
         if (price.pricingState() == UsagePricingState.NO_CHARGE) return BigDecimal.ZERO;
         if (price.pricingState() == UsagePricingState.UNPRICED)
-            throw new IllegalStateException("A scan cannot reserve an unpriced model");
+            throw new ScanModelUnavailableException("A scan cannot reserve an unpriced model");
         return inputRate(price)
                 .multiply(BigDecimal.valueOf(input))
                 .add(Objects.requireNonNullElse(price.per1mOutputUsd(), BigDecimal.ZERO)
@@ -116,7 +132,7 @@ public class ScanBudget {
     static BigDecimal rate(LlmPriceSnapshot price) {
         if (price.pricingState() == UsagePricingState.NO_CHARGE) return BigDecimal.ZERO;
         if (price.pricingState() == UsagePricingState.UNPRICED)
-            throw new IllegalStateException("A scan cannot reserve an unpriced model");
+            throw new ScanModelUnavailableException("A scan cannot reserve an unpriced model");
         return inputRate(price).max(Objects.requireNonNullElse(price.per1mOutputUsd(), BigDecimal.ZERO));
     }
 
@@ -129,8 +145,9 @@ public class ScanBudget {
 
     /** Includes all completed calls of every model in the active attempt; settled attempts are already in the ledger. */
     public BigDecimal inFlight(ReviewJob job, ConfigSnapshot snapshot) {
-        var price = snapshot.priceSnapshot();
-        if (price == null) throw new IllegalStateException("The active scan has no frozen price");
+        var price = snapshot.model().priceSnapshot();
+        if (price == null || price.pricingState() == UsagePricingState.UNPRICED)
+            throw new ScanModelUnavailableException("The active scan has no usable frozen price");
         BigDecimal total = Objects.requireNonNull(price.calculateCost(
                         job.getLlmInputTokens(),
                         job.getLlmOutputTokens(),
@@ -141,8 +158,11 @@ public class ScanBudget {
             var model = used.modelKind() == ModelKind.CHAT
                     ? snapshot.model()
                     : snapshot.practiceScriptSlot(used.modelKind());
-            if (model == null || model.priceSnapshot() == null || used.searchUnits() > 0)
-                throw new IllegalStateException("The scan's direct spend is unverifiable");
+            if (model == null
+                    || model.priceSnapshot() == null
+                    || model.priceSnapshot().pricingState() == UsagePricingState.UNPRICED
+                    || used.searchUnits() > 0)
+                throw new ScanModelUnavailableException("The scan's direct spend is unverifiable");
             total = total.add(Objects.requireNonNull(model.priceSnapshot()
                     .calculateCost(
                             used.inputTokens(), used.outputTokens(), used.cacheReadTokens(), used.cacheWriteTokens())

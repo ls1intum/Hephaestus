@@ -32,10 +32,13 @@ import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
@@ -43,6 +46,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -67,7 +71,6 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
             new PracticeScriptInputs(mapper),
             history,
             members,
-            mock(ReviewOutputService.class),
             mapper,
             Clock.fixed(NOW, ZoneOffset.UTC));
 
@@ -117,7 +120,6 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         var review = RuntimeReviewTestData.review(ReviewKind.ITEM, assignment);
         when(assignments.review(job)).thenReturn(review);
         when(assignments.load(job)).thenReturn(List.of(assignment));
-        when(source.kind()).thenReturn(assignment.item().kind());
         when(source.supports(assignment.item())).thenReturn(true);
         var pinned = mock(ItemSnapshot.class);
         when(source.pin(assignment.item(), assignment.version())).thenReturn(pinned);
@@ -200,5 +202,38 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         var job = prepare(ReadNeed.COMPLETE, partial);
         assertThatThrownBy(() -> handler.prepareInputs(job)).isInstanceOf(InsufficientEvidenceException.class);
         assertDecision(job, ReviewPracticeStatus.WITHHELD);
+    }
+
+    @Test
+    void shouldStageThePreviousResultsActualCitationCoordinates() {
+        var job = prepare(true);
+        var prior = mock(ResultHistoryEntry.class);
+        when(prior.resultId()).thenReturn(UUID.fromString("10000000-0000-4000-8000-000000000099"));
+        when(prior.recordedAt()).thenReturn(NOW.minusSeconds(60));
+        when(prior.origin()).thenReturn(ReviewOrigin.REQUEST);
+        when(prior.itemVersion()).thenReturn("docs:previous");
+        when(prior.outcome()).thenReturn(ResultOutcome.MET);
+        when(prior.evidence()).thenReturn(mapper.readTree("""
+            {"citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
+              "path":"document/body","startLine":2,"endLine":3,"quote":"Exact words",
+              "verification":{"status":"VERIFIED","itemSha256":"digest","quoteSha256":"digest"}}]}
+            """));
+        when(history.previousResults(any())).thenReturn(List.of(prior));
+        try (var prepared = handler.prepareInputs(job)) {
+            assertThat(prepared.folderIndex()).isNotNull();
+        }
+        var captured = ArgumentCaptor.forClass(PreparedEvidence.class);
+        verify(files).prepare(eq(job), captured.capture(), any());
+        var staged = captured.getValue().files().entrySet().stream()
+                .filter(file -> file.getKey().endsWith(".inputs.json"))
+                .findFirst()
+                .orElseThrow();
+        var citations = mapper.readTree(staged.getValue()).path("previous").path("citations");
+        assertThat(citations.size()).isEqualTo(1);
+        assertThat(citations.get(0).path("startLine").asInt()).isEqualTo(2);
+        assertThat(citations.get(0).path("endLine").asInt()).isEqualTo(3);
+        assertThat(citations.get(0).path("path").asString()).isEqualTo("document/body");
+        assertThat(citations.get(0).has("quote")).isFalse();
+        assertThat(citations.get(0).has("verification")).isFalse();
     }
 }

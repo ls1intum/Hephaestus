@@ -17,7 +17,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub sub_issues webhook events. */
+/**
+ * Handles GitHub sub_issues webhook events.
+ */
 @Component
 public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHandler<GitHubSubIssuesEventDTO> {
 
@@ -55,7 +57,7 @@ public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHan
         }
 
         log.debug(
-                "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}," + " repoName={}",
+                "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}, repoName={}",
                 event.action(),
                 parentIssueDto.number(),
                 subIssueDto.number(),

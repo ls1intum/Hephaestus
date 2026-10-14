@@ -518,10 +518,3 @@ For a Gradle wrapper update, also run the build with `--warning-mode all` and re
 compatibility before accepting a new major. Do not suppress upstream deprecations to make the
 upgrade appear clean. A JDK-line change updates `.java-version` and Renovate's matching
 `constraints.java`. `gate:toolchain` rejects drift between them.
-
-## Reset an earlier practice preview
-
-A database that applied an earlier push of the unreleased practice cutover changelog must be reset before this build starts.
-Run `vp run dev:reset`. This deletes local database data.
-Then start the normal development environment.
-Released installations use the forward migration and verified backup procedure, not this reset.

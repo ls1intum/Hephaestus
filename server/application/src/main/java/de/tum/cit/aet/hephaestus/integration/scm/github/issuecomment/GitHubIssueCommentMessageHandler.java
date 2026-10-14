@@ -19,14 +19,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub issue_comment webhook events.
- *
- * <p>This handler processes comments on both Issues and Pull Requests. GitHub sends issue_comment
- * events for both entity types, with a pull_request field present when the comment is on a PR.
- *
- * <p><b>Key Design Decision:</b> For Issues, we always process the parent entity first to ensure it
- * exists. For PRs, we rely on the comment processor to create a stub PR entity if needed, since the
- * PR webhook may not have arrived yet. This prevents the 769+ ParentEntityNotFoundException errors
- * that occurred due to message ordering.
+ * <p>
+ * This handler processes comments on both Issues and Pull Requests. GitHub sends
+ * issue_comment events for both entity types, with a pull_request field present
+ * when the comment is on a PR.
+ * <p>
+ * <b>Key Design Decision:</b> For Issues, we always process the parent entity first
+ * to ensure it exists. For PRs, we rely on the comment processor to create a stub
+ * PR entity if needed, since the PR webhook may not have arrived yet. This prevents
+ * the 769+ ParentEntityNotFoundException errors that occurred due to message ordering.
  *
  * @see GitHubIssueCommentProcessor#processWithParentCreation
  */
@@ -67,8 +68,7 @@ public class GitHubIssueCommentMessageHandler extends AbstractIntegrationMessage
         }
 
         log.debug(
-                "Received issue_comment event: action={}, issueNumber={}, commentId={},"
-                        + " repoName={}, isPullRequest={}",
+                "Received issue_comment event: action={}, issueNumber={}, commentId={}, repoName={}, isPullRequest={}",
                 event.action(),
                 issueDto.number(),
                 commentDto.id(),

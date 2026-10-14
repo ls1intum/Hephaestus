@@ -23,10 +23,10 @@ import { type ResultsSearch, resultsQuery, REVIEW_PAGE_SIZE } from "./review-sea
 import type { ReviewPeople } from "./ReviewPersonFacet";
 
 const PEOPLE: ReviewPeople = {
-	options: workspaceMembers.map((member) => ({
-		userId: member.userId,
-		label: member.userName ?? `#${member.userId}`,
-		secondary: member.userLogin,
+	options: workspaceMembers.map(({ account }) => ({
+		accountId: account.id,
+		label: account.displayName ?? `#${account.id}`,
+		secondary: account.identities[0]?.login ?? undefined,
 	})),
 	capped: false,
 	isLoading: false,
@@ -56,9 +56,10 @@ const pool = loadedList<ReviewResult>;
  * The route fetches; this screen only draws what it is handed. To keep the facets live in a story
  * without a network, the filtering the server does is applied here — over the query object the route
  * would actually send, so a facet that stopped reaching the request would stop working here too.
- * What the *endpoint* names those parameters is a separate contract, pinned by the route test.
+ * What the *endpoint* names those parameters is a separate contract, pinned by the route test. A
+ * row does not say which group its practice is in, so the Group facet narrows nothing here.
  */
-const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
+const SEVERITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, TRIVIAL: 3 };
 
 /** The server's "Most actionable first" (`PracticeResultRepository.OPERATOR_ORDER`), as a sort key. */
 function actionabilityKey(result: ReviewResult): number {
@@ -78,7 +79,7 @@ function inServerOrder(
 	}
 	const rows = [...list.rows].sort(
 		(a, b) =>
-			actionabilityKey(a) - actionabilityKey(b) || b.observedAt.getTime() - a.observedAt.getTime(),
+			actionabilityKey(a) - actionabilityKey(b) || b.recordedAt.getTime() - a.recordedAt.getTime(),
 	);
 	return { ...list, rows };
 }
@@ -91,15 +92,14 @@ function resultPage(
 	return narrowedList(
 		inServerOrder(list, search),
 		(row) =>
-			(!query.from || row.observedAt >= new Date(query.from)) &&
-			(!query.to || row.observedAt < new Date(query.to)) &&
-			selects(query.groupSlug, row.group?.slug) &&
-			selects(query.practiceSlug, row.practiceSlug) &&
+			(!query.from || row.recordedAt >= new Date(query.from)) &&
+			(!query.to || row.recordedAt < new Date(query.to)) &&
+			selects(search.practiceSlug, row.practiceSlug) &&
 			selects(query.severity, row.severity) &&
-			selects(query.origin, row.origin) &&
-			(query.agentJobId === undefined || row.agentJobId === query.agentJobId) &&
-			(query.subjectUserId === undefined || row.subject?.id === query.subjectUserId),
-		query.size,
+			selects(query.outcome, row.outcome) &&
+			(query.reviewId === undefined || row.reviewId === query.reviewId) &&
+			(search.developerId === undefined || row.developer?.accountId === search.developerId),
+		REVIEW_PAGE_SIZE,
 	);
 }
 
@@ -114,9 +114,7 @@ const meta = {
 	args: {
 		search: {
 			outcome: undefined,
-
 			severity: undefined,
-			origin: undefined,
 		},
 		onSearchChange: fn(),
 		results: pool(reviewResults),
@@ -223,15 +221,14 @@ export const NarrowedToTheSelectedResult: Story = {
 		search: {
 			outcome: undefined,
 			severity: undefined,
-			origin: undefined,
-			agentJobId: "11111111-1111-1111-1111-111111111111",
-			practiceResultId: "66666666-6666-6666-6666-666666666666",
+			reviewId: "11111111-1111-1111-1111-111111111111",
+			resultId: "66666666-6666-6666-6666-666666666666",
 		},
 	},
 	parameters: {
 		router: {
 			initialUrl:
-				"/?agentJobId=11111111-1111-1111-1111-111111111111&practiceResultId=66666666-6666-6666-6666-666666666666",
+				"/?reviewId=11111111-1111-1111-1111-111111111111&resultId=66666666-6666-6666-6666-666666666666",
 		},
 	},
 	play: async ({ canvas }) => {

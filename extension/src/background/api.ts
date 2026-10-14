@@ -254,7 +254,7 @@ export class AuthenticatedApi {
 				listOwnItemReviews({ client, path: { workspaceSlug, itemId }, query: { size: 1 } }),
 			),
 		);
-		const latest = reviews.content?.[0];
+		const latest = reviews.content[0];
 		if (latest === undefined) {
 			return null;
 		}

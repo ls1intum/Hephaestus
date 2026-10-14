@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.FeedbackModeRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.GroupRefDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGuidanceDTO;
@@ -168,16 +168,14 @@ public class PracticeCatalogController {
         return presenter.present(ctx.id(), groups.bindPractice(ctx, practiceSlug, input.groupSlug()));
     }
 
-    @PutMapping("/{practiceSlug}/placement")
+    @PatchMapping("/{practiceSlug}/group")
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    @Operation(operationId = "placePractice")
-    public List<PracticeDTO> place(
-            WorkspaceContext ctx,
-            @PathVariable String practiceSlug,
-            @RequestBody @Valid PlacePracticeRequestDTO input) {
+    @Operation(operationId = "movePractice")
+    public List<PracticeDTO> move(
+            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody @Valid MovePracticeRequestDTO input) {
         return presenter.presentPractices(
-                ctx.id(), practices.placePractice(ctx, practiceSlug, input.groupSlug(), input.position()));
+                ctx.id(), practices.movePractice(ctx, practiceSlug, input.groupSlug(), input.position()));
     }
 
     @DeleteMapping("/{practiceSlug}/catalog-customization")

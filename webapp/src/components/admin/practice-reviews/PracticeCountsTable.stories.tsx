@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 
+import type { ReviewOverview } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { levelsOpenedBy } from "@/test/detail-stack";
@@ -136,12 +137,12 @@ export const Default: Story = {
 		// once, so where a piece about two practices counts in both rows, the line under the table
 		// says so.
 		await expect(cellsOf(canvas.getByRole("row", { name: /^All practices/u })).slice(0, 6)).toEqual(
-			["78", "27 of 78", "10 of 78", "6 of 78", "3 of 78", "14 of 23"],
+			["78", "27 of 78", "10 of 78", "6 of 78", "3 of 78", "14 of 24"],
 		);
 		await expect(
 			canvas.getByText(/^Feedback delivered adds up to 16 across the practices, but 14 pieces/u),
 		).toBeVisible();
-		// Nothing is marked, so the ones with the most marked incorrect, then undetermined, lead; the
+		// Nothing is marked, so the ones with the most marked incorrect, then could not determine, lead; the
 		// rest stay busiest first.
 		await expect(
 			within(table)
@@ -166,29 +167,31 @@ export const Default: Story = {
 };
 
 /** The busiest first, then two practices that a course would want to look at. */
-const MARKED_PRACTICES = {
+const MARKED_PRACTICES: ReviewOverview = {
 	...practiceReviewOverview,
 	practices: [
 		...practiceReviewOverview.practices,
 		{
 			feedback: feedbackCounts([]),
+			group: null,
 			practiceSlug: "wiki-docs",
 			practiceName: "Wiki pages are kept up to date",
-			practiceResults: { met: 0, notMet: 0, notApplicable: 29, undetermined: 1 },
-			practiceResultsInvalidated: 0,
+			results: { met: 0, notMet: 0, doesNotApply: 29, couldNotDetermine: 1 },
+			resultsMarkedIncorrect: 0,
 		},
 		{
 			feedback: feedbackCounts([]),
+			group: null,
 			practiceSlug: "resolve-open-threads",
 			practiceName: "Open threads are resolved",
-			practiceResults: { met: 8, notMet: 4, notApplicable: 1, undetermined: 9 },
-			practiceResultsInvalidated: 0,
+			results: { met: 8, notMet: 4, doesNotApply: 1, couldNotDetermine: 9 },
+			resultsMarkedIncorrect: 0,
 		},
 	],
 };
 
 /**
- * "Mostly not applicable" from 90 % not applicable, "Often undecided" from 30 % undetermined, each from
+ * "Mostly not applicable" from 90 % does not apply, "Often undecided" from 30 % could not determine, each from
  * 20 results: the marked practices lead, the stronger marker first, and "Busiest first" puts
  * the table back in the server's order.
  */
@@ -310,7 +313,7 @@ export const TurnedOffPracticeHidden: Story = {
 	args: {
 		practices: workspacePractices.map((practice) =>
 			practice.slug === "thin-controllers"
-				? { ...practice, autonomy: { ...practice.autonomy, effective: "OFF" as const } }
+				? { ...practice, feedbackMode: { ...practice.feedbackMode, effective: "OFF" } }
 				: practice,
 		),
 	},
@@ -383,7 +386,7 @@ export const TurnedOffInAnotherGroup: Story = {
 	args: {
 		practices: workspacePractices.map((practice) =>
 			practice.slug === "thin-controllers"
-				? { ...practice, autonomy: { ...practice.autonomy, effective: "OFF" as const } }
+				? { ...practice, feedbackMode: { ...practice.feedbackMode, effective: "OFF" } }
 				: practice,
 		),
 		filter: { groups: ["testing"], showTurnedOff: false, onChange: fn() },

@@ -18,7 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/** Post-submission lifecycle operations on an agent job: user cancel and delivery retry. */
+/** Cancels submitted review jobs and records spend before stopping their containers. */
 @Service
 public class ReviewJobLifecycleService {
 
@@ -51,7 +51,7 @@ public class ReviewJobLifecycleService {
         this.jobTelemetry = jobTelemetry;
     }
 
-    private record CancelOutcome(ReviewJob job, boolean dispatchCancel) {}
+    private record CancelOutcome(ReviewJob job, boolean stopContainer) {}
 
     /**
      * Idempotent when the job is already CANCELLED; throws 409 for any other terminal state.
@@ -65,7 +65,7 @@ public class ReviewJobLifecycleService {
 
         // Split deployment: ask the owning worker to stop its container over the WSS channel (ADR 0009).
         // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
-        if (outcome.dispatchCancel()) {
+        if (outcome.stopContainer()) {
             String workerId = outcome.job().getWorkerId();
             if (workerId != null) {
                 workerJobCancelDispatcher.ifPresent(d -> d.dispatch(workerId, jobId, "user-cancel"));
@@ -126,7 +126,7 @@ public class ReviewJobLifecycleService {
 
         // Reload to read worker_id, which is only set at claim.
         ReviewJob fresh = requireJob(workspaceId, jobId);
-        recordUnverifiableUsageIfStarted(workspaceId, fresh);
+        recordUsageIfStarted(workspaceId, fresh);
         jobTelemetry.terminal(fresh, ReviewJobStatus.CANCELLED, ReviewJobTelemetry.age(fresh));
         return new CancelOutcome(fresh, true);
     }
@@ -136,19 +136,17 @@ public class ReviewJobLifecycleService {
      * {@code worker_id} proves only that a worker claimed the row, and preparation before that boundary
      * cannot incur provider usage — booking it would make the workspace's month unverifiable for free.
      */
-    private void recordUnverifiableUsageIfStarted(Long workspaceId, ReviewJob job) {
+    private void recordUsageIfStarted(Long workspaceId, ReviewJob job) {
         if (job.getExecutionStartedAt() == null) {
             return;
         }
         ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-        LlmPriceSnapshot price =
-                snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
-        // A cancel from the API cannot see what the attempt consumed; the executor path that observes
-        // the cancellation bills the proxy-attributed tokens, so the review's own row carries none. A
-        // practice script call waits for the job row and is dropped once the transition above ends the
-        // attempt, so the practice script rows are complete here.
-        boolean billed =
-                TerminalUsage.none().appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
+        LlmPriceSnapshot price = snap.model().priceSnapshot() != null
+                ? snap.model().priceSnapshot()
+                : LlmPriceSnapshot.unpricedInstance();
+        boolean billed = TerminalUsage.fromProxy(
+                        agentJobRepository.findLlmUsageById(job.getId()).orElse(null))
+                .appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
         log.info(
                 "Recorded {} usage ledger entry (user-cancel): jobId={}",
                 billed ? "a confirmed" : "an UNPRICED",

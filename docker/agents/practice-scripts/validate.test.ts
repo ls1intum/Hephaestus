@@ -120,12 +120,8 @@ void test("a required unbound model withholds and a missing candidate fails", as
 		assert.equal(result.status, status);
 	}
 });
-void test("missing inputs and retired command options are command errors", () => {
-	for (const args of [
-		[cli],
-		[cli, "--cause", "old.json"],
-		[cli, "--signal", "scm.pull_request.opened"],
-	]) {
+void test("missing inputs and unknown options are command errors", () => {
+	for (const args of [[cli], [cli, "--context", "context"]]) {
 		const exit = run(args);
 		assert.equal(exit.status, 2);
 		assert.match(exit.stderr, /required|Unknown option/u);

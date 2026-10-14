@@ -18,6 +18,6 @@ public final class TerminalUsageTestFixtures {
                         job.getWorkspaceId(),
                         job,
                         snapshot,
-                        Objects.requireNonNull(snapshot.priceSnapshot()));
+                        Objects.requireNonNull(snapshot.model().priceSnapshot()));
     }
 }

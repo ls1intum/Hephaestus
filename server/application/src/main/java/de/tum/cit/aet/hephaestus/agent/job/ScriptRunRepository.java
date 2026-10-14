@@ -55,7 +55,7 @@ public interface ScriptRunRepository extends JpaRepository<ScriptRun, ScriptRun.
         String getName();
     }
 
-    /** Of these practice revisions of the workspace, the ones that hold a practice script. */
+    /** Of these practice versions of the workspace, the ones that hold a practice script. */
     @Query(value = """
         SELECT r.id
         FROM practice_version r

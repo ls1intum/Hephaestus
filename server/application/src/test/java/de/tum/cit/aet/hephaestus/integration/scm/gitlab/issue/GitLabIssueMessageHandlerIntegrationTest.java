@@ -488,15 +488,21 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         private UUID recordResult(Issue issue) {
-            return new ScmReviewFixtures(fixtureJdbc, fixtureItems, fixturePeople, transactionTemplate, objectMapper)
-                    .result(
-                            savedWorkspace.getId(),
-                            issue,
-                            issueVersions
-                                    .of(ScmEventPayload.IssueData.from(issue))
-                                    .value(),
-                            Instant.now())
-                    .resultId();
+            return Objects.requireNonNull(transactionTemplate.execute(status -> {
+                var current = issueRepository
+                        .findByIdWithAuthorAndRepository(issue.getId())
+                        .orElseThrow();
+                return new ScmReviewFixtures(
+                                fixtureJdbc, fixtureItems, fixturePeople, transactionTemplate, objectMapper)
+                        .result(
+                                savedWorkspace.getId(),
+                                current,
+                                issueVersions
+                                        .of(ScmEventPayload.IssueData.from(current))
+                                        .value(),
+                                Instant.now())
+                        .resultId();
+            }));
         }
     }
 

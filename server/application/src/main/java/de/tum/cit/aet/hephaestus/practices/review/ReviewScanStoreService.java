@@ -84,7 +84,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
         limit(limit);
         var review = reviews.findByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
         if (review.getKind() != ReviewKind.SCAN) throw new IllegalArgumentException("Select a scan review.");
-        if (ReviewServiceImpl.terminal(review.getStatus())
+        if (review.getStatus().isTerminal()
                 || review.getChecks().path("cancellationRequested").asBoolean()) return List.of();
         var activeJobs = runtime.activeJobIds(workspaceId, reviewId);
         return jdbc
@@ -267,7 +267,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
     private Review active(long workspaceId, UUID reviewId) {
         var review = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
         if (review.getKind() != ReviewKind.SCAN
-                || ReviewServiceImpl.terminal(review.getStatus())
+                || review.getStatus().isTerminal()
                 || review.getChecks().path("cancellationRequested").asBoolean())
             throw new IllegalStateException("This scan no longer accepts work.");
         return review;

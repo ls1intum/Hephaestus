@@ -1,3 +1,9 @@
+// Finds the permission-related references and the authorization requests that the change adds in Swift
+// files, and the usage-description keys in the change or in the first plist and project files of the
+// checkout, each with its path. A reference names a type or call to inspect. It does not show that the
+// change requests restricted access. A key in some file does not show that the target declares it, and
+// a key that is not found does not show that the target does not declare it. The review reads the
+// target, the actual API and the description.
 import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index.ts";
 import {
 	countLabel,
@@ -5,12 +11,6 @@ import {
 	scanAddedLines,
 	type SourcePattern,
 } from "../kits/scm/source-scan.ts";
-// Finds the permission-related references and the authorization requests that the change adds in Swift
-// files, and the usage-description keys in the change or in the first plist and project files of the
-// checkout, each with its path. A reference names a type or call to inspect. It does not show that the
-// change requests restricted access. A key in some file does not show that the target declares it, and
-// a key that is not found does not show that the target does not declare it. The review reads the
-// target, the actual API and the description.
 import {
 	DIRECTION_CHARS,
 	factsOf,
@@ -126,6 +126,8 @@ interface CheckoutKeys {
 	filesFound: number;
 	filesRead: number;
 	unreadable: number;
+	/** Whether a listing was cut, so more project files may exist than were found. */
+	listingCut: boolean;
 }
 
 const PROJECT_FILES = [
@@ -135,24 +137,25 @@ const PROJECT_FILES = [
 	"**/*.xcodeproj/project.pbxproj",
 ];
 
-async function usageKeysInCheckout(tree: FileTree | null): Promise<CheckoutKeys> {
+/** The usage keys in the checkout's project files; null when the checkout was not captured. */
+async function usageKeysInCheckout(tree: FileTree | null): Promise<CheckoutKeys | null> {
+	if (tree === null) {
+		return null;
+	}
 	const keys = new Map<string, string[]>();
 	let files: string[] = [];
-	try {
-		for (const glob of PROJECT_FILES) {
-			const listed = await tree?.list(glob);
-			files.push(...(listed?.paths ?? []));
-		}
-	} catch {
-		// no readable checkout: no file read, so no key located
-		files = [];
+	let listingCut = false;
+	for (const glob of PROJECT_FILES) {
+		const listed = await tree.list(glob);
+		files.push(...listed.paths);
+		listingCut ||= listed.truncated;
 	}
 	files = files.filter((f) => !/(?:^|\/)(?:Pods|\.build|DerivedData|Carthage)\//u.test(f));
 	let unreadable = 0;
 	const read = files.slice(0, PROJECT_FILES_READ);
 	for (const file of read) {
-		const found = await tree?.read(file).catch(() => null);
-		if (found?.status !== "FOUND") {
+		const found = await tree.read(file);
+		if (found.status !== "FOUND") {
 			unreadable += 1;
 			continue;
 		}
@@ -161,7 +164,13 @@ async function usageKeysInCheckout(tree: FileTree | null): Promise<CheckoutKeys>
 			keys.set(key, [...new Set([...(keys.get(key) ?? []), file])]);
 		}
 	}
-	return { keys, filesFound: files.length, filesRead: read.length - unreadable, unreadable };
+	return {
+		keys,
+		filesFound: files.length,
+		filesRead: read.length - unreadable,
+		unreadable,
+		listingCut,
+	};
 }
 
 export default definePracticeScript({
@@ -210,14 +219,17 @@ export default definePracticeScript({
 				const where = [
 					...new Set([
 						...(inChange === undefined ? [] : [inChange]),
-						...(checkout.keys.get(key) ?? []),
+						...(checkout?.keys.get(key) ?? []),
 					]),
 				];
 				return where.length === 0 ? [] : [`${key} (${where.join(", ")})`];
 			});
 		const directions: string[] = [...sampleNote(scan)];
 		if (references.length > 0) {
-			const read = `${String(checkout.filesRead)} of ${String(checkout.filesFound)} plist/project file(s) read${checkout.unreadable > 0 ? `, ${String(checkout.unreadable)} unreadable` : ""}`;
+			const read =
+				checkout === null
+					? "not the checkout, which was not captured"
+					: `${String(checkout.filesRead)} of ${String(checkout.filesFound)}${checkout.listingCut ? " or more" : ""} plist/project file(s) read${checkout.unreadable > 0 ? `, ${String(checkout.unreadable)} unreadable` : ""}`;
 			const lines = references.map(([kind, , keys]) => {
 				if (keys.length === 0) {
 					return `${kind} (no usage key applies).`;
@@ -255,8 +267,12 @@ export default definePracticeScript({
 				permissionReferenceKinds: references.length,
 				authorizationRequests: requests,
 				usageKeysAdded: keysInChange.size,
-				usageKeysLocatedInCheckout: checkout.keys.size,
-				projectFilesRead: checkout.filesRead,
+				...(checkout === null
+					? {}
+					: {
+							usageKeysLocatedInCheckout: checkout.keys.size,
+							projectFilesRead: checkout.filesRead,
+						}),
 				filesScanned: scan.filesScanned,
 				linesAdded: scan.linesAdded,
 			},

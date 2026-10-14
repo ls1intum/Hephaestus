@@ -8,6 +8,6 @@ import tools.jackson.databind.JsonNode;
 public interface ClosedPracticeInput {
     @JsonAnySetter
     default void rejectUnknownField(String field, @Nullable JsonNode value) {
-        throw new IllegalArgumentException("Unknown practice definition field: " + field);
+        throw new IllegalArgumentException("Unknown field: " + field);
     }
 }

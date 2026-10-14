@@ -3,9 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -16,12 +14,11 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.cit.aet.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
 import de.tum.cit.aet.hephaestus.workspace.exception.LastOwnerRemovalException;
 import java.time.Clock;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
@@ -31,6 +28,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class MembershipService {
     private final MembershipRepository memberships;
@@ -38,49 +36,43 @@ public class MembershipService {
     private final ConfigAuditPort configAudit;
     private final WorkspaceAccessService access;
     private final ObjectProvider<PeopleRegistry> people;
-    private final AccountIdentityQuery identities;
     private final WorkspaceActorSelector actorSelector;
     private final Clock clock;
     private final AccountDirectory accounts;
     private final GitProviderRegistry providers;
 
-    @Transactional
     public long accountIdForUser(long scmUserId) {
         var actor = providers
                 .actor(scmUserId)
                 .filter(GitProviderRegistry.ActorProfile::human)
                 .orElseThrow(() -> new IllegalArgumentException("A human provider account is required."));
+        return accountIdFor(actor);
+    }
+
+    private long accountIdFor(GitProviderRegistry.ActorProfile actor) {
         return people.getObject()
                 .ensureHuman(
                         new PersonIdentity(actor.providerId(), actor.providerUserKey(), null), actor.displayName());
     }
 
-    @Transactional
     public int ensureMemberships(Workspace workspace, Set<Long> scmUserIds) {
         int inserted = 0;
         for (long scmUserId : scmUserIds) {
-            if (providers
-                    .actor(scmUserId)
-                    .filter(GitProviderRegistry.ActorProfile::human)
-                    .isEmpty()) continue;
+            var actor = providers.actor(scmUserId).filter(GitProviderRegistry.ActorProfile::human);
+            if (actor.isEmpty()) continue;
             inserted += memberships.insertIfAbsent(
-                    workspace.getId(), accountIdForUser(scmUserId), Membership.WorkspaceRole.MEMBER.name(), false);
+                    workspace.getId(), accountIdFor(actor.get()), Membership.WorkspaceRole.MEMBER.name(), false);
         }
         return inserted;
     }
 
-    @Transactional
     public void syncWorkspaceMembers(Workspace workspace, Map<Long, Membership.WorkspaceRole> providerRoles) {
         Map<Long, Membership.WorkspaceRole> desired = new HashMap<>();
         for (var entry : providerRoles.entrySet()) {
-            if (providers
-                    .actor(entry.getKey())
-                    .filter(GitProviderRegistry.ActorProfile::human)
-                    .isEmpty()) continue;
+            var actor = providers.actor(entry.getKey()).filter(GitProviderRegistry.ActorProfile::human);
+            if (actor.isEmpty()) continue;
             desired.merge(
-                    accountIdForUser(entry.getKey()),
-                    entry.getValue(),
-                    (first, next) -> first.isAtLeast(next) ? first : next);
+                    accountIdFor(actor.get()), entry.getValue(), (first, next) -> first.isAtLeast(next) ? first : next);
         }
         for (var entry : desired.entrySet()) {
             var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), entry.getKey());
@@ -98,7 +90,6 @@ public class MembershipService {
         }
     }
 
-    @Transactional
     public void applyProviderGrant(Workspace workspace, Long scmUserId, Membership.@Nullable WorkspaceRole role) {
         long accountId = accountIdForUser(scmUserId);
         var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId);
@@ -110,7 +101,6 @@ public class MembershipService {
         } else createMembership(workspace, accountId, role);
     }
 
-    @Transactional
     public Membership createMembership(Workspace workspace, Long accountId, Membership.WorkspaceRole role) {
         var existing = memberships.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId);
         if (existing.isPresent()) {
@@ -129,7 +119,6 @@ public class MembershipService {
         return memberships.save(member);
     }
 
-    @Transactional
     public Membership assignRole(Long workspaceId, Long accountId, Membership.WorkspaceRole role) {
         var workspace = lockForMembershipChange(workspaceId);
         requireCanManageRole(workspace, role);
@@ -151,10 +140,9 @@ public class MembershipService {
         return memberships.save(member);
     }
 
-    @Transactional
     public void removeMembership(Long workspaceId, Long accountId) {
         var workspace = lockForMembershipChange(workspaceId);
-        var member = getMembership(workspaceId, accountId);
+        var member = requireMembership(workspaceId, accountId);
         requireCanManageRole(workspace, member.getRole());
         requireNotLastOwner(workspace, member);
         if (member.getLeftAt() != null) return;
@@ -163,9 +151,8 @@ public class MembershipService {
                 ConfigAuditEntityType.WORKSPACE_ROLE, accountId, workspaceId, snapshot(member)));
     }
 
-    @Transactional
     public Membership updateMemberVisibility(Long workspaceId, Long accountId, boolean hidden) {
-        var member = getMembership(workspaceId, accountId);
+        var member = requireMembership(workspaceId, accountId);
         var before = snapshot(member);
         member.setHidden(hidden);
         configAudit.record(ConfigAuditEntry.updated(
@@ -174,13 +161,13 @@ public class MembershipService {
     }
 
     @Transactional(readOnly = true)
-    public Set<Long> getHiddenMemberIds(Long workspaceId) {
-        return memberships.findHiddenAccountIdsByWorkspaceId(workspaceId);
+    public Membership getMembership(Long workspaceId, Long accountId) {
+        return requireMembership(workspaceId, accountId);
     }
 
-    @Transactional(readOnly = true)
-    public Membership getMembership(Long workspaceId, Long accountId) {
-        return findMembership(workspaceId, accountId)
+    private Membership requireMembership(Long workspaceId, Long accountId) {
+        return memberships
+                .findByWorkspace_IdAndAccount_Id(workspaceId, accountId)
                 .orElseThrow(() -> new EntityNotFoundException("Membership", accountId));
     }
 
@@ -195,28 +182,21 @@ public class MembershipService {
     }
 
     @Transactional(readOnly = true)
-    public Set<Long> practiceReviewEligibleAccountIds(Long workspaceId) {
-        return memberships.findByWorkspace_Id(workspaceId).stream()
-                .filter(member -> isPracticeReviewEligible(workspaceId, Objects.requireNonNull(member.getAccountId())))
-                .map(Membership::getAccountId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+    public Set<Long> eligibleAccountIds(Long workspaceId, Collection<Long> accountIds) {
+        return eligibleIds(workspaceId, accountIds);
     }
 
     @Transactional(readOnly = true)
     public boolean isPracticeReviewEligible(Long workspaceId, Long accountId) {
-        return findMembership(workspaceId, accountId)
-                .filter(member -> member.getLeftAt() == null)
-                .filter(member -> accounts.find(accountId)
-                        .map(account -> account.status() == Account.Status.ACTIVE
-                                || account.status() == Account.Status.UNCLAIMED)
-                        .orElse(false))
-                .filter(member -> actorSelector
-                        .connectedProviderId(workspaceId)
-                        .map(provider -> identities.activeLinksForAccount(accountId).stream()
-                                .anyMatch(identity -> provider.equals(identity.providerId())))
-                        .orElse(true))
-                .isPresent();
+        return eligibleIds(workspaceId, Set.of(accountId)).contains(accountId);
+    }
+
+    private Set<Long> eligibleIds(Long workspaceId, Collection<Long> accountIds) {
+        if (accountIds.isEmpty()) return Set.of();
+        return memberships.findEligibleAccountIds(
+                workspaceId,
+                accountIds,
+                actorSelector.connectedProviderId(workspaceId).orElse(null));
     }
 
     private Workspace lockForMembershipChange(Long workspaceId) {

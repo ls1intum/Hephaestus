@@ -118,6 +118,9 @@ spring:
     # reverted as the framework default in #24249). The cold-start overlap it bought is not worth that
     # footgun, so we keep bootstrap synchronous on the main thread for every profile.
     data:
+        web:
+            pageable:
+                max-page-size: 100
         jpa:
             repositories:
                 bootstrap-mode: default

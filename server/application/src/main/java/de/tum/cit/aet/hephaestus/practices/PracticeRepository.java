@@ -22,6 +22,12 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findByWorkspaceId(Long workspaceId);
 
     @EntityGraph(attributePaths = {"group", "currentVersion"})
+    Optional<Practice> findByIdAndWorkspaceId(Long id, Long workspaceId);
+
+    @EntityGraph(attributePaths = {"group", "currentVersion"})
+    List<Practice> findByWorkspaceIdAndIdIn(Long workspaceId, Collection<Long> ids);
+
+    @EntityGraph(attributePaths = {"group", "currentVersion"})
     List<Practice> findByWorkspaceIdAndKind(Long workspaceId, ItemKind kind);
 
     @EntityGraph(attributePaths = {"group", "currentVersion"})

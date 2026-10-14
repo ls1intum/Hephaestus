@@ -13,8 +13,6 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
 
 @Tag("unit")
 class DeterministicGroupGuidanceComposerTest {
@@ -93,15 +91,6 @@ class DeterministicGroupGuidanceComposerTest {
 
         assertThat(guidance)
                 .isEqualTo("Your recent feedback shows a strength in “Test Coverage”. Keep building on it.");
-    }
-
-    @ParameterizedTest
-    @EnumSource(
-            value = PracticeStanding.class,
-            names = {"NOT_OBSERVED", "NO_OPPORTUNITY"})
-    void shouldReturnNoGuidanceForEveryNonVerdictStatus(PracticeStanding status) {
-        assertThat(DeterministicGroupGuidanceComposer.compose(status, List.of()))
-                .isNull();
     }
 
     @Test

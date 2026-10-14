@@ -9,7 +9,7 @@ import { daysBefore } from "@/stories/story-clock";
 import { SlackChannelRow } from "./SlackChannelRow";
 
 const channel: SlackMonitoredChannel = {
-	id: 1,
+	id: "1",
 	slackTeamId: "T0000000000",
 	slackChannelId: "C01ACTIVE001",
 	channelName: "team-standup",
@@ -70,7 +70,7 @@ export const NotStarted: Story = {
 			slackChannelId: "C02PENDING02",
 			channelName: "team-intro",
 			consentState: "PENDING",
-			consentAnnouncedAt: undefined,
+			consentAnnouncedAt: null,
 		},
 	},
 	play: async ({ canvas }) => {
@@ -136,7 +136,7 @@ export const Revoked: Story = {
 	},
 };
 
-/** Members who opted out are a first-class trust signal, with a keyboard-reachable tooltip. */
+/** Members who opted out are a first-class fact, with a keyboard-reachable tooltip. */
 export const WithOptOuts: Story = {
 	args: { channel: { ...channel, optedOutMemberCount: 3 } },
 	play: async ({ canvas }) => {
@@ -150,7 +150,7 @@ export const WithOptOuts: Story = {
 
 /** No name from Slack — the row falls back to the stable id rather than rendering "#undefined". */
 export const NoChannelName: Story = {
-	args: { channel: { ...channel, channelName: undefined } },
+	args: { channel: { ...channel, channelName: null } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText(/C01ACTIVE001/u).length).toBeGreaterThan(0);
 	},

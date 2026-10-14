@@ -118,7 +118,6 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
             try {
                 if (!accountHeader.matches("[1-9][0-9]*")) throw new NumberFormatException();
                 viewedAccountId = Long.parseLong(accountHeader);
-                if (viewedAccountId <= 0) throw new NumberFormatException();
             } catch (NumberFormatException invalidId) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "The viewed account ID is not valid.", invalidId);
@@ -128,14 +127,9 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
                     .filter(candidate -> candidate.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
                     .orElseThrow(
                             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "The workspace was not found."));
-            var user = users.requireAccount(workspace.getId(), viewedAccountId);
+            users.requireAccount(workspace.getId(), viewedAccountId);
             String query = request.getQueryString();
-            access.record(
-                    workspace.getId(),
-                    null,
-                    Long.parseLong(user.accountId()),
-                    reason,
-                    query == null ? path : path + "?" + query);
+            access.record(workspace.getId(), null, viewedAccountId, reason, query == null ? path : path + "?" + query);
             UserViewContextHolder.set(new UserViewContextHolder.View(workspace.getId(), viewedAccountId));
             response.setHeader("Cache-Control", "no-store");
         } catch (RuntimeException error) {

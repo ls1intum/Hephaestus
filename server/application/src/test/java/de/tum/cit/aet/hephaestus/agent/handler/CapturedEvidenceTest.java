@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
+import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
-import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -31,7 +31,7 @@ class CapturedEvidenceTest extends BaseUnitTest {
     void readsOnlyAvailableSourcesAndTheirExactFileProof() {
         Instant now = Instant.parse("2026-10-14T00:00:00Z");
         var manifest = new JobFolderIndex(
-                SourceCatalogRegistry.CURRENT_VERSION,
+                ClasspathSourceCatalogRegistry.CURRENT_VERSION,
                 "0".repeat(64),
                 "docs.document",
                 now,
@@ -73,7 +73,7 @@ class CapturedEvidenceTest extends BaseUnitTest {
         var job = new ReviewJob();
         job.setCapture(capture);
         var evidence = CapturedEvidence.of(job, mapper);
-        assertThat(evidence.contractVersion()).isEqualTo(SourceCatalogRegistry.CURRENT_VERSION);
+        assertThat(evidence.contractVersion()).isEqualTo(ClasspathSourceCatalogRegistry.CURRENT_VERSION);
         assertThat(evidence.availableSources()).containsExactly(CONTENT);
         assertThat(evidence.requireFile(CONTENT, "context/document.md"))
                 .isEqualTo(new CapturedEvidence.FileProof(CONTENT, "a".repeat(64)));

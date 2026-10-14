@@ -95,10 +95,7 @@ public class AuthAuditController {
             @Nullable Long actingAccountId,
             @Nullable Long viewedActorId,
             @Nullable Long viewedAccountId,
-            // Resolved identities for accountId / actingAccountId (null when the account no longer
-            // exists);
-            // the raw ids stay for back-compat and so deleted-account rows are still attributable
-            // by id.
+            // Raw IDs retain attribution after an account is deleted.
             @Nullable AuthAuditAccountDTO account,
             @Nullable AuthAuditAccountDTO actor,
             @Nullable String failureReason,

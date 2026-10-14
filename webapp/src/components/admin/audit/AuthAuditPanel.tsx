@@ -65,7 +65,7 @@ export function AuthAuditPanel({
 	});
 
 	const pages = loadedPages(listQuery.data);
-	const events: AuthEventView[] = dedupeById(pages.flatMap((p) => p.content ?? []));
+	const events: AuthEventView[] = dedupeById(pages.flatMap((p) => p.content));
 	const total = pages[0]?.totalElements;
 	const hasAppliedFilter =
 		(filters.eventType?.length ?? 0) > 0 ||

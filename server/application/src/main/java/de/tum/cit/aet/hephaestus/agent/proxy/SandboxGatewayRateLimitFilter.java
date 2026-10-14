@@ -24,12 +24,11 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>Runs after the chain's authorization rules, so a call that its scope refuses spends nothing
  * from the bucket of the principal that its path routes to. A request that carries no
- * {@link ProxyRouting} principal is passed on unchanged.
+ * {@link ProxyIdentity} principal is passed on unchanged.
  *
  * <p>A bucket store it cannot reach fails open. The caller is already job-token-authenticated and its
- * spend still has to pass the budget gate, so an unreachable store must not close the sandbox's only
- * door mid-review; it is counted instead, so a limiter that has stopped limiting is visible rather
- * than silent.
+ * spend still has to pass the budget gate. The limiter records an unavailable bucket store and
+ * permits the authenticated call.
  */
 public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
 
@@ -58,13 +57,13 @@ public final class SandboxGatewayRateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !(authentication.getPrincipal() instanceof ProxyRouting routing)) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof ProxyIdentity identity)) {
             chain.doFilter(request, response);
             return;
         }
 
         // The principal names a job or a session, never a token — safe at WARN.
-        String principal = routing.principalDescription();
+        String principal = identity.description();
         ConsumptionProbe probe = bucketResolver.tryConsume(KEY_PREFIX + principal, bucketConfiguration, e -> {
             accounting.recordGatewayLimiterError();
             log.warn("Sandbox gateway rate limit backend error: principal={}", principal, e);

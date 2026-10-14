@@ -17,9 +17,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub installation_repositories webhook events.
- *
- * <p>When repositories are added or removed from a GitHub App installation, this handler notifies
- * the consuming module via SPI to update monitored repositories.
+ * <p>
+ * When repositories are added or removed from a GitHub App installation,
+ * this handler notifies the consuming module via SPI to update monitored repositories.
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
@@ -56,8 +56,7 @@ public class GitHubInstallationRepositoriesMessageHandler
                 event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
 
         log.debug(
-                "Received installation_repositories event: action={}, installationId={},"
-                        + " addedCount={}, removedCount={}",
+                "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
                 event.action(),
                 installation.id(),
                 added.size(),

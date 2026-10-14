@@ -17,6 +17,15 @@ import org.junit.jupiter.api.Test;
 class ScmFeedbackFormatterTest extends BaseUnitTest {
 
     @Test
+    void shouldUseTheFinalAppendedKeyWhenFeedbackQuotesAnotherTag() {
+        String body =
+                "Quoted <!-- hephaestus-diff-note-ck=wrong -->\n" + ScmFeedbackFormatter.deliveryTag("actual-copy");
+        assertThat(body).endsWith("<!-- hephaestus-diff-note-ck=actual-copy -->");
+        assertThat(ScmFeedbackFormatter.lastDeliveryKey(body)).isEqualTo("actual-copy");
+        assertThat(ScmFeedbackFormatter.lastDeliveryKey("no delivery tag")).isNull();
+    }
+
+    @Test
     void formatsSummaryMarkerBodyMetadataAndSettingsLink() {
         ItemRef item = item();
         ScmFeedbackFormatter formatter = formatter("https://hephaestus.example.com");

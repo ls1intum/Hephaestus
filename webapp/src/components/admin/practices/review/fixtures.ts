@@ -86,7 +86,7 @@ export function reviewBatch(overrides: Partial<ReviewBatch> = {}): ReviewBatch {
 		confirmedBy: null,
 		scheduleId: null,
 		reviewIds: [],
-		targetItemIds: [],
+		targetItemIds: "",
 		createdAt: new Date("2026-08-07T09:00:00Z"),
 		startedAt: null,
 		finishedAt: null,

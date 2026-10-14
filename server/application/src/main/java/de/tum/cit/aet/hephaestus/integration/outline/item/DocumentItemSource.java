@@ -70,13 +70,8 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
     }
 
     @Override
-    public ItemKind kind() {
-        return DocumentEvents.DOCUMENT;
-    }
-
-    @Override
     public Set<ItemKind> kinds() {
-        return Set.of(kind());
+        return Set.of(DocumentEvents.DOCUMENT);
     }
 
     @Override
@@ -89,7 +84,7 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
 
     @Override
     public boolean supports(ItemRef item) {
-        return kind().equals(item.kind()) && item.sourceId() != null;
+        return DocumentEvents.DOCUMENT.equals(item.kind()) && item.sourceId() != null;
     }
 
     @Override

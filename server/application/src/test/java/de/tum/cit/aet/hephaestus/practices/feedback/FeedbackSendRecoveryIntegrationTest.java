@@ -43,7 +43,7 @@ class FeedbackSendRecoveryIntegrationTest extends AbstractFeedbackDeliveryIntegr
         newSender().send(workspace.getId(), feedbackId);
         assertThat(provider.summaryCreates).isZero();
         assertThat(current().getState()).isEqualTo(FeedbackState.FAILED);
-        assertThat(children().getFirst().getLastError()).startsWith("ABSENT:");
+        assertThat(children().getFirst().getReadback()).isEqualTo(FeedbackCopyReadback.ABSENT);
         store.retry(workspace.getId(), feedbackId, developerId);
         newSender().send(workspace.getId(), feedbackId);
         assertThat(provider.summaryCreates).isEqualTo(1);
@@ -202,7 +202,7 @@ class FeedbackSendRecoveryIntegrationTest extends AbstractFeedbackDeliveryIntegr
         due();
         newSender().send(workspace.getId(), feedbackId);
         assertThat(current().getState()).isEqualTo(FeedbackState.FAILED);
-        assertThat(children().getFirst().getLastError()).startsWith("ABSENT:");
+        assertThat(children().getFirst().getReadback()).isEqualTo(FeedbackCopyReadback.ABSENT);
         assertThat(provider.summaryCreates).isEqualTo(1);
         var fence = children().getFirst().getWriteStartedAt();
         provider.summaryFailure = Failure.NONE;

@@ -9,7 +9,6 @@ import { readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import type { DiffFile } from "../../kits/scm/types.ts";
 import { oneLine } from "./bounded-text.ts";
 import {
 	isSafeRelativePath,
@@ -20,13 +19,12 @@ import {
 import {
 	assertCitationRange,
 	changeLines,
+	MAX_READ_BYTES,
 	quotedLines,
 	type EvidenceSources,
 } from "./evidence-reader.ts";
 import { UnratedError } from "./practice-script.ts";
 
-/** A file larger than this is not quoted from. */
-const MAX_QUOTED_FILE_BYTES = 2 * 1024 * 1024;
 /**
  * The review input is inlined beside the criteria in the turn that evaluates the practice, so it is
  * bounded: one busy program cannot crowd the criteria and the brief out of the prompt.
@@ -45,8 +43,6 @@ const CONTEXT_VALUE_CHARS = 1200;
 /** A lead with the first line its source holds at that place. */
 export interface QuotedLead extends ReviewLead {
 	quote: string;
-	/** The lead cites a line that the change since the previous review added. */
-	newSinceLastReview?: true;
 }
 
 const GIT_ENV = { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_OPTIONAL_LOCKS: "0" };
@@ -68,7 +64,7 @@ async function fileInside(root: string, relative: string): Promise<string | unde
 			return undefined;
 		}
 		const stats = await stat(full);
-		return stats.isFile() && stats.size <= MAX_QUOTED_FILE_BYTES ? full : undefined;
+		return stats.isFile() && stats.size <= MAX_READ_BYTES ? full : undefined;
 	} catch {
 		return undefined;
 	}
@@ -89,7 +85,11 @@ async function quoteOf(
 		);
 	}
 	if ("file" in at) {
-		if (sources.repo === null || !isSafeRelativePath(at.file)) {
+		if (
+			sources.repo === null ||
+			!isSafeRelativePath(at.file) ||
+			(sources.permittedPaths !== undefined && !sources.permittedPaths.has(at.file))
+		) {
 			return undefined;
 		}
 		const end = at.endLine ?? at.line;
@@ -98,10 +98,10 @@ async function quoteOf(
 			try {
 				const { stdout } = await git(
 					"git",
-					["-C", sources.repo, "show", `${at.revision}:${at.file}`],
+					["-C", sources.repo, "show", "--end-of-options", `${at.revision}:${at.file}`],
 					{
 						env: GIT_ENV,
-						maxBuffer: MAX_QUOTED_FILE_BYTES,
+						maxBuffer: MAX_READ_BYTES,
 						encoding: "utf8",
 						signal,
 					},
@@ -133,27 +133,6 @@ async function quoteOf(
 		: quotedLines(await readFile(file, { encoding: "utf8", signal }), at.line, at.line);
 }
 
-/**
- * Whether a lead cites a line that the change since the previous review added: a location in the
- * change on its new side, with at least one line of its range added since.
- */
-export function addedSince(at: EvidenceLocation, since: ReadonlyMap<string, DiffFile>): boolean {
-	if (!("change" in at) || at.side === "OLD") {
-		return false;
-	}
-	const file = since.get(at.change);
-	if (file === undefined) {
-		return false;
-	}
-	const { line: first, endLine: last = first } = at;
-	for (let line = first; line <= last; line += 1) {
-		if (file.addedLines.has(line)) {
-			return true;
-		}
-	}
-	return false;
-}
-
 function where(at: EvidenceLocation, contextReference: string): string {
 	if ("change" in at) {
 		const range = at.endLine === undefined ? `${at.line}` : `${at.line}-${at.endLine}`;
@@ -168,13 +147,12 @@ function where(at: EvidenceLocation, contextReference: string): string {
 }
 
 /**
- * Each lead with its quote, in the program's order, marked when it points at a line added since the
- * previous review. A lead whose source does not hold its place throws: the review input is wrong.
+ * Each lead with its quote, in the program's order. A lead whose source does not hold its place
+ * throws: the review input is wrong.
  */
 export async function resolveLeads(
 	leads: readonly ReviewLead[],
 	sources: EvidenceSources,
-	changeSince?: ReadonlyMap<string, DiffFile>,
 	signal?: AbortSignal,
 ): Promise<QuotedLead[]> {
 	const quoted: QuotedLead[] = [];
@@ -195,11 +173,7 @@ export async function resolveLeads(
 				`lead ${index + 1} (${lead.label}) points at ${where(lead.at, sources.contextReference)}, which its source does not hold`,
 			);
 		}
-		quoted.push(
-			changeSince !== undefined && addedSince(lead.at, changeSince)
-				? { ...lead, quote, newSinceLastReview: true }
-				: { ...lead, quote },
-		);
+		quoted.push({ ...lead, quote });
 	}
 	return quoted;
 }
@@ -209,7 +183,7 @@ function leadRow(lead: QuotedLead, contextReference: string): string {
 		.map(([key, value]) => `${key}=${String(value)}`)
 		.join(", ");
 	const quote = lead.quote.split("\n")[0]?.trim().slice(0, 120) ?? "";
-	return `  - at ${where(lead.at, contextReference)}${lead.newSinceLastReview === true ? " (new)" : ""}${quote ? `: \`${quote}\`` : ""}${facts ? ` [${facts}]` : ""}`;
+	return `  - at ${where(lead.at, contextReference)}${quote ? `: \`${quote}\`` : ""}${facts ? ` [${facts}]` : ""}`;
 }
 
 /** The characters that lines take in a section, each with its line break. */
@@ -244,19 +218,11 @@ export function renderReviewInput(
 	leads: readonly QuotedLead[],
 	contextReference: string,
 	fullInput: string,
-	/** Whether the change since the previous review is known, so each lead could be marked. */
-	changeSinceKnown = false,
 ): string {
 	const body: string[] = (options.directions ?? []).map((direction) => `- ${direction}`);
 	const leadRows = new Set<string>();
 	if (leads.length > 0) {
-		const marked = leads.filter((lead) => lead.newSinceLastReview === true).length;
 		body.push("", "**Leads:**");
-		if (changeSinceKnown) {
-			body.push(
-				`${marked} of ${leads.length} leads point at lines added since the last review of this practice, each marked (new).`,
-			);
-		}
 		// In the program's order: each run of leads with one label goes under that label once.
 		for (const [index, lead] of leads.entries()) {
 			if (leads[index - 1]?.label !== lead.label) {

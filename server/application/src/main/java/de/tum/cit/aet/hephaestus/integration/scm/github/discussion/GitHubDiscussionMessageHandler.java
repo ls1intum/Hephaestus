@@ -16,7 +16,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Handles GitHub discussion webhook events. */
+/**
+ * Handles GitHub discussion webhook events.
+ */
 @Slf4j
 @Component
 public class GitHubDiscussionMessageHandler extends AbstractIntegrationMessageHandler<GitHubDiscussionEventDTO> {

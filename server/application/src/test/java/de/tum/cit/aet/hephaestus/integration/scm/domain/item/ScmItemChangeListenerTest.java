@@ -22,7 +22,7 @@ class ScmItemChangeListenerTest extends BaseUnitTest {
         var item = mock(ScmItemSourceQuery.WorkspaceItem.class);
         when(item.getWorkspaceId()).thenReturn(11L);
         when(item.getItemId()).thenReturn(22L);
-        when(query.issueItems(33L)).thenReturn(List.of(item));
+        when(query.issueItems(ScmItemEvents.ISSUE.value(), 33L)).thenReturn(List.of(item));
         var issue = mock(ScmEventPayload.IssueData.class);
         when(issue.id()).thenReturn(33L);
         var event = mock(ScmDomainEvent.IssueClosed.class);

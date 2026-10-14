@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogLock;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
+import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseFieldDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -30,6 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 @ConditionalOnServerRole
 public class PracticeReleaseService {
     private final CatalogService catalog;
+    private final PracticeReviewDigest digest;
     private final CatalogLock catalogLock;
     private final PracticeRepository practices;
     private final PracticeGroupRepository groupRepository;
@@ -40,13 +42,14 @@ public class PracticeReleaseService {
     private final ConfigAuditPort audit;
 
     public List<PracticeReleaseProposalDTO> list(WorkspaceContext ctx) {
+        var effective = catalog.effectiveCatalog();
         return practices.findAllForCatalog(ctx.id()).stream()
                 .filter(practice -> practice.getCatalogSlug() != null)
-                .filter(practice -> catalog.effectiveCatalog()
+                .filter(practice -> effective
                         .practice(Objects.requireNonNull(practice.getCatalogSlug()))
                         .map(offer -> !Objects.equals(practice.getCatalogBase(), mapper.valueToTree(offer.effective())))
                         .orElse(false))
-                .map(practice -> proposal(practice))
+                .map(practice -> proposal(practice, effective))
                 .toList();
     }
 
@@ -55,9 +58,14 @@ public class PracticeReleaseService {
     }
 
     private PracticeReleaseProposalDTO proposal(Practice practice) {
+        return proposal(practice, catalog.effectiveCatalog());
+    }
+
+    private PracticeReleaseProposalDTO proposal(Practice practice, EffectiveCatalog effective) {
         var source = practice.getCatalogSlug();
         if (source == null) throw new EntityNotFoundException("Practice release", practice.getSlug());
-        var offer = catalog.practice(source);
+        var offer =
+                effective.practice(source).orElseThrow(() -> new EntityNotFoundException("Catalog practice", source));
         var base = versions.catalogBaseOf(practice);
         var current = versions.definitionOf(practice.getCurrentVersion());
         String tag = tag(practice, offer.etag());
@@ -67,7 +75,7 @@ public class PracticeReleaseService {
                 current,
                 base == null ? null : base.definition(),
                 offer.effective().definition(),
-                offer.etag(),
+                digest.of(offer.effective().definition()),
                 tag,
                 PracticeDefinitionMerge.changes(
                                 base == null ? null : base.definition(),

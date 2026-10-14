@@ -357,8 +357,12 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
 
     private InteractiveSandboxRuntimeKey runtimeKey(InteractiveSandboxSpec spec) {
         String token = spec.networkPolicy() != null ? spec.networkPolicy().llmProxyToken() : null;
-        var routing =
-                token != null ? mentorProxyCredentialRegistry.validate(token).orElse(null) : null;
+        var routing = token != null
+                ? mentorProxyCredentialRegistry
+                        .authenticate(token)
+                        .flatMap(mentorProxyCredentialRegistry::resolve)
+                        .orElse(null)
+                : null;
         return InteractiveSandboxRuntimeKey.of(spec, routing);
     }
 

@@ -29,9 +29,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID>, JpaSp
 
     List<Feedback> findByWorkspaceIdAndReviewIdOrderByCreatedAtAscIdAsc(long workspaceId, UUID reviewId);
 
-    List<Feedback> findByWorkspaceIdAndDeveloperIdAndDestinationOrderByCreatedAtDescIdDesc(
-            long workspaceId, long developerId, FeedbackDestination destination);
-
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT f FROM Feedback f WHERE f.id = :id AND f.workspaceId = :workspaceId")
     Optional<Feedback> lockByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") long workspaceId);

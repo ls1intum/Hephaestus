@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSend;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendQueue;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.dto.CreateFeedbackDecisionRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
@@ -49,6 +49,7 @@ public class FeedbackDecisionService {
     private final FeedbackGate gate;
     private final FeedbackContentDigest digests;
     private final PersonDataWriteFence privacy;
+    private final FeedbackSendQueue sendQueue;
 
     @Transactional
     public FeedbackDecision decide(
@@ -128,19 +129,10 @@ public class FeedbackDecisionService {
                     null,
                     feedback.getDeliveredAt());
             if (feedback.getDestination() == FeedbackDestination.ON_WORK) {
-                sends.save(FeedbackSend.builder()
-                        .feedbackId(feedbackId)
-                        .workspaceId(workspaceId)
-                        .action(FeedbackSendAction.POST)
-                        .state(
-                                action == FeedbackDecisionAction.APPROVE
-                                        ? FeedbackSendState.PENDING
-                                        : FeedbackSendState.DONE)
-                        .attempts(send.map(FeedbackSend::getAttempts).orElse(0))
-                        .nextAttemptAt(now)
-                        .createdAt(send.map(FeedbackSend::getCreatedAt).orElse(now))
-                        .updatedAt(now)
-                        .build());
+                sendQueue.queue(
+                        feedback,
+                        FeedbackSendAction.POST,
+                        action == FeedbackDecisionAction.APPROVE ? FeedbackSendState.PENDING : FeedbackSendState.DONE);
             }
         }
         FeedbackDecision decision = decisions.save(FeedbackDecision.builder()
@@ -160,29 +152,12 @@ public class FeedbackDecisionService {
                         .anyMatch(copy -> copy.getState() == FeedbackCopyState.POSTED
                                 || copy.getState() == FeedbackCopyState.RETRACTED)
                 && send.map(row -> row.getState() == FeedbackSendState.DONE).orElse(true)) {
-            sends.save(FeedbackSend.builder()
-                    .feedbackId(feedbackId)
-                    .workspaceId(workspaceId)
-                    .action(FeedbackSendAction.RETRACT)
-                    .state(FeedbackSendState.PENDING)
-                    .attempts(send.map(FeedbackSend::getAttempts).orElse(0))
-                    .nextAttemptAt(now)
-                    .createdAt(send.map(FeedbackSend::getCreatedAt).orElse(now))
-                    .updatedAt(now)
-                    .build());
+            sendQueue.queue(feedback, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
         }
         if (action == FeedbackDecisionAction.APPROVE) {
             events.publishEvent(new ApprovedFeedbackReadyEvent(workspaceId, feedbackId));
         }
         return decision;
-    }
-
-    @Transactional(readOnly = true)
-    public List<FeedbackDecision> list(long workspaceId, UUID feedbackId) {
-        var feedback = feedbackRepository
-                .findByIdAndWorkspaceId(feedbackId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
-        return decisions.findByWorkspaceIdAndFeedbackIdOrderByDecidedAtDescIdDesc(workspaceId, feedback.getId());
     }
 
     private static void validate(

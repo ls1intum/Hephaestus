@@ -63,7 +63,7 @@ void test("an I/O call is placed in the type that encloses it: the view's counts
 	assert.equal(result.facts.filesWithUnknownLocation, 0);
 });
 
-void test("an unavailable pinned file withholds the scan input instead of claiming unknown placement", async () => {
+void test("an unavailable pinned file withholds the scan input instead of claiming unknown item membership", async () => {
 	const result = await runBundledProgram("keeps-views-free-of-networking-and-persistence", {
 		repo: {},
 		change: new Map([whole("App/EventList.swift", view)]),

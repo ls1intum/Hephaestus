@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.outline.identity;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
-import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -42,7 +41,6 @@ public class OutlineIdentityResolver {
                 .flatMap(outlineProviderId ->
                         accountIdentityQuery.resolveAccountId(outlineProviderId, outlineSubject, teamId))
                 .filter(accountId -> workspaceMembershipQuery.membershipsForAccount(accountId).stream()
-                        .anyMatch(view ->
-                                view.workspaceId() == workspaceId && Objects.equals(view.accountId(), accountId)));
+                        .anyMatch(view -> view.workspaceId() == workspaceId));
     }
 }

@@ -52,9 +52,7 @@ public class ProductItemQuery {
     }
 
     private ItemSource source(ItemRef item) {
-        var matched = sources.stream()
-                .filter(s -> s.kind().equals(item.kind()) && s.supports(item))
-                .toList();
+        var matched = sources.stream().filter(s -> s.supports(item)).toList();
         if (matched.size() != 1) throw new IllegalArgumentException("The item has no unambiguous source.");
         return matched.getFirst();
     }

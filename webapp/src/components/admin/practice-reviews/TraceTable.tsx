@@ -23,7 +23,7 @@ const COLUMNS: Record<TraceTableKind, { times: string; plain: string }> = {
 
 const HEADERS: Record<TraceTableKind, readonly string[]> = {
 	results: ["#", "Practice", "Outcome", "Severity", "Feedback", "Time"],
-	feedback: ["#", "Channel", "State", "From", "Time"],
+	feedback: ["#", "Destination", "State", "From", "Time"],
 };
 
 /** The grid of one row, and of the header above the rows, so the columns line up. */

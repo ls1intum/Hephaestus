@@ -131,8 +131,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                 writer.upsert(new ItemRegistration(workspaceId, ScmItemEvents.FILE, null, root.itemId(), "src/a.ts"));
         assertThat(sourceAccess.permits(file, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isTrue();
-        var foreign =
-                workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("foreign-access-" + UUID.randomUUID()));
+        var foreign = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace(
+                "foreign-access-" + UUID.randomUUID().toString().substring(0, 12)));
         assertThat(monitored.repositories(foreign.getId())).isEmpty();
         assertThat(sourceAccess.permits(
                         new ItemRef(foreign.getId(), file.itemId(), file.kind(), null, root.itemId(), file.path()),
@@ -308,13 +308,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         historicalCommit.setRepository(fixture.repository());
         historicalCommit.setAuthor(historyAuthor);
         commits.saveAndFlush(historicalCommit);
-        UUID restriction = UUID.randomUUID();
-        jdbc.update(
-                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) "
-                        + "VALUES (?,?,?,'','ERASED')",
-                restriction,
-                fixture.provider().getId(),
-                Long.toString(historyAuthor.getNativeId()));
+        UUID restriction = databaseTestUtils.erase(
+                Objects.requireNonNull(fixture.provider().getId()), Long.toString(historyAuthor.getNativeId()), "");
         try {
             assertThatThrownBy(() -> sources.capture(
                             pullSnapshot,
@@ -444,7 +439,10 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                                 ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), slug),
                         ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE))
                 : WorkspaceTestFixtures.persistGitLabWorkspace(
-                        workspaces, connections, WorkspaceTestFixtures.gitLabPatWorkspace(slug), url);
+                        workspaces,
+                        connections,
+                        WorkspaceTestFixtures.gitLabPatWorkspace(slug).withSlug(slug),
+                        url);
         var repository = new Repository();
         repository.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         repository.setProvider(provider);
@@ -474,6 +472,9 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                                 ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), slug),
                         ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE))
                 : WorkspaceTestFixtures.persistGitLabWorkspace(
-                        workspaces, connections, WorkspaceTestFixtures.gitLabPatWorkspace(slug), url);
+                        workspaces,
+                        connections,
+                        WorkspaceTestFixtures.gitLabPatWorkspace(slug).withSlug(slug),
+                        url);
     }
 }

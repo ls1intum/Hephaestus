@@ -538,7 +538,7 @@ export async function runCustomProgram(
 			}
 			case "failed": {
 				finished = true;
-				// A program that fails before it declares itself, such as one in the retired form, is not a program.
+				// A program that fails before it declares itself is not a program.
 				const reason = message.reason ?? (meta === undefined ? "invalid-program" : "error");
 				settled = {
 					failure: {

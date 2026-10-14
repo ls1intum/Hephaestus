@@ -1,9 +1,9 @@
-import { scm, expectKind } from "../kits/scm/index.ts";
-import { bodyFact, classifyIssue, subIssueRollup } from "../kits/scm/issue-classification.ts";
-import { checkableItems } from "../kits/scm/review.ts";
 // Finds the task-list items and the issue-number mentions in the body of an issue, its labels, and the
 // sub-issue rollup with its source. The criteria decide from the text if the work is large and if it
 // is broken down.
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { bodyFact, classifyIssue, subIssueRollup } from "../kits/scm/issue-classification.ts";
+import { checkableItems } from "../kits/scm/review.ts";
 import { DIRECTION_CHARS, listWithin } from "../lib/core/bounded-text.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 

@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
@@ -27,7 +28,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturePrepar
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedWork;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCitableTexts;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
@@ -60,12 +60,12 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
-public class ScmItemService {
+public class ScmItemService implements ItemSource {
     private final ScmItemAccess items;
     private final ScmItemLabelQuery labels;
     private final ScmRepositoryAccess repositories;
     private final RepositoryRepository repositoryRows;
-    private final IssueRepository issues;
+    private final ScmWorkLookup workLookup;
     private final PullRequestReviewRepository reviews;
     private final IssueEvidenceVersion issueVersions;
     private final ScmGitTree tree;
@@ -74,14 +74,21 @@ public class ScmItemService {
     private final ScmWorkCapture workCapture;
     private final ScmCaptureContributors contributors;
 
+    @Override
+    public boolean supports(ItemRef item) {
+        return ScmItemEvents.ALL.contains(item.kind());
+    }
+
+    @Override
     public Map<Long, ItemLabel> labels(long workspaceId, Collection<ItemRef> refs) {
         items.requireAll(workspaceId, refs);
         return labels.labels(workspaceId, refs.stream().map(ItemRef::itemId).toList());
     }
 
+    @Override
     public Optional<ItemSnapshot> current(ItemRef item) {
         try {
-            return Optional.of(pin(item, null));
+            return Optional.of(pinItem(item, null));
         } catch (ItemCaptureException e) {
             if (e.code() == ItemCaptureCode.ITEM_REMOVED || e.code() == ItemCaptureCode.ITEM_NOT_VISIBLE)
                 return Optional.empty();
@@ -89,7 +96,13 @@ public class ScmItemService {
         }
     }
 
+    @Transactional(readOnly = true, noRollbackFor = ItemCaptureException.class)
+    @Override
     public ItemSnapshot pin(ItemRef item, @Nullable ItemVersion requested) {
+        return pinItem(item, requested);
+    }
+
+    private ItemSnapshot pinItem(ItemRef item, @Nullable ItemVersion requested) {
         items.require(item);
         if (item.kind().equals(ScmItemEvents.FILE) ? item.path() == null : item.sourceId() == null) throw invisible();
         ItemSnapshot snapshot;
@@ -110,11 +123,9 @@ public class ScmItemService {
             workItem = items.parent(item, ScmItemEvents.PULL_REQUEST);
             if (!Objects.equals(workItem.sourceId(), work.getId())) throw invisible();
         } else {
-            work = issues.findByIdWithAuthorAndRepository(Objects.requireNonNull(item.sourceId()))
+            work = workLookup
+                    .find(item.kind(), Objects.requireNonNull(item.sourceId()))
                     .orElseThrow(ScmItemService::gone);
-            if ((work instanceof PullRequest) != item.kind().equals(ScmItemEvents.PULL_REQUEST)
-                    || (!item.kind().equals(ScmItemEvents.ISSUE) && !item.kind().equals(ScmItemEvents.PULL_REQUEST)))
-                throw invisible();
         }
         if (work.getDeletedAt() != null) throw gone();
         Repository repository = Objects.requireNonNull(work.getRepository());
@@ -255,8 +266,9 @@ public class ScmItemService {
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Override
     public CaptureContribution capture(ItemSnapshot pinned, CaptureRequest request) {
-        ItemSnapshot verified = pin(pinned.item(), pinned.version());
+        ItemSnapshot verified = pinItem(pinned.item(), pinned.version());
         if (!verified.integration().equals(pinned.integration())
                 || !verified.roles().equals(pinned.roles())) throw versionUnavailable();
         if (!request.sourceContractVersion().equals("2.0.0") || request.scriptContractVersion() != 3)
@@ -270,7 +282,9 @@ public class ScmItemService {
                     .orElseThrow(ScmItemService::gone);
             work = Objects.requireNonNull(review.getPullRequest());
         } else
-            work = issues.findByIdWithAuthorAndRepository(
+            work = workLookup
+                    .find(
+                            pinned.item().kind(),
                             Objects.requireNonNull(pinned.item().sourceId()))
                     .orElseThrow(ScmItemService::gone);
         contributors.require(work, review, request.sources());
@@ -298,6 +312,7 @@ public class ScmItemService {
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @Override
     public JsonNode record(ItemSnapshot pinned, Map<String, byte[]> capturedFiles) {
         ItemKind kind = pinned.item().kind();
         boolean treeRecord = kind.equals(ScmItemEvents.FILE) || kind.equals(ScmItemEvents.REPOSITORY);

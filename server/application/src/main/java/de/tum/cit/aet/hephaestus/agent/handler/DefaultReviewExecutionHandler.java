@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
@@ -7,10 +8,8 @@ import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
-import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
@@ -41,6 +40,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -49,7 +49,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
-public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
+public class DefaultReviewExecutionHandler {
     private final ReviewJobAssignments assignments;
     private final List<ItemSource> sources;
     private final WorkspaceContextBuilder context;
@@ -58,18 +58,14 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
     private final PracticeScriptInputs inputs;
     private final ReviewHistoryContentSource history;
     private final ReviewAssignmentStore capture;
-    private final ReviewOutputService output;
     private final ObjectMapper mapper;
     private final Clock clock;
 
-    @Override
     public PreparedJobInputs prepareInputs(ReviewJob job) {
         var review = assignments.review(job);
         var pinned = assignments.load(job);
         var item = pinned.getFirst().item();
-        var matching = sources.stream()
-                .filter(source -> source.kind().equals(item.kind()) && source.supports(item))
-                .toList();
+        var matching = sources.stream().filter(source -> source.supports(item)).toList();
         if (matching.size() != 1) throw new IllegalStateException("The item needs exactly one capture source");
         var source = matching.getFirst();
         var contracts = pinned.stream()
@@ -81,7 +77,7 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
                         .contract())
                 .distinct()
                 .toList();
-        if (!contracts.equals(List.of("2.0.0")))
+        if (!contracts.equals(List.of(SandboxLayout.SOURCE_CONTRACT_VERSION)))
             throw new IllegalArgumentException("The assigned source contract is not executable");
         var required = pinned.stream()
                 .flatMap(a -> (review.kind() == ReviewKind.SCAN
@@ -97,7 +93,13 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
         try {
             var evidence = context.prepare(
                     snapshot,
-                    new CaptureRequest(review.id(), job.getId(), job.getAttempt(), required, contracts.getFirst(), 3));
+                    new CaptureRequest(
+                            review.id(),
+                            job.getId(),
+                            job.getAttempt(),
+                            required,
+                            contracts.getFirst(),
+                            SandboxLayout.PRACTICE_CONTRACT_VERSION));
             try {
                 var manifest = Objects.requireNonNull(evidence.manifest());
                 var now = clock.instant();
@@ -151,8 +153,12 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
                                         .put("origin", prior.origin().name())
                                         .put("itemVersion", prior.itemVersion())
                                         .put("outcome", prior.outcome().name());
-                                coordinates.putArray("citations");
-                                previous = coordinates;
+                                var priorEvidence = prior.evidence();
+                                if (priorEvidence != null
+                                        && priorEvidence.path("citations").isArray()) {
+                                    coordinates.set("citations", previousCitations(priorEvidence));
+                                    previous = coordinates;
+                                }
                             }
                         }
                         staged.putAll(inputs.stage(
@@ -160,7 +166,6 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
                                 assignment,
                                 record,
                                 Objects.requireNonNullElse(job.getStartedAt(), now),
-                                null,
                                 previous));
                     }
                 }
@@ -198,6 +203,35 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
         }
     }
 
+    private JsonNode previousCitations(JsonNode evidence) {
+        var citations = new ArrayList<PreviousCitation>();
+        for (var source : evidence.path("citations")) {
+            if (!source.path("sourcePath").isString()
+                    || !source.path("path").isString()
+                    || !source.path("startLine").isIntegralNumber()
+                    || !source.path("endLine").isIntegralNumber()) continue;
+            citations.add(new PreviousCitation(
+                    source.path("sourceKind").asString(),
+                    source.path("sourcePath").asString(),
+                    source.path("path").asString(),
+                    source.path("startLine").asInt(),
+                    source.path("endLine").asInt(),
+                    source.hasNonNull("side") ? source.path("side").asString() : null,
+                    source.hasNonNull("revision") ? source.path("revision").asString() : null));
+        }
+        return mapper.valueToTree(citations);
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record PreviousCitation(
+            String sourceKind,
+            String sourcePath,
+            String path,
+            int startLine,
+            int endLine,
+            @Nullable String side,
+            @Nullable String revision) {}
+
     private AutomatedReviewReadinessDecision readiness(
             ReviewAssignmentSnapshot assignment, JobFolderIndex manifest, Instant now, ReviewKind scope) {
         var definition = assignment.practice().definition();
@@ -234,10 +268,5 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
         if (checks.stream().anyMatch(check -> !check.meetsRequirements()))
             reasons.add(AutomatedReviewReadinessReason.DECLARED_EVIDENCE_INSUFFICIENT);
         return new AutomatedReviewReadinessDecision(assignment.practiceSlug(), now, reasons.isEmpty(), reasons, checks);
-    }
-
-    @Override
-    public PreparedResults prepareResults(ReviewJob job, AdmissionRequestDTO submission) {
-        return output.prepare(job, submission);
     }
 }

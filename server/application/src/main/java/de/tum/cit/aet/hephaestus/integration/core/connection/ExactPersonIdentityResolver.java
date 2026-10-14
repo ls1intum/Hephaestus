@@ -24,9 +24,7 @@ import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/**
- * Exact provider-key closure, including disabled links. Cached actor ids are never ownership proof.
- */
+/** Exact provider-key closure, including disabled links. Cached actor ids are never ownership proof. */
 @Component
 @ConditionalOnCaptureRole
 @WorkspaceAgnostic("Verified person requests intentionally span all workspaces")
@@ -95,14 +93,12 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
             owners.addAll(linkedOwners(identity));
         }
         if (owners.size() > 1) {
-            throw conflict(
-                    "The supplied identities belong to different accounts. Correct the exact" + " identity scope.");
+            throw conflict("The supplied identities belong to different accounts. Correct the exact identity scope.");
         }
         Long resolvedAccount = owners.stream().findFirst().orElse(null);
         if (resolvedAccount != null) {
             identities.addAll(jdbc.query(
-                    "SELECT provider_id, provider_user_key, NULLIF(team_key,'') AS team_id"
-                            + " FROM identity WHERE account_id = ?",
+                    "SELECT provider_id, provider_user_key, NULLIF(team_key,'') AS team_id FROM identity WHERE account_id = ?",
                     (rs, row) -> new PersonIdentity(
                             rs.getLong("provider_id"),
                             Objects.requireNonNull(rs.getString("provider_user_key")),
@@ -125,8 +121,7 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
             // with an internally conflicting link must not widen an erasure request silently.
             List<Long> linked = linkedOwners(identity);
             if (linked.stream().anyMatch(owner -> !owner.equals(resolvedAccount))) {
-                throw conflict(
-                        "A provider identity is linked to another account. Resolve the link" + " conflict first.");
+                throw conflict("A provider identity is linked to another account. Resolve the link conflict first.");
             }
         }
         List<PersonIdentity> ordered = identities.stream()
@@ -165,7 +160,7 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
                     .orElseThrow(() -> invalid("The provider instance id does not exist"));
             var origin = ScmOrigin.of(selected.serverUrl())
                     .orElseThrow(() ->
-                            conflict("The provider instance has no valid origin." + " Repair its exact instance key."));
+                            conflict("The provider instance has no valid origin. Repair its exact instance key."));
             for (var candidate : instances) {
                 if (candidate.type().equals(selected.type())
                         && ScmOrigin.of(candidate.serverUrl())
@@ -179,12 +174,10 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
 
     private List<Long> linkedOwners(PersonIdentity identity) {
         String type = validateProvider(identity);
-        // Outline links retain the verified OAuth workspace key. An instance/native-user request
-        // must check every such link before selecting anything, not silently miss its account.
-        boolean outlineInstanceIdentity = type.equals("OUTLINE");
+        // An instance-only Outline request checks all verified teams; a supplied team stays exact.
+        boolean outlineInstanceIdentity = type.equals("OUTLINE") && identity.teamId() == null;
         return jdbc.query(
-                "SELECT DISTINCT account_id FROM identity WHERE provider_id=? AND"
-                        + " provider_user_key=? AND (team_key=COALESCE(?,'') OR ?)",
+                "SELECT DISTINCT account_id FROM identity WHERE provider_id=? AND provider_user_key=? AND (team_key=COALESCE(?,'') OR ?)",
                 (rs, row) -> rs.getLong(1),
                 identity.providerId(),
                 identity.subject(),
@@ -208,10 +201,10 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
         String type = types.getFirst();
         if (type.equals("SLACK")) {
             if (!Boolean.TRUE.equals(jdbc.queryForObject(
-                    "SELECT server_url='https://slack.com' FROM identity_provider WHERE" + " id=?",
+                    "SELECT server_url='https://slack.com' FROM identity_provider WHERE id=?",
                     Boolean.class,
                     identity.providerId())))
-                throw invalid("A Slack identity requires the configured https://slack.com provider" + " instance");
+                throw invalid("A Slack identity requires the configured https://slack.com provider instance");
             if (identity.teamId() == null) {
                 throw invalid("A Slack identity requires its native Slack workspace id");
             }

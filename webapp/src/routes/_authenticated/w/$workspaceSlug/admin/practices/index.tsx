@@ -33,6 +33,13 @@ import type {
 } from "@/api/types.gen";
 import { generateSlug } from "@/components/admin/practice-editor/constants";
 import {
+	type GroupAdoptionPreview,
+	parseAdoptablePractices,
+	parseGroupAdoptionPreview,
+	parsePracticeAdoptionPreview,
+	type PracticeAdoptionPreview,
+} from "@/components/admin/practices/catalog-adoption";
+import {
 	GroupAdoptionPanel,
 	type GroupAdoptionState,
 } from "@/components/admin/practices/GroupAdoptionPanel";
@@ -101,8 +108,8 @@ import { useSearchState } from "@/lib/search-params";
 
 /** A level's payload, tagged by the kind of entry that produced it; a level not yet created has none. */
 type LevelPayload =
-	| { kind: "catalog-group"; data: CatalogGroupAdoptionPreview }
-	| { kind: "catalog-practice"; data: CatalogPracticePreview }
+	| { kind: "catalog-group"; data: GroupAdoptionPreview }
+	| { kind: "catalog-practice"; data: PracticeAdoptionPreview }
 	| { kind: "practice"; data: Practice };
 type LevelQuery = { data: LevelPayload | null | undefined } | undefined;
 
@@ -191,6 +198,7 @@ function PracticeCatalogRoute() {
 	});
 	const catalogQuery = useQuery({
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
+		select: parseAdoptablePractices,
 		enabled: library === true,
 	});
 	// What each practice script needs is read only on a practice's own level.
@@ -206,13 +214,15 @@ function PracticeCatalogRoute() {
 			if (entry.kind === "catalog-group") {
 				return {
 					...previewGroupAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
-					select: (data: CatalogGroupAdoptionPreview) => ({ kind: "catalog-group", data }) as const,
+					select: (data: CatalogGroupAdoptionPreview) =>
+						({ kind: "catalog-group", data: parseGroupAdoptionPreview(data) }) as const,
 				};
 			}
 			if (entry.kind === "catalog-practice") {
 				return {
 					...previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
-					select: (data: CatalogPracticePreview) => ({ kind: "catalog-practice", data }) as const,
+					select: (data: CatalogPracticePreview) =>
+						({ kind: "catalog-practice", data: parsePracticeAdoptionPreview(data) }) as const,
 				};
 			}
 			if (entry.kind === "practice-new") {
@@ -281,6 +291,7 @@ function PracticeCatalogRoute() {
 		...previewGroupAdoptionOptions({
 			path: { workspaceSlug, slug: resetGroup?.catalogOrigin.catalogSlug ?? "" },
 		}),
+		select: parseGroupAdoptionPreview,
 		enabled: resetGroup?.catalogOrigin.catalogSlug != null,
 	});
 	let resetState: ResetToCatalogState = { status: "loading" };

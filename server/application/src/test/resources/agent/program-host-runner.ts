@@ -19,6 +19,7 @@ import nodePath from "node:path";
 import { mock } from "node:test";
 
 import {
+	AUTHENTICATION_PRACTICE,
 	GOLDEN_INPUTS,
 	GOLDEN_RECORD,
 	PRACTICES_DIR,
@@ -29,6 +30,55 @@ const LIB = nodePath.resolve(
 	import.meta.dirname,
 	"../../../../../../docker/agents/practice-scripts/lib",
 );
+
+export const INVALID_META_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
+export default definePracticeScript({
+    meta: { limits: {} },
+    async run() { return { outcome: "MET" }; },
+});
+`;
+
+export function codingAgentExports(
+	cwd: string,
+	manager: unknown,
+	onResourceLoad?: (options: {
+		systemPrompt: string;
+		agentsFilesOverride?: () => unknown;
+		extensionFactories?: unknown[];
+	}) => void,
+	beforeRuntime?: () => void,
+) {
+	return {
+		defineTool: (tool: unknown) => tool,
+		estimateTokens: (message: { content: string }) => Math.ceil(message.content.length / 4),
+		createCodemodeExtension: () => () => undefined,
+		getAgentDir: () => cwd,
+		DefaultResourceLoader: class {
+			constructor(options: {
+				systemPrompt: string;
+				agentsFilesOverride?: () => unknown;
+				extensionFactories?: unknown[];
+			}) {
+				onResourceLoad?.(options);
+			}
+			readonly loaded = Promise.resolve();
+			async reload() {
+				await this.loaded;
+			}
+		},
+		SettingsManager: { create: () => ({}) },
+		SessionManager: { create: () => manager, inMemory: () => manager, open: () => manager },
+		ModelRuntime: {
+			async create() {
+				beforeRuntime?.();
+				return {
+					registerProvider: () => undefined,
+					getModel: () => ({ id: "test-model", contextWindow: 128_000, maxTokens: 16_384 }),
+				};
+			},
+		},
+	};
+}
 
 /** What the mocked review session of a practice does: submit a result, end without one, or never end. */
 export type SessionBehaviour = "submit" | "silent" | "hang";
@@ -140,10 +190,7 @@ export function stagePractices(cwd: string, practices: readonly StagedPractice[]
 		),
 	);
 	for (const { slug, program, inputs = true } of practices) {
-		write(
-			`catalog/practices/${slug}.md`,
-			"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n",
-		);
+		write(`catalog/practices/${slug}.md`, AUTHENTICATION_PRACTICE);
 		if (inputs) {
 			write(
 				`${PRACTICES_DIR}/${slug}.inputs.json`,
@@ -288,26 +335,7 @@ if (scenario !== undefined && scenario !== "") {
 	let sessionCount = 0;
 	mock.module("@earendil-works/pi-coding-agent", {
 		namedExports: {
-			defineTool: (tool: unknown) => tool,
-			estimateTokens: (message: { content: string }) => Math.ceil(message.content.length / 4),
-			createCodemodeExtension: () => () => undefined,
-			getAgentDir: () => cwd,
-			DefaultResourceLoader: class {
-				readonly loaded = Promise.resolve();
-				async reload() {
-					await this.loaded;
-				}
-			},
-			SettingsManager: { create: () => ({}) },
-			SessionManager: { create: () => manager, inMemory: () => manager, open: () => manager },
-			ModelRuntime: {
-				async create() {
-					return {
-						registerProvider: () => undefined,
-						getModel: () => ({ id: "test-model", contextWindow: 128_000, maxTokens: 16_384 }),
-					};
-				},
-			},
+			...codingAgentExports(cwd, manager),
 			async createAgentSession(options: { customTools: CustomTool[] }) {
 				sessionCount += 1;
 				const session = sessionCount;

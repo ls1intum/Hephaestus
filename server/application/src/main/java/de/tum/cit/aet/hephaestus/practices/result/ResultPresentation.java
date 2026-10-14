@@ -30,10 +30,13 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import java.time.Instant;
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -101,7 +104,23 @@ public class ResultPresentation {
                 : List.of();
     }
 
-    public ResultListDTO list(ResultView v, boolean permitted) {
+    public List<ResultListDTO> lists(long workspaceId, Collection<ResultView> views, Set<UUID> permitted) {
+        if (views.isEmpty()) return List.of();
+        var ids = views.stream().map(v -> v.result().getId()).toList();
+        var marked = marks.findByWorkspaceIdAndResultIdInAndRemovedAtIsNull(workspaceId, ids).stream()
+                .collect(Collectors.groupingBy(ResultMark::getResultId));
+        var children = problems.findByWorkspaceIdAndResultIdInOrderByResultIdAscPositionAsc(workspaceId, ids).stream()
+                .collect(Collectors.groupingBy(Problem::getResultId));
+        return views.stream()
+                .map(v -> list(
+                        v,
+                        permitted.contains(v.result().getId()),
+                        marked.getOrDefault(v.result().getId(), List.of()),
+                        children.getOrDefault(v.result().getId(), List.of())))
+                .toList();
+    }
+
+    private ResultListDTO list(ResultView v, boolean permitted, List<ResultMark> activeMarks, List<Problem> children) {
         var r = v.result();
         return new ResultListDTO(
                 r.getId(),
@@ -115,9 +134,21 @@ public class ResultPresentation {
                 v.review().getOrigin(),
                 r.getRecordedAt(),
                 currentness(v),
-                markedAt(r, ResultMarkKind.INCORRECT),
-                markedAt(r, ResultMarkKind.ACCEPTED),
-                summaries(r, permitted));
+                markTime(activeMarks, ResultMarkKind.INCORRECT),
+                markTime(activeMarks, ResultMarkKind.ACCEPTED),
+                permitted
+                        ? children.stream()
+                                .map(p -> new ProblemSummaryDTO(p.getId(), p.getSeverity(), p.getSummary()))
+                                .toList()
+                        : List.of());
+    }
+
+    private static @Nullable Instant markTime(List<ResultMark> active, ResultMarkKind kind) {
+        return active.stream()
+                .filter(m -> m.getKind() == kind)
+                .map(ResultMark::getCreatedAt)
+                .findFirst()
+                .orElse(null);
     }
 
     public ResultDetailDTO detail(ResultView v, boolean permitted) {

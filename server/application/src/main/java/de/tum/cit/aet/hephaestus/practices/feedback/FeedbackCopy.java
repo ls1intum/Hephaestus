@@ -77,6 +77,10 @@ public class FeedbackCopy {
     @Column(name = "stop_reason", nullable = true, length = 48)
     private @Nullable FeedbackStopReason stopReason;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "readback", nullable = true, length = 16)
+    private @Nullable FeedbackCopyReadback readback;
+
     @Column(name = "last_error", nullable = true, length = 512)
     private @Nullable String lastError;
 

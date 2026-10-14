@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
@@ -43,7 +42,7 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
     void missingItemIsSkipped() {
         var batch = batch();
         when(items.find(1, 7)).thenReturn(Optional.empty());
-        assertThat(submitter.offer(batch, 7)).isEqualTo(ReviewBatchSubmitter.SubmissionOutcome.SKIPPED);
+        assertThat(submitter.offer(batch, 7)).isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
         verifyNoInteractions(reviews);
     }
 
@@ -84,12 +83,7 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
         when(spend.remaining(batch)).thenReturn(new ReviewBatchSpend.Snapshot(reserved, true));
         var id = UUID.randomUUID();
         when(reviews.request(ArgumentMatchers.any())).thenReturn(id);
-        if (reviewKind == ReviewKind.SCAN) {
-            when(items.pin(ref, null)).thenReturn(snapshot);
-            when(ledger.findByIdAndWorkspaceId(id, 1))
-                    .thenReturn(Optional.of(Review.builder().id(id).build()));
-        }
-        assertThat(submitter.offer(batch, 7)).isEqualTo(ReviewBatchSubmitter.SubmissionOutcome.SUBMITTED);
+        assertThat(submitter.offer(batch, 7)).isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
         var capture = ArgumentCaptor.forClass(ReviewRequest.class);
         verify(reviews).request(capture.capture());
         var request = capture.getValue();

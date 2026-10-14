@@ -32,48 +32,51 @@ export function parseDiff(diffContent: string): Map<string, DiffFile> {
 		let currentHunk: DiffHunk | null = null;
 		let newLineNum = 0;
 		let oldLineNum = 0;
+		// Lines the current hunk still holds, by its header; a hunk line is read by its first character only.
+		let oldLeft = 0;
+		let newLeft = 0;
 
-		for (const line of lines) {
-			const {
-				oldStart,
-				oldCount = "1",
-				newStart,
-				newCount = "1",
-			} = HUNK_HEADER.exec(line)?.groups ?? {};
-			if (oldStart !== undefined && newStart !== undefined) {
-				currentHunk = {
-					oldStart: Number.parseInt(oldStart, 10),
-					oldCount: Number.parseInt(oldCount, 10),
-					newStart: Number.parseInt(newStart, 10),
-					newCount: Number.parseInt(newCount, 10),
-					lines: [],
-				};
-				hunks.push(currentHunk);
-				oldLineNum = currentHunk.oldStart;
-				newLineNum = currentHunk.newStart;
+		for (const annotated of lines) {
+			const line = annotated.replace(/^\[L\d+\] /u, "");
+			if (currentHunk === null || (oldLeft === 0 && newLeft === 0)) {
+				const {
+					oldStart,
+					oldCount = "1",
+					newStart,
+					newCount = "1",
+				} = HUNK_HEADER.exec(line)?.groups ?? {};
+				if (oldStart !== undefined && newStart !== undefined) {
+					currentHunk = {
+						oldStart: Number.parseInt(oldStart, 10),
+						oldCount: Number.parseInt(oldCount, 10),
+						newStart: Number.parseInt(newStart, 10),
+						newCount: Number.parseInt(newCount, 10),
+						lines: [],
+					};
+					hunks.push(currentHunk);
+					oldLineNum = currentHunk.oldStart;
+					newLineNum = currentHunk.newStart;
+					oldLeft = currentHunk.oldCount;
+					newLeft = currentHunk.newCount;
+				}
 				continue;
 			}
-
-			if (!currentHunk) {
-				continue;
-			}
-
-			// Strip [L<n>] annotation if present
-			const stripped = line.replace(/^\[L\d+\]\s*/u, "");
-
-			if (stripped.startsWith("+") && !stripped.startsWith("+++")) {
-				addedLines.set(newLineNum, stripped.slice(1));
-				currentHunk.lines.push(stripped);
+			if (line.startsWith("+")) {
+				addedLines.set(newLineNum, line.slice(1));
+				currentHunk.lines.push(line);
 				newLineNum += 1;
-			} else if (stripped.startsWith("-") && !stripped.startsWith("---")) {
-				removedLines.set(oldLineNum, stripped.slice(1));
-				currentHunk.lines.push(stripped);
+				newLeft -= 1;
+			} else if (line.startsWith("-")) {
+				removedLines.set(oldLineNum, line.slice(1));
+				currentHunk.lines.push(line);
 				oldLineNum += 1;
-			} else if (!stripped.startsWith("\\")) {
-				// Context line
-				currentHunk.lines.push(stripped);
+				oldLeft -= 1;
+			} else if (!line.startsWith("\\")) {
+				currentHunk.lines.push(line);
 				newLineNum += 1;
 				oldLineNum += 1;
+				newLeft -= 1;
+				oldLeft -= 1;
 			}
 		}
 

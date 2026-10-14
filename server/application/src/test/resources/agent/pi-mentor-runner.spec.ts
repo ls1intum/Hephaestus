@@ -38,7 +38,7 @@ void test("the protocol is version 3, which names prepared feedback separately",
 	assert.equal(MENTOR_PROTOCOL_VERSION, 3);
 });
 
-void test("fetch_context reads the history of results, not the retired history of problems", () => {
+void test("fetch_context reads the authorized result history", () => {
 	assert.equal(isFetchContextKey("inputs/context/results_history.json"), true);
 	assert.equal(isFetchContextKey("inputs/context/problems_history.json"), false);
 	assert.equal(

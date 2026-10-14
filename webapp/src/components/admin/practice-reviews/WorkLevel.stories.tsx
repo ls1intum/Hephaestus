@@ -1,21 +1,34 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 
-import { artifactTrace, tracedArtifact } from "@/components/practice-trace/fixtures";
+import { eventLabel } from "@/components/practice-trace/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { settledDrawerPanel } from "@/stories/overlay";
 
-import { mergedPullRequestFacts, openIssueFacts } from "./fixtures";
+import {
+	itemEventsOf,
+	mergedPullRequestFacts,
+	openIssueFacts,
+	pullRequestReviewItem,
+	reviewDetailCompleted,
+	reviewItem,
+	trackerIssue,
+} from "./fixtures";
 import { SHEET_SECTIONS } from "./RecordSheet";
+import { itemLevel } from "./review-levels";
 import { WorkLevel } from "./WorkLevel";
 
+const retryItem = fn();
+/** The pull request's events: one started its review, one waited out a cooldown, one was blocked. */
+const reviewItemEvents = itemEventsOf(reviewDetailCompleted);
+
 /**
- * One piece of work's sheet, in the order every record sheet has: a status line (whether a review
- * started, where it stands on its provider, how many moments, the latest), What it is (kind,
- * author, branches, size, checks), its history — opened, every moment on the work with what
- * happened, how we came to know, why no review started and the setting that would let it through,
- * merged or closed — Technical (closed) and asking for a review as the footer.
+ * One item's sheet, in the order every record sheet has: a status line (what became of its latest
+ * event, how many events started a review, the latest), What it is (kind, where it lives, the work
+ * it belongs to, and what its provider reports), its history — every event on the item with how we
+ * came to know, what became of it, why no review started and the setting that would let it
+ * through — Technical (closed) and asking for a review as the footer.
  */
 const meta = {
 	component: WorkLevel,
@@ -25,12 +38,15 @@ const meta = {
 	args: {
 		workspaceSlug: "demo",
 		path: { behind: [{ label: "Practice reviews", depth: 0 }], onClose: fn() },
-		work: { status: "ready", work: tracedArtifact(1430) },
+		item: { status: "ready", item: reviewItem },
+		events: { status: "ready", events: reviewItemEvents },
+		facts: { status: "ready", facts: mergedPullRequestFacts.facts },
+		eventLabel,
 		onRequestReview: fn(),
 	},
-	argTypes: { path: { control: false } },
+	argTypes: { path: { control: false }, eventLabel: { control: false } },
 	render: (args) => (
-		<InLevelStack entry={{ kind: "work", id: "issue:1430" }} path={args.path}>
+		<InLevelStack entry={itemLevel(reviewItem.id)} path={args.path}>
 			{(level) => <WorkLevel {...args} {...level} />}
 		</InLevelStack>
 	),
@@ -39,21 +55,36 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const NoReviewStarted: Story = {
+/**
+ * Every event on the pull request, oldest first, with what became of each, and what its provider
+ * reports about it.
+ */
+export const WithEvents: Story = {
 	play: async ({ args, userEvent }) => {
-		const panel = within(await settledDrawerPanel());
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
 		await expect(
 			panel.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent),
 		).toStrictEqual([SHEET_SECTIONS.what, SHEET_SECTIONS.state, SHEET_SECTIONS.technical]);
-		// Said once: the status line, not a badge, a field and a heading.
-		await expect(panel.getAllByText("No review started")).toHaveLength(1);
-		panel.getByText(/This workspace’s review settings did not allow a review of this work\./u);
-		await expect(panel.getByRole("link", { name: "Open Review: When and where" })).toHaveAttribute(
+		const history = within(panel.getByRole("list", { name: "History" }));
+		await expect(history.getAllByRole("listitem")).toHaveLength(reviewItemEvents.length);
+		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(
+			`${reviewItemEvents.length} events, 1 started a review`,
+		);
+		// Why an event started no review, with the setting that would let it through.
+		history.getByText(/The assigned AI model was unavailable\./u);
+		await expect(history.getByRole("link", { name: "Open AI models" })).toHaveAttribute(
 			"href",
-			expect.stringContaining("/admin/practices/review"),
+			expect.stringContaining("/admin/models"),
+		);
+		// What the provider reports, linked where it has a page.
+		panel.getByText("feature/retry-service → main");
+		await expect(panel.getByRole("link", { name: "Failing" })).toHaveAttribute(
+			"href",
+			expect.stringContaining("/checks"),
 		);
 		await userEvent.click(panel.getByRole("button", { name: "Request review" }));
-		// It starts an agent job, so it asks first.
+		// It starts a review, so it asks first.
 		await expect(args.onRequestReview).not.toHaveBeenCalled();
 		const confirm = await screen.findByRole("alertdialog");
 		await userEvent.click(within(confirm).getByRole("button", { name: "Request review" }));
@@ -61,7 +92,7 @@ export const NoReviewStarted: Story = {
 	},
 };
 
-/** While a review of the work is queued or running, the footer says so and asks nothing. */
+/** While a review of the item is queued or running, the footer says so and asks nothing. */
 export const RequestBlockedWhileRunning: Story = {
 	args: { requestBlocked: "A review of this work is already queued or running." },
 	play: async ({ args, userEvent }) => {
@@ -73,84 +104,79 @@ export const RequestBlockedWhileRunning: Story = {
 	},
 };
 
-/**
- * Every moment on the work, oldest first, between when it was opened and merged, and what its
- * provider reported about it: facts of the work, said here.
- */
-export const WithMoments: Story = {
-	args: {
-		work: { status: "ready", work: tracedArtifact(1423) },
-		moments: { status: "ready", moments: artifactTrace.signals },
-		facts: { status: "ready", facts: mergedPullRequestFacts },
-	},
-	play: async () => {
-		const panelElement = await settledDrawerPanel();
-		const panel = within(panelElement);
-		const history = within(panel.getByRole("list", { name: "History" }));
-		// The moments, opened, merged, and the last update after the merge.
-		await expect(history.getAllByRole("listitem")).toHaveLength(artifactTrace.signals.length + 3);
-		history.getByText("Opened");
-		history.getByText("Merged");
-		// Merged once: the flag in the status line, then the event.
-		await expect(panelElement.querySelector("[data-sheet-status]")).toHaveTextContent(/Merged/u);
-		panel.getByText("Jane Doe");
-		panel.getByText("feature/retry-service");
-		panel.getByText("+120 −30 · 7 files · 3 commits");
-		panel.getByText("Checks failed");
-		panel.getByText("Head revision");
-	},
-};
-
-/** An issue has an author and times, and no branches, size or checks. */
+/** An issue reports only what its provider has for it: no branches, size or checks. */
 export const IssueFacts: Story = {
-	args: { facts: { status: "ready", facts: openIssueFacts } },
+	args: {
+		item: { status: "ready", item: trackerIssue },
+		events: { status: "ready", events: [] },
+		facts: { status: "ready", facts: openIssueFacts.facts },
+	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByText("Alex Smith");
-		await expect(panel.queryByText("Branches")).toBeNull();
+		panel.getByText("grace");
+		await expect(panel.queryByText("Branch")).toBeNull();
 		await expect(panel.queryByText("Checks")).toBeNull();
 	},
 };
 
-/** What the provider reported could not be read: the moments still stand. */
+/** A pull request review is its own item, and links to the pull request it belongs to. */
+export const PartOfAPullRequest: Story = {
+	args: {
+		item: { status: "ready", item: pullRequestReviewItem },
+		events: { status: "ready", events: [] },
+		facts: { status: "ready", facts: [] },
+		onRequestReview: undefined,
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		await expect(panel.getByRole("link", { name: "Open the work it belongs to" })).toHaveAttribute(
+			"href",
+			expect.stringContaining(`item%3A${reviewItem.id}`),
+		);
+		await expect(panel.queryByRole("button", { name: "Request review" })).toBeNull();
+	},
+};
+
+/** No event was recorded on the item: the history says so instead of an empty list. */
+export const NoEvents: Story = {
+	args: { events: { status: "ready", events: [] } },
+	play: async () => {
+		const panelElement = await settledDrawerPanel();
+		const panel = within(panelElement);
+		panel.getByText("No event was recorded on this work.");
+		await expect(panelElement.querySelector("[data-sheet-status]")).toBeNull();
+	},
+};
+
+/** What the provider reports could not be read: the events still stand. */
 export const ProviderFactsFailed: Story = {
 	args: { facts: { status: "error", error: new Error("Network down"), onRetry: fn() } },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByText(/what the provider reported about this work/u);
+		panel.getByText(/what the provider reports about this work/u);
 		panel.getByRole("list", { name: "History" });
 	},
 };
 
-/**
- * Work in a repository the workspace does not monitor: nothing is stored about it, and the sheet
- * says so instead of an error, with what the server answered on a quiet line under it, while the
- * moments still stand.
- */
-export const RepositoryNotMonitored: Story = {
+/** While the item is read, the sheet's shape stands in for it. */
+export const Loading: Story = {
 	args: {
-		facts: {
-			status: "ready",
-			facts: undefined,
-			unmonitored: true,
-			answer: "204 No Content from GET /workspaces/demo/practices/reviews/work/scm.issue/1430",
-		},
+		item: { status: "loading" },
+		events: { status: "loading" },
+		facts: { status: "loading" },
 	},
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		await expect(panel.getByText(/workspace does not monitor the repository/u)).toBeVisible();
-		await expect(panel.getByText(/^Server answer: 204 No Content from GET /u)).toBeVisible();
-		await expect(panel.queryByRole("alert")).toBeNull();
-		panel.getByRole("list", { name: "History" });
+		await expect(panel.queryByRole("heading", { name: SHEET_SECTIONS.what })).toBeNull();
 	},
 };
 
-/** Work nothing was recorded about says so, under a title that says what it is. */
-export const NothingRecorded: Story = {
-	args: { work: { status: "ready", work: undefined } },
-	play: async () => {
+/** The item could not be read: the sheet says so and offers to try again. */
+export const LoadFailed: Story = {
+	args: { item: { status: "error", error: new Error("Network down"), onRetry: retryItem } },
+	play: async ({ userEvent }) => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByText(/Nothing was recorded about this work/u);
-		await expect(panel.getByRole("heading", { level: 2 })).toHaveTextContent("Unknown work");
+		await userEvent.click(panel.getByRole("button", { name: "Retry" }));
+		await expect(retryItem).toHaveBeenCalled();
 	},
 };

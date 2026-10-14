@@ -4,8 +4,6 @@ import { describe, test } from "node:test";
 import {
 	CANDIDATE_LIMITS,
 	CANDIDATE_REFUSALS,
-	LEGACY_CONTRACT_ERROR,
-	legacyContractError,
 	MAX_REVIEW_OPTIONS_BYTES,
 	parseCandidate,
 	parseMeta,
@@ -319,7 +317,7 @@ void describe("the candidate rules", () => {
 		accepted(value);
 	});
 
-	void test("a leads return is malformed: nothing guesses what it meant", () => {
+	void test("a value without an outcome is malformed: nothing guesses what it meant", () => {
 		assert.equal(refusalOf({ leads: [], facts: {} }), "malformed_candidate");
 		assert.equal(refusalOf(null), "malformed_candidate");
 		assert.equal(refusalOf("MET"), "malformed_candidate");
@@ -402,33 +400,14 @@ void describe("the program's meta", () => {
 			{ models: { chat: "sometimes" } },
 			{ models: { vision: "required" } },
 			{ limits: {} },
+			{ version: 1 },
 			null,
 			"meta",
 		]) {
 			const parsed = parseMeta(meta);
 			assert.ok("error" in parsed, JSON.stringify(meta));
-			assert.equal(parsed.legacy, false);
 			assert.match(parsed.error, /^meta: /u);
 		}
-	});
-
-	void test("a key of the retired leads contract is refused with the legacy error that names it", () => {
-		assert.equal(legacyContractError("version"), LEGACY_CONTRACT_ERROR);
-		for (const key of ["version", "kinds", "tokens"] as const) {
-			assert.deepEqual(
-				parseMeta({ models: { chat: "required" }, [key]: key === "kinds" ? {} : 1 }),
-				{
-					error: legacyContractError(key),
-					legacy: true,
-				},
-			);
-			assert.match(legacyContractError(key), new RegExp(`\\(meta\\.${key}\\)`, "u"));
-		}
-		// The first retired key in the contract's order is named.
-		assert.deepEqual(parseMeta({ tokens: 1, kinds: {} }), {
-			error: legacyContractError("kinds"),
-			legacy: true,
-		});
 	});
 });
 

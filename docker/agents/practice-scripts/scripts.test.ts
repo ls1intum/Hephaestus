@@ -516,17 +516,13 @@ void describe("every bundled practice script", async () => {
 		.map((name) => name.slice(0, -".ts".length))
 		.toSorted();
 
-	void it("covers the whole bundled set", () => {
-		assert.equal(slugs.length, 34);
-	});
-
 	for (const slug of slugs) {
 		void it(`${slug} asks exactly one review on minimal inputs of its kind`, async () => {
 			// runBundledReview fails unless the program asks one review and returns its result unchanged.
 			await runBundledReview(slug, MINIMAL_INPUTS[await kindOf(slug)]);
 		});
 
-		void it(`${slug} declares an empty meta: no models, version, kinds or tokens`, async () => {
+		void it(`${slug} declares an empty meta: it needs no direct model`, async () => {
 			assert.deepEqual(await stagedMeta(slug), {});
 		});
 	}

@@ -65,7 +65,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                         githubPrincipal("gh-2", "dev@example.com", "octocat"),
                         AuthIntentCookie.Intent.login(null, null))
                 .account();
-        long accountsAfterLogin = accountRepository.count();
 
         // While authenticated, they link their wiki identity (simulated auth.info principal).
         AccountProvisioningService.ProvisionResult linked = service.resolveOrProvision(
@@ -77,7 +76,7 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
         assertThat(linked.identityLinked()).isTrue();
         assertThat(linked.account().getId()).isEqualTo(persistedId(github.getId()));
         // The link attached to the existing account — it did NOT JIT a new one.
-        assertThat(accountRepository.count()).isEqualTo(accountsAfterLogin);
+        assertThat(accountRepository.findById(persistedId(github.getId()))).isPresent();
 
         List<Identity> links = identityRepository.findActiveByAccountId(persistedId(github.getId()));
         assertThat(links).extracting(Identity::getProviderUserKey).containsExactlyInAnyOrder("gh-2", OUTLINE_USER);
@@ -93,7 +92,6 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void outlineLoginModeIsRefusedBecauseTheProviderIsLinkOnly() {
         seedProvider("outline-loginmode", LoginProvider.ProviderType.OUTLINE);
-        long before = accountRepository.count();
 
         // LOGIN mode on a link-only provider — the success handler maps this to
         // /auth/error?code=link_requires_auth.
@@ -104,13 +102,12 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                         AuthIntentCookie.Intent.login(null, null)))
                 .isInstanceOf(LinkOnlyProviderLoginException.class);
 
-        assertThat(accountRepository.count()).isEqualTo(before);
+        assertThat(accountRepository.findByPrimaryEmail("dev@example.com")).isEmpty();
     }
 
     @Test
     void unauthenticatedOutlineLinkStartCreatesNoAccount() {
         seedProvider("outline-noauth", LoginProvider.ProviderType.OUTLINE);
-        long before = accountRepository.count();
 
         // A LINK-mode callback with no authenticated account binding must fail closed — never an
         // orphan.
@@ -121,7 +118,7 @@ class OutlineIdentityIntegrationTest extends RealAuthIntegrationTest {
                         AuthIntentCookie.Intent.link(null, "/settings")))
                 .isInstanceOf(IllegalStateException.class);
 
-        assertThat(accountRepository.count()).isEqualTo(before);
+        assertThat(accountRepository.findByPrimaryEmail("dev@example.com")).isEmpty();
     }
 
     @Test

@@ -266,8 +266,7 @@ public class GitHubSummaryWriter implements SummaryWriter {
                 cursor = next;
             } catch (RuntimeException e) {
                 log.debug(
-                        "Existing-summary dedup lookup failed (treated as unknown, not absent):"
-                                + " scopeId={}, error={}",
+                        "Existing-summary dedup lookup failed (treated as unknown, not absent): scopeId={}, error={}",
                         scopeId,
                         e.getMessage());
                 return SummaryLookup.unknown();

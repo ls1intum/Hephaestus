@@ -1,4 +1,4 @@
-/** The parsed change, as `lib/diff-parser.ts` reads a unified diff. */
+/** The parsed change, as `diff-parser.ts` reads a unified diff. */
 
 export interface DiffFile {
 	path: string;

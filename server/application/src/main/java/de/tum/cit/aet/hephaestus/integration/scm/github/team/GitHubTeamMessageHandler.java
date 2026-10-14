@@ -30,20 +30,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Handles GitHub team webhook events.
  *
- * <p><b>Subject tiers.</b> GitHub delivers {@code team} events with two different payload shapes
- * and the generic subject deriver keys them onto two different tiers:
- *
+ * <p><b>Subject tiers.</b> GitHub delivers {@code team} events with two different payload shapes and
+ * the generic subject deriver keys them onto two different tiers:
  * <ul>
- *   <li>{@code created}/{@code edited}/{@code deleted} carry only an {@code organization} → {@code
- *       organization.team} (this handler).
- *   <li>{@code added_to_repository}/{@code removed_from_repository} additionally carry a {@code
- *       repository} → {@code repository.team}, routed by {@link GitHubTeamRepositoryMessageHandler}
- *       which delegates back into {@link #routeTeamEvent(GitHubTeamEventDTO)}.
+ *   <li>{@code created}/{@code edited}/{@code deleted} carry only an {@code organization} →
+ *       {@code organization.team} (this handler).</li>
+ *   <li>{@code added_to_repository}/{@code removed_from_repository} additionally carry a
+ *       {@code repository} → {@code repository.team}, routed by {@link GitHubTeamRepositoryMessageHandler}
+ *       which delegates back into {@link #routeTeamEvent(GitHubTeamEventDTO)}.</li>
  * </ul>
- *
  * Without the second registration the repo-permission actions would key to {@code repository.team},
- * which has no handler, and be silently ACK-dropped — team↔repo permission changes would only land
- * at the next full team sync.
+ * which has no handler, and be silently ACK-dropped — team↔repo permission changes would only land at
+ * the next full team sync.
  */
 @Component
 public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<GitHubTeamEventDTO> {
@@ -87,9 +85,9 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
 
     /**
      * Shared routing for every team action, regardless of subject tier. Package-visible so the
-     * {@code repository.team} sibling handler ({@link GitHubTeamRepositoryMessageHandler}) can
-     * reuse the exact same dispatch for the {@code added_to_repository}/{@code
-     * removed_from_repository} deliveries that arrive on the repository tier.
+     * {@code repository.team} sibling handler ({@link GitHubTeamRepositoryMessageHandler}) can reuse the
+     * exact same dispatch for the {@code added_to_repository}/{@code removed_from_repository} deliveries
+     * that arrive on the repository tier.
      */
     void routeTeamEvent(GitHubTeamEventDTO event) {
         var teamDto = event.team();
@@ -145,7 +143,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         var teamOpt = teamRepository.findByNativeIdAndProviderId(Objects.requireNonNull(teamDto.id()), providerId);
         if (teamOpt.isEmpty()) {
             log.debug(
-                    "Skipped added_to_repository: reason=teamNotFound, teamNativeId={}," + " teamName={}",
+                    "Skipped added_to_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
                     teamDto.id(),
                     sanitizeForLog(teamDto.name()));
             return;
@@ -154,7 +152,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         var repoOpt = repositoryRepository.findByNativeIdAndProviderId(repoRef.id(), providerId);
         if (repoOpt.isEmpty()) {
             log.debug(
-                    "Skipped added_to_repository: reason=repoNotMonitored, repoNativeId={}," + " repoName={}",
+                    "Skipped added_to_repository: reason=repoNotMonitored, repoNativeId={}, repoName={}",
                     repoRef.id(),
                     sanitizeForLog(repoRef.fullName()));
             return;
@@ -204,7 +202,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         var teamOpt = teamRepository.findByNativeIdAndProviderId(Objects.requireNonNull(teamDto.id()), providerId);
         if (teamOpt.isEmpty()) {
             log.debug(
-                    "Skipped removed_from_repository: reason=teamNotFound, teamNativeId={}," + " teamName={}",
+                    "Skipped removed_from_repository: reason=teamNotFound, teamNativeId={}, teamName={}",
                     teamDto.id(),
                     sanitizeForLog(teamDto.name()));
             return;
@@ -213,7 +211,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
         var repoOpt = repositoryRepository.findByNativeIdAndProviderId(repoRef.id(), providerId);
         if (repoOpt.isEmpty()) {
             log.debug(
-                    "Skipped removed_from_repository: reason=repoNotMonitored, repoNativeId={}," + " repoName={}",
+                    "Skipped removed_from_repository: reason=repoNotMonitored, repoNativeId={}, repoName={}",
                     repoRef.id(),
                     sanitizeForLog(repoRef.fullName()));
             return;
@@ -233,9 +231,7 @@ public class GitHubTeamMessageHandler extends AbstractIntegrationMessageHandler<
                                     sanitizeForLog(repo.getNameWithOwner()));
                         },
                         () -> log.debug(
-                                "Skipped removed_from_repository:"
-                                        + " reason=permissionNotFound, teamName={},"
-                                        + " repoName={}",
+                                "Skipped removed_from_repository: reason=permissionNotFound, teamName={}, repoName={}",
                                 sanitizeForLog(team.getName()),
                                 sanitizeForLog(repo.getNameWithOwner())));
     }

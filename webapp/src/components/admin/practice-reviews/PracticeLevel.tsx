@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 
-import type { Practice, PracticeDefinitionOptions, PracticeRevision } from "@/api/types.gen";
+import type { Practice, PracticeDefinitionOptions, PracticeVersion } from "@/api/types.gen";
 import { PRACTICE_DEFINITION_FIELDS } from "@/components/admin/practices/practice-definition-fields";
 import { practiceFormLevel } from "@/components/admin/practices/practice-search";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
@@ -11,10 +11,10 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { detailStackKey } from "@/components/layout/detail-drawer/detail-stack";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
-import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
-import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
+import { FEEDBACK_MODE_DEFS } from "@/components/practice-vocabulary/feedback-mode-defs";
+import { FeedbackModeSourceNote } from "@/components/practice-vocabulary/FeedbackModeSourceNote";
 import { DrawerBody } from "@/components/ui/drawer";
-import { autonomySourceOf } from "@/lib/practice-autonomy";
+import { feedbackModeSourceOf } from "@/lib/practice-feedback-mode";
 import { hasText } from "@/lib/text";
 
 import {
@@ -37,26 +37,27 @@ export interface PracticeLevelProps {
 	practice: PanelState<{
 		practice: Practice | undefined;
 		definitionOptions: PracticeDefinitionOptions;
-		/** The group's display name, for the autonomy it inherits. Absent when unassigned. */
+		/** The group's display name, for the feedback mode it inherits. Absent when unassigned. */
 		groupName?: string;
 	}>;
 	/** Every stored version of its definition, newest first, with what changed in each. */
-	revisions?: PanelState<{ revisions: PracticeRevision[] }>;
+	versions?: PanelState<{ versions: PracticeVersion[] }>;
 }
 
 /**
  * One practice's sheet: its full definition and nothing else, as Practice setup's panel shows it —
- * one component for both. The status line says its autonomy, where that comes from and when it last
- * changed; the history says when it was created, each version of its definition with what changed
- * in it, and whether its automated review was withdrawn. It counts nothing: the row it was opened from has the counts. Changing it is Practice
- * setup's form, which the header links to.
+ * one component for both. The status line says its feedback mode, which decides only how its
+ * feedback is delivered, where that comes from and when it last changed; who reviews it is its
+ * definition's Reviewed by. The history says when it was created and each version of its definition
+ * with what changed in it. It counts nothing: the row it was opened from has the counts. Changing it
+ * is Practice setup's form, which the header links to.
  */
 export function PracticeLevel({
 	workspaceSlug,
 	nested,
 	path,
 	practice: state,
-	revisions,
+	versions,
 }: PracticeLevelProps) {
 	const practice = state.status === "ready" ? state.practice : undefined;
 	const groupName = state.status === "ready" ? state.groupName : undefined;
@@ -69,18 +70,22 @@ export function PracticeLevel({
 			chips={
 				practice && (
 					<SheetStatusLine
-						status={<StatusBadge def={AUTONOMY_DEFS[practice.autonomy.effective]} />}
+						status={<StatusBadge def={FEEDBACK_MODE_DEFS[practice.feedbackMode.effective]} />}
 						flag={
-							<AutonomySourceNote
-								source={autonomySourceOf(practice.autonomy, groupName ?? null)}
+							<FeedbackModeSourceNote
+								source={feedbackModeSourceOf(practice.feedbackMode, "PRACTICE", groupName ?? null)}
 								className="text-muted-foreground"
 							/>
 						}
-						at={{ label: "changed", date: practice.updatedAt }}
+						at={
+							practice.updatedAt === null
+								? { label: "created", date: practice.createdAt }
+								: { label: "changed", date: practice.updatedAt }
+						}
 					/>
 				)
 			}
-			title={practice?.name}
+			title={practice && (practice.currentVersion.name ?? practice.slug)}
 			description={
 				practice && (
 					<InlineLink
@@ -144,35 +149,31 @@ export function PracticeLevel({
 					<SheetHistory
 						events={[
 							...practiceHistory(practice),
-							...(revisions?.status === "ready" ? revisions.revisions.map(revisionEvent) : []),
+							...(versions?.status === "ready" ? versions.versions.map(versionEvent) : []),
 						]}
 					/>
-					{revisions?.status === "error" && (
+					{versions?.status === "error" && (
 						<QueryErrorAlert
-							error={revisions.error}
+							error={versions.error}
 							title="We could not load the versions of this practice"
-							onRetry={revisions.onRetry}
+							onRetry={versions.onRetry}
 						/>
 					)}
 				</SheetSection>
 				<SheetTechnical
 					facts={[
 						{ label: "Slug", value: <code>{practice.slug}</code>, copy: practice.slug },
-						{ label: "Practice ID", value: String(practice.id), copy: String(practice.id) },
+						{ label: "Practice ID", value: practice.id, copy: practice.id },
 						{
 							label: "Group",
 							value: hasText(practice.groupSlug) ? <code>{practice.groupSlug}</code> : "Unassigned",
 						},
-						{
-							label: "Current version",
-							value:
-								revisions?.status === "ready" && revisions.revisions.length > 0
-									? String(revisions.revisions[0]?.revisionNumber)
-									: "—",
-						},
+						{ label: "Current version", value: String(practice.currentVersion.number) },
 						{
 							label: "Practice script",
-							value: hasText(practice.practiceScript) ? "Present" : "None",
+							value: hasText(practice.currentVersion.definition?.script)
+								? "Written for this practice"
+								: "Built-in",
 						},
 					]}
 				/>
@@ -188,30 +189,25 @@ function practiceHistory(practice: Practice): SheetEvent[] {
 			at: practice.createdAt,
 			title: "Created",
 			detail:
-				practice.catalogOrigin === undefined
+				practice.catalogOrigin.catalogSlug === null
 					? "Written in this workspace."
-					: `Adopted from the catalog (${practice.catalogOrigin.slug}).`,
+					: `Adopted from the catalog (${practice.catalogOrigin.catalogSlug}).`,
 		},
 	];
-	if (practice.updatedAt.getTime() !== practice.createdAt.getTime()) {
+	if (
+		practice.updatedAt !== null &&
+		practice.updatedAt.getTime() !== practice.createdAt.getTime()
+	) {
 		events.push({ key: "changed", at: practice.updatedAt, title: "Last changed" });
-	}
-	if (practice.automatedReviewWithdrawal !== undefined) {
-		events.push({
-			key: "withdrawn",
-			at: undefined,
-			title: "Automated review withdrawn",
-			detail: practice.automatedReviewWithdrawal.description,
-		});
 	}
 	return events;
 }
 
 /** One version of the definition: what changed in it, and whether what a review checks changed. */
-function revisionEvent(revision: PracticeRevision): SheetEvent {
-	const changed = revision.changed.map((field) => PRACTICE_DEFINITION_FIELDS[field].label);
+function versionEvent(version: PracticeVersion): SheetEvent {
+	const changed = version.changed.map((field) => PRACTICE_DEFINITION_FIELDS[field].label);
 	let detail: string | undefined;
-	if (revision.revisionNumber === 1) {
+	if (version.number === 1) {
 		detail = "The first version of the definition.";
 	} else if (changed.length === 0) {
 		detail = "Recorded again without a change to the definition.";
@@ -219,13 +215,13 @@ function revisionEvent(revision: PracticeRevision): SheetEvent {
 		detail = `Changed: ${changed.join(", ")}.`;
 	}
 	return {
-		key: `revision-${revision.id}`,
-		at: revision.createdAt,
-		title: `Version ${revision.revisionNumber}`,
+		key: `version-${version.id}`,
+		at: version.createdAt,
+		title: `Version ${version.number}`,
 		detail: (
 			<>
 				<span className="block">{detail}</span>
-				{revision.reviewRulesChanged && (
+				{version.reviewChanged && (
 					<span className="block">
 						What a review checks changed, so earlier results no longer reflect it.
 					</span>

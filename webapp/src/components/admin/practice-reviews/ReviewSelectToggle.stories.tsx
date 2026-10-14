@@ -14,7 +14,7 @@ const meta = {
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],
 	args: {
-		selection: { kind: "review", agentJobId: REVIEW_ID },
+		selection: { kind: "review", reviewId: REVIEW_ID },
 		name: "review of Member-facing review activity",
 	},
 } satisfies Meta<typeof ReviewSelectToggle>;
@@ -36,7 +36,7 @@ export const NotSelected: Story = {
 
 /** The selection in the address is this row's: a press clears it. */
 export const Selected: Story = {
-	parameters: { router: { initialUrl: `/?agentJobId=${REVIEW_ID}&selected=true` } },
+	parameters: { router: { initialUrl: `/?reviewId=${REVIEW_ID}&selected=true` } },
 	play: async ({ canvas, userEvent }) => {
 		const toggle = canvas.getByRole("button", {
 			name: "Track review of Member-facing review activity",
@@ -54,7 +54,7 @@ export const Selected: Story = {
 export const AnotherKindSelected: Story = {
 	parameters: {
 		router: {
-			initialUrl: `/?agentJobId=${REVIEW_ID}&practiceResultId=22222222-2222-2222-2222-222222222222&selected=true`,
+			initialUrl: `/?reviewId=${REVIEW_ID}&resultId=22222222-2222-2222-2222-222222222222&selected=true`,
 		},
 	},
 	play: async ({ canvas }) => {

@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction;
+import de.tum.cit.aet.hephaestus.core.privacy.IdentityRestrictionRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.sql.SQLException;
@@ -7,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import jdk.jfr.Category;
 import jdk.jfr.Event;
@@ -31,11 +34,23 @@ public class DatabaseTestUtils {
     private @Nullable EntityManager entityManager;
 
     private final TransactionTemplate transactionTemplate;
+    private final IdentityRestrictionRepository restrictions;
     private @Nullable String truncateStatement;
 
-    public DatabaseTestUtils(PlatformTransactionManager transactionManager) {
+    public DatabaseTestUtils(
+            PlatformTransactionManager transactionManager, IdentityRestrictionRepository restrictions) {
+        this.restrictions = restrictions;
         transactionTemplate = new TransactionTemplate(transactionManager);
         transactionTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    }
+
+    public UUID erase(long providerId, String userKey, @Nullable String teamKey) {
+        var restriction = new IdentityRestriction();
+        restriction.setProviderId(providerId);
+        restriction.setProviderUserKey(userKey);
+        restriction.setTeamKey(teamKey == null ? "" : teamKey);
+        restriction.setKind(IdentityRestriction.Kind.ERASED);
+        return restrictions.saveAndFlush(restriction).getId();
     }
 
     public void cleanDatabase() {

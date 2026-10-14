@@ -5,16 +5,16 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemMergeTimeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ScmItemMergeTimeQuery implements ItemMergeTimeQuery {
     private final ScmItemAccess items;
-    private final JdbcTemplate jdbc;
+    private final ScmItemQueryRepository queries;
     private final RepositoryRepository repositories;
     private final ScmRepositoryAccess access;
 
@@ -41,52 +41,32 @@ public class ScmItemMergeTimeQuery implements ItemMergeTimeQuery {
                 .toList();
         if (supported.isEmpty()) return Map.of();
         items.requireAll(workspaceId, supported);
-        var rows = jdbc.query(
-                """
-                SELECT i.id, work.id AS pull_id, work.issue_type, work.is_merged, work.merged_at, work.repository_id,
-                    repository_item.id AS repository_item_id
-                FROM item i
-                LEFT JOIN item parent ON parent.id=i.parent_id AND parent.workspace_id=i.workspace_id
-                LEFT JOIN pull_request_review review ON i.kind='scm.pull_request_review'
-                    AND review.id=i.source_id AND parent.kind='scm.pull_request'
-                    AND parent.source_id=review.pull_request_id
-                LEFT JOIN issue work ON work.id=CASE WHEN i.kind='scm.pull_request' THEN i.source_id
-                    WHEN i.kind='scm.pull_request_review' THEN review.pull_request_id END
-                    AND (review.id IS NULL OR review.provider_id=work.provider_id)
-                LEFT JOIN item repository_item ON repository_item.workspace_id=i.workspace_id
-                    AND repository_item.kind='scm.repository' AND repository_item.source_id=work.repository_id
-                    AND repository_item.id=CASE WHEN i.kind='scm.pull_request' THEN i.parent_id ELSE parent.parent_id END
-                WHERE i.workspace_id=? AND i.id=ANY(?)
-                """,
-                (rs, row) -> {
-                    var mergedAt = rs.getTimestamp("merged_at");
-                    return new MergeFact(
-                            rs.getLong("id"),
-                            rs.getObject("pull_id", Long.class),
-                            rs.getString("issue_type"),
-                            rs.getObject("repository_item_id", Long.class),
-                            rs.getBoolean("is_merged"),
-                            mergedAt == null ? null : mergedAt.toInstant(),
-                            rs.getObject("repository_id", Long.class));
-                },
+        var rows = queries.mergeFacts(
                 workspaceId,
-                new SqlArrayValue(
-                        "bigint", supported.stream().map(ItemRef::itemId).toArray()));
+                supported.stream().map(ItemRef::itemId).toList(),
+                ScmItemEvents.REPOSITORY.value(),
+                ScmItemEvents.PULL_REQUEST_REVIEW.value(),
+                ScmItemEvents.PULL_REQUEST.value());
         if (rows.size() != supported.size()) throw unavailable();
         Map<Long, Instant> result = new HashMap<>();
-        var authorizedRepositories = new HashSet<Long>();
+        var repositoryIds = rows.stream()
+                .map(ScmItemQueryRepository.MergeRow::getRepositoryId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        var repositoryRows = repositories.findAllById(repositoryIds).stream()
+                .collect(Collectors.toMap(Repository::getId, Function.identity()));
+        if (repositoryRows.size() != repositoryIds.size()) throw unavailable();
+        repositoryRows.values().forEach(repository -> access.authorize(workspaceId, repository));
         for (var row : rows) {
-            if (row.pullId() == null || row.repositoryItemId() == null || !"PULL_REQUEST".equals(row.issueType()))
-                throw unavailable();
-            Long repositoryId = row.repositoryId();
+            if (row.getPullId() == null
+                    || row.getRepositoryItemId() == null
+                    || !"PULL_REQUEST".equals(row.getIssueType())) throw unavailable();
+            Long repositoryId = row.getRepositoryId();
             if (repositoryId == null) throw unavailable();
-            if (authorizedRepositories.add(repositoryId))
-                access.authorize(
-                        workspaceId,
-                        repositories.findById(repositoryId).orElseThrow(ScmItemMergeTimeQuery::unavailable));
-            Instant at = row.mergedAt();
-            if (at != null) result.put(row.itemId(), at);
-            else if (row.merged()) throw unavailable();
+            Instant at = row.getMergedAt();
+            if (at != null) result.put(row.getId(), at);
+            else if (row.getIsMerged()) throw unavailable();
         }
         return Map.copyOf(result);
     }
@@ -94,13 +74,4 @@ public class ScmItemMergeTimeQuery implements ItemMergeTimeQuery {
     private static ItemCaptureException unavailable() {
         return new ItemCaptureException(ItemCaptureCode.SOURCE_NOT_READY, "SCM merge timing facts are unavailable");
     }
-
-    private record MergeFact(
-            long itemId,
-            @Nullable Long pullId,
-            @Nullable String issueType,
-            @Nullable Long repositoryItemId,
-            boolean merged,
-            @Nullable Instant mergedAt,
-            @Nullable Long repositoryId) {}
 }

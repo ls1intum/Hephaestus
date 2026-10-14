@@ -73,13 +73,8 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
     }
 
     @Override
-    public ItemKind kind() {
-        return ThreadEvents.THREAD;
-    }
-
-    @Override
     public Set<ItemKind> kinds() {
-        return Set.of(kind());
+        return Set.of(ThreadEvents.THREAD);
     }
 
     @Override
@@ -98,7 +93,7 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
 
     @Override
     public boolean supports(ItemRef item) {
-        return kind().equals(item.kind()) && item.sourceId() != null;
+        return ThreadEvents.THREAD.equals(item.kind()) && item.sourceId() != null;
     }
 
     @Override

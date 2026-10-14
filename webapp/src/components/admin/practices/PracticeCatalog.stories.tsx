@@ -268,7 +268,6 @@ export const WithInstanceCatalog: Story = {
 						slug: longTextPractice.slug,
 						name: nameOf(longTextPractice),
 						kind: longTextPractice.kind,
-						whyItMatters: null,
 						groupSlug: longTextPractice.groupSlug,
 						groupName: longNamedGroup.name,
 						availability: "ADOPTED",

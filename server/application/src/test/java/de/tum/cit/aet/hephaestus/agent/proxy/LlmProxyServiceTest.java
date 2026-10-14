@@ -92,6 +92,9 @@ class LlmProxyServiceTest extends BaseUnitTest {
     @Mock
     private MentorTurnUsageAccumulator mentorTurnUsageAccumulator;
 
+    @Mock
+    private ProxyRoutingService routingService;
+
     private LlmProxyService controller;
     private SimpleMeterRegistry meterRegistry;
 
@@ -107,7 +110,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 new ProxyAccounting(
                         budgetGate, usageAccumulator, mentorTurnUsageAccumulator, meterRegistry, OBJECT_MAPPER),
                 requestPolicy,
-                mock(ScanCallGuard.class));
+                mock(ScanCallGuard.class),
+                routingService);
     }
 
     @Test
@@ -120,7 +124,6 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 new MockHttpServletResponse(),
                 new HttpHeaders(),
                 jsonBody());
-        assertThat(result).isNotNull();
         assertThat(result.getStatusCode().value()).isEqualTo(403);
         verifyNoInteractions(resolver, budgetGate);
     }
@@ -698,7 +701,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
                             new SimpleMeterRegistry(),
                             OBJECT_MAPPER),
                     requestPolicy,
-                    mock(ScanCallGuard.class));
+                    mock(ScanCallGuard.class),
+                    routingService);
             var routing = routing("openai-completions");
             authenticate(routing);
             when(resolver.resolveProxyCredential(any()))
@@ -793,7 +797,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
                             new SimpleMeterRegistry(),
                             OBJECT_MAPPER),
                     requestPolicy,
-                    mock(ScanCallGuard.class));
+                    mock(ScanCallGuard.class),
+                    routingService);
             authenticate(practiceScriptRouting(slot, protocol));
             when(resolver.resolveProxyCredential(any())).thenReturn(credential(protocol, LlmAuthMode.BEARER));
             HttpHeaders headers = new HttpHeaders();
@@ -849,7 +854,8 @@ class LlmProxyServiceTest extends BaseUnitTest {
                             streamingMeterRegistry,
                             OBJECT_MAPPER),
                     requestPolicy,
-                    mock(ScanCallGuard.class));
+                    mock(ScanCallGuard.class),
+                    routingService);
         }
 
         @AfterEach
@@ -1210,7 +1216,10 @@ class LlmProxyServiceTest extends BaseUnitTest {
     }
 
     private void authenticate(ProxyRouting routing) {
-        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(routing, Set.of()));
+        var identity = new ProxyIdentity(
+                null, null, new MentorProxyCredentialRegistry.AuthenticatedSession(UUID.randomUUID(), "test-hash"));
+        lenient().when(routingService.resolve(eq(identity), any())).thenReturn(routing);
+        SecurityContextHolder.getContext().setAuthentication(new JobTokenAuthentication(identity, Set.of()));
     }
 
     private void stubCredential(ProxyRouting routing, LlmModelResolver.ProxyCredential credential) {

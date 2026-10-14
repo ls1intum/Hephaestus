@@ -640,12 +640,10 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         @Test
         void shouldExcludeSuppressedPeopleEvenWhenTheirLedgerRowsRemain() {
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -1, DAY);
-            jdbc.update(
-                    "INSERT INTO identity_restriction (id,provider_id,provider_user_key,team_key,kind) VALUES"
-                            + " (?,?,?,'','ERASED')",
-                    UUID.randomUUID(),
-                    ada.getProvider().getId(),
-                    ada.getNativeId().toString());
+            databaseTestUtils.erase(
+                    Objects.requireNonNull(ada.getProvider().getId()),
+                    ada.getNativeId().toString(),
+                    "");
             assertThat(page().people()).isEmpty();
             jdbc.update(
                     "UPDATE membership SET hidden=true WHERE workspace_id=? AND account_id=(SELECT i.account_id FROM"
