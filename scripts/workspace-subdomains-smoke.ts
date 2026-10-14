@@ -491,7 +491,6 @@ try {
 				);
 			}
 			await run("docker", [...args, "up", "--detach", "--no-deps", "reverse-proxy"], { env });
-			port = await publishedPort(443);
 			const changedListing = await output("docker", [...args, "ps", "--quiet", "reverse-proxy"], {
 				env,
 			});
