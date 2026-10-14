@@ -40,9 +40,9 @@ flowchart TD
     J -->|Approved| L[Merge]
 ```
 
-**Agents do not stage, commit, or push** until you run `/land-pr`.
-Afterwards, `/fix-ci` and `/resolve-review` push their own fixes.
-Thus, neither loops back through `/land-pr`.
+`AGENTS.md` § Pull requests owns authorization.
+`/land-pr` is the normal publication workflow.
+After publication, `/fix-ci` and `/resolve-review` push fixes to the same pull request under that authorization.
 
 Read the diff yourself.
 This is the review that matters.
@@ -56,6 +56,16 @@ Use specific evidence, such as:
 - A request against the endpoint that you added.
 - A query that confirms the stored row.
 - The logs after the change.
+
+## Context and handoffs
+
+For sustained parallel work, keep one current summary in a gitignored scratch directory:
+selected outcome, source revision, ownership, evidence links, blockers, and next action.
+Link detailed logs separately.
+Replace stale summaries rather than appending them.
+Each implementation has one owner and an exclusive worktree.
+Review changed scope independently on its final source, with concrete defects and residual risks.
+Use the parallel delivery protocol below for shared files and generation.
 
 ## Parallel delivery protocol
 

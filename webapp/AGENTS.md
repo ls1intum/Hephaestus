@@ -80,7 +80,7 @@ derives URL segments from the filenames there and the router owns that naming.
 ## Linting
 
 **oxlint lints, oxfmt formats.**
-The rule set has layers, as root `AGENTS.md` § Lint and format explains.
+`docs/contributor/local-verification.mdx` § Lint and format explains the configuration layers.
 `oxlint.app.jsonc` owns what this tree shares with the extension, including compiler, Vitest, and Storybook rules.
 This tree's `.oxlintrc.json` holds design-system checks and decisions that differ, each with its reason.
 Each restriction explains itself in its diagnostic at the call site.
