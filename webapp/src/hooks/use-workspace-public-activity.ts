@@ -43,35 +43,44 @@ export function useWorkspacePublicActivity({
 		...listHiddenContributorsOptions({ path }),
 		enabled: workspaceSlug !== undefined,
 	});
+	// Each write names, and refreshes, the workspace it was submitted for: the reply can arrive after
+	// the admin has moved to another workspace.
 	const showAgain = useMutation({
 		...updatePublicActivityObjectionMutation(),
-		onSuccess: () => {
-			void queryClient.invalidateQueries({ queryKey: listHiddenContributorsQueryKey({ path }) });
+		onSuccess: (_data, { path: { workspaceSlug: submitted } }) => {
+			const workspace = { path: { workspaceSlug: submitted } };
+			void queryClient.invalidateQueries({ queryKey: listHiddenContributorsQueryKey(workspace) });
 			void queryClient.invalidateQueries({
-				queryKey: getPublicActivityHiddenCountQueryKey({ path }),
+				queryKey: getPublicActivityHiddenCountQueryKey(workspace),
 			});
-			toast.success("Shown in activity again");
+			toast.success("Shown in activity again", { description: inWorkspace(submitted) });
 		},
-		onError: (error) =>
-			toast.error(problemDetailOf(error, "We could not show this person again. Try again.")),
+		onError: (error, { path: { workspaceSlug: submitted } }) =>
+			toast.error(problemDetailOf(error, "We could not show this person again. Try again."), {
+				description: inWorkspace(submitted),
+			}),
 	});
 	const update = useMutation({
 		...updatePublicActivityMutation(),
-		onSuccess: (data, { body }) => {
-			queryClient.setQueryData(getWorkspacePublicActivitySettingsQueryKey({ path }), data);
+		onSuccess: (data, { path: submitted, body }) => {
+			queryClient.setQueryData(
+				getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
+				data,
+			);
 			// The list says whether the page is live, and the count follows what the page lists.
 			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 			void queryClient.invalidateQueries({
-				queryKey: getPublicActivityHiddenCountQueryKey({ path }),
+				queryKey: getPublicActivityHiddenCountQueryKey({ path: submitted }),
 			});
-			announce(body);
+			announce(body, submitted.workspaceSlug);
 		},
-		onError: (error) => {
+		onError: (error, { path: submitted }) => {
 			void queryClient.invalidateQueries({
-				queryKey: getWorkspacePublicActivitySettingsQueryKey({ path }),
+				queryKey: getWorkspacePublicActivitySettingsQueryKey({ path: submitted }),
 			});
 			toast.error(
 				problemDetailOf(error, "We could not change the public activity page. Try again."),
+				{ description: inWorkspace(submitted.workspaceSlug) },
 			);
 		},
 	});
@@ -137,20 +146,25 @@ function pendingChange(
 	return publicActivityEnabled === enabled ? "search-engines" : "enabled";
 }
 
-function announce({
-	publicActivityEnabled,
-	allowSearchEngines,
-}: UpdateWorkspacePublicActivityRequest) {
+/** Which workspace a notification is about, since the admin may be looking at another one by then. */
+function inWorkspace(workspaceSlug: string): string {
+	return `In workspace ${workspaceSlug}.`;
+}
+
+function announce(
+	{ publicActivityEnabled, allowSearchEngines }: UpdateWorkspacePublicActivityRequest,
+	workspaceSlug: string,
+) {
 	if (publicActivityEnabled) {
 		toast.success(
 			allowSearchEngines
 				? "The public activity page is on, and search engines can list it"
 				: "The public activity page is on",
+			{ description: inWorkspace(workspaceSlug) },
 		);
 		return;
 	}
 	toast.success("The public activity page is off", {
-		description:
-			"Visitors see the change when they load the page again, at most about a minute later.",
+		description: `${inWorkspace(workspaceSlug)} Visitors see the change when they load the page again, at most about a minute later.`,
 	});
 }
