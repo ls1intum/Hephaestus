@@ -13,6 +13,7 @@ import {
 import { expectFoldOnTableColumns } from "@/stories/fold-columns";
 
 import { SAMPLE_NEVER_APPLIED, SAMPLE_NOT_OBSERVED } from "@/stories/practice-profile-samples";
+import { practiceStandingOf } from "@/stories/practice-profile-story-mock-data";
 import {
 	type FoldReason,
 	FoldedPractices,
@@ -25,24 +26,20 @@ const onOpen = fn();
 const standingsOf = (
 	items: readonly { slug: string; name: string }[],
 	standing: PracticeStanding["standing"],
-): PracticeStanding[] => items.map((item) => ({ ...item, standing, strengths: [], toWorkOn: [] }));
+): PracticeStanding[] => items.map((item) => practiceStandingOf({ ...item, standing }));
 
 const SHOWN_ROWS: PracticeStanding[] = [
-	{
+	practiceStandingOf({
 		slug: "describe-change",
 		name: "Describe what changed and why",
 		standing: "DEVELOPING",
 		direction: "IMPROVING",
-		strengths: [],
-		toWorkOn: [],
-	},
-	{
+	}),
+	practiceStandingOf({
 		slug: "small-diff",
 		name: "Keep the diff reviewable in one sitting",
 		standing: "STRENGTH",
-		strengths: [],
-		toWorkOn: [],
-	},
+	}),
 ];
 const NEVER_APPLIED_ROWS = standingsOf(SAMPLE_NEVER_APPLIED, "NO_OPPORTUNITY");
 const NOT_OBSERVED_ROWS = standingsOf(SAMPLE_NOT_OBSERVED, "NOT_OBSERVED");
@@ -63,7 +60,7 @@ function PracticeRow({ practice, folded }: { practice: PracticeStanding; folded?
 			) : (
 				<StandingCell
 					standing={practice.standing}
-					direction={practice.direction}
+					direction={practice.direction ?? undefined}
 					scope="practice"
 				/>
 			)}

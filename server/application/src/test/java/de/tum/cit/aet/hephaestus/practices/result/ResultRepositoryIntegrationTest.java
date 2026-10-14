@@ -63,7 +63,7 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow();
         assertThat(saved.getReviewId()).isEqualTo(r.getReviewId());
         assertThat(saved.getDeveloperId()).isEqualTo(scenarioAccountId);
-        assertThat(saved.getEvidenceVersion()).isEqualTo(1);
+        assertThat(saved.getEvidenceVersion()).isEqualTo((short) 1);
         assertThat(problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(saved.getWorkspaceId(), r.getId()))
                 .hasSize(1);
     }

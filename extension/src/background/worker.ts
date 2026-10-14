@@ -539,7 +539,7 @@ async function dispatch<K extends keyof RpcResponses>(
 }
 
 /**
- * The only door into the worker. Shape first, then who is asking, then the command — and the reply
+ * The only entry into the worker. Shape first, then who is asking, then the command — and the reply
  * carries the generation it was computed under.
  */
 export async function handleMessage(

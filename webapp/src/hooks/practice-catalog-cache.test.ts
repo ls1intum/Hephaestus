@@ -1,38 +1,40 @@
 import { describe, expect, it } from "vitest";
 
 import type { Practice } from "@/api/types.gen";
-import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
-
 import {
-	chosenAutonomy,
-	inheritedAutonomy,
+	chosenFeedbackMode,
+	inheritedFeedbackMode,
+	mockGroups,
 	mockPractice,
 } from "@/components/admin/practices/fixtures";
 
 import {
-	applyDisplayOrder,
-	applyPracticePlacements,
-	placePractice,
-	practicePlacementSnapshot,
-	selectPracticePatch,
+	applyPositions,
+	applyPracticePositions,
+	movePractice,
+	practicePositionSnapshot,
 	unassignPractices,
+	withGroupDetails,
 } from "./practice-catalog-cache";
 
 /** A second edit landing on one row, which a structural rollback must leave alone. */
-function withAutonomy(practices: Practice[], slug: string, autonomy: Practice["autonomy"]) {
-	return practices.map((item) => (item.slug === slug ? { ...item, autonomy } : item));
+function withFeedbackMode(
+	practices: Practice[],
+	slug: string,
+	feedbackMode: Practice["feedbackMode"],
+) {
+	return practices.map((item) => (item.slug === slug ? { ...item, feedbackMode } : item));
 }
 
-function practice(slug: string, groupSlug: string | undefined, displayOrder: number): Practice {
-	return {
-		...mockPractice,
-		id: displayOrder + 1,
-		name: slug,
-		slug,
-		groupSlug,
-		displayOrder,
-	};
+function practice(slug: string, groupSlug: string | null, position: number): Practice {
+	return { ...mockPractice, id: String(position + 1), slug, groupSlug, position };
 }
+
+const positions = (practices: Practice[], groupSlug: string) =>
+	practices
+		.filter((candidate) => candidate.groupSlug === groupSlug)
+		.sort((a, b) => a.position - b.position)
+		.map(({ slug, position }) => [slug, position]);
 
 describe("practice catalog cache updates", () => {
 	it("reorders only the requested slugs", () => {
@@ -42,16 +44,16 @@ describe("practice catalog cache updates", () => {
 			practice("elsewhere", "delivery", 0),
 		];
 
-		const result = applyDisplayOrder(practices, ["second", "first"]);
+		const result = applyPositions(practices, ["second", "first"]);
 
-		expect(result.map(({ slug, displayOrder }) => [slug, displayOrder])).toStrictEqual([
+		expect(result.map(({ slug, position }) => [slug, position])).toStrictEqual([
 			["first", 1],
 			["second", 0],
 			["elsewhere", 0],
 		]);
 	});
 
-	it("places a practice between rows in another group and compacts both buckets", () => {
+	it("places a practice between rows in another group and compacts both groups", () => {
 		const practices = [
 			practice("first", "quality", 0),
 			practice("moving", "quality", 1),
@@ -60,23 +62,13 @@ describe("practice catalog cache updates", () => {
 			practice("after", "delivery", 1),
 		];
 
-		const result = placePractice(practices, "moving", "delivery", 1);
+		const result = movePractice(practices, "moving", "delivery", 1);
 
-		expect(
-			result
-				.filter(({ groupSlug }) => groupSlug === "quality")
-				.sort((a, b) => a.displayOrder - b.displayOrder)
-				.map(({ slug, displayOrder }) => [slug, displayOrder]),
-		).toStrictEqual([
+		expect(positions(result, "quality")).toStrictEqual([
 			["first", 0],
 			["last", 1],
 		]);
-		expect(
-			result
-				.filter(({ groupSlug }) => groupSlug === "delivery")
-				.sort((a, b) => a.displayOrder - b.displayOrder)
-				.map(({ slug, displayOrder }) => [slug, displayOrder]),
-		).toStrictEqual([
+		expect(positions(result, "delivery")).toStrictEqual([
 			["before", 0],
 			["moving", 1],
 			["after", 2],
@@ -85,7 +77,7 @@ describe("practice catalog cache updates", () => {
 
 	it("unassigns a group's practices without disturbing existing unassigned order", () => {
 		const practices = [
-			practice("existing", undefined, 0),
+			practice("existing", null, 0),
 			practice("first", "quality", 0),
 			practice("second", "quality", 1),
 			practice("elsewhere", "delivery", 0),
@@ -94,132 +86,52 @@ describe("practice catalog cache updates", () => {
 		const result = unassignPractices(practices, "quality");
 
 		expect(
-			result.map(({ slug, groupSlug, displayOrder }) => [slug, groupSlug, displayOrder]),
+			result.map(({ slug, groupSlug, position }) => [slug, groupSlug, position]),
 		).toStrictEqual([
-			["existing", undefined, 0],
-			["first", undefined, 1],
-			["second", undefined, 2],
+			["existing", null, 0],
+			["first", null, 1],
+			["second", null, 2],
 			["elsewhere", "delivery", 0],
 		]);
 	});
 
 	it("supports empty destinations and structural-only rollback", () => {
 		const practices = [
-			{ ...practice("moving", "quality", 0), autonomy: inheritedAutonomy("AUTOMATIC") },
+			{ ...practice("moving", "quality", 0), feedbackMode: inheritedFeedbackMode("AUTOMATIC") },
 			practice("remaining", "quality", 1),
 		];
-		const snapshot = practicePlacementSnapshot(practices, "moving", null);
-		const moved = withAutonomy(
-			placePractice(practices, "moving", null, 0),
+		const snapshot = practicePositionSnapshot(practices, "moving", null);
+		const moved = withFeedbackMode(
+			movePractice(practices, "moving", null, 0),
 			"moving",
-			chosenAutonomy("OFF"),
+			chosenFeedbackMode("OFF"),
 		);
 
-		const restored = applyPracticePlacements(moved, snapshot);
+		const restored = applyPracticePositions(moved, snapshot);
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
-			autonomy: chosenAutonomy("OFF"),
+			feedbackMode: chosenFeedbackMode("OFF"),
 			groupSlug: "quality",
-			displayOrder: 0,
+			position: 0,
 		});
-		expect(restored.find(({ slug }) => slug === "remaining")?.displayOrder).toBe(1);
+		expect(restored.find(({ slug }) => slug === "remaining")?.position).toBe(1);
 	});
 
-	it("reconciles only fields owned by the edit request", () => {
-		const updated = {
-			...practice("edited", "delivery", 4),
-			autonomy: chosenAutonomy("OFF"),
-			name: "Updated",
-			automatedReviewValidation: {
-				...mockAuthorDeclaredEvidenceValidation,
-				reviewRuleFingerprint: `v5:${"1".repeat(64)}`,
-			},
-		};
+	it("replaces a group's details and keeps its place and feedback mode", () => {
+		const [group] = withGroupDetails(mockGroups, "review-ready-work", {
+			name: "Code quality",
+			description: null,
+			icon: "Code",
+			color: null,
+			shownToDevelopers: false,
+		});
 
-		expect(selectPracticePatch(updated, { name: "Updated" })).toStrictEqual({
-			name: "Updated",
-			automatedReviewValidation: updated.automatedReviewValidation,
-		});
-		expect(
-			selectPracticePatch(updated, {
-				group: { groupSlug: "delivery" },
-			}),
-		).toStrictEqual({
-			groupSlug: "delivery",
-			displayOrder: 4,
-			automatedReviewValidation: updated.automatedReviewValidation,
-		});
-		expect(
-			selectPracticePatch({ ...updated, whyItMatters: undefined }, { clear: ["WHY_IT_MATTERS"] }),
-		).toStrictEqual({ whyItMatters: undefined });
-		expect(
-			selectPracticePatch(
-				{ ...updated, visual: undefined, guide: undefined },
-				{ clear: ["VISUAL", "GUIDE"] },
-			),
-		).toStrictEqual({ visual: undefined, guide: undefined });
-		expect(
-			selectPracticePatch(updated, {
-				automatedReviewPolicy: updated.automatedReviewPolicy,
-			}),
-		).toStrictEqual({
-			automatedReviewPolicy: updated.automatedReviewPolicy,
-			automatedReviewValidation: updated.automatedReviewValidation,
-		});
-		expect(selectPracticePatch(updated, { criteria: updated.criteria })).toStrictEqual({
-			criteria: updated.criteria,
-			automatedReviewPolicy: updated.automatedReviewPolicy,
-			automatedReviewValidation: updated.automatedReviewValidation,
-		});
-		expect(selectPracticePatch(updated, { clear: ["PRACTICE_SCRIPT"] })).toStrictEqual({
-			practiceScript: updated.practiceScript,
-			automatedReviewPolicy: updated.automatedReviewPolicy,
-			automatedReviewValidation: updated.automatedReviewValidation,
-		});
-		// Replacing the occasion can move the practice to a different kind of work, and with it to that
-		// kind's recommended review settings — so the optimistic patch carries those too.
-		expect(selectPracticePatch(updated, { signals: updated.signals })).toStrictEqual({
-			signals: updated.signals,
-			evidenceRequirements: updated.evidenceRequirements,
-			reviewWhen: updated.reviewWhen,
-			subject: updated.subject,
-			precondition: updated.precondition,
-			artifactKind: updated.artifactKind,
-			automatedReviewPolicy: updated.automatedReviewPolicy,
-			automatedReviewValidation: updated.automatedReviewValidation,
+		expect(group).toMatchObject({
+			name: "Code quality",
+			icon: "Code",
+			shownToDevelopers: false,
+			position: mockGroups[0]?.position,
+			feedbackMode: mockGroups[0]?.feedbackMode,
 		});
 	});
-});
-
-it("reconciles the server’s new assessment basis when signals move work types", () => {
-	const updated = {
-		...mockPractice,
-		artifactKind: "scm.issue",
-		signals: ["scm.issue.opened"],
-		automatedReviewValidation: {
-			...mockAuthorDeclaredEvidenceValidation,
-			reviewRuleFingerprint: `v5:${"3".repeat(64)}`,
-		},
-	};
-	expect(selectPracticePatch(updated, { signals: updated.signals })).toMatchObject({
-		artifactKind: "scm.issue",
-		automatedReviewValidation: updated.automatedReviewValidation,
-	});
-	expect(selectPracticePatch(updated, { reviewWhen: {} })).not.toHaveProperty(
-		"automatedReviewValidation",
-	);
-});
-
-it("retains the returned assessment basis for scheduling changes within one work type", () => {
-	const current = {
-		...mockPractice,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	};
-	expect(
-		selectPracticePatch(current, { signals: ["scm.pull_request.merged"] })
-			.automatedReviewValidation,
-	).toStrictEqual(current.automatedReviewValidation);
-	expect(
-		selectPracticePatch(current, { reviewWhen: { draftStatus: ["DRAFT"] } }),
-	).not.toHaveProperty("automatedReviewValidation");
 });

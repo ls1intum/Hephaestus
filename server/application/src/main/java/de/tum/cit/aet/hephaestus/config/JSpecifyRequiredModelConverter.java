@@ -12,8 +12,10 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Set;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -116,18 +118,30 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
     /** ALWAYS records publish every key, including null; OpenAPI 3.1 records null in the value type. */
     private static void markNullable(Schema<?> model, String name) {
         Schema<?> property = model.getProperties().get(name);
-        if (property == null
-                || (property.getTypes() != null && property.getTypes().contains("null"))) {
-            return;
-        }
+        if (property == null) return;
         if (property.get$ref() != null
                 || property.getOneOf() != null
                 || property.getAnyOf() != null
                 || property.getAllOf() != null) {
+            if (property.getAnyOf() != null
+                    && property.getAnyOf().stream().anyMatch(branch -> {
+                        Schema<?> value = branch;
+                        return value.get$ref() == null
+                                && value.getTypes() != null
+                                && value.getTypes().contains("null");
+                    })) return;
+            if (property.getTypes() != null) {
+                var nonNullTypes = new HashSet<>(property.getTypes());
+                nonNullTypes.remove("null");
+                property.setTypes(nonNullTypes.isEmpty() ? null : nonNullTypes);
+            }
+            if ("null".equals(property.getType())) property.setType(null);
             Schema<Object> nullable = new Schema<>();
             nullable.setDescription(property.getDescription());
             nullable.addAnyOfItem(property);
-            nullable.addAnyOfItem(new Schema<>().type("null"));
+            Schema<Object> nullValue = new Schema<>();
+            nullValue.setTypes(Set.of("null"));
+            nullable.addAnyOfItem(nullValue);
             model.addProperty(name, nullable);
             return;
         }
@@ -137,7 +151,14 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
         types.add("null");
         property.setType(null);
         property.setTypes(types);
-        if (property.getEnum() != null) property.addEnumItemObject(null);
+        allowNullEnumValue(property);
+    }
+
+    private static <T> void allowNullEnumValue(Schema<T> property) {
+        if (property.getEnum() != null && !property.getEnum().contains(null)) {
+            property.setEnum(new ArrayList<>(property.getEnum()));
+            property.addEnumItemObject(null);
+        }
     }
 
     private static @Nullable Schema<?> referencedModel(Schema<?> resolved, ModelConverterContext context) {

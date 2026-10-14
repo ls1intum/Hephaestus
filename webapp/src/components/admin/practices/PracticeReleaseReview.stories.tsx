@@ -1,45 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
-import type { PracticeDefinition, PracticeReleaseProposal } from "@/api/types.gen";
-import { mockPullRequestReviewFields, mockPullRequestPolicy } from "@/mocks/fixtures/practice";
 import { bundledGuidance, unthemedVisual } from "@/stories/practice-guidance-story-mock-data";
 import { expectTablesScrollInPlace } from "@/stories/reflow";
 
+import { releaseBase as base, releaseProposal } from "./fixtures";
 import { PracticeReleaseReview } from "./PracticeReleaseReview";
 
-const base: PracticeDefinition = {
-	name: "Explain the change",
-	...mockPullRequestReviewFields,
-	criteria: "Explain the old behavior",
-	automatedReviewPolicy: mockPullRequestPolicy,
-	whyItMatters: "Reviewers need context.",
-	deliveryBehavior: { summaryOnly: false },
-};
-
-const proposal: PracticeReleaseProposal = {
-	slug: "explain-the-change",
-	base,
-	current: {
-		...base,
-		criteria: "Our own review criteria",
-		whyItMatters: "Our team needs context.",
-	},
-	offered: {
-		...base,
-		criteria: "Explain the change and why it matters",
-		deliveryBehavior: { summaryOnly: true },
-	},
-	baseSource: "EXACT_ADOPTION",
-	offeredDigest: "offered",
-	etag: "proposal",
-	currentRevision: 2,
+const proposal = releaseProposal({
 	fields: [
-		{ field: "CRITERIA", offeredChanged: true, conflict: true },
-		{ field: "WHY_IT_MATTERS", offeredChanged: false, conflict: false },
-		{ field: "DELIVERY_BEHAVIOR", offeredChanged: true, conflict: false },
+		{ field: "CRITERIA", changedLocally: true, offeredChanged: true, conflict: true },
+		{ field: "NAME", changedLocally: true, offeredChanged: false, conflict: false },
+		{ field: "LINE_NOTES", changedLocally: false, offeredChanged: true, conflict: false },
 	],
-};
+});
 
 const meta = {
 	component: PracticeReleaseReview,
@@ -63,53 +37,48 @@ export const ConflictingUpdate: Story = {
 		);
 		await expect(accept).toBeEnabled();
 		await userEvent.click(accept);
-		await expect(args.onAccept).toHaveBeenCalledWith({
-			CRITERIA: "OFFERED",
-			DELIVERY_BEHAVIOR: "OFFERED",
-		});
+		await expect(args.onAccept).toHaveBeenCalledWith([
+			{ field: "LINE_NOTES", source: "OFFERED" },
+			{ field: "CRITERIA", source: "OFFERED" },
+		]);
 	},
 };
 
-/** Delivery choices read as sentences on both sides, never as the object the wire carries. */
-export const DeliveryInWords: Story = {
+/** Settings read as words on every side, never as the value the wire carries. */
+export const LineNotesInWords: Story = {
 	play: async () => {
-		await expect(
-			screen.getByText("Feedback stays in the summary, not on a changed line."),
-		).toBeVisible();
-		await expect(screen.getAllByText("No special delivery rules.").length).toBeGreaterThan(0);
-		await expect(screen.queryByText(/summaryOnly/u)).not.toBeInTheDocument();
+		await expect(screen.getByText("Summary only")).toBeVisible();
+		await expect(screen.getAllByText("Leaves line notes").length).toBeGreaterThan(0);
+		await expect(screen.queryByText(/lineNotes/u)).not.toBeInTheDocument();
 	},
 };
 
-export const RecoveredBase: Story = {
-	args: { proposal: { ...proposal, baseSource: "CURRENT_DEFINITION" } },
+/** Without the adopted version, nothing is chosen for the reader. */
+export const AdoptedVersionUnknown: Story = {
+	args: { proposal: { ...proposal, base: null } },
 	play: async ({ args }) => {
 		await expect(screen.getByText(/Choose a version for each changed field/u)).toBeVisible();
+		await expect(screen.getAllByText("Not recorded").length).toBeGreaterThan(0);
 		const accept = screen.getByRole("button", { name: "Accept selected fields" });
-		const delivery = within(
-			screen.getByRole("radiogroup", { name: "Use a version for Feedback delivery" }),
+		const lineNotes = within(
+			screen.getByRole("radiogroup", { name: "Use a version for Line notes" }),
 		);
-		await expect(delivery.getByRole("radio", { name: "Proposed" })).not.toBeChecked();
-		await expect(delivery.getByRole("radio", { name: "Current" })).not.toBeChecked();
+		await expect(lineNotes.getByRole("radio", { name: "Proposed" })).not.toBeChecked();
+		await expect(lineNotes.getByRole("radio", { name: "Current" })).not.toBeChecked();
 		await userEvent.click(
 			within(
 				screen.getByRole("radiogroup", { name: "Use a version for Review criteria" }),
 			).getByRole("radio", { name: "Proposed" }),
 		);
 		await expect(accept).toBeDisabled();
-		await userEvent.click(delivery.getByRole("radio", { name: "Current" }));
+		await userEvent.click(lineNotes.getByRole("radio", { name: "Current" }));
 		await expect(accept).toBeEnabled();
 		await userEvent.click(accept);
-		await expect(args.onAccept).toHaveBeenCalledWith({
-			CRITERIA: "OFFERED",
-			DELIVERY_BEHAVIOR: "CURRENT",
-		});
+		await expect(args.onAccept).toHaveBeenCalledWith([
+			{ field: "CRITERIA", source: "OFFERED" },
+			{ field: "LINE_NOTES", source: "CURRENT" },
+		]);
 	},
-};
-
-export const RecordedVersionBase: Story = {
-	...RecoveredBase,
-	args: { proposal: { ...proposal, baseSource: "REVISION_FINGERPRINT_MATCH" } },
 };
 
 const readyProposal = {
@@ -117,7 +86,7 @@ const readyProposal = {
 	current: base,
 	fields: proposal.fields
 		.filter((field) => field.offeredChanged)
-		.map((field) => ({ ...field, conflict: false })),
+		.map((field) => ({ ...field, changedLocally: false, conflict: false })),
 };
 
 export const Accepting: Story = {
@@ -131,11 +100,13 @@ export const Accepting: Story = {
 	},
 };
 
+/** Declining does not close the way back: the copy says where Reset to catalog stays. */
 export const Declining: Story = {
 	args: { proposal: readyProposal, pending: "decline" },
 	play: async () => {
 		await expect(screen.getByRole("button", { name: "Declining update…" })).toBeDisabled();
 		await expect(screen.getByRole("button", { name: "Accept selected fields" })).toBeDisabled();
+		await expect(screen.getByText(/Reset to catalog stays available/u)).toBeVisible();
 		for (const choice of screen.getAllByRole("radio")) {
 			await expect(choice).toHaveAttribute("aria-disabled", "true");
 		}
@@ -146,7 +117,7 @@ export const NarrowComparison: Story = {
 	args: {
 		proposal: {
 			...proposal,
-			fields: [{ field: "CRITERIA", offeredChanged: true, conflict: false }],
+			fields: [{ field: "CRITERIA", changedLocally: false, offeredChanged: true, conflict: false }],
 		},
 	},
 	parameters: { chromatic: { viewports: [320, 930] } },
@@ -179,12 +150,16 @@ export const GuidanceUpdate: Story = {
 	args: {
 		proposal: {
 			...proposal,
-			current: { ...base, visual: unthemedVisual },
-			offered: { ...base, visual: bundledGuidance.visual, guide: bundledGuidance.guide },
-			fields: [
-				{ field: "VISUAL", offeredChanged: true, conflict: true },
-				{ field: "GUIDE", offeredChanged: true, conflict: false },
-			],
+			current: { ...base, guidance: { ...base.guidance, visual: unthemedVisual } },
+			offered: {
+				...base,
+				guidance: {
+					...base.guidance,
+					visual: bundledGuidance.visual,
+					guide: bundledGuidance.guide,
+				},
+			},
+			fields: [{ field: "GUIDANCE", changedLocally: true, offeredChanged: true, conflict: true }],
 		},
 	},
 	play: async ({ args }) => {
@@ -194,31 +169,31 @@ export const GuidanceUpdate: Story = {
 		const description = screen.getByText(bundledGuidance.visual.alt, { selector: "p" });
 		await expect(description.scrollWidth).toBeLessThanOrEqual(description.clientWidth);
 		await expect(screen.getByText(/^## How to do it/u)).toBeVisible();
-		await expect(screen.getByText("figures/split-order.svg")).toBeVisible();
 		await expect(screen.queryByText(/<svg/u)).not.toBeInTheDocument();
 
 		await userEvent.click(
-			within(screen.getByRole("radiogroup", { name: "Use a version for Visual" })).getByRole(
+			within(screen.getByRole("radiogroup", { name: "Use a version for Guidance" })).getByRole(
 				"radio",
 				{ name: "Current" },
 			),
 		);
 		await userEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
-		await expect(args.onAccept).toHaveBeenCalledWith({ VISUAL: "CURRENT", GUIDE: "OFFERED" });
+		await expect(args.onAccept).toHaveBeenCalledWith([{ field: "GUIDANCE", source: "CURRENT" }]);
 	},
 };
 
-/** The practice's review program carries the editor's name for it. */
+/** A practice script reads as built-in where a version has none. */
 export const PracticeScriptUpdate: Story = {
 	args: {
 		proposal: {
 			...proposal,
 			current: base,
-			offered: { ...base, practiceScript: "export default { models: {} };" },
-			fields: [{ field: "PRACTICE_SCRIPT", offeredChanged: true, conflict: false }],
+			offered: { ...base, script: "export default { models: {} };" },
+			fields: [{ field: "SCRIPT", changedLocally: false, offeredChanged: true, conflict: false }],
 		},
 	},
 	play: async () => {
-		await expect(screen.getByText("Practice script")).toBeVisible();
+		await expect(screen.getByRole("rowheader", { name: /Practice script/u })).toBeVisible();
+		await expect(screen.getAllByText("Built-in").length).toBe(2);
 	},
 };

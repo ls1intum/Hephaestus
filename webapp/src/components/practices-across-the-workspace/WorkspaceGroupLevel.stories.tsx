@@ -6,7 +6,7 @@ import { withPageBehind } from "@/stories/decorators";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import {
 	MANY_PRACTICES,
-	NOBODY,
+	NO_OUTCOMES,
 	PACKAGING_GROUP,
 } from "@/stories/practices-across-the-workspace-story-data";
 import { expectNoPanelOverflow } from "@/stories/reflow";
@@ -31,7 +31,7 @@ const meta = {
 	},
 	argTypes: { path: { control: false } },
 	render: (args) => (
-		<Stateful initial={[{ kind: "practice-group", id: PACKAGING_GROUP.groupSlug }]}>
+		<Stateful initial={[{ kind: "practice-group", id: PACKAGING_GROUP.slug }]}>
 			{(stack, setStack) => (
 				<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
 					{(_entry, level) => (
@@ -58,21 +58,15 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The head carries the crumb, the group and its split with the You marker. The way to the group in
- * the reader's profile is the level's footer, which the route adds. The reader's own standing and
- * trend are there, not here.
+ * The head carries the crumb and the group; each practice shows how many developers have results
+ * in it and how they came out. The way to the group in the reader's profile is the level's footer,
+ * which the route adds.
  */
 export const Default: Story = {
 	play: async ({ args }) => {
 		const panel = await settledDrawerPanel();
 		const level = within(panel);
 		await expectSettledVisible(level.getByRole("heading", { name: "Packaging work for review" }));
-		// The head's bar comes first; a practice that splits as its group does repeats its words.
-		await expect(
-			level.getAllByRole("img", {
-				name: "28 developers with a current standing in this workspace: 7 Needs attention, 6 Mixed feedback, 8 Going well, 7 none yet. The You marker is on Needs attention.",
-			})[0],
-		).toBeVisible();
 		const table = within(
 			level.getByRole("table", { name: "Practices of Packaging work for review" }),
 		);
@@ -85,45 +79,30 @@ export const Default: Story = {
 			}),
 		);
 		await expect(args.onGoToPractice).toHaveBeenCalledWith("scope-to-one-concern");
-		// A practice with small parts draws like any other, the reader marked.
-		await expect(
-			table.getByRole("img", {
-				name: "28 developers with a current standing in this workspace: 1 Needs attention, 0 Mixed feedback, 2 Going well, 25 none yet. The You marker is on none yet.",
-			}),
-		).toBeVisible();
-		// The bars' explanation waits behind the legend's (i), worded for a practice.
-		await expect(level.queryByText(/^Each bar counts developers/u)).toBeNull();
-		await userEvent.click(level.getByRole("button", { name: "About the bars" }));
-		const barsPanel = await screen.findByRole("dialog", { name: "About the bars" });
-		await expectSettledVisible(barsPanel);
-		const bars = within(barsPanel);
-		await expect(bars.getByText(/current standing in the practice,/u)).toBeVisible();
-		await expect(
-			bars.getByText(/So a small count can let others tell where you stand\.$/u),
-		).toBeVisible();
+		const diff = table.getByRole("row", { name: /Keep the diff reviewable in one sitting/u });
+		await expect(diff).toHaveTextContent("21 developers");
+		await expect(diff).toHaveTextContent("Not met 9");
 	},
 };
 
-/** Nobody has a standing yet: the head's bar and the table each say so once. */
-export const NobodyYet: Story = {
+/** No review has produced a result yet: each practice says so, and still opens in the profile. */
+export const NoResultsYet: Story = {
 	args: {
 		state: {
 			status: "ready",
 			group: {
 				...PACKAGING_GROUP,
-				yourStanding: undefined,
-				split: NOBODY,
 				practices: PACKAGING_GROUP.practices.map((one) => ({
 					...one,
-					yourStanding: undefined,
-					split: NOBODY,
+					developers: 0,
+					outcomes: NO_OUTCOMES,
 				})),
 			},
 		},
 	},
 	play: async () => {
 		const level = within(await settledDrawerPanel());
-		await expect(level.getAllByText("No developer has a standing yet.")).toHaveLength(2);
+		await expect(level.getAllByText("No results yet")).toHaveLength(5);
 		await expect(
 			level.getByRole("button", {
 				name: "Open in your Practice profile Scope the change to one concern",
@@ -196,7 +175,6 @@ export const NoPractices: Story = {
 	play: async () => {
 		const level = within(await settledDrawerPanel());
 		await expect(level.getByText("No practices yet")).toBeVisible();
-		await expect(level.queryByText(/^Each bar counts developers/u)).toBeNull();
 	},
 };
 

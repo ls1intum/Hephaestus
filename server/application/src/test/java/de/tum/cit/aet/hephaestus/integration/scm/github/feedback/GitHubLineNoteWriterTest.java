@@ -313,17 +313,28 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
                 ScmFeedbackFixtures.line(new FeedbackAnchor("src/Foo.java", 9, 10, side), "fix", MARKER, "range-copy");
         var comment = authored(kept);
         comment.put("originalStartLine", 9);
-        comment.put("startDiffSide", side == CitationSide.OLD ? "LEFT" : "RIGHT");
-        stubReviewThreads(List.of(thread("THREAD_range", "RC_range", comment)));
+        var thread = thread("THREAD_range", "RC_range", comment);
+        String expectedSide = side == CitationSide.OLD ? "LEFT" : "RIGHT";
+        String otherSide = side == CitationSide.OLD ? "RIGHT" : "LEFT";
+        thread.put("diffSide", expectedSide);
+        thread.put("startDiffSide", expectedSide);
+        stubReviewThreads(List.of(thread));
 
         assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
                 .singleElement()
                 .satisfies(copy -> assertThat(copy.externalRef()).isEqualTo("RC_range"));
 
-        comment.put("startDiffSide", side == CitationSide.OLD ? "RIGHT" : "LEFT");
+        thread.put("startDiffSide", otherSide);
         assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
                 .isEmpty();
-        comment.remove("startDiffSide");
+        thread.remove("startDiffSide");
+        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
+                .isEmpty();
+        thread.put("startDiffSide", expectedSide);
+        thread.put("diffSide", otherSide);
+        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
+                .isEmpty();
+        thread.remove("diffSide");
         assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
                 .isEmpty();
         assertThat(fence.attempts).isEmpty();
@@ -439,7 +450,6 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         comment.put("body", posted(item));
         comment.put("viewerDidAuthor", true);
         comment.put("path", "src/Foo.java");
-        comment.put("diffSide", item.anchor().side() == CitationSide.OLD ? "LEFT" : "RIGHT");
         comment.put("originalLine", 10);
         comment.put("originalStartLine", null);
         comment.put("originalCommit", Map.of("oid", COMMIT));
@@ -561,6 +571,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         t.put("id", threadId);
         t.put("isOutdated", false);
         t.put("isResolved", false);
+        t.put("diffSide", "RIGHT");
         t.put("comments", Map.of("nodes", new ArrayList<>(List.of(firstComment))));
         return t;
     }

@@ -88,14 +88,14 @@ class FeedbackModeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest
     void shouldKeepReviewEligibilityWhenFeedbackIsOff() {
         var owner = persistUser("mode-owner");
         var workspace = createWorkspace("mode-off", "Modes", "mode-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "off-review",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         practice.setFeedbackMode(FeedbackMode.OFF);
         practices.saveAndFlush(practice);
         assertThat(service.listReviewedPractices(WorkspaceContext.fromWorkspace(workspace, Set.of(), null)))
@@ -111,14 +111,14 @@ class FeedbackModeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest
         workspaces.saveAndFlush(workspace);
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
         var group = groups.createGroup(ctx, "mode-group", new GroupAttributes("Modes", null, null, null, null), true);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "inherited-review",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 group.getId(),
                 0,
-                null);
+                null));
         var versionId = practice.getCurrentVersion().getId();
         assertThat(FeedbackModeResolver.resolvePractice(practice, FeedbackMode.AUTOMATIC)
                         .mode())

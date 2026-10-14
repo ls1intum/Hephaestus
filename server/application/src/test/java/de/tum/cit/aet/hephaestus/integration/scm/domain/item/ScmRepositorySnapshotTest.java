@@ -7,24 +7,16 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.GeneralReviewCommentContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 class ScmRepositorySnapshotTest extends BaseUnitTest {
@@ -54,19 +46,12 @@ class ScmRepositorySnapshotTest extends BaseUnitTest {
                 rows,
                 mock(IssueRepository.class),
                 mock(PullRequestReviewRepository.class),
-                mock(UserRepository.class),
                 mock(IssueEvidenceVersion.class),
                 tree,
                 mock(ScmFileVersions.class),
-                mock(ScmCaptureConsent.class),
-                mock(JdbcTemplate.class),
                 new ObjectMapper(),
-                mock(PullRequestContentSource.class),
-                mock(IssueContentSource.class),
-                mock(GeneralReviewCommentContentSource.class),
-                mock(ReviewThreadContentSource.class),
-                mock(LinkedWorkItemContentSource.class),
-                mock(RepositoryTreeContentSource.class));
+                mock(ScmWorkCapture.class),
+                mock(ScmCaptureContributors.class));
         var snapshot = service.pin(ref, null);
         assertThat(snapshot.state()).containsEntry("defaultBranch", branch);
         assertThat(snapshot.version().value()).isEqualTo("a".repeat(40));

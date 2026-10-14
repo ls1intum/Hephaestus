@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
+	bindPracticeGroupMutation,
 	createPracticeMutation,
 	getPracticeQueryKey,
 	listPracticesQueryKey,
@@ -10,20 +11,19 @@ import {
 import type { CreatePracticeRequest, Practice, UpdatePracticeRequest } from "@/api/types.gen";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
+import { practiceCatalogStructureScope, upsertPractice } from "./practice-catalog-cache";
 import { refreshPracticeGuidance } from "./practice-guidance-cache";
 
-import {
-	patchPractice,
-	practiceCatalogStructureScope,
-	selectPracticePatch,
-	upsertPractice,
-} from "./practice-catalog-cache";
-
 export interface PracticeEditor {
-	create: (data: CreatePracticeRequest, groupSlug: string | null) => Promise<Practice>;
+	create: (request: CreatePracticeRequest) => Promise<Practice>;
+	/**
+	 * Replaces the definition of the version named in the request, then moves the practice to
+	 * `groupSlug` when that differs. The group is where the practice is listed, not in its
+	 * definition, so a move never makes a version of its own.
+	 */
 	update: (
-		slug: string,
-		data: UpdatePracticeRequest,
+		practice: Practice,
+		request: UpdatePracticeRequest,
 		groupSlug: string | null,
 	) => Promise<Practice>;
 	isPending: boolean;
@@ -43,8 +43,20 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 	const update = useMutation({
 		...updatePracticeMutation(),
 		scope,
+		// A stale version is the host's to explain: it keeps the draft and offers the newest version.
+		onError: (error) => {
+			if (problemStatusOf(error) !== 409) {
+				toast.error("We could not save the practice", { description: problemDetailOf(error) });
+			}
+		},
+	});
+	const bindGroup = useMutation({
+		...bindPracticeGroupMutation(),
+		scope,
 		onError: (error) =>
-			toast.error("We could not save the practice", { description: problemDetailOf(error) }),
+			toast.error("The practice was saved, but we could not move it to the group", {
+				description: problemDetailOf(error),
+			}),
 	});
 	const create = useMutation({
 		...createPracticeMutation(),
@@ -55,42 +67,51 @@ export function usePracticeEditor(workspaceSlug: string): PracticeEditor {
 				: toast.error("We could not create the practice", { description: problemDetailOf(error) }),
 	});
 
+	const store = async (practice: Practice) => {
+		const detailQueryKey = getPracticeQueryKey({
+			path: { workspaceSlug, practiceSlug: practice.slug },
+		});
+		queryClient.setQueryData(detailQueryKey, practice);
+		queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
+			practices ? upsertPractice(practices, practice) : practices,
+		);
+		void queryClient.invalidateQueries({ queryKey: detailQueryKey });
+		void queryClient.invalidateQueries({ queryKey: listQueryKey });
+		await refreshPracticeGuidance(queryClient, workspaceSlug, practice.slug);
+	};
+
 	return {
-		isPending: update.isPending || create.isPending,
-		update: async (slug, data, groupSlug) => {
-			const request = { ...data, group: { groupSlug } };
-			const detailQueryKey = getPracticeQueryKey({ path: { workspaceSlug, practiceSlug: slug } });
+		isPending: update.isPending || bindGroup.isPending || create.isPending,
+		update: async (practice, request, groupSlug) => {
+			const path = { workspaceSlug, practiceSlug: practice.slug };
 			await Promise.all([
-				queryClient.cancelQueries({ queryKey: detailQueryKey }),
+				queryClient.cancelQueries({ queryKey: getPracticeQueryKey({ path }) }),
 				queryClient.cancelQueries({ queryKey: listQueryKey }),
 			]);
 			const updated = await update.mutateAsync({
-				path: { workspaceSlug, practiceSlug: slug },
+				path,
 				body: request,
 			});
-			queryClient.setQueryData(detailQueryKey, updated);
-			queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
-				practices
-					? patchPractice(practices, updated.slug, selectPracticePatch(updated, request))
-					: practices,
-			);
-			void queryClient.invalidateQueries({ queryKey: detailQueryKey });
-			void queryClient.invalidateQueries({ queryKey: listQueryKey });
-			await refreshPracticeGuidance(queryClient, workspaceSlug, updated.slug);
-			toast.success("Practice saved");
-			return updated;
+			if (groupSlug === updated.groupSlug) {
+				await store(updated);
+				toast.success("Practice saved");
+				return updated;
+			}
+			try {
+				const placed = await bindGroup.mutateAsync({ path, body: { groupSlug } });
+				await store(placed);
+				toast.success("Practice saved");
+				return placed;
+			} catch (error) {
+				// The new version exists whatever happened to the move, so the caches show it.
+				await store(updated);
+				throw error;
+			}
 		},
-		create: async (data, groupSlug) => {
+		create: async (request) => {
 			await queryClient.cancelQueries({ queryKey: listQueryKey });
-			const created = await create.mutateAsync({
-				path: { workspaceSlug },
-				body: { ...data, groupSlug },
-			});
-			queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
-				practices ? upsertPractice(practices, created) : practices,
-			);
-			void queryClient.invalidateQueries({ queryKey: listQueryKey });
-			await refreshPracticeGuidance(queryClient, workspaceSlug, created.slug);
+			const created = await create.mutateAsync({ path: { workspaceSlug }, body: request });
+			await store(created);
 			toast.success("Practice created");
 			return created;
 		},

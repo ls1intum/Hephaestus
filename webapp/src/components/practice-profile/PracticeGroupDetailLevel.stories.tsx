@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 
-import type { PracticeGroup } from "@/api/types.gen";
+import type { GroupRef } from "@/api/types.gen";
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { text, work } from "@/components/practice-vocabulary/feedback-text";
 import { withPageBehind, withProvider } from "@/stories/decorators";
@@ -12,10 +12,10 @@ import {
 	OVERVIEW_FIXTURE,
 	packagingGroup,
 	packagingStanding,
+	pullRequest as storyPullRequest,
 } from "@/stories/practice-profile-story-mock-data";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
-import { precedes } from "@/test/dom";
 
 import { SAMPLE_PATTERN_NONE_CLEAN } from "@/stories/practice-profile-samples";
 import { composeGroupOverview } from "./compose-overview";
@@ -72,13 +72,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /** A group the overview does not mention: no practice carries a sentence. */
-const otherGroup: PracticeGroup = {
+const otherGroup: GroupRef = {
 	...packagingGroup,
 	slug: "testing-discipline",
 	name: "Testing your changes",
 	icon: "TestTube",
 	color: "emerald",
-	description: "Prove a change works before a reviewer has to take your word for it.",
 };
 
 /** The table's own rows: its first body, without the header or a fold under it. */
@@ -89,17 +88,13 @@ const practiceRows = () =>
 	).getAllByRole("row");
 
 /**
- * The group the overview knows, in one column: the catalog's words on the group lead, then the
- * practices with a sentence under each practice the overview mentions. No summary card and no
- * "Where you stand" section stand between them.
+ * The group the overview knows, in one column: the practices with a sentence under each practice
+ * the overview mentions. No summary card and no "Where you stand" section stand over them.
  */
 export const Default: Story = {
 	play: async ({ args }) => {
 		const table = await screen.findByRole("table", { name: "Practices in this group" });
 		await expectSettledVisible(table);
-		const lead = screen.getByText(/one concern per change/u);
-		await expect(lead).toBeVisible();
-		await expect(precedes(lead, table)).toBe(true);
 		const header = screen.getByRole("heading", { name: packagingGroup.name });
 		await expect(header).toBeVisible();
 		await expect(screen.getByText("Group")).toBeVisible();
@@ -143,18 +138,6 @@ export const Standing: Story = {
 			await screen.findByRole("table", { name: "Practices in this group" }),
 		);
 		await expect(screen.queryByRole("region", { name: "Where you stand" })).toBeNull();
-		await expect(screen.getByText(/one concern per change/u)).toBeVisible();
-	},
-};
-
-/** A group nothing is written about yet opens on its practices, with no line saying so. */
-export const NoDescription: Story = {
-	args: { group: { ...packagingGroup, description: undefined } },
-	play: async () => {
-		await expectSettledVisible(
-			await screen.findByRole("table", { name: "Practices in this group" }),
-		);
-		await expect(screen.queryByText(/one concern per change/u)).not.toBeInTheDocument();
 	},
 };
 
@@ -193,9 +176,7 @@ export const OtherGroup: Story = {
 	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("Describe what changed and why"));
-		await expect(
-			screen.getByText("Prove a change works before a reviewer has to take your word for it."),
-		).toBeVisible();
+		await expect(screen.getByRole("heading", { name: otherGroup.name })).toBeVisible();
 		await expect(screen.queryByText(/^Feedback resolved by the work after/u)).toBeNull();
 	},
 };
@@ -212,8 +193,8 @@ export const NoPractices: Story = {
 			...packagingStanding,
 			groupSlug: otherGroup.slug,
 			standing: "NOT_OBSERVED",
-			direction: undefined,
-			trendSupport: undefined,
+			direction: null,
+			trendSupport: null,
 		},
 		practices: [],
 		...groupOverview(otherGroup.slug),
@@ -315,17 +296,10 @@ export const MobileSummarySpansHeader: Story = {
 const [patterned] = detailPractices;
 const neverAppliedPractices = detailPractices.map((practice, index) =>
 	index === detailPractices.length - 1
-		? { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+		? { ...practice, standing: "NO_OPPORTUNITY" as const, doesNotApplyOnly: true }
 		: practice,
 );
-const pullRequest = (number: number) =>
-	work({
-		kind: "scm.pull_request",
-		id: String(9000 + number),
-		label: `#${number}`,
-		title: `Pull request ${number}`,
-		provider: "GITHUB",
-	});
+const pullRequest = (number: number) => work(storyPullRequest(number));
 /** A row's sentence that names the work already, as a fall back does. */
 const patternedSentences = patterned && {
 	...groupOverview(packagingGroup.slug).practiceSentences,
@@ -378,14 +352,14 @@ export const PatternPhone: Story = {
 /** The group's practices with one never applied and one no review has observed yet. */
 const foldedPractices = detailPractices.map((practice, index) => {
 	if (index === detailPractices.length - 1) {
-		return { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true };
+		return { ...practice, standing: "NO_OPPORTUNITY" as const, doesNotApplyOnly: true };
 	}
 	if (index === detailPractices.length - 2) {
 		return {
 			...practice,
 			standing: "NOT_OBSERVED" as const,
-			direction: undefined,
-			trendSupport: undefined,
+			direction: null,
+			trendSupport: null,
 		};
 	}
 	return practice;
@@ -430,8 +404,8 @@ export const OnlyNotObservedPractices: Story = {
 		practices: detailPractices.map((practice) => ({
 			...practice,
 			standing: "NOT_OBSERVED" as const,
-			direction: undefined,
-			trendSupport: undefined,
+			direction: null,
+			trendSupport: null,
 		})),
 	},
 	play: async () => {

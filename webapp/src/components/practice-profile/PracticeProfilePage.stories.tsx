@@ -4,12 +4,14 @@ import { expect, fn, userEvent, within } from "storybook/test";
 import { HEPH_LABEL } from "@/components/brand/HephIcon";
 import { ALL_FEEDBACK_CARDS } from "@/stories/practice-feedback-cards-story-mock-data";
 import {
-	OVERVIEW_FIXTURE,
 	groups,
+	LATEST_REVIEW,
+	OVERVIEW_FIXTURE,
 	practiceStandings,
 } from "@/stories/practice-profile-story-mock-data";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
+import { precedes } from "@/test/dom";
 
 import { withProvider } from "@/stories/decorators";
 import { DEFAULT_FEEDBACK_TAB } from "./practice-profile-search";
@@ -21,7 +23,8 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		latestRun: OVERVIEW_FIXTURE.latestRun,
+		latestReview: LATEST_REVIEW,
+		goingWell: OVERVIEW_FIXTURE.goingWell,
 		practices: practiceStandings,
 		groups,
 		feedbackCards: ALL_FEEDBACK_CARDS,
@@ -32,8 +35,9 @@ const meta = {
 		state: { status: "ready" },
 	},
 	argTypes: {
-		// One run reference from the server: nothing in it is a control a reader could set by hand.
-		latestRun: { control: false },
+		// References from the server: nothing in them is a control a reader could set by hand.
+		latestReview: { control: false },
+		goingWell: { control: false },
 	},
 } satisfies Meta<typeof PracticeProfilePage>;
 
@@ -64,7 +68,14 @@ export const Default: Story = {
 			"href",
 			expect.stringContaining("practice-groups:all"),
 		);
-		// No summary card stands between the header and the feedback: the cards come first.
+		// What goes well sits between the header and the feedback, in the server's words; no summary
+		// card of the page's own stands there.
+		const goingWell = canvas.getByRole("heading", { level: 2, name: "Going well" });
+		const feedback = canvas.getByRole("heading", { level: 2, name: "Your feedback" });
+		await expect(precedes(goingWell, feedback)).toBe(true);
+		await expect(
+			canvas.getByRole("link", { name: "Mark the change ready and link its issue" }),
+		).toHaveAttribute("href", expect.stringContaining("practice:ready-and-traceable-handoff"));
 		await expect(canvas.queryByRole("img", { name: HEPH_LABEL })).toBeNull();
 		await expect(canvas.queryByText("What changed")).toBeNull();
 		// A card's practice pill and its "Learn more" both open the practice's level, where its
@@ -121,7 +132,7 @@ export const FeedbackTabs: Story = {
 
 		await userEvent.click(canvas.getByRole("tab", { name: /^All/u }));
 		await expect(articles()).toHaveLength(9);
-		// Newest first across both: the open and the resolved card from the latest run lead.
+		// Newest first across both: the open and the resolved card from the latest review lead.
 		await expect(articles()[0]).toHaveTextContent("Created 9 September, 2:10 pm");
 
 		await userEvent.click(canvas.getByRole("tab", { name: /^Open/u }));
@@ -132,12 +143,13 @@ export const FeedbackTabs: Story = {
 };
 
 /**
- * No review has reached any practice, so there is no run, no feedback, and the tab says so in the
+ * No review has reached any practice, so there is no review, no feedback, and the tab says so in the
  * empty block every practice surface uses: the icon, what is missing, and when it will show up.
  */
 export const ColdStart: Story = {
 	args: {
-		latestRun: undefined,
+		latestReview: undefined,
+		goingWell: [],
 		practices: [],
 		feedbackCards: [],
 	},
@@ -157,7 +169,8 @@ export const ColdStart: Story = {
 /** "Resolved and closed" says what would move a card here, rather than repeating the other tabs. */
 export const NothingResolvedYet: Story = {
 	args: {
-		latestRun: undefined,
+		latestReview: undefined,
+		goingWell: [],
 		practices: [],
 		feedbackCards: [],
 		feedbackTab: "resolved",
@@ -175,7 +188,8 @@ export const NothingResolvedYet: Story = {
 /** The card list is a skeleton of two cards, and the tabs carry no counts yet. */
 export const Loading: Story = {
 	args: {
-		latestRun: undefined,
+		latestReview: undefined,
+		goingWell: [],
 		practices: [],
 		groups: [],
 		feedbackCards: [],
@@ -189,7 +203,8 @@ export const Loading: Story = {
 
 export const LoadFailed: Story = {
 	args: {
-		latestRun: undefined,
+		latestReview: undefined,
+		goingWell: [],
 		practices: [],
 		groups: [],
 		feedbackCards: [],

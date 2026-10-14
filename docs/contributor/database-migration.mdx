@@ -51,7 +51,7 @@ Never use a database that contains data you need to keep.
 These commands apply the changelog chain to the supplied database.
 
 Set `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in the process environment.
-Process variables override values in `server/.env`.
+Process variables override the values in the server environment file.
 The external mode requires `pg_isready`.
 It does not call Docker Compose or change database data directories.
 You must start and remove the disposable database yourself.

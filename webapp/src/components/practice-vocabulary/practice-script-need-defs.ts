@@ -19,5 +19,5 @@ export const PRACTICE_SCRIPT_REQUIRED_DEF: StatusDef = {
 
 /** The badge a need wears, or null for an optional one, which wears none. */
 export function practiceScriptNeedBadge(need: PracticeScriptNeedKind): StatusDef | null {
-	return need === "REQUIRED" ? PRACTICE_SCRIPT_REQUIRED_DEF : null;
+	return need === "required" ? PRACTICE_SCRIPT_REQUIRED_DEF : null;
 }

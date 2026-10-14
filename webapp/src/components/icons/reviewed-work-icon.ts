@@ -1,5 +1,5 @@
 import { PROVIDER_ICONS } from "@/components/icons/integration-provider-icons";
-import { type ArtifactKindIcon, artifactKindIcon, type WorkProvider } from "@/lib/artifact-kinds";
+import { type ItemKindIcon, itemKindIcon, type ItemProvider } from "@/lib/item-kinds";
 
 /**
  * The provider's mark where the caller has one — a run records its provider — falling back to the
@@ -8,7 +8,7 @@ import { type ArtifactKindIcon, artifactKindIcon, type WorkProvider } from "@/li
  */
 export function reviewedWorkIcon(
 	kind: string | undefined,
-	provider?: WorkProvider,
-): ArtifactKindIcon {
-	return provider ? PROVIDER_ICONS[provider] : artifactKindIcon(kind);
+	provider?: ItemProvider,
+): ItemKindIcon {
+	return provider ? PROVIDER_ICONS[provider] : itemKindIcon(kind);
 }

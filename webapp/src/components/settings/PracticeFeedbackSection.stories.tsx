@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "storybook/test";
+import { expect, fn } from "storybook/test";
 
 import { PracticeFeedbackSection } from "./PracticeFeedbackSection";
 
@@ -17,10 +17,17 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The choice belongs to the account, so turning it off in one workspace turns it off in all. */
 export const Enabled: Story = {
 	args: {
 		practiceFeedbackDeliveryEnabled: true,
 		isLoading: false,
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("switch", { name: "Comments and Slack reminders" }),
+		).toBeChecked();
+		await expect(canvas.getByText(/This choice applies in every workspace\./u)).toBeVisible();
 	},
 };
 

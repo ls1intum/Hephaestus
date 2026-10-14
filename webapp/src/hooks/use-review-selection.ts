@@ -8,7 +8,7 @@ import {
 	listPracticesOptions,
 	listTracedArtifactsOptions,
 } from "@/api/@tanstack/react-query.gen";
-import type { ReviewedWorkRef } from "@/api/types.gen";
+import type { ItemRef } from "@/api/types.gen";
 import { subjectLabel } from "@/components/admin/practice-reviews/review-format";
 import { type RecordRef, selectionRecord } from "@/components/admin/practice-reviews/review-layers";
 import type { ReviewScope } from "@/components/admin/practice-reviews/review-scope";
@@ -19,8 +19,8 @@ import {
 import type { ReviewSelectionName } from "@/components/admin/practice-reviews/ReviewSelectionBar";
 import { type PanelState, panelState } from "@/components/common/panel-state";
 import { useNow } from "@/components/common/use-now";
-import { reviewedWorkName } from "@/lib/artifact-kinds";
 import { formatDayTime } from "@/lib/dates";
+import { itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
 /** One piece of work, as the work list filters by it. */
@@ -148,7 +148,7 @@ function useRecordRead(
 					status: "ready" as const,
 					name:
 						named === undefined
-							? reviewedWorkName({ kind: selection.artifactKind, label: "" })
+							? itemName({ kind: selection.artifactKind, label: "" })
 							: workName(named),
 				})),
 				trace,
@@ -220,7 +220,7 @@ function useRecordRead(
 	}
 }
 
-function workOf(reviewedWork: ReviewedWorkRef | undefined): SelectedWork | undefined {
+function workOf(reviewedWork: ItemRef | undefined): SelectedWork | undefined {
 	const artifactId = Number(reviewedWork?.id);
 	return reviewedWork !== undefined && Number.isSafeInteger(artifactId) && artifactId > 0
 		? { artifactKind: reviewedWork.kind, artifactId }
@@ -228,6 +228,6 @@ function workOf(reviewedWork: ReviewedWorkRef | undefined): SelectedWork | undef
 }
 
 /** "Pull request #1423 · Fix the parser", or the name alone where the work has no title. */
-function workName(reviewedWork: ReviewedWorkRef): string {
-	return [reviewedWorkName(reviewedWork), reviewedWork.title].filter(hasText).join(" · ");
+function workName(reviewedWork: ItemRef): string {
+	return [itemName(reviewedWork), reviewedWork.title].filter(hasText).join(" · ");
 }

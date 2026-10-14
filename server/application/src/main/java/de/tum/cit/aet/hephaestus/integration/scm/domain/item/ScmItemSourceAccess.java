@@ -53,6 +53,10 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
     @Transactional(readOnly = true)
     public boolean permits(ItemRef item, SourceUsePurpose purpose) {
         Objects.requireNonNull(purpose);
+        return permitsItem(item);
+    }
+
+    private boolean permitsItem(ItemRef item) {
         if (!kinds().contains(item.kind())) return false;
         try {
             items.require(item);
@@ -69,12 +73,12 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
             }
             if (item.kind().equals(ScmItemEvents.FILE)) {
                 if (source != null || item.path() == null) return false;
-                return permits(items.parent(item, ScmItemEvents.REPOSITORY), purpose);
+                return permitsItem(items.parent(item, ScmItemEvents.REPOSITORY));
             }
             if (source == null || item.path() != null) return false;
             if (item.kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW)) {
                 var parent = items.parent(item, ScmItemEvents.PULL_REQUEST);
-                if (!permits(parent, purpose)) return false;
+                if (!permitsItem(parent)) return false;
                 var review = reviews.findById(source);
                 if (review.isEmpty()
                         || review.orElseThrow().getPullRequest() == null
@@ -82,7 +86,7 @@ public class ScmItemSourceAccess implements ItemSourceAccess {
                     return false;
             } else {
                 var parent = items.parent(item, ScmItemEvents.REPOSITORY);
-                if (!permits(parent, purpose)) return false;
+                if (!permitsItem(parent)) return false;
                 var work = issues.findByIdWithAuthorAndRepository(source);
                 if (work.isEmpty()
                         || work.orElseThrow().getDeletedAt() != null

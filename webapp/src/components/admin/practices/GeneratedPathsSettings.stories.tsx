@@ -3,8 +3,8 @@ import { expect, fn, userEvent } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { Stateful } from "@/stories/stateful";
 import { pending } from "@/test/async";
-import { mockReviewSettings } from "./fixtures";
 import { GeneratedPathsSettings } from "./GeneratedPathsSettings";
+import { reviewSettings } from "./review/fixtures";
 
 const meta = {
 	component: GeneratedPathsSettings,
@@ -15,12 +15,12 @@ const meta = {
 		chromatic: { viewports: [320, 1440] },
 	},
 	args: {
-		settings: mockReviewSettings(),
+		settings: reviewSettings(),
 		repositories: {
 			status: "ready",
 			options: [
-				{ value: "owner/repo", label: "owner/repo" },
-				{ value: "group/nested/project", label: "group/nested/project" },
+				{ itemId: "101", name: "owner/repo" },
+				{ itemId: "102", name: "group/nested/project" },
 			],
 		},
 		isSaving: false,
@@ -33,7 +33,7 @@ type Story = StoryObj<typeof meta>;
 export const EmptyPatterns: Story = {};
 export const Configured: Story = {
 	args: {
-		settings: mockReviewSettings({
+		settings: reviewSettings({
 			generatedPaths: {
 				"owner/repo": ["webapp/src/api/**", "**/*.generated.ts"],
 				"group/nested/project": ["client/**"],

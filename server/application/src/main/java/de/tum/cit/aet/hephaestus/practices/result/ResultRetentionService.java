@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -38,7 +39,7 @@ public class ResultRetentionService {
                         "SELECT DISTINCT workspace_id FROM review WHERE kind='SCAN' AND completed_at<=:cutoff AND"
                             + " COALESCE((report->>'expired')::boolean,false)=false UNION SELECT DISTINCT workspace_id"
                             + " FROM result WHERE ended_at<=:cutoff ORDER BY workspace_id")
-                .param("cutoff", cutoff)
+                .param("cutoff", Timestamp.from(cutoff))
                 .query((rs, n) -> rs.getLong(1))
                 .list();
         for (var workspace : workspaces) purgeWorkspace(workspace, cutoff);
@@ -50,7 +51,7 @@ public class ResultRetentionService {
                             "SELECT id FROM review WHERE workspace_id=:ws AND kind='SCAN' AND completed_at<=:cutoff"
                                     + " AND COALESCE((report->>'expired')::boolean,false)=false ORDER BY id::text")
                     .param("ws", workspaceId)
-                    .param("cutoff", cutoff)
+                    .param("cutoff", Timestamp.from(cutoff))
                     .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
                     .list();
             for (var scan : scans) reports.expire(workspaceId, scan);
@@ -62,7 +63,7 @@ public class ResultRetentionService {
                            ORDER BY r.id::text
                 """)
                     .param("ws", workspaceId)
-                    .param("cutoff", cutoff)
+                    .param("cutoff", Timestamp.from(cutoff))
                     .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
                     .list();
             if (ids.isEmpty()) return;

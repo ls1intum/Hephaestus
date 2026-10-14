@@ -45,7 +45,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class ReviewBatchService {
     private final ReviewBatchRepository batches;
     private final ReviewBatchTargetRepository targets;
-    private final ReviewBatchScopeRepository scope;
+    private final ReviewBatchScopeQuery scope;
     private final ReviewBatchCostEstimator costs;
     private final ReviewBatchProperties properties;
     private final ReviewRepository reviews;

@@ -38,7 +38,7 @@ export function AvailablePracticeList({
 	const offered = practices.filter(
 		(practice) =>
 			practice.availability !== "ADOPTED" ||
-			(practice.groupSlug !== undefined && !existingGroupSlugs.has(practice.groupSlug)),
+			(practice.groupSlug !== null && !existingGroupSlugs.has(practice.groupSlug)),
 	);
 
 	if (offered.length === 0) {
@@ -76,7 +76,7 @@ export function AvailablePracticeList({
 				const { groupSlug } = first;
 				const available = entries.filter(({ availability }) => availability === "AVAILABLE").length;
 				const restorable = entries.filter(({ availability }) => availability === "ADOPTED").length;
-				const groupMissing = groupSlug !== undefined && !existingGroupSlugs.has(groupSlug);
+				const groupMissing = groupSlug !== null && !existingGroupSlugs.has(groupSlug);
 
 				return (
 					<Section
@@ -154,7 +154,7 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 					<span className="sr-only">, {def.action}</span>
 				</ItemTitle>
 				<ItemDescription className="line-clamp-none">
-					<WorkTypeLabel artifactKind={practice.artifactKind} />
+					<WorkTypeLabel itemKind={practice.kind} />
 				</ItemDescription>
 				{/* Without this the rows differ only by name: the large majority of the bundled catalogue
 				    reviews a pull request, so the work type above separates almost none of them. */}

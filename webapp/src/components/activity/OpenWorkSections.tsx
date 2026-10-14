@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { andList } from "@/lib/text";
 
@@ -101,7 +101,7 @@ export function OpenWorkSections({ state, providerType, reviewNow }: OpenWorkSec
 								{ list: ready.openWork.teamReviewRequests, of: "your teams’ review requests" },
 								{
 									list: ready.openWork.pullRequests,
-									of: `your open ${artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType)}`,
+									of: `your open ${itemKindNoun(ITEM_KIND.pullRequest, 2, providerType)}`,
 								},
 							]}
 						/>

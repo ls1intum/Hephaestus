@@ -1,24 +1,26 @@
 import { cn } from "cn";
-import type { ReviewLineageFeedback, ReviewLineageResult } from "@/api/types.gen";
 import { OUTCOME_DEFS, type Outcome } from "@/components/practice-vocabulary/outcome-defs";
 import { resultSummary } from "./result-words";
 
-import { countOf, type NumberedById, toneChip } from "./lineage-chain";
+import {
+	countOf,
+	type LineageFeedback,
+	type LineageResult,
+	type NumberedById,
+	toneChip,
+} from "./lineage-chain";
 
 /**
- * How a result's chip looks: its verdict's tone, hollow where not applicable, a dashed edge
- * and a struck number where marked incorrect, a ring on the record the trace was opened for. The
- * legend draws its samples with it.
+ * How a result's chip looks: its verdict's tone, hollow where the practice does not apply, a ring
+ * on the record the trace was opened for. The legend draws its samples with it.
  */
 export function resultChipClass({
 	outcome,
-	invalidated = false,
 	ringed = false,
 	size = "md",
 	className,
 }: {
 	outcome: Outcome;
-	invalidated?: boolean;
 	ringed?: boolean;
 	size?: "sm" | "md";
 	className?: string;
@@ -27,18 +29,16 @@ export function resultChipClass({
 		"inline-flex shrink-0 items-center justify-center rounded-full border font-semibold tabular-nums",
 		size === "md" ? "size-[1.125rem] text-2xs" : "size-4 text-2xs leading-none",
 		toneChip(OUTCOME_DEFS[outcome].badgeVariant),
-		outcome === "NOT_APPLICABLE" && "bg-background",
-		invalidated && "border-dashed line-through",
+		outcome === "DOES_NOT_APPLY" && "bg-background",
 		ringed && "ring-2 ring-foreground ring-offset-1 ring-offset-background",
 		className,
 	);
 }
 
 /**
- * One result as a small numbered chip in its verdict's tone. Not applicable is hollow, so it
- * does not read as undetermined, which shares its grey. The level's traced result is ringed;
- * one marked incorrect has a dashed edge and a struck number. The words are for a screen reader
- * only, since the number alone says nothing there.
+ * One result as a small numbered chip in its verdict's tone. Does not apply is hollow, so it does
+ * not read as could not determine, which shares its grey. The level's traced result is ringed. The
+ * words are for a screen reader only, since the number alone says nothing there.
  */
 export function LineageResultChip({
 	result,
@@ -49,7 +49,7 @@ export function LineageResultChip({
 	className,
 	connector,
 }: {
-	result: ReviewLineageResult;
+	result: LineageResult;
 	number: number;
 	size?: "sm" | "md";
 	/** The record the trace was opened for. */
@@ -63,8 +63,7 @@ export function LineageResultChip({
 	const outcome = OUTCOME_DEFS[result.outcome];
 	const words = [
 		`Result ${number}, ${outcome.label.toLowerCase()}`,
-		result.invalidated ? ", marked incorrect" : "",
-		withSummary ? `: ${resultSummary(result)}` : "",
+		withSummary ? `: ${resultSummary({ summary: result.summary ?? undefined })}` : "",
 	].join("");
 	return (
 		<span
@@ -74,7 +73,6 @@ export function LineageResultChip({
 			data-ringed={ringed}
 			className={resultChipClass({
 				outcome: result.outcome,
-				invalidated: result.invalidated,
 				ringed,
 				size,
 				className,
@@ -87,9 +85,9 @@ export function LineageResultChip({
 }
 
 /**
- * "From 1 3": the chips of the results a piece of feedback was composed from. A result
- * the chain does not list has no chip, so it is counted: as one of another review where the piece
- * came from one, otherwise as one the list leaves out.
+ * "From 1 3": the chips of the results a piece of feedback was composed from. A result the story
+ * does not number has no chip, so it is counted: as one of another review where the piece came
+ * from one, otherwise as one the story leaves out.
  */
 export function LineageSourceChips({
 	feedback,
@@ -98,7 +96,7 @@ export function LineageSourceChips({
 	connectors = false,
 	fromClassName,
 }: {
-	feedback: ReviewLineageFeedback;
+	feedback: LineageFeedback;
 	byId: NumberedById;
 	/** Marks each chip as the end of a connector from its result. */
 	connectors?: boolean;
@@ -107,14 +105,14 @@ export function LineageSourceChips({
 	/** The "From" word, which a table whose column is headed "From" hides from sight. */
 	fromClassName?: string;
 }) {
-	if (feedback.practiceResultIds.length === 0) {
+	if (feedback.basis.length === 0) {
 		return <span>From no recorded result</span>;
 	}
-	const known = feedback.practiceResultIds
+	const known = feedback.basis
 		.map((id) => byId.get(id))
 		.filter((entry) => entry !== undefined)
 		.sort((a, b) => a.number - b.number);
-	const unknown = feedback.practiceResultIds.length - known.length;
+	const unknown = feedback.basis.length - known.length;
 	const counted = known.length > 0 ? `+ ${unknown}` : countOf(unknown, "result", "results");
 	const rest = `${counted} ${elsewhere === undefined ? "not listed" : `of ${elsewhere}`}`;
 	return (

@@ -113,7 +113,9 @@ export function copyCountsSentence(counts: FeedbackCopyCounts): string {
 
 /** Whether some copies landed and others did not: a partial package, which no single state names. */
 export function isPartialPackage(counts: FeedbackCopyCounts): boolean {
-	return counts.posted > 0 && counts.failed + counts.withheld + counts.planned + counts.writeStarted > 0;
+	return (
+		counts.posted > 0 && counts.failed + counts.withheld + counts.planned + counts.writeStarted > 0
+	);
 }
 
 const KIND_NOUNS: Record<FeedbackCopyKind, [singular: string, plural: string]> = {
@@ -137,7 +139,10 @@ const STATE_VERBS: Record<FeedbackCopyState, string> = {
  * Groups keep the copies' own order, so the summary reads first when it is first.
  */
 export function copiesSentence(copies: readonly Pick<FeedbackCopy, "kind" | "state">[]): string {
-	const groups = new Map<string, { kind: FeedbackCopyKind; state: FeedbackCopyState; count: number }>();
+	const groups = new Map<
+		string,
+		{ kind: FeedbackCopyKind; state: FeedbackCopyState; count: number }
+	>();
 	for (const { kind, state } of copies) {
 		const key = `${kind}:${state}`;
 		const group = groups.get(key);

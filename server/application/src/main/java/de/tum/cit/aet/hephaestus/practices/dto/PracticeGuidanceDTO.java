@@ -10,8 +10,8 @@ import org.jspecify.annotations.Nullable;
 public record PracticeGuidanceDTO(
         String practiceSlug,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         PracticeVisual visual,
 
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         PracticeGuide guide) {}

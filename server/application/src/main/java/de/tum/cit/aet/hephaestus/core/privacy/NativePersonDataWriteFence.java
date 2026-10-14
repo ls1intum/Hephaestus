@@ -49,7 +49,7 @@ public class NativePersonDataWriteFence implements PersonDataWriteFence {
     @Transactional(propagation = Propagation.MANDATORY)
     public boolean holdForAccountWrite(long accountId) {
         var identities = jdbc.query(
-                "SELECT i.provider_id,i.provider_user_key,i.team_key FROM identity i JOIN"
+                "SELECT i.provider_id,i.provider_user_key,NULLIF(i.team_key,'') FROM identity i JOIN"
                         + " account a ON a.id=i.account_id WHERE i.account_id=? AND a.status IN"
                         + " ('ACTIVE','UNCLAIMED')",
                 (rs, row) ->
@@ -71,7 +71,7 @@ public class NativePersonDataWriteFence implements PersonDataWriteFence {
         requireFreshControlReads();
         if (accountIds.isEmpty()) return List.of();
         var rows = jdbc.query(
-                "SELECT i.account_id,i.provider_id,i.provider_user_key,i.team_key FROM"
+                "SELECT i.account_id,i.provider_id,i.provider_user_key,NULLIF(i.team_key,'') FROM"
                         + " identity i JOIN account a ON a.id=i.account_id WHERE"
                         + " i.account_id=ANY(?) AND a.status IN ('ACTIVE','UNCLAIMED') ORDER BY"
                         + " i.account_id,i.id",

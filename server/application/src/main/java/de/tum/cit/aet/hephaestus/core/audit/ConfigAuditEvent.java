@@ -88,8 +88,8 @@ public class ConfigAuditEvent {
 
     /**
      * Dot-paths whose value differs between the snapshots (see {@code ConfigAuditDiff}). Persisted
-     * rather than derived because Postgres has no built-in jsonb diff, and because per-control history
-     * must filter server-side: several controls live in one entity, so a whole page may contain zero
+     * rather than derived because per-control history must filter server-side: several controls live
+     * in one entity, so a whole page may contain zero
      * rows matching the requested control, and a client filtering after paging cannot know whether to
      * fetch more.
      */
@@ -97,13 +97,11 @@ public class ConfigAuditEvent {
     @Column(name = "changed_keys", nullable = false, columnDefinition = "text[]")
     private String[] changedKeys;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "old_value", columnDefinition = "jsonb")
+    @Column(name = "old_value", columnDefinition = "text")
     @Nullable
     private String oldValue;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "new_value", columnDefinition = "jsonb")
+    @Column(name = "new_value", columnDefinition = "text")
     @Nullable
     private String newValue;
 

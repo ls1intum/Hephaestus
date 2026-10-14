@@ -332,7 +332,7 @@ export default defineConfig({
 				"node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/practice-scripts/*.test.ts docker/agents/practice-scripts/lib/core/**/*.test.ts docker/agents/practice-scripts/kits/**/*.test.ts docker/agents/pi/*.test.ts",
 			),
 			"test:tooling": run(
-				"node --test scripts/*.test.ts server/application/src/test/resources/integration/scm/sarif/*.test.ts",
+				"node --test scripts/*.test.ts scripts/api-generator/*.test.ts server/application/src/test/resources/integration/scm/sarif/*.test.ts",
 			),
 
 			// Load tests

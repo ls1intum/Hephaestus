@@ -81,7 +81,7 @@ function shown(parts: ChatMessage["parts"]): string[] {
 
 describe("shownFeedbackText", () => {
 	const RESULT = "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f";
-	const OBSERVATION = "8d3e6f1a-2b4c-4d5e-9f6a-7b8c9d0e1f2a";
+	const PROBLEM = "8d3e6f1a-2b4c-4d5e-9f6a-7b8c9d0e1f2a";
 
 	it("reads a streamed reply's feedback exactly as it reads the stored reply", async () => {
 		const message = await streamed([
@@ -93,24 +93,14 @@ describe("shownFeedbackText", () => {
 			{
 				type: "data-result",
 				id: "a1",
-				data: { practiceResultId: RESULT, text: "Name the trade-off." },
+				data: { resultId: RESULT, text: "Name the trade-off." },
 			},
 			{
-				type: "data-result-observation",
+				type: "data-problem",
 				id: "a2",
-				data: {
-					practiceResultId: RESULT,
-					observationId: OBSERVATION,
-					text: "Link the issue it closes.",
-				},
+				data: { resultId: RESULT, problemId: PROBLEM, text: "Link the issue it closes." },
 			},
-			// Saved before results had observations: its id names the result.
-			{
-				type: "data-observation",
-				id: "a3",
-				data: { observationId: RESULT, text: "Say what it changes." },
-			},
-			{ type: "data-result", id: "a4", data: { practiceResultId: RESULT } },
+			{ type: "data-result", id: "a3", data: { resultId: RESULT } },
 			{ type: "finish" },
 		]);
 		const stored = parseThreadMessages([structuredClone(message)]);
@@ -119,24 +109,23 @@ describe("shownFeedbackText", () => {
 		expect(shown(message.parts)).toStrictEqual([
 			"Name the trade-off.",
 			"Link the issue it closes.",
-			"Say what it changes.",
 		]);
 		expect(shown(stored[0].parts)).toStrictEqual(shown(message.parts));
 	});
 
 	it.each([
-		["a link stored before links carried feedback", "data-observation", { observationId: UUID }],
-		["blank feedback", "data-result", { practiceResultId: UUID, text: "  " }],
-		["a malformed payload", "data-result", { practiceResultId: 7, text: "Name the trade-off." }],
+		["a link stored without feedback", "data-result", { resultId: UUID }],
+		["blank feedback", "data-result", { resultId: UUID, text: "  " }],
+		["a malformed payload", "data-result", { resultId: 7, text: "Name the trade-off." }],
 		[
-			"an observation link that names no observation",
-			"data-result-observation",
-			{ practiceResultId: UUID, text: "Name the trade-off." },
+			"a problem link that names no problem",
+			"data-problem",
+			{ resultId: UUID, text: "Name the trade-off." },
 		],
 		[
-			"a result link in the saved shape under the new name",
+			"a result link in a retired shape",
 			"data-result",
-			{ observationId: UUID, text: "Name the trade-off." },
+			{ practiceResultId: UUID, text: "Name the trade-off." },
 		],
 	])("shows nothing for %s", (_name, type, data) => {
 		const part = parseThreadMessages([

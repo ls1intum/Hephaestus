@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.review.schedule;
 
-import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.AuditLedger;
+import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.CreateReviewBatchRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.ReviewBatchDTO;
 import de.tum.cit.aet.hephaestus.practices.review.schedule.dto.UpdateReviewBatchStatusRequestDTO;
@@ -10,12 +12,12 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -36,16 +38,17 @@ public class ReviewBatchController {
 
     @GetMapping
     @Operation(operationId = "listReviewBatches", summary = "List review batches")
-    public PagedModel<ReviewBatchDTO> list(
+    public PageResponseDTO<ReviewBatchDTO> list(
             WorkspaceContext ws,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return new PagedModel<>(batches.list(ws, PageRequest.of(page, size)));
+        return PageResponseDTO.from(batches.list(ws, PageRequest.of(page, size)));
     }
 
     @PostMapping
     @Operation(operationId = "createReviewBatch", summary = "Create a review batch")
-    @AuditExempt(reason = "The batch service records its configuration audit")
+    @ApiResponse(responseCode = "201", description = "Created")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_BATCH")
     public ResponseEntity<ReviewBatchDTO> create(
             WorkspaceContext ws, @Valid @RequestBody CreateReviewBatchRequestDTO input) {
         return ResponseEntity.status(201).body(batches.create(ws, input));
@@ -59,7 +62,7 @@ public class ReviewBatchController {
 
     @PatchMapping("/{batchId}/status")
     @Operation(operationId = "updateReviewBatchStatus", summary = "Pause, resume or cancel a review batch")
-    @AuditExempt(reason = "The batch service records its configuration audit")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "REVIEW_BATCH")
     public ReviewBatchDTO status(
             WorkspaceContext ws,
             @PathVariable UUID batchId,

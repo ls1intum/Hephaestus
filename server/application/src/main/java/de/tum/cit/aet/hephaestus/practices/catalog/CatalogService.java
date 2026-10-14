@@ -46,6 +46,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 @ConditionalOnServerRole
 public class CatalogService {
     private final CatalogEntryRepository entries;
@@ -56,7 +57,6 @@ public class CatalogService {
     private final JsonMapper mapper;
     private final ConfigAuditPort audit;
 
-    @Transactional(readOnly = true)
     public EffectiveCatalog effectiveCatalog() {
         var bundle = bundled.catalog();
         var groups = compose(CatalogEntryType.GROUP, bundle.groups(), GroupDefinition.class, value -> null);
@@ -132,7 +132,7 @@ public class CatalogService {
                     .add(slug)
                     .add(mapper.writeValueAsString(effective))
                     .addNullable(original == null ? null : mapper.writeValueAsString(original))
-                    .addNullable(baseNode == null ? null : mapper.writeValueAsString(baseNode))
+                    .addNullable(baseNode == null ? null : mapper.writeValueAsString(base == null ? baseNode : base))
                     .addInt(position)
                     .addInt(excluded ? 1 : 0)
                     .add(entry == null ? "0" : Long.toString(entry.getVersion()))
@@ -145,14 +145,12 @@ public class CatalogService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public CatalogOffer<CatalogPracticeDocument> practice(String slug) {
         return effectiveCatalog()
                 .practice(slug)
                 .orElseThrow(() -> new EntityNotFoundException("Catalog practice", slug));
     }
 
-    @Transactional(readOnly = true)
     public CatalogOffer<GroupDefinition> group(String slug) {
         return effectiveCatalog().group(slug).orElseThrow(() -> new EntityNotFoundException("Catalog group", slug));
     }
@@ -328,7 +326,6 @@ public class CatalogService {
         if (!precondition.matchesExact(tag)) throw new StaleCuratedEntryException(tag);
     }
 
-    @Transactional(readOnly = true)
     public CatalogDTO view() {
         var catalog = effectiveCatalog();
         return new CatalogDTO(

@@ -11,7 +11,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-terms";
 
 /** The answer in flight, or the reason the last one failed. */
@@ -48,7 +48,7 @@ export function PublicActivityOnboardingDialog({
 	onDefer,
 }: PublicActivityOnboardingDialogProps) {
 	const popupRef = useRef<HTMLDivElement>(null);
-	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
+	const pullRequests = itemKindNoun(ITEM_KIND.pullRequest, 2, providerType);
 	const repositories = getProviderTerms(providerType).repositories.toLowerCase();
 	const saving = answer.status === "saving";
 	return (

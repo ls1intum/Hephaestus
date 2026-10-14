@@ -48,6 +48,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -239,8 +240,9 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
     private UUID invocation(long workspaceId, UUID reviewId, ReviewJobStatus status) {
         var id = UUID.randomUUID();
         jdbc.sql("INSERT INTO"
-            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot)"
-            + " VALUES(:id,:review,:ws,:status,0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb)")
+            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,available_at,started_at,completed_at)"
+            + " VALUES(:id,:review,:ws,:status,0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,CASE WHEN"
+            + " :status='QUEUED' THEN NULL ELSE :at END,CASE WHEN :status='FAILED' THEN :at ELSE NULL END)")
                 .param("id", id)
                 .param("review", reviewId)
                 .param("ws", workspaceId)
@@ -255,7 +257,8 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                                         reviewId,
                                         scenario.owner().practice().getId(),
                                         scenario.file().getId())))))
-                .param("trace", id.toString())
+                .param("trace", id.toString().replace("-", ""))
+                .param("at", Timestamp.from(Instant.now()))
                 .update();
         return id;
     }

@@ -92,7 +92,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void aContextualCollaboratorsAccountChoiceWithholdsTheWholePinnedDocument() {
-        var fixture = readableDocument();
+        var fixture = readableDocument("https://wiki.example.com");
         assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isTrue();
         var pinned = resolver.pin(fixture.item(), null);
@@ -121,7 +121,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void theSameNativeSubjectInAnotherTeamDoesNotOwnOrSuppressThisDocument() {
-        var fixture = readableDocument();
+        var fixture = readableDocument("https://wiki.example.com");
         var foreign = accounts.save(new Account("Other team collaborator"));
         foreign.setAiChoice(AiChoice.NO_AI);
         foreign.setAiChoiceAt(Instant.now());
@@ -150,20 +150,19 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
                 .isEmpty();
     }
 
-    private ReadableDocument readableDocument() {
+    private ReadableDocument readableDocument(String serverUrl) {
         var workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("doc-source-" + UUID.randomUUID()));
         String team = UUID.randomUUID().toString();
         var connection = new Connection(
                 workspace,
                 IntegrationKind.OUTLINE,
                 team,
-                new ConnectionConfig.OutlineConfig("https://wiki.example.com", null, null, Set.of()));
+                new ConnectionConfig.OutlineConfig(serverUrl, null, null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
-        connections.saveAndFlush(connection);
+        connection = connections.saveAndFlush(connection);
         var provider = providers
-                .findByTypeAndServerUrl(IdentityProviderType.OUTLINE, "https://wiki.example.com")
-                .orElseGet(() ->
-                        providers.save(new IdentityProvider(IdentityProviderType.OUTLINE, "https://wiki.example.com")));
+                .findByTypeAndServerUrl(IdentityProviderType.OUTLINE, serverUrl)
+                .orElseGet(() -> providers.save(new IdentityProvider(IdentityProviderType.OUTLINE, serverUrl)));
         long providerId = Objects.requireNonNull(provider.getId());
         human(workspace, providerId, team, "creator");
         long collaborator = human(workspace, providerId, team, "collaborator");
@@ -179,7 +178,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
         document.setCreatedBySubject("creator");
         document.setCreatedByName("Creator");
         document.setCollaboratorSubjects(List.of("collaborator"));
-        documents.saveAndFlush(document);
+        document = documents.saveAndFlush(document);
         var item = items.upsert(
                 new ItemRegistration(workspace.getId(), DocumentEvents.DOCUMENT, document.getId(), null, null));
         return new ReadableDocument(item, collaborator, providerId, team);
@@ -208,7 +207,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void equivalentProviderSpellingCannotBypassKnownCollaboratorNoAi() {
-        var fixture = readableDocument();
+        var fixture = readableDocument("https://wiki.example.com");
         var pinned = resolver.pin(fixture.item(), null);
         var document = documents
                 .findById(Objects.requireNonNull(fixture.item().sourceId()))
@@ -239,7 +238,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void anotherApprovedConnectionCannotPermitAnUnapprovedDocumentOrigin() {
-        var fixture = readableDocument();
+        var fixture = readableDocument("https://unapproved.example.com");
         var document = documents
                 .findById(Objects.requireNonNull(fixture.item().sourceId()))
                 .orElseThrow();
@@ -251,10 +250,11 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
                 new ConnectionConfig.OutlineConfig("https://wiki.example.com", null, null, Set.of()));
         approved.setState(IntegrationState.ACTIVE);
         connections.saveAndFlush(approved);
-        String unapprovedUrl = "https://unapproved.example.com";
-        providers.saveAndFlush(new IdentityProvider(IdentityProviderType.OUTLINE, unapprovedUrl));
-        connection.setConfig(new ConnectionConfig.OutlineConfig(unapprovedUrl, null, null, Set.of()));
-        connections.saveAndFlush(connection);
+        if (providers
+                .findByTypeAndServerUrl(IdentityProviderType.OUTLINE, "https://wiki.example.com")
+                .isEmpty()) {
+            providers.saveAndFlush(new IdentityProvider(IdentityProviderType.OUTLINE, "https://wiki.example.com"));
+        }
 
         assertThat(resolver.current(fixture.item())).isEmpty();
         assertThat(resolver.permits(fixture.item(), SourceUsePurpose.CONVERSATIONAL_MENTORING))

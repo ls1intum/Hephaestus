@@ -1,4 +1,5 @@
 import { defineConfig } from "@hey-api/openapi-ts";
+import { discriminatedUnionDates } from "./discriminated-union-dates.ts";
 
 export default defineConfig({
 	input: "../../server/openapi.yaml",
@@ -14,6 +15,7 @@ export default defineConfig({
 			dates: true,
 			bigInt: false,
 			name: "@hey-api/transformers",
+			transformers: [discriminatedUnionDates],
 		},
 		// Apply generated date transformers so SDK values match their Date types.
 		{

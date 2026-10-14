@@ -253,12 +253,16 @@ describe("AgentBindingsPage rows", () => {
 		{
 			practiceSlug: "comment-quality",
 			practiceName: "Comment quality",
-			asOf: { jobId: "job-1", finishedAt: new Date("2026-10-03T09:00:00") },
+			asOf: {
+				reviewId: "review-1",
+				jobId: "job-1",
+				finishedAt: new Date("2026-10-03T09:00:00"),
+			},
 			scriptChanged: false,
 			needs: [
 				{
-					purpose: "PRACTICE_DECISION",
-					need: "REQUIRED",
+					slot: "decision",
+					need: "required",
 					unmetTiers: ["IN_HOUSE", "CLOUD", "UNDECLARED"],
 				},
 			],

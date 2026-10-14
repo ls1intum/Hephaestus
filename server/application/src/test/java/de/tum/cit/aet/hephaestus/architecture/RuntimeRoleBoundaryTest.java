@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import java.time.Clock;
 import java.util.List;
 import java.util.Map;
@@ -252,6 +253,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 ConditionalOnServerRole.class.getName(),
                 ConditionalOnWorkerRole.class.getName(),
                 ConditionalOnWebhookRole.class.getName(),
+                ConditionalOnCaptureRole.class.getName(),
                 "de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayConfiguration.sandboxGatewayBucketResolver()",
                 "de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtConfiguration");
         List<String> gated = classes.stream()
@@ -283,9 +285,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toList());
 
         assertThat(hosts)
-                .as(
-                        "@EnableScheduling (direct or meta-annotated) must appear on exactly one class (ServerSchedulingConfig); "
-                                + "any other @Scheduled host relies on its absence on the webhook role to no-op silently — keep that invariant load-bearing.")
+                .as("@EnableScheduling (direct or meta-annotated) must appear on exactly one class"
+                        + " (ServerSchedulingConfig); any other @Scheduled host relies on its absence on the"
+                        + " webhook role to no-op silently — keep that invariant load-bearing.")
                 .containsExactly("de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig");
     }
 
@@ -300,9 +302,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                         "de.tum.cit.aet.hephaestus.workspace..",
                         "de.tum.cit.aet.hephaestus.activity..",
                         "de.tum.cit.aet.hephaestus.agent..")
-                .because(
-                        "webhook receiver is a pure publish-only role; depending on workspace/activity/agent would re-introduce "
-                                + "the wiring leaks runtime testing already exposed (ObjectProvider cascade, etc.) and break role isolation")
+                .because("webhook receiver is a pure publish-only role; depending on workspace/activity/agent would"
+                        + " re-introduce the wiring leaks runtime testing already exposed (ObjectProvider cascade,"
+                        + " etc.) and break role isolation")
                 .check(classes);
     }
 
@@ -359,6 +361,8 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
      */
     private static final List<String> CROSS_ROLE_AUTH_SPI_IMPLS = List.of(
             "de.tum.cit.aet.hephaestus.core.auth.AccountIdentityQueryService",
+            // Worker capture reads account choices and status through this neutral data-access port.
+            "de.tum.cit.aet.hephaestus.core.auth.AccountDirectoryService",
             "de.tum.cit.aet.hephaestus.core.auth.AccountRoleQueryService",
             "de.tum.cit.aet.hephaestus.core.auth.AccountSummaryQueryService");
 
@@ -382,8 +386,8 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toList());
 
         assertThat(ungated)
-                .as(
-                        "Every core.auth stereotype bean must carry @ConditionalOnServerRole — the auth web/auth surface is server-role only")
+                .as("Every core.auth stereotype bean must carry @ConditionalOnServerRole — the auth web/auth"
+                        + " surface is server-role only")
                 .isEmpty();
     }
 

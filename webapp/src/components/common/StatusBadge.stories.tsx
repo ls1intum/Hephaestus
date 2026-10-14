@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { DASHBOARD_VISIBILITY_DEFS } from "@/components/practice-vocabulary/dashboard-visibility-defs";
-import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-outcome-defs";
-import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { DELIVERY_STATE_DEFS } from "@/components/practice-vocabulary/delivery-state-defs";
+import { FEEDBACK_DESTINATION_DEFS } from "@/components/practice-vocabulary/feedback-destination-defs";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import {
 	REVIEW_STATUS_DEFS,
-	RESULT_PROCESSING_DEFS,
+	REVIEW_JOB_PROCESSING_DEFS,
 } from "@/components/practice-vocabulary/review-status-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withholding-defs";
@@ -61,14 +61,14 @@ function Gallery<TValue extends string>({
 export const EveryRegistry: Story = {
 	render: (args: { def: StatusDef }) => (
 		<div className="space-y-6">
-			<Gallery heading="Delivery outcome" defs={DELIVERY_STATE_DEFS} />
-			<Gallery heading="Delivery channel" defs={DELIVERY_PLACE_DEFS} />
+			<Gallery heading="Delivery" defs={DELIVERY_STATE_DEFS} />
+			<Gallery heading="Destination" defs={FEEDBACK_DESTINATION_DEFS} />
 			<Gallery heading="Dashboard visibility" defs={DASHBOARD_VISIBILITY_DEFS} />
 			<Gallery heading="Why withheld" defs={WITHHOLDING_FAMILY_DEFS} />
 			<Gallery heading="Outcome" defs={OUTCOME_DEFS} />
 			<Gallery heading="Severity" defs={SEVERITY_DEFS} />
 			<Gallery heading="Review status" defs={REVIEW_STATUS_DEFS} />
-			<Gallery heading="Result processing" defs={RESULT_PROCESSING_DEFS} />
+			<Gallery heading="Job processing" defs={REVIEW_JOB_PROCESSING_DEFS} />
 			<section className="space-y-2">
 				<h3 className="text-sm font-semibold">Selected in Controls</h3>
 				<StatusBadge def={args.def} />
@@ -78,7 +78,7 @@ export const EveryRegistry: Story = {
 	play: async ({ canvas }) => {
 		// The bare stored state, which is what this gallery shows: the per-lane refinements of it are
 		// `deliveryOutcome`'s job and appear on a row, never in the registry.
-		canvas.getByText("Prepared");
+		canvas.getByText("Ready");
 		canvas.getByText("Withheld");
 		canvas.getByText("On the work");
 	},
@@ -86,7 +86,7 @@ export const EveryRegistry: Story = {
 
 /** A label is prose, so it can be long: the badge truncates rather than opening a table column. */
 export const LongLabelTruncates: Story = {
-	args: { def: DELIVERY_STATE_DEFS.PREPARED },
+	args: { def: DELIVERY_STATE_DEFS.READY },
 	render: (args: { def: StatusDef }) => (
 		<div className="w-40 border p-2">
 			<StatusBadge def={args.def} />

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 
-import type { ProfileReviewRun, ReviewedWorkRef } from "@/api/types.gen";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { SelectFilter } from "@/components/common/SelectFilter";
@@ -10,8 +9,8 @@ import {
 } from "@/components/layout/detail-drawer/DetailDrawerHeader";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { TraceKindFilter } from "@/components/practice-trace/TraceKindFilter";
-import type { ReviewRunFeedState } from "@/components/profile/review-runs";
-import { EarlierReviews } from "@/components/profile/ReviewRunFeed";
+import { EarlierReviews } from "@/components/profile/ReviewFeed";
+import type { ReviewFeedState } from "@/components/profile/reviews";
 import { DrawerBody, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasText } from "@/lib/text";
@@ -23,7 +22,7 @@ import {
 	REVIEWS_OF_YOUR_WORK,
 	type ReviewTimeframe,
 } from "./practice-profile-search";
-import { ReviewRunsTable, ReviewRunsTableSkeleton } from "./ReviewRunsTable";
+import { ReviewsTable, ReviewsTableSkeleton } from "./ReviewsTable";
 
 const TIMEFRAME_OPTIONS = REVIEW_TIMEFRAMES.map((value) => ({
 	value,
@@ -33,7 +32,7 @@ const TIMEFRAME_OPTIONS = REVIEW_TIMEFRAMES.map((value) => ({
 export interface ProfileReviewsLevelProps {
 	nested?: boolean;
 	path: LevelPath;
-	feed: ReviewRunFeedState<ProfileReviewRun>;
+	feed: ReviewFeedState;
 	/**
 	 * Each review's position among the reviews of its work, by review id; absent while the feed does
 	 * not hold every review, so no row claims a count it cannot see.
@@ -42,16 +41,16 @@ export interface ProfileReviewsLevelProps {
 	onOpenReview: (reviewId: string) => void;
 	/** The review whose level is open over this one. */
 	openReviewId?: string;
-	/** The kind of work the list is narrowed to, or `undefined` for all of it. */
+	/** The item kind the list is narrowed to, or `undefined` for all of it. */
 	kind?: string;
 	onKindChange: (kind: string | undefined) => void;
 	/** How far back the list reaches, or `undefined` for every review. */
 	since?: ReviewTimeframe;
 	onSinceChange: (since: ReviewTimeframe | undefined) => void;
-	/** Offered only on the rows whose `mayRequest` allows it. */
-	onReviewNow?: (work: ReviewedWorkRef) => void;
-	/** The work an ask is in flight about. */
-	requesting?: Pick<ReviewedWorkRef, "kind" | "id">;
+	/** Asks for a review of an item; absent where the reader may not ask. */
+	onReviewNow?: (itemId: string) => void;
+	/** The item an ask is in flight about. */
+	requesting?: string;
 }
 
 /**
@@ -73,7 +72,7 @@ export function ProfileReviewsLevel({
 	onReviewNow,
 	requesting,
 }: ProfileReviewsLevelProps) {
-	const runs = feed.status === "ready" ? feed.runs : [];
+	const reviews = feed.status === "ready" ? feed.reviews : [];
 	const filtered = hasText(kind) || since !== undefined;
 
 	let body: ReactNode;
@@ -89,14 +88,14 @@ export function ProfileReviewsLevel({
 			break;
 		}
 		case "loading": {
-			body = <ReviewRunsTableSkeleton rows={PROFILE_REVIEWS_PAGE_SIZE} />;
+			body = <ReviewsTableSkeleton rows={PROFILE_REVIEWS_PAGE_SIZE} />;
 			break;
 		}
 		case "ready": {
 			body = (
 				<>
-					<ReviewRunsTable
-						runs={feed.runs}
+					<ReviewsTable
+						reviews={feed.reviews}
 						filtered={filtered}
 						onOpenReview={onOpenReview}
 						openReviewId={openReviewId}
@@ -134,7 +133,7 @@ export function ProfileReviewsLevel({
 					}}
 				>
 					<TraceKindFilter
-						seen={runs.map((run) => run.reviewedWork.kind)}
+						seen={reviews.map((entry) => entry.review.item.kind)}
 						value={kind}
 						onChange={onKindChange}
 					/>

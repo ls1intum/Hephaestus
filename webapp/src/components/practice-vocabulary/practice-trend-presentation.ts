@@ -1,5 +1,5 @@
 import type { TrendSupport } from "@/api/types.gen";
-import { artifactKindNoun, type WorkProvider } from "@/lib/artifact-kinds";
+import { itemKindNoun, type ItemProvider } from "@/lib/item-kinds";
 import { capitalise } from "@/lib/text";
 
 import { count as counted, spell } from "./feedback-text";
@@ -70,7 +70,7 @@ export function explainStanding(
 	standing: PracticeGroupStandingValue,
 	scope: StandingScope,
 	support: TrendSupport | undefined,
-	provider?: WorkProvider,
+	provider?: ItemProvider,
 ): string {
 	const { description } = standingDefs(scope)[standing];
 	const work = isSettledStanding(standing) ? standingWork(support) : undefined;
@@ -80,8 +80,8 @@ export function explainStanding(
 	const reviewed = Math.max(support.reviewedWork, work);
 	const kind = support.reviewedWorkKind;
 	const noun = (n: number) => {
-		if (kind !== undefined) {
-			return artifactKindNoun(kind, n, provider);
+		if (kind !== null) {
+			return itemKindNoun(kind, n, provider);
 		}
 		return n === 1 ? ANY_WORK.one : ANY_WORK.many;
 	};
@@ -126,7 +126,7 @@ export function formatTrendProvenance(
 
 	const span = support.calendarSpanDays;
 	const spanSentence =
-		span !== undefined && span > 0 ? ` Evidence spans ${counted(span, "day", "days")}.` : "";
+		span !== null && span > 0 ? ` Evidence spans ${counted(span, "day", "days")}.` : "";
 
 	if (direction === "INSUFFICIENT_EVIDENCE") {
 		const missing = support.opportunitiesUntilComparable;
@@ -141,10 +141,9 @@ export function formatTrendProvenance(
 		const comparable = support.comparablePractices;
 		const eligible = support.eligiblePractices;
 		// One clause with two counts: both digits as soon as either reaches ten.
-		const digits =
-			comparable !== undefined && eligible !== undefined && Math.max(comparable, eligible) >= 10;
+		const digits = comparable !== null && eligible !== null && Math.max(comparable, eligible) >= 10;
 		const coverage =
-			comparable !== undefined && eligible !== undefined
+			comparable !== null && eligible !== null
 				? ` ${capitalise(spell(comparable, digits))} of ${counted(eligible, "practice", "practices", digits)} here had enough evidence to compare.`
 				: "";
 		return `Across ${reviewedWork(opportunities)} in this group.${coverage}${spanSentence}`;

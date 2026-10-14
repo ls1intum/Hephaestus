@@ -321,14 +321,9 @@ export function sameItem(itemId: string | undefined, context: Pick<ReadyContext,
 	return itemId === context.item.id;
 }
 
-/** Missing metadata is unknown, not proof that a downloaded first page is the complete result. */
-function requiredTotal(total: number | undefined, returned: number): number {
-	if (
-		total === undefined ||
-		!Number.isSafeInteger(total) ||
-		total < returned ||
-		(returned === 0 && total !== 0)
-	) {
+/** An unusable total is unknown, not proof that a downloaded first page is the complete result. */
+function requiredTotal(total: number, returned: number): number {
+	if (!Number.isSafeInteger(total) || total < returned || (returned === 0 && total !== 0)) {
 		throw new WorkerError("server", "Hephaestus returned an incomplete answer. Try again.");
 	}
 	return total;
@@ -364,7 +359,7 @@ export async function resultPage(
 ): Promise<ResultPage> {
 	const { context, stillShowing } = await requireReady(env, tabId, workspaceSlug);
 	const answer = await env.api.ownResults(workspaceSlug, context.item.id, RESULT_PAGE_SIZE);
-	const content = answer.content ?? [];
+	const { content } = answer;
 	requireOnlyThisItem(
 		content.map((row) => row.item.id),
 		context,
@@ -396,10 +391,7 @@ export async function resultPage(
  * work's origin — GitLab's `issues` and `work_items` addresses of one issue both count. Anything else
  * loses its link.
  */
-function verifiedPermalink(
-	permalink: string | null,
-	context: ReadyContext,
-): string | undefined {
+function verifiedPermalink(permalink: string | null, context: ReadyContext): string | undefined {
 	if (permalink === null) {
 		return undefined;
 	}

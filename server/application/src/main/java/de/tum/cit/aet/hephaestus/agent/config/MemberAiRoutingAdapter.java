@@ -46,14 +46,19 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
     @Transactional(readOnly = true)
     public Optional<WorkspaceAgentBinding> bindingForPeople(
             long workspaceId, AgentPurpose purpose, List<@Nullable Long> people) {
+        return routePeople(workspaceId, purpose, people);
+    }
+
+    private Optional<WorkspaceAgentBinding> routePeople(
+            long workspaceId, AgentPurpose purpose, List<@Nullable Long> people) {
         if (people.isEmpty())
             throw new IllegalArgumentException("A review must declare its subjects, including nobody");
         var candidates = bindings.findByWorkspaceIdAndPurpose(workspaceId, purpose).stream()
                 .filter(models::isAvailable)
-                .filter(row ->
-                        people.stream().allMatch(person -> allows(workspaceId, person, models.connectionRef(row))));
+                .filter(row -> people.stream()
+                        .allMatch(person -> permitsModel(workspaceId, person, models.connectionRef(row))));
         if (purpose != AgentPurpose.PRACTICE_REVIEW) {
-            var review = bindingForPeople(workspaceId, AgentPurpose.PRACTICE_REVIEW, people);
+            var review = routePeople(workspaceId, AgentPurpose.PRACTICE_REVIEW, people);
             if (review.isEmpty()) return Optional.empty();
             var ceiling = review.get().getDataHandlingTier();
             candidates = candidates.filter(row -> ceiling == DataHandlingTier.UNDECLARED
@@ -77,7 +82,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
      * this bean skips its proxy.
      */
     private Optional<WorkspaceAgentBinding> route(long workspaceId, AgentPurpose purpose, @Nullable Long developerId) {
-        if (developerId == null) return bindingForPeople(workspaceId, purpose, Collections.singletonList(null));
+        if (developerId == null) return routePeople(workspaceId, purpose, Collections.singletonList(null));
         if (suppression.isAccountSuppressed(developerId)) return Optional.empty();
         var decision = preferences.forDeveloper(workspaceId, developerId);
         if (!decision.permitsAi()) return Optional.empty();
@@ -191,6 +196,10 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
 
     @Transactional(readOnly = true)
     public boolean allows(long workspaceId, @Nullable Long developerId, LlmModelResolver.ConnectionRef model) {
+        return permitsModel(workspaceId, developerId, model);
+    }
+
+    private boolean permitsModel(long workspaceId, @Nullable Long developerId, LlmModelResolver.ConnectionRef model) {
         if (developerId != null && suppression.isAccountSuppressed(developerId)) return false;
         if (model.workspaceId() == null || model.workspaceId() != workspaceId) return false;
         if (developerId == null) return models.dataHandlingTier(model).isPresent();

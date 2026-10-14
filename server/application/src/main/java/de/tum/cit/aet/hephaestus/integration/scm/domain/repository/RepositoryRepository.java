@@ -56,8 +56,8 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     /**
      * Finds a repository by its full name with the organization eagerly fetched.
      */
-    @Query(
-            "SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE r.nameWithOwner = :nameWithOwner")
+    @Query("SELECT r FROM Repository r LEFT JOIN FETCH r.organization LEFT JOIN FETCH r.provider WHERE"
+            + " r.nameWithOwner = :nameWithOwner")
     Optional<Repository> findByNameWithOwnerWithOrganization(@Param("nameWithOwner") String nameWithOwner);
 
     /**
@@ -96,6 +96,17 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
         ORDER BY r.nameWithOwner
         """)
     List<Repository> findAllByWorkspaceMonitors(@Param("workspaceId") Long workspaceId);
+
+    /** Requires the workspace monitor's exact path, native identity and configured SCM provider. */
+    @Query("""
+        SELECT (COUNT(r) > 0) FROM Repository r
+        WHERE r.id = :repositoryId AND EXISTS (
+            SELECT 1 FROM RepositoryToMonitor m
+            WHERE m.workspace.id = :workspaceId AND m.nameWithOwner = r.nameWithOwner
+                AND monitor_covers_repository(m.workspace.id, m.nativeId, r.nativeId, r.provider.id) = true
+        )
+        """)
+    boolean isMonitored(@Param("workspaceId") long workspaceId, @Param("repositoryId") long repositoryId);
 
     /**
      * The repositories on {@code providerId} at the workspace's monitored paths. A monitor names a path, and another

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { expect, fn, userEvent, within } from "storybook/test";
-import type { PracticeGroup } from "@/api/types.gen";
+import type { GroupRef } from "@/api/types.gen";
 
 import {
 	DEFAULT_PRACTICE_GROUP_SORT,
@@ -74,7 +74,7 @@ export const Default: Story = {
 		);
 		await expect(breakdowns[0]).toStrictEqual(["2Needs attention", "1Mixed", "2Going well"]);
 		// A group with no event shows its name and nothing beneath it.
-		await expect(canvas.queryByText("Nothing new since the latest run.")).toBeNull();
+		await expect(canvas.queryByText("Nothing new since the latest review.")).toBeNull();
 		await expect(canvas.getByText("Acting on review feedback").closest("td")?.textContent).toBe(
 			"Acting on review feedback",
 		);
@@ -264,7 +264,7 @@ const neverAppliedByGroup = Object.fromEntries(
 			? practices.map((practice) => ({
 					...practice,
 					standing: "NO_OPPORTUNITY" as const,
-					notApplicableOnly: true,
+					doesNotApplyOnly: true,
 				}))
 			: practices,
 	]),
@@ -351,7 +351,7 @@ const mixedSilentByGroup = Object.fromEntries(
 		slug === mixedSilentGroup?.slug
 			? practices.map((practice, index) =>
 					index === 0
-						? { ...practice, standing: "NO_OPPORTUNITY" as const, notApplicableOnly: true }
+						? { ...practice, standing: "NO_OPPORTUNITY" as const, doesNotApplyOnly: true }
 						: { ...practice, standing: "NOT_OBSERVED" as const },
 				)
 			: practices,
@@ -377,7 +377,7 @@ export const MixedSilentGroupFolded: Story = {
 	},
 };
 
-const emptyGroup: PracticeGroup = {
+const emptyGroup: GroupRef = {
 	...packagingGroup,
 	slug: "release-hygiene",
 	name: "Keeping releases tidy",

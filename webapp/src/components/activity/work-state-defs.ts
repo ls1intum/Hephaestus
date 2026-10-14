@@ -21,7 +21,7 @@ import {
 	getPullRequestStateIcon,
 	type IconComponent,
 } from "@/components/icons/provider-icons";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 
 import type { ActivityKindDef } from "./activity-kind-defs";
@@ -107,7 +107,7 @@ export function workStateVisual(
 	return {
 		icon,
 		colorClass,
-		label: `${state} ${artifactKindNoun(ARTIFACT_KIND.pullRequest, 1, provider)}`,
+		label: `${state} ${itemKindNoun(ITEM_KIND.pullRequest, 1, provider)}`,
 	};
 }
 

@@ -29,7 +29,7 @@ public class PracticeStandingController {
 
     @GetMapping
     @Operation(
-            operationId = "listPracticeStandings",
+            operationId = "getOwnPracticeStandings",
             summary = "List the current developer's practice standings",
             description = "Returns each practice's standing, direction, supporting results, and developer guidance.")
     @ApiResponse(

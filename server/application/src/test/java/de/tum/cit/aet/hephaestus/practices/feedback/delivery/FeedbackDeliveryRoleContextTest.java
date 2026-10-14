@@ -6,9 +6,11 @@ import static org.mockito.Mockito.mock;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackGate;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackHistoryQueryService;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackStoreService;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousPracticePageFeedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionService;
 import de.tum.cit.aet.hephaestus.practices.feedback.page.PracticePageFeedbackBasis;
 import java.util.Arrays;
@@ -24,6 +26,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class FeedbackDeliveryRoleContextTest {
     private static final Set<Class<?>> CAPTURE_HELPERS = Set.of(
             FeedbackStoreService.class,
+            FeedbackQueryRepository.class,
+            FeedbackContentDigest.class,
             FeedbackGate.class,
             FeedbackHistoryQueryService.class,
             PreviousPracticePageFeedback.class,

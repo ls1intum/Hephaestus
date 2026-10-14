@@ -1,18 +1,18 @@
-import type { ReviewFeedback, ReviewedWorkRef } from "@/api/types.gen";
+import type { ReviewFeedback, ItemRef } from "@/api/types.gen";
 import { HephMarkIcon } from "@/components/brand/HephIcon";
 import type { StatusDefs } from "@/components/common/status-def";
 import { GitHubIcon, GitLabIcon, SlackIcon } from "@/components/icons/brand";
-import { reviewedWorkName } from "@/lib/artifact-kinds";
+import { itemName } from "@/lib/item-kinds";
 
-import { DELIVERY_PLACE_DEFS } from "./delivery-place-defs";
+import { FEEDBACK_DESTINATION_DEFS } from "./feedback-destination-defs";
 
 export type FeedbackLocation = ReviewFeedback["location"];
 
 /**
- * **Where** a piece of feedback appears, by the provider that shows it: its channel split where the
+ * **Where** a piece of feedback appears, by the provider that shows it: its destination split where the
  * record names the provider (`docs/contributor/practice-feedback-language.md`, location). It answers
- * the same question as `DELIVERY_PLACE_DEFS`, more precisely, so a row shows one of the two, never
- * both. The three channel-wide entries stand where no provider is known.
+ * the same question as `FEEDBACK_DESTINATION_DEFS`, more precisely, so a row shows one of the two, never
+ * both. The three destination-wide entries stand where no provider is known.
  *
  * <p>The labels are the facet's words and the badge's. The sentence a row and the drawer show is
  * {@link feedbackLocationSentence}.
@@ -31,9 +31,9 @@ export const FEEDBACK_LOCATION_DEFS: StatusDefs<FeedbackLocation> = {
 		description: "Posted as a comment on the merge request or issue at GitLab.",
 	},
 	OTHER_WORK: {
-		// The channel's own word and mark, so the Channel filter and the channel tag agree.
-		label: DELIVERY_PLACE_DEFS.IN_CONTEXT.label,
-		icon: DELIVERY_PLACE_DEFS.IN_CONTEXT.icon,
+		// The destination's own word and mark, so the Destination filter and the destination tag agree.
+		label: FEEDBACK_DESTINATION_DEFS.ON_WORK.label,
+		icon: FEEDBACK_DESTINATION_DEFS.ON_WORK.icon,
 		badgeVariant: "outline",
 		description:
 			"Posted on the work the feedback is about, at a provider the record does not name as GitHub or GitLab.",
@@ -52,17 +52,17 @@ export const FEEDBACK_LOCATION_DEFS: StatusDefs<FeedbackLocation> = {
 			"Raised in a turn of the developer’s conversation with Heph in a Slack direct message.",
 	},
 	NEXT_CONVERSATION: {
-		// The channel's own word and mark, so the Channel filter and the channel tag agree.
-		label: DELIVERY_PLACE_DEFS.IN_CHAT.label,
-		icon: DELIVERY_PLACE_DEFS.IN_CHAT.icon,
+		// The destination's own word and mark, so the Destination filter and the destination tag agree.
+		label: FEEDBACK_DESTINATION_DEFS.CONVERSATION.label,
+		icon: FEEDBACK_DESTINATION_DEFS.CONVERSATION.icon,
 		badgeVariant: "outline",
 		description:
 			"For the developer’s conversation with Heph. No turn raised it yet, or the turn that raised it is gone.",
 	},
 	PRACTICE_PAGES: {
-		// The channel's own word and mark, so the Channel filter and the channel tag agree.
-		label: DELIVERY_PLACE_DEFS.IN_APP.label,
-		icon: DELIVERY_PLACE_DEFS.IN_APP.icon,
+		// The destination's own word and mark, so the Destination filter and the destination tag agree.
+		label: FEEDBACK_DESTINATION_DEFS.PRACTICE_PAGE.label,
+		icon: FEEDBACK_DESTINATION_DEFS.PRACTICE_PAGE.icon,
 		badgeVariant: "outline",
 		description: "A card on the developer’s own practice pages, which only they can read.",
 	},
@@ -75,9 +75,9 @@ export const FEEDBACK_LOCATION_DEFS: StatusDefs<FeedbackLocation> = {
  */
 export function feedbackLocationSentence(
 	location: FeedbackLocation,
-	reviewedWork: Pick<ReviewedWorkRef, "kind" | "provider" | "label"> | undefined,
+	item: Pick<ItemRef, "kind" | "provider" | "label"> | null,
 ): string {
-	const work = reviewedWork ? reviewedWorkName(reviewedWork) : undefined;
+	const work = item === null ? undefined : itemName(item);
 	switch (location) {
 		case "GITHUB":
 		case "GITLAB": {

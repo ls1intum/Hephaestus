@@ -27,86 +27,148 @@ import org.springframework.test.context.bean.override.mockito.MockitoBeans;
 class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
 
     private static final Map<String, String> FULL_CONTEXT_ASSIGNMENTS = Map.ofEntries(
-            assignment("agent.handler.PracticeReviewPipelineIntegrationTest", "workspace-folder"),
-            assignment(
-                    "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest", "gitlab-token-lifecycle"),
-            assignment("testconfig.BaseIntegrationTest", "base"),
+            assignment("StartupBudgetIntegrationTest", "startup"),
             assignment("agent.mentor.chat.MentorWorkerSplitIntegrationTest", "mentor-worker-split"),
             assignment("agent.practice.live.PracticeScriptLiveLlmTest", "practice-script-live"),
-            assignment("notification.AccountDeletionEmailIntegrationTest", "email-capture"),
-            assignment("notification.AccountSecurityEmailIntegrationTest", "email-capture"),
-            assignment("productfeedback.ProductFeedbackEmailIntegrationTest", "email-capture"),
-            assignment("productfeedback.SurveyEmailInvitationIntegrationTest", "email-capture"),
-            assignment("notification.email.EmailAdminControllerIntegrationTest", "email-capture"),
-            assignment("agent.handler.ResultAdmissionConcurrencyIntegrationTest", "admission-race"),
-            assignment("agent.job.PullRequestRepairRecheckIntegrationTest", "admission-race"),
-            assignment("agent.job.DeferredIssueEventIntegrationTest", "issue-event-transaction"),
-            assignment("agent.job.ClosedIssueDiscussionIntegrationTest", "issue-event-transaction"),
-            assignment("agent.job.IssueUpdateCoalescerIntegrationTest", "issue-coalescer-transaction"),
-            assignment("testconfig.RealAuthIntegrationTest", "real-auth"),
-            assignment("StartupBudgetIntegrationTest", "startup"),
-            assignment("core.auth.dev.DevLoginIntegrationTest", "dev-login"),
-            assignment("core.auth.consent.ConsentSignInBootstrapIntegrationTest", "consent-sign-in"),
-            assignment("core.auth.clientsession.ClientSessionIntegrationTest", "dev-login"),
             assignment("core.auth.clientsession.ClientSessionConcurrencyIntegrationTest", "dev-login"),
-            assignment("integration.scm.github.BaseGitHubLiveIntegrationTest", "github-live"),
+            assignment("core.auth.clientsession.ClientSessionIntegrationTest", "dev-login"),
+            assignment("core.auth.consent.ConsentSignInBootstrapIntegrationTest", "consent-sign-in"),
+            assignment("core.auth.dev.DevLoginIntegrationTest", "dev-login"),
+            assignment("integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest", "slack-signed"),
+            assignment("integration.core.sync.api.SyncControllerIntegrationTest", "sync-controller-focused"),
             assignment("integration.outline.OutlineFrameworkRegistrationIntegrationTest", "outline-enabled"),
             assignment(
                     "integration.outline.collection.OutlineCollectionAdminControllerIntegrationTest",
                     "outline-enabled"),
             assignment(
                     "integration.outline.connect.OutlineConnectionAdminControllerIntegrationTest", "outline-enabled"),
+            assignment("integration.outline.item.DocumentItemSourceIntegrationTest", "outline-enabled"),
             assignment("integration.outline.sync.OutlineDocumentSyncIntegrationTest", "outline-enabled"),
-            assignment("integration.core.sync.api.SyncControllerIntegrationTest", "sync-controller-focused"),
+            assignment("integration.scm.github.BaseGitHubLiveIntegrationTest", "github-live"),
+            assignment(
+                    "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest", "gitlab-token-lifecycle"),
             assignment(
                     "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
                     "gitlab-event-routing"),
-            assignment("integration.slack.conversation.ConversationThreadTriggerIntegrationTest", "slack-ingest"),
             assignment("integration.slack.SlackConsentLifecycleE2EIntegrationTest", "slack-lifecycle"),
             assignment("integration.slack.channel.SlackChannelAdminControllerIntegrationTest", "slack-signed"),
-            assignment("integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest", "slack-signed"));
+            assignment("integration.slack.item.SlackThreadProjectionIntegrationTest", "slack-ingest"),
+            assignment("integration.slack.item.ThreadItemSourceIntegrationTest", "slack-enabled"),
+            assignment("notification.AccountDeletionEmailIntegrationTest", "email-capture"),
+            assignment("notification.AccountSecurityEmailIntegrationTest", "email-capture"),
+            assignment("notification.email.EmailAdminControllerIntegrationTest", "email-capture"),
+            assignment("practices.acrossworkspace.PracticesAcrossWorkspaceIntegrationTest", "review-evidence"),
+            assignment("practices.adapter.ConversationFeedbackErasureIntegrationTest", "review-fixture"),
+            assignment("practices.adapter.PracticesWorkspacePurgeAdapterTest", "review-fixture"),
+            assignment("practices.feedback.AbstractFeedbackDeliveryIntegrationTest", "review-feedbackdelivery"),
+            assignment("practices.feedback.FeedbackHistoryQueryIntegrationTest", "review-feedbackhistoryquery"),
+            assignment("practices.feedback.FeedbackReviewControllerIntegrationTest", "review-feedbackreviewcontroller"),
+            assignment("practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest", "review-evidence"),
+            assignment("practices.groupdetail.PracticeGroupReviewsControllerIntegrationTest", "review-fixture"),
+            assignment("practices.profile.PracticeProfileOverviewIntegrationTest", "review-fixture"),
+            assignment("practices.profile.PracticeProfileReviewIntegrationTest", "review-evidence"),
+            assignment("practices.result.PracticeGroupStandingIntegrationTest", "review-fixture"),
+            assignment("practices.result.ResultAdmissionIntegrationTest", "review-resultadmission"),
+            assignment("practices.result.ResultControllerIntegrationTest", "review-fixture"),
+            assignment("practices.result.ResultCurrentOrderIntegrationTest", "review-fixture"),
+            assignment("practices.result.ResultHistoryIntegrationTest", "review-resulthistory"),
+            assignment("practices.result.ResultMarkFeedbackIntegrationTest", "review-fixture"),
+            assignment("practices.result.ResultMarkServiceIntegrationTest", "review-fixture"),
+            assignment("practices.result.ResultRepositoryIntegrationTest", "review-fixture"),
+            assignment("practices.review.DeliveredWorkFeedbackControllerIntegrationTest", "review-fixture"),
+            assignment("practices.review.DeliveredWorkFeedbackRepositoryIntegrationTest", "review-fixture"),
+            assignment("practices.review.PracticeReviewCoverageReplaceIntegrationTest", "review-fixture"),
+            assignment("practices.review.PracticeReviewSettingsControllerIntegrationTest", "review-fixture"),
+            assignment("practices.review.ReviewContextControllerIntegrationTest", "review-fixture"),
+            assignment("practices.review.ReviewGateIntegrationTest", "review-fixture"),
+            assignment("practices.review.ReviewNarrativeHistoryIntegrationTest", "review-fixture"),
+            assignment("practices.review.ReviewOperationalViewsIntegrationTest", "review-reviewoperationalviews"),
+            assignment("practices.review.ReviewRequestControllerIntegrationTest", "review-fixture"),
+            assignment("practices.review.ReviewSummaryControllerIntegrationTest", "review-fixture"),
+            assignment("practices.review.ReviewTimingFactsIntegrationTest", "review-reviewtimingfacts"),
+            assignment("practices.review.feedbackmode.FeedbackModeReviewIntegrationTest", "review-feedbackmodereview"),
+            assignment("practices.review.schedule.ReviewBatchControllerIntegrationTest", "review-fixture"),
+            assignment("practices.review.schedule.ReviewBatchScopeIntegrationTest", "review-fixture"),
+            assignment("practices.review.schedule.ReviewScheduleControllerIntegrationTest", "review-fixture"),
+            assignment("practices.reviewoutput.PracticeReviewItemFactsIntegrationTest", "review-fixture"),
+            assignment("practices.reviewoutput.PracticeReviewOutputControllerIntegrationTest", "review-fixture"),
+            assignment("practices.reviewoutput.ReviewLineageIntegrationTest", "review-fixture"),
+            assignment("practices.scan.ScanReportIntegrationTest", "review-scanreport"),
+            assignment("practices.trace.ItemTraceControllerIntegrationTest", "review-fixture"),
+            assignment("productfeedback.ProductFeedbackEmailIntegrationTest", "email-capture"),
+            assignment("productfeedback.SurveyEmailInvitationIntegrationTest", "email-capture"),
+            assignment("testconfig.BaseIntegrationTest", "base"),
+            assignment("testconfig.RealAuthIntegrationTest", "real-auth"));
 
     private static final Map<String, String> FULL_CONTEXT_JUSTIFICATIONS = Map.ofEntries(
-            Map.entry(
-                    "workspace-folder",
-                    "real Slack and Outline visibility, repeatable-read capture and cross-source admission; projection spy commits a concurrent row to prove isolation"),
-            Map.entry(
-                    "mentor-worker-split",
-                    "server-only role with authenticated worker transport and controlled runner, routing and admission boundaries"),
-            Map.entry(
-                    "practice-script-live",
-                    "worker role with the real LLM proxy on a free sandbox gateway port, calling live models"),
-            Map.entry(
-                    "gitlab-token-lifecycle",
-                    "real credential storage, lifecycle locks and attention with only irreversible upstream token rotation mocked"),
             Map.entry("base", "shared PostgreSQL, HTTP, security, and application acceptance context"),
-            Map.entry(
-                    "email-capture",
-                    "shared configured sender identity and captured SMTP boundary for durable delivery and HTTP authorization"),
-            Map.entry(
-                    "admission-race",
-                    "real proxied result admission with a held verification and bounded database lock waits"),
-            Map.entry(
-                    "issue-event-transaction",
-                    "real transactional event listeners, issue snapshots and comments with controlled workspace resolution"),
-            Map.entry(
-                    "issue-coalescer-transaction",
-                    "real proxied job submission with controlled issue admission and bounded database lock waits"),
-            Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
-            Map.entry("startup", "production main-method startup instrumentation"),
-            Map.entry("dev-login", "dev-login feature-property behavior"),
             Map.entry(
                     "consent-sign-in",
                     "real cookie and installed-client sign-in with the production consent interceptor enabled"),
+            Map.entry("dev-login", "dev-login feature-property behavior"),
+            Map.entry(
+                    "email-capture",
+                    "shared configured sender identity and captured SMTP boundary for durable delivery and HTTP"
+                            + " authorization"),
             Map.entry("github-live", "explicitly selected live GitHub profile and credentials"),
+            Map.entry(
+                    "gitlab-event-routing",
+                    "real JetStream scope consumer with GitLab discovery, webhook and sync held at the API boundary"),
+            Map.entry(
+                    "gitlab-token-lifecycle",
+                    "real credential storage, lifecycle locks and attention with only irreversible upstream token"
+                            + " rotation mocked"),
+            Map.entry(
+                    "mentor-worker-split",
+                    "server-only role with authenticated worker transport and controlled runner, routing and admission"
+                            + " boundaries"),
             Map.entry("outline-enabled", "enabled Outline integration wiring"),
+            Map.entry(
+                    "practice-script-live",
+                    "worker role with the real LLM proxy on a free sandbox gateway port, calling live models"),
+            Map.entry("real-auth", "real OAuth and authentication wiring without test security"),
+            Map.entry(
+                    "review-evidence",
+                    "shared review fixture with the neutral evidence authorization boundary controlled for exact"
+                            + " visibility assertions"),
+            Map.entry(
+                    "review-feedbackdelivery",
+                    "real feedback receipts and recovery with irreversible delivery and readiness boundaries"
+                            + " controlled"),
+            Map.entry(
+                    "review-feedbackhistoryquery",
+                    "real persisted history with exact private/public source permissions controlled"),
+            Map.entry(
+                    "review-feedbackmodereview",
+                    "real feedback mode inheritance with runtime attempt authority controlled"),
+            Map.entry(
+                    "review-feedbackreviewcontroller",
+                    "real authenticated feedback routes with item display labels controlled"),
+            Map.entry(
+                    "review-fixture",
+                    "shared persisted review/item/account fixture with real product services and schema functions"),
+            Map.entry(
+                    "review-resultadmission",
+                    "real transactional result admission with controlled runtime attempts, budget and custody"
+                            + " boundaries"),
+            Map.entry(
+                    "review-resulthistory",
+                    "real persisted result history with runtime and source permission boundaries controlled"),
+            Map.entry(
+                    "review-reviewoperationalviews",
+                    "real operational HTTP product views with worker runtime facts controlled"),
+            Map.entry(
+                    "review-reviewtimingfacts",
+                    "real retained product timing and bounded percentile queries with provider merge facts controlled"),
+            Map.entry(
+                    "review-scanreport",
+                    "real scan report membership, marks and visibility with runtime/person boundaries controlled"),
+            Map.entry("slack-enabled", "real Slack item resolution with the configured provider adapter"),
             Map.entry("slack-ingest", "enabled Slack ingest wiring with its review-submission spy"),
             Map.entry("slack-lifecycle", "agent submission boundary override"),
             Map.entry("slack-signed", "enabled signed Slack HTTP wiring"),
-            Map.entry("sync-controller-focused", "controlled sync provider and runner behavior"),
-            Map.entry(
-                    "gitlab-event-routing",
-                    "real JetStream scope consumer with GitLab discovery, webhook and sync held at the API boundary"));
+            Map.entry("startup", "production main-method startup instrumentation"),
+            Map.entry("sync-controller-focused", "controlled sync provider and runner behavior"));
 
     private static final Set<String> SPRING_BOOT_TESTS = names(
             "StartupBudgetIntegrationTest", "testconfig.BaseIntegrationTest", "testconfig.RealAuthIntegrationTest");
@@ -130,28 +192,28 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "testconfig.RealAuthIntegrationTest");
 
     private static final Set<String> PROPERTY_SOURCE_TESTS = names(
-            "testconfig.RealAuthIntegrationTest",
-            "agent.handler.PracticeReviewPipelineIntegrationTest",
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
-            "notification.AccountDeletionEmailIntegrationTest",
-            "notification.AccountSecurityEmailIntegrationTest",
-            "productfeedback.ProductFeedbackEmailIntegrationTest",
-            "productfeedback.SurveyEmailInvitationIntegrationTest",
-            "notification.email.EmailAdminControllerIntegrationTest",
-            "agent.job.IssueUpdateCoalescerIntegrationTest",
             "core.auth.clientsession.ClientSessionConcurrencyIntegrationTest",
             "core.auth.clientsession.ClientSessionIntegrationTest",
-            "core.auth.dev.DevLoginIntegrationTest",
             "core.auth.consent.ConsentSignInBootstrapIntegrationTest",
+            "core.auth.dev.DevLoginIntegrationTest",
+            "integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest",
             "integration.outline.OutlineFrameworkRegistrationIntegrationTest",
             "integration.outline.collection.OutlineCollectionAdminControllerIntegrationTest",
             "integration.outline.connect.OutlineConnectionAdminControllerIntegrationTest",
+            "integration.outline.item.DocumentItemSourceIntegrationTest",
             "integration.outline.sync.OutlineDocumentSyncIntegrationTest",
             "integration.slack.SlackConsentLifecycleE2EIntegrationTest",
             "integration.slack.channel.SlackChannelAdminControllerIntegrationTest",
-            "integration.core.oauth.SlackOAuthCallbackConflictIntegrationTest",
-            "integration.slack.conversation.ConversationThreadTriggerIntegrationTest",
-            "testconfig.BaseIntegrationTest");
+            "integration.slack.item.SlackThreadProjectionIntegrationTest",
+            "integration.slack.item.ThreadItemSourceIntegrationTest",
+            "notification.AccountDeletionEmailIntegrationTest",
+            "notification.AccountSecurityEmailIntegrationTest",
+            "notification.email.EmailAdminControllerIntegrationTest",
+            "productfeedback.ProductFeedbackEmailIntegrationTest",
+            "productfeedback.SurveyEmailInvitationIntegrationTest",
+            "testconfig.BaseIntegrationTest",
+            "testconfig.RealAuthIntegrationTest");
 
     private static final Set<String> DIRTY_CONTEXT_TESTS = Set.of();
 
@@ -159,7 +221,19 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             "agent.mentor.chat.MentorWorkerSplitIntegrationTest",
             "integration.scm.gitlab.credentials.GitLabTokenLifecycleIntegrationTest",
             "integration.scm.gitlab.workspace.GitLabWorkspaceEventRoutingIntegrationTest",
-            "integration.slack.SlackConsentLifecycleE2EIntegrationTest");
+            "integration.slack.SlackConsentLifecycleE2EIntegrationTest",
+            "practices.acrossworkspace.PracticesAcrossWorkspaceIntegrationTest",
+            "practices.feedback.AbstractFeedbackDeliveryIntegrationTest",
+            "practices.feedback.FeedbackHistoryQueryIntegrationTest",
+            "practices.feedback.FeedbackReviewControllerIntegrationTest",
+            "practices.groupdetail.PracticeGroupReviewHistoryIntegrationTest",
+            "practices.profile.PracticeProfileReviewIntegrationTest",
+            "practices.result.ResultAdmissionIntegrationTest",
+            "practices.result.ResultHistoryIntegrationTest",
+            "practices.review.ReviewOperationalViewsIntegrationTest",
+            "practices.review.ReviewTimingFactsIntegrationTest",
+            "practices.review.feedbackmode.FeedbackModeReviewIntegrationTest",
+            "practices.scan.ScanReportIntegrationTest");
 
     @Test
     void shouldMatchReviewedContextDeclarationsWhenArchitectureTestsRun() {
@@ -177,8 +251,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                 .map(JavaClass::getName)
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(mockitoBeans)
-                .as(
-                        "@MockitoBean changes Spring's context-cache key; reuse an existing configuration or review this inventory")
+                .as("@MockitoBean changes Spring's context-cache key; reuse an existing configuration or review"
+                        + " this inventory")
                 .isEqualTo(MOCKITO_BEAN_TESTS);
 
         Set<String> dynamicProperties = classesWithTests.stream()
@@ -248,7 +322,8 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
                 .collect(Collectors.toCollection(TreeSet::new));
         assertThat(actual)
                 .as(
-                        "@%s changes Spring's context-cache key; reuse an existing configuration or review this inventory",
+                        "@%s changes Spring's context-cache key; reuse an existing configuration or review this"
+                                + " inventory",
                         annotation.getSimpleName())
                 .isEqualTo(expected);
     }

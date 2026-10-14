@@ -1,33 +1,37 @@
 import { describe, expect, it } from "vitest";
 
-import type { PracticeGroup, PracticeGroupStanding } from "@/api/types.gen";
+import type { GroupRef, PracticeGroupStanding } from "@/api/types.gen";
 
 import { DEFAULT_PRACTICE_GROUP_SORT, sortPracticeGroups } from "./practice-group-list-order";
 
-function group(slug: string, name: string, displayOrder = 0): PracticeGroup {
-	return {
-		id: slug.length,
-		slug,
-		name,
-		displayOrder,
-		visibleInPracticeDashboards: true,
-		autonomy: { effective: "AUTOMATIC", inherited: true, source: "WORKSPACE" },
-		createdAt: new Date("2026-01-01T00:00:00Z"),
-	};
+function group(slug: string, name: string): GroupRef {
+	return { slug, name, color: null, icon: null };
 }
 
 function standing(slug: string, value: PracticeGroupStanding["standing"]): PracticeGroupStanding {
-	return { groupSlug: slug, groupName: slug, standing: value, practiceResults: [], sources: [] };
+	return {
+		groupSlug: slug,
+		groupName: slug,
+		standing: value,
+		results: [],
+		sources: [],
+		direction: null,
+		feedbackSince: null,
+		feedbackSpanDays: null,
+		guidance: null,
+		guidanceSource: null,
+		trendSupport: null,
+	};
 }
 
-const slugsOf = (groups: PracticeGroup[]) => groups.map((entry) => entry.slug);
+const slugsOf = (groups: GroupRef[]) => groups.map((entry) => entry.slug);
 
 describe("sortPracticeGroups", () => {
 	const groups = [
-		group("well", "Going well", 3),
-		group("attention", "Needs attention", 2),
-		group("mixed", "Mixed", 1),
-		group("silent", "Not observed", 0),
+		group("well", "Going well"),
+		group("attention", "Needs attention"),
+		group("mixed", "Mixed"),
+		group("silent", "Not observed"),
 	];
 	const standings = {
 		well: standing("well", "STRENGTH"),
@@ -53,13 +57,13 @@ describe("sortPracticeGroups", () => {
 		]);
 	});
 
-	it("breaks ties by the catalog's display order, then the name, in both directions", () => {
-		const tied = [group("b", "Bravo", 2), group("c", "Charlie", 1), group("a", "Alpha", 1)];
+	it("breaks ties by the catalog's order the groups arrived in, in both directions", () => {
+		const tied = [group("b", "Bravo"), group("c", "Charlie"), group("a", "Alpha")];
 		const all = Object.fromEntries(
 			tied.map((entry) => [entry.slug, standing(entry.slug, "MIXED")]),
 		);
-		expect(slugsOf(sortPracticeGroups(tied, all, "asc"))).toStrictEqual(["a", "c", "b"]);
-		expect(slugsOf(sortPracticeGroups(tied, all, "desc"))).toStrictEqual(["a", "c", "b"]);
+		expect(slugsOf(sortPracticeGroups(tied, all, "asc"))).toStrictEqual(["b", "c", "a"]);
+		expect(slugsOf(sortPracticeGroups(tied, all, "desc"))).toStrictEqual(["b", "c", "a"]);
 	});
 
 	it("returns a copy", () => {

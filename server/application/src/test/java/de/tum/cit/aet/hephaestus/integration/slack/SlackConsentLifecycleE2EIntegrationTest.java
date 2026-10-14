@@ -8,13 +8,14 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobService;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackMonitoredChannelDTO;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
@@ -46,7 +47,6 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
@@ -129,7 +129,10 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private AccountRepository accounts;
+
+    @Autowired
+    private IdentityRepository identities;
 
     @Autowired
     private WorkspaceRepository workspaceRepository;
@@ -170,13 +173,9 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-e2e-lifecycle"));
         workspaceId = workspace.getId();
-        u1MemberId = memberships.accountIdForUser(userRepository
-                .save(TestUserFactory.createUser(100L, "e2e-u1", provider))
-                .getId());
+        u1MemberId = SlackConversationTestSupport.accountWithIdentity(accounts, identities, provider, 100L, "e2e-u1");
         memberships.createMembership(workspace, u1MemberId, Membership.WorkspaceRole.MEMBER);
-        u2MemberId = memberships.accountIdForUser(userRepository
-                .save(TestUserFactory.createUser(200L, "e2e-u2", provider))
-                .getId());
+        u2MemberId = SlackConversationTestSupport.accountWithIdentity(accounts, identities, provider, 200L, "e2e-u2");
         memberships.createMembership(workspace, u2MemberId, Membership.WorkspaceRole.MEMBER);
         practice = savePractice(workspace);
 

@@ -1,29 +1,25 @@
 import { Link } from "@tanstack/react-router";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, type Mock, vi } from "vitest";
 
-import {
-	mockPracticeDefinitionOptions,
-	mockPullRequestReviewFields,
-	mockPullRequestPolicy,
-} from "@/mocks/fixtures/practice";
 import { deferred } from "@/test/async";
 import { renderWithRouter } from "@/test/router-harness";
 
+import { mockDefinitionOptions, mockScan, practiceValueOf } from "./fixtures";
 import { PracticeDefinitionForm, type PracticeDefinitionValue } from "./PracticeDefinitionForm";
 
 vi.mock("@/components/common/CodeEditor", () => ({
 	CodeEditor: () => <div />,
 }));
 
-async function renderCreateForm(
-	onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>,
-) {
+type Submit = (value: PracticeDefinitionValue) => void | Promise<void>;
+
+async function renderCreateForm(onSubmit: Submit) {
 	return renderWithRouter(
 		<PracticeDefinitionForm
 			mode="create"
 			groups={[]}
-			definitionOptions={mockPracticeDefinitionOptions}
+			definitionOptions={mockDefinitionOptions}
 			isPending={false}
 			cancelAction={<Link to="/">Cancel</Link>}
 			onSubmit={onSubmit}
@@ -32,110 +28,226 @@ async function renderCreateForm(
 	);
 }
 
-const nameField = () => screen.getByRole<HTMLInputElement>("textbox", { name: /Name/u });
+async function renderEditForm(onSubmit: Submit, initialData = practiceValueOf()) {
+	return renderWithRouter(
+		<PracticeDefinitionForm
+			mode="edit"
+			groups={[{ slug: "review-ready-work", name: "Review-ready work" }]}
+			definitionOptions={mockDefinitionOptions}
+			initialData={initialData}
+			isPending={false}
+			cancelAction={<Link to="/">Cancel</Link>}
+			onSubmit={onSubmit}
+		/>,
+		"/admin/practices/new",
+	);
+}
+
+function submitted(onSubmit: Mock<Submit>): PracticeDefinitionValue {
+	const [value] = onSubmit.mock.lastCall ?? [];
+	if (value === undefined) {
+		throw new Error("The form submitted nothing");
+	}
+	return value;
+}
+
+const nameField = () => screen.getByRole<HTMLInputElement>("textbox", { name: /^Name/u });
 const slugField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Identifier" });
+const appliesWhenField = () =>
+	screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Applies when" });
 
 async function openTechnicalSettings() {
 	fireEvent.click(screen.getByRole("button", { name: /Technical settings/u }));
 	return screen.findByRole("textbox", { name: "Identifier" });
 }
 
-function fillValidDraft() {
+/** A create draft the server would accept: a name, criteria, and one source the review must read. */
+async function fillValidDraft() {
 	fireEvent.change(nameField(), { target: { value: "Explain what changed and why" } });
 	fireEvent.change(screen.getByRole("textbox", { name: /What to look for/u }), {
 		target: { value: "Look for a description that explains the behaviour change." },
 	});
+	fireEvent.click(screen.getByRole("button", { name: "Choose sources" }));
+	const core = await screen.findByRole("radiogroup", { name: "How Pull request details is read" });
+	fireEvent.click(within(core).getByRole("radio", { name: "Required" }));
 }
 
-describe("the gate field", () => {
-	it("does not save malformed JSON while keeping the draft visible", async () => {
-		const onSubmit = vi.fn();
-		await renderCreateForm(onSubmit);
-		fillValidDraft();
-		fireEvent.change(screen.getByRole("textbox", { name: "Only review when" }), {
-			target: { value: "{" },
+describe("the definition an edit submits", () => {
+	it("gives back an untouched practice as the one closed definition it loaded", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit, practiceValueOf({ scan: mockScan }));
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit)).toStrictEqual(practiceValueOf({ scan: mockScan }));
+	});
+
+	it("shows the kind of an existing practice without offering to change it", async () => {
+		await renderEditForm(vi.fn());
+		expect(screen.queryByRole("radio", { name: /^Issue/u })).toBeNull();
+		screen.getByText(/The kind of item cannot change after the practice exists\./u);
+	});
+
+	it("saves Going well, which every practice can say", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit);
+		fireEvent.change(screen.getByRole("textbox", { name: "Going well" }), {
+			target: { value: "You keep every change to one purpose." },
 		});
-		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
-		expect(onSubmit).not.toHaveBeenCalled();
-		expect(screen.getByRole("textbox", { name: "Only review when" })).toHaveProperty("value", "{");
-		expect(screen.getAllByText("Enter valid JSON for the gate.").length).toBeGreaterThan(0);
-	});
-});
-
-it("restores a work-type draft without a gate instead of submitting another draft’s gate", async () => {
-	const onSubmit = vi.fn();
-	await renderCreateForm(onSubmit);
-	fillValidDraft();
-	fireEvent.click(screen.getByRole("radio", { name: /^Issue/u }));
-	fireEvent.change(screen.getByRole("textbox", { name: "Only review when" }), {
-		target: {
-			value: '{"skipReason":"No matching paths","anyOf":[{"changedPathMatches":["**/*.ts"]}]}',
-		},
-	});
-	fireEvent.click(screen.getByRole("radio", { name: /^Pull or merge request/u }));
-	expect(screen.getByRole("textbox", { name: "Only review when" })).toHaveProperty("value", "");
-	fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
-	await waitFor(() =>
-		expect(onSubmit).toHaveBeenCalledWith(
-			expect.objectContaining({ name: "Explain what changed and why" }),
-		),
-	);
-	expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty("precondition");
-});
-
-it("restores each gate draft and refuses an invalid restored draft", async () => {
-	const onSubmit = vi.fn();
-	await renderCreateForm(onSubmit);
-	fillValidDraft();
-	const gate = '{"skipReason":"No matching paths","anyOf":[{"changedPathMatches":["**/*.ts"]}]}';
-	fireEvent.click(screen.getByRole("radio", { name: /^Issue/u }));
-	fireEvent.change(screen.getByRole("textbox", { name: "Only review when" }), {
-		target: { value: gate },
-	});
-	fireEvent.click(screen.getByRole("radio", { name: /^Pull or merge request/u }));
-	fireEvent.click(screen.getByRole("radio", { name: /^Issue/u }));
-	expect(screen.getByRole("textbox", { name: "Only review when" })).toHaveProperty("value", gate);
-	fireEvent.change(screen.getByRole("textbox", { name: "Only review when" }), {
-		target: { value: "{" },
-	});
-	fireEvent.click(screen.getByRole("radio", { name: /^Pull or merge request/u }));
-	fireEvent.click(screen.getByRole("radio", { name: /^Issue/u }));
-	expect(screen.getByRole("textbox", { name: "Only review when" })).toHaveProperty("value", "{");
-	fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
-	expect(onSubmit).not.toHaveBeenCalled();
-	expect(screen.getAllByText("Enter valid JSON for the gate.").length).toBeGreaterThan(0);
-});
-
-describe("the identifier of an existing practice", () => {
-	it("does not change when the practice is renamed", async () => {
-		const onSubmit = vi.fn();
-		await renderWithRouter(
-			<PracticeDefinitionForm
-				mode="edit"
-				groups={[]}
-				definitionOptions={mockPracticeDefinitionOptions}
-				initialData={{
-					...mockPullRequestReviewFields,
-					slug: "reviewable-diffs",
-					name: "Small changes",
-					criteria: "Changes must remain reviewable.",
-					automatedReviewPolicy: mockPullRequestPolicy,
-				}}
-				isPending={false}
-				cancelAction={<Link to="/">Cancel</Link>}
-				onSubmit={onSubmit}
-			/>,
-			"/admin/practices/new",
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition.guidance.goingWell).toBe(
+			"You keep every change to one purpose.",
 		);
+	});
+
+	it("keeps the identifier when the practice is renamed", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit);
 		await openTechnicalSettings();
 		fireEvent.change(nameField(), { target: { value: "Small, reviewable changes" } });
-		expect(slugField().value).toBe("reviewable-diffs");
+		expect(slugField().value).toBe("keep-the-change-reviewable");
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		await waitFor(() =>
-			expect(onSubmit).toHaveBeenCalledWith(
-				expect.objectContaining({ slug: "reviewable-diffs", name: "Small, reviewable changes" }),
-			),
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit)).toMatchObject({
+			slug: "keep-the-change-reviewable",
+			definition: { name: "Small, reviewable changes" },
+		});
+	});
+});
+
+describe("Reviewed by", () => {
+	it("says what a save with Nobody clears, and clears it", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(
+			onSubmit,
+			practiceValueOf({ script: "export default 1;", scan: mockScan }),
 		);
+		fireEvent.click(screen.getByRole("radio", { name: /^Nobody/u }));
+		screen.getByText(
+			"Saving with Nobody clears the read sources, the practice script and the scan settings. Choose Hephaestus again before you save to keep them.",
+		);
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition).toMatchObject({
+			reviewedBy: { by: "NOBODY", humanReason: null, limits: [] },
+			reads: { sources: [] },
+			script: null,
+			scan: null,
+		});
+	});
+
+	it("refuses People without a reason, and saves the reason it is given", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit);
+		fireEvent.click(screen.getByRole("radio", { name: /^People/u }));
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(
+			screen.getAllByText("Say why people review this practice, in at most 500 characters.").length,
+		).toBeGreaterThan(0);
+
+		fireEvent.change(screen.getByRole("textbox", { name: /Why do people review it/u }), {
+			target: { value: "The decision was made in a meeting." },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition.reviewedBy).toStrictEqual({
+			by: "PEOPLE",
+			humanReason: {
+				code: "THE_DECISION_WAS_MADE_IN_A_MEETING",
+				description: "The decision was made in a meeting.",
+			},
+			limits: [],
+		});
+	});
+});
+
+describe("About", () => {
+	it("offers the work itself and saves it as no role", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit, practiceValueOf({ about: null }));
+		expect(screen.getByRole("combobox", { name: /^About/u }).textContent).toContain("The work");
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition.about).toBeNull();
+	});
+});
+
+describe("Applies when", () => {
+	it("does not save malformed JSON while keeping the draft visible", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit);
+		fireEvent.change(appliesWhenField(), { target: { value: "[" } });
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(appliesWhenField().value).toBe("[");
+		expect(screen.getAllByText("Enter the conditions as valid JSON.").length).toBeGreaterThan(0);
+	});
+
+	it("asks for Otherwise once there are conditions, and saves both", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit);
+		fireEvent.change(appliesWhenField(), {
+			target: { value: '[{"changedPath":["**/*.swift"]}]' },
+		});
+		fireEvent.change(screen.getByRole("textbox", { name: /^Otherwise/u }), {
+			target: { value: "the change touches no Swift source file" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition.appliesWhen).toStrictEqual({
+			anyOf: [{ changedPath: ["**/*.swift"] }],
+			otherwise: "the change touches no Swift source file",
+		});
+	});
+});
+
+describe("the kind a practice is created for", () => {
+	it("restores each kind's conditions instead of submitting another kind's", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderCreateForm(onSubmit);
+		await fillValidDraft();
+		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
+		fireEvent.change(appliesWhenField(), {
+			target: { value: '[{"hasItems":"scm.review-threads"}]' },
+		});
+		fireEvent.click(screen.getByRole("radio", { name: /^Pull request\b(?! review)/u }));
+		expect(appliesWhenField().value).toBe("");
+		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
+		expect(appliesWhenField().value).toBe('[{"hasItems":"scm.review-threads"}]');
+	});
+});
+
+describe("scans", () => {
+	it("keeps the scan draft while scans are off, and saves no scan", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit, practiceValueOf({ scan: mockScan }));
+		const toggle = screen.getByRole("switch", { name: "Include in scans" });
+		fireEvent.click(toggle);
+		expect(screen.queryByRole("textbox", { name: /^Include/u })).toBeNull();
+		fireEvent.click(toggle);
+		expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: /^Include/u }).value).toBe(
+			mockScan.include.join("\n"),
+		);
+		fireEvent.click(toggle);
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		await waitFor(() => expect(onSubmit).toHaveBeenCalledOnce());
+		expect(submitted(onSubmit).definition.scan).toBeNull();
+	});
+
+	it("refuses a pattern that leaves the repository", async () => {
+		const onSubmit = vi.fn<Submit>();
+		await renderEditForm(onSubmit, practiceValueOf({ scan: mockScan }));
+		fireEvent.change(screen.getByRole("textbox", { name: /^Include/u }), {
+			target: { value: "../outside/**" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+		expect(onSubmit).not.toHaveBeenCalled();
+		expect(
+			screen.getAllByText(
+				"A pattern cannot leave the repository: remove “..” from “../outside/**”.",
+			).length,
+		).toBeGreaterThan(0);
 	});
 });
 
@@ -179,7 +291,7 @@ describe("the unsaved-changes guard around a save", () => {
 	it("stays out of the way of a caller navigating after a successful save", async () => {
 		const saved = deferred<undefined>();
 		const { router } = await renderCreateForm(async () => saved.promise);
-		fillValidDraft();
+		await fillValidDraft();
 
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		saved.resolve(undefined);
@@ -194,7 +306,7 @@ describe("the unsaved-changes guard around a save", () => {
 	it("comes back down when the save is refused", async () => {
 		const failed = deferred<undefined>();
 		await renderCreateForm(async () => failed.promise);
-		fillValidDraft();
+		await fillValidDraft();
 
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		// The guard re-arms from `track`'s rejection handler, so the click below has to wait for
@@ -213,7 +325,7 @@ describe("the unsaved-changes guard around a save", () => {
 		// A caller returning `void` is not reporting success — holding the guard down on that would
 		// leave a failed save unprotected for good.
 		await renderCreateForm(vi.fn());
-		fillValidDraft();
+		await fillValidDraft();
 
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
@@ -223,47 +335,28 @@ describe("the unsaved-changes guard around a save", () => {
 });
 
 describe("the practice script section", () => {
-	it("waits closed without a script, links its guide, and names AI models as words where the host has no link", async () => {
+	it("waits closed as the built-in review, links its guide, and names AI models as words where the host has no link", async () => {
 		await renderCreateForm(vi.fn());
-		const trigger = screen.getByRole("button", { name: /^Script/u });
-		expect(trigger.getAttribute("aria-expanded")).toBe("false");
-		fireEvent.click(trigger);
+		const section = screen.getByRole("button", { name: /^Script/u });
+		expect(section.getAttribute("aria-expanded")).toBe("false");
+		screen.getByText(/^Built-in\./u);
+		fireEvent.click(section);
 
 		const guide = await screen.findByRole("link", { name: /^Write a practice script/u });
 		expect(guide.getAttribute("href")).toBe("https://docs.hephaestus.build/admin/practice-scripts");
 		screen.getByText(/It can call the models on AI models\.$/u);
 		expect(screen.queryByRole("link", { name: "AI models" })).toBeNull();
-		// The script has its own section, so the technical settings do not name it.
-		screen.getByText("Identifier and feedback delivery");
 	});
 
-	it("opens itself when a switch of work type swaps the script out of sight", async () => {
-		await renderWithRouter(
-			<PracticeDefinitionForm
-				mode="edit"
-				groups={[]}
-				definitionOptions={mockPracticeDefinitionOptions}
-				initialData={{
-					...mockPullRequestReviewFields,
-					slug: "reviewable-diffs",
-					name: "Small changes",
-					criteria: "Changes must remain reviewable.",
-					automatedReviewPolicy: mockPullRequestPolicy,
-					practiceScript: "export default definePracticeScript({});",
-				}}
-				isPending={false}
-				cancelAction={<Link to="/">Cancel</Link>}
-				onSubmit={vi.fn()}
-			/>,
-			"/admin/practices/new",
-		);
-		const trigger = screen.getByRole("button", { name: /^Script/u });
-		expect(trigger.getAttribute("aria-expanded")).toBe("true");
-		fireEvent.click(trigger);
-		expect(trigger.getAttribute("aria-expanded")).toBe("false");
+	it("opens with the script a practice already has", async () => {
+		await renderEditForm(vi.fn(), practiceValueOf({ script: "export default 1;" }));
+		const section = screen.getByRole("button", { name: /^Script/u });
+		expect(section.getAttribute("aria-expanded")).toBe("true");
+	});
 
-		// An issue has no script of its own yet, so this one leaves the form: the section says so.
-		fireEvent.click(screen.getByRole("radio", { name: /^Issue/u }));
-		expect(trigger.getAttribute("aria-expanded")).toBe("true");
+	it("is not offered while people review the practice", async () => {
+		await renderEditForm(vi.fn());
+		fireEvent.click(screen.getByRole("radio", { name: /^People/u }));
+		expect(screen.queryByRole("button", { name: /^Script/u })).toBeNull();
 	});
 });

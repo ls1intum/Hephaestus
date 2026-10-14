@@ -1,36 +1,29 @@
 import { HandIcon } from "lucide-react";
 
-import type { PracticeEvidenceOutcome, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
-import { OccasionLifecycle } from "@/components/admin/practice-editor/OccasionLifecycle";
-import { PracticeEvidenceEditor } from "@/components/admin/practice-editor/PracticeEvidenceEditor";
-import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-editor/PracticeEvidenceOutcomeSummary";
-import {
-	type PracticeReviewFields,
-	normalizeReviewSettings,
-	OCCASION_ID_PREFIX,
-	occasionFieldId,
-} from "@/components/admin/practice-editor/review-settings";
+import type { PracticeItemTypeOption, PracticeReadSource, ReviewOn } from "@/api/types.gen";
 import { FieldError } from "@/components/ui/field";
-import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
+import { itemKindIcon } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
+
+import { PracticeReadsEditor } from "./PracticeReadsEditor";
+import { REVIEW_ON_ID_PREFIX, type ReviewedByKind, reviewOnFieldId } from "./review-settings";
+import { ReviewOnEditor } from "./ReviewOnEditor";
 
 /** Also the `aria-describedby` target: focus lands on the control, not on the rendered message. */
 const REVIEW_SETTINGS_ERROR_ID = "practice-review-settings-error";
 
-/** Human review also covers policies unavailable on this instance: both record evidence without AI review. */
-export type PracticeOccasionMode = "reviewed" | "human-review" | "guidance-only";
+/** When a practice is reviewed and what that review reads. */
+export interface ReviewSettings {
+	reviewOn: ReviewOn;
+	reads: PracticeReadSource[];
+}
 
 export interface PracticeReviewSettingsEditorProps {
-	options: PracticeWorkTypeDefinitionOptions;
-	/**
-	 * The one occasion this practice is reviewed on. A practice has exactly one: to read different
-	 * evidence at a different moment, the server asks for a second practice rather than a second
-	 * occasion, so there is nothing here to add to or remove.
-	 */
-	reviewFields: PracticeReviewFields;
-	onChange: (reviewFields: PracticeReviewFields) => void;
-	mode?: PracticeOccasionMode;
-	outcome?: PracticeEvidenceOutcome;
+	itemType: PracticeItemTypeOption;
+	value: ReviewSettings;
+	onChange: (value: ReviewSettings) => void;
+	/** Who reviews the practice: only an automated review reads anything. */
+	reviewedBy: ReviewedByKind;
 	error?: string;
 	/** The control the error points at, so the field it names is the one that opens. */
 	errorFocusId?: string;
@@ -38,96 +31,68 @@ export interface PracticeReviewSettingsEditorProps {
 }
 
 /**
- * When a practice is reviewed and what that review reads: a moment strip, the draft question, and
- * one evidence list. Deliberately not a card — it is the body of the form's own section, and a
- * border around it would say there is a second one of these somewhere.
+ * Review on, When, and what the review reads. Deliberately not a card — it is the body of the
+ * form's own section, and a border around it would say there is a second one of these somewhere.
  */
 export function PracticeReviewSettingsEditor({
-	options,
-	reviewFields,
+	itemType,
+	value,
 	onChange,
-	mode = "reviewed",
-	outcome,
+	reviewedBy,
 	error,
 	errorFocusId,
 	disabled = false,
 }: PracticeReviewSettingsEditorProps) {
-	const WorkIcon = artifactKindIcon(options.artifactKind);
-	const signalsInvalid = errorFocusId === occasionFieldId("signals");
-	const reviewWhenInvalid = errorFocusId === occasionFieldId("reviewWhen");
-	const evidenceInvalid = errorFocusId === occasionFieldId("evidence");
-	// A review asked for by hand runs a practice the workspace lets run: guidance-only and
-	// human-review-needed practices sit at OFF, so promising one here would be a promise nothing keeps.
-	const handAsked = options.manualReviewSignal !== undefined && mode === "reviewed";
-	const toggleSignal = (signal: string, chosen: boolean) =>
-		onChange(
-			normalizeReviewSettings({
-				...reviewFields,
-				signals: chosen
-					? [...reviewFields.signals, signal]
-					: reviewFields.signals.filter((value) => value !== signal),
-			}),
-		);
+	const KindIcon = itemKindIcon(itemType.kind);
+	const errorFor = (field: "events" | "state" | "reads") =>
+		errorFocusId === reviewOnFieldId(field) && hasText(error)
+			? REVIEW_SETTINGS_ERROR_ID
+			: undefined;
+	const automated = reviewedBy === "HEPHAESTUS";
 
 	return (
 		<div className="space-y-4">
 			<div className="space-y-1.5">
 				<p className="flex items-center gap-2 text-sm font-medium">
-					<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
-					{artifactKindLabel(options.artifactKind)}
+					<KindIcon className="size-4 text-muted-foreground" aria-hidden />
+					{itemType.label}
 				</p>
-				{mode !== "guidance-only" && (
-					<p className="text-sm text-muted-foreground">
-						{mode === "reviewed"
-							? "Every review is checked for the evidence it must have before it runs. Missing or incomplete evidence skips the practice rather than guessing."
-							: "Evidence is recorded, but nothing is reviewed while the practice asks for a human."}
-					</p>
-				)}
+				<p className="text-sm text-muted-foreground">
+					{automated
+						? "Every review first captures the sources it must read. When one cannot be captured, the review is withheld rather than guessed."
+						: "No automated review runs, so this practice reads nothing."}
+				</p>
 			</div>
 
-			{outcome && (
-				<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
-			)}
-
-			<OccasionLifecycle
-				workType={options}
-				selected={reviewFields.signals}
-				onToggle={toggleSignal}
-				reviewWhen={reviewFields.reviewWhen}
-				onReviewWhenChange={(reviewWhen) =>
-					onChange(normalizeReviewSettings({ ...reviewFields, reviewWhen }))
-				}
-				errorId={signalsInvalid && hasText(error) ? REVIEW_SETTINGS_ERROR_ID : undefined}
-				reviewWhenErrorId={
-					reviewWhenInvalid && hasText(error) ? REVIEW_SETTINGS_ERROR_ID : undefined
-				}
+			<ReviewOnEditor
+				itemType={itemType}
+				reviewOn={value.reviewOn}
+				onChange={(reviewOn) => onChange({ ...value, reviewOn })}
+				eventsErrorId={errorFor("events")}
+				stateErrorId={errorFor("state")}
 				disabled={disabled}
 			/>
 
-			{mode === "guidance-only" ? (
-				<p className="text-sm text-muted-foreground">
-					Guidance only: this practice reads nothing, because no review runs.
-				</p>
-			) : (
-				<PracticeEvidenceEditor
-					options={options}
-					evidenceRequirements={reviewFields.evidenceRequirements}
-					idPrefix={OCCASION_ID_PREFIX}
+			{automated && (
+				<PracticeReadsEditor
+					readSources={itemType.readSources}
+					sources={value.reads}
+					idPrefix={REVIEW_ON_ID_PREFIX}
 					disabled={disabled}
-					invalid={evidenceInvalid}
-					errorId={evidenceInvalid && hasText(error) ? REVIEW_SETTINGS_ERROR_ID : undefined}
-					onChange={(evidenceRequirements) => onChange({ ...reviewFields, evidenceRequirements })}
+					invalid={errorFocusId === reviewOnFieldId("reads")}
+					errorId={errorFor("reads")}
+					onChange={(reads) => onChange({ ...value, reads })}
 				/>
 			)}
 
-			{/* Under the evidence rather than over the moments: asking by hand is a second way in, not a
-			    moment nobody is allowed to tick, and what it reads is the list directly above. */}
-			{handAsked && (
+			{/* Under the reads rather than over the events: a request is a second way in, not an event
+			    nobody is allowed to tick, and what it reads is the list directly above. */}
+			{automated && (
 				<p className="flex items-start gap-2 text-sm text-muted-foreground">
 					<HandIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
 					<span>
-						Anyone can also request this review with “Request review” on the work itself. It reads
-						the same evidence and runs whatever state the work is in.
+						Anyone can also request this review on the work itself. A requested review ignores
+						Review on and When, and still checks Applies when.
 					</span>
 				</p>
 			)}
@@ -135,18 +100,4 @@ export function PracticeReviewSettingsEditor({
 			{hasText(error) && <FieldError id={REVIEW_SETTINGS_ERROR_ID}>{error}</FieldError>}
 		</div>
 	);
-}
-
-/** Strips the occasion's evidence, which is what "guidance only" means server-side. */
-export function withoutEvidence(reviewFields: PracticeReviewFields): PracticeReviewFields {
-	return { ...reviewFields, evidenceRequirements: [] };
-}
-
-export function withRecommendedEvidence(
-	reviewFields: PracticeReviewFields,
-	options: PracticeWorkTypeDefinitionOptions,
-): PracticeReviewFields {
-	return reviewFields.evidenceRequirements.length > 0
-		? reviewFields
-		: { ...reviewFields, evidenceRequirements: [...options.recommendedEvidenceRequirements] };
 }

@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.core.connection;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionCredentialsReplacedEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ConnectionLifecycleEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -26,11 +25,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Connection lookups + state transitions. Transitions are guarded by {@link
@@ -51,7 +46,7 @@ public class ConnectionService {
     private final ApplicationEventPublisher eventPublisher;
     private final SyncJobService syncJobService;
 
-    private final TransactionTemplate providerTeardownTemplate;
+    private final ConnectionLifecycleEffects lifecycleEffects;
     private final CredentialReader credentialReader;
     private final SourceProviderNamespaces sourceNamespaces;
 
@@ -71,8 +66,7 @@ public class ConnectionService {
         this.credentialConverter = credentialConverter;
         this.eventPublisher = eventPublisher;
         this.syncJobService = syncJobService;
-        this.providerTeardownTemplate = new TransactionTemplate(transactionManager);
-        this.providerTeardownTemplate.setPropagationBehavior(TransactionDefinition.PROPAGATION_NOT_SUPPORTED);
+        this.lifecycleEffects = new ConnectionLifecycleEffects(eventPublisher, transactionManager);
     }
 
     @Transactional(readOnly = true)
@@ -502,7 +496,7 @@ public class ConnectionService {
         return applyTransition(
                 connection,
                 req,
-                locked -> eraseAndTearDownProviderAfterCommit(locked, strategy),
+                locked -> lifecycleEffects.eraseAndTearDownProviderAfterCommit(locked, strategy),
                 /* fenceOnActiveSyncJob */ true);
     }
 
@@ -523,7 +517,7 @@ public class ConnectionService {
                 connection,
                 req,
                 locked -> {
-                    providerTeardownTemplate.executeWithoutResult(status -> revoke.run());
+                    lifecycleEffects.revoke(revoke);
                     erase.run();
                 },
                 /* fenceOnActiveSyncJob */ false);
@@ -605,68 +599,8 @@ public class ConnectionService {
             }
         }
         Connection saved = connectionRepository.save(connection);
-        publishLifecycleEvent(saved, current, req.next());
+        lifecycleEffects.publishLifecycleEvent(saved, current, req.next());
         return saved;
-    }
-
-    /**
-     * The teardown is prepared with this transaction suspended, so a failed credential read cannot
-     * mark the disconnect rollback-only; those reads see the committed row, credentials included,
-     * since the lifecycle lock blocks writers, not readers.
-     */
-    private void eraseAndTearDownProviderAfterCommit(Connection connection, ConnectionStrategy strategy) {
-        IntegrationRef ref = new IntegrationRef(
-                connection.getKind(),
-                connection.getWorkspace().getId(),
-                connection.getInstanceKey(),
-                connection.getId());
-        strategy.eraseLocalData(ref);
-        Optional<Runnable> teardown;
-        try {
-            teardown = Objects.requireNonNull(
-                    providerTeardownTemplate.execute(status -> strategy.prepareProviderTeardown(ref)));
-        } catch (RuntimeException e) {
-            log.warn(
-                    "Provider teardown could not be prepared on disconnect of connection={}"
-                            + " kind={}: {} — disconnecting without it",
-                    ref.connectionId(),
-                    ref.kind(),
-                    e.toString());
-            return;
-        }
-        teardown.ifPresent(call ->
-                TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            call.run();
-                        } catch (RuntimeException e) {
-                            log.warn(
-                                    "Provider teardown failed after disconnect of"
-                                            + " connection={} kind={}: {} — local data"
-                                            + " already erased",
-                                    ref.connectionId(),
-                                    ref.kind(),
-                                    e.toString());
-                        }
-                    }
-                }));
-    }
-
-    /**
-     * ItemEventDefinition a genuine ACTIVE-boundary crossing to vendor adapters (AFTER_COMMIT
-     * listeners). Fires inside the transition transaction so a rollback also drops the event; the
-     * same-state and duplicate-correlation early returns above keep replays silent.
-     */
-    private void publishLifecycleEvent(Connection connection, IntegrationState previous, IntegrationState next) {
-        long workspaceId = connection.getWorkspace().getId();
-        if (next == IntegrationState.ACTIVE) {
-            eventPublisher.publishEvent(
-                    new ConnectionLifecycleEvent.Activated(connection.getId(), workspaceId, connection.getKind()));
-        } else if (previous == IntegrationState.ACTIVE) {
-            eventPublisher.publishEvent(
-                    new ConnectionLifecycleEvent.Deactivated(connection.getId(), workspaceId, connection.getKind()));
-        }
     }
 
     /**

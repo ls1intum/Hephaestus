@@ -16,12 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 @ConditionalOnServerRole
 public class CatalogReleaseService {
     private final CatalogService catalog;
     private final CatalogLock lock;
 
-    @Transactional(readOnly = true)
     public CatalogPracticeReleaseProposalDTO proposal(String slug) {
         var entry = catalog.practice(slug);
         var shipped = entry.shipped();

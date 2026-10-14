@@ -140,14 +140,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldExposeStringIdsAndTheCurrentDefinition() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("wire-practice", "Wire", "wire-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "wire-definition",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         client.get()
                 .uri("/workspaces/{workspace}/practices/{slug}", workspace.getWorkspaceSlug(), practice.getSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -170,14 +170,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldReplaceFeedbackModeAndRestoreInheritance() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("wire-mode", "Modes", "wire-mode-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "mode-definition",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         String uri =
                 "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/" + practice.getSlug() + "/feedback-mode";
         client.patch()
@@ -227,14 +227,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldRejectAStaleDefinitionWithoutAppendingAVersion() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("wire-stale", "Stale", "stale-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "stale-definition",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         var firstId = Objects.requireNonNull(practice.getCurrentVersion().getId());
         var second = versions.append(
                 practice, DefinitionTestFixtures.rename(DefinitionTestFixtures.definition(), "New name"), null);
@@ -258,14 +258,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         var owner = persistUser("admin");
         var local = createWorkspace("wire-local", "Local", "local-org", AccountType.ORG, owner);
         var foreign = createWorkspace("wire-foreign", "Foreign", "foreign-org", AccountType.ORG, owner);
-        versions.create(
+        versions.create(new PracticeVersionService.NewPractice(
                 foreign,
                 "foreign-practice",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         client.get()
                 .uri("/workspaces/{workspace}/practices/foreign-practice", local.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -287,14 +287,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldRejectRetiredModeFieldsAndMissingExplicitOverrides() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("wire-invalid", "Invalid", "invalid-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "invalid-definition",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         String uri =
                 "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/" + practice.getSlug() + "/feedback-mode";
         for (String body : List.of("{}", "{\"feedbackMode\":null,\"autonomy\":\"AUTOMATIC\"}")) {
@@ -315,14 +315,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     void shouldKeepGuidanceValidatorsScopedToTheirContent() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("wire-guidance", "Guidance", "guidance-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "stored-guidance",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         String uri = "/workspaces/" + workspace.getWorkspaceSlug() + "/practices/" + practice.getSlug() + "/guidance";
         String tag = Objects.requireNonNull(client.get()
                 .uri(uri)

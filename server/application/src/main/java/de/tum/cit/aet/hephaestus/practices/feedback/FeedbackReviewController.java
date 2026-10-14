@@ -16,6 +16,7 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -94,6 +95,7 @@ public class FeedbackReviewController {
     @AuditExempt(reason = "Feedback decisions retain the actor, note and timestamp")
     @PostMapping("/feedback/{feedbackId}/decisions")
     @Operation(operationId = "createFeedbackDecision")
+    @ApiResponse(responseCode = "201", description = "Feedback decision recorded")
     public ResponseEntity<FeedbackDecisionDTO> decide(
             WorkspaceContext workspace,
             @PathVariable UUID feedbackId,
@@ -110,6 +112,7 @@ public class FeedbackReviewController {
     @AuditExempt(reason = "Retry retains the physical write fences and send attempt history")
     @PostMapping("/feedback/{feedbackId}/retry")
     @Operation(operationId = "retryFeedback")
+    @ApiResponse(responseCode = "202", description = "Feedback retry accepted")
     public ResponseEntity<ReviewFeedbackDetailDTO> retry(WorkspaceContext workspace, @PathVariable UUID feedbackId) {
         store.retry(
                 workspace.id(), feedbackId, SecurityUtils.getCurrentAccountId().orElseThrow());

@@ -61,7 +61,7 @@ it("keeps the view and the viewed user when sign-out fails", async () => {
 	await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
 	await screen.findByText("Sign-out settled");
 
-	expect(getUserViewSession()?.userId).toBe(11);
+	expect(getUserViewSession()?.accountId).toBe("11");
 	expect(screen.queryByText("Acting as alex")).not.toBeNull();
 });
 

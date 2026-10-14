@@ -1,3 +1,5 @@
+import { OWN_REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
+
 import { formatRelative } from "~/components/common/format";
 import type {
 	ReviewActivity,
@@ -37,66 +39,50 @@ export interface SummaryFacts {
 	readOnly?: boolean;
 }
 
-const ACTIVITY_TEXT: Record<ReviewActivity, string> = {
-	pending: "Review decision pending",
-	deferred: "Review decision deferred",
-};
-
 /**
- * When a review last recorded a result for this work: the newest time a practice's review decided,
- * among practices it reviewed — not when an event on the work was noticed.
+ * When the reader's latest own review finished, if it finished with results: a review that failed or
+ * was cancelled recorded none, and one still moving has not finished.
  */
 export function reviewedAt(context: Pick<ReadyContext, "trace">): string | undefined {
-	let latest: string | undefined;
-	for (const entry of context.trace?.practices ?? []) {
-		if (
-			entry.outcome === "REVIEWED" &&
-			entry.decidedAt !== undefined &&
-			(latest === undefined || Date.parse(entry.decidedAt) > Date.parse(latest))
-		) {
-			latest = entry.decidedAt;
-		}
-	}
-	return latest;
+	const review = context.trace?.review;
+	return review !== undefined &&
+		(review.status === "COMPLETE" || review.status === "PARTIAL") &&
+		review.completedAt !== null
+		? review.completedAt
+		: undefined;
 }
 
-/**
- * How many provider comments Hephaestus recorded posting for the reader. Empty says only that none is
- * recorded, not that the provider shows none.
- */
 const COMMIT = /^[0-9a-f]{7,64}$/u;
 
+/** The commit the latest finished own review looked at, shortened, when its version names one. */
+export function reviewedVersion(context: Pick<ReadyContext, "trace">): string | undefined {
+	const version = context.trace?.review.itemVersion ?? undefined;
+	return reviewedAt(context) !== undefined && version !== undefined && COMMIT.test(version)
+		? version.slice(0, 7)
+		: undefined;
+}
+
 /**
- * The commit the newest reviewed result looked at, shortened: the occasion that started that review,
- * when the trace ties the two together and names a commit. Otherwise nothing.
+ * What the line says when the latest own review did not finish every practice. The report claims
+ * nothing about the practices it could not review.
  */
-export function reviewedRevision(context: Pick<ReadyContext, "trace">): string | undefined {
-	const reviewed = reviewedAt(context);
-	const { trace } = context;
-	if (reviewed === undefined || trace === null) {
-		return undefined;
-	}
-	const reviewId = trace.practices.find(
-		(entry) => entry.outcome === "REVIEWED" && entry.decidedAt === reviewed,
-	)?.reviewId;
-	const revision = trace.signals.find(
-		(signal) => signal.reviewId !== undefined && signal.reviewId === reviewId,
-	)?.revision;
-	return revision !== undefined && COMMIT.test(revision) ? revision.slice(0, 7) : undefined;
+export function unfinishedReview(context: Pick<ReadyContext, "trace">): string | undefined {
+	const status = context.trace?.review.status;
+	return status === "PARTIAL" || status === "FAILED"
+		? `review ${OWN_REVIEW_STATUS_DEFS[status].label.toLowerCase()}`
+		: undefined;
 }
 
-/** How many practices a review could not finish, which the report names and claims nothing more of. */
-export function incompletePractices(context: Pick<ReadyContext, "trace">): number {
-	return (context.trace?.practices ?? []).filter((entry) => entry.outcome === "FAILED").length;
-}
-
+/**
+ * How many provider comments Hephaestus recorded posting for the reader. None says only that none is
+ * recorded, not that the provider shows none.
+ */
 function feedbackText(feedback: WorkFeedback): string {
 	const comments = feedback.comments.length;
-	if (comments === 0 && !feedback.more) {
+	if (comments === 0) {
 		return "No recorded comments for you";
 	}
-	const counted = comments === 1 ? "1 comment" : `${comments} comments`;
-	return feedback.more ? `At least ${counted} for you` : `${counted} for you`;
+	return comments === 1 ? "1 comment for you" : `${comments} comments for you`;
 }
 
 /**
@@ -150,11 +136,11 @@ export function summarizeReport({
 			break;
 		}
 	}
-	const request = state.canRequestReview && !readOnly ? ("request-review" as const) : undefined;
+	const request = state.requestAllowed && !readOnly ? ("request-review" as const) : undefined;
 	const parts: string[] = [];
 	let tone: ReportSummary["tone"] = "neutral";
 	if (activity !== undefined) {
-		parts.push(ACTIVITY_TEXT[activity]);
+		parts.push(`Review ${OWN_REVIEW_STATUS_DEFS[activity].label.toLowerCase()}`);
 	}
 	if (feedback?.status === "error") {
 		parts.push("We could not load your comments");
@@ -171,10 +157,10 @@ export function summarizeReport({
 	} else if (state.trace === null && activity === undefined) {
 		parts.push("review status unavailable");
 	}
-	// A review that could not finish for a practice is said on the line, not only inside.
-	const incomplete = incompletePractices(state);
-	if (incomplete > 0) {
-		parts.push(incomplete === 1 ? "1 practice incomplete" : `${incomplete} practices incomplete`);
+	// A review that could not finish is said on the line, not only inside.
+	const unfinished = unfinishedReview(state);
+	if (unfinished !== undefined) {
+		parts.push(unfinished);
 	}
 	return { text: parts.join(" · "), tone, action: request };
 }

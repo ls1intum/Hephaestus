@@ -2,13 +2,14 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
 
+import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { withStandardPage } from "@/stories/decorators";
 
 import { WorkspaceSettingsPage, type WorkspaceSettingsPageProps } from "./WorkspaceSettingsPage";
 
 const membershipRead = [
 	http.get("*/workspaces/:workspaceSlug/members/me", () =>
-		HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
+		HttpResponse.json(ownMembership("OWNER")),
 	),
 ];
 

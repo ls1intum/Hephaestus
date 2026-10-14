@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.account.AccountPreferencesQueryAdapter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
@@ -9,7 +10,6 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -38,7 +38,7 @@ class AccountChoiceIntegrationTest extends BaseIntegrationTest {
     private AccountIdentityQuery identityQuery;
 
     @Autowired
-    private AccountPreferencesQuery preferences;
+    private AccountPreferencesQueryAdapter preferences;
 
     @Autowired
     private MemberAiPreferences aiPreferences;

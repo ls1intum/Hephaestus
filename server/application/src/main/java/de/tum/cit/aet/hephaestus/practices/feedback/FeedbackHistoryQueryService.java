@@ -35,7 +35,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -57,14 +56,14 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     private final ResultPresentation presentation;
     private final ReviewRepository reviews;
     private final ObjectMapper mapper;
-    private final JdbcClient jdbc;
+    private final FeedbackQueryRepository queries;
     private final ResultSourceAuthorization sourceAuthorization;
     private final PracticeRepository practices;
 
     @Override
     public List<FeedbackHistoryEntry> forDeveloper(
             long workspaceId, long developerAccountId, Instant since, int limit) {
-        if (!member(workspaceId, developerAccountId)) return List.of();
+        if (!queries.member(workspaceId, developerAccountId)) return List.of();
         Specification<Feedback> selected = (row, query, cb) -> cb.and(
                 cb.equal(row.get("workspaceId"), workspaceId),
                 cb.equal(row.get("developerId"), developerAccountId),
@@ -74,7 +73,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
 
     @Override
     public List<FeedbackHistoryEntry> forItem(long workspaceId, long itemId, long viewerAccountId, int limit) {
-        if (!member(workspaceId, viewerAccountId)) return List.of();
+        if (!queries.member(workspaceId, viewerAccountId)) return List.of();
         Specification<Feedback> selected = (row, query, cb) -> cb.and(
                 cb.equal(row.get("workspaceId"), workspaceId),
                 cb.equal(row.get("itemId"), itemId),
@@ -201,7 +200,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                                 .sorted()
                                 .toList()
                         : List.of(),
-                threadId(workspaceId, row.getId()),
+                queries.threadId(workspaceId, row.getId()),
                 complete,
                 publicHistory);
     }
@@ -215,22 +214,6 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
                 .findById(result.getPracticeId())
                 .filter(practice -> practice.getWorkspaceId() == result.getWorkspaceId())
                 .map(practice -> new AuthorizedSupport(result.getId(), practice.getSlug(), facts));
-    }
-
-    private @Nullable UUID threadId(long workspaceId, UUID feedbackId) {
-        return jdbc.sql("SELECT m.thread_id FROM feedback_copy c JOIN chat_message m ON"
-                        + " m.id=c.chat_message_id AND m.workspace_id=c.workspace_id JOIN"
-                        + " chat_thread t ON t.id=m.thread_id AND t.workspace_id=m.workspace_id"
-                        + " JOIN feedback f ON f.id=c.feedback_id AND"
-                        + " f.workspace_id=c.workspace_id WHERE c.workspace_id=:workspaceId AND"
-                        + " c.feedback_id=:feedbackId AND c.kind='CHAT_TURN' AND c.posted_at IS"
-                        + " NOT NULL AND t.account_id=f.developer_id AND"
-                        + " f.destination='CONVERSATION' ORDER BY c.position LIMIT 1")
-                .param("workspaceId", workspaceId)
-                .param("feedbackId", feedbackId)
-                .query(UUID.class)
-                .optional()
-                .orElse(null);
     }
 
     private JsonNode publicHistory(
@@ -325,15 +308,4 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
             @Nullable String externalUrl,
             Instant postedAt,
             FeedbackCopyState state) {}
-
-    private boolean member(long workspaceId, long accountId) {
-        return jdbc.sql("SELECT EXISTS(SELECT 1 FROM membership m JOIN account a ON"
-                        + " a.id=m.account_id WHERE m.workspace_id=:workspaceId AND"
-                        + " m.account_id=:accountId AND m.left_at IS NULL AND a.status IN"
-                        + " ('ACTIVE','UNCLAIMED'))")
-                .param("workspaceId", workspaceId)
-                .param("accountId", accountId)
-                .query(Boolean.class)
-                .single();
-    }
 }

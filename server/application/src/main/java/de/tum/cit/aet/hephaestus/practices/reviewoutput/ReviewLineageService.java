@@ -27,7 +27,6 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,14 +46,13 @@ public class ReviewLineageService {
     private final ProductReferenceQuery references;
     private final EvidenceAuthorization authorization;
 
-    public ReviewLineageDTO graph(
-            long ws,
-            LineageKind kind,
-            @Nullable Long itemId,
-            @Nullable UUID reviewId,
-            @Nullable UUID resultId,
-            @Nullable UUID problemId,
-            @Nullable UUID feedbackId) {
+    public ReviewLineageDTO graph(long ws, ReviewLineageFilterParams filter) {
+        var kind = filter.kind();
+        var itemId = filter.itemId();
+        var reviewId = filter.reviewId();
+        var resultId = filter.resultId();
+        var problemId = filter.problemId();
+        var feedbackId = filter.feedbackId();
         if (Stream.of(itemId, reviewId, resultId, problemId, feedbackId)
                         .filter(Objects::nonNull)
                         .count()

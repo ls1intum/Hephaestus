@@ -4,9 +4,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
-import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
-import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +26,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
-class ReviewJobRetentionIntegrationTest extends AbstractWorkspaceIntegrationTest {
+class ReviewJobRetentionIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private WorkspaceRepository workspaces;
+
     @Autowired
     private ReviewJobRepository jobRepository;
 
@@ -47,9 +51,8 @@ class ReviewJobRetentionIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Test
     @Transactional
     void removesOriginalCompositionInputsOnceNoWriterCanUseThem() {
-        var owner = persistUser("basis-owner");
-        Workspace workspace = createWorkspace("basis-retention", "Basis", "basis-org", AccountType.ORG, owner);
-        Workspace other = createWorkspace("basis-other", "Other", "basis-other-org", AccountType.ORG, owner);
+        Workspace workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("basis-retention"));
+        Workspace other = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("basis-other"));
         ReviewJob ended = oldTerminalJob(workspace);
         ReviewJob running = oldJob(workspace, ReviewJobStatus.RUNNING);
         ReviewJob expired = oldJob(workspace, ReviewJobStatus.RUNNING);
@@ -74,8 +77,7 @@ class ReviewJobRetentionIntegrationTest extends AbstractWorkspaceIntegrationTest
     @Test
     @Transactional
     void shouldPreserveTheOriginalInputDigestThroughPostgresJsonb() {
-        var owner = persistUser("basis-json-owner");
-        Workspace workspace = createWorkspace("basis-json", "Basis", "basis-json-org", AccountType.ORG, owner);
+        Workspace workspace = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("basis-json"));
         ReviewJob job = jobRepository.saveAndFlush(oldTerminalJob(workspace));
         var original = Map.of(
                 "z.md",

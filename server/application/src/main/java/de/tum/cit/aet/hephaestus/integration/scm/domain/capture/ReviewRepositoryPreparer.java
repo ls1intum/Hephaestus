@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
-import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -27,7 +26,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class ReviewRepositoryPreparer {
     private final GitRepositoryManager git;
     private final PullRequestRepository pullRequests;
-    private final RepositoryToMonitorRepository monitors;
     private final ConnectionService connections;
     private final List<ScmTokenSource> tokenSources;
     private final RepositoryRepository repositories;
@@ -57,7 +55,7 @@ public class ReviewRepositoryPreparer {
         if (source == null) return List.of();
         var origin = source.serverUrl(workspaceId).flatMap(ScmOrigin::of);
         if (origin.isEmpty()) return List.of();
-        return monitoredRepositories(workspaceId).stream()
+        return repositories.findAllByWorkspaceMonitors(workspaceId).stream()
                 .filter(repository -> repository.getProvider().kind() == kind
                         && ScmOrigin.of(repository.getProvider().getServerUrl()).equals(origin))
                 .toList();
@@ -75,7 +73,7 @@ public class ReviewRepositoryPreparer {
         if (repository == null
                 || repository.getId() != work.repositoryId()
                 || !repository.getNameWithOwner().equals(work.repositoryPath())
-                || !monitors.existsByWorkspaceIdAndNameWithOwner(workspaceId, work.repositoryPath()))
+                || !repositories.isMonitored(workspaceId, repository.getId()))
             throw new ItemCaptureException(
                     ItemCaptureCode.ITEM_NOT_VISIBLE, "Workspace does not monitor the pinned repository");
         var integration = capture.pinned().integration();

@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.events.WorkspaceCreatedEvent;
 import java.time.Instant;
 import java.util.Set;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -16,10 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @ConditionalOnServerRole
-@RequiredArgsConstructor
 public class PracticeCatalogInstallationManager {
-    @Value("${hephaestus.practices.seed-default-catalog:true}")
-    private boolean enabled;
+    private final boolean enabled;
 
     private final CatalogService catalog;
     private final CatalogLock lock;
@@ -29,14 +26,37 @@ public class PracticeCatalogInstallationManager {
     private final PracticeService practices;
     private final PracticeRepository practiceRepository;
 
+    public PracticeCatalogInstallationManager(
+            @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
+            CatalogService catalog,
+            CatalogLock lock,
+            WorkspaceRepository workspaces,
+            PracticeGroupService groups,
+            PracticeGroupRepository groupRepository,
+            PracticeService practices,
+            PracticeRepository practiceRepository) {
+        this.enabled = enabled;
+        this.catalog = catalog;
+        this.lock = lock;
+        this.workspaces = workspaces;
+        this.groups = groups;
+        this.groupRepository = groupRepository;
+        this.practices = practices;
+        this.practiceRepository = practiceRepository;
+    }
+
     @EventListener
     @Transactional
     public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
-        install(event.workspaceId());
+        installCatalog(event.workspaceId());
     }
 
     @Transactional
     public void install(Long workspaceId) {
+        installCatalog(workspaceId);
+    }
+
+    private void installCatalog(Long workspaceId) {
         if (!enabled) return;
         lock.acquire();
         var workspace = workspaces.findByIdForUpdate(workspaceId).orElseThrow();

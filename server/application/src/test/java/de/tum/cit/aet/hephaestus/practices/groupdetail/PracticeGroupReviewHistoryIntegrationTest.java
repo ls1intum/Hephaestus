@@ -85,7 +85,7 @@ class PracticeGroupReviewHistoryIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].review.id")
                 .isEqualTo(r.getReviewId().toString());

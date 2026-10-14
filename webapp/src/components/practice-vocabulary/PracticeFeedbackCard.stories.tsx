@@ -40,7 +40,7 @@ const meta = {
 		onSendComment: fn(),
 		onSkipComment: fn(),
 		onDisagree: fn(),
-		onSendDispute: fn(),
+		onSendDisagreement: fn(),
 		onResolve: fn(),
 		onLearnMore: fn(),
 		onOpenPractice: fn(),
@@ -563,7 +563,7 @@ export const ResponseLabels: Story = {
 
 /**
  * The ratings: icon buttons named by their words, each with its tooltip, that still write
- * the registry's values and still open the dispute.
+ * the registry's values and still open the disagreement.
  */
 export const Ratings: Story = {
 	args: { card: { ...card, state: "open" }, usefulness: "HELPFUL" },
@@ -590,22 +590,24 @@ export const Ratings: Story = {
 	},
 };
 
-/** A dispute must carry a sentence, which workspace admins read instead of the card. */
+/** A disagreement must carry a sentence, which workspace admins read instead of the card. */
 export const DisagreeOpen: Story = {
-	args: { card: { ...card, state: "open" }, openBand: "dispute" },
+	args: { card: { ...card, state: "open" }, openBand: "disagreement" },
 	play: async ({ args, canvas }) => {
 		const field = canvas.getByRole("textbox", { name: "What is wrong in this feedback?" });
 		await expect(field).toBeRequired();
 		await expect(field).toHaveAccessibleDescription(/Workspace admins read your sentence/u);
 		await userEvent.type(field, "#17 split the refactor out already.");
 		await userEvent.click(canvas.getByRole("button", { name: "Send" }));
-		await expect(args.onSendDispute).toHaveBeenCalledWith("#17 split the refactor out already.");
+		await expect(args.onSendDisagreement).toHaveBeenCalledWith(
+			"#17 split the refactor out already.",
+		);
 	},
 };
 
-/** A standing dispute leaves the card open; the Disagree icon stays pressed in its tone. */
-export const Disputed: Story = {
-	args: { card: { ...card, state: "open" }, resolution: "DISPUTED" },
+/** A standing disagreement leaves the card open; the Disagree icon stays pressed in its tone. */
+export const Disagreed: Story = {
+	args: { card: { ...card, state: "open" }, resolution: "DISAGREE" },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Disagree" })).toHaveAttribute(
 			"aria-pressed",
@@ -632,7 +634,7 @@ export const HelpfulNoteOpen: Story = {
 	},
 };
 
-/** "Not helpful" opens an optional note, as "Helpful" does; Disagree is the one path to a dispute. */
+/** "Not helpful" opens an optional note, as "Helpful" does; Disagree is the one path to a disagreement. */
 export const NotHelpfulNoteOpen: Story = {
 	args: { card: { ...card, state: "open" }, usefulness: "UNHELPFUL", openBand: "comment" },
 	play: async ({ args, canvas }) => {

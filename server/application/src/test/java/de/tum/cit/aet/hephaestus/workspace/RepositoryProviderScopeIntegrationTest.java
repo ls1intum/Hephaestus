@@ -10,6 +10,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemSourceAccess;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -17,7 +23,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.adapter.WorkspaceSyncTargetProvider;
 import java.util.Objects;
@@ -28,7 +33,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.web.reactive.server.WebTestClient;
 
 class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private static final String NAME = "shared-org/shared-repo";
@@ -50,7 +54,10 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
     private WorkspaceSyncTargetProvider syncTargets;
 
     @Autowired
-    private WebTestClient web;
+    private ItemWriter itemWriter;
+
+    @Autowired
+    private ScmItemSourceAccess sourceAccess;
 
     @Autowired
     private IssueRepository issues;
@@ -392,30 +399,18 @@ class RepositoryProviderScopeIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private void assertWorkFacts(Workspace workspace, Issue issue) {
-        web.get()
-                .uri(
-                        "/workspaces/{slug}/practices/reviews/work/scm.issue/{id}",
-                        workspace.getWorkspaceSlug(),
-                        issue.getId())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.artifactId")
-                .isEqualTo(issue.getId());
+        assertThat(sourceAccess.permits(item(workspace, issue), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)).isTrue();
     }
 
     private void assertNoWorkFacts(Workspace workspace, Issue issue) {
-        web.get()
-                .uri(
-                        "/workspaces/{slug}/practices/reviews/work/scm.issue/{id}",
-                        workspace.getWorkspaceSlug(),
-                        issue.getId())
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isNoContent()
-                .expectBody(Void.class);
+        assertThat(sourceAccess.permits(item(workspace, issue), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)).isFalse();
+    }
+
+    private ItemRef item(Workspace workspace, Issue issue) {
+        var sourceRepository = Objects.requireNonNull(issue.getRepository());
+        var repository = itemWriter.upsert(new ItemRegistration(
+                workspace.getId(), new ItemKind("scm.repository"), sourceRepository.getId(), null, null));
+        return itemWriter.upsert(new ItemRegistration(
+                workspace.getId(), new ItemKind("scm.issue"), issue.getId(), repository.itemId(), null));
     }
 }

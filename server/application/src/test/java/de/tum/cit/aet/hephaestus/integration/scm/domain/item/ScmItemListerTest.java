@@ -31,7 +31,9 @@ class ScmItemListerTest extends BaseUnitTest {
         var tree = mock(ScmGitTree.class);
         var holder = new ItemRef(1, 2, ScmItemEvents.REPOSITORY, 3L, null, null);
         var version = new ItemVersion("a".repeat(40), null);
-        var repository = mock(Repository.class);
+        var repository = new Repository();
+        repository.setId(3L);
+        repository.setNameWithOwner("owner/repository");
         var key = new RepositoryKey(1L, 3L);
         var integration = new IntegrationRef(IntegrationKind.GITHUB, 1, "test");
         var snapshot = new ItemSnapshot(

@@ -31,7 +31,7 @@ function verdict(row: ResultRow) {
 		label: resultVerdict(row.outcome, row.problems.length),
 		tone,
 		severity:
-			row.outcome === "NOT_MET" && row.severity !== undefined
+			row.outcome === "NOT_MET" && row.severity !== null
 				? statusDefOr(SEVERITY_DEFS, row.severity).label
 				: undefined,
 	};
@@ -40,7 +40,7 @@ function verdict(row: ResultRow) {
 function Result({ row }: { row: ResultRow }) {
 	const { def, label, tone, severity } = verdict(row);
 	const Icon = def.icon;
-	const currentnessNote = claimCurrentnessNote(row.claimCurrentness);
+	const currentnessNote = claimCurrentnessNote(row.currentness);
 	return (
 		<li className={cn(INDENT, "flex min-w-0 items-start gap-2 py-1.5 text-sm")}>
 			<Icon aria-hidden className={cn("mt-0.5 size-4 shrink-0", tone)} />
@@ -53,15 +53,16 @@ function Result({ row }: { row: ResultRow }) {
 						{currentnessNote === undefined ? null : ` · ${currentnessNote}`}
 					</span>
 				</span>
-				<span className="break-words text-muted-foreground">{row.summary}</span>
+				{row.summary === null ? null : (
+					<span className="break-words text-muted-foreground">{row.summary}</span>
+				)}
 				{row.outcome === "NOT_MET" && row.problems.length > 0 ? (
 					<ul
 						aria-label="Problems"
 						className="mt-1 list-disc space-y-0.5 pl-4 text-muted-foreground"
 					>
-						{row.problems.map((problem, index) => (
-							// A list row carries no problem id; a problem's place in its result is stable.
-							<li key={index} className="break-words">
+						{row.problems.map((problem) => (
+							<li key={problem.id} className="break-words">
 								{problem.summary}
 							</li>
 						))}

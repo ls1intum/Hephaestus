@@ -3,17 +3,18 @@ import { createFileRoute, Link, retainSearchParams } from "@tanstack/react-route
 import { Inbox, ListChecks } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
 import {
 	adoptGroupMutation,
 	adoptPracticeMutation,
 	getPracticeDefinitionOptionsOptions,
 	getPracticeOptions,
+	getPracticeReleaseOptions,
 	listAdoptablePracticesOptions,
 	listAdoptablePracticesQueryKey,
-	listGroupsOptions,
-	listGroupsQueryKey,
-	listPracticeEvidenceOutcomesOptions,
+	listPracticeGroupsOptions,
+	listPracticeGroupsQueryKey,
 	listPracticesOptions,
 	listPracticesQueryKey,
 	listPracticeReleasesOptions,
@@ -27,6 +28,8 @@ import type {
 	CatalogPracticePreview,
 	Practice,
 	PracticeGroup,
+	UpdatePracticeGroupRequest,
+	UpdatePracticeRequest,
 } from "@/api/types.gen";
 import { generateSlug } from "@/components/admin/practice-editor/constants";
 import {
@@ -56,6 +59,10 @@ import {
 	PracticeTreeSkeleton,
 } from "@/components/admin/practices/PracticeSkeletons";
 import {
+	ResetToCatalogDialog,
+	type ResetToCatalogState,
+} from "@/components/admin/practices/ResetToCatalogDialog";
+import {
 	type PracticeScriptNeedsState,
 	WorkspacePracticePanel,
 	type WorkspacePracticeState,
@@ -69,6 +76,7 @@ import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { useDetailStack } from "@/components/layout/detail-drawer/use-detail-stack";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -116,6 +124,21 @@ function workspacePracticeAt(query: LevelQuery) {
 	return tagged?.kind === "practice" ? tagged.data : undefined;
 }
 
+/** A group's details as an update replaces them, with `patch` applied. */
+function groupDetails(
+	group: PracticeGroup,
+	patch: Partial<UpdatePracticeGroupRequest>,
+): UpdatePracticeGroupRequest {
+	const { name, description, icon, color, shownToDevelopers } = group;
+	return { name, description, icon, color, shownToDevelopers, ...patch };
+}
+
+/** What a reset compares: one practice or one group, by slug. */
+interface ResetTarget {
+	kind: "practice" | "group";
+	slug: string;
+}
+
 /** What the adoption panel's primary action reads as, once the preview it acts on is known. */
 function adoptionAction(stale: boolean, adding: boolean) {
 	if (stale) {
@@ -139,6 +162,12 @@ function PracticeCatalogRoute() {
 	const [deletingGroup, setDeletingGroup] = useState<PracticeGroup | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
 	const [staleLevelKey, setStaleLevelKey] = useState<string | null>(null);
+	const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
+	const [resetStale, setResetStale] = useState(false);
+	// The edit level whose save was refused because a newer version exists, and how many times a
+	// reader has loaded the newest version into the editor.
+	const [conflictSlug, setConflictSlug] = useState<string | null>(null);
+	const [editorGeneration, setEditorGeneration] = useState(0);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
 	const editor = usePracticeEditor(workspaceSlug);
 	const queryClient = useQueryClient();
@@ -149,7 +178,7 @@ function PracticeCatalogRoute() {
 	const stackControls = useDetailStack();
 
 	const groupsQuery = useQuery({
-		...listGroupsOptions({ path: { workspaceSlug } }),
+		...listPracticeGroupsOptions({ path: { workspaceSlug } }),
 	});
 	const practicesQuery = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
@@ -159,10 +188,6 @@ function PracticeCatalogRoute() {
 	});
 	const definitionOptionsQuery = useQuery({
 		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
-	});
-	// How past reviews turned out is context beside the form, not something the editor waits for.
-	const evidenceOutcomesQuery = useQuery({
-		...listPracticeEvidenceOutcomesOptions({ path: { workspaceSlug } }),
 	});
 	const catalogQuery = useQuery({
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
@@ -214,7 +239,8 @@ function PracticeCatalogRoute() {
 				return practiceAdoptionAt(query)?.definition.name ?? label;
 			}
 			if (entry.kind === "practice") {
-				return workspacePracticeAt(query)?.name ?? label;
+				const practice = workspacePracticeAt(query);
+				return practice === undefined ? label : currentDefinition(practice).name;
 			}
 			return label;
 		},
@@ -241,12 +267,101 @@ function PracticeCatalogRoute() {
 	}
 
 	/** The groups the editor offers. A hidden group still holds practices but is not a destination. */
-	const editableGroups = groupsQuery.data?.filter((group) => group.visibleInPracticeDashboards);
+	const editableGroups = groupsQuery.data?.filter((group) => group.shownToDevelopers);
+
+	// A reset compares this workspace's version with the catalog's offer before anything changes.
+	const resetGroup = groupsQuery.data?.find(
+		(group) => resetTarget?.kind === "group" && group.slug === resetTarget.slug,
+	);
+	const resetPracticeQuery = useQuery({
+		...getPracticeReleaseOptions({ path: { workspaceSlug, slug: resetTarget?.slug ?? "" } }),
+		enabled: resetTarget?.kind === "practice",
+	});
+	const resetGroupOfferQuery = useQuery({
+		...previewGroupAdoptionOptions({
+			path: { workspaceSlug, slug: resetGroup?.catalogOrigin.catalogSlug ?? "" },
+		}),
+		enabled: resetGroup?.catalogOrigin.catalogSlug != null,
+	});
+	let resetState: ResetToCatalogState = { status: "loading" };
+	const resetQuery = resetTarget?.kind === "group" ? resetGroupOfferQuery : resetPracticeQuery;
+	if (resetQuery.isError) {
+		resetState = {
+			status: "error",
+			error: resetQuery.error,
+			onRetry: () => {
+				void resetQuery.refetch();
+			},
+		};
+	} else if (resetTarget?.kind === "practice" && resetPracticeQuery.data) {
+		const { current, offered } = resetPracticeQuery.data;
+		resetState = { status: "ready", comparison: { kind: "practice", current, offered } };
+	} else if (resetGroup && resetGroupOfferQuery.data) {
+		const { name, description, icon, color } = resetGroup;
+		resetState = {
+			status: "ready",
+			comparison: {
+				kind: "group",
+				current: { name, description, icon, color },
+				offered: resetGroupOfferQuery.data.definition,
+			},
+		};
+	}
+	const resetPractice = practicesQuery.data?.find(({ slug }) => slug === resetTarget?.slug);
+	let resetName = "";
+	if (resetTarget?.kind === "group") {
+		resetName = resetGroup?.name ?? "";
+	} else if (resetPractice !== undefined) {
+		resetName = currentDefinition(resetPractice).name;
+	}
+	const closeReset = () => {
+		setResetTarget(null);
+		setResetStale(false);
+	};
+	const openReset = (target: ResetTarget) => {
+		setResetStale(false);
+		setResetTarget(target);
+	};
+	/** A refused reset shows the comparison as it now stands; it never retries on its own. */
+	const resetRefused = async (error: unknown) => {
+		if (problemStatusOf(error) !== 409 && problemStatusOf(error) !== 412) {
+			toast.error("We could not reset to the catalog. Nothing was changed. Try again.");
+			return;
+		}
+		await resetQuery.refetch();
+		setResetStale(true);
+	};
+	const confirmReset = () => {
+		if (resetTarget?.kind === "practice" && resetPracticeQuery.data) {
+			catalog.resetPractice.mutate(
+				{
+					path: { workspaceSlug, practiceSlug: resetTarget.slug },
+					headers: { "If-Match": `"${resetPracticeQuery.data.etag}"` },
+				},
+				{
+					onSuccess: closeReset,
+					onError: (error) => {
+						void resetRefused(error);
+					},
+				},
+			);
+		} else if (resetGroup) {
+			catalog.resetGroup.mutate(
+				{ path: { workspaceSlug, groupSlug: resetGroup.slug }, shown: resetGroup },
+				{
+					onSuccess: closeReset,
+					onError: (error) => {
+						void resetRefused(error);
+					},
+				},
+			);
+		}
+	};
 
 	const invalidateCatalogQueries = async () =>
 		Promise.all([
 			queryClient.invalidateQueries({
-				queryKey: listGroupsQueryKey({ path: { workspaceSlug } }),
+				queryKey: listPracticeGroupsQueryKey({ path: { workspaceSlug } }),
 			}),
 			queryClient.invalidateQueries({
 				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
@@ -281,7 +396,11 @@ function PracticeCatalogRoute() {
 			].filter(Boolean);
 			toast.success("Group updated", { description: changes.join(", ") });
 		},
-		onError: () => toast.error("We could not add the group. Nothing was changed. Try again."),
+		onError: (error) => {
+			if (problemStatusOf(error) !== 409) {
+				toast.error("We could not add the group. Nothing was changed. Try again.");
+			}
+		},
 	});
 	const adoptCatalogPractice = useMutation({
 		...adoptPracticeMutation(),
@@ -309,50 +428,57 @@ function PracticeCatalogRoute() {
 			]);
 			toast.success("Practice added", { description: preview.definition.name });
 		} catch (error) {
-			const status = problemStatusOf(error);
-			if (status === 409) {
+			if (problemStatusOf(error) !== 409) {
+				toast.error("We could not add the practice. Try again.");
+				return;
+			}
+			// The preview this add was pinned to no longer holds: read what holds now.
+			const refreshed = await query.refetch();
+			const current = practiceAdoptionAt(refreshed);
+			if (current?.availability === "ADOPTED") {
 				await invalidateCatalogQueries();
 				toast.info("This practice is already in the workspace");
 				stackControls.close(depth);
-				return;
+			} else if (current) {
+				setStaleLevelKey(detailStackKey(entry));
+			} else {
+				toast.error(
+					"The catalog changed and the preview could not reload. Reopen the practice to try again.",
+				);
 			}
-			if (status === 412) {
-				const refreshed = await query.refetch();
-				if (refreshed.isSuccess) {
-					setStaleLevelKey(detailStackKey(entry));
-				} else {
-					toast.error(
-						"The catalog changed and the preview could not reload. Reopen the practice to try again.",
-					);
-				}
-				return;
-			}
-			toast.error("We could not add the practice. Try again.");
 		}
 	};
 
 	let catalogTree: ReactNode;
-	if (groupsQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending) {
+	if (groupsQuery.isPending || practicesQuery.isPending) {
 		catalogTree = <PracticeTreeSkeleton groups={3} practicesPerGroup={3} />;
-	} else if (groupsQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError) {
+	} else if (groupsQuery.isError || practicesQuery.isError) {
 		catalogTree = (
 			<QueryErrorAlert
-				error={groupsQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
+				error={groupsQuery.error ?? practicesQuery.error}
 				title="We could not load practices"
 				onRetry={() => {
 					void groupsQuery.refetch();
 					void practicesQuery.refetch();
-					void definitionOptionsQuery.refetch();
 				}}
 			/>
 		);
 	} else {
+		const groups = groupsQuery.data;
+		const updateGroup = async (groupSlug: string, patch: Partial<UpdatePracticeGroupRequest>) => {
+			const group = groups.find(({ slug }) => slug === groupSlug);
+			return group
+				? catalog.updateGroup.mutateAsync({
+						path: { workspaceSlug, groupSlug },
+						body: groupDetails(group, patch),
+					})
+				: Promise.reject(new Error(`No group ${groupSlug}`));
+		};
 		catalogTree = (
 			<PracticeCatalog
 				workspaceSlug={workspaceSlug}
-				groups={groupsQuery.data}
+				groups={groups}
 				practices={practicesQuery.data}
-				definitionOptions={definitionOptionsQuery.data}
 				pending={{
 					groupSlugs: catalog.pendingGroupSlugs,
 					practiceSlugs: catalog.pendingPracticeSlugs,
@@ -379,13 +505,15 @@ function PracticeCatalogRoute() {
 					try {
 						await catalog.createGroup.mutateAsync({
 							path: { workspaceSlug },
-							// The picker only ever sets a value, so `null` means "not chosen" — omit it and the
-							// server keeps seeding the chip from the slug.
+							// A null icon or colour means "not chosen": the server seeds the chip from the slug.
 							body: {
 								slug: generateSlug(name),
 								name,
-								icon: icon ?? undefined,
-								color: color ?? undefined,
+								description: null,
+								icon,
+								color,
+								position: null,
+								shownToDevelopers: true,
 							},
 						});
 						return true;
@@ -393,37 +521,32 @@ function PracticeCatalogRoute() {
 						return false;
 					}
 				}}
-				onUpdateGroup={async (groupSlug, { name, icon, color }) => {
+				onUpdateGroup={async (groupSlug, details) => {
 					try {
-						await catalog.updateGroup.mutateAsync({
-							path: { workspaceSlug, groupSlug },
-							body: { name, icon: icon ?? undefined, color: color ?? undefined },
-						});
+						await updateGroup(groupSlug, details);
 						return true;
 					} catch {
 						return false;
 					}
 				}}
-				onSetGroupDashboardVisibility={(groupSlug, visibleInPracticeDashboards) =>
-					catalog.updateGroup.mutate({
-						path: { workspaceSlug, groupSlug },
-						body: { visibleInPracticeDashboards },
-					})
-				}
+				onSetGroupShownToDevelopers={(groupSlug, shownToDevelopers) => {
+					void updateGroup(groupSlug, { shownToDevelopers }).catch(() => undefined);
+				}}
 				onDeleteGroup={(groupSlug) =>
-					setDeletingGroup(groupsQuery.data.find((group) => group.slug === groupSlug) ?? null)
+					setDeletingGroup(groups.find((group) => group.slug === groupSlug) ?? null)
 				}
-				onReorderGroups={(orderedSlugs) =>
-					catalog.reorderGroups.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })
+				onResetGroup={(groupSlug) => openReset({ kind: "group", slug: groupSlug })}
+				onReorderGroups={(slugs) =>
+					catalog.reorderGroups.mutate({ path: { workspaceSlug }, body: { slugs } })
 				}
-				onSetGroupVisual={(groupSlug, patch) =>
-					catalog.updateGroup.mutate({ path: { workspaceSlug, groupSlug }, body: patch })
-				}
+				onSetGroupVisual={(groupSlug, patch) => {
+					void updateGroup(groupSlug, patch).catch(() => undefined);
+				}}
 				onDeletePractice={setDeletingPractice}
-				onPlacePractice={(practiceSlug, groupSlug, position) =>
-					catalog.placePractice.mutate({
+				onMovePractice={(practiceSlug, groupSlug, position) =>
+					catalog.movePractice.mutate({
 						path: { workspaceSlug, practiceSlug },
-						body: { groupSlug: groupSlug ?? undefined, position },
+						body: { groupSlug, position },
 					})
 				}
 			/>
@@ -494,7 +617,7 @@ function PracticeCatalogRoute() {
 								});
 							} catch (error) {
 								// Same failure as a practice's, so the same recovery: refresh in place.
-								if (problemStatusOf(error) !== 412) {
+								if (problemStatusOf(error) !== 409) {
 									return;
 								}
 								const refreshed = await query.refetch();
@@ -571,6 +694,7 @@ function PracticeCatalogRoute() {
 								path={pathAt(level.depth)}
 								state={state}
 								practiceScript={practiceScriptNeedsOf(entry.id)}
+								onResetToCatalog={() => openReset({ kind: "practice", slug: entry.id })}
 							/>
 						);
 					}
@@ -582,6 +706,48 @@ function PracticeCatalogRoute() {
 						const saved = async (work: Promise<unknown>) => {
 							await work;
 							stackControls.close(level.depth);
+						};
+						const conflict =
+							!creating && conflictSlug === entry.id && editing !== undefined ? (
+								<Alert variant="warning" role="alert">
+									<AlertTitle>Someone saved a newer version</AlertTitle>
+									<AlertDescription>
+										<p>
+											Nothing was saved. Your changes are still here, so copy what you want to keep.
+											Loading version {editing.currentVersion.number} replaces them.
+										</p>
+										<Button
+											size="sm"
+											variant="outline"
+											className="mt-2"
+											onClick={() => {
+												setConflictSlug(null);
+												setEditorGeneration((generation) => generation + 1);
+											}}
+										>
+											Load version {editing.currentVersion.number}
+										</Button>
+									</AlertDescription>
+								</Alert>
+							) : undefined;
+						const update = async (
+							practice: Practice,
+							request: UpdatePracticeRequest,
+							groupSlug: string | null,
+						) => {
+							try {
+								await editor.update(practice, request, groupSlug);
+							} catch (error) {
+								if (problemStatusOf(error) === 409) {
+									setConflictSlug(practice.slug);
+									void query?.refetch();
+								}
+								throw error;
+							}
+							// A changed script makes the needs on record stale.
+							void queryClient.invalidateQueries({
+								queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
+							});
 						};
 						return (
 							<PracticeFormLevel
@@ -600,27 +766,18 @@ function PracticeCatalogRoute() {
 									// already sent every other way of having none to the skeleton, so no practice
 									// here means this level is writing a new one.
 									<PracticeForm
+										key={`${entry.id}:${editorGeneration}`}
 										{...(editing === undefined
 											? {
 													mode: "create" as const,
-													onSubmit: async (data, groupSlug) =>
-														saved(editor.create(data, groupSlug)),
+													onSubmit: async (request) => saved(editor.create(request)),
 												}
 											: {
 													mode: "edit" as const,
 													initialData: editing,
-													onSubmit: async (slug, data, groupSlug) => {
-														await saved(editor.update(slug, data, groupSlug));
-														// A changed script makes the needs on record stale.
-														void queryClient.invalidateQueries({
-															queryKey: listPracticeScriptNeedsQueryKey({
-																path: { workspaceSlug },
-															}),
-														});
-													},
-													evidenceOutcome: evidenceOutcomesQuery.data?.find(
-														(outcome) => outcome.practiceSlug === entry.id,
-													),
+													notice: conflict,
+													onSubmit: async (request, groupSlug) =>
+														saved(update(editing, request, groupSlug)),
 												})}
 										workspaceSlug={workspaceSlug}
 										groups={editableGroups}
@@ -681,51 +838,25 @@ function PracticeCatalogRoute() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete group “{deletingGroup?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Choose whether to keep this group’s practices in the workspace or delete them with the
-							group. Deleting practices also permanently deletes their results. You cannot undo
-							this.
+							Its practices stay in the workspace, unassigned, with their results.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					<AlertDialogFooter className="sm:grid sm:grid-cols-3">
+					<AlertDialogFooter>
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
-							variant="outline"
-							disabled={catalog.deleteGroup.isPending}
-							onClick={() => {
-								if (!deletingGroup) {
-									return;
-								}
-								catalog.deleteGroup.mutate(
-									{ path: { workspaceSlug, groupSlug: deletingGroup.slug } },
-									{ onSuccess: () => setDeletingGroup(null) },
-								);
-							}}
-						>
-							{catalog.deleteGroup.isPending &&
-							catalog.deleteGroup.variables.query?.deletePractices !== true
-								? "Deleting group…"
-								: "Keep practices unassigned"}
-						</AlertDialogAction>
-						<AlertDialogAction
 							variant="destructive"
+							className="min-w-28"
 							disabled={catalog.deleteGroup.isPending}
 							onClick={() => {
-								if (!deletingGroup) {
-									return;
+								if (deletingGroup) {
+									catalog.deleteGroup.mutate(
+										{ path: { workspaceSlug, groupSlug: deletingGroup.slug } },
+										{ onSuccess: () => setDeletingGroup(null) },
+									);
 								}
-								catalog.deleteGroup.mutate(
-									{
-										path: { workspaceSlug, groupSlug: deletingGroup.slug },
-										query: { deletePractices: true },
-									},
-									{ onSuccess: () => setDeletingGroup(null) },
-								);
 							}}
 						>
-							{catalog.deleteGroup.isPending &&
-							catalog.deleteGroup.variables.query?.deletePractices === true
-								? "Deleting group and practices…"
-								: "Delete group and practices"}
+							{catalog.deleteGroup.isPending ? "Deleting…" : "Delete group"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -741,7 +872,10 @@ function PracticeCatalogRoute() {
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Delete practice “{deletingPractice?.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>
+							Delete practice “
+							{deletingPractice === null ? "" : currentDefinition(deletingPractice).name}”?
+						</AlertDialogTitle>
 						<AlertDialogDescription>
 							This permanently deletes the practice and its results. You cannot undo this.
 						</AlertDialogDescription>
@@ -768,6 +902,20 @@ function PracticeCatalogRoute() {
 					</AlertDialogFooter>
 				</AlertDialogContent>
 			</AlertDialog>
+
+			<ResetToCatalogDialog
+				open={resetTarget !== null}
+				onOpenChange={(open) => {
+					if (!open) {
+						closeReset();
+					}
+				}}
+				name={resetName}
+				state={resetState}
+				pending={catalog.resetPractice.isPending || catalog.resetGroup.isPending}
+				stale={resetStale}
+				onConfirm={confirmReset}
+			/>
 		</PageLayout>
 	);
 }

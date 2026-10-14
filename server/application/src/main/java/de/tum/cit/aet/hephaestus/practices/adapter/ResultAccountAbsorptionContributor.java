@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAbsorptionContributor;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.Objects;
 import java.util.UUID;
@@ -48,7 +49,7 @@ public class ResultAccountAbsorptionContributor implements AccountAbsorptionCont
             """)
                 .param("claimed", claimedAccountId)
                 .param("unclaimed", unclaimedAccountId)
-                .param("at", clock.instant())
+                .param("at", Timestamp.from(clock.instant()))
                 .update();
         jdbc.sql("UPDATE result SET developer_id=:claimed WHERE developer_id=:unclaimed")
                 .param("claimed", claimedAccountId)

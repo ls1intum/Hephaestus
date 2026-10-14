@@ -4,72 +4,58 @@ import { beforeEach, expect, it } from "vitest";
 
 import { getPracticeGuidanceOptions } from "@/api/@tanstack/react-query.gen";
 import type { PracticeReleaseProposal } from "@/api/types.gen";
-import { mockPractice } from "@/components/admin/practices/fixtures";
-import { mockPullRequestReviewFields, mockPullRequestPolicy } from "@/mocks/fixtures/practice";
+import { definitionOf } from "@/components/admin/practice-editor/fixtures";
+import type { Wire } from "@/lib/dates";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
 
-const base = {
-	name: "Explain the change",
-	...mockPullRequestReviewFields,
-	criteria: "Earlier criteria",
-	automatedReviewPolicy: mockPullRequestPolicy,
-	deliveryBehavior: { summaryOnly: false },
-};
+import { practiceSetupHandlers, wireGuidance, wirePractice } from "./-practice-wire";
 
-const proposal: PracticeReleaseProposal = {
-	slug: "explain-the-change",
+const base = definitionOf({ name: "Explain the change", criteria: "Earlier criteria" });
+
+const proposal: Wire<PracticeReleaseProposal> = {
+	practiceSlug: "explain-the-change",
+	currentVersionId: "801",
 	base,
 	current: { ...base, criteria: "Our criteria" },
 	offered: { ...base, criteria: "New catalog criteria" },
-	baseSource: "EXACT_ADOPTION",
-	offeredDigest: "digest",
+	offeredDigest: "sha256:offered",
 	etag: "reviewed-offer",
-	currentRevision: 1,
-	fields: [{ field: "CRITERIA", offeredChanged: true, conflict: true }],
+	fields: [{ field: "CRITERIA", changedLocally: true, offeredChanged: true, conflict: true }],
 };
+
+const accepted = wirePractice({
+	slug: proposal.practiceSlug,
+	definition: proposal.offered,
+	versionId: "802",
+	versionNumber: 2,
+});
 
 beforeEach(() => {
 	server.use(
-		http.get("*/workspaces", () =>
-			HttpResponse.json([
-				{
-					id: 1,
-					workspaceSlug: "acme",
-					displayName: "Acme",
-					providerType: "GITHUB",
-					status: "ACTIVE",
-					practicesEnabled: false,
-				},
-			]),
-		),
-		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-		),
+		...practiceSetupHandlers(),
 		http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([proposal])),
-		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
 	);
 });
 
 it("accepts a workspace update with explicit field choice and the reviewed version", async () => {
 	const queryClient = testQueryClient();
 	const guidanceOptions = {
-		...getPracticeGuidanceOptions({ path: { workspaceSlug: "acme", practiceSlug: proposal.slug } }),
+		...getPracticeGuidanceOptions({
+			path: { workspaceSlug: "acme", practiceSlug: proposal.practiceSlug },
+		}),
 		staleTime: 30_000,
 	};
-	queryClient.setQueryData(guidanceOptions.queryKey, {
-		practiceSlug: proposal.slug,
-		guide: { markdown: "Earlier guide", figures: {} },
-	});
+	queryClient.setQueryData(
+		guidanceOptions.queryKey,
+		wireGuidance(proposal.practiceSlug, "Earlier guide"),
+	);
 	let receivedTag: string | null = null;
 	let receivedBody: unknown;
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
-			HttpResponse.json({
-				practiceSlug: proposal.slug,
-				guide: { markdown: "Adopted guide", figures: {} },
-			}),
+			HttpResponse.json(wireGuidance(proposal.practiceSlug, "Adopted guide")),
 		),
 		http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", async ({ request }) => {
 			receivedTag = request.headers.get("if-match");
@@ -77,7 +63,7 @@ it("accepts a workspace update with explicit field choice and the reviewed versi
 			server.use(
 				http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
 			);
-			return HttpResponse.json({ ...mockPractice, slug: proposal.slug });
+			return HttpResponse.json(accepted);
 		}),
 	);
 	renderRouteAt("/w/acme/admin/practices/releases", queryClient);
@@ -95,7 +81,7 @@ it("accepts a workspace update with explicit field choice and the reviewed versi
 	fireEvent.click(screen.getByRole("button", { name: "Accept selected fields" }));
 
 	await waitFor(() => expect(receivedTag).toBe('"reviewed-offer"'));
-	expect(receivedBody).toStrictEqual({ choices: { CRITERIA: "OFFERED" } });
+	expect(receivedBody).toStrictEqual({ choices: [{ field: "CRITERIA", source: "OFFERED" }] });
 	await screen.findByText("No updates to review", undefined, ROUTE_RENDER_WAIT);
 	await expect(queryClient.query(guidanceOptions)).resolves.toMatchObject({
 		guide: { markdown: "Adopted guide" },
@@ -137,12 +123,11 @@ it.each(decisions)(
 				return refreshed.promise;
 			}),
 			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
-				HttpResponse.json({
-					practiceSlug: proposal.slug,
-					guide: { markdown: "Adopted guide", figures: {} },
-				}),
+				HttpResponse.json(wireGuidance(proposal.practiceSlug, "Adopted guide")),
 			),
-			http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", () => HttpResponse.json({})),
+			http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", () =>
+				HttpResponse.json(accepted),
+			),
 			http.delete(
 				"*/workspaces/:workspaceSlug/practices/releases/:slug",
 				() => new HttpResponse(null, { status: 204 }),
@@ -199,12 +184,11 @@ it.each(decisions)(
 				HttpResponse.json({ status: 503 }, { status: 503 }),
 			),
 			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/guidance", () =>
-				HttpResponse.json({
-					practiceSlug: proposal.slug,
-					guide: { markdown: "Adopted guide", figures: {} },
-				}),
+				HttpResponse.json(wireGuidance(proposal.practiceSlug, "Adopted guide")),
 			),
-			http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", () => HttpResponse.json({})),
+			http.put("*/workspaces/:workspaceSlug/practices/releases/:slug", () =>
+				HttpResponse.json(accepted),
+			),
 			http.delete(
 				"*/workspaces/:workspaceSlug/practices/releases/:slug",
 				() => new HttpResponse(null, { status: 204 }),

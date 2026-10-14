@@ -1,28 +1,19 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 
-import { NEUTRAL_GREY } from "@/components/practice-vocabulary/standing-counts";
-
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
-import { NONE_YET_PLAIN } from "./across-workspace-copy";
+import { PAGE_INTRO } from "./across-workspace-copy";
 
 const meta = {
 	component: InfoTip,
 	tags: ["autodocs"],
 	args: {
-		label: "About the bars",
-		children: (
-			<InfoLines
-				lines={[
-					{ ...NONE_YET_PLAIN, swatchClass: NEUTRAL_GREY },
-					{ term: "You:", text: "the marker shows your part." },
-				]}
-			/>
-		),
+		label: "About this page",
+		children: <InfoLines lines={PAGE_INTRO} />,
 	},
 	render: (args) => (
 		<p className="text-sm text-muted-foreground">
-			Last 30 days <InfoTip {...args} />
+			How each practice goes across this workspace. <InfoTip {...args} />
 		</p>
 	),
 } satisfies Meta<typeof InfoTip>;
@@ -33,12 +24,12 @@ type Story = StoryObj<typeof meta>;
 /** A press or a tap opens the panel, so a touch screen reads it too; Escape closes it. */
 export const OpensOnPress: Story = {
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "About the bars" }));
-		const panel = await screen.findByRole("dialog", { name: "About the bars" });
-		await expect(panel).toHaveTextContent("Grey does not mean okay.");
+		await userEvent.click(canvas.getByRole("button", { name: "About this page" }));
+		const panel = await screen.findByRole("dialog", { name: "About this page" });
+		await expect(panel).toHaveTextContent("can be wrong.");
 		// The panel names itself first, and each line leads with its term in bold.
-		await expect(panel.querySelector("p")).toHaveTextContent(/^About the bars$/u);
-		await expect(within(panel).getByText("Grey, None yet:").tagName).toBe("STRONG");
+		await expect(panel.querySelector("p")).toHaveTextContent(/^About this page$/u);
+		await expect(within(panel).getByText("Not a grade:").tagName).toBe("STRONG");
 		await userEvent.keyboard("{Escape}");
 		await waitFor(async () => {
 			await expect(screen.queryByRole("dialog")).toBeNull();
@@ -50,22 +41,22 @@ export const OpensOnPress: Story = {
 export const OpensOnKeyboardFocus: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.tab();
-		const trigger = canvas.getByRole("button", { name: "About the bars" });
-		await expect(trigger).toHaveFocus();
-		const panel = await screen.findByRole("dialog", { name: "About the bars" });
+		const button = canvas.getByRole("button", { name: "About this page" });
+		await expect(button).toHaveFocus();
+		const panel = await screen.findByRole("dialog", { name: "About this page" });
 		await waitFor(async () => {
 			await expect(panel).toBeVisible();
 		});
-		await expect(panel).toHaveTextContent("Grey does not mean okay.");
-		await expect(trigger).toHaveFocus();
+		await expect(panel).toHaveTextContent("can be wrong.");
+		await expect(button).toHaveFocus();
 	},
 };
 
 /** A pointer resting on the button opens the panel. */
 export const OpensOnHover: Story = {
 	play: async ({ canvas }) => {
-		await userEvent.hover(canvas.getByRole("button", { name: "About the bars" }));
-		const panel = await screen.findByRole("dialog", { name: "About the bars" });
+		await userEvent.hover(canvas.getByRole("button", { name: "About this page" }));
+		const panel = await screen.findByRole("dialog", { name: "About this page" });
 		await waitFor(async () => {
 			await expect(panel).toBeVisible();
 		});
@@ -75,8 +66,8 @@ export const OpensOnHover: Story = {
 /** Left open, as the panel reads in a screenshot. */
 export const Open: Story = {
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "About the bars" }));
-		const panel = await screen.findByRole("dialog", { name: "About the bars" });
+		await userEvent.click(canvas.getByRole("button", { name: "About this page" }));
+		const panel = await screen.findByRole("dialog", { name: "About this page" });
 		await waitFor(async () => {
 			await expect(panel).toBeVisible();
 		});
@@ -91,7 +82,7 @@ export const Phone: Story = {
 	globals: { viewport: { value: "phone390" } },
 	play: async (context) => {
 		await Open.play?.(context);
-		const panel = await screen.findByRole("dialog", { name: "About the bars" });
+		const panel = await screen.findByRole("dialog", { name: "About this page" });
 		await expect(panel.getBoundingClientRect().right).toBeLessThanOrEqual(390);
 	},
 };

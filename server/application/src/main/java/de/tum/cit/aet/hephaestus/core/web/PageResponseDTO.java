@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.core.web;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,6 +11,7 @@ import org.springframework.data.domain.Sort;
  * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PageResponseDTO<T>(
         List<T> content,
         long totalElements,
@@ -38,12 +40,14 @@ public record PageResponseDTO<T>(
                 PageableDTO.from(page.getPageable()));
     }
 
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record SortDTO(boolean empty, boolean sorted, boolean unsorted) {
         static SortDTO from(Sort sort) {
             return new SortDTO(sort.isEmpty(), sort.isSorted(), sort.isUnsorted());
         }
     }
 
+    @JsonInclude(JsonInclude.Include.ALWAYS)
     public record PageableDTO(int pageNumber, int pageSize, long offset, boolean paged, boolean unpaged, SortDTO sort) {
         static PageableDTO from(Pageable pageable) {
             return new PageableDTO(

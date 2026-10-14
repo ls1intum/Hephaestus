@@ -1,104 +1,172 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 
-import type { CuratedPracticeDefinition } from "@/api/types.gen";
 import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeDefinitionOptions,
-	mockPullRequestReviewFields,
-	mockPullRequestPolicy,
-} from "@/mocks/fixtures/practice";
-import { realPracticeDefinition } from "@/mocks/fixtures/practice-catalog";
+	definitionOf,
+	mockDefinitionOptions,
+	mockScan,
+} from "@/components/admin/practice-editor/fixtures";
+import {
+	realPracticeDefinition,
+	realPracticeKind,
+	realPracticeSlug,
+} from "@/mocks/fixtures/practice-catalog";
 import { bundledGuidance, bundledPractice } from "@/stories/practice-guidance-story-mock-data";
 import { expectNoOverflowingElement } from "@/stories/reflow";
 import { precedes } from "@/test/dom";
 
+import { practiceScript } from "./fixtures";
 import { PracticeDefinitionPreview } from "./PracticeDefinitionPreview";
 
-const definition: CuratedPracticeDefinition = {
+const definition = definitionOf({
 	name: "Describe what changed and why",
-	artifactKind: "scm.pull_request",
-	...mockPullRequestReviewFields,
 	criteria: "Confirm the pull request explains both the change and its motivation.",
-	deliveryBehavior: { summaryOnly: false },
-	automatedReviewPolicy: mockPullRequestPolicy,
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	practiceScript: "export default { hasDescription: pullRequest.body.length > 0 };",
-	whyItMatters: "Reviewers need intent to assess whether the change solves the right problem.",
-	whatGoodLooksLike: "A concise summary, motivation, and verification steps.",
-	groupSlug: "review-ready-work",
-};
+	script: practiceScript(),
+});
 
 const meta = {
 	component: PracticeDefinitionPreview,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
 	// A real bundled practice, not invented copy: the layout claims below are about its size.
-	args: { definition: realPracticeDefinition, options: mockPracticeDefinitionOptions },
+	args: {
+		slug: realPracticeSlug,
+		kind: realPracticeKind,
+		definition: realPracticeDefinition,
+		options: mockDefinitionOptions,
+	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeDefinitionPreview>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** Review on, About, Reviewed by, Script, Scan support and Version, in that order. */
 export const Complete: Story = {
-	args: { definition },
+	args: { kind: "scm.pull_request", definition, version: 4 },
 	play: async ({ canvas }) => {
-		await expect(canvas.queryByText("Pull request details")).not.toBeInTheDocument();
-		await expect(canvas.queryByText(/hasDescription/u)).not.toBeInTheDocument();
-		await userEvent.click(canvas.getByRole("button", { name: "Review scope and evidence" }));
-		await expect(canvas.getByText("Pull request details")).toBeVisible();
+		const settings = canvas.getByRole("region", { name: "Review settings" });
+		const row = (label: string) => within(settings).getByText(label).nextElementSibling;
+		await expect(row("Review on")).toHaveTextContent(/Opened.*Marked ready for review/u);
+		await expect(row("Review on")).toHaveTextContent(/Draft status: Ready for review/u);
+		await expect(row("About")).toHaveTextContent("Author");
+		await expect(row("Reviewed by")).toHaveTextContent("Heph");
+		await expect(row("Reads")).toHaveTextContent("Pull request details (required)");
+		await expect(row("Script")).toHaveTextContent("Practice script");
+		await expect(row("Scan support")).toHaveTextContent("Not included in scans");
+		await expect(row("Version")).toHaveTextContent("Version 4");
+		await expect(canvas.queryByText(/definePracticeScript/u)).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: "Practice script" }));
-		await expect(canvas.getByText(/hasDescription/u)).toBeVisible();
-		// The disclosures follow a review: how it decides, what it reads, what runs before it.
+		await expect(canvas.getByText(/definePracticeScript/u)).toBeVisible();
 		const decides = canvas.getByRole("button", { name: "How it decides" });
-		const scope = canvas.getByRole("button", { name: "Review scope and evidence" });
-		const script = canvas.getByRole("button", { name: "Practice script" });
-		await expect(precedes(decides, scope) && precedes(scope, script)).toBe(true);
+		await expect(precedes(settings, decides)).toBe(true);
 	},
 };
 
-export const WithoutOptionalGuidance: Story = {
-	args: {
-		definition: {
-			...definition,
-			whyItMatters: undefined,
-			whatGoodLooksLike: undefined,
-			practiceScript: undefined,
-		},
+/** No script is the built-in review, said in words. */
+export const BuiltInScript: Story = {
+	args: { kind: "scm.pull_request", definition: { ...definition, script: null } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Built-in")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Practice script" })).not.toBeInTheDocument();
 	},
 };
 
-export const ScopedReviewer: Story = {
-	args: {
-		definition: {
-			...definition,
+export const IncludedInScans: Story = {
+	args: { kind: "scm.pull_request", definition: { ...definition, scan: mockScan } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Include: **/*.ts, **/*.tsx")).toBeVisible();
+		await expect(canvas.getByText("Exclude: **/*.gen.ts")).toBeVisible();
+	},
+};
 
-			...mockPullRequestReviewFields,
-			subject: "REVIEWER",
-			precondition: {
-				skipReason: "the change has no Swift code",
-				anyOf: [{ changedPathMatches: ["**/*.swift"] }],
+/** A kind that scans cannot review says so, rather than offering a setting it cannot have. */
+export const ScansUnsupported: Story = {
+	args: { kind: "scm.issue", definition: definitionOf({ reviewOn: { events: [], state: {} } }) },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Scans do not review this kind of work")).toBeVisible();
+		await expect(canvas.getByText("Only when someone asks")).toBeVisible();
+	},
+};
+
+export const ReviewedByPeople: Story = {
+	args: {
+		kind: "scm.pull_request",
+		definition: definitionOf({
+			reviewedBy: {
+				by: "PEOPLE",
+				humanReason: { code: "DESIGN_JUDGEMENT", description: "Design choices need a person." },
+				limits: [],
 			},
-		},
+			reads: { contract: "2.0.0", sources: [] },
+		}),
 	},
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Review scope and evidence" }));
-		await expect(canvas.getByText("Reviewer")).toBeVisible();
-		await expect(canvas.getByText("Changed path matches **/*.swift")).toBeVisible();
+		await expect(canvas.getByText("People")).toBeVisible();
+		await expect(canvas.getByText("Design choices need a person.")).toBeVisible();
+	},
+};
+
+export const ReviewedByNobody: Story = {
+	args: {
+		kind: "scm.pull_request",
+		definition: definitionOf({
+			reviewedBy: { by: "NOBODY", humanReason: null, limits: [] },
+			reads: { contract: "2.0.0", sources: [] },
+		}),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Nobody")).toBeVisible();
+		await expect(
+			canvas.getByText("This practice offers guidance without automated review."),
+		).toBeVisible();
+	},
+};
+
+/** About a merger and only for Swift changes: both settings read in words. */
+export const ScopedMerger: Story = {
+	args: {
+		kind: "scm.pull_request",
+		definition: definitionOf({
+			about: "MERGER",
+			appliesWhen: {
+				otherwise: "The change has no Swift code.",
+				anyOf: [{ changedPath: ["**/*.swift"] }],
+			},
+		}),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Whoever merged it")).toBeVisible();
+		await expect(canvas.getByText("Changes a path matching **/*.swift")).toBeVisible();
+		await expect(canvas.getByText("Otherwise: The change has no Swift code.")).toBeVisible();
+	},
+};
+
+/** A practice about the work itself has no role, and says so. */
+export const AboutTheWork: Story = {
+	args: { kind: "scm.pull_request", definition: definitionOf({ about: null }) },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("The work")).toBeVisible();
 	},
 };
 
 export const LongContentInDarkMode: Story = {
 	args: {
+		kind: "scm.pull_request",
 		definition: {
 			...definition,
 			criteria:
 				"Confirm that the pull request explains the behavior change, the operational constraints that shaped it, the alternatives considered, and the evidence used to verify the result. Stay silent when the change is generated automatically and no meaningful author decision exists.",
-			whatGoodLooksLike:
-				"The description connects the implementation to the user-visible outcome, names the rejected alternatives without reproducing the entire design discussion, and gives reviewers concrete verification steps.",
+			guidance: {
+				...definition.guidance,
+				whatGoodLooksLike:
+					"The description connects the implementation to the user-visible outcome, names the rejected alternatives without reproducing the entire design discussion, and gives reviewers concrete verification steps.",
+			},
 		},
 	},
 	globals: { theme: "dark" },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(/connects the implementation/u)).toBeVisible();
+	},
 };
 
 /**
@@ -107,13 +175,15 @@ export const LongContentInDarkMode: Story = {
  */
 export const CriteriaIsMarkdown: Story = {
 	args: {
+		kind: "scm.pull_request",
 		definition: {
 			...definition,
+			script: null,
 			criteria: [
 				"## The standard",
 				"Judge whether the change is packaged at a size a reviewer can read *end to end*.",
 				"",
-				"## Signals",
+				"## What to look for",
 				"- One self-contained concern",
 				"- A `diff` a reviewer can hold in their head",
 			].join("\n"),
@@ -123,8 +193,6 @@ export const CriteriaIsMarkdown: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "How it decides" }));
 		const standard = await canvas.findByRole("heading", { name: "The standard", level: 4 });
 		await expect(standard).toBeVisible();
-		await expect(canvas.getByRole("list")).toBeVisible();
-		await expect(canvas.getAllByRole("listitem")).toHaveLength(2);
 		await expect(canvas.getByText("end to end").tagName).toBe("EM");
 		await expect(canvas.queryByText(/^## /u)).not.toBeInTheDocument();
 	},
@@ -133,13 +201,12 @@ export const CriteriaIsMarkdown: Story = {
 /**
  * The decision being made is "do we want this practice", so the rationale leads. `criteria` answers a
  * different question — how the model judges — in text addressed to the model, so it sits behind a
- * disclosure with the practice script rather than above the reason to adopt.
+ * disclosure rather than above the reason to adopt.
  */
 export const RationaleLeadsTheRuleFollows: Story = {
 	play: async ({ canvas }) => {
-		const rationale = canvas.getByText(realPracticeDefinition.whyItMatters);
+		const rationale = canvas.getByText(realPracticeDefinition.guidance.whyItMatters);
 		await expect(rationale).toBeVisible();
-		// Collapsed, so none of the rule is in the accessible tree until it is asked for.
 		await expect(
 			canvas.queryByRole("heading", { name: "The standard", level: 4 }),
 		).not.toBeInTheDocument();
@@ -148,24 +215,27 @@ export const RationaleLeadsTheRuleFollows: Story = {
 	},
 };
 
-/** A practice may carry only one of the two guidance fields; nothing above may collapse without it. */
+/** A practice may carry only one of the guidance fields; nothing above may collapse without it. */
 export const RationaleOnly: Story = {
-	args: { definition: { ...realPracticeDefinition, whatGoodLooksLike: undefined } },
+	args: {
+		definition: {
+			...realPracticeDefinition,
+			guidance: { ...realPracticeDefinition.guidance, whatGoodLooksLike: null },
+		},
+	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(realPracticeDefinition.whyItMatters)).toBeVisible();
+		await expect(canvas.getByText(realPracticeDefinition.guidance.whyItMatters)).toBeVisible();
 		await expect(
 			canvas.queryByRole("heading", { name: "What good looks like" }),
 		).not.toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "How it decides" })).toBeVisible();
 	},
 };
 
-/** An artifact kind the options do not describe: the evidence summary must still render. */
-export const UnknownWorkType: Story = {
-	args: { options: { ...mockPracticeDefinitionOptions, workTypes: [] } },
+/** A kind the options do not describe still renders its settings, with the raw names. */
+export const UnknownItemKind: Story = {
+	args: { options: { ...mockDefinitionOptions, itemTypes: [] } },
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Review scope and evidence" }));
-		await expect(await canvas.findByRole("button", { name: "How it decides" })).toBeVisible();
+		await expect(canvas.getByText("docs.document.core (required in full)")).toBeVisible();
 	},
 };
 
@@ -183,11 +253,15 @@ export const NarrowViewport: Story = {
  */
 export const WithVisualAndGuide: Story = {
 	args: {
+		kind: "scm.pull_request",
 		definition: {
 			...definition,
-			...bundledPractice,
-			visual: bundledGuidance.visual,
-			guide: bundledGuidance.guide,
+			guidance: {
+				...definition.guidance,
+				...bundledPractice,
+				visual: bundledGuidance.visual,
+				guide: bundledGuidance.guide,
+			},
 		},
 	},
 	play: async ({ canvas }) => {
@@ -199,13 +273,9 @@ export const WithVisualAndGuide: Story = {
 		await expect(
 			within(guide).getByRole("heading", { level: 4, name: "How to do it" }),
 		).toBeVisible();
-		await expect(
-			within(guide).getByRole("img", { name: /^Three changes follow in order/u }),
-		).toBeVisible();
-		// The guide comes before the review details, which stay behind their disclosures.
-		await expect(
-			precedes(guide, canvas.getByRole("button", { name: "Review scope and evidence" })),
-		).toBe(true);
-		await expect(canvas.queryByRole("button", { name: "Read more" })).not.toBeInTheDocument();
+		// The guide comes before the review settings.
+		await expect(precedes(guide, canvas.getByRole("region", { name: "Review settings" }))).toBe(
+			true,
+		);
 	},
 };

@@ -3,18 +3,15 @@ import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
-import {
-	mockConversationWorkType,
-	mockPracticeDefinitionOptions,
-	mockPullRequestWorkType,
-} from "@/mocks/fixtures/practice";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { withPageBehind } from "@/stories/decorators";
 import { settledDrawerPanel } from "@/stories/overlay";
-import { bundledGuidance, bundledPractice } from "@/stories/practice-guidance-story-mock-data";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
-import { mockGroups, mockPracticeWithAllTriggers } from "./fixtures";
+import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+
+import { mockGroups, mockScriptedPractice } from "./fixtures";
 import { GUARDED_LEVEL_KINDS, practiceFormLevel } from "./practice-search";
 import { PracticeForm } from "./PracticeForm";
 import { PracticeFormLevel } from "./PracticeFormLevel";
@@ -25,7 +22,8 @@ const editSubmit = fn();
 /**
  * The editor is a level of the practice-setup drawer stack, so the tree a practice belongs to stays
  * on screen while it is written — and so these stories exercise the surface people actually get.
- * The level is guarded: only Cancel and Save leave it.
+ * The fields are the shared editor's, whose own stories cover them; these cover what the workspace
+ * wraps around it and what it sends.
  */
 const meta = {
 	component: PracticeForm,
@@ -39,7 +37,7 @@ const meta = {
 		mode: "create",
 		workspaceSlug: "demo",
 		groups: mockGroups,
-		definitionOptions: mockPracticeDefinitionOptions,
+		definitionOptions: mockDefinitionOptions,
 		onSubmit: createSubmit,
 		isPending: false,
 		cancel: <LevelCancel />,
@@ -85,13 +83,7 @@ export const Create: Story = {
 		// The level is the full viewport at 320px, so the longest form in the app has to fit it by
 		// scrolling down and never across.
 		await expectNoPanelOverflow(await settledDrawerPanel());
-		// No script yet, so its section waits closed, with its subtitle saying it is optional.
-		const script = screen.getByRole("button", { name: /^Script/u });
-		await expect(script).toHaveAttribute("aria-expanded", "false");
-		await userEvent.click(script);
-		await expect(
-			screen.getByText(/^TypeScript that reviews this practice and returns its result\./u),
-		).toBeVisible();
+		await expect(screen.queryByText("What the reviews recorded")).not.toBeInTheDocument();
 	},
 };
 
@@ -110,84 +102,38 @@ export const EscapeLeavesACleanEditor: Story = {
 	},
 };
 
-/**
- * A practice with a script opens with the script showing. The script has a section of its own after
- * when the practice is reviewed, because it runs before each of those reviews; the technical
- * settings stay closed.
- */
-export const EditWithPracticeScript: Story = {
-	args: { mode: "edit", initialData: mockPracticeWithAllTriggers, onSubmit: fn() },
+/** An edit says what the save creates, and leads to the results that stay with the practice. */
+export const Edit: Story = {
+	args: { mode: "edit", initialData: mockScriptedPractice, onSubmit: editSubmit },
 	play: async () => {
 		await settledDrawerPanel();
-		const script = screen.getByRole("button", { name: /^Script/u });
-		await expect(script).toHaveAttribute("aria-expanded", "true");
-		// The snapshot shows the section this story is about, not the top of the form.
-		script.scrollIntoView({ block: "start" });
-		await expect(screen.getByRole("button", { name: /^Technical settings/u })).toHaveAttribute(
-			"aria-expanded",
-			"false",
-		);
+		await expect(screen.getByText(/the change becomes version 2/u)).toBeVisible();
 		await expect(
-			screen.getByText("Optional. The program that reviews this practice."),
-		).toBeVisible();
-		await expect(screen.getByText("Identifier and feedback delivery")).toBeVisible();
-		await expect(screen.getByRole("link", { name: /^Write a practice script/u })).toHaveAttribute(
-			"href",
-			"https://docs.hephaestus.build/admin/practice-scripts",
-		);
+			screen.getByRole("link", { name: "See review outcomes" }).getAttribute("href"),
+		).toMatch(/^\/w\/demo\/admin\/practices\/reviews\/results\?.*commit-discipline/u);
 		await expect(screen.getByRole("link", { name: "AI models" })).toHaveAttribute(
 			"href",
 			"/w/demo/admin/models",
 		);
-		// The script is written the way the guide teaches it.
-		const [contract] = await screen.findAllByText(/definePracticeScript\(/u);
-		await expect(contract).toBeVisible();
 	},
 };
 
-/**
- * Only a practice that Hephaestus reviews runs a script, so *Guidance only* hides the section. The
- * script stays in the draft and a note says so: choosing review again brings it back, and only a save
- * under a choice without review removes it.
- */
-export const ScriptKeptAcrossSupportChoices: Story = {
-	args: { mode: "edit", initialData: mockPracticeWithAllTriggers, onSubmit: fn() },
-	play: async () => {
-		await settledDrawerPanel();
-		await userEvent.click(screen.getByRole("radio", { name: /^Guidance only/u }));
-		await expect(screen.queryByRole("button", { name: /^Script/u })).toBeNull();
-		const note = screen.getByText(
-			"A practice script needs a practice that Hephaestus can review. Your script stays in this draft, and saving with this choice removes it.",
-		);
-		await expect(note).toBeVisible();
-
-		await userEvent.click(screen.getByRole("radio", { name: /^AI-supported mentoring/u }));
-		await expect(note).not.toBeInTheDocument();
-		const [contract] = await screen.findAllByText(/definePracticeScript\(/u);
-		await expect(contract).toBeVisible();
-
-		// The snapshot shows the note under the choice it explains.
-		await userEvent.click(screen.getByRole("radio", { name: /^Guidance only/u }));
-		screen.getByText(/^A practice script needs a practice/u).scrollIntoView({ block: "center" });
-	},
-};
-
-/** A copy whose catalog entry withdrew automated review keeps its authored settings but never runs. */
-export const EditWithdrawnByTheCatalog: Story = {
+/** A save refused because someone saved first: the host's notice sits above the kept draft. */
+export const EditConflict: Story = {
 	args: {
 		mode: "edit",
-		initialData: {
-			...mockPracticeWithAllTriggers,
-			automatedReviewWithdrawal: {
-				code: "AT_CLOSE_STATE_NOT_CAPTURED",
-				description: "Nothing Hephaestus collects shows the issue as it was at its close.",
-			},
-		},
-		onSubmit: fn(),
+		initialData: mockScriptedPractice,
+		onSubmit: editSubmit,
+		notice: (
+			<Alert variant="warning" role="alert">
+				<AlertTitle>Someone saved a newer version</AlertTitle>
+				<AlertDescription>Your changes are still here. Nothing was saved.</AlertDescription>
+			</Alert>
+		),
 	},
 	play: async () => {
 		await settledDrawerPanel();
-		await expect(screen.getByText("Hephaestus no longer reviews this practice")).toBeVisible();
+		await expect(screen.getByRole("alert")).toHaveTextContent(/Nothing was saved/u);
 	},
 };
 
@@ -199,150 +145,27 @@ export const Submitting: Story = {
 	},
 };
 
-export const EditClearsOptionalGuidance: Story = {
-	args: {
-		mode: "edit",
-		initialData: {
-			...mockPracticeWithAllTriggers,
-			whyItMatters: "Small commits make review safer.",
-			whatGoodLooksLike: "Each commit explains one coherent change.",
-		},
-		onSubmit: editSubmit,
-	},
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async () => {
-		await settledDrawerPanel();
-		editSubmit.mockClear();
-		await userEvent.clear(screen.getByRole("textbox", { name: "Why it matters" }));
-		await userEvent.clear(screen.getByRole("textbox", { name: "What good looks like" }));
-		await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
-
-		await expect(editSubmit).toHaveBeenCalledWith(
-			"commit-discipline",
-			expect.objectContaining({
-				clear: ["PRECONDITION", "WHY_IT_MATTERS", "WHAT_GOOD_LOOKS_LIKE", "VISUAL", "GUIDE"],
-			}),
-			null,
-		);
-	},
-};
-
-/** The bundled visual and guide in the editor, the visual previewed in both themes. */
-export const EditWithVisualAndGuide: Story = {
-	args: {
-		mode: "edit",
-		initialData: {
-			...mockPracticeWithAllTriggers,
-			whyItMatters: bundledPractice.whyItMatters,
-			whatGoodLooksLike: bundledPractice.whatGoodLooksLike,
-			visual: bundledGuidance.visual,
-			guide: bundledGuidance.guide,
-		},
-		onSubmit: editSubmit,
-	},
-};
-
-/** Pasted markup needs a description before it can be saved, and the summary leads to it. */
-export const VisualNeedsDescription: Story = {
+/** A new practice sends its kind and its definition, with no position: the server appends it. */
+export const CreateSends: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async () => {
 		await settledDrawerPanel();
 		createSubmit.mockClear();
-		await userEvent.type(screen.getByRole("textbox", { name: /Name/u }), "Scope one change");
-		await userEvent.type(
-			screen.getByRole("textbox", { name: /What to look for/u }),
-			"Check that the change does one thing.",
-		);
-		await userEvent.click(screen.getByRole("textbox", { name: "SVG markup" }));
-		await userEvent.paste(bundledGuidance.visual.svg);
-		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
-
-		await expect(createSubmit).not.toHaveBeenCalled();
-		await waitFor(async () => {
-			await expect(screen.getByRole("textbox", { name: "Description *" })).toHaveFocus();
-		});
-		await expect(
-			screen.getByRole("textbox", { name: "Description *" }),
-		).toHaveAccessibleDescription(/Describe what the visual shows\./u);
-	},
-};
-
-export const ValidationErrors: Story = {
-	parameters: { chromatic: { viewports: [320, 1440] } },
-	play: async () => {
-		await settledDrawerPanel();
-		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
-		await expect(screen.getByRole("textbox", { name: /Name/u })).toHaveAccessibleDescription(
-			"Enter a name of at least 3 characters.",
-		);
-		await expect(screen.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
-		await expect(screen.getByRole("textbox", { name: /Name/u })).toHaveAttribute(
-			"aria-invalid",
-			"true",
-		);
-	},
-};
-
-export const ValidationAndSubmit: Story = {
-	...ValidationErrors,
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async (context) => {
-		createSubmit.mockClear();
-		await ValidationErrors.play?.(context);
-
 		await userEvent.type(screen.getByRole("textbox", { name: /Name/u }), "Clear review context");
 		await userEvent.type(
 			screen.getByRole("textbox", { name: /What to look for/u }),
 			"Check whether the reviewed work explains its purpose.",
 		);
 		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
-		await expect(createSubmit).toHaveBeenCalledWith(
-			expect.objectContaining({
+		await expect(createSubmit).toHaveBeenCalledOnce();
+		await expect(createSubmit.mock.lastCall?.[0]).toMatchObject({
+			slug: "clear-review-context",
+			kind: "scm.pull_request",
+			position: null,
+			definition: {
 				name: "Clear review context",
-				slug: "clear-review-context",
 				criteria: "Check whether the reviewed work explains its purpose.",
-
-				signals: [
-					"scm.pull_request.opened",
-					"scm.pull_request.ready",
-					"scm.pull_request.synchronized",
-				],
-				evidenceRequirements: mockPullRequestWorkType.recommendedEvidenceRequirements,
-
-				automatedReviewPolicy: mockPullRequestWorkType.recommendedPolicy,
-			}),
-			null,
-		);
-	},
-};
-
-export const ConversationPractice: Story = {
-	parameters: { chromatic: { disableSnapshot: true } },
-	play: async () => {
-		await settledDrawerPanel();
-		createSubmit.mockClear();
-		await userEvent.type(screen.getByRole("textbox", { name: /Name/u }), "Helpful discussion");
-		await userEvent.click(screen.getByRole("radio", { name: /Conversation/u }));
-		// A conversation is settled or it is not, so its one occasion is chosen for the author rather
-		// than left as an empty list that cannot be saved.
-		await expect(screen.getByRole("checkbox", { name: "Discussion settled" })).toBeChecked();
-		await userEvent.type(
-			screen.getByRole("textbox", { name: /What to look for/u }),
-			"Check whether the conversation stays constructive.",
-		);
-		await userEvent.click(screen.getByRole("button", { name: "Create practice" }));
-		await expect(createSubmit).toHaveBeenCalledWith(
-			expect.objectContaining({
-				name: "Helpful discussion",
-				slug: "helpful-discussion",
-				criteria: "Check whether the conversation stays constructive.",
-
-				signals: ["chat.conversation_thread.settled"],
-				evidenceRequirements: mockConversationWorkType.recommendedEvidenceRequirements,
-
-				automatedReviewPolicy: mockConversationWorkType.recommendedPolicy,
-			}),
-			null,
-		);
+			},
+		});
 	},
 };

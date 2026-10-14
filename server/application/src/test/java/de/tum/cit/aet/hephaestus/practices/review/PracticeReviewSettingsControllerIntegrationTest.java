@@ -76,7 +76,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends BaseIntegrationTes
                 .bodyValue(Map.of("cooldownMinutes", 30))
                 .exchange()
                 .expectStatus()
-                .isEqualTo(412);
+                .isEqualTo(409);
     }
 
     @Test

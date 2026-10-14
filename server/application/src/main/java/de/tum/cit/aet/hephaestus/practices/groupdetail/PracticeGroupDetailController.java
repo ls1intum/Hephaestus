@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.groupdetail;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -9,7 +10,6 @@ import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.web.PagedModel;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,13 +26,13 @@ public class PracticeGroupDetailController {
 
     @GetMapping
     @Operation(operationId = "listOwnGroupReviews", summary = "List your reviews in a practice group")
-    public PagedModel<ProfileReviewDTO> list(
+    public PageResponseDTO<ProfileReviewDTO> list(
             WorkspaceContext ws,
             @PathVariable String groupSlug,
             @RequestParam(required = false) @Nullable String itemKind,
             @RequestParam(required = false) @Nullable Instant since,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return new PagedModel<>(reviews.list(ws, groupSlug, itemKind, since, PageRequest.of(page, size)));
+        return PageResponseDTO.from(reviews.list(ws, groupSlug, itemKind, since, PageRequest.of(page, size)));
     }
 }

@@ -26,6 +26,13 @@ const suspended: AdminAccountView = {
 	appRole: "USER",
 	status: "SUSPENDED",
 };
+/** Roster sync created this account; the person has not signed in, so it has no email yet. */
+const unclaimed: AdminAccountView = {
+	id: 4,
+	displayName: "Dana Unclaimed",
+	appRole: "USER",
+	status: "UNCLAIMED",
+};
 
 /**
  * Super-admin users table (presentation-only). Rendered against fixtures so every state — loading,
@@ -36,11 +43,11 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		users: [admin, user, suspended],
+		users: [admin, user, suspended, unclaimed],
 		isLoading: false,
 		isError: false,
 		hasSearch: false,
-		totalLoaded: 3,
+		totalLoaded: 4,
 		currentUserId: 1,
 		hasNextPage: false,
 		isFetchingNextPage: false,
@@ -58,10 +65,11 @@ export const Default: Story = {
 		await canvas.findByText("Ada Admin");
 		// Roles and statuses in words, never the constants the wire carries.
 		canvas.getByText("Instance admin");
-		await expect(canvas.getAllByText("User")).toHaveLength(2);
+		await expect(canvas.getAllByText("User")).toHaveLength(3);
 		canvas.getByText("Suspended");
+		canvas.getByText("Unclaimed");
 		await expect(
-			canvas.queryByText(/^(?:APP_ADMIN|USER|ACTIVE|SUSPENDED)$/u),
+			canvas.queryByText(/^(?:APP_ADMIN|USER|ACTIVE|SUSPENDED|UNCLAIMED)$/u),
 		).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: "Actions for Ada Admin" }));
 		// A disabled Base UI item has pointer-events:none, so the guard is asserted rather than clicked.

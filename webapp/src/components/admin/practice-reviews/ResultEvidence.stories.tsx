@@ -28,7 +28,7 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 	},
 	"scm.repository.tree": {
 		path: "webapp/src/lib/artifact-kinds.ts",
-		quote: 'export const ARTIFACT_KIND = {\n\tpullRequest: "scm.pull_request",\n};',
+		quote: 'export const ITEM_KIND = {\n\tpullRequest: "scm.pull_request",\n};',
 	},
 	"scm.issue.core": {
 		path: "Issue #1430",

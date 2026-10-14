@@ -1,6 +1,6 @@
 import { UsersIcon } from "lucide-react";
 
-import type { UserViewUser } from "@/api/types.gen";
+import type { UserViewAccount } from "@/api/types.gen";
 import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -21,31 +21,27 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { hasText } from "@/lib/text";
 
-export type UserViewUsersState = PanelState<{ users: UserViewUser[]; totalPages: number }>;
+import { ACCOUNT_STATUS_LABELS, accountName } from "./account-labels";
+
+export type UserViewUsersState = PanelState<{ users: UserViewAccount[]; totalPages: number }>;
 
 export interface UserViewUsersTableProps {
 	state: UserViewUsersState;
 	page: number;
 	onPageChange: (page: number) => void;
-	onView: (user: UserViewUser) => void;
+	onView: (user: UserViewAccount) => void;
 }
 
 const SKELETON_COLUMNS = ["w-40", "w-28", null];
-
-function accountLabel(user: UserViewUser): string {
-	if (user.accountId == null) {
-		return "No account yet";
-	}
-	return user.accountStatus === "ACTIVE" ? "Active account" : "Account not active";
-}
 
 function UsersTableHeader() {
 	return (
 		<TableHeader>
 			<TableRow>
 				<TableHead scope="col">User</TableHead>
-				<TableHead scope="col">Hephaestus account</TableHead>
+				<TableHead scope="col">Account</TableHead>
 				<TableHead scope="col" className="text-right">
 					<span className="sr-only">User view</span>
 				</TableHead>
@@ -90,25 +86,30 @@ export function UserViewUsersTable({ state, page, onPageChange, onView }: UserVi
 			<Table>
 				<UsersTableHeader />
 				<TableBody>
-					{state.users.map((user) => (
-						<TableRow key={user.userId}>
-							<TableCell>
-								<span className="block font-medium">{user.name ?? user.login}</span>
-								<span className="block text-muted-foreground">{user.login}</span>
-							</TableCell>
-							<TableCell>{accountLabel(user)}</TableCell>
-							<TableCell className="text-right">
-								<Button
-									variant="outline"
-									size="sm"
-									aria-label={`View as user: ${user.login}`}
-									onClick={() => onView(user)}
-								>
-									View as user
-								</Button>
-							</TableCell>
-						</TableRow>
-					))}
+					{state.users.map((user) => {
+						const name = accountName(user.account);
+						return (
+							<TableRow key={user.accountId}>
+								<TableCell>
+									<span className="block font-medium">{name}</span>
+									{hasText(user.providerLogin) && user.providerLogin !== name && (
+										<span className="block text-muted-foreground">{user.providerLogin}</span>
+									)}
+								</TableCell>
+								<TableCell>{ACCOUNT_STATUS_LABELS[user.account.status]}</TableCell>
+								<TableCell className="text-right">
+									<Button
+										variant="outline"
+										size="sm"
+										aria-label={`View as user: ${name}`}
+										onClick={() => onView(user)}
+									>
+										View as user
+									</Button>
+								</TableCell>
+							</TableRow>
+						);
+					})}
 				</TableBody>
 			</Table>
 			<TablePagination

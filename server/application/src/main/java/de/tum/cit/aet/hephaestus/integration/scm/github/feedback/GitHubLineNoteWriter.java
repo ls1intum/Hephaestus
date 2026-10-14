@@ -523,7 +523,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
             return; // human thread or a bot note that carries no delivery key
         }
         LineNote item = expected.get(key);
-        boolean verified = item != null && sameCopy(firstComment, body, item, readback, commitOid);
+        boolean verified = item != null && sameCopy(thread, firstComment, body, item, readback, commitOid);
         String url = firstComment.get("url") instanceof String commentUrl ? commentUrl : null;
         Copy previous = copies.get(key);
         if (verified && (previous == null || !previous.verified())) {
@@ -538,7 +538,12 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
      * lines and commit.
      */
     private static boolean sameCopy(
-            Map<?, ?> comment, String body, LineNote item, CopyReadback readback, @Nullable String commitOid) {
+            Map<?, ?> thread,
+            Map<?, ?> comment,
+            String body,
+            LineNote item,
+            CopyReadback readback,
+            @Nullable String commitOid) {
         FeedbackAnchor diff = item.anchor();
         if (diff.endLine() == null || diff.side() == null) return false;
         Integer startLine = diff.startLine();
@@ -546,8 +551,8 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         String expectedSide = diff.side() == CitationSide.OLD ? "LEFT" : "RIGHT";
         return Boolean.TRUE.equals(comment.get("viewerDidAuthor"))
                 && body.equals(postedBody(item, readback))
-                && expectedSide.equals(comment.get("diffSide"))
-                && (expectedStart == null || expectedSide.equals(comment.get("startDiffSide")))
+                && expectedSide.equals(thread.get("diffSide"))
+                && (expectedStart == null || expectedSide.equals(thread.get("startDiffSide")))
                 && diff.path().equals(comment.get("path"))
                 && comment.get("originalLine") instanceof Number line
                 && line.intValue() == diff.endLine()

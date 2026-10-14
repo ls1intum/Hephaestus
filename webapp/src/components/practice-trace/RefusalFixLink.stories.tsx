@@ -1,11 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { RefusalFixLink, type RefusalFixLinkProps } from "./RefusalFixLink";
-import { REFUSAL_FIXES, type SignalStateReason } from "./trace-format";
+import { REFUSAL_FIXES, type RefusalReason } from "./trace-format";
 
 /** Keyed on the wire union, so a reason the server adds is a compile error here until it is listed. */
 const REASON_KEYS = {
-	GATE_SKIPPED: true,
+	GATE_WITHHELD: true,
 	COOLDOWN_ACTIVE: true,
 	REQUEST_COOLDOWN_ACTIVE: true,
 	REQUESTER_QUOTA_EXHAUSTED: true,
@@ -19,32 +19,30 @@ const REASON_KEYS = {
 	PRACTICES_DISABLED: true,
 	NO_ACTIVE_PRACTICE: true,
 	REVIEW_MODEL_UNBOUND: true,
-	PRACTICE_AUTONOMY_OFF: true,
-	BUDGET_EXHAUSTED: true,
-	SUBJECT_UNLINKED: true,
-	MERGE_ACTOR_UNAVAILABLE: true,
 	MEMBER_AI_DECLINED: true,
 	PERSON_DATA_ERASED: true,
+	FEEDBACK_MODE_OFF: true,
+	SUBJECT_UNLINKED: true,
+	MERGE_ACTOR_UNAVAILABLE: true,
 	MODEL_UNAVAILABLE: true,
-	ARTIFACT_NOT_VISIBLE: true,
+	BUDGET_EXHAUSTED: true,
+	ITEM_NOT_VISIBLE: true,
 	PENDING_DEADLINE_EXCEEDED: true,
-	ARTIFACT_GONE: true,
-} satisfies Record<SignalStateReason, true>;
+	ITEM_GONE: true,
+} satisfies Record<RefusalReason, true>;
 
-const REASONS = Object.keys(REASON_KEYS).filter(
-	(key): key is SignalStateReason => key in REASON_KEYS,
-);
+const REASONS = Object.keys(REASON_KEYS).filter((key): key is RefusalReason => key in REASON_KEYS);
 
 /**
  * Written out rather than derived from `REFUSAL_FIXES`: branching on `section` the way the component
  * does would make a wrong component and a wrong test agree. `how-much` is the Review page's default
  * section, so it carries no search param.
  */
-const EXPECTED_HREFS: readonly (readonly [SignalStateReason, string])[] = [
-	["GATE_SKIPPED", "/w/demo/admin/practices/review?section=when-and-where"],
-	["OUT_OF_REVIEW_SCOPE", "/w/demo/admin/practices/review?section=when-and-where"],
-	["PRACTICES_DISABLED", "/w/demo/admin/practices/review?section=when-and-where"],
-	["PRACTICE_AUTONOMY_OFF", "/w/demo/admin/practices/review"],
+const EXPECTED_HREFS: readonly (readonly [RefusalReason, string])[] = [
+	["GATE_WITHHELD", "/w/demo/admin/practices/review?section=automated-review"],
+	["OUT_OF_REVIEW_SCOPE", "/w/demo/admin/practices/review?section=automated-review"],
+	["PRACTICES_DISABLED", "/w/demo/admin/practices/review?section=automated-review"],
+	["FEEDBACK_MODE_OFF", "/w/demo/admin/practices/review"],
 	["NO_ACTIVE_PRACTICE", "/w/demo/admin/practices"],
 	["REVIEW_MODEL_UNBOUND", "/w/demo/admin/models"],
 	["MODEL_UNAVAILABLE", "/w/demo/admin/models"],
@@ -74,7 +72,7 @@ const meta = {
 	component: RefusalFixLink,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
 	tags: ["autodocs"],
-	args: { workspaceSlug: "demo", reason: "REVIEW_MODEL_UNBOUND", canAdminister: true },
+	args: { workspaceSlug: "demo", reason: "REVIEW_MODEL_UNBOUND" },
 } satisfies Meta<typeof RefusalFixLink>;
 
 export default meta;
@@ -91,12 +89,11 @@ export const Default: Story = {
 
 /** The second shape a fix has: one route plus a search param rather than a route of its own. */
 export const ASectionOfTheReviewPage: Story = {
-	args: { reason: "GATE_SKIPPED" },
+	args: { reason: "GATE_WITHHELD" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("link", { name: "Open Review: When and where" })).toHaveAttribute(
-			"href",
-			"/w/demo/admin/practices/review?section=when-and-where",
-		);
+		await expect(
+			canvas.getByRole("link", { name: "Open Review: Automated review" }),
+		).toHaveAttribute("href", "/w/demo/admin/practices/review?section=automated-review");
 	},
 };
 
@@ -137,14 +134,5 @@ export const WhereEachFixLives: Story = {
 			const row = canvas.getByRole("listitem", { name: reason });
 			await expect(within(row).getByRole("link")).toHaveAttribute("href", href);
 		}
-	},
-};
-
-export const AMemberSeesNoLinks: Story = {
-	args: { canAdminister: false },
-	render: (args) => <RefusalCatalogue {...args} />,
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("listitem", { name: "REVIEW_MODEL_UNBOUND" })).toBeVisible();
-		await expect(canvas.queryAllByRole("link")).toHaveLength(0);
 	},
 };

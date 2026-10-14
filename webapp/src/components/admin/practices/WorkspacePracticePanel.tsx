@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
-import { ClipboardCheck, Pencil } from "lucide-react";
+import { ClipboardCheck, Pencil, RotateCcw } from "lucide-react";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
 import { cn } from "cn";
 import type {
@@ -10,6 +11,7 @@ import type {
 	PracticeScriptNeed,
 } from "@/api/types.gen";
 import { reviewLevel } from "@/components/admin/practice-reviews/review-levels";
+import { canResetToCatalog } from "@/components/admin/practices/CatalogOriginBadge";
 import {
 	PRACTICE_SETUP_LEVEL_LABELS,
 	practiceFormLevel,
@@ -26,6 +28,7 @@ import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
 import { PracticeScriptModelLink } from "@/components/practice-trace/PracticeScriptModelLink";
 import {
 	AGENT_PURPOSE_DEFS,
+	type AgentPurpose,
 	assignModelLabel,
 	isPracticeScriptPurpose,
 } from "@/components/practice-vocabulary/agent-purpose-defs";
@@ -40,7 +43,7 @@ import { PURPOSE_STATUS_DEFS } from "@/components/practice-vocabulary/purpose-st
 import { UnmetTiers } from "@/components/practice-vocabulary/UnmetTiers";
 import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
 import {
 	Item,
@@ -52,7 +55,7 @@ import {
 } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatShortDay } from "@/lib/dates";
-import { capitalise, hasText } from "@/lib/text";
+import { capitalise } from "@/lib/text";
 
 export type WorkspacePracticeState = PanelState<{
 	practice: Practice;
@@ -75,15 +78,25 @@ export interface WorkspacePracticePanelProps {
 	nested?: boolean;
 	/** Where the level sits, from the drawer. */
 	path: LevelPath;
+	/** Opens the reset's comparison. Offered only while the catalog has a different version. */
+	onResetToCatalog: () => void;
 }
+
+/** The model a script's slot calls: its chat slot is the review model. */
+const SLOT_PURPOSE = {
+	chat: "PRACTICE_REVIEW",
+	decision: "PRACTICE_DECISION",
+	embedding: "PRACTICE_EMBEDDING",
+	reranking: "PRACTICE_RERANKING",
+} as const satisfies Record<PracticeScriptNeed["slot"], AgentPurpose>;
 
 /**
  * A workspace practice, read-only, so that opening one is not the same act as editing it.
  *
- * Renders the same `PracticeDefinitionPreview` the catalog drawer uses — `Practice` is
- * structurally a `CuratedPracticeDefinition` — so a practice reads identically whether it was met in
- * the catalog or in the workspace's own tree. Editing stays a route: a form that must ask before
- * discarding work is not a dismissible surface.
+ * Renders the same `PracticeDefinitionPreview` the catalog drawer uses, from the practice's current
+ * version, so a practice reads identically whether it was met in the catalog or in the workspace's
+ * own tree. Editing is a guarded level on top: a form that must ask before discarding work is not a
+ * dismissible surface.
  */
 export function WorkspacePracticePanel({
 	workspaceSlug,
@@ -91,6 +104,7 @@ export function WorkspacePracticePanel({
 	practiceScript,
 	nested,
 	path,
+	onResetToCatalog,
 }: WorkspacePracticePanelProps) {
 	if (state.status !== "ready") {
 		return (
@@ -117,7 +131,8 @@ export function WorkspacePracticePanel({
 	}
 
 	const { practice, definitionOptions, groupName } = state;
-	const scripted = hasText(practice.practiceScript);
+	const definition = currentDefinition(practice);
+	const scripted = definition.script !== null;
 	const blocking = scripted ? blockingNeeds(practiceScript) : [];
 
 	return (
@@ -127,8 +142,8 @@ export function WorkspacePracticePanel({
 				path={path}
 				current={PRACTICE_SETUP_LEVEL_LABELS.practice}
 				mark={<GroupPill size="lg" slug={practice.groupSlug} name={groupName} />}
-				title={practice.name}
-				description={<WorkTypeLabel artifactKind={practice.artifactKind} />}
+				title={definition.name}
+				description={<WorkTypeLabel itemKind={practice.kind} />}
 			/>
 
 			<DrawerBody>
@@ -136,6 +151,18 @@ export function WorkspacePracticePanel({
 					practice={practice}
 					definitionOptions={definitionOptions}
 					groupName={groupName}
+					resetAction={
+						canResetToCatalog(practice.catalogOrigin) && (
+							<Button
+								size="sm"
+								variant="outline"
+								className="mt-2 self-start"
+								onClick={onResetToCatalog}
+							>
+								<RotateCcw /> Reset to catalog
+							</Button>
+						)
+					}
 					notice={
 						blocking.length > 0 && (
 							<BlockingNeedsAlert workspaceSlug={workspaceSlug} needs={blocking} />
@@ -173,7 +200,7 @@ function currentNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 		return [];
 	}
 	const { summary } = state;
-	return summary.scriptChanged || summary.asOf === undefined ? [] : summary.needs;
+	return summary.scriptChanged || summary.asOf === null ? [] : summary.needs;
 }
 
 /**
@@ -183,8 +210,8 @@ function currentNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 function blockingNeeds(state: PracticeScriptNeedsState): PracticeScriptNeed[] {
 	return currentNeeds(state).filter(
 		(need) =>
-			need.need === "REQUIRED" &&
-			isPracticeScriptPurpose(need.purpose) &&
+			need.need === "required" &&
+			isPracticeScriptPurpose(SLOT_PURPOSE[need.slot]) &&
 			need.unmetTiers.length > 0,
 	);
 }
@@ -214,15 +241,18 @@ function BlockingNeedsAlert({
 		<Alert variant={BLOCKING_TONE} role="note">
 			<BlockingIcon aria-hidden />
 			<AlertDescription>
-				{needs.map((need) => (
-					<p key={need.purpose}>
-						The practice script does not run for {workOf(need.unmetTiers)}: no{" "}
-						{AGENT_PURPOSE_DEFS[need.purpose].noun} is assigned for them.{" "}
-						<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={need.purpose}>
-							{assignModelLabel(need.purpose)}
-						</PracticeScriptModelLink>
-					</p>
-				))}
+				{needs.map((need) => {
+					const purpose = SLOT_PURPOSE[need.slot];
+					return (
+						<p key={need.slot}>
+							The practice script does not run for {workOf(need.unmetTiers)}: no{" "}
+							{AGENT_PURPOSE_DEFS[purpose].noun} is assigned for them.{" "}
+							<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={purpose}>
+								{assignModelLabel(purpose)}
+							</PracticeScriptModelLink>
+						</p>
+					);
+				})}
 			</AlertDescription>
 		</Alert>
 	);
@@ -260,11 +290,11 @@ function PracticeScriptNeeds({ workspaceSlug, state }: PracticeScriptNeedsProps)
 	if (summary?.scriptChanged === true) {
 		return <NeedsNote>The script changed. Its models show after its next review.</NeedsNote>;
 	}
-	if (summary?.asOf === undefined) {
+	if (summary === undefined || summary.asOf === null) {
 		return <NeedsNote>Its models show after its next review.</NeedsNote>;
 	}
 	// The review model always runs the review, so a row for it would have nothing to say.
-	const models = summary.needs.filter((need) => isPracticeScriptPurpose(need.purpose));
+	const models = summary.needs.filter((need) => isPracticeScriptPurpose(SLOT_PURPOSE[need.slot]));
 	return (
 		<div className="space-y-2">
 			{models.length === 0 ? (
@@ -277,7 +307,7 @@ function PracticeScriptNeeds({ workspaceSlug, state }: PracticeScriptNeedsProps)
 				<div className="rounded-lg border">
 					<ItemGroup aria-label="Models the script uses" className="gap-0">
 						{models.map((need) => (
-							<NeedItem key={need.purpose} workspaceSlug={workspaceSlug} need={need} />
+							<NeedItem key={need.slot} workspaceSlug={workspaceSlug} need={need} />
 						))}
 					</ItemGroup>
 				</div>
@@ -293,15 +323,16 @@ function NeedsNote({ children }: { children: string }) {
 
 function NeedItem({ workspaceSlug, need }: { workspaceSlug: string; need: PracticeScriptNeed }) {
 	const unmet = need.unmetTiers.length > 0;
+	const purpose = SLOT_PURPOSE[need.slot];
 	const badge = practiceScriptNeedBadge(need.need);
 	return (
 		<Item variant="row" size="sm" role="listitem">
 			<ItemContent>
 				<ItemTitle className="flex flex-wrap items-center gap-2">
 					<ModelKindMark
-						purpose={need.purpose}
+						purpose={purpose}
 						size="md"
-						name={capitalise(AGENT_PURPOSE_DEFS[need.purpose].noun)}
+						name={capitalise(AGENT_PURPOSE_DEFS[purpose].noun)}
 					/>
 					{badge && <StatusBadge def={badge} />}
 				</ItemTitle>
@@ -315,8 +346,8 @@ function NeedItem({ workspaceSlug, need }: { workspaceSlug: string; need: Practi
 			{unmet && (
 				// Below `sm` under the line it fixes, so the name and the line keep the row's width.
 				<ItemActions className="basis-full pl-10 sm:basis-auto sm:pl-0">
-					<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={need.purpose}>
-						{assignModelLabel(need.purpose)}
+					<PracticeScriptModelLink workspaceSlug={workspaceSlug} purpose={purpose}>
+						{assignModelLabel(purpose)}
 					</PracticeScriptModelLink>
 				</ItemActions>
 			)}
@@ -330,7 +361,7 @@ function AsOfReview({ workspaceSlug, asOf }: { workspaceSlug: string; asOf: Prac
 			<Link
 				to="/w/$workspaceSlug/admin/practices/reviews"
 				params={{ workspaceSlug }}
-				search={detailSearch(reviewLevel(asOf.jobId))}
+				search={detailSearch(reviewLevel(asOf.reviewId))}
 				className="underline-offset-4 hover:text-foreground hover:underline"
 			>
 				As of the review on {formatShortDay(asOf.finishedAt)}

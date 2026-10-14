@@ -476,7 +476,7 @@ export type BindPracticeGroupRequest = {
 
 export type BoundModelSlot = {
     kind: 'CHAT' | 'DECISION' | 'EMBEDDING' | 'RERANKING';
-    model: FrozenModel | unknown;
+    model: FrozenModel | null;
     slot: string;
 };
 
@@ -505,7 +505,7 @@ export type CatalogGroup = {
     name: string;
     offered: boolean;
     position: number;
-    shipped: CatalogGroupDefinition;
+    shipped: CatalogGroupDefinition | null;
     slug: string;
     state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
 };
@@ -536,7 +536,7 @@ export type CatalogGroupInput = {
     description: string | null;
     icon: string | null;
     name: string;
-    position: number | null;
+    position: null | number;
     slug: string;
 };
 
@@ -561,7 +561,7 @@ export type CatalogPractice = {
     kind: string;
     offered: boolean;
     position: number;
-    shipped: PracticeDefinition;
+    shipped: PracticeDefinition | null;
     slug: string;
     state: 'FROM_HEPHAESTUS' | 'EDITED_HERE' | 'UPDATE_WAITING' | 'YOURS' | 'NO_LONGER_SHIPPED';
 };
@@ -570,7 +570,7 @@ export type CatalogPracticeInput = {
     definition: PracticeDefinition;
     groupSlug: string | null;
     kind: string;
-    position: number | null;
+    position: null | number;
     slug: string;
 };
 
@@ -586,7 +586,7 @@ export type CatalogPracticePreview = {
 };
 
 export type CatalogPracticeReleaseProposal = {
-    base: PracticeDefinition;
+    base: PracticeDefinition | null;
     current: PracticeDefinition;
     etag: string;
     fields: Array<PracticeReleaseField>;
@@ -1088,7 +1088,7 @@ export type CreatePracticeGroupRequest = {
     description: string | null;
     icon: string | null;
     name: string;
-    position: number | null;
+    position: null | number;
     shownToDevelopers: boolean;
     slug: string;
 };
@@ -1097,7 +1097,7 @@ export type CreatePracticeRequest = {
     definition: PracticeDefinition;
     groupSlug: string | null;
     kind: string;
-    position: number | null;
+    position: null | number;
     slug: string;
 };
 
@@ -1306,7 +1306,7 @@ export type DeliveredFeedbackPractice = {
 
 export type DeliveredWorkFeedback = {
     feedback: Array<DeliveredWorkFeedbackItem>;
-    item: ItemRef | unknown;
+    item: ItemRef | null;
 };
 
 export type DeliveredWorkFeedbackCopy = {
@@ -1381,7 +1381,7 @@ export type EvidenceCitation = {
     sourceKind: string;
     sourcePath: string | null;
     startLine: null | number;
-    verification: CitationProof | unknown;
+    verification: CitationProof | null;
 };
 
 /**
@@ -1493,7 +1493,7 @@ export type FeedbackCopyCounts = {
 
 export type FeedbackDecision = {
     action: 'APPROVE' | 'REJECT' | 'WITHDRAW' | 'RESTORE';
-    actor: AccountRef | unknown;
+    actor: AccountRef | null;
     contentDigest: string | null;
     decidedAt: Date;
     feedbackId: string;
@@ -1525,7 +1525,7 @@ export type FeedbackItem = {
 
 export type FeedbackModeAssignment = {
     effective: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
-    override: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
+    override: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC' | null;
     source: 'PRACTICE' | 'GROUP' | 'WORKSPACE' | 'INSTANCE';
 };
 
@@ -1778,17 +1778,17 @@ export type GroupRef = {
 };
 
 export type HistoricalPracticeDefinition = {
-    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER';
-    appliesWhen: AppliesWhen;
+    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
+    appliesWhen: AppliesWhen | null;
     criteria: string | null;
-    guidance: PracticeGuidance;
+    guidance: PracticeGuidance | null;
     knownFields: Array<'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE'>;
     lineNotes: boolean | null;
     name: string | null;
-    reads: PracticeReads;
-    reviewOn: ReviewOn;
-    reviewedBy: ReviewedBy;
-    scan: ScanDefinition;
+    reads: PracticeReads | null;
+    reviewOn: ReviewOn | null;
+    reviewedBy: ReviewedBy | null;
+    scan: ScanDefinition | null;
     script: string | null;
 };
 
@@ -2019,7 +2019,7 @@ export type JsonNode = {
     valueNode?: boolean;
 };
 
-export type JudgedScanReportItem = Omit<ScanReportItem, 'status'> & {
+export type JudgedScanReportItem = {
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     item: ItemRef;
     itemVersion: string;
@@ -2077,10 +2077,10 @@ export type LinkedProvider = {
     type?: string;
 };
 
-export type ListedScanReportItem = Omit<ScanReportItem, 'status'> & {
+export type ListedScanReportItem = {
     item: ItemRef;
     itemVersion: string;
-    lastResult: ResultList | unknown;
+    lastResult: ResultList | null;
     practiceName: string;
     practiceSlug: string;
     reason: string | null;
@@ -2431,10 +2431,10 @@ export type LoginProviderView = {
     updatedAt: Date;
 };
 
-export type NotReviewedScanReportItem = Omit<ScanReportItem, 'status'> & {
+export type NotReviewedScanReportItem = {
     item: ItemRef;
     itemVersion: string;
-    lastResult: ResultList | unknown;
+    lastResult: ResultList | null;
     practiceName: string;
     practiceSlug: string;
     reason: string | null;
@@ -2460,7 +2460,7 @@ export type NotificationPreferences = {
 };
 
 export type OpenQuestion = {
-    citation: EvidenceCitation | unknown;
+    citation: EvidenceCitation | null;
     openQuestion: string;
     wouldSettleIt: string;
 };
@@ -2642,7 +2642,7 @@ export type OwnFeedbackRef = {
     deliveredAt: Date | null;
     destination: 'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION';
     id: string;
-    response: FeedbackResponse | unknown;
+    response: FeedbackResponse | null;
     state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
 };
 
@@ -2659,10 +2659,10 @@ export type OwnItemTrace = {
 };
 
 export type PageMetadata = {
-    number?: number;
-    size?: number;
-    totalElements?: number;
-    totalPages?: number;
+    number: number;
+    size: number;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -2671,17 +2671,17 @@ export type PageMetadata = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoAuthEventView = {
-    content?: Array<AuthEventView>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<AuthEventView>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -2690,17 +2690,17 @@ export type PageResponseDtoAuthEventView = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoConfigAuditEntryView = {
-    content?: Array<ConfigAuditEntryView>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<ConfigAuditEntryView>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -2709,17 +2709,17 @@ export type PageResponseDtoConfigAuditEntryView = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoResultList = {
-    content?: Array<ResultList>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<ResultList>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -2728,17 +2728,17 @@ export type PageResponseDtoResultList = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoReviewFeedback = {
-    content?: Array<ReviewFeedback>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<ReviewFeedback>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -2747,17 +2747,17 @@ export type PageResponseDtoReviewFeedback = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoSyncJob = {
-    content?: Array<SyncJob>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<SyncJob>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 /**
@@ -2766,26 +2766,26 @@ export type PageResponseDtoSyncJob = {
  * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
  */
 export type PageResponseDtoUserViewAccount = {
-    content?: Array<UserViewAccount>;
-    empty?: boolean;
-    first?: boolean;
-    last?: boolean;
-    number?: number;
-    numberOfElements?: number;
-    pageable?: Pageable;
-    size?: number;
-    sort?: Sort;
-    totalElements?: number;
-    totalPages?: number;
+    content: Array<UserViewAccount>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
 };
 
 export type Pageable = {
-    offset?: number;
-    pageNumber?: number;
-    pageSize?: number;
-    paged?: boolean;
-    sort?: Sort;
-    unpaged?: boolean;
+    offset: number;
+    pageNumber: number;
+    pageSize: number;
+    paged: boolean;
+    sort: Sort;
+    unpaged: boolean;
 };
 
 export type PagedModelFeedbackItem = {
@@ -2898,7 +2898,7 @@ export type Practice = {
 
 export type PracticeDefinition = {
     about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
-    appliesWhen: AppliesWhen | unknown;
+    appliesWhen: AppliesWhen | null;
     criteria: string;
     guidance: PracticeGuidance;
     lineNotes: boolean;
@@ -2906,7 +2906,7 @@ export type PracticeDefinition = {
     reads: PracticeReads;
     reviewOn: ReviewOn;
     reviewedBy: ReviewedBy;
-    scan: ScanDefinition | unknown;
+    scan: ScanDefinition | null;
     script: string | null;
 };
 
@@ -2941,15 +2941,21 @@ export type PracticeGroupStanding = {
     results: Array<PracticeStandingResult>;
     sources: Array<FeedbackSourceCount>;
     standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
-    trendSupport: TrendSupport | unknown;
+    trendSupport: TrendSupport | null;
 };
 
 export type PracticeGuidance = {
     goingWell: string | null;
-    guide: PracticeGuide | unknown;
-    visual: PracticeVisual | unknown;
+    guide: PracticeGuide | null;
+    visual: PracticeVisual | null;
     whatGoodLooksLike: string | null;
     whyItMatters: string | null;
+};
+
+export type PracticeGuidanceDto = {
+    guide: PracticeGuide | null;
+    practiceSlug: string;
+    visual: PracticeVisual | null;
 };
 
 /**
@@ -3011,7 +3017,7 @@ export type PracticePageFeedback = {
     practiceSlug: string;
     preparedAt: Date;
     readAt: Date | null;
-    response: FeedbackResponse | unknown;
+    response: FeedbackResponse | null;
     whatGoodLooksLike: string | null;
     whyItMatters: string | null;
     withdrawn: boolean;
@@ -3020,7 +3026,7 @@ export type PracticePageFeedback = {
 export type PracticeProfileOverview = {
     changes: Array<ProfileChange>;
     goingWell: Array<GoingWellPractice>;
-    latestReview: ProfileReviewRef | unknown;
+    latestReview: ProfileReviewRef | null;
     reviewedItems: Array<ItemRef>;
     window: OverviewWindow;
 };
@@ -3043,7 +3049,7 @@ export type PracticeReleaseField = {
 };
 
 export type PracticeReleaseProposal = {
-    base: PracticeDefinition;
+    base: PracticeDefinition | null;
     current: PracticeDefinition;
     currentVersionId: string;
     etag: string;
@@ -3186,7 +3192,7 @@ export type PracticeScriptRun = {
 };
 
 export type PracticeScriptSummary = {
-    asOf: PracticeScriptAsOf | unknown;
+    asOf: PracticeScriptAsOf | null;
     needs: Array<PracticeScriptNeed>;
     practiceName: string;
     practiceSlug: string;
@@ -3203,7 +3209,7 @@ export type PracticeStanding = {
     standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
     strengths: Array<PracticeStandingResult>;
     toWorkOn: Array<PracticeStandingResult>;
-    trendSupport: TrendSupport | unknown;
+    trendSupport: TrendSupport | null;
     whatGoodLooksLike: string | null;
     whyItMatters: string | null;
 };
@@ -3223,7 +3229,7 @@ export type PracticeTraceEntry = {
     feedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
     practiceSlug: string;
     results: ReviewResultCounts;
-    review: ReviewRef | unknown;
+    review: ReviewRef | null;
     reviewOn: ReviewOn;
     withheldReasons: Array<ReasonCount>;
 };
@@ -3231,10 +3237,10 @@ export type PracticeTraceEntry = {
 export type PracticeVersion = {
     changed: Array<'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE'>;
     createdAt: Date;
-    createdBy: AccountRef;
-    definition: PracticeDefinition;
+    createdBy: AccountRef | null;
+    definition: PracticeDefinition | null;
     definitionAvailable: boolean;
-    historicalDefinition: HistoricalPracticeDefinition;
+    historicalDefinition: HistoricalPracticeDefinition | null;
     id: string;
     name: string | null;
     number: number;
@@ -3263,7 +3269,7 @@ export type PracticeWorkspaceOverview = {
 
 export type PracticeWorkspaceTile = {
     developers: number;
-    group: GroupRef | unknown;
+    group: GroupRef | null;
     outcomes: OutcomeVector;
     practiceName: string;
     practiceSlug: string;
@@ -3297,7 +3303,7 @@ export type ProbeLlmConnectionRequest = {
 };
 
 export type Problem = {
-    basis: DutyBasis | IntroducedBasis | StateBasis | WorsenedBasis | unknown;
+    basis: DutyBasis | IntroducedBasis | StateBasis | WorsenedBasis | null;
     citations: Array<EvidenceCitation>;
     explanation: string | null;
     id: string;
@@ -3780,12 +3786,12 @@ export type ResultCoverage = {
 
 export type ResultDetail = {
     acceptedAt: Date | null;
-    coverage: ClaimedCoverage | HostCoverage | unknown;
+    coverage: ClaimedCoverage | HostCoverage | null;
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     endReason: 'REPLACED' | 'OUTRANKED' | 'WORK_CHANGED' | 'REPAIRED' | 'REMOVED' | null;
     endedAt: Date | null;
-    evidence: ResultEvidence | unknown;
-    example: ResultExample | unknown;
+    evidence: ResultEvidence | null;
+    example: ResultExample | null;
     explanation: string | null;
     feedback: Array<OwnFeedbackRef>;
     id: string;
@@ -3807,9 +3813,9 @@ export type ResultDetail = {
 
 export type ResultEvidence = {
     citations: Array<EvidenceCitation>;
-    inapplicability: InapplicabilityWarrant | unknown;
+    inapplicability: InapplicabilityWarrant | null;
     openQuestions: Array<OpenQuestion>;
-    search: SearchWarrant | unknown;
+    search: SearchWarrant | null;
 };
 
 export type ResultExample = {
@@ -3836,17 +3842,17 @@ export type ResultList = {
 
 export type ResultMark = {
     createdAt: Date;
-    createdBy: AccountRef | unknown;
+    createdBy: AccountRef | null;
     id: string;
     kind: 'INCORRECT' | 'ACCEPTED';
     reason: string;
     removalReason: string | null;
     removedAt: Date | null;
-    removedBy: AccountRef | unknown;
+    removedBy: AccountRef | null;
     resultId: string;
 };
 
-export type ReusedScanReportItem = Omit<ScanReportItem, 'status'> & {
+export type ReusedScanReportItem = {
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     item: ItemRef;
     itemVersion: string;
@@ -3877,16 +3883,16 @@ export type Review = {
     orderedAt: Date;
     origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
     practices: Array<ReviewPractice>;
-    requestedBy: AccountRef | unknown;
+    requestedBy: AccountRef | null;
     results: ReviewResultCounts;
-    startedBy: ItemEvent | unknown;
+    startedBy: ItemEvent | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
     stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
 };
 
 export type ReviewBatch = {
     budgetUsd: string | null;
-    confirmedBy: AccountRef | unknown;
+    confirmedBy: AccountRef | null;
     createdAt: Date;
     estimatedCostUsd: string | null;
     estimatedItems: number;
@@ -3898,7 +3904,7 @@ export type ReviewBatch = {
     itemKind: string;
     origin: 'BACKFILL' | 'SCHEDULE';
     pauseReason: 'BUDGET_EXHAUSTED' | 'REVIEW_MODEL_UNBOUND' | 'WORKSPACE_UNAVAILABLE' | null;
-    requestedBy: AccountRef | unknown;
+    requestedBy: AccountRef | null;
     reviewIds: Array<string>;
     scheduleId: string | null;
     skippedCount: number;
@@ -3920,7 +3926,7 @@ export type ReviewBoundFeedback = {
 
 export type ReviewBoundResult = {
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    developer: ReviewDeveloper | unknown;
+    developer: ReviewDeveloper | null;
     id: string;
     item: ItemRef;
     outcome: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
@@ -3940,7 +3946,7 @@ export type ReviewBucket = {
 };
 
 export type ReviewContext = {
-    item: ItemRef | unknown;
+    item: ItemRef | null;
     reasonDescription: string | null;
     requestAllowed: boolean;
     workspaceId: string;
@@ -3953,7 +3959,7 @@ export type ReviewDetail = {
     completedAt: Date | null;
     createdAt: Date;
     feedback: ReviewFeedbackCounts;
-    generatedPaths: GeneratedPathReview | unknown;
+    generatedPaths: GeneratedPathReview | null;
     id: string;
     item: ItemRef;
     itemVersion: string | null;
@@ -3963,11 +3969,11 @@ export type ReviewDetail = {
     orderedAt: Date;
     origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
     practices: Array<ReviewPractice>;
-    requestedBy: AccountRef | unknown;
+    requestedBy: AccountRef | null;
     results: ReviewResultCounts;
-    runtime: ReviewRuntime | unknown;
+    runtime: ReviewRuntime | null;
     stageTiming: Array<ReviewStageTiming>;
-    startedBy: ItemEvent | unknown;
+    startedBy: ItemEvent | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
     stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
     usage: ReviewUsage;
@@ -3998,7 +4004,7 @@ export type ReviewFeedback = {
     developer: ReviewDeveloper;
     disagreedAt: Date | null;
     id: string;
-    item: ItemRef | unknown;
+    item: ItemRef | null;
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
     replacesId: string | null;
     resultCount: number;
@@ -4035,10 +4041,10 @@ export type ReviewFeedbackDetail = {
     developer: ReviewDeveloper;
     disagreedAt: Date | null;
     id: string;
-    item: ItemRef | unknown;
+    item: ItemRef | null;
     location: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
     replacesId: string | null;
-    response: FeedbackResponse | unknown;
+    response: FeedbackResponse | null;
     resultCount: number;
     reviewId: string;
     sends: Array<FeedbackSend>;
@@ -4086,13 +4092,13 @@ export type ReviewLineageEdge = {
 };
 
 export type ReviewLineageNode = {
-    feedback: ReviewBoundFeedback | unknown;
+    feedback: ReviewBoundFeedback | null;
     id: string;
-    item: ItemRef | unknown;
+    item: ItemRef | null;
     kind: 'ITEM' | 'REVIEW' | 'RESULT' | 'PROBLEM' | 'FEEDBACK';
-    problem: ProblemSummary | unknown;
-    result: ReviewBoundResult | unknown;
-    review: ReviewRef | unknown;
+    problem: ProblemSummary | null;
+    result: ReviewBoundResult | null;
+    review: ReviewRef | null;
 };
 
 export type ReviewMethod = {
@@ -4128,13 +4134,13 @@ export type ReviewPractice = {
     practiceVersionId: string | null;
     reason: string | null;
     results: ReviewResultCounts;
-    script: PracticeScriptRun | unknown;
+    script: PracticeScriptRun | null;
     status: 'QUEUED' | 'READY' | 'RUNNING' | 'DONE' | 'WITHHELD' | 'FAILED';
 };
 
 export type ReviewPracticeCounts = {
     feedback: ReviewFeedbackCounts;
-    group: GroupRef | unknown;
+    group: GroupRef | null;
     practiceName: string;
     practiceSlug: string;
     results: ReviewResultCounts;
@@ -4144,11 +4150,11 @@ export type ReviewPracticeCounts = {
 export type ReviewProblem = {
     acceptedAt: Date | null;
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    developer: ReviewDeveloper | unknown;
+    developer: ReviewDeveloper | null;
     disagreedAt: Date | null;
     endLine: null | number;
     evidenceHidden: boolean;
-    group: GroupRef | unknown;
+    group: GroupRef | null;
     id: string;
     item: ItemRef;
     markedIncorrectAt: Date | null;
@@ -4168,11 +4174,11 @@ export type ReviewProblem = {
 export type ReviewProblemDetail = {
     acceptedAt: Date | null;
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    developer: ReviewDeveloper | unknown;
+    developer: ReviewDeveloper | null;
     disagreedAt: Date | null;
     endLine: null | number;
     evidenceHidden: boolean;
-    group: GroupRef | unknown;
+    group: GroupRef | null;
     id: string;
     item: ItemRef;
     markedIncorrectAt: Date | null;
@@ -4205,7 +4211,7 @@ export type ReviewQueue = {
 };
 
 export type ReviewQueueItem = {
-    developer: ReviewDeveloper | unknown;
+    developer: ReviewDeveloper | null;
     heldForBudget: boolean;
     item: ItemRef;
     jobId: string;
@@ -4235,7 +4241,7 @@ export type ReviewRequestOutcome = {
 export type ReviewResult = {
     acceptedAt: Date | null;
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    developer: ReviewDeveloper | unknown;
+    developer: ReviewDeveloper | null;
     feedback: ReviewFeedbackCounts;
     id: string;
     item: ItemRef;
@@ -4261,16 +4267,16 @@ export type ReviewResultCounts = {
 
 export type ReviewResultDetail = {
     acceptedAt: Date | null;
-    coverage: ClaimedCoverage | HostCoverage | unknown;
+    coverage: ClaimedCoverage | HostCoverage | null;
     currentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    developer: ReviewDeveloper | unknown;
+    developer: ReviewDeveloper | null;
     disagreements: Array<FeedbackDisagreement>;
     endReason: 'REPLACED' | 'OUTRANKED' | 'WORK_CHANGED' | 'REPAIRED' | 'REMOVED' | null;
     endedAt: Date | null;
-    evidence: ResultEvidence | unknown;
+    evidence: ResultEvidence | null;
     evidenceHidden: boolean;
     evidenceVersion: number;
-    example: ResultExample | unknown;
+    example: ResultExample | null;
     explanation: string | null;
     feedback: Array<ReviewBoundFeedback>;
     id: string;
@@ -4299,7 +4305,7 @@ export type ReviewSchedule = {
     budgetUsd: string | null;
     cadence: 'DAILY' | 'WEEKLY';
     createdAt: Date;
-    createdBy: AccountRef | unknown;
+    createdBy: AccountRef | null;
     enabled: boolean;
     id: string;
     itemKind: string;
@@ -4354,9 +4360,9 @@ export type ReviewSummary = {
     orderedAt: Date;
     origin: 'EVENT' | 'REQUEST' | 'SCHEDULE' | 'BACKFILL';
     practices: Array<ReviewPractice>;
-    requestedBy: AccountRef | unknown;
+    requestedBy: AccountRef | null;
     results: ReviewResultCounts;
-    startedBy: ItemEvent | unknown;
+    startedBy: ItemEvent | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
     stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
 };
@@ -4376,7 +4382,7 @@ export type ReviewTiming = {
     finished: ReviewTimingStage;
     finishedAfterMerge: number;
     finishedAfterMergeStartedByMerge: number;
-    finishedShares: ReviewTimeShares | unknown;
+    finishedShares: ReviewTimeShares | null;
     from: Date;
     model: ReviewTimingStage;
     posted: ReviewTimingStage;
@@ -4385,7 +4391,7 @@ export type ReviewTiming = {
     read: ReviewTimingStage;
     to: Date;
     total: ReviewTimingStage;
-    totalShares: ReviewTimeShares | unknown;
+    totalShares: ReviewTimeShares | null;
     waitingLong: number;
 };
 
@@ -4419,12 +4425,12 @@ export type ReviewUsageAttempt = {
 
 export type ReviewedBy = {
     by: 'HEPHAESTUS' | 'PEOPLE' | 'NOBODY';
-    humanReason: ReviewLimit | unknown;
+    humanReason: ReviewLimit | null;
     limits: Array<ReviewLimit>;
 };
 
 export type ReviewedPractice = {
-    group: GroupRef;
+    group: GroupRef | null;
     name: string;
     slug: string;
     whatGoodLooksLike: string | null;
@@ -4526,7 +4532,7 @@ export type ScanDetail = {
     progress: ScanProgress;
     ref: string;
     repository: ItemRef;
-    requestedBy: AccountRef | unknown;
+    requestedBy: AccountRef | null;
     startedAt: Date | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
     stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
@@ -4573,7 +4579,7 @@ export type ScanReport = {
     notReviewedReasons: Array<ReasonCount>;
     practices: Array<ScanPracticeReport>;
     problemChanges: ProblemChanges;
-    recordedCounts: ScanCounts | unknown;
+    recordedCounts: ScanCounts | null;
     removalGuard: RemovalGuard;
     scan: ScanSummary;
     withheldReasons: Array<ReasonCount>;
@@ -4589,6 +4595,23 @@ export type ScanReportItemsPage = {
     nextCursor: string | null;
 };
 
+export type ScanReportProblem = {
+    absentReason: 'REPAIRED' | null;
+    baselineState: 'NEW' | 'UNCHANGED' | 'UPDATED' | 'ABSENT' | null;
+    item: ItemRef;
+    practiceName: string;
+    practiceSlug: string;
+    previousProblemId: string | null;
+    problem: Problem;
+    resultId: string;
+};
+
+export type ScanReportProblemsPage = {
+    content: Array<ScanReportProblem>;
+    hasNext: boolean;
+    nextCursor: string | null;
+};
+
 export type ScanSummary = {
     baselineScanId: string | null;
     completedAt: Date | null;
@@ -4600,7 +4623,7 @@ export type ScanSummary = {
     practiceCount: number;
     ref: string;
     repository: ItemRef;
-    requestedBy: AccountRef | unknown;
+    requestedBy: AccountRef | null;
     startedAt: Date | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
     stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
@@ -4633,7 +4656,7 @@ export type SetCatalogStatusRequest = {
 };
 
 export type SetFeedbackModeRequest = {
-    feedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC';
+    feedbackMode: 'OFF' | 'APPROVE_FIRST' | 'AUTOMATIC' | null;
 };
 
 export type SetMemberHiddenRequest = {
@@ -4762,9 +4785,9 @@ export type SlackUserWorkspacePreferences = {
 };
 
 export type Sort = {
-    empty?: boolean;
-    sorted?: boolean;
-    unsorted?: boolean;
+    empty: boolean;
+    sorted: boolean;
+    unsorted: boolean;
 };
 
 export type StartScanRequest = {
@@ -5639,7 +5662,7 @@ export type Value = {
     value?: string;
 };
 
-export type WithheldScanReportItem = Omit<ScanReportItem, 'status'> & {
+export type WithheldScanReportItem = {
     item: ItemRef;
     itemVersion: string;
     practiceName: string;
@@ -10884,9 +10907,9 @@ export type CreatePracticeGroupData = {
 
 export type CreatePracticeGroupResponses = {
     /**
-     * OK
+     * Practice group created
      */
-    200: PracticeGroup;
+    201: PracticeGroup;
 };
 
 export type CreatePracticeGroupResponse = CreatePracticeGroupResponses[keyof CreatePracticeGroupResponses];
@@ -10948,10 +10971,12 @@ export type DeletePracticeGroupData = {
 
 export type DeletePracticeGroupResponses = {
     /**
-     * OK
+     * Practice group deleted
      */
-    200: unknown;
+    204: void;
 };
+
+export type DeletePracticeGroupResponse = DeletePracticeGroupResponses[keyof DeletePracticeGroupResponses];
 
 export type GetPracticeGroupData = {
     body?: never;
@@ -11177,9 +11202,9 @@ export type CreatePracticeData = {
 
 export type CreatePracticeResponses = {
     /**
-     * OK
+     * Practice created
      */
-    200: Practice;
+    201: Practice;
 };
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
@@ -11414,7 +11439,7 @@ export type GetReviewItemData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        itemId: number;
+        itemId: string;
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/practices/items/{itemId}';
@@ -11436,7 +11461,7 @@ export type ListItemEventsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        itemId: number;
+        itemId: string;
     };
     query?: {
         page?: number;
@@ -11461,7 +11486,7 @@ export type GetItemFactsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        itemId: number;
+        itemId: string;
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/facts';
@@ -11483,7 +11508,7 @@ export type GetOwnItemTraceData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        itemId: number;
+        itemId: string;
     };
     query: {
         reviewId: string;
@@ -11507,7 +11532,7 @@ export type ListOwnItemReviewsData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        itemId: number;
+        itemId: string;
     };
     query?: {
         page?: number;
@@ -11532,7 +11557,7 @@ export type GetItemTraceData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        itemId: number;
+        itemId: string;
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/practices/items/{itemId}/trace';
@@ -11695,7 +11720,7 @@ export type ListOwnResultsData = {
         groupSlug?: string;
         outcome?: 'MET' | 'NOT_MET' | 'DOES_NOT_APPLY' | 'COULD_NOT_DETERMINE';
         itemKind?: string;
-        itemId?: number;
+        itemId?: string;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'TRIVIAL'>;
         displayableOnly?: boolean;
         sort?: 'NEWEST' | 'ACTIONABILITY';
@@ -12136,7 +12161,7 @@ export type ListReviewsData = {
         status?: Array<'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED'>;
         kind?: 'ITEM' | 'SCAN';
         reviewId?: string;
-        itemId?: number;
+        itemId?: string;
         developerId?: number;
         practiceSlug?: string;
         groupSlug?: string;
@@ -12396,7 +12421,7 @@ export type GetReviewLineageData = {
     };
     query: {
         kind: 'ITEM' | 'REVIEW' | 'RESULT' | 'PROBLEM' | 'FEEDBACK';
-        itemId?: number;
+        itemId?: string;
         reviewId?: string;
         resultId?: string;
         problemId?: string;
@@ -12471,7 +12496,7 @@ export type ListReviewProblemsData = {
     };
     query?: {
         reviewId?: string;
-        itemId?: number;
+        itemId?: string;
         itemKind?: string;
         practiceSlug?: string;
         groupSlug?: string;
@@ -12555,7 +12580,7 @@ export type ListReviewResultsData = {
     };
     query?: {
         reviewId?: string;
-        itemId?: number;
+        itemId?: string;
         itemKind?: string;
         practiceSlug?: string;
         groupSlug?: string;
@@ -12975,8 +13000,10 @@ export type ListScanReportProblemsResponses = {
     /**
      * OK
      */
-    200: unknown;
+    200: ScanReportProblemsPage;
 };
+
+export type ListScanReportProblemsResponse = ListScanReportProblemsResponses[keyof ListScanReportProblemsResponses];
 
 export type ExportScanSarifData = {
     body?: never;
@@ -13100,10 +13127,12 @@ export type DeletePracticeData = {
 
 export type DeletePracticeResponses = {
     /**
-     * OK
+     * Practice deleted
      */
-    200: unknown;
+    204: void;
 };
+
+export type DeletePracticeResponse = DeletePracticeResponses[keyof DeletePracticeResponses];
 
 export type GetPracticeData = {
     body?: never;
@@ -13238,7 +13267,7 @@ export type GetPracticeGuidanceResponses = {
     /**
      * OK
      */
-    200: PracticeGuidance;
+    200: PracticeGuidanceDto;
 };
 
 export type GetPracticeGuidanceResponse = GetPracticeGuidanceResponses[keyof GetPracticeGuidanceResponses];

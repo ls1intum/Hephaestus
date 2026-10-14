@@ -26,10 +26,22 @@ import { GITLAB_ISSUE, GITLAB_MR, GITLAB_MR5, GITLAB_MR6 } from "./provider-page
  * Real Hephaestus APIs and authentication, fixture provider pages. This does not prove provider
  * ingestion, a review execution, production OAuth, or the web app's authoritative actions.
  */
-const QUEUED_JOB = "7d5e0c3a-1b2c-4d3e-8f40-000000000001";
-const FAILED_JOB = "7d5e0c3a-1b2c-4d3e-8f40-000000000002";
-const MR4_WORK_ID = "920010";
-const TRACE_URL = `${WEB_APP_URL}/w/ext-e2e/feedback/scm.pull_request/${MR4_WORK_ID}`;
+// Item and review ids from seed.sql. Item ids are the server's decimal strings.
+const QUEUED_REVIEW = "7d5e0c3a-1b2c-4d3e-8f40-000000000001";
+const FAILED_REVIEW = "7d5e0c3a-1b2c-4d3e-8f40-000000000002";
+const MR4_ITEM_ID = "920110";
+const ISSUE4_ITEM_ID = "920111";
+const MR5_ITEM_ID = "920112";
+const MR6_ITEM_ID = "920113";
+const CHOICE_ITEM_ID = "922110";
+const ALTERNATE_CHOICE_ITEM_ID = "922111";
+
+/** The reader's own feedback page for an item. */
+function feedbackPage(itemId: string, workspaceSlug = "ext-e2e"): string {
+	return `${WEB_APP_URL}/w/${workspaceSlug}/feedback/${itemId}`;
+}
+
+const TRACE_URL = feedbackPage(MR4_ITEM_ID);
 
 async function expectSafeLink(link: Locator, href: string): Promise<void> {
 	await expect(link).toHaveAttribute("href", href);
@@ -57,16 +69,24 @@ function otherLoopback(hostname: string): string {
 	return hostname === "localhost" ? "127.0.0.1" : "localhost";
 }
 
-/** Records every request to the server's practice endpoints. */
-function recordPracticeReads(reads: string[]) {
+/** Records every request to the server whose address contains `scope`. */
+function recordServerReads(reads: string[], scope = "/practices/") {
 	return (request: Request) => {
-		if (request.url().startsWith(SERVER_URL) && request.url().includes("/practices/")) {
+		if (request.url().startsWith(SERVER_URL) && request.url().includes(scope)) {
 			reads.push(request.url());
 		}
 	};
 }
 
-const MR5_TRACE = `${WEB_APP_URL}/w/ext-e2e/feedback/scm.pull_request/920012`;
+/** The recorded requests to `path` under a workspace, as parsed addresses. */
+function readsOf(reads: string[], path: string): URL[] {
+	return reads.map((url) => new URL(url)).filter((url) => url.pathname.endsWith(path));
+}
+
+/** Reading the practice page's feedback delivers it, so the extension never asks for it. */
+const PRACTICE_PAGE_FEEDBACK = "/practices/feedback/practice-page";
+
+const MR5_TRACE = feedbackPage(MR5_ITEM_ID);
 
 test.beforeAll(async () => {
 	if (!(await serverAvailable())) {
@@ -94,7 +114,7 @@ test.describe("signing in", () => {
 		const issue = await context.newPage();
 		await providerTab(issue, GITLAB_ISSUE);
 		const issueFrame = await openInline(issue);
-		await expectWork(issueFrame, `${WEB_APP_URL}/w/ext-e2e/feedback/scm.issue/920011`);
+		await expectWork(issueFrame, feedbackPage(ISSUE4_ITEM_ID));
 
 		await stopWorker(context, page);
 		const again = await context.newPage();
@@ -118,15 +138,18 @@ test.describe("inline review activity", () => {
 		await providerTab(page, GITLAB_MR);
 		const frame = await openInline(page);
 		await expectWork(frame, TRACE_URL);
-		// Every developer's records, delivery and runs are the web app's: one link, for this work.
-		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/runs?artifactKind=scm.pull_request&artifactId=${MR4_WORK_ID}&detail=work%3Apull-request%3A${MR4_WORK_ID}`;
+		// Every developer's records, delivery and reviews are the web app's: one link, for this item.
+		const details = `${WEB_APP_URL}/w/ext-e2e/admin/practices/reviews/reviews?itemId=${MR4_ITEM_ID}&detail=item%3A${MR4_ITEM_ID}`;
 		await expectSafeLink(frame.getByRole("link", { name: /^Review details/u }), details);
 		await expect(frame.getByRole("button", { name: /Manage/u })).toHaveCount(0);
 		// Only the line opens; nothing inside it opens further.
 		await expect(frame.locator("[aria-expanded]")).toHaveCount(1);
 
-		// An admin's panel does not turn another developer's queued run into their own review.
-		await expect(line(frame)).toContainText("review status unavailable");
+		// The admin's own latest review is the completed one with their results. The queued and the failed
+		// review of this work record nothing for them, so neither becomes the admin's review status.
+		await expect(line(frame)).toContainText("3 comments for you · reviewed ");
+		await expect(line(frame)).not.toContainText("Review waiting");
+		await expect(line(frame)).not.toContainText("review failed");
 		await expect(frame.getByRole("button", { name: "Request review" })).toBeVisible();
 
 		// On work with nothing running, "Request review" opens the extension's own window, which
@@ -174,21 +197,21 @@ test.describe("inline review activity", () => {
 		await expectWork(frame, TRACE_URL);
 		const tabId = await tabIdOf(worker, GITLAB_MR);
 		for (const message of [
-			{ type: "request-review", tabId, workspaceSlug: "ext-e2e", workId: MR4_WORK_ID },
-			{ type: "cancel-review", tabId, workspaceSlug: "ext-e2e", jobId: QUEUED_JOB },
-			{ type: "retry-result-processing", tabId, workspaceSlug: "ext-e2e", jobId: FAILED_JOB },
-			// Admin reads and run changes are the web app's; the extension has no command for them.
+			{ type: "request-review", tabId, workspaceSlug: "ext-e2e", itemId: MR4_ITEM_ID },
+			{ type: "cancel-review", tabId, workspaceSlug: "ext-e2e", reviewId: QUEUED_REVIEW },
+			{ type: "retry-result-processing", tabId, workspaceSlug: "ext-e2e", reviewId: FAILED_REVIEW },
+			// Admin reads and review changes are the web app's; the extension has no command for them.
 			{ type: "get-review-details", workspaceSlug: "ext-e2e" },
 			{ type: "list-results", workspaceSlug: "ext-e2e", scope: "workspace" },
 			{
 				type: "open-action",
 				workspaceSlug: "ext-e2e",
-				action: { kind: "cancel-review", jobId: QUEUED_JOB },
+				action: { kind: "cancel-review", reviewId: QUEUED_REVIEW },
 			},
 			{
 				type: "open-action",
 				workspaceSlug: "ext-e2e",
-				action: { kind: "retry-delivery", jobId: FAILED_JOB },
+				action: { kind: "retry-delivery", reviewId: FAILED_REVIEW },
 			},
 			{ type: "set-preferred-workspace", workspaceSlug: "ext-e2e" },
 			{ type: "get-context", tabId },
@@ -222,10 +245,7 @@ test.describe("inline review activity", () => {
 		const mutations = watchReviewMutations(context);
 		const page = await context.newPage();
 		await providerTab(page, GITLAB_MR);
-		const hold = await holdServer(
-			context,
-			/\/practices\/reviewed-work\/scm\.pull_request\/920010\/review-runs$/u,
-		);
+		const hold = await holdServer(context, /\/practices\/items\/920110\/reviews$/u);
 		await openInline(page);
 		await expect.poll(() => hold.hits.length).toBeGreaterThan(0);
 		await page.evaluate(() => {
@@ -246,10 +266,7 @@ test.describe("inline review activity", () => {
 		await providerTab(page, GITLAB_MR);
 		const old = await openInline(page);
 		await expectWork(old, TRACE_URL);
-		const hold = await holdServer(
-			context,
-			/\/practices\/reviewed-work\/scm\.pull_request\/920012\/review-runs$/u,
-		);
+		const hold = await holdServer(context, /\/practices\/items\/920112\/reviews$/u);
 		await page.evaluate(() => {
 			history.pushState({}, "", "/ext/demo/-/merge_requests/5");
 		});
@@ -274,7 +291,7 @@ test.describe("inline review activity", () => {
 		const issue = await context.newPage();
 		await providerTab(issue, GITLAB_ISSUE);
 		const issueInline = await openInline(issue);
-		await expectWork(issueInline, `${WEB_APP_URL}/w/ext-e2e/feedback/scm.issue/920011`);
+		await expectWork(issueInline, feedbackPage(ISSUE4_ITEM_ID));
 		await expect.poll(() => hold.hits.length).toBeGreaterThan(0);
 		await options.bringToFront();
 		await options.getByRole("button", { name: "Sign out", exact: true }).click();
@@ -328,17 +345,18 @@ test.describe("inline review activity", () => {
 		await providerTab(page, "https://gitlab.example.test/ext/choice/-/issues/1");
 		const frame = await openInline(page);
 		await frame.getByRole("radio", { name: "Extension E2E", exact: true }).check();
-		const primaryTrace = `${WEB_APP_URL}/w/ext-e2e/feedback/scm.issue/922010`;
+		const primaryTrace = feedbackPage(CHOICE_ITEM_ID);
 		await expectWork(frame, primaryTrace);
+		// The same provider issue is another item in the other workspace.
 		const hold = await holdServer(
 			context,
-			/\/workspaces\/ext-e2e-alternate\/practices\/reviewed-work\/scm\.issue\/922010\/review-runs$/u,
+			/\/workspaces\/ext-e2e-alternate\/practices\/items\/922111\/reviews$/u,
 		);
 		await frame.getByRole("radio", { name: "Extension E2E alternate", exact: true }).click();
 		await expect.poll(() => hold.hits.length).toBeGreaterThan(0);
 		await expect(frame.locator(`a[href="${primaryTrace}"]`)).toHaveCount(0);
 		await hold.release();
-		await expectWork(frame, `${WEB_APP_URL}/w/ext-e2e-alternate/feedback/scm.issue/922010`);
+		await expectWork(frame, feedbackPage(ALTERNATE_CHOICE_ITEM_ID, "ext-e2e-alternate"));
 		await expect(
 			frame.getByRole("radio", { name: "Extension E2E alternate", exact: true }),
 		).toBeChecked();
@@ -359,10 +377,17 @@ test.describe("a developer who is not an admin", () => {
 	}) => {
 		await acceptNotice("e2e-dev", { admin: false });
 		await signIn(context, "e2e-dev", { admin: false });
+		const reads: string[] = [];
+		context.on("request", recordServerReads(reads));
 		const page = await context.newPage();
 		await providerTab(page, GITLAB_MR6);
 		const frame = await openInline(page);
 		await expect(line(frame)).toContainText("3 comments for you");
+		// The server finds the work from the page's address.
+		expect(
+			readsOf(reads, "/practices/feedback/on-work").map((url) => url.searchParams.get("url")),
+		).toContain(GITLAB_MR6);
+		expect(readsOf(reads, PRACTICE_PAGE_FEEDBACK)).toStrictEqual([]);
 		// Where each comment is, is the link to it: three native comments, each once.
 		const comments = frame.getByRole("list", { name: "Comments for you" });
 		await expect(comments.getByRole("link")).toHaveCount(3);
@@ -370,8 +395,10 @@ test.describe("a developer who is not an admin", () => {
 			await expect(comments.getByRole("link", { name, exact: true })).toHaveCount(1);
 		}
 		await expect(comments.getByText(/^Explain validation, Keep changes focused · /u)).toBeVisible();
-		// No body, and no practice of feedback that was never posted, reaches the comments. (The
-		// reader's own results below may name that practice: they are about the work.)
+		// No body reaches the comments, and the partly posted package rests on no result, so its line
+		// note names no practice. (The reader's own results below may name the E2E_ practice: they are
+		// about the work.) Another account's, the practice page's, the conversation's, the failed and the
+		// replaced feedback have no comment here, whatever provider refs they carry.
 		await expect(comments).not.toContainText("E2E_");
 		await expect(frame.locator("body")).not.toContainText("_BODY");
 		const summary = frame.locator(`a[href="${GITLAB_MR6}#note_926001"]`);
@@ -385,15 +412,32 @@ test.describe("a developer who is not an admin", () => {
 	}) => {
 		await acceptNotice("e2e-dev", { admin: false });
 		await signIn(context, "e2e-dev", { admin: false });
+		const reads: string[] = [];
+		context.on("request", recordServerReads(reads, "/workspaces/ext-e2e/"));
+		// !6 is authored by the second of the account's two provider identities.
 		const own = await context.newPage();
 		await providerTab(own, GITLAB_MR6);
 		const ownFrame = await openInline(own);
-		await expectWork(ownFrame, `${WEB_APP_URL}/w/ext-e2e/feedback/scm.pull_request/920013`);
+		await expectWork(ownFrame, feedbackPage(MR6_ITEM_ID));
 		const results = ownFrame.getByRole("region", { name: "Your results" });
-		// One not met result and two met. The seeded run recorded no evidence, so the list names no
-		// problem under the not met result, and the three rows are the only items.
-		await expect(results.getByRole("listitem")).toHaveCount(3);
-		await expect(results).toContainText("Not met · Major");
+		// One not met result with its one problem, and two met: three rows and one problem line.
+		await expect(results.getByRole("listitem")).toHaveCount(4);
+		await expect(results).toContainText("Not met · 1 problem · Major");
+		await expect(results.getByRole("list", { name: "Problems" })).toHaveText(
+			"Synthetic browser-test problem; no model reviewed this work.",
+		);
+		// Every read names the item the server resolved, never the provider's own number.
+		expect(readsOf(reads, "/members/me")).not.toStrictEqual([]);
+		expect(readsOf(reads, `/practices/items/${MR6_ITEM_ID}/reviews`)).not.toStrictEqual([]);
+		expect(
+			readsOf(reads, `/practices/items/${MR6_ITEM_ID}/own-trace`).map((url) =>
+				url.searchParams.get("reviewId"),
+			),
+		).toContain("8f1e2026-0006-4a00-8000-000000000001");
+		expect(
+			readsOf(reads, "/practices/results").map((url) => url.searchParams.get("itemId")),
+		).toContain(MR6_ITEM_ID);
+		expect(readsOf(reads, PRACTICE_PAGE_FEEDBACK)).toStrictEqual([]);
 		await expect(ownFrame.getByRole("button", { name: "Request review" }).first()).toBeVisible();
 		await expect(ownFrame.getByRole("link", { name: /^Review details/u })).toHaveCount(0);
 
@@ -412,7 +456,7 @@ test("a list reads only the pressed row, and shows its preview at once without a
 	await acceptNotice("e2e", { admin: true });
 	await signIn(context, "e2e", { admin: true });
 	const reads: string[] = [];
-	context.on("request", recordPracticeReads(reads));
+	context.on("request", recordServerReads(reads));
 	const page = await context.newPage();
 	await page.goto("https://gitlab.example.test/ext/demo/-/merge_requests");
 	await expect(page.locator("hephaestus-inspect")).toHaveCount(2);
@@ -428,6 +472,7 @@ test("a list reads only the pressed row, and shows its preview at once without a
 	expect(reads.some((url) => new URL(url).pathname.endsWith("/feedback/on-work"))).toBe(true);
 	expect(reads.some((url) => new URL(url).pathname.endsWith("/practices/results"))).toBe(false);
 	expect(reads.some((url) => new URL(url).pathname.includes("/practices/reviews/"))).toBe(false);
+	expect(readsOf(reads, PRACTICE_PAGE_FEEDBACK)).toStrictEqual([]);
 	// A comment link takes the tab to that comment on the work.
 	const first = frame.getByRole("link").first();
 	const href = await first.getAttribute("href");

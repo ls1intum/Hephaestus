@@ -31,7 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 class ReviewBatchDriverTest extends BaseUnitTest {
     final ReviewBatchRepository batches = mock(ReviewBatchRepository.class);
-    final ReviewBatchScopeRepository scope = mock(ReviewBatchScopeRepository.class);
+    final ReviewBatchScopeQuery scope = mock(ReviewBatchScopeQuery.class);
     final ReviewBatchSubmitter submitter = mock(ReviewBatchSubmitter.class);
     final WorkspaceRepository workspaces = mock(WorkspaceRepository.class);
     final ReviewBudget budget = mock(ReviewBudget.class);

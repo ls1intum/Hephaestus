@@ -85,7 +85,7 @@ class ReviewRequestControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("itemId", scenario.item().getId().toString()))
                 .exchange()
                 .expectStatus()
-                .isUnauthorized()
+                .isForbidden()
                 .expectBody(Void.class);
     }
 }

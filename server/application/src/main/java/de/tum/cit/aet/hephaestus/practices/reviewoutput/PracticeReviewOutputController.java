@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.CreateResultMarkRequestDTO;
@@ -13,22 +14,20 @@ import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewProblemDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewProblemDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDetailDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.LineageKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultSort;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.Nullable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.web.PagedModel;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -53,13 +52,13 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/results")
     @Operation(operationId = "listReviewResults", summary = "List review results")
-    public PagedModel<ReviewResultDTO> list(
+    public PageResponseDTO<ReviewResultDTO> list(
             WorkspaceContext ws,
             @Valid @ParameterObject ReviewResultFilterParams filter,
             @RequestParam(defaultValue = "NEWEST") ResultSort sort,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
-        return new PagedModel<>(query.list(ws.id(), filter.toFilter(), sort, PageRequest.of(page, size)));
+        return PageResponseDTO.from(query.list(ws.id(), filter.toFilter(), sort, PageRequest.of(page, size)));
     }
 
     @GetMapping("/results/{resultId}")
@@ -70,12 +69,12 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/problems")
     @Operation(operationId = "listReviewProblems", summary = "List review problems")
-    public PagedModel<ReviewProblemDTO> problems(
+    public PageResponseDTO<ReviewProblemDTO> problems(
             WorkspaceContext ws,
             @Valid @ParameterObject ReviewProblemFilterParams filter,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
-        return new PagedModel<>(query.listProblems(
+        return PageResponseDTO.from(query.listProblems(
                 ws.id(), filter.toResultFilter(), filter.toProblemFilter(), PageRequest.of(page, size)));
     }
 
@@ -96,6 +95,7 @@ public class PracticeReviewOutputController {
     @PostMapping("/results/{resultId}/marks")
     @AuditExempt(reason = "The result mark records the actor and reason")
     @Operation(operationId = "createResultMark", summary = "Mark a result")
+    @ApiResponse(responseCode = "201", description = "Created")
     public ResponseEntity<ResultMarkDTO> createMark(
             WorkspaceContext ws, @PathVariable UUID resultId, @Valid @RequestBody CreateResultMarkRequestDTO request) {
         var m = marks.create(
@@ -127,14 +127,7 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/lineage")
     @Operation(operationId = "getReviewLineage", summary = "Trace an item, review, result, problem or feedback")
-    public ReviewLineageDTO lineage(
-            WorkspaceContext ws,
-            @RequestParam LineageKind kind,
-            @RequestParam(required = false) @Nullable Long itemId,
-            @RequestParam(required = false) @Nullable UUID reviewId,
-            @RequestParam(required = false) @Nullable UUID resultId,
-            @RequestParam(required = false) @Nullable UUID problemId,
-            @RequestParam(required = false) @Nullable UUID feedbackId) {
-        return lineage.graph(ws.id(), kind, itemId, reviewId, resultId, problemId, feedbackId);
+    public ReviewLineageDTO lineage(WorkspaceContext ws, @Valid @ParameterObject ReviewLineageFilterParams filter) {
+        return lineage.graph(ws.id(), filter);
     }
 }

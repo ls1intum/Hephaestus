@@ -4,36 +4,44 @@ import { InfoIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { toast } from "sonner";
 import {
-	autonomyRollupOptions,
+	createReviewBatchMutation,
+	createReviewScheduleMutation,
+	deleteReviewScheduleMutation,
+	getFeedbackModeRollupOptions,
 	getPracticeReviewSettingsOptions,
-	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
 	listAgentsOptions,
-	listBackfillRunsOptions,
-	listBackfillRunsQueryKey,
-	listMembersOptions,
+	listMembershipsOptions,
+	listPracticeGroupsOptions,
 	listPracticesOptions,
-	listSweepSchedulesOptions,
-	preflightBackfillRunMutation,
-	previewCoverageMutation,
-	updateBackfillRunStatusMutation,
+	listReviewBatchesOptions,
+	listReviewBatchesQueryKey,
+	listReviewItemsOptions,
+	listReviewSchedulesOptions,
+	listReviewSchedulesQueryKey,
+	previewReviewScopeMutation,
+	setReviewScheduleEnabledMutation,
+	updateReviewBatchStatusMutation,
+	updateReviewScheduleMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
-	CreateReviewBackfillRunRequest,
+	AccountRef,
+	CreateReviewBatchRequest,
+	ReviewSchedule,
 	UpdatePracticeReviewSettingsRequest,
 } from "@/api/types.gen";
-import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
-import { PracticeReviewBackfill } from "@/components/admin/practices/PracticeReviewBackfill";
+import { PracticeFeedbackModePage } from "@/components/admin/practices/practice-feedback-mode/PracticeFeedbackModePage";
+import { PracticeReviewBatch } from "@/components/admin/practices/PracticeReviewBatch";
+import { PracticeReviewSchedule } from "@/components/admin/practices/PracticeReviewSchedule";
 import type {
-	PeopleCoverageOptions,
-	RepositoryCoverageOptions,
-} from "@/components/admin/practices/PracticeReviewCoverageSettings";
+	PeopleScopeOptions,
+	RepositoryScopeOptions,
+} from "@/components/admin/practices/PracticeReviewScopeSettings";
 import {
 	type PracticeReviewField,
 	PracticeReviewSettings,
 	type PracticeReviewWorkspaceUpdate,
 } from "@/components/admin/practices/PracticeReviewSettings";
-import { PracticeReviewSweepSchedule } from "@/components/admin/practices/PracticeReviewSweepSchedule";
 import {
 	PracticeDefinitionSkeleton,
 	ReviewSettingsSkeleton,
@@ -46,13 +54,13 @@ import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import environment from "@/environment";
-import { usePracticeAutonomyMutations } from "@/hooks/use-practice-autonomy-mutations";
+import { usePracticeFeedbackModeMutations } from "@/hooks/use-practice-feedback-mode-mutations";
 import { usePracticeReviewSettingsMutation } from "@/hooks/use-practice-review-settings";
 import { reviewModelOf, useReviewRunning } from "@/hooks/use-review-running";
-import { useSweepScheduleMutations } from "@/hooks/use-sweep-schedule-mutations";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
+import { ITEM_KIND } from "@/lib/item-kinds";
 import { workspaceAdminHead } from "@/lib/page-title";
-import { problemDetailOf } from "@/lib/problem-detail";
+import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
 import { hasText } from "@/lib/text";
 
@@ -61,6 +69,9 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 	validateSearch: reviewSearchSchema,
 	component: ReviewRoute,
 });
+
+/** The largest page the server serves; the pickers list every repository and member it returns. */
+const PICKER_PAGE_SIZE = 100;
 
 function ReviewRoute() {
 	const { workspaceSlug } = Route.useParams();
@@ -83,8 +94,8 @@ function ReviewRoute() {
 			}}
 			running={running}
 			sections={{
-				"how-much": (
-					<HowMuchSection
+				"feedback-mode": (
+					<FeedbackModeSection
 						workspaceSlug={workspaceSlug}
 						overridesOnly={overrides === true}
 						onOverridesOnlyChange={(next) => {
@@ -95,117 +106,158 @@ function ReviewRoute() {
 						}}
 					/>
 				),
-				"when-and-where": <WhenAndWhereSection workspaceSlug={workspaceSlug} />,
+				"automated-review": <AutomatedReviewSection workspaceSlug={workspaceSlug} />,
 				"past-work": <PastWorkSection workspaceSlug={workspaceSlug} />,
 			}}
 		/>
 	);
 }
 
-interface HowMuchSectionProps {
+interface FeedbackModeSectionProps {
 	workspaceSlug: string;
 	overridesOnly: boolean;
 	onOverridesOnlyChange: (next: boolean) => void;
 }
 
-function HowMuchSection({
+function FeedbackModeSection({
 	workspaceSlug,
 	overridesOnly,
 	onOverridesOnlyChange,
-}: HowMuchSectionProps) {
-	const settingsQuery = useQuery({
-		...getPracticeReviewSettingsOptions({ path: { workspaceSlug } }),
-	});
-	const rollupQuery = useQuery({ ...autonomyRollupOptions({ path: { workspaceSlug } }) });
-	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
+}: FeedbackModeSectionProps) {
+	const settingsQuery = useQuery(getPracticeReviewSettingsOptions({ path: { workspaceSlug } }));
+	const rollupQuery = useQuery(getFeedbackModeRollupOptions({ path: { workspaceSlug } }));
+	const groupsQuery = useQuery(listPracticeGroupsOptions({ path: { workspaceSlug } }));
+	const practicesQuery = useQuery(listPracticesOptions({ path: { workspaceSlug } }));
 
-	const autonomyMutations = usePracticeAutonomyMutations(workspaceSlug);
+	const feedbackModes = usePracticeFeedbackModeMutations(workspaceSlug);
 	const updateSettings = usePracticeReviewSettingsMutation(workspaceSlug, {
 		success: "Review settings updated",
 		error: "We could not update review settings",
 	});
 
-	if (settingsQuery.isPending || rollupQuery.isPending || practicesQuery.isPending) {
+	const queries = [settingsQuery, rollupQuery, groupsQuery, practicesQuery];
+	if (queries.some((query) => query.isPending)) {
 		return <PracticeDefinitionSkeleton />;
 	}
 
-	const error = settingsQuery.error ?? rollupQuery.error ?? practicesQuery.error;
-	if (error || !settingsQuery.data || !rollupQuery.data || !practicesQuery.data) {
+	const error = queries.find((query) => query.error)?.error;
+	if (
+		error ||
+		!settingsQuery.data ||
+		!rollupQuery.data ||
+		!groupsQuery.data ||
+		!practicesQuery.data
+	) {
 		return (
 			<QueryErrorAlert
 				error={error}
-				title="We could not load the autonomy settings"
+				title="We could not load the feedback modes"
 				onRetry={() => {
-					void settingsQuery.refetch();
-					void rollupQuery.refetch();
-					void practicesQuery.refetch();
+					for (const query of queries) {
+						void query.refetch();
+					}
 				}}
 			/>
 		);
 	}
 
 	return (
-		<PracticeAutonomyPage
+		<PracticeFeedbackModePage
 			workspaceSlug={workspaceSlug}
 			settings={settingsQuery.data}
 			rollup={rollupQuery.data}
+			groups={groupsQuery.data}
 			practices={practicesQuery.data}
 			pending={{
 				workspace: updateSettings.isPending,
-				groupSlugs: autonomyMutations.pendingGroupSlugs,
-				practiceSlugs: autonomyMutations.pendingPracticeSlugs,
-				bulk: autonomyMutations.bulk,
+				groupSlugs: feedbackModes.pendingGroupSlugs,
+				practiceSlugs: feedbackModes.pendingPracticeSlugs,
+				bulk: feedbackModes.bulk,
 			}}
 			overridesOnly={overridesOnly}
 			onOverridesOnlyChange={onOverridesOnlyChange}
-			onSetWorkspaceDefault={(defaultAutonomy) =>
-				updateSettings.mutate({ path: { workspaceSlug }, body: { defaultAutonomy } })
+			onSetWorkspaceDefault={(defaultFeedbackMode) =>
+				updateSettings.mutate({ path: { workspaceSlug }, body: { defaultFeedbackMode } })
 			}
 			onClearWorkspaceDefault={() =>
 				updateSettings.mutate({
 					path: { workspaceSlug },
-					body: { reset: ["DEFAULT_AUTONOMY"] },
+					body: { reset: ["DEFAULT_FEEDBACK_MODE"] },
 				})
 			}
-			onSetGroupAutonomy={(groupSlug, autonomy) =>
-				autonomyMutations.setGroupAutonomy.mutate({
+			onSetGroupFeedbackMode={(groupSlug, feedbackMode) =>
+				feedbackModes.setGroupFeedbackMode.mutate({
 					path: { workspaceSlug, groupSlug },
-					body: { autonomy },
+					body: { feedbackMode },
 				})
 			}
-			onClearGroupAutonomy={(groupSlug) =>
-				autonomyMutations.setGroupAutonomy.mutate({ path: { workspaceSlug, groupSlug }, body: {} })
+			onClearGroupFeedbackMode={(groupSlug) =>
+				feedbackModes.setGroupFeedbackMode.mutate({
+					path: { workspaceSlug, groupSlug },
+					body: { feedbackMode: null },
+				})
 			}
-			onSetPracticeAutonomy={(practiceSlug, autonomy) =>
-				autonomyMutations.setPracticeAutonomy.mutate({
+			onSetPracticeFeedbackMode={(practiceSlug, feedbackMode) =>
+				feedbackModes.setPracticeFeedbackMode.mutate({
 					path: { workspaceSlug, practiceSlug },
-					body: { autonomy },
+					body: { feedbackMode },
 				})
 			}
-			onClearPracticeAutonomy={(practiceSlug) =>
-				autonomyMutations.setPracticeAutonomy.mutate({
+			onClearPracticeFeedbackMode={(practiceSlug) =>
+				feedbackModes.setPracticeFeedbackMode.mutate({
 					path: { workspaceSlug, practiceSlug },
-					body: {},
+					body: { feedbackMode: null },
 				})
 			}
-			onBulkSetAutonomy={(practiceSlugs, autonomy) => {
-				void autonomyMutations.setManyPracticeAutonomies(practiceSlugs, autonomy);
+			onBulkSetFeedbackMode={(practiceSlugs, feedbackMode) => {
+				void feedbackModes.setManyPracticeFeedbackModes(practiceSlugs, feedbackMode);
 			}}
 		/>
 	);
 }
 
-function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
-	const reviewSettingsQuery = useQuery({
-		...getPracticeReviewSettingsOptions({ path: { workspaceSlug } }),
-	});
-	const bindingsQuery = useQuery({ ...listAgentsOptions({ path: { workspaceSlug } }) });
+/** The name a reader knows, falling back to a provider identity for an account with no name yet. */
+function accountLabel(account: AccountRef): string {
+	return (
+		[
+			account.displayName,
+			...account.identities.flatMap((identity) => [identity.displayName, identity.login]),
+		].find((name): name is string => hasText(name)) ?? `Member ${account.id}`
+	);
+}
+
+function accountDescription(account: AccountRef): string | undefined {
+	const logins = account.identities.flatMap((identity) =>
+		hasText(identity.login) ? [`@${identity.login}`] : [],
+	);
+	if (account.status === "UNCLAIMED") {
+		logins.push("not signed in yet");
+	}
+	return logins.length === 0 ? undefined : logins.join(", ");
+}
+
+/** A schedule's version, as the strong entity tag the server compares an If-Match against. */
+const scheduleTag = (schedule: ReviewSchedule) => `"${schedule.version}"`;
+
+function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
+	const queryClient = useQueryClient();
+	const reviewSettingsQuery = useQuery(
+		getPracticeReviewSettingsOptions({ path: { workspaceSlug } }),
+	);
+	const bindingsQuery = useQuery(listAgentsOptions({ path: { workspaceSlug } }));
 	const settingsReviewModel = reviewModelOf(bindingsQuery);
-	const workspaceQuery = useQuery({ ...getWorkspaceOptions({ path: { workspaceSlug } }) });
-	const schedulesQuery = useQuery(listSweepSchedulesOptions({ path: { workspaceSlug } }));
-	const repositoriesQuery = useQuery(getRepositoriesToMonitorOptions({ path: { workspaceSlug } }));
-	const membersQuery = useQuery(listMembersOptions({ path: { workspaceSlug } }));
-	const coveragePreview = useMutation(previewCoverageMutation());
+	const workspaceQuery = useQuery(getWorkspaceOptions({ path: { workspaceSlug } }));
+	const schedulesQuery = useQuery(listReviewSchedulesOptions({ path: { workspaceSlug } }));
+	const repositoriesQuery = useQuery(
+		listReviewItemsOptions({
+			path: { workspaceSlug },
+			query: { itemKind: ITEM_KIND.repository, size: PICKER_PAGE_SIZE },
+		}),
+	);
+	const membersQuery = useQuery(
+		listMembershipsOptions({ path: { workspaceSlug }, query: { size: PICKER_PAGE_SIZE } }),
+	);
+	const scopePreview = useMutation(previewReviewScopeMutation());
 
 	const updatePracticeReviewSettings = usePracticeReviewSettingsMutation(workspaceSlug, {
 		success: "Review settings updated",
@@ -215,12 +267,66 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 		success: "Practice review settings updated",
 		error: "We could not update practice review settings",
 	});
-	const schedules = useSweepScheduleMutations(workspaceSlug);
+
+	/**
+	 * The server owns the schedule list (it computes the next run), so each write invalidates rather
+	 * than writing a guess into the cache. A recurring check is a standing authorization to spend, so
+	 * every write says whether it landed, except an edit the reader is looking straight at.
+	 */
+	const invalidateSchedules = async () =>
+		queryClient.invalidateQueries({
+			queryKey: listReviewSchedulesQueryKey({ path: { workspaceSlug } }),
+		});
+	const scheduleFailed = (verb: string) => (error: unknown) => {
+		void invalidateSchedules();
+		toast.error(`We could not ${verb} this recurring check`, {
+			description: problemDetailOf(error),
+		});
+	};
+	const createSchedule = useMutation({
+		...createReviewScheduleMutation(),
+		onSuccess: () => {
+			void invalidateSchedules();
+			toast.success("Recurring check started");
+		},
+		onError: scheduleFailed("start"),
+	});
+	const replaceSchedule = useMutation({
+		...updateReviewScheduleMutation(),
+		onSuccess: () => {
+			void invalidateSchedules();
+		},
+		onError: scheduleFailed("update"),
+	});
+	const enableSchedule = useMutation({
+		...setReviewScheduleEnabledMutation(),
+		onSuccess: (schedule) => {
+			void invalidateSchedules();
+			toast.success(schedule.enabled ? "Recurring check resumed" : "Recurring check paused");
+		},
+		onError: scheduleFailed("change"),
+	});
+	const deleteSchedule = useMutation({
+		...deleteReviewScheduleMutation(),
+		onSuccess: () => {
+			void invalidateSchedules();
+			toast.success("Recurring check deleted");
+		},
+		onError: (error) => {
+			if (problemStatusOf(error) === 409) {
+				toast.error("This recurring check has already run", {
+					description: "Its earlier runs keep it in place. Pause it instead.",
+				});
+				return;
+			}
+			scheduleFailed("delete")(error);
+		},
+	});
 
 	const isLoading = reviewSettingsQuery.isPending || workspaceQuery.isPending;
 	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
-	let repositoryOptions: RepositoryCoverageOptions;
+	let repositoryOptions: RepositoryScopeOptions;
 	if (repositoriesQuery.isPending) {
 		repositoryOptions = { status: "loading" };
 	} else if (repositoriesQuery.isError) {
@@ -234,14 +340,14 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 	} else {
 		repositoryOptions = {
 			status: "ready",
-			options: repositoriesQuery.data.map((repository) => ({
-				value: repository,
-				label: repository,
+			options: (repositoriesQuery.data.content ?? []).map((repository) => ({
+				itemId: repository.id,
+				name: repository.label,
 			})),
 		};
 	}
 
-	let peopleOptions: PeopleCoverageOptions;
+	let peopleOptions: PeopleScopeOptions;
 	if (membersQuery.isPending) {
 		peopleOptions = { status: "loading" };
 	} else if (membersQuery.isError) {
@@ -258,12 +364,9 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 			options: membersQuery.data
 				.filter((member) => member.eligibleForPracticeReview)
 				.map((member) => ({
-					value: member.userId,
-					label:
-						[member.userName, member.userLogin].find(
-							(name) => name != null && name.trim() !== "",
-						) ?? `Member ${member.userId}`,
-					description: hasText(member.userLogin) ? `@${member.userLogin}` : undefined,
+					value: member.accountId,
+					label: accountLabel(member.account),
+					description: accountDescription(member.account),
 				})),
 		};
 	}
@@ -298,8 +401,8 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 				}
 				workspace={{
 					enabled: workspaceQuery.data.practicesEnabled,
-					autoTriggerEnabled: workspaceQuery.data.practiceReviewAutoTriggerEnabled,
-					manualTriggerEnabled: workspaceQuery.data.practiceReviewManualTriggerEnabled,
+					startsFromActivity: workspaceQuery.data.practiceReviewAutoTriggerEnabled,
+					startsOnRequest: workspaceQuery.data.practiceReviewManualTriggerEnabled,
 					isSaving: updateFeatures.isPending,
 					onUpdate: (settings: PracticeReviewWorkspaceUpdate) =>
 						updateFeatures.mutate({ path: { workspaceSlug }, body: settings }),
@@ -320,9 +423,9 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 							body: { reset: [field] },
 						}),
 				}}
-				coverage={{
+				scope={{
 					preview: async (scope) =>
-						coveragePreview.mutateAsync({ path: { workspaceSlug }, body: scope }),
+						scopePreview.mutateAsync({ path: { workspaceSlug }, body: scope }),
 					repositories: repositoryOptions,
 					people: peopleOptions,
 				}}
@@ -337,49 +440,74 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 					<InfoIcon aria-hidden />
 					<AlertTitle>Reviews start paused in this preview</AlertTitle>
 					<AlertDescription>
-						Staging data is available, but cloned model bindings, triggers and recurring checks
-						start paused. To test a review in this preview only, select and enable the practice
-						review model below. Then enable the manual or automatic trigger you need.
+						Staging data is available, but cloned model assignments, review starts and recurring
+						checks start paused. To test a review in this preview only, select and enable the
+						practice review model below. Then turn on the way to start a review that you need.
 					</AlertDescription>
 				</Alert>
 			)}
 			{reviewSettings}
-			<PracticeReviewSweepSchedule
+			<PracticeReviewSchedule
 				schedules={schedulesQuery.data ?? []}
 				isLoading={schedulesQuery.isLoading}
 				isError={schedulesQuery.isError}
 				onRetry={() => {
 					void schedulesQuery.refetch();
 				}}
-				isSaving={schedules.isSaving}
-				onCreate={schedules.onCreate}
-				onReplace={schedules.onReplace}
-				onDelete={schedules.onDelete}
+				isSaving={
+					createSchedule.isPending ||
+					replaceSchedule.isPending ||
+					enableSchedule.isPending ||
+					deleteSchedule.isPending
+				}
+				onCreate={(input) => createSchedule.mutate({ path: { workspaceSlug }, body: input })}
+				onReplace={(schedule, input) =>
+					replaceSchedule.mutate({
+						path: { workspaceSlug, scheduleId: schedule.id },
+						body: input,
+						headers: { "If-Match": scheduleTag(schedule) },
+					})
+				}
+				onSetEnabled={(schedule, enabled) =>
+					enableSchedule.mutate({
+						path: { workspaceSlug, scheduleId: schedule.id },
+						body: { enabled },
+						headers: { "If-Match": scheduleTag(schedule) },
+					})
+				}
+				onDelete={(schedule) =>
+					deleteSchedule.mutate({
+						path: { workspaceSlug, scheduleId: schedule.id },
+						headers: { "If-Match": scheduleTag(schedule) },
+					})
+				}
 			/>
 		</div>
 	);
 }
 
-const ACTIVE_BACKFILL_POLL_MS = 15_000;
+const ACTIVE_BATCH_POLL_MS = 15_000;
 
 function PastWorkSection({ workspaceSlug }: { workspaceSlug: string }) {
 	const queryClient = useQueryClient();
 
-	const runsQuery = useQuery({
-		...listBackfillRunsOptions({ path: { workspaceSlug } }),
+	const batchesQuery = useQuery({
+		...listReviewBatchesOptions({ path: { workspaceSlug } }),
 		refetchInterval: (query) =>
-			query.state.data?.some((run) => run.status === "RUNNING" || run.status === "PAUSED") === true
-				? ACTIVE_BACKFILL_POLL_MS
+			query.state.data?.content?.some(
+				(batch) => batch.status === "RUNNING" || batch.status === "PAUSED",
+			) === true
+				? ACTIVE_BATCH_POLL_MS
 				: false,
 	});
 
 	const invalidate = async () =>
 		queryClient.invalidateQueries({
-			queryKey: listBackfillRunsQueryKey({ path: { workspaceSlug } }),
+			queryKey: listReviewBatchesQueryKey({ path: { workspaceSlug } }),
 		});
 
-	const preflight = useMutation({
-		...preflightBackfillRunMutation(),
+	const estimate = useMutation({
+		...createReviewBatchMutation(),
 		onSuccess: () => {
 			void invalidate();
 		},
@@ -391,16 +519,19 @@ function PastWorkSection({ workspaceSlug }: { workspaceSlug: string }) {
 	});
 
 	const updateStatus = useMutation({
-		...updateBackfillRunStatusMutation(),
-		onSuccess: (run) => {
+		...updateReviewBatchStatusMutation(),
+		onSuccess: (batch) => {
 			void invalidate();
-			if (run.status === "RUNNING") {
-				toast.success("Review of past work started");
-			} else if (run.status === "CANCELLED") {
+			if (batch.status === "RUNNING") {
+				toast.success("Review of past work running");
+			} else if (batch.status === "PAUSED") {
+				toast.success("Review of past work paused");
+			} else if (batch.status === "CANCELLED") {
 				toast.success("Review of past work stopped");
 			}
 		},
 		onError: (error) => {
+			void invalidate();
 			toast.error("We could not update this review of past work", {
 				description: problemDetailOf(error),
 			});
@@ -409,23 +540,24 @@ function PastWorkSection({ workspaceSlug }: { workspaceSlug: string }) {
 
 	return (
 		<div className="max-w-3xl">
-			<PracticeReviewBackfill
-				runs={runsQuery.data ?? []}
-				isLoading={runsQuery.isLoading}
-				isError={runsQuery.isError}
+			<PracticeReviewBatch
+				batches={batchesQuery.data?.content ?? []}
+				isLoading={batchesQuery.isLoading}
+				isError={batchesQuery.isError}
 				onRetry={() => {
-					void runsQuery.refetch();
+					void batchesQuery.refetch();
 				}}
-				isEstimating={preflight.isPending}
-				onEstimate={(request: CreateReviewBackfillRunRequest) =>
-					preflight.mutate({ path: { workspaceSlug }, body: request })
+				isEstimating={estimate.isPending}
+				onEstimate={(request: CreateReviewBatchRequest) =>
+					estimate.mutate({ path: { workspaceSlug }, body: request })
 				}
 				isUpdating={updateStatus.isPending}
-				onConfirm={(runId) =>
-					updateStatus.mutate({ path: { workspaceSlug, runId }, body: { status: "RUNNING" } })
-				}
-				onCancel={(runId) =>
-					updateStatus.mutate({ path: { workspaceSlug, runId }, body: { status: "CANCELLED" } })
+				onChangeStatus={(batch, status) =>
+					updateStatus.mutate({
+						path: { workspaceSlug, batchId: batch.id },
+						body: { status },
+						headers: { "If-Match": batch.etag },
+					})
 				}
 			/>
 		</div>

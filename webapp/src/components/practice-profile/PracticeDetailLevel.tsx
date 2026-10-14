@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { PracticeStanding } from "@/api/types.gen";
+import type { PracticeStanding, ReviewedPractice } from "@/api/types.gen";
 import {
 	PracticeTabsList,
 	PracticeTabsRail,
@@ -24,13 +24,14 @@ import {
 	PracticeFeedbackCardSkeleton,
 } from "@/components/practice-vocabulary/PracticeFeedbackCard";
 import { StandingBadge, TrendNote } from "@/components/practice-vocabulary/StandingBadge";
+import { ReviewFeed, ReviewFeedSkeleton } from "@/components/profile/ReviewFeed";
 import {
-	EMPTY_REVIEW_RUN_FEED,
-	type ResultControls,
-	type ReviewRunFeedState,
-} from "@/components/profile/review-runs";
-import { ReviewRunFeed, ReviewRunFeedSkeleton } from "@/components/profile/ReviewRunFeed";
+	EMPTY_REVIEW_FEED,
+	type FeedbackResponseControls,
+	type ReviewFeedState,
+} from "@/components/profile/reviews";
 import { DrawerBody } from "@/components/ui/drawer";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { hasText } from "@/lib/text";
 
@@ -55,11 +56,17 @@ export interface PracticeDetailLevelProps {
 	path: LevelPath;
 	/** Returns to the group's level under this one; a card's group name is a link only with it. */
 	onOpenGroup?: () => void;
-	/** The practice, as the standings carry it: the catalog's words and where the reader stands. */
-	practice?: PracticeStanding;
 	/**
-	 * The practice's picture and guide, which load on their own after the standing: the picture
-	 * joins the introduction, and a guide adds the Guide tab.
+	 * The practice, as the standings carry it: the catalog's words and where the reader stands.
+	 * Absent for a practice with no standing, which the level shows from its words and guidance
+	 * alone.
+	 */
+	practice?: PracticeStanding;
+	/** The name and words of a practice with no standing, from the workspace's catalog. */
+	described?: Pick<ReviewedPractice, "name" | "whyItMatters" | "whatGoodLooksLike">;
+	/**
+	 * The practice's guidance, which loads on its own after the standing: the picture joins the
+	 * introduction, and a guide adds the Guide tab.
 	 */
 	guidance: PracticeGuidanceState;
 	/**
@@ -68,7 +75,8 @@ export interface PracticeDetailLevelProps {
 	 */
 	tab: PracticeTab;
 	onTabChange?: (tab: PracticeTab) => void;
-	feed?: ReviewRunFeedState;
+	/** The reviews of the practice's group; the level shows this practice's results in them. */
+	feed?: ReviewFeedState;
 	/** The developer's practice feedback; the level shows the cards written about this practice. */
 	feedbackCards?: PracticeFeedbackCardEntry[];
 	/**
@@ -78,8 +86,8 @@ export interface PracticeDetailLevelProps {
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
 	/** How many rows the feed draws while its first page loads. */
 	skeletonRows: number;
-	/** The reader's response to a result, from the route. */
-	results?: ResultControls;
+	/** The reader's responses to their feedback, from the route; without them none can be given. */
+	responses?: FeedbackResponseControls;
 	isLoading: boolean;
 	error?: unknown;
 	onRetry?: () => void;
@@ -101,6 +109,11 @@ function feedbackCardsOf(cards: PracticeFeedbackCardEntry[], practiceSlug: strin
 
 const NO_CARDS: PracticeFeedbackCardEntry[] = [];
 
+const NO_WORDS = { whyItMatters: null, whatGoodLooksLike: null };
+
+/** The required words for a practice that the workspace reviews by hand or not at all. */
+const GUIDANCE_ONLY = "This practice offers guidance without automated review.";
+
 /**
  * One practice as the level over its group: the practice's introduction, then its tabs — the
  * feedback written about it, which the level opens on, the results of the reviews of the reader's work,
@@ -113,31 +126,30 @@ export function PracticeDetailLevel({
 	path,
 	onOpenGroup,
 	practice,
+	described,
 	guidance,
 	tab,
 	onTabChange,
-	feed = EMPTY_REVIEW_RUN_FEED,
+	feed = EMPTY_REVIEW_FEED,
 	feedbackCards = NO_CARDS,
 	ratingProps,
 	skeletonRows,
-	results,
+	responses,
 	isLoading,
 	error,
 	onRetry,
 	neverApplied = false,
 }: PracticeDetailLevelProps) {
-	// The server narrows which runs reached the practice; the level narrows the same way and shows
-	// only that practice's results instead of everything the run found.
-	const runs =
+	// The feed holds every review of the group; the level shows only the reviews that reached this
+	// practice, and only this practice's results in each.
+	const reviews =
 		feed.status === "ready" && practice
-			? feed.runs
-					.map((run) => ({
-						...run,
-						practiceResults: run.practiceResults.filter(
-							(result) => result.practiceSlug === practice.slug,
-						),
+			? feed.reviews
+					.map((review) => ({
+						...review,
+						results: review.results.filter((result) => result.practiceSlug === practice.slug),
 					}))
-					.filter((run) => run.practiceResults.length > 0)
+					.filter((review) => review.results.length > 0)
 			: [];
 	const feedback = practice
 		? feedbackCardsOf(feedbackCards, practice.slug)
@@ -145,17 +157,17 @@ export function PracticeDetailLevel({
 	const feedbackCount = (feedback.open ? 1 : 0) + feedback.resolved.length;
 	// What each tab counts is what it can show. The feedback cards arrive in one piece, so that
 	// count is always known; the results are paged, so a number taken from the loaded pages
-	// would be short while earlier runs are still a press away, and would grow under the reader as
-	// they press. An unnumbered tab says less and nothing wrong, so the count waits for the last
+	// would be short while earlier reviews are still a press away, and would grow under the reader
+	// as they press. An unnumbered tab says less and nothing wrong, so the count waits for the last
 	// page.
 	const counts: Partial<Record<PracticeTab, number>> = {
 		results:
 			feed.status === "ready" && !feed.hasMore
-				? runs.reduce((count, run) => count + run.practiceResults.length, 0)
+				? reviews.reduce((count, review) => count + review.results.length, 0)
 				: undefined,
 		feedback: feedbackCount,
 	};
-	const guide = guidance.status === "ready" ? guidance.guide : undefined;
+	const guide = guidance.status === "ready" ? (guidance.guide ?? undefined) : undefined;
 	// The Guide tab exists only once a guide has arrived; until then, or without one, a link to it
 	// lands on the feedback.
 	const tabs = PRACTICE_TABS.filter((candidate) => candidate !== "guide" || guide !== undefined);
@@ -177,7 +189,7 @@ export function PracticeDetailLevel({
 			<div className="flex flex-col gap-4">
 				<PracticeTabsSkeleton tabs={tabs.length} />
 				{shownTab === "results" ? (
-					<ReviewRunFeedSkeleton rows={skeletonRows} />
+					<ReviewFeedSkeleton rows={skeletonRows} />
 				) : (
 					<div className="flex flex-col gap-2.5" aria-busy="true">
 						<span className="sr-only">Loading feedback…</span>
@@ -199,7 +211,7 @@ export function PracticeDetailLevel({
 			/>
 		);
 	} else if (practice) {
-		const requestedNote = requestedReviewNote(practice, runs);
+		const requestedNote = requestedReviewNote(practice, reviews);
 		body = (
 			<>
 				{neverApplied && <p className="max-w-2xl text-sm">{NEVER_APPLIED.description}</p>}
@@ -259,21 +271,21 @@ export function PracticeDetailLevel({
 						<Section
 							size="lg"
 							title="Results"
-							description="Reviews of your work that reached this practice, newest first: why each was noted, the evidence, and the next step."
+							description="Reviews of your work that reached this practice, newest first: what each recorded, the evidence, and the next step."
 						>
 							{hasText(requestedNote) && <p className="max-w-2xl text-sm">{requestedNote}</p>}
-							<ReviewRunFeed
+							<ReviewFeed
 								feed={feed}
-								runs={runs}
+								reviews={reviews}
 								skeletonRows={skeletonRows}
-								results={results}
+								responses={responses}
 								// The rows are this practice's own, so none repeats its name under the summary.
 								showPracticeName={false}
 								// Every row here reviews the same practice, so the newest is the one the reader
 								// came for; the rest are its history and wait for a press.
 								initiallyOpen="newest"
 								emptyTitle="No results yet"
-								emptyDescription="A result appears here after a review checks this practice against your work."
+								emptyDescription="They appear after Heph reviews your work."
 							/>
 						</Section>
 					</TabsContent>
@@ -287,6 +299,28 @@ export function PracticeDetailLevel({
 					)}
 				</Tabs>
 			</>
+		);
+	} else if (guidance.status === "ready") {
+		// No standing, yet the workspace describes the practice: it offers guidance and no results.
+		body = (
+			<>
+				<p className="max-w-2xl text-sm">{GUIDANCE_ONLY}</p>
+				<PracticeIntro practice={described ?? NO_WORDS} guidance={guidance} />
+				{guide && (
+					// `h3`: the guide's own headings are `h4`, and the outline may not skip a level.
+					<Section size="lg" level={3} title="Practice guide">
+						<PracticeGuideMarkdown guide={guide} />
+					</Section>
+				)}
+			</>
+		);
+	} else if (guidance.status === "loading") {
+		body = (
+			<div className="flex max-w-2xl flex-col gap-2" aria-busy="true">
+				<span className="sr-only">Loading this practice…</span>
+				<Skeleton className="h-5 w-full" />
+				<Skeleton className="h-5 w-3/4" />
+			</div>
 		);
 	} else {
 		body = (
@@ -303,7 +337,7 @@ export function PracticeDetailLevel({
 				nested={nested}
 				path={path}
 				current="Practice"
-				title={practice?.name ?? "Practice"}
+				title={practice?.name ?? described?.name ?? "Practice"}
 				chips={
 					practice && (
 						<>
@@ -315,11 +349,11 @@ export function PracticeDetailLevel({
 									<StandingBadge
 										standing={practice.standing}
 										scope="practice"
-										support={practice.trendSupport}
+										support={practice.trendSupport ?? undefined}
 									/>
 									<TrendNote
-										direction={practice.direction}
-										support={practice.trendSupport}
+										direction={practice.direction ?? undefined}
+										support={practice.trendSupport ?? undefined}
 										scope="practice"
 									/>
 								</>

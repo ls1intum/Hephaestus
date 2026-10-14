@@ -88,7 +88,6 @@ public class PracticeVersionService {
                 .orElse(1);
         PracticeVersion version = versions.saveAndFlush(
                 new PracticeVersion(locked, number, mapper.valueToTree(definition), createdByAccountId));
-        Objects.requireNonNull(entityManager).refresh(version);
         locked.setCurrentVersion(version);
         practice.setCurrentVersion(version);
         practices.save(locked);
@@ -96,14 +95,14 @@ public class PracticeVersionService {
     }
 
     @Transactional
-    public Practice create(
-            Workspace workspace,
-            String slug,
-            ItemKind kind,
-            PracticeDefinition definition,
-            @Nullable Long groupId,
-            int position,
-            @Nullable Long createdByAccountId) {
+    public Practice create(NewPractice request) {
+        var workspace = request.workspace();
+        var slug = request.slug();
+        var kind = request.kind();
+        var definition = request.definition();
+        var groupId = request.groupId();
+        var position = request.position();
+        var createdByAccountId = request.createdByAccountId();
         validator.validate(kind, definition);
         // The deferred current-version link permits reserving both identities before inserting
         // the practice and its first version.
@@ -139,6 +138,15 @@ public class PracticeVersionService {
                 .executeUpdate();
         return practices.findByWorkspaceIdAndSlug(workspace.getId(), slug).orElseThrow();
     }
+
+    public record NewPractice(
+            Workspace workspace,
+            String slug,
+            ItemKind kind,
+            PracticeDefinition definition,
+            @Nullable Long groupId,
+            int position,
+            @Nullable Long createdByAccountId) {}
 
     @Transactional(readOnly = true)
     public PracticeVersionDTO viewCurrent(Practice practice) {

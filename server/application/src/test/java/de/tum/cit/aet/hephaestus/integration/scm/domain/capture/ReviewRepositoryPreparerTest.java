@@ -21,7 +21,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,7 +30,7 @@ import tools.jackson.databind.ObjectMapper;
 class ReviewRepositoryPreparerTest extends BaseUnitTest {
     private final GitRepositoryManager git = mock(GitRepositoryManager.class);
     private final PullRequestRepository pullRequests = mock(PullRequestRepository.class);
-    private final RepositoryToMonitorRepository monitors = mock(RepositoryToMonitorRepository.class);
+    private final RepositoryRepository repositories = mock(RepositoryRepository.class);
     private final ConnectionService connections = mock(ConnectionService.class);
     private final ScmTokenSource tokens = mock(ScmTokenSource.class);
     private ScmCaptureContext context;
@@ -59,13 +58,12 @@ class ReviewRepositoryPreparerTest extends BaseUnitTest {
         pr.setId(3L);
         pr.setRepository(repository);
         when(pullRequests.findByIdWithAuthorAndRepository(3L)).thenReturn(Optional.of(pr));
-        when(monitors.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo")).thenReturn(true);
+        when(repositories.isMonitored(1L, 2L)).thenReturn(true);
         when(connections.findActive(1L, IntegrationKind.GITHUB)).thenReturn(Optional.of(mock(Connection.class)));
         when(tokens.kind()).thenReturn(IntegrationKind.GITHUB);
         when(tokens.serverUrl(1L)).thenReturn(Optional.of("https://scm.example"));
         when(tokens.accessToken(1L)).thenReturn(Optional.of("test-token"));
-        preparer = new ReviewRepositoryPreparer(
-                git, pullRequests, monitors, connections, List.of(tokens), mock(RepositoryRepository.class));
+        preparer = new ReviewRepositoryPreparer(git, pullRequests, connections, List.of(tokens), repositories);
     }
 
     @Test
@@ -78,7 +76,7 @@ class ReviewRepositoryPreparerTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseWorkOutsideWorkspaceMonitors() {
-        when(monitors.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo")).thenReturn(false);
+        when(repositories.isMonitored(1L, 2L)).thenReturn(false);
         assertThatThrownBy(() -> preparer.authorize(context))
                 .isInstanceOf(ItemCaptureException.class)
                 .hasMessageContaining("does not monitor");

@@ -32,7 +32,7 @@ public class PracticeGroupStandingController {
 
     @GetMapping
     @Operation(
-            operationId = "listPracticeGroupStandings",
+            operationId = "getOwnGroupStandings",
             summary = "List the current developer's practice group standings",
             description =
                     "Returns every active practice group's standing, direction, guidance, and supporting results.")

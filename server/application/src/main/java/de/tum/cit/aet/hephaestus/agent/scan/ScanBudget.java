@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
@@ -23,7 +24,6 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 /** Reserves the finite worst cost before the single next file job enters the queue. */
@@ -34,7 +34,7 @@ public class ScanBudget {
     private final ReviewMethodVerifier methods;
     private final ReviewJobRepository jobs;
     private final SandboxGatewayProperties gateway;
-    private final JdbcClient jdbc;
+    private final ReviewRuntimeRepository runtime;
     private final ReviewMemberAiPolicy policy;
     private final LlmAdmissionService admission;
     private final LlmBudgetService monthly;
@@ -98,14 +98,8 @@ public class ScanBudget {
         return spent.priced() && spent.cost().add(estimate).compareTo(scan.budgetUsd()) <= 0;
     }
 
-    public Spend spent(long workspaceId, UUID reviewId) {
-        return jdbc.sql("SELECT COALESCE(SUM(cost_usd),0) cost,COALESCE(bool_and(cost_usd IS NOT NULL AND"
-                        + " pricing_state<>'UNPRICED'),true) priced FROM llm_usage_event WHERE workspace_id=:ws"
-                        + " AND review_id=:review")
-                .param("ws", workspaceId)
-                .param("review", reviewId)
-                .query((rs, n) -> new Spend(Objects.requireNonNull(rs.getBigDecimal("cost")), rs.getBoolean("priced")))
-                .single();
+    public ReviewRuntimeRepository.Spend spent(long workspaceId, UUID reviewId) {
+        return runtime.spent(workspaceId, reviewId);
     }
 
     public static BigDecimal cost(LlmPriceSnapshot price, long input, long output) {
@@ -156,6 +150,4 @@ public class ScanBudget {
         }
         return total;
     }
-
-    public record Spend(BigDecimal cost, boolean priced) {}
 }

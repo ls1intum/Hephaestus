@@ -7,14 +7,17 @@ import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
@@ -37,6 +40,8 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
     void shouldAppendAnAcceptedCatalogVersionAndPreserveThePinnedDefinitionAndMode() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("release-accept", "Release", "accept-org", AccountType.ORG, owner);
+        SecurityContextHolder.setContext(MockSecurityContextUtils.createSecurityContext(
+                "admin", Long.toString(accountId(owner)), new String[] {"app_admin"}, "mock-jwt-token-for-admin-user"));
         installer.install(workspace.getId());
         var source = catalog.effectiveCatalog().installablePractices().getFirst();
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
@@ -80,8 +85,13 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
     void shouldKeepLocalDefinitionWhenDecliningAnInstanceOffer() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("release-decline", "Release", "release-org", AccountType.ORG, owner);
+        SecurityContextHolder.setContext(MockSecurityContextUtils.createSecurityContext(
+                "admin", Long.toString(accountId(owner)), new String[] {"app_admin"}, "mock-jwt-token-for-admin-user"));
         installer.install(workspace.getId());
-        var source = catalog.effectiveCatalog().installablePractices().getFirst();
+        var source = catalog.effectiveCatalog().installablePractices().stream()
+                .filter(offer -> offer.effective().groupSlug() != null)
+                .findFirst()
+                .orElseThrow();
         var existing = service.getPractice(WorkspaceContext.fromWorkspace(workspace, Set.of(), null), source.slug());
         var first = existing.getCurrentVersion();
         var changed = DefinitionTestFixtures.rename(source.effective().definition(), "Updated catalog name");
@@ -96,6 +106,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 false,
                 EntityTagPrecondition.parse(EntityTagPrecondition.format(source.etag())));
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);
+        service.setFeedbackMode(ctx, source.slug(), FeedbackMode.OFF);
         var proposal = releases.get(ctx, source.slug());
         releases.decline(
                 ctx, source.slug(), EntityTagPrecondition.parse(EntityTagPrecondition.format(proposal.etag())));
@@ -105,6 +116,8 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 .isEqualTo(catalog.practice(source.slug()).effective());
         assertThat(releases.list(ctx))
                 .noneMatch(release -> release.practiceSlug().equals(source.slug()));
+        service.placePractice(ctx, source.slug(), null, 0);
+        assertThat(service.getPractice(ctx, source.slug()).getGroup()).isNull();
         var declinedProposal = releases.get(ctx, source.slug());
         assertThatThrownBy(() -> releases.reset(ctx, source.slug(), null))
                 .isInstanceOf(PracticeReleasePreconditionRequiredException.class);
@@ -117,5 +130,8 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(versions.definitionOf(reset.getCurrentVersion())).isEqualTo(changed);
         assertThat(versions.definitionOf(first)).isEqualTo(source.effective().definition());
         assertThat(versions.history(reset)).hasSize(2);
+        assertThat(Objects.requireNonNull(reset.getGroup()).getSlug())
+                .isEqualTo(source.effective().groupSlug());
+        assertThat(reset.getFeedbackMode()).isEqualTo(FeedbackMode.OFF);
     }
 }

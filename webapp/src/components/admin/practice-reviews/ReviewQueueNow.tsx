@@ -2,7 +2,7 @@ import { ClockIcon, ListOrderedIcon, LoaderIcon, PauseIcon, TriangleAlertIcon } 
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { PracticeReviewQueue, PracticeReviewQueueItem } from "@/api/types.gen";
+import type { ReviewQueue, ReviewQueueItem } from "@/api/types.gen";
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
 import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
@@ -10,17 +10,13 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { type StatusDef, statusToneClass } from "@/components/common/status-def";
 import { reviewedWorkIcon } from "@/components/icons/reviewed-work-icon";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
-import {
-	ON_HOLD,
-	type ReviewStatusFilter,
-	WAITING,
-} from "@/components/practice-vocabulary/review-status-defs";
+import type { ReviewStatus } from "@/components/practice-vocabulary/review-status-defs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { durationText } from "@/lib/dates";
+import { firstNonBlank } from "@/lib/text";
 
 import { type CardFigure, FigureCaption, FigureRow } from "./CardFigures";
 import { OVERVIEW_TYPE } from "./overview-type-scale";
-import { subjectLabel } from "./review-format";
 import { reviewLevel } from "./review-levels";
 import {
 	oldestWaitSeconds,
@@ -35,7 +31,7 @@ import {
 import { ReviewListLink } from "./ReviewListLink";
 
 /** The queue as it stands now, read apart from the range: it is the same whatever the range. */
-export type ReviewQueueState = PanelState<{ queue: PracticeReviewQueue }>;
+export type ReviewQueueState = PanelState<{ queue: ReviewQueue }>;
 
 export interface ReviewQueueNowProps {
 	workspaceSlug: string;
@@ -73,8 +69,10 @@ const QUEUE_ITEM_DEFS: Record<QueueItemState, StatusDef & { short: string }> = {
 /**
  * The left part of the Queue card: under "Now", what the queue holds right now, whatever the range.
  * How many reviews wait, run and are held for budget, and the oldest wait while something waits, in
- * one line, each a link to what it counts; then the first few in line as a small table of work,
- * developer, state and how long, each work opening its review. What each figure counts is in the (i) beside "Now".
+ * one line. Running links to the reviews it counts and the oldest wait to its review; waiting and on
+ * hold stay plain, since the review list filters by review status and both are queued. Then the
+ * first few in line as a small table of work, developer, state and how long, each work opening its
+ * review. What each figure counts is in the (i) beside "Now".
  * Only a problem stands out: a hold for budget, in red, since nothing runs until an admin acts, and
  * a wait of half an hour or more, marked in words only. Everything else is quiet, and an empty
  * queue says so in a line.
@@ -118,11 +116,11 @@ export function ReviewQueueNow({ workspaceSlug, state }: ReviewQueueNowProps) {
 }
 
 /** The (i) beside "Now": what each figure counts, and how fast the queue empties now. */
-function queueInfo(queue: PracticeReviewQueue | undefined) {
+function queueInfo(queue: ReviewQueue | undefined) {
 	return [
 		{
 			term: "Waiting",
-			text: "counts reviews that wait for a worker now, not those on hold or waiting before a retry. The count opens exactly them.",
+			text: "counts reviews that wait for a worker now, not those on hold or waiting before a retry.",
 		},
 		{
 			term: "Running",
@@ -133,7 +131,7 @@ function queueInfo(queue: PracticeReviewQueue | undefined) {
 		},
 		{
 			term: "On hold for budget",
-			text: "counts reviews that wait now because the monthly AI budget is used up. A hold is red. The count opens the reviews on hold.",
+			text: "counts reviews that wait now because the monthly AI budget is used up. A hold is red.",
 		},
 		{
 			term: "Oldest wait",
@@ -158,7 +156,7 @@ function QueueFigures({
 	queue,
 }: {
 	workspaceSlug: string;
-	queue: PracticeReviewQueue;
+	queue: ReviewQueue;
 }) {
 	const total = queueTotal(queue);
 	const rows = queue.head.slice(0, QUEUE_ROWS);
@@ -168,14 +166,7 @@ function QueueFigures({
 			key: "waiting",
 			term: "waiting",
 			value: (
-				<QueueCount
-					workspaceSlug={workspaceSlug}
-					count={queue.waiting}
-					status={WAITING}
-					noun="waiting"
-				>
-					{queue.waiting}
-				</QueueCount>
+<span>{queue.waiting}</span>
 			),
 			none: queue.waiting === 0,
 		},
@@ -198,16 +189,9 @@ function QueueFigures({
 			key: "held",
 			term: "on hold for budget",
 			value: (
-				<QueueCount
-					workspaceSlug={workspaceSlug}
-					count={queue.heldForBudget}
-					status={ON_HOLD}
-					noun="on hold"
-				>
-					<Problem show={queue.heldForBudget > 0} broken>
-						{queue.heldForBudget}
-					</Problem>
-				</QueueCount>
+				<Problem show={queue.heldForBudget > 0} broken>
+					{queue.heldForBudget}
+				</Problem>
 			),
 			none: queue.heldForBudget === 0,
 		},
@@ -237,10 +221,7 @@ function QueueFigures({
 							<ReviewListLink
 								workspaceSlug={workspaceSlug}
 								// The queue's own statuses, so the list holds exactly the reviews the total counts.
-								destination={{
-									list: "runs",
-									search: { status: ["RUNNING", WAITING, ON_HOLD] },
-								}}
+								destination={{ list: "runs", search: { status: ["RUNNING", "QUEUED"] } }}
 							/>
 						}
 					>
@@ -265,8 +246,8 @@ function QueueCount({
 }: {
 	workspaceSlug: string;
 	count: number;
-	status: ReviewStatusFilter;
-	/** "waiting", "running", "on hold". */
+	status: ReviewStatus;
+	/** "running". */
 	noun: string;
 	children: ReactNode;
 }) {
@@ -293,7 +274,7 @@ function QueueCount({
  * The oldest wait as the link to the review that waits: the first waiting review of the queue's head
  * whose wait began then. Not among the head, it is plain text.
  */
-function OldestWait({ queue, children }: { queue: PracticeReviewQueue; children: ReactNode }) {
+function OldestWait({ queue, children }: { queue: ReviewQueue; children: ReactNode }) {
 	const since = queue.oldestWaitingSince?.getTime();
 	const item = queue.head.find(
 		(candidate) => queueItemState(candidate) === "waiting" && candidate.since.getTime() === since,
@@ -305,7 +286,7 @@ function OldestWait({ queue, children }: { queue: PracticeReviewQueue; children:
 		<InlineLink
 			tone="count"
 			aria-label="Open the review that has waited longest"
-			render={<DetailStackLink entry={reviewLevel(item.id)} single />}
+			render={<DetailStackLink entry={reviewLevel(item.reviewId)} single />}
 		>
 			{children}
 		</InlineLink>
@@ -353,8 +334,8 @@ function QueueTable({
 	queue,
 	rows,
 }: {
-	queue: PracticeReviewQueue;
-	rows: readonly PracticeReviewQueueItem[];
+	queue: ReviewQueue;
+	rows: readonly ReviewQueueItem[];
 }) {
 	return (
 		<table aria-label="First in the queue" className="w-full text-sm">
@@ -376,33 +357,34 @@ function QueueTable({
 			</thead>
 			<tbody>
 				{rows.map((item) => (
-					<QueueRow key={item.id} queue={queue} item={item} />
+					<QueueRow key={item.jobId} queue={queue} item={item} />
 				))}
 			</tbody>
 		</table>
 	);
 }
 
-function QueueRow({ queue, item }: { queue: PracticeReviewQueue; item: PracticeReviewQueueItem }) {
+function QueueRow({ queue, item }: { queue: ReviewQueue; item: ReviewQueueItem }) {
 	const def = QUEUE_ITEM_DEFS[queueItemState(item)];
-	const work = item.target.reviewedWork;
-	const Icon = work ? reviewedWorkIcon(work.kind, work.provider) : undefined;
+	const Icon = reviewedWorkIcon(item.item.kind, item.item.provider ?? undefined);
 	const StateIcon = def.icon;
 	return (
 		<tr>
 			<td className={cn(QUEUE_CELL, "pr-4 whitespace-nowrap")}>
 				<InlineLink
 					className="inline-flex items-center gap-1.5"
-					title={item.target.title}
-					render={<DetailStackLink entry={reviewLevel(item.id)} single />}
+					title={item.item.title ?? undefined}
+					render={<DetailStackLink entry={reviewLevel(item.reviewId)} single />}
 				>
-					{Icon && <Icon className="size-3.5 shrink-0" />}
-					<span>{work?.label ?? item.target.title}</span>
+					<Icon className="size-3.5 shrink-0" />
+					<span>{item.item.label}</span>
 				</InlineLink>
 			</td>
 			{/* `max-w-0` lets the cell shrink below its words, so the name truncates, not the row. */}
 			<td className={cn(QUEUE_CELL, "max-w-0 pr-4", OVERVIEW_TYPE.label)}>
-				<span className="block truncate">{item.developer ? subjectLabel(item.developer) : ""}</span>
+				<span className="block truncate">{item.developer
+						? (firstNonBlank(item.developer.displayName, item.developer.providerLogin) ?? "")
+						: ""}</span>
 			</td>
 			<td className={cn(QUEUE_CELL, "pr-4 whitespace-nowrap", OVERVIEW_TYPE.label)}>
 				<span className="inline-flex items-center gap-1.5" title={def.label}>

@@ -547,8 +547,14 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                         // write is committed, or the sync reads PAUSED and no-ops.
                                         "OutlineCollectionResumedEvent");
 
-                                boolean isWorkspaceAware =
-                                        workspaceAwareEventPrefixes.stream().anyMatch(paramTypeName::contains);
+                                boolean isWorkspaceAware = paramType.getAllMethods().stream()
+                                                .anyMatch(accessor ->
+                                                        accessor.getName().equals("workspaceId")
+                                                                && (accessor.getRawReturnType()
+                                                                                .isEquivalentTo(long.class)
+                                                                        || accessor.getRawReturnType()
+                                                                                .isEquivalentTo(Long.class)))
+                                        || workspaceAwareEventPrefixes.stream().anyMatch(paramTypeName::contains);
 
                                 if (!isWorkspaceAware && !paramTypeName.equals("Object")) {
                                     events.add(SimpleConditionEvent.violated(
@@ -686,7 +692,8 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                     .anyMatch(
                                             p -> p.getSimpleName().contains("WorkspaceContext")
                                                     || p.getSimpleName().contains("Workspace")
-                                                    || p.getName().contains("Long") // workspaceId as Long
+                                                    || p.isEquivalentTo(Long.class)
+                                                    || p.isEquivalentTo(long.class) // workspace ids
                                             );
 
                             if (!isWorkspaceAware && !hasWorkspaceParam) {

@@ -36,7 +36,7 @@ public class PracticesWorkspacePurgeAdapter implements WorkspacePurgeContributor
         jdbc.sql("DELETE FROM review_schedule WHERE workspace_id=:ws")
                 .param("ws", ws)
                 .update();
-        jdbc.sql("SET CONSTRAINTS sfk_practice_current_version DEFERRED").update();
+        jdbc.sql("SET CONSTRAINTS ALL DEFERRED").update();
         jdbc.sql("DELETE FROM practice_version WHERE workspace_id=:ws")
                 .param("ws", ws)
                 .update();

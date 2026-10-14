@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryScope;
+import de.tum.cit.aet.hephaestus.integration.core.framework.MonitoredRepositoryScope;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;

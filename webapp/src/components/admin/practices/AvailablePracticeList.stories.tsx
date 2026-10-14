@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 
 import type { CatalogPracticeSummary } from "@/api/types.gen";
-import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
 
 import { AvailablePracticeList } from "./AvailablePracticeList";
 
@@ -15,29 +14,34 @@ const detailParamOf = (link: HTMLElement) =>
 const describeWhatAndWhy: CatalogPracticeSummary = {
 	slug: "describe-what-and-why",
 	name: "Describe what changed and why",
-	artifactKind: "scm.pull_request",
+	kind: "scm.pull_request",
 	groupSlug: "review-ready-work",
 	groupName: "Review-ready work",
 	availability: "AVAILABLE",
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	whyItMatters: null,
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 };
 
 const reviewScope: CatalogPracticeSummary = {
 	slug: "review-scope",
 	name: "Keep pull requests focused",
-	artifactKind: "scm.pull_request",
+	kind: "scm.pull_request",
 	groupSlug: "review-ready-work",
 	groupName: "Review-ready work",
 	availability: "ADOPTED",
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	whyItMatters: null,
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 };
 
 const issueContext: CatalogPracticeSummary = {
 	slug: "issue-context",
 	name: "Include enough issue context",
-	artifactKind: "scm.issue",
+	kind: "scm.issue",
+	groupSlug: null,
+	groupName: null,
 	availability: "SLUG_CONFLICT",
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+	whyItMatters: null,
+	reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 };
 
 const practices: CatalogPracticeSummary[] = [describeWhatAndWhy, reviewScope, issueContext];

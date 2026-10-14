@@ -87,8 +87,8 @@ State which entries applied:
   A new workspace-owned table is workspace-scoped from its first migration.
 - **Destinations.** Feedback appears on the reviewed work, on the developer's practice page, and in conversation.
   A change to what feedback carries needs a decision per destination.
-- **Reverse states.** Include needs exclude, pause needs resume, customize needs reset. A one-way
-  door is a bug.
+- **Reverse states.** Include needs exclude, pause needs resume, customize needs reset. A change
+  that cannot be undone is a bug.
 - **Both admin consoles.** Instance-wide and per-workspace administration share components.
   A scope-specific field in a shared component silently breaks the other console.
   See `webapp/AGENTS.md` § Which admin console a component belongs to.
@@ -301,7 +301,7 @@ Write a rule once.
 - Stacked PRs follow `CONTRIBUTING.md` § Stacked Pull Requests through `/gh-stack`. A layer that
   cannot satisfy the normal PR, release and quality requirements on its own is not a layer.
 - When you monitor a PR, poll checks and comments newer than the last push.
-  Verify each bot finding against the source.
+  Verify each bot comment against the source.
   Fix the real ones.
   Dismiss the rest with a written reason.
   If nothing is new, stay quiet.

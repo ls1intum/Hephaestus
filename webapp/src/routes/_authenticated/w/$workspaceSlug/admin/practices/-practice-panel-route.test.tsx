@@ -1,76 +1,76 @@
-import { screen, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
-import type { PracticeScriptSummary } from "@/api/types.gen";
-import { mockPractices } from "@/components/admin/practices/fixtures";
+import type { PracticeReleaseProposal, PracticeScriptSummary } from "@/api/types.gen";
+import { definitionOf } from "@/components/admin/practice-editor/fixtures";
 import { detailSearch } from "@/components/layout/detail-drawer/detail-stack";
 import type { Wire } from "@/lib/dates";
 import { stringifySearch } from "@/lib/router-search";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
+import {
+	practiceSetupHandlers,
+	practicesHandlers,
+	wireGroup,
+	wirePractice,
+} from "./-practice-wire";
+
 vi.setConfig({ testTimeout: 20_000 });
 
-const [base] = mockPractices;
-if (base === undefined) {
-	throw new Error("The shared practice fixtures no longer hold a practice to show");
-}
-const scripted = {
-	...base,
-	slug: "comment-quality",
-	name: "Comment quality",
-	practiceScript: "x",
-};
+const at = (kind: "practice" | "practice-edit", id: string) =>
+	`/w/acme/admin/practices${stringifySearch(detailSearch({ kind, id }))}`;
 
-const summaries: Wire<PracticeScriptSummary>[] = [
-	{
-		practiceSlug: "another-practice",
-		practiceName: "Another practice",
-		asOf: { jobId: "11111111-1111-1111-1111-111111111111", finishedAt: "2026-10-01T09:00:00Z" },
-		scriptChanged: false,
-		needs: [{ purpose: "PRACTICE_EMBEDDING", need: "OPTIONAL", unmetTiers: ["CLOUD"] }],
-	},
-	{
-		practiceSlug: "comment-quality",
-		practiceName: "Comment quality",
-		asOf: { jobId: "22222222-2222-2222-2222-222222222222", finishedAt: "2026-10-03T09:00:00Z" },
-		scriptChanged: false,
-		needs: [{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers: ["IN_HOUSE"] }],
-	},
-];
+beforeEach(() => {
+	server.use(...practiceSetupHandlers());
+});
 
 describe("a practice's script needs on practice setup", () => {
+	const scripted = wirePractice({
+		slug: "comment-quality",
+		definition: definitionOf({ name: "Comment quality", script: "export default {};" }),
+	});
+	const summaries: Wire<PracticeScriptSummary>[] = [
+		{
+			practiceSlug: "another-practice",
+			practiceName: "Another practice",
+			asOf: {
+				jobId: "1",
+				reviewId: "11111111-1111-1111-1111-111111111111",
+				finishedAt: "2026-10-01T09:00:00Z",
+			},
+			scriptChanged: false,
+			needs: [{ slot: "embedding", need: "optional", unmetTiers: ["CLOUD"] }],
+		},
+		{
+			practiceSlug: "comment-quality",
+			practiceName: "Comment quality",
+			asOf: {
+				jobId: "2",
+				reviewId: "22222222-2222-2222-2222-222222222222",
+				finishedAt: "2026-10-03T09:00:00Z",
+			},
+			scriptChanged: false,
+			needs: [{ slot: "decision", need: "required", unmetTiers: ["IN_HOUSE"] }],
+		},
+	];
 	const needsRequested = vi.fn<(workspaceSlug: string) => void>();
 
 	beforeEach(() => {
 		needsRequested.mockReset();
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
-			),
-			http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json([])),
-			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([scripted])),
-			// Declared before the `:practiceSlug` handler, which would otherwise match these paths.
-			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
-				HttpResponse.json(mockPracticeDefinitionOptions),
-			),
-			http.get("*/workspaces/:workspaceSlug/practices/releases", () => HttpResponse.json([])),
+			...practicesHandlers([scripted]),
 			http.get("*/workspaces/:workspaceSlug/practices/practice-script-needs", ({ params }) => {
 				needsRequested(String(params.workspaceSlug));
 				return HttpResponse.json(summaries);
 			}),
-			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug", () =>
-				HttpResponse.json(scripted),
-			),
 		);
 	});
 
 	it("shows the open practice's own needs, read for this workspace", async () => {
-		renderRouteAt(
-			`/w/acme/admin/practices${stringifySearch(detailSearch({ kind: "practice", id: "comment-quality" }))}`,
-		);
+		renderRouteAt(at("practice", "comment-quality"));
 
 		// The unmet required model stops the script, so the panel says so before anything else.
 		const alert = await screen.findByRole("note", {}, ROUTE_RENDER_WAIT);
@@ -90,5 +90,218 @@ describe("a practice's script needs on practice setup", () => {
 
 		await screen.findByRole("link", { name: "Comment quality" }, ROUTE_RENDER_WAIT);
 		expect(needsRequested).not.toHaveBeenCalled();
+	});
+});
+
+describe("resetting a practice to the catalog after declining its update", () => {
+	const ours = definitionOf({ name: "Explain the change", criteria: "Our criteria" });
+	const offered = { ...ours, criteria: "New catalog criteria" };
+	// Declining kept our definition and moved the catalog base: the practice now reads Edited here.
+	const declined = wirePractice({
+		slug: "explain-the-change",
+		definition: ours,
+		versionId: "803",
+		versionNumber: 3,
+		catalogOrigin: {
+			catalogSlug: "explain-the-change",
+			state: "EDITED_HERE",
+			localEdits: ["CRITERIA"],
+			offeredDigest: "sha256:offered",
+		},
+	});
+	const proposal: Wire<PracticeReleaseProposal> = {
+		practiceSlug: "explain-the-change",
+		currentVersionId: "803",
+		base: offered,
+		current: ours,
+		offered,
+		offeredDigest: "sha256:offered",
+		etag: "reset-basis",
+		fields: [{ field: "CRITERIA", changedLocally: true, offeredChanged: false, conflict: false }],
+	};
+
+	it("shows the concrete difference, then saves the catalog's version as a new version", async () => {
+		const seenIfMatch = vi.fn<(tag: string | null) => void>();
+		const reset = wirePractice({
+			slug: "explain-the-change",
+			definition: offered,
+			versionId: "804",
+			versionNumber: 4,
+			catalogOrigin: { ...declined.catalogOrigin, state: "FROM_HEPHAESTUS", localEdits: [] },
+		});
+		server.use(
+			...practicesHandlers([declined]),
+			http.get("*/workspaces/:workspaceSlug/practices/releases/:slug", () =>
+				HttpResponse.json(proposal),
+			),
+			http.delete(
+				"*/workspaces/:workspaceSlug/practices/:practiceSlug/catalog-customization",
+				({ request }) => {
+					seenIfMatch(request.headers.get("If-Match"));
+					server.use(...practicesHandlers([reset]));
+					return HttpResponse.json(reset);
+				},
+			),
+		);
+
+		renderRouteAt(at("practice", "explain-the-change"));
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Reset to catalog" }, ROUTE_RENDER_WAIT),
+		);
+
+		const dialog = await screen.findByRole("alertdialog", {
+			name: "Reset “Explain the change” to the catalog?",
+		});
+		const criteria = await within(dialog).findByRole("rowheader", { name: "Review criteria" });
+		expect(criteria.closest("tr")?.textContent).toBe(
+			"Review criteriaOur criteriaNew catalog criteria",
+		);
+		within(dialog).getByText(/saved as a new version/u);
+		expect(seenIfMatch).not.toHaveBeenCalled();
+
+		fireEvent.click(within(dialog).getByRole("button", { name: "Reset to catalog" }));
+
+		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith('"reset-basis"'));
+		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull(), ROUTE_RENDER_WAIT);
+		await screen.findByText("Version 4", {}, ROUTE_RENDER_WAIT);
+		await screen.findByText("Same as the catalog");
+		expect(screen.queryByRole("button", { name: "Reset to catalog" })).toBeNull();
+	});
+
+	it("keeps the practice and shows the new comparison when the offer changed meanwhile", async () => {
+		server.use(
+			...practicesHandlers([declined]),
+			// The comparison the reader sees, then the one that holds once the catalog moved on.
+			http.get(
+				"*/workspaces/:workspaceSlug/practices/releases/:slug",
+				() => HttpResponse.json(proposal),
+				{ once: true },
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/releases/:slug", () =>
+				HttpResponse.json({
+					...proposal,
+					offered: { ...offered, criteria: "Newer catalog criteria" },
+					etag: "newer-basis",
+				}),
+			),
+			http.delete("*/workspaces/:workspaceSlug/practices/:practiceSlug/catalog-customization", () =>
+				HttpResponse.json(
+					{ title: "Practice release changed", status: 409, detail: "The offer changed." },
+					{ status: 409 },
+				),
+			),
+		);
+
+		renderRouteAt(at("practice", "explain-the-change"));
+		fireEvent.click(
+			await screen.findByRole("button", { name: "Reset to catalog" }, ROUTE_RENDER_WAIT),
+		);
+		const dialog = await screen.findByRole("alertdialog");
+		fireEvent.click(await within(dialog).findByRole("button", { name: "Reset to catalog" }));
+
+		const refused = await within(dialog).findByRole("alert", {}, ROUTE_RENDER_WAIT);
+		expect(refused.textContent).toContain("Nothing was reset.");
+		await within(dialog).findByText("Newer catalog criteria");
+		screen.getByText("Version 3");
+	});
+});
+
+describe("editing a workspace practice", () => {
+	const practice = wirePractice({
+		slug: "keep-the-change-reviewable",
+		definition: definitionOf(),
+		groupSlug: "review-ready-work",
+		versionId: "701",
+	});
+
+	beforeEach(() => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-groups", () =>
+				HttpResponse.json([
+					wireGroup("review-ready-work", "Review-ready work"),
+					wireGroup("testing", "Testing what changed", { position: 1 }),
+				]),
+			),
+			...practicesHandlers([practice]),
+		);
+	});
+
+	it("sends one complete definition and moves the practice in a separate call", async () => {
+		const updated = vi.fn<(body: unknown) => void>();
+		const moved = vi.fn<(body: unknown) => void>();
+		server.use(
+			http.patch("*/workspaces/:workspaceSlug/practices/:practiceSlug", async ({ request }) => {
+				updated(await request.json());
+				return HttpResponse.json({
+					...practice,
+					currentVersion: { ...practice.currentVersion, id: "702", number: 2 },
+				});
+			}),
+			http.put("*/workspaces/:workspaceSlug/practices/:practiceSlug/group", async ({ request }) => {
+				moved(await request.json());
+				return HttpResponse.json([{ ...practice, groupSlug: "testing" }]);
+			}),
+		);
+
+		renderRouteAt(at("practice-edit", practice.slug));
+		fireEvent.change(await screen.findByRole("textbox", { name: /Name/u }, ROUTE_RENDER_WAIT), {
+			target: { value: "Keep each change reviewable" },
+		});
+		fireEvent.click(screen.getByRole("combobox", { name: /Group/u }));
+		fireEvent.click(await screen.findByRole("option", { name: "Testing what changed" }));
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+		await waitFor(
+			() => expect(moved).toHaveBeenCalledWith({ groupSlug: "testing" }),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(updated).toHaveBeenCalledExactlyOnceWith({
+			expectedVersionId: "701",
+			definition: { ...currentDefinition(practice), name: "Keep each change reviewable" },
+		});
+	});
+
+	it("refuses a stale save without a new version, keeps the draft, and loads the newest on request", async () => {
+		const newer = {
+			...practice,
+			currentVersion: {
+				...practice.currentVersion,
+				id: "702",
+				number: 2,
+				definition: { ...currentDefinition(practice), name: "Their name" },
+			},
+		};
+		const moved = vi.fn();
+		server.use(
+			http.patch("*/workspaces/:workspaceSlug/practices/:practiceSlug", () => {
+				server.use(...practicesHandlers([newer]));
+				return HttpResponse.json(
+					{ title: "Practice version changed", status: 409, detail: "A newer version exists." },
+					{ status: 409 },
+				);
+			}),
+			http.put("*/workspaces/:workspaceSlug/practices/:practiceSlug/group", () => {
+				moved();
+				return HttpResponse.json([]);
+			}),
+		);
+
+		renderRouteAt(at("practice-edit", practice.slug));
+		fireEvent.change(await screen.findByRole("textbox", { name: /Name/u }, ROUTE_RENDER_WAIT), {
+			target: { value: "My name" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+		const conflict = await screen.findByRole("alert", {}, ROUTE_RENDER_WAIT);
+		expect(conflict.textContent).toContain("Someone saved a newer version");
+		// The draft is untouched until the reader chooses to load the newest version.
+		screen.getByDisplayValue("My name");
+		expect(moved).not.toHaveBeenCalled();
+
+		fireEvent.click(
+			await within(conflict).findByRole("button", { name: "Load version 2" }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findByDisplayValue("Their name");
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 });

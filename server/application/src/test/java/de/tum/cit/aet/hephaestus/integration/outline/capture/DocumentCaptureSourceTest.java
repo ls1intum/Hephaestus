@@ -194,10 +194,10 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
         JsonNode root = objectMapper.readTree(Objects.requireNonNull(files.get("inputs/context/outline_docs.json")));
         JsonNode linked = root.get(0);
         assertThat(linked.get("author").asString()).isEqualTo("Ada Lovelace");
-        assertThat(linked.get("author_account_id").asLong()).isEqualTo(555L);
+        assertThat(linked.get("author_account_id").asString()).isEqualTo("555");
         assertThat(linked.get("last_edited_by").asString()).isEqualTo("Ada Lovelace");
-        assertThat(linked.get("last_edited_by_member_id").asLong()).isEqualTo(555L);
-        // Unlinked author degrades to name-only: the member-id key is simply absent, never null.
+        assertThat(linked.get("last_edited_by_account_id").asString()).isEqualTo("555");
+        // Unlinked author degrades to name-only: the account id key is simply absent, never null.
         JsonNode unlinked = root.get(1);
         assertThat(unlinked.get("author").asString()).isEqualTo("Grace Hopper");
         assertThat(unlinked.has("author_account_id")).isFalse();
@@ -234,10 +234,10 @@ class DocumentCaptureSourceTest extends BaseUnitTest {
         assertThat(collaborators).hasSize(2);
         assertThat(collaborators.get(0).get("subject").asString()).isEqualTo("0aa1bb2c-user");
         assertThat(collaborators.get(0).get("name").asString()).isEqualTo("Ada Lovelace");
-        assertThat(collaborators.get(0).get("member_id").asLong()).isEqualTo(555L);
+        assertThat(collaborators.get(0).get("account_id").asString()).isEqualTo("555");
         assertThat(collaborators.get(1).get("subject").asString()).isEqualTo("7cc9dd0e-user");
         assertThat(collaborators.get(1).has("name")).isFalse();
-        assertThat(collaborators.get(1).has("member_id")).isFalse();
+        assertThat(collaborators.get(1).has("account_id")).isFalse();
 
         JsonNode bare = root.get(1);
         assertThat(bare.has("created")).isFalse();

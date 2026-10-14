@@ -25,8 +25,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>Records serialize their components in declaration order, which is what makes the diff and no-op
- * suppression meaningful. That determinism holds only up to the insert: {@code jsonb} renormalizes key
- * order at rest, so the bytes on disk are not the bytes compared.
+ * suppression meaningful. TEXT storage preserves the serialized snapshots exactly.
  */
 final class ConfigAuditSnapshotMapper {
 

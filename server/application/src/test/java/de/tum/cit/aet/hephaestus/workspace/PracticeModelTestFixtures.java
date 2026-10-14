@@ -86,15 +86,15 @@ public class PracticeModelTestFixtures {
                 new ReviewOn(List.of(), Map.of()),
                 null,
                 kind.equals("scm.file") || kind.equals("scm.repository") ? null : AboutRole.AUTHOR,
-                new PracticeReads(
-                        "source-use/2.0.0", List.of(new PracticeReadSource(new SourceKind(source), ReadNeed.REQUIRED))),
+                new PracticeReads("2.0.0", List.of(new PracticeReadSource(new SourceKind(source), ReadNeed.REQUIRED))),
                 new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
                 "Check the retained fixture work.",
                 null,
                 null,
                 false,
                 new PracticeGuidance(null, null, null, null, null));
-        var practice = versions.create(workspace, slug, itemKind, definition, null, 0, null);
+        var practice = versions.create(
+                new PracticeVersionService.NewPractice(workspace, slug, itemKind, definition, null, 0, null));
         var item = new Item();
         item.setWorkspaceId(workspace.getId());
         item.setKind(itemKind);
@@ -218,8 +218,9 @@ public class PracticeModelTestFixtures {
                 .getSingleResult();
         if (existing != 0) work = forkReview(work);
         jdbc.update(
-                "INSERT INTO membership(workspace_id,account_id,role,hidden,joined_at) VALUES"
-                        + " (?,?,'MEMBER',false,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
+                "INSERT INTO"
+                    + " membership(workspace_id,account_id,role,hidden,review_selected,public_activity_seen,joined_at)"
+                    + " VALUES (?,?,'MEMBER',false,false,false,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING",
                 work.review().getWorkspaceId(),
                 developerId);
         var at = Instant.now();

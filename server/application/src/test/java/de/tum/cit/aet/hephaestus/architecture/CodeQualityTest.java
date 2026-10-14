@@ -23,6 +23,7 @@ import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountErasureContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
+import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -33,27 +34,30 @@ import org.springframework.data.repository.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
+/*
  * Code Quality Tests - Detect anti-patterns and code smells.
  *
- * <p>These tests enforce quality standards:
- * <ul>
- *   <li>God class detection (SRP violations)</li>
- *   <li>Constructor parameter limits</li>
- *   <li>Interface Segregation Principle</li>
- *   <li>Dependency Inversion patterns</li>
- * </ul>
+ * These tests enforce quality standards:
  *
- * <p>All thresholds are defined in {@link ArchitectureTestConstants}.
+ *   God class detection (SRP violations)
+ *   Constructor parameter limits
+ *   Interface Segregation Principle
+ *   Dependency Inversion patterns
  *
- * @see ArchitectureTestConstants
+ *
+ * All thresholds are defined in ArchitectureTestConstants.
+ *
+ * Thresholds: ArchitectureTestConstants.
  */
 class CodeQualityTest extends HephaestusArchitectureTest {
+    private static final Map<String, Integer> CONTRACT_INTERFACE_METHODS = Map.of(
+            "de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor", 9,
+            "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel", 9);
 
     @Nested
     class GodClassTests {
 
-        /**
+        /*
          * Orchestrator services that coordinate many sub-services may legitimately exceed the
          * threshold; each exemption below carries its own justification.
          */
@@ -99,7 +103,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /** Business methods exclude getters, setters, equals, hashCode, toString, and constructors. */
+        /* Business methods exclude getters, setters, equals, hashCode, toString, and constructors. */
         @Test
         void servicesHaveLimitedBusinessMethods() {
             ArchRule rule = classes()
@@ -125,6 +129,10 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // Activity writes carry the event identity and its context through the SPI.
                     "ActivityEventService.record",
                     "ActivityRecorder.record",
+                    // The frozen seven-argument decision binds actor, action, explanation and approved digest.
+                    "FeedbackStore.decide",
+                    "FeedbackStoreService.decide",
+                    "FeedbackDecisionService.decide",
                     // @Bean factory wiring Spring dependencies — not business logic complexity
                     "DockerSandboxConfiguration.dockerSandboxAdapter",
                     "DockerSandboxConfiguration.dockerInteractiveSandboxAdapter");
@@ -158,7 +166,15 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
                     "AuthEventRepository.findForAdmin",
                     // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
-                    "SyncJobRepository.completeActiveJob");
+                    "SyncJobRepository.completeActiveJob",
+                    // Each atomic ledger update binds its immutable scope, receipt and lease facts individually.
+                    "FeedbackCopyRepository.confirmPosted",
+                    "FeedbackCopyRepository.recordConversationOutcome",
+                    "FeedbackRepository.recordFirstRead",
+                    "FeedbackSendRepository.settle",
+                    "ItemEventRepository.decide",
+                    "ItemEventRepository.insertIfAbsent",
+                    "ResultRepository.findReuseCandidate");
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams =
                     new ArchCondition<>("have methods with at most " + MAX_METHOD_PARAMETERS + " parameters") {
@@ -215,7 +231,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /** Boolean-parameter count is a proxy here since ArchUnit cannot measure cyclomatic complexity directly. */
+        /* Boolean-parameter count is a proxy here since ArchUnit cannot measure cyclomatic complexity directly. */
         @Test
         void serviceMethodsAvoidExcessiveBooleanParams() {
             ArchCondition<JavaClass> avoidManyBooleans =
@@ -326,12 +342,14 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                     .filter(m -> m.getModifiers().contains(JavaModifier.ABSTRACT))
                                     .count();
 
-                            if (methodCount > MAX_INTERFACE_METHODS) {
+                            Integer contracted = CONTRACT_INTERFACE_METHODS.get(javaClass.getName());
+                            int limit = contracted == null ? MAX_INTERFACE_METHODS : contracted;
+                            if (methodCount > limit || (contracted != null && methodCount != contracted)) {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
                                                 "%s has %d abstract methods (max %d) - ISP violation",
-                                                javaClass.getSimpleName(), methodCount, MAX_INTERFACE_METHODS)));
+                                                javaClass.getSimpleName(), methodCount, limit)));
                             }
                         }
                     };
@@ -349,14 +367,14 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
-         * <b>Width = abstract + default instance methods.</b> Counting only {@code abstract}
-         * methods would let an interface hide its true surface behind {@code default} no-op
+        /*
+         * Width = abstract + default instance methods. Counting only abstract
+         * methods would let an interface hide its true surface behind default no-op
          * bodies — a default no-op is still part of the contract every caller can invoke, so it
          * counts toward ISP width exactly like an abstract method. Static and private (helper)
          * methods are excluded — they are not part of the implementable contract.
          *
-         * <p>Applies to every interface under {@code ..spi..} with no exemptions.
+         * Applies to every interface under ..spi..; the two frozen domain contracts have exact budgets.
          */
         @Test
         void spiInterfacesAreFocused() {
@@ -369,12 +387,14 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                     .filter(m -> !m.getModifiers().contains(JavaModifier.PRIVATE))
                                     .count();
 
-                            if (methodCount > MAX_SPI_METHODS) {
+                            Integer contracted = CONTRACT_INTERFACE_METHODS.get(javaClass.getName());
+                            int limit = contracted == null ? MAX_SPI_METHODS : contracted;
+                            if (methodCount > limit || (contracted != null && methodCount != contracted)) {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
                                                 "SPI %s has %d abstract+default methods (max %d) - split interface",
-                                                javaClass.getSimpleName(), methodCount, MAX_SPI_METHODS)));
+                                                javaClass.getSimpleName(), methodCount, limit)));
                             }
                         }
                     };
@@ -397,7 +417,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @Nested
     class DependencyInversionTests {
 
-        /** ObjectProvider is a valid way to break cycles, but new usages must justify themselves below. */
+        /* ObjectProvider is a valid way to break cycles, but new usages must justify themselves below. */
         @Test
         void objectProviderUsageIsLimited() {
             Set<String> knownCycleBreakers = Set.of(
@@ -408,6 +428,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "AccountPurger", // PersonDataService's registry includes CoreAccountPersonDataCatalog, which
                     // depends on this purger; resolve the erasure coordinator after initialization.
                     "MembershipService", // Reads exist on every role; PeopleRegistryService is server-only.
+                    "ExactPersonIdentityResolver", // Source-owner callbacks resolve this exact identity closure.
+                    "OutlinePersonSourceIdentityContributor", // Permission reads suppression, whose registry includes
+                    // this source.
                     "WorkspaceActivationService",
                     "GitHubLifecycleListener", // IntegrationNatsConsumer absent under the webhook runtime role
                     // (server.enabled=false) — see ADR 0008
@@ -492,7 +515,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
     @Nested
     class DataAccessTests {
 
-        /** A {@code @Configuration} class, or a class nested in one such as the post-processor it registers. */
+        /* A @Configuration class, or a class nested in one such as the post-processor it registers. */
         private static final DescribedPredicate<JavaClass> CONFIGURATION = DescribedPredicate.describe(
                 "@Configuration classes and the classes nested in them",
                 javaClass -> javaClass.isMetaAnnotatedWith(Configuration.class)
@@ -501,11 +524,11 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                 .map(enclosing -> enclosing.isMetaAnnotatedWith(Configuration.class))
                                 .orElse(false));
 
-        /**
-         * The person-data boundary: {@code core.privacy}, the adapters each module registers through its SPI
+        /*
+         * The person-data boundary: core.privacy, the adapters each module registers through its SPI
          * or as an account erasure contributor, and the callers of the copy fence's leased session. They export
          * and erase across every module's tables, including tables without an entity, and
-         * {@link PersonalDataMapArchTest} holds their SQL to the personal-data map.
+         * PersonalDataMapArchTest holds their SQL to the personal-data map.
          */
         private static final DescribedPredicate<JavaClass> PERSON_DATA_BOUNDARY = DescribedPredicate.describe(
                 "the person-data boundary",
@@ -517,9 +540,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                 .anyMatch(dependency ->
                                         dependency.getTargetClass().isEquivalentTo(PersonDataCopyFence.Lease.class)));
 
-        /**
+        /*
          * Spring's JDBC templates and clients run SQL that neither the tenancy statement inspector nor the
-         * repository query rules can see. Configuration hands them to libraries, {@code core.database} holds
+         * repository query rules can see. Configuration hands them to libraries, core.database holds
          * the schema infrastructure that has to run outside a repository's transaction, and the person-data
          * boundary has its own guard.
          */
@@ -583,7 +606,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
             rule.check(classes);
         }
 
-        /**
+        /*
          * Scans method bytecode for instantiation of UnsupportedOperationException, which catches
          * both direct throws and throws via utility methods.
          */

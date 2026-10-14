@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.core.auth.dto.ProviderIdentityRefDTO;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
@@ -141,7 +140,7 @@ public class ProductReferenceQuery {
                             .flatMap(link -> providers
                                     .profile(link.providerId(), link.providerUserKey(), link.teamKey())
                                     .map(profile -> new ProviderIdentityRefDTO(
-                                            IntegrationKind.valueOf(providers.providerTypeName(link.providerId())),
+                                            providers.providerTypeName(link.providerId()),
                                             profile.login(),
                                             profile.displayName(),
                                             profile.avatarUrl()))

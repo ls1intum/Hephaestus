@@ -244,7 +244,9 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .expectStatus()
                     .isNoContent();
             assertThat(workspaceMembershipService.findMembership(workspace.getId(), accountId(owner)))
-                    .isEmpty();
+                    .get()
+                    .extracting(Membership::getLeftAt)
+                    .isNotNull();
         } else {
             webTestClient
                     .post()
@@ -352,7 +354,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         User hiddenUser = persistUser("hidden-user");
         workspaceMembershipService.createMembership(workspace, accountId(hiddenUser), WorkspaceRole.MEMBER);
-        workspaceMembershipService.updateMemberVisibility(workspace.getId(), hiddenUser.getId(), true);
+        workspaceMembershipService.updateMemberVisibility(workspace.getId(), accountId(hiddenUser), true);
 
         User visibleUser = persistUser("visible-user");
         workspaceMembershipService.createMembership(workspace, accountId(visibleUser), WorkspaceRole.MEMBER);
@@ -364,16 +366,22 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         // Hiding is not a grant: someone the provider no longer lists loses the workspace, hidden
         // or not.
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), hiddenUser.getId()))
-                .isEmpty();
         assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
-                        workspace.getId(), visibleUser.getId()))
-                .isEmpty();
+                        workspace.getId(), accountId(hiddenUser)))
+                .get()
+                .extracting(Membership::getLeftAt)
+                .isNotNull();
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                        workspace.getId(), accountId(visibleUser)))
+                .get()
+                .extracting(Membership::getLeftAt)
+                .isNotNull();
 
         desiredRoles.put(hiddenUser.getId(), WorkspaceRole.MEMBER);
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), hiddenUser.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                        workspace.getId(), accountId(hiddenUser)))
                 .get()
                 .extracting(Membership::isHidden)
                 .isEqualTo(true);
@@ -389,7 +397,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         User hiddenUser = persistUser("rolechange-hidden");
         workspaceMembershipService.createMembership(workspace, accountId(hiddenUser), WorkspaceRole.MEMBER);
-        workspaceMembershipService.updateMemberVisibility(workspace.getId(), hiddenUser.getId(), true);
+        workspaceMembershipService.updateMemberVisibility(workspace.getId(), accountId(hiddenUser), true);
 
         User promoted = persistUser("rolechange-promoted");
         workspaceMembershipService.createMembership(workspace, accountId(promoted), WorkspaceRole.MEMBER);
@@ -401,12 +409,14 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), hiddenUser.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                        workspace.getId(), accountId(hiddenUser)))
                 .get()
                 .extracting(Membership::isHidden)
                 .isEqualTo(true);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(workspace.getId(), promoted.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                        workspace.getId(), accountId(promoted)))
                 .get()
                 .extracting(Membership::getRole)
                 .isEqualTo(WorkspaceRole.ADMIN);

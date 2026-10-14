@@ -1,0 +1,50 @@
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+
+import { listOwnItemReviewsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
+import { ItemFeedbackPage } from "@/components/profile/ItemFeedbackPage";
+import { reviewFeedState } from "@/components/profile/reviews";
+import { useFeedbackResponseWrite } from "@/hooks/use-feedback-response-write";
+import { REVIEW_PAGE_SIZE } from "@/hooks/use-practice-group-detail";
+import { pageHead } from "@/lib/page-title";
+import { useAuth } from "@/runtime/auth/AuthContext";
+import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+
+/**
+ * The address every comment Hephaestus posts on reviewed work ends with, so it is a contract with
+ * comments already out there: `itemId` is the workspace's item id, and the page shows only the
+ * reader's own reviews of the item.
+ */
+export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/feedback/$itemId")({
+	remountDeps: ({ params }) => params,
+	loader: ({ params: { itemId } }) => {
+		const id = Number(itemId);
+		if (!Number.isSafeInteger(id) || id < 1) {
+			throw notFound();
+		}
+		return { itemId: id };
+	},
+	head: pageHead("Your feedback on this work"),
+	component: ItemFeedbackRoute,
+});
+
+function ItemFeedbackRoute() {
+	// A user view reads the developer's feedback and answers nothing on their behalf.
+	const readOnly = useAuth().userView !== undefined;
+	const { workspaceSlug } = Route.useParams();
+	const { itemId } = Route.useLoaderData();
+	const reviews = useInfiniteQuery({
+		...listOwnItemReviewsInfiniteOptions({
+			path: { workspaceSlug, itemId },
+			query: { size: REVIEW_PAGE_SIZE },
+		}),
+		...pagedModelParams,
+	});
+	const responses = useFeedbackResponseWrite(workspaceSlug);
+	return (
+		<ItemFeedbackPage
+			feed={reviewFeedState(reviews)}
+			responses={readOnly ? undefined : responses}
+		/>
+	);
+}

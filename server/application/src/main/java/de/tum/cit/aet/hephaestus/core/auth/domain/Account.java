@@ -95,7 +95,7 @@ public class Account {
     @Version
     @Column(nullable = false)
     @ColumnDefault("0")
-    private Long version = 0L;
+    private @Nullable Long version;
 
     public Account(String displayName) {
         this.displayName = displayName;

@@ -118,7 +118,7 @@ Art. 26 GDPR (joint controllership) is equally absent: EDPB 07/2020 §§ 50–65
 
 TUM is the controller. The public TUM notice (§10) states that workspace administrators make workspace-configurable decisions under TUM's operating responsibility. An administrator acting within TUM is not a separate controller because of that role.
 
-The listed decisions cover repository selection, practices, models, automatic review triggers, Slack routing and selected Outline collections. The privacy statement sets out the responsibilities of TUM/AET and of workspace administrators.
+The listed decisions cover repository selection, practices, models, automatic review settings, Slack routing and selected Outline collections. The privacy statement sets out the responsibilities of TUM/AET and of workspace administrators.
 
 TUM/AET is the single point of contact for data-subject rights. The workspace administrator is also a contact for workspace-specific questions.
 

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.PracticeModelTestFixtures;
@@ -128,6 +129,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
         accounts.saveAndFlush(source);
         var workspace = new Workspace();
         workspace.setWorkspaceSlug("people-" + UUID.randomUUID());
+        workspace.setAccountType(AccountType.ORG);
         workspace.setDisplayName("People test");
         workspace.setAccountLogin("people");
         workspace = workspaces.saveAndFlush(workspace);
@@ -171,6 +173,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
         long sourceId = people.ensureHuman(identity(null), "Roster developer");
         var workspace = new Workspace();
         workspace.setWorkspaceSlug("claim-merge-" + UUID.randomUUID());
+        workspace.setAccountType(AccountType.ORG);
         workspace.setDisplayName("Claim merge");
         workspace.setAccountLogin("claim-merge-" + UUID.randomUUID());
         workspace = workspaces.saveAndFlush(workspace);
@@ -279,6 +282,7 @@ class PeopleRegistryIntegrationTest extends BaseIntegrationTest {
         long accountId = people.ensureHuman(identity(null), "Former member");
         var workspace = new Workspace();
         workspace.setWorkspaceSlug("left-" + UUID.randomUUID());
+        workspace.setAccountType(AccountType.ORG);
         workspace.setDisplayName("Left membership");
         workspace.setAccountLogin("left-" + UUID.randomUUID());
         workspace = workspaces.saveAndFlush(workspace);

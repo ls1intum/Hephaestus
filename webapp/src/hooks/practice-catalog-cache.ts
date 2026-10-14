@@ -1,149 +1,56 @@
-import type {
-	Practice,
-	PracticeGroup,
-	UpdatePracticeGroupRequest,
-	UpdatePracticeRequest,
-} from "@/api/types.gen";
+import type { Practice, PracticeGroup, UpdatePracticeGroupRequest } from "@/api/types.gen";
 
 export function practiceCatalogStructureScope(workspaceSlug: string) {
 	return { id: `practice-catalog:${workspaceSlug}:structure` };
 }
 
-export function applyDisplayOrder<T extends { displayOrder: number; slug: string }>(
+/** Catalog order: position first, then name, so equal positions still read the same every time. */
+export function byPosition<T extends { position: number; name: string }>(a: T, b: T) {
+	return a.position - b.position || a.name.localeCompare(b.name);
+}
+
+export function applyPositions<T extends { position: number; slug: string }>(
 	items: T[],
 	orderedSlugs: string[],
 ): T[] {
-	const orderBySlug = new Map(orderedSlugs.map((slug, index) => [slug, index]));
+	const positionBySlug = new Map(orderedSlugs.map((slug, index) => [slug, index]));
 	return items.map((item) => {
-		const displayOrder = orderBySlug.get(item.slug);
-		return displayOrder === undefined ? item : { ...item, displayOrder };
+		const position = positionBySlug.get(item.slug);
+		return position === undefined ? item : { ...item, position };
 	});
-}
-
-function replaceGroup(groups: PracticeGroup[], updated: PracticeGroup): PracticeGroup[] {
-	return groups.map((group) => (group.slug === updated.slug ? updated : group));
 }
 
 export function upsertGroup(groups: PracticeGroup[], updated: PracticeGroup): PracticeGroup[] {
 	return groups.some((group) => group.slug === updated.slug)
-		? replaceGroup(groups, updated)
+		? groups.map((group) => (group.slug === updated.slug ? updated : group))
 		: [...groups, updated];
 }
 
-export function patchGroup(
+/** A group with the details an update replaces, as the server will return it. */
+export function withGroupDetails(
 	groups: PracticeGroup[],
 	slug: string,
-	patch: UpdatePracticeGroupRequest,
+	details: UpdatePracticeGroupRequest,
 ): PracticeGroup[] {
-	return groups.map((group) => (group.slug === slug ? { ...group, ...patch } : group));
+	return groups.map((group) => (group.slug === slug ? { ...group, ...details } : group));
 }
 
-export function selectGroupPatch(
-	group: PracticeGroup,
-	request: UpdatePracticeGroupRequest,
-): UpdatePracticeGroupRequest {
-	return {
-		...(request.visibleInPracticeDashboards === undefined
-			? {}
-			: { visibleInPracticeDashboards: group.visibleInPracticeDashboards }),
-		...("color" in request ? { color: group.color } : {}),
-		...("description" in request ? { description: group.description } : {}),
-		...("displayOrder" in request ? { displayOrder: group.displayOrder } : {}),
-		...("icon" in request ? { icon: group.icon } : {}),
-		...("name" in request ? { name: group.name } : {}),
-	};
-}
-
-function replacePractice(practices: Practice[], updated: Practice): Practice[] {
-	return practices.map((practice) => (practice.slug === updated.slug ? updated : practice));
+export function removeGroup(groups: PracticeGroup[], slug: string): PracticeGroup[] {
+	return groups.filter((group) => group.slug !== slug);
 }
 
 export function upsertPractice(practices: Practice[], updated: Practice): Practice[] {
 	return practices.some((practice) => practice.slug === updated.slug)
-		? replacePractice(practices, updated)
+		? practices.map((practice) => (practice.slug === updated.slug ? updated : practice))
 		: [...practices, updated];
 }
 
-export function patchPractice(
-	practices: Practice[],
-	slug: string,
-	patch: Partial<Practice>,
-): Practice[] {
-	return practices.map((practice) =>
-		practice.slug === slug ? { ...practice, ...patch } : practice,
-	);
-}
+export type PracticePosition = Pick<Practice, "groupSlug" | "position" | "slug">;
 
-export function selectPracticePatch(
-	practice: Practice,
-	request: UpdatePracticeRequest,
-): Partial<Practice> {
-	const clear = new Set(request.clear);
-	return {
-		// The kind of work is read off the signals server-side, so replacing them can move it — and can
-		// therefore swap in a different work type's recommended review settings.
-		...("signals" in request ||
-		"evidenceRequirements" in request ||
-		"reviewWhen" in request ||
-		"subject" in request ||
-		"precondition" in request ||
-		clear.has("PRECONDITION")
-			? {
-					signals: practice.signals,
-					evidenceRequirements: practice.evidenceRequirements,
-					reviewWhen: practice.reviewWhen,
-					subject: practice.subject,
-					precondition: practice.precondition,
-					artifactKind: practice.artifactKind,
-				}
-			: {}),
-		...("signals" in request || "reviewWhen" in request
-			? { automatedReviewPolicy: practice.automatedReviewPolicy }
-			: {}),
-		...("criteria" in request ? { criteria: practice.criteria } : {}),
-		// A signal edit can change the kind of assessed work; use the server's resulting validation basis.
-		...("signals" in request ||
-		"criteria" in request ||
-		"practiceScript" in request ||
-		clear.has("PRACTICE_SCRIPT") ||
-		"automatedReviewPolicy" in request ||
-		"evidenceRequirements" in request ||
-		"subject" in request ||
-		"precondition" in request ||
-		clear.has("PRECONDITION")
-			? {
-					automatedReviewPolicy: practice.automatedReviewPolicy,
-					automatedReviewValidation: practice.automatedReviewValidation,
-				}
-			: {}),
-		...("name" in request || "group" in request
-			? { automatedReviewValidation: practice.automatedReviewValidation }
-			: {}),
-		...("name" in request ? { name: practice.name } : {}),
-		...("practiceScript" in request || clear.has("PRACTICE_SCRIPT")
-			? { practiceScript: practice.practiceScript }
-			: {}),
-		...("whatGoodLooksLike" in request || clear.has("WHAT_GOOD_LOOKS_LIKE")
-			? { whatGoodLooksLike: practice.whatGoodLooksLike }
-			: {}),
-		...("whyItMatters" in request || clear.has("WHY_IT_MATTERS")
-			? { whyItMatters: practice.whyItMatters }
-			: {}),
-		...("visual" in request || clear.has("VISUAL") ? { visual: practice.visual } : {}),
-		...("guide" in request || clear.has("GUIDE") ? { guide: practice.guide } : {}),
-		...("group" in request
-			? { groupSlug: practice.groupSlug, displayOrder: practice.displayOrder }
-			: {}),
-	};
-}
+const byPracticePosition = (a: Practice, b: Practice) =>
+	a.position - b.position || a.slug.localeCompare(b.slug);
 
-export type PracticePlacement = Pick<Practice, "groupSlug" | "displayOrder" | "slug">;
-
-export function byDisplayOrder<T extends { displayOrder: number; name: string }>(a: T, b: T) {
-	return a.displayOrder - b.displayOrder || a.name.localeCompare(b.name);
-}
-
-export function placePractice(
+export function movePractice(
 	practices: Practice[],
 	slug: string,
 	groupSlug: string | null,
@@ -154,89 +61,74 @@ export function placePractice(
 		return practices;
 	}
 
-	const sourceGroupSlug = moving.groupSlug ?? null;
+	const sourceGroupSlug = moving.groupSlug;
 	const inGroup = (candidate: Practice, candidateGroupSlug: string | null) =>
-		candidate.slug !== slug && (candidate.groupSlug ?? null) === candidateGroupSlug;
+		candidate.slug !== slug && candidate.groupSlug === candidateGroupSlug;
 	const source = practices
 		.filter((practice) => inGroup(practice, sourceGroupSlug))
-		.sort(byDisplayOrder);
+		.sort(byPracticePosition);
 	const destination =
 		sourceGroupSlug === groupSlug
 			? source
-			: practices.filter((practice) => inGroup(practice, groupSlug)).sort(byDisplayOrder);
-	destination.splice(Math.min(position, destination.length), 0, {
-		...moving,
-		groupSlug: groupSlug ?? undefined,
-	});
+			: practices.filter((practice) => inGroup(practice, groupSlug)).sort(byPracticePosition);
+	destination.splice(Math.min(position, destination.length), 0, { ...moving, groupSlug });
 
-	const placements = [
+	const positions = [
 		...(sourceGroupSlug === groupSlug
 			? []
-			: source.map((practice, displayOrder) => ({
+			: source.map((practice, index) => ({
 					slug: practice.slug,
-					groupSlug: sourceGroupSlug ?? undefined,
-					displayOrder,
+					groupSlug: sourceGroupSlug,
+					position: index,
 				}))),
-		...destination.map((practice, displayOrder) => ({
+		...destination.map((practice, index) => ({
 			slug: practice.slug,
-			groupSlug: groupSlug ?? undefined,
-			displayOrder,
+			groupSlug,
+			position: index,
 		})),
 	];
-	return applyPracticePlacements(practices, placements);
+	return applyPracticePositions(practices, positions);
 }
 
-export function practicePlacementSnapshot(
+export function practicePositionSnapshot(
 	practices: Practice[],
 	practiceSlug: string,
 	destinationGroupSlug: string | null,
-): PracticePlacement[] {
+): PracticePosition[] {
 	const sourceGroupSlug =
 		practices.find((practice) => practice.slug === practiceSlug)?.groupSlug ?? null;
 	return practices
-		.filter((practice) => {
-			const groupSlug = practice.groupSlug ?? null;
-			return groupSlug === sourceGroupSlug || groupSlug === destinationGroupSlug;
-		})
-		.map(({ slug, groupSlug, displayOrder }) => ({ slug, groupSlug, displayOrder }));
+		.filter(({ groupSlug }) => groupSlug === sourceGroupSlug || groupSlug === destinationGroupSlug)
+		.map(({ slug, groupSlug, position }) => ({ slug, groupSlug, position }));
 }
 
-export function applyPracticePlacements(
+export function applyPracticePositions(
 	practices: Practice[],
-	placements: PracticePlacement[],
+	positions: PracticePosition[],
 ): Practice[] {
-	const bySlug = new Map(placements.map((placement) => [placement.slug, placement]));
+	const bySlug = new Map(positions.map((position) => [position.slug, position]));
 	return practices.map((practice) => {
-		const placement = bySlug.get(practice.slug);
-		return placement
-			? {
-					...practice,
-					groupSlug: placement.groupSlug,
-					displayOrder: placement.displayOrder,
-				}
-			: practice;
+		const moved = bySlug.get(practice.slug);
+		return moved ? { ...practice, groupSlug: moved.groupSlug, position: moved.position } : practice;
 	});
 }
 
-export function removeGroup(groups: PracticeGroup[], slug: string): PracticeGroup[] {
-	return groups.filter((group) => group.slug !== slug);
-}
-
+/** Deleting a group keeps its practices, unassigned and after the ones already there. */
 export function unassignPractices(practices: Practice[], groupSlug: string): Practice[] {
-	const firstDisplayOrder =
+	const firstPosition =
 		Math.max(
 			-1,
 			...practices
-				.filter((practice) => practice.groupSlug == null)
-				.map((practice) => practice.displayOrder),
+				.filter((practice) => practice.groupSlug === null)
+				.map((practice) => practice.position),
 		) + 1;
 	let offset = 0;
 	return practices.map((practice) => {
 		if (practice.groupSlug !== groupSlug) {
 			return practice;
 		}
-		const displayOrder = firstDisplayOrder + offset;
+		const position = firstPosition + offset;
 		offset += 1;
-		return { ...practice, groupSlug: undefined, displayOrder };
+		return { ...practice, groupSlug: null, position };
 	});
 }

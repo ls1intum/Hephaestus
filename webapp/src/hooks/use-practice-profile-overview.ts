@@ -11,8 +11,8 @@ import { EMPTY_OVERVIEW } from "@/components/practice-profile/compose-overview";
 export const PRACTICE_PROFILE_POLL_MS = 60_000;
 
 /**
- * The practice profile's overview — what held, what changed and what the latest run looked at —
- * empty until it loads. The overview is read with no window, so the server compares the latest run
+ * The practice profile's overview — what goes well, what changed and what the latest review looked at —
+ * empty until it loads. The overview is read with no window, so the server compares the latest review
  * with the one before it.
  */
 export function usePracticeProfileOverview(workspaceSlug: string) {

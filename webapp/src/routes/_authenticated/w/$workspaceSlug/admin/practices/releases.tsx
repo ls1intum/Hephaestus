@@ -7,10 +7,12 @@ import { toast } from "sonner";
 import {
 	acceptPracticeReleaseMutation,
 	declinePracticeReleaseMutation,
+	getPracticeQueryKey,
 	listPracticeReleasesOptions,
 	listPracticeReleasesQueryKey,
 	listPracticesQueryKey,
 	listPracticeScriptNeedsQueryKey,
+	listPracticeVersionsQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { PracticeReleaseReview } from "@/components/admin/practices/PracticeReleaseReview";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -39,8 +41,12 @@ function PracticeReleaseInbox() {
 	const [selectedSlug, setSelectedSlug] = useState<string | null>(null);
 	const queryClient = useQueryClient();
 	const query = useQuery(listPracticeReleasesOptions({ path: { workspaceSlug } }));
-	const refresh = async () => {
+	const refresh = async (practiceSlug: string) => {
+		const path = { workspaceSlug, practiceSlug };
 		await Promise.all([
+			// Accepting saves a new version; declining changes where the practice stands with the catalog.
+			queryClient.invalidateQueries({ queryKey: getPracticeQueryKey({ path }) }),
+			queryClient.invalidateQueries({ queryKey: listPracticeVersionsQueryKey({ path }) }),
 			queryClient.invalidateQueries({
 				queryKey: listPracticeReleasesQueryKey({ path: { workspaceSlug } }),
 			}),
@@ -57,33 +63,36 @@ function PracticeReleaseInbox() {
 		...acceptPracticeReleaseMutation(),
 		onSuccess: async (updated) => {
 			await Promise.all([
-				refresh(),
+				refresh(updated.slug),
 				refreshPracticeGuidance(queryClient, workspaceSlug, updated.slug),
 			]);
 			toast.success("Practice update accepted");
 		},
-		onError: (error) => {
-			if (problemStatusOf(error) === 412) {
-				void refresh();
+		onError: (error, variables) => {
+			// A stale offer is refused whole; the inbox reloads with the comparison as it now stands.
+			if (problemStatusOf(error) === 409) {
+				void refresh(variables.path.slug);
 			}
 			toast.error("We could not accept the update", { description: problemDetailOf(error) });
 		},
 	});
 	const decline = useMutation({
 		...declinePracticeReleaseMutation(),
-		onSuccess: async () => {
-			await refresh();
+		onSuccess: async (_data, variables) => {
+			await refresh(variables.path.slug);
 			toast.success("Practice update declined");
 		},
-		onError: (error) => {
-			if (problemStatusOf(error) === 412) {
-				void refresh();
+		onError: (error, variables) => {
+			// A stale offer is refused whole; the inbox reloads with the comparison as it now stands.
+			if (problemStatusOf(error) === 409) {
+				void refresh(variables.path.slug);
 			}
 			toast.error("We could not decline the update", { description: problemDetailOf(error) });
 		},
 	});
 	const proposals = query.data ?? [];
-	const selected = proposals.find((proposal) => proposal.slug === selectedSlug) ?? proposals[0];
+	const selected =
+		proposals.find((proposal) => proposal.practiceSlug === selectedSlug) ?? proposals[0];
 	const pending = (accept.isPending ? "accept" : null) ?? (decline.isPending ? "decline" : null);
 	let content: ReactNode;
 	if (query.isPending) {
@@ -112,7 +121,8 @@ function PracticeReleaseInbox() {
 					<EmptyTitle>No updates to review</EmptyTitle>
 					<EmptyDescription>
 						Catalog changes to your practices appear here. Accepted and declined versions do not
-						return unless the catalog changes again.
+						return unless the catalog changes again. Reset to catalog stays available on each
+						practice.
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -123,11 +133,11 @@ function PracticeReleaseInbox() {
 				<nav aria-label="Pending practice updates" className="space-y-2">
 					{proposals.map((proposal) => (
 						<button
-							key={proposal.slug}
+							key={proposal.practiceSlug}
 							type="button"
-							aria-current={proposal.slug === selected.slug ? "true" : undefined}
+							aria-current={proposal.practiceSlug === selected.practiceSlug ? "true" : undefined}
 							className="w-full rounded-md border p-3 text-left text-sm hover:bg-muted aria-current:bg-muted"
-							onClick={() => setSelectedSlug(proposal.slug)}
+							onClick={() => setSelectedSlug(proposal.practiceSlug)}
 						>
 							<span className="block font-medium">{proposal.offered.name}</span>
 							<span className="text-muted-foreground">
@@ -142,14 +152,14 @@ function PracticeReleaseInbox() {
 					pending={pending}
 					onAccept={(choices) =>
 						accept.mutate({
-							path: { workspaceSlug, slug: selected.slug },
+							path: { workspaceSlug, slug: selected.practiceSlug },
 							headers: { "If-Match": `"${selected.etag}"` },
 							body: { choices },
 						})
 					}
 					onDecline={() =>
 						decline.mutate({
-							path: { workspaceSlug, slug: selected.slug },
+							path: { workspaceSlug, slug: selected.practiceSlug },
 							headers: { "If-Match": `"${selected.etag}"` },
 						})
 					}

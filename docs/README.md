@@ -22,7 +22,7 @@ Three shapes, so a reader recognises what they are looking at before reading it:
 
 | Shape | Use | Node ids |
 |---|---|---|
-| `flowchart LR` | something moves through owners or doors | PascalCase, labelled with what crosses the arrow |
+| `flowchart LR` | something moves through owners or boundaries | PascalCase, labelled with what crosses the arrow |
 | `flowchart TB` | stages, and the distinct way each one can end | PascalCase |
 | `sequenceDiagram` | one exchange across processes | participant names as deployed |
 

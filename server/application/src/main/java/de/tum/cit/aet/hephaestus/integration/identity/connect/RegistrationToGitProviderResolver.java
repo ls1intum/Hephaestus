@@ -110,6 +110,10 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     @Override
     @Transactional(readOnly = true)
     public Optional<Long> findActorId(long gitProviderId, String subject) {
+        return actorId(gitProviderId, subject);
+    }
+
+    private Optional<Long> actorId(long gitProviderId, String subject) {
         final long nativeId;
         try {
             nativeId = Long.parseLong(subject);
@@ -125,7 +129,7 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     @Transactional(readOnly = true)
     public Optional<IdentityProfile> profile(long providerId, String providerUserKey, @Nullable String teamKey) {
         if (teamKey != null && !teamKey.isEmpty()) return Optional.empty();
-        return findActorId(providerId, providerUserKey)
+        return actorId(providerId, providerUserKey)
                 .flatMap(userRepository::findById)
                 .map(user ->
                         new IdentityProfile(user.getLogin(), user.getName(), user.getAvatarUrl(), user.getHtmlUrl()));

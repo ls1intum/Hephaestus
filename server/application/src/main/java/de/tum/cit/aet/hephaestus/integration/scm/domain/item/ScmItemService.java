@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
-import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -9,7 +8,6 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
-import de.tum.cit.aet.hephaestus.evidence.capture.WorkspaceRefusal;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -22,12 +20,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.GeneralReviewCommentContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCaptureContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturePreparation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedWork;
@@ -40,9 +34,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -53,10 +45,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
@@ -77,19 +67,12 @@ public class ScmItemService {
     private final RepositoryRepository repositoryRows;
     private final IssueRepository issues;
     private final PullRequestReviewRepository reviews;
-    private final UserRepository users;
     private final IssueEvidenceVersion issueVersions;
     private final ScmGitTree tree;
     private final ScmFileVersions fileVersions;
-    private final ScmCaptureConsent consent;
-    private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
-    private final PullRequestContentSource pullContent;
-    private final IssueContentSource issueContent;
-    private final GeneralReviewCommentContentSource generalComments;
-    private final ReviewThreadContentSource threads;
-    private final LinkedWorkItemContentSource linked;
-    private final RepositoryTreeContentSource repositoryTree;
+    private final ScmWorkCapture workCapture;
+    private final ScmCaptureContributors contributors;
 
     public Map<Long, ItemLabel> labels(long workspaceId, Collection<ItemRef> refs) {
         items.requireAll(workspaceId, refs);
@@ -152,9 +135,10 @@ public class ScmItemService {
                     objectId(pull.getHeadRefOid()),
                     pull.getTitle(),
                     pull.getBody(),
-                    objectId(review.getCommitId()),
-                    review.getBody(),
-                    review.getState().name());
+                    new ScmVersion.ReviewContent(
+                            objectId(review.getCommitId()),
+                            review.getBody(),
+                            review.getState().name()));
             state.put("reviewState", review.getState().name());
         } else {
             add(roles, AboutRole.AUTHOR, work.getAuthor());
@@ -289,7 +273,7 @@ public class ScmItemService {
             work = issues.findByIdWithAuthorAndRepository(
                             Objects.requireNonNull(pinned.item().sourceId()))
                     .orElseThrow(ScmItemService::gone);
-        requireContributors(work, review, request.sources());
+        contributors.require(work, review, request.sources());
         Repository repository = Objects.requireNonNull(work.getRepository());
         PullRequest pull = work instanceof PullRequest p ? p : null;
         ScmCapturedWork frozen = new ScmCapturedWork(
@@ -310,27 +294,7 @@ public class ScmItemService {
                         : review.getAuthor().getId());
         ScmCaptureContext context =
                 new ScmCaptureContext(pinned, request, frozen, new ScmCapturePreparation(), Instant.now());
-        List<CaptureContribution> contributions = new ArrayList<>();
-        try {
-            if (pull == null) contributions.add(issueContent.capture(context, request.sources()));
-            else {
-                contributions.add(pullContent.capture(context, request.sources()));
-                contributions.add(generalComments.capture(context, request.sources()));
-                contributions.add(threads.capture(context, request.sources()));
-                contributions.add(linked.capture(context, request.sources()));
-                contributions.add(repositoryTree.capture(context, request.sources()));
-            }
-            return combine(contributions);
-        } catch (RuntimeException failure) {
-            for (var contribution : contributions)
-                if (contribution.cleanup() != null)
-                    try {
-                        contribution.cleanup().close();
-                    } catch (Exception e) {
-                        failure.addSuppressed(e);
-                    }
-            throw failure;
-        }
+        return workCapture.capture(context);
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -380,59 +344,9 @@ public class ScmItemService {
         }
     }
 
-    private void requireContributors(Issue work, @Nullable PullRequestReview review, Set<SourceKind> selected) {
-        List<User> contributors = new ArrayList<>(work.getAssignees());
-        if (work.getAuthor() != null) contributors.add(work.getAuthor());
-        if (review != null && review.getAuthor() != null) contributors.add(review.getAuthor());
-        if (work instanceof PullRequest pull && pull.getMergedBy() != null) contributors.add(pull.getMergedBy());
-        List<Long> ids = new ArrayList<>();
-        if (selected.contains(IssueContentSource.COMMENTS) || selected.contains(GeneralReviewCommentContentSource.KIND))
-            ids.addAll(jdbc.queryForList(
-                    "SELECT author_id FROM issue_comment WHERE issue_id=? AND author_id IS" + " NOT NULL",
-                    Long.class,
-                    work.getId()));
-        if (selected.contains(PullRequestContentSource.COMMENTS) || selected.contains(ReviewThreadContentSource.KIND))
-            ids.addAll(jdbc.queryForList(
-                    "SELECT author_id FROM pull_request_review_comment WHERE"
-                            + " pull_request_id=? AND author_id IS NOT NULL",
-                    Long.class,
-                    work.getId()));
-        if (selected.contains(GeneralReviewCommentContentSource.KIND))
-            ids.addAll(jdbc.queryForList(
-                    "SELECT author_id FROM pull_request_review WHERE pull_request_id=? AND" + " author_id IS NOT NULL",
-                    Long.class,
-                    work.getId()));
-        if (selected.contains(ReviewThreadContentSource.KIND))
-            ids.addAll(jdbc.queryForList(
-                    "SELECT resolved_by_id FROM pull_request_review_thread WHERE"
-                            + " pull_request_id=? AND resolved_by_id IS NOT NULL",
-                    Long.class,
-                    work.getId()));
-        if (work instanceof PullRequest && selected.contains(PullRequestContentSource.DIFF))
-            ids.addAll(jdbc.query(
-                    "SELECT DISTINCT roles.user_id FROM commit_pull_request cp JOIN ("
-                            + "SELECT id AS commit_id,author_id AS user_id FROM git_commit UNION ALL "
-                            + "SELECT id,committer_id FROM git_commit UNION ALL "
-                            + "SELECT commit_id,user_id FROM commit_contributor) roles ON roles.commit_id=cp.commit_id "
-                            + "WHERE cp.pull_request_id=? AND roles.user_id IS NOT NULL",
-                    (rs, row) -> rs.getLong("user_id"),
-                    work.getId()));
-        if (work instanceof PullRequest && selected.contains(RepositoryTreeContentSource.KIND))
-            ids.addAll(jdbc.query(
-                    "SELECT DISTINCT roles.user_id FROM git_commit c JOIN ("
-                            + "SELECT id AS commit_id,author_id AS user_id FROM git_commit UNION ALL "
-                            + "SELECT id,committer_id FROM git_commit UNION ALL "
-                            + "SELECT commit_id,user_id FROM commit_contributor) roles ON roles.commit_id=c.id "
-                            + "WHERE c.repository_id=? AND roles.user_id IS NOT NULL",
-                    (rs, row) -> rs.getLong("user_id"),
-                    Objects.requireNonNull(work.getRepository()).getId()));
-        users.findAllById(ids.stream().distinct().toList()).forEach(contributors::add);
-        consent.require(contributors);
-    }
-
     private CaptureContribution captureTree(ItemSnapshot pinned, CaptureRequest request) {
         SourceKind source = RepositoryTreeContentSource.KIND;
-        if (!request.sources().contains(source)) return combine(List.of());
+        if (!request.sources().contains(source)) return ScmCaptureContributions.combine(List.of());
         ItemRef holder = pinned.item().kind().equals(ScmItemEvents.FILE)
                 ? items.parent(pinned.item(), ScmItemEvents.REPOSITORY)
                 : pinned.item();
@@ -486,62 +400,6 @@ public class ScmItemService {
                 snapshot.limitations().isEmpty() ? Map.of() : Map.of(source, List.copyOf(snapshot.limitations())),
                 List.of(new EvidenceDirectory("repos/reviewed/", snapshot.stagingDir())),
                 List.of(),
-                citable);
-    }
-
-    private static CaptureContribution combine(List<CaptureContribution> values) {
-        Map<String, byte[]> files = new HashMap<>();
-        Map<SourceKind, SourceCompleteness> completeness = new HashMap<>();
-        Map<SourceKind, String> identities = new HashMap<>();
-        Map<SourceKind, Instant> observed = new HashMap<>(), effective = new HashMap<>();
-        Map<SourceKind, SourceContentState> content = new HashMap<>();
-        Map<SourceKind, SourceCaptureState> states = new HashMap<>();
-        Map<String, Path> disk = new HashMap<>();
-        Map<SourceKind, List<String>> limitations = new HashMap<>();
-        List<EvidenceDirectory> directories = new ArrayList<>();
-        List<WorkspaceRefusal> refusals = new ArrayList<>();
-        List<CitableText> citable = new ArrayList<>();
-        for (var value : values) {
-            value.files().forEach((path, bytes) -> {
-                if (files.putIfAbsent(path, bytes) != null)
-                    throw new IllegalStateException("Duplicate capture path: " + path);
-            });
-            completeness.putAll(value.completeness());
-            identities.putAll(value.immutableIdentities());
-            observed.putAll(value.observedAt());
-            effective.putAll(value.sourceEffectiveAt());
-            content.putAll(value.contentStates());
-            states.putAll(value.stateOverrides());
-            disk.putAll(value.filesOnDisk());
-            limitations.putAll(value.captureLimitations());
-            directories.addAll(value.directories());
-            refusals.addAll(value.refusals());
-            citable.addAll(value.citableTexts());
-        }
-        return new CaptureContribution(
-                files,
-                completeness,
-                identities,
-                observed,
-                effective,
-                content,
-                states,
-                disk,
-                () -> {
-                    Exception failure = null;
-                    for (var value : values)
-                        if (value.cleanup() != null)
-                            try {
-                                value.cleanup().close();
-                            } catch (Exception e) {
-                                if (failure == null) failure = e;
-                                else failure.addSuppressed(e);
-                            }
-                    if (failure != null) throw failure;
-                },
-                limitations,
-                directories,
-                refusals,
                 citable);
     }
 

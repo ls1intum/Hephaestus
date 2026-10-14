@@ -150,10 +150,10 @@ const LIVE_TRANSPORT = createChat<ChatMessage>().transport({
 	fallback: ({ writer }) => {
 		writer.text("I looked at your latest pull request, **Cache the practice catalog**.");
 		writer.data({
-			type: "data-observation",
+			type: "data-result",
 			id: "live-link",
 			data: {
-				observationId: "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f",
+				resultId: "3f0c2b4e-8a1d-4c6e-9b7f-2d5e8a1c4b6f",
 				text: "Your description names the decision but not why it beat invalidating on write.",
 			},
 		});

@@ -50,7 +50,7 @@ class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(0);
     }
 
@@ -107,7 +107,7 @@ class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
                         Instant.now().toString()))
                 .exchange()
                 .expectStatus()
-                .isUnauthorized()
+                .isForbidden()
                 .expectBody(Void.class);
     }
 }

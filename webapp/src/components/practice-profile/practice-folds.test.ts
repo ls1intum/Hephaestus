@@ -1,27 +1,21 @@
 import { describe, expect, it } from "vitest";
 
 import type { PracticeStanding } from "@/api/types.gen";
+import { practiceStandingOf } from "@/stories/practice-profile-story-mock-data";
 
 import { groupNeverApplied, groupNotObservedYet, splitFoldedPractices } from "./practice-folds";
 
 const standing = (
 	slug: string,
 	value: PracticeStanding["standing"],
-	notApplicableOnly?: boolean,
-): PracticeStanding => ({
-	slug,
-	name: slug,
-	standing: value,
-	toWorkOn: [],
-	strengths: [],
-	notApplicableOnly,
-});
+	doesNotApplyOnly = false,
+): PracticeStanding => practiceStandingOf({ slug, name: slug, standing: value, doesNotApplyOnly });
 
 describe("splitFoldedPractices", () => {
 	it("folds the practices that never applied and the ones not observed yet, apart", () => {
 		const { shown, neverApplied, notObserved } = splitFoldedPractices([
 			standing("a", "NO_OPPORTUNITY", true),
-			// Undetermined somewhere: a silence, not a practice that never applied.
+			// Could not determine somewhere: a silence, not a practice that never applied.
 			standing("b", "NO_OPPORTUNITY", false),
 			standing("c", "NOT_OBSERVED"),
 			standing("d", "DEVELOPING"),

@@ -30,7 +30,7 @@ public class PracticeProfileOverviewController {
 
     @GetMapping("/overview")
     @Operation(
-            operationId = "getPracticeProfileOverview",
+            operationId = "getOwnPracticeProfileOverview",
             summary = "What was met, what changed and which work was reviewed since the run before the latest one",
             description = "Returns the practices met as a strength, every change to a standing, trend, group or"
                     + " piece of feedback inside the window, and the work reviewed inside it, as structured"

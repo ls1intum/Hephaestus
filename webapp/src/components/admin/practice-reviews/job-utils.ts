@@ -1,25 +1,18 @@
 import { formatDistanceStrict } from "date-fns";
-import type { AgentJob } from "@/api/types.gen";
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import type { ReviewJob, ReviewSummary } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
+import { ITEM_KIND } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
-export type JobWait = { kind: "hold"; reason: string } | { kind: "backoff" };
+export type JobWait = { kind: "backoff" };
 
 /**
- * `null` for a run that is simply claimable: `availableAt` is in the past for almost every run, so a
- * "due …" line on every queued row would be noise. A hold is keyed off `holdReason` alone, not the
- * clock — the server re-parks a still-capped run each time its `availableAt` lapses.
+ * `null` for a job that is simply claimable: `availableAt` is in the past for almost every job, so a
+ * "due …" line on every queued row would be noise.
  */
-export function jobWait(
-	job: Pick<AgentJob, "status" | "holdReason" | "availableAt">,
-	now: number,
-): JobWait | null {
+export function jobWait(job: Pick<ReviewJob, "status" | "availableAt">, now: number): JobWait | null {
 	if (job.status !== "QUEUED") {
 		return null;
-	}
-	if (hasText(job.holdReason)) {
-		return { kind: "hold", reason: job.holdReason };
 	}
 	const availableAt = asDate(job.availableAt);
 	return availableAt && availableAt.getTime() > now ? { kind: "backoff" } : null;
@@ -31,54 +24,32 @@ export interface HoldReasonCopy {
 	detail: string;
 }
 
-/**
- * `holdReason` is a plain string on the wire and the server may add reasons, so an unknown one reads
- * as a plain "On hold" rather than as its constant.
- */
-const HOLD_REASON_COPY: Record<string, HoldReasonCopy | undefined> = {
-	BUDGET: {
-		label: "Over the AI budget",
-		detail:
-			"The monthly AI budget is used up, so this review is waiting, not failed. It continues on its own when the budget is raised or the next month starts. AI usage shows which budget is used up and who can raise it.",
-	},
+/** A queued job held because the monthly AI budget is used up (`heldForBudget`). */
+export const BUDGET_HOLD: HoldReasonCopy = {
+	label: "Over the AI budget",
+	detail:
+		"The monthly AI budget is used up, so this review is waiting, not failed. It continues on its own when the budget is raised or the next month starts. AI usage shows which budget is used up and who can raise it.",
 };
 
-const UNKNOWN_HOLD_DETAIL =
-	"This review is waiting, not failed. It continues on its own when the hold ends.";
-
-export function holdReasonCopy(reason: string): HoldReasonCopy {
-	const known = HOLD_REASON_COPY[reason];
-	if (known) {
-		return known;
-	}
-	return { label: "On hold", detail: UNKNOWN_HOLD_DETAIL };
-}
-
-export function isCancellable(status: AgentJob["status"]): boolean {
+/** Cancelling stops every job of the review that still waits or runs. */
+export function isCancellable(status: ReviewSummary["status"]): boolean {
 	return status === "QUEUED" || status === "RUNNING";
 }
 
-export function isResultProcessingRetryable(
-	job: Pick<AgentJob, "status" | "deliveryStatus">,
-): boolean {
-	return job.status === "COMPLETED" && job.deliveryStatus === "FAILED";
-}
-
 /**
- * The kinds the request endpoint accepts. A conversation and a document are reviewed on the occasion
+ * The kinds the request endpoint accepts. A conversation and a document are reviewed on the event
  * their source produces, and asking for one by hand is refused. Nothing on the wire says which kinds
- * have a front door; being wrong in this direction costs a missing button rather than a broken one.
+ * accept a request; being wrong in this direction costs a missing button rather than a broken one.
  */
 export const REVIEWABLE_ON_DEMAND: ReadonlySet<string> = new Set([
-	ARTIFACT_KIND.pullRequest,
-	ARTIFACT_KIND.issue,
+	ITEM_KIND.pullRequest,
+	ITEM_KIND.issue,
 ]);
 
 export interface JobPhases {
 	wait: string;
-	preparation: string;
 	execution: string;
-	/** The wait then runs from the request, through every earlier attempt and retry wait. */
+	/** The wait then runs from this attempt's availability, after every earlier attempt. */
 	retried: boolean;
 }
 
@@ -103,32 +74,21 @@ function elapsed(from: Date | null | undefined, to: Date | null | undefined): st
 }
 
 /**
- * The current attempt's phases between the boundaries the job records: its claim (`startedAt`), the
- * moment before the sandbox is invoked (`executionStartedAt`) and its end. A retry clears the first two.
- * A live phase is in progress, never a figure; a missing, unreadable or out-of-order boundary is not
- * recorded, and so is every phase that depends on it.
+ * The current attempt's phases between the boundaries the job records: when it became available
+ * (`availableAt`), its claim (`startedAt`) and its end. A live phase is in progress, never a figure; a
+ * missing, unreadable or out-of-order boundary is not recorded, and so is every phase that depends on
+ * it.
  */
 export function jobPhases(
-	job: Pick<
-		AgentJob,
-		"status" | "createdAt" | "startedAt" | "executionStartedAt" | "completedAt" | "retryCount"
-	>,
+	job: Pick<ReviewJob, "status" | "availableAt" | "startedAt" | "completedAt" | "attempt">,
 ): JobPhases {
-	const retried = job.retryCount > 0;
+	const retried = job.attempt > 1;
 	if (job.status === "QUEUED") {
-		return { wait: IN_PROGRESS, preparation: NOT_STARTED, execution: NOT_STARTED, retried };
+		return { wait: IN_PROGRESS, execution: NOT_STARTED, retried };
 	}
 	const started = instant(job.startedAt);
-	const executing = instant(job.executionStartedAt);
-	const wait = elapsed(instant(job.createdAt), started);
-	if (job.status === "RUNNING" && started && executing === undefined) {
-		return { wait, preparation: IN_PROGRESS, execution: NOT_STARTED, retried };
-	}
-	const preparation = elapsed(started, executing);
-	let execution = NOT_RECORDED;
-	if (preparation !== NOT_RECORDED) {
-		execution =
-			job.status === "RUNNING" ? IN_PROGRESS : elapsed(executing, instant(job.completedAt));
-	}
-	return { wait, preparation, execution, retried };
+	const wait = elapsed(instant(job.availableAt), started);
+	const execution =
+		job.status === "RUNNING" ? IN_PROGRESS : elapsed(started, instant(job.completedAt));
+	return { wait, execution, retried };
 }

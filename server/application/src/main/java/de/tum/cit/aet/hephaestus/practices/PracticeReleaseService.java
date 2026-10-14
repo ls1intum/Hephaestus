@@ -26,6 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 @ConditionalOnServerRole
 public class PracticeReleaseService {
     private final CatalogService catalog;
@@ -38,7 +39,6 @@ public class PracticeReleaseService {
     private final JsonMapper mapper;
     private final ConfigAuditPort audit;
 
-    @Transactional(readOnly = true)
     public List<PracticeReleaseProposalDTO> list(WorkspaceContext ctx) {
         return practices.findAllForCatalog(ctx.id()).stream()
                 .filter(practice -> practice.getCatalogSlug() != null)
@@ -50,7 +50,6 @@ public class PracticeReleaseService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public PracticeReleaseProposalDTO get(WorkspaceContext ctx, String slug) {
         return proposal(practice(ctx, slug));
     }
@@ -123,7 +122,7 @@ public class PracticeReleaseService {
                 .effective();
         if (!practice.getKind().equals(document.kind()))
             throw new IllegalArgumentException("A catalog reset cannot change the practice's item kind.");
-        groups.applyBinding(ctx, practice, document.groupSlug());
+        groups.restoreCatalogBinding(ctx, practice, document.groupSlug());
         versions.append(
                 practice,
                 document.definition(),
@@ -160,7 +159,6 @@ public class PracticeReleaseService {
         return group;
     }
 
-    @Transactional(readOnly = true)
     public String groupResetTag(WorkspaceContext ctx, String slug) {
         var group = groups.getGroup(ctx, slug);
         var offer = group.getCatalogSlug() == null

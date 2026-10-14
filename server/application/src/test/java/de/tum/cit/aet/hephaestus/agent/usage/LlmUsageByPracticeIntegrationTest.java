@@ -529,14 +529,14 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     private void practice(Workspace workspace, String slug, String name) {
         var kind = new ItemKind("scm.pull_request");
-        runtimePracticeVersions.create(
+        runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 slug,
                 kind,
                 RuntimePracticeTestData.definition(kind, name, "Criteria for " + name, null),
                 null,
                 0,
-                null);
+                null));
     }
 
     private ReviewJob runningJob(Workspace workspace) {

@@ -4,7 +4,7 @@ import { HttpResponse, http, type PathParams } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UpdateWorkspacePublicActivityRequest } from "@/api/types.gen";
-import { workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
@@ -16,7 +16,7 @@ vi.setConfig({ testTimeout: 15_000 });
 function renderSettingsRoute(practicesEnabled: boolean) {
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 		http.get("*/workspaces", () =>
 			HttpResponse.json([workspaceListItem("acme", { practicesEnabled })]),

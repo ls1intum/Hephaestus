@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewPracticeCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewResultCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewStatusCountsDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.TimeBucketSize;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -118,8 +119,8 @@ public class ReviewOverviewService {
     private ReviewResultCountsDTO outcomes(long ws, TimeRange range, @Nullable Long practice) {
         var params = new LinkedHashMap<String, Object>();
         params.put("ws", ws);
-        params.put("from", range.from());
-        params.put("to", range.to());
+        params.put("from", Timestamp.from(range.from()));
+        params.put("to", Timestamp.from(range.to()));
         if (practice != null) params.put("practice", practice);
         var c = jdbc
                 .sql("SELECT outcome,count(*) FROM result WHERE workspace_id=:ws AND recorded_at>=:from AND"
@@ -137,8 +138,8 @@ public class ReviewOverviewService {
     private ReviewFeedbackCountsDTO feedback(long ws, TimeRange range, @Nullable Long practice) {
         var params = new LinkedHashMap<String, Object>();
         params.put("ws", ws);
-        params.put("from", range.from());
-        params.put("to", range.to());
+        params.put("from", Timestamp.from(range.from()));
+        params.put("to", Timestamp.from(range.to()));
         if (practice != null) params.put("practice", practice);
         var c = jdbc
                 .sql("SELECT f.state,count(*) FROM feedback f WHERE f.workspace_id=:ws AND f.created_at>=:from AND"
@@ -169,8 +170,8 @@ public class ReviewOverviewService {
     private int incorrect(long ws, TimeRange range, @Nullable Long practice) {
         var params = new LinkedHashMap<String, Object>();
         params.put("ws", ws);
-        params.put("from", range.from());
-        params.put("to", range.to());
+        params.put("from", Timestamp.from(range.from()));
+        params.put("to", Timestamp.from(range.to()));
         if (practice != null) params.put("practice", practice);
         return jdbc.sql("SELECT count(*) FROM result r WHERE r.workspace_id=:ws AND r.recorded_at>=:from AND"
                         + " r.recorded_at<:to"
@@ -187,8 +188,8 @@ public class ReviewOverviewService {
                 .sql("SELECT " + field + ",count(*) FROM " + table + " WHERE workspace_id=:ws AND " + time
                         + ">=:from AND " + time + "<:to GROUP BY " + field)
                 .param("ws", ws)
-                .param("from", range.from())
-                .param("to", range.to())
+                .param("from", Timestamp.from(range.from()))
+                .param("to", Timestamp.from(range.to()))
                 .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
                 .list()
                 .stream()
@@ -199,8 +200,8 @@ public class ReviewOverviewService {
         return jdbc.sql("SELECT count(*) FROM " + table + " WHERE workspace_id=:ws AND " + time + ">=:from AND " + time
                         + "<:to")
                 .param("ws", ws)
-                .param("from", from)
-                .param("to", to)
+                .param("from", Timestamp.from(from))
+                .param("to", Timestamp.from(to))
                 .query((rs, n) -> rs.getInt(1))
                 .single();
     }
@@ -222,8 +223,8 @@ public class ReviewOverviewService {
                                     + " AND q.status IN ('COMPLETE','PARTIAL','FAILED','CANCELLED'))) GROUP BY m.state")
                             .param("ws", ws)
                             .param("practice", p.getId())
-                            .param("from", range.from())
-                            .param("to", range.to())
+                            .param("from", Timestamp.from(range.from()))
+                            .param("to", Timestamp.from(range.to()))
                             .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
                             .list()
                             .stream()

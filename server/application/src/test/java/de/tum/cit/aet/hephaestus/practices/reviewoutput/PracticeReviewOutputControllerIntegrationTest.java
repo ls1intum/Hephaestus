@@ -67,7 +67,7 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(1);
     }
 
@@ -92,7 +92,7 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(0);
     }
 

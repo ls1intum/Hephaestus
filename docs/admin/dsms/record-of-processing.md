@@ -276,7 +276,7 @@ Authored repository artifacts and derived records
 
 These include issues, pull/merge requests, comments and reviews synced from GitHub / gitlab.lrz.de. They also include their practice results and problems, delivery-policy traces, and pending delivery packages. The active PostgreSQL mirror remains while at least one workspace monitors the source repository. Removal occurs when the last workspace stops monitoring it, the last relevant connection disconnects, the workspace is purged, or verified erasure completes.
 
-After projection of a package into the practice-feedback ledger, a terminal delivery keeps only its idempotency and provider-placement record. Failed packages remain available for an administrator to retry. Diagnostic, worker-input, and broker copies follow the bounded windows below. They do not all support immediate selective erasure.
+After delivery ends, a feedback copy keeps only its idempotency key and provider comment record. Failed feedback remains available for an administrator to send again. Diagnostic, worker-input, and broker copies follow the bounded windows below. They do not all support immediate selective erasure.
 
 Workspace memberships, AI conversations, and activity records
 
@@ -387,7 +387,7 @@ For a wider verified Art. 15 request, an instance administrator uses Person data
 2. Preview the per-store scope.
 3. Download one machine-readable JSON file.
 
-The file includes conversations, practice results with their problems (also invalidated results), feedback and its delivery state (also never delivered), activity, memberships, profiles, preferences and collected Slack content. It excludes credentials and other people's profile data. The access and erasure contributors use the same frozen selections. A changed preview needs a replacement.
+The file includes conversations, practice results with their problems (also results marked incorrect), feedback and its delivery state (also never delivered), activity, memberships, profiles, preferences and collected Slack content. It excludes credentials and other people's profile data. The access and erasure contributors use the same frozen selections. A changed preview needs a replacement.
 
 Original source-platform content and copies outside active application storage remain subject to the platform or operator's separate procedure. No layer of the stack writes an HTTP access log, so there are no HTTP access-log entries to disclose. Hephaestus holds IP addresses on authentication events, which the self-service export already covers.
 

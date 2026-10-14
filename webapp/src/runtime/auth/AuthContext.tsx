@@ -82,7 +82,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 	const hasRole = (role: string) => !viewed && (user?.roles ?? []).includes(role);
 
-	const username = viewed?.login ?? user?.username ?? undefined;
+	// A viewed account with no login here has no profile page; the operator's own login must not stand in.
+	const username = viewed ? (viewed.providerLogin ?? undefined) : (user?.username ?? undefined);
 
 	const getUserId = () => (viewed !== undefined || user?.id == null ? undefined : String(user.id));
 

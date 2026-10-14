@@ -2,93 +2,102 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 import {
-	autonomyRollupQueryKey,
-	createGroupMutation,
-	deleteGroupMutation,
+	createPracticeGroupMutation,
+	deletePracticeGroupMutation,
 	deletePracticeMutation,
-	getPracticeQueryKey,
+	getFeedbackModeRollupQueryKey,
+	getPracticeGroupQueryKey,
 	getPracticeGuidanceQueryKey,
+	getPracticeQueryKey,
+	getPracticeReleaseQueryKey,
 	listAdoptablePracticesQueryKey,
-	listGroupsQueryKey,
+	listPracticeGroupsQueryKey,
+	listPracticeReleasesQueryKey,
+	listPracticeScriptNeedsQueryKey,
 	listPracticesOptions,
 	listPracticesQueryKey,
+	listPracticeVersionsQueryKey,
 	placePracticeMutation,
 	previewGroupAdoptionQueryKey,
-	reorderGroupsMutation,
-	updateGroupMutation,
+	reorderPracticeGroupsMutation,
+	resetPracticeToCatalogMutation,
+	updatePracticeGroupMutation,
 } from "@/api/@tanstack/react-query.gen";
+import { getPracticeGroup, resetGroupToCatalog } from "@/api/sdk.gen";
 import type { Practice, PracticeGroup } from "@/api/types.gen";
 import {
-	applyDisplayOrder,
-	applyPracticePlacements,
-	byDisplayOrder,
-	patchGroup,
-	patchPractice,
-	placePractice,
+	applyPositions,
+	applyPracticePositions,
+	byPosition,
+	movePractice,
 	practiceCatalogStructureScope,
-	practicePlacementSnapshot,
+	practicePositionSnapshot,
 	removeGroup,
-	selectGroupPatch,
 	unassignPractices,
 	upsertGroup,
+	upsertPractice,
+	withGroupDetails,
 } from "@/hooks/practice-catalog-cache";
+import { refreshPracticeGuidance } from "@/hooks/practice-guidance-cache";
 import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 
 const UNASSIGNED = "__unassigned__";
 
+/** What a reset was shown: the group's details and the catalog version it compared them against. */
+function groupResetBasis(group: PracticeGroup) {
+	const { name, description, icon, color, catalogOrigin } = group;
+	return JSON.stringify([name, description, icon, color, catalogOrigin.offeredDigest]);
+}
+
 export function usePracticeCatalogMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
-	const groupsQueryKey = listGroupsQueryKey({ path: { workspaceSlug } });
+	const groupsQueryKey = listPracticeGroupsQueryKey({ path: { workspaceSlug } });
 	const practicesQueryKey = listPracticesQueryKey({ path: { workspaceSlug } });
 	const adoptionCatalogQueryKey = listAdoptablePracticesQueryKey({ path: { workspaceSlug } });
 	const groupMutationKey = ["practice-catalog", workspaceSlug, "groups"] as const;
 	const practiceMutationKey = ["practice-catalog", workspaceSlug, "practices"] as const;
 	const structuralScope = practiceCatalogStructureScope(workspaceSlug);
-	const applyPlacementCaches = (
-		placements: Pick<Practice, "groupSlug" | "displayOrder" | "slug">[],
-	) => {
+	const practiceQueryKey = (practiceSlug: string) =>
+		getPracticeQueryKey({ path: { workspaceSlug, practiceSlug } });
+	const applyPositionCaches = (positions: Pick<Practice, "groupSlug" | "position" | "slug">[]) => {
 		queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-			applyPracticePlacements(practices, placements),
+			applyPracticePositions(practices, positions),
 		);
-		for (const placement of placements) {
-			queryClient.setQueryData<Practice>(
-				getPracticeQueryKey({
-					path: { workspaceSlug, practiceSlug: placement.slug },
-				}),
-				(practice) =>
-					practice
-						? {
-								...practice,
-								groupSlug: placement.groupSlug,
-								displayOrder: placement.displayOrder,
-							}
-						: practice,
+		for (const { slug, groupSlug, position } of positions) {
+			queryClient.setQueryData<Practice>(practiceQueryKey(slug), (practice) =>
+				practice ? { ...practice, groupSlug, position } : practice,
 			);
 		}
 	};
+	const storePractice = (practice: Practice) => {
+		queryClient.setQueryData(practiceQueryKey(practice.slug), practice);
+		queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices) =>
+			practices ? upsertPractice(practices, practice) : practices,
+		);
+	};
 
-	const invalidateAutonomyRollup = () => {
+	const invalidateFeedbackModeRollup = () => {
 		void queryClient.invalidateQueries({
-			queryKey: autonomyRollupQueryKey({ path: { workspaceSlug } }),
+			queryKey: getFeedbackModeRollupQueryKey({ path: { workspaceSlug } }),
 		});
 	};
 	const invalidateGroupsAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: groupMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: groupsQueryKey });
-			invalidateAutonomyRollup();
+			invalidateFeedbackModeRollup();
 		}
 	};
 	const invalidatePracticesAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: practiceMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: practicesQueryKey });
-			invalidateAutonomyRollup();
+			invalidateFeedbackModeRollup();
 		}
 	};
 
 	const createGroup = useMutation({
-		...filedUnder(groupMutationKey, createGroupMutation()),
+		...filedUnder(groupMutationKey, createPracticeGroupMutation()),
 		scope: structuralScope,
 		onMutate: async () => {
 			await queryClient.cancelQueries({ queryKey: groupsQueryKey });
@@ -100,9 +109,8 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			toast.success("Group created");
 		},
 		onError: (error) => {
-			const status = problemStatusOf(error);
 			toast.error(
-				status === 409
+				problemStatusOf(error) === 409
 					? "A group with that name already exists"
 					: "We could not create the group. Try again.",
 			);
@@ -111,7 +119,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	});
 
 	const updateGroup = useMutation({
-		...filedUnder(groupMutationKey, updateGroupMutation()),
+		...filedUnder(groupMutationKey, updatePracticeGroupMutation()),
 		scope: structuralScope,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: groupsQueryKey });
@@ -119,29 +127,29 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 				.getQueryData<PracticeGroup[]>(groupsQueryKey)
 				?.find((group) => group.slug === variables.path.groupSlug);
 			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-				patchGroup(groups, variables.path.groupSlug, variables.body),
+				withGroupDetails(groups, variables.path.groupSlug, variables.body),
 			);
 			return { previous };
 		},
-		onError: (_error, variables, context) => {
+		onError: (_error, _variables, context) => {
 			const previous = context?.previous;
 			if (previous) {
 				queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-					patchGroup(groups, previous.slug, selectGroupPatch(previous, variables.body)),
+					upsertGroup(groups, previous),
 				);
 			}
 			toast.error("We could not update the group. Try again.");
 		},
-		onSuccess: (updated, variables) => {
+		onSuccess: (updated) => {
 			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-				patchGroup(groups, updated.slug, selectGroupPatch(updated, variables.body)),
+				upsertGroup(groups, updated),
 			);
 		},
 		onSettled: invalidateGroupsAfterLastWrite,
 	});
 
 	const deleteGroup = useMutation({
-		...filedUnder(groupMutationKey, deleteGroupMutation()),
+		...filedUnder(groupMutationKey, deletePracticeGroupMutation()),
 		scope: structuralScope,
 		onMutate: async () => {
 			await Promise.all([
@@ -155,51 +163,22 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 				removeGroup(groups, slug),
 			);
 			const practices = queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? [];
-			if (variables.query?.deletePractices === true) {
-				const deleted = practices.filter((practice) => practice.groupSlug === slug);
-				queryClient.setQueryData<Practice[]>(
-					practicesQueryKey,
-					practices.filter((practice) => practice.groupSlug !== slug),
-				);
-				for (const practice of deleted) {
-					queryClient.removeQueries({
-						queryKey: getPracticeGuidanceQueryKey({
-							path: { workspaceSlug, practiceSlug: practice.slug },
-						}),
-						exact: true,
-					});
-					queryClient.removeQueries({
-						queryKey: getPracticeQueryKey({
-							path: { workspaceSlug, practiceSlug: practice.slug },
-						}),
-						exact: true,
-					});
-				}
-				void queryClient.invalidateQueries({ queryKey: adoptionCatalogQueryKey });
-			} else {
-				const affected = practices.filter((practice) => practice.groupSlug === slug);
-				const updated = unassignPractices(practices, slug);
-				applyPlacementCaches(
-					updated.map(({ groupSlug, displayOrder, slug: practiceSlug }) => ({
-						groupSlug,
-						displayOrder,
-						slug: practiceSlug,
-					})),
-				);
-				await Promise.all(
-					affected.map(async (practice) => {
-						const filters = {
-							queryKey: getPracticeQueryKey({
-								path: { workspaceSlug, practiceSlug: practice.slug },
-							}),
-							exact: true,
-						};
-						// Invalidation can reuse an in-flight first fetch; cancel it before reading the new basis.
-						await queryClient.cancelQueries(filters);
-						await queryClient.invalidateQueries(filters);
-					}),
-				);
-			}
+			const affected = practices.filter((practice) => practice.groupSlug === slug);
+			applyPositionCaches(
+				unassignPractices(practices, slug).map(({ groupSlug, position, slug: practiceSlug }) => ({
+					groupSlug,
+					position,
+					slug: practiceSlug,
+				})),
+			);
+			await Promise.all(
+				affected.map(async (practice) => {
+					const filters = { queryKey: practiceQueryKey(practice.slug), exact: true };
+					// A cache refresh can reuse an in-flight first fetch; cancel it before reading the new basis.
+					await queryClient.cancelQueries(filters);
+					await queryClient.invalidateQueries(filters);
+				}),
+			);
 			void queryClient.invalidateQueries({
 				queryKey: previewGroupAdoptionQueryKey({ path: { workspaceSlug, slug } }),
 			});
@@ -215,15 +194,15 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	});
 
 	const reorderGroups = useMutation({
-		...filedUnder(groupMutationKey, reorderGroupsMutation()),
+		...filedUnder(groupMutationKey, reorderPracticeGroupsMutation()),
 		scope: structuralScope,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: groupsQueryKey });
 			const previousOrder = [...(queryClient.getQueryData<PracticeGroup[]>(groupsQueryKey) ?? [])]
-				.sort(byDisplayOrder)
+				.sort(byPosition)
 				.map((group) => group.slug);
 			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-				applyDisplayOrder(groups, variables.body.orderedSlugs),
+				applyPositions(groups, variables.body.slugs),
 			);
 			return { previousOrder };
 		},
@@ -231,18 +210,94 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			const previousOrder = context?.previousOrder;
 			if (previousOrder) {
 				queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-					applyDisplayOrder(groups, previousOrder),
+					applyPositions(groups, previousOrder),
 				);
 			}
 			toast.error("We could not reorder the groups. Try again.");
 		},
 		onSuccess: (updated) => {
-			const order = [...updated].sort(byDisplayOrder).map((group) => group.slug);
+			const order = [...updated].sort(byPosition).map((group) => group.slug);
 			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
-				applyDisplayOrder(groups, order),
+				applyPositions(groups, order),
 			);
 		},
 		onSettled: invalidateGroupsAfterLastWrite,
+	});
+
+	/**
+	 * Resets a group's details to the catalog's. The server tags the group's reset basis only in the
+	 * `ETag` of its own read, so the reset reads it first and refuses, as the server would, when the
+	 * group or the offered version is no longer the one the reader compared.
+	 */
+	const resetGroup = useMutation({
+		mutationKey: groupMutationKey,
+		mutationFn: async ({
+			path,
+			shown,
+		}: {
+			path: { workspaceSlug: string; groupSlug: string };
+			shown: PracticeGroup;
+		}) => {
+			const { data: current, response } = await getPracticeGroup({ path, throwOnError: true });
+			const etag = response.headers.get("ETag");
+			if (etag === null || groupResetBasis(current) !== groupResetBasis(shown)) {
+				queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+					upsertGroup(groups, current),
+				);
+				const detail = "The group or the catalog changed. Compare again before you reset.";
+				throw Object.assign(new Error(detail), {
+					status: 409,
+					title: "Practice group changed",
+					detail,
+				});
+			}
+			const { data } = await resetGroupToCatalog({
+				path,
+				headers: { "If-Match": etag },
+				throwOnError: true,
+			});
+			return data;
+		},
+		scope: structuralScope,
+		onSuccess: (reset) => {
+			queryClient.setQueryData<PracticeGroup[]>(groupsQueryKey, (groups = []) =>
+				upsertGroup(groups, reset),
+			);
+			queryClient.setQueryData(
+				getPracticeGroupQueryKey({ path: { workspaceSlug, groupSlug: reset.slug } }),
+				reset,
+			);
+			toast.success("Group reset to the catalog");
+		},
+		onSettled: invalidateGroupsAfterLastWrite,
+	});
+
+	/** Installs the catalog's current definition as a new version; history and results stay. */
+	const resetPractice = useMutation({
+		...filedUnder(practiceMutationKey, resetPracticeToCatalogMutation()),
+		scope: structuralScope,
+		onSuccess: async (reset) => {
+			storePractice(reset);
+			const path = { workspaceSlug, practiceSlug: reset.slug };
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: listPracticeVersionsQueryKey({ path }) }),
+				queryClient.invalidateQueries({
+					queryKey: getPracticeReleaseQueryKey({ path: { workspaceSlug, slug: reset.slug } }),
+				}),
+				queryClient.invalidateQueries({
+					queryKey: listPracticeReleasesQueryKey({ path: { workspaceSlug } }),
+				}),
+				// A reset can change the practice script, which makes the needs on record stale.
+				queryClient.invalidateQueries({
+					queryKey: listPracticeScriptNeedsQueryKey({ path: { workspaceSlug } }),
+				}),
+				refreshPracticeGuidance(queryClient, workspaceSlug, reset.slug),
+			]);
+			toast.success("Practice reset to the catalog", {
+				description: `Saved as version ${reset.currentVersion.number}.`,
+			});
+		},
+		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
 	const place = useMutation({
@@ -251,13 +306,13 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: practicesQueryKey });
 			const practices = queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? [];
-			const destinationGroupSlug = variables.body.groupSlug ?? null;
-			const previous = practicePlacementSnapshot(
+			const destinationGroupSlug = variables.body.groupSlug;
+			const previous = practicePositionSnapshot(
 				practices,
 				variables.path.practiceSlug,
 				destinationGroupSlug,
 			);
-			const optimistic = placePractice(
+			const optimistic = movePractice(
 				practices,
 				variables.path.practiceSlug,
 				destinationGroupSlug,
@@ -265,35 +320,24 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			);
 			queryClient.setQueryData(practicesQueryKey, optimistic);
 			const affectedSlugs = new Set(previous.map(({ slug }) => slug));
-			applyPlacementCaches(
+			applyPositionCaches(
 				optimistic
 					.filter(({ slug }) => affectedSlugs.has(slug))
-					.map(({ slug, groupSlug, displayOrder }) => ({ slug, groupSlug, displayOrder })),
+					.map(({ slug, groupSlug, position }) => ({ slug, groupSlug, position })),
 			);
 			return { previous };
 		},
 		onError: (_error, _variables, context) => {
 			const previous = context?.previous;
 			if (previous) {
-				applyPlacementCaches(previous);
+				applyPositionCaches(previous);
 			}
 			toast.error("We could not move the practice. Try again.");
 		},
-		onSuccess: (updated, variables) => {
-			applyPlacementCaches(
-				updated.map(({ slug, groupSlug, displayOrder }) => ({ slug, groupSlug, displayOrder })),
+		onSuccess: (updated) => {
+			applyPositionCaches(
+				updated.map(({ slug, groupSlug, position }) => ({ slug, groupSlug, position })),
 			);
-			const moved = updated.find(({ slug }) => slug === variables.path.practiceSlug);
-			if (moved) {
-				const patch = { automatedReviewValidation: moved.automatedReviewValidation };
-				queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-					patchPractice(practices, moved.slug, patch),
-				);
-				queryClient.setQueryData<Practice>(
-					getPracticeQueryKey({ path: { workspaceSlug, practiceSlug: moved.slug } }),
-					(practice) => (practice ? { ...practice, ...patch } : practice),
-				);
-			}
 		},
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
@@ -305,35 +349,21 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			await Promise.all([
 				queryClient.cancelQueries({ queryKey: practicesQueryKey }),
 				queryClient.cancelQueries({
-					queryKey: getPracticeQueryKey({
-						path: {
-							workspaceSlug,
-							practiceSlug: variables.path.practiceSlug,
-						},
-					}),
+					queryKey: practiceQueryKey(variables.path.practiceSlug),
 					exact: true,
 				}),
 			]);
 		},
 		onSuccess: (_data, variables) => {
+			const { practiceSlug } = variables.path;
 			queryClient.removeQueries({
-				queryKey: getPracticeGuidanceQueryKey({
-					path: { workspaceSlug, practiceSlug: variables.path.practiceSlug },
-				}),
+				queryKey: getPracticeGuidanceQueryKey({ path: { workspaceSlug, practiceSlug } }),
 				exact: true,
 			});
 			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-				practices.filter((practice) => practice.slug !== variables.path.practiceSlug),
+				practices.filter((practice) => practice.slug !== practiceSlug),
 			);
-			queryClient.removeQueries({
-				queryKey: getPracticeQueryKey({
-					path: {
-						workspaceSlug,
-						practiceSlug: variables.path.practiceSlug,
-					},
-				}),
-				exact: true,
-			});
+			queryClient.removeQueries({ queryKey: practiceQueryKey(practiceSlug), exact: true });
 			void queryClient.invalidateQueries({ queryKey: adoptionCatalogQueryKey });
 			toast.success("Practice deleted");
 		},
@@ -384,12 +414,14 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		createGroup,
 		deleteGroup,
 		deletePractice,
-		placePractice: place,
+		movePractice: place,
 		pendingGroupSlugs,
 		pendingPracticeSlugs,
 		blockedMoveDestinationSlugs,
 		blockedPracticeOrderBuckets,
 		reorderGroups,
+		resetGroup,
+		resetPractice,
 		updateGroup,
 	};
 }

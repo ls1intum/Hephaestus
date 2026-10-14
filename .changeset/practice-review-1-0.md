@@ -11,7 +11,7 @@ An incomplete scan does not claim that problems were fixed or files disappeared.
 
 Practice definitions now have fixed versions.
 The editor separates Review on, Applies when, About, Reviewed by and Feedback mode.
-Renaming a practice or moving it between groups does not invalidate its results.
+Renaming a practice or moving it between groups keeps its results current.
 Off stops feedback at every destination while eligible reviews can still record results.
 Choose People or Nobody under Reviewed by to prevent automated review of a practice.
 
@@ -42,5 +42,4 @@ Upgrade all roles, the agent image, the webapp, browser extensions and custom cl
 
 Rewrite changed custom scripts for the new contract.
 Review practices left Off if you intended to prevent automated review.
-Preview databases from earlier pushes of this branch must be reset.
 Follow the migration guide for the complete procedure and the new token and search-unit limits.

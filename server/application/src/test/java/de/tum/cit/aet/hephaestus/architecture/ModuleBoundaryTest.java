@@ -137,12 +137,10 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
         void scmDoesNotDependOnWorkspace() {
             ArchRule rule = noClasses()
                     .that()
-                    .resideInAPackage("..integration.scm..")
-                    .and()
-                    .resideOutsideOfPackages("..integration.scm.github..", "..integration.scm.gitlab..")
+                    .resideInAPackage("de.tum.cit.aet.hephaestus.integration.scm.domain..")
                     .should()
                     .dependOnClassesThat()
-                    .resideInAPackage("..workspace..")
+                    .resideInAPackage("de.tum.cit.aet.hephaestus.workspace..")
                     .because("Vendor-neutral SCM domain must depend on SPIs, not workspace implementation. "
                             + "Vendor adapters (scm.github/scm.gitlab) are exempt — they bridge workspace concerns.");
             rule.check(classes);
@@ -172,8 +170,8 @@ class ModuleBoundaryTest extends HephaestusArchitectureTest {
                     .dependOnClassesThat()
                     .resideInAnyPackage(
                             "..activity..", "..mentor..", "..notification..", "..account..", "..contributors..")
-                    .because(
-                            "Vendor-neutral SCM domain must be isolated - use domain events for cross-cutting concerns");
+                    .because("Vendor-neutral SCM domain must be isolated - use domain events for cross-cutting"
+                            + " concerns");
             rule.check(classes);
         }
 

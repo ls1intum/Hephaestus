@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +40,7 @@ class AccountReferenceServiceTest extends BaseUnitTest {
         assertThat(reference.displayName()).isEqualTo("Developer");
         assertThat(reference.avatarUrl()).isEqualTo("avatar");
         assertThat(reference.identities()).singleElement().satisfies(identity -> {
-            assertThat(identity.provider()).isEqualTo(IntegrationKind.GITHUB);
+            assertThat(identity.provider()).isEqualTo("GITHUB");
             assertThat(identity.login()).isEqualTo("developer");
             assertThat(identity.displayName()).isEqualTo("Current mirror name");
         });
@@ -64,7 +63,7 @@ class AccountReferenceServiceTest extends BaseUnitTest {
         assertThat(reference.status()).isEqualTo(Account.Status.UNCLAIMED);
         assertThat(reference.avatarUrl()).isNull();
         assertThat(reference.identities()).singleElement().satisfies(identity -> {
-            assertThat(identity.provider()).isEqualTo(IntegrationKind.GITLAB);
+            assertThat(identity.provider()).isEqualTo("GITLAB");
             assertThat(identity.login()).isNull();
             assertThat(identity.displayName()).isNull();
             assertThat(identity.avatarUrl()).isNull();

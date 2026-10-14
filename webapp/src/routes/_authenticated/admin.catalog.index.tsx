@@ -5,40 +5,32 @@ import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import {
-	adminGetCuratedCatalogOptions,
-	adminGetCuratedCatalogQueryKey,
-	adminGetCuratedGroupQueryKey,
-	adminGetCuratedPracticeQueryKey,
-	adminPlaceCuratedPracticeMutation,
-	adminReorderCuratedGroupsMutation,
-	adminReorderCuratedPracticesMutation,
-	adminResetCuratedCatalogOrderMutation,
-	adminUpdateCuratedGroupStatusMutation,
-	adminUpdateCuratedPracticeStatusMutation,
+	getCatalogGroupQueryKey,
+	getCatalogPracticeQueryKey,
+	getInstanceCatalogOptions,
+	getInstanceCatalogQueryKey,
+	placeCatalogPracticeMutation,
+	reorderCatalogGroupsMutation,
+	resetCatalogOrderMutation,
+	setCatalogGroupStatusMutation,
+	setCatalogPracticeStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type {
-	CuratedCatalog,
-	CuratedGroup,
-	CuratedPractice,
-	CuratedPracticeSummary,
-} from "@/api/types.gen";
+import type { Catalog, CatalogGroup, CatalogPractice } from "@/api/types.gen";
 import {
-	orderedPracticeSlugs,
-	placeCuratedPractice,
-	reorderCuratedGroups,
-	reorderCuratedPractices,
-} from "@/components/admin/curated-catalog/curated-catalog-cache";
+	placeCatalogPractice,
+	reorderCatalogGroups,
+} from "@/components/admin/catalog/catalog-cache";
 import {
-	CURATED_CATALOG_SEARCH_PARAMS,
-	CURATED_LEVEL_KINDS,
-	CURATED_LEVEL_LABELS,
-	type CuratedCatalogSearch,
-	curatedCatalogSearchSchema,
-	curatedGroupLevel,
-	curatedPracticeLevel,
-	GUARDED_CURATED_LEVEL_KINDS,
-} from "@/components/admin/curated-catalog/curated-catalog-search";
-import { CuratedCatalogPage } from "@/components/admin/curated-catalog/CuratedCatalogPage";
+	CATALOG_LEVEL_KINDS,
+	CATALOG_LEVEL_LABELS,
+	CATALOG_SEARCH_PARAMS,
+	type CatalogSearch,
+	catalogGroupLevel,
+	catalogPracticeLevel,
+	catalogSearchSchema,
+	GUARDED_CATALOG_LEVEL_KINDS,
+} from "@/components/admin/catalog/catalog-search";
+import { CatalogPage } from "@/components/admin/catalog/CatalogPage";
 import { PracticeTreeSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { parseDetailStack } from "@/components/layout/detail-drawer/detail-stack";
@@ -54,31 +46,31 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 
-import { CuratedGroupCreateLevel } from "./-CuratedGroupCreateLevel";
-import { CuratedGroupEditLevel } from "./-CuratedGroupEditLevel";
-import { CuratedPracticeCreateLevel } from "./-CuratedPracticeCreateLevel";
-import { CuratedPracticeEditLevel } from "./-CuratedPracticeEditLevel";
+import { CatalogGroupCreateLevel } from "./-CatalogGroupCreateLevel";
+import { CatalogGroupEditLevel } from "./-CatalogGroupEditLevel";
+import { CatalogPracticeCreateLevel } from "./-CatalogPracticeCreateLevel";
+import { CatalogPracticeEditLevel } from "./-CatalogPracticeEditLevel";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/")({
 	head: instanceAdminHead("Practice catalog"),
-	validateSearch: curatedCatalogSearchSchema,
-	search: { middlewares: [retainSearchParams(CURATED_CATALOG_SEARCH_PARAMS)] },
-	component: AdminCuratedCatalogPage,
+	validateSearch: catalogSearchSchema,
+	search: { middlewares: [retainSearchParams(CATALOG_SEARCH_PARAMS)] },
+	component: AdminCatalogPage,
 });
 
-const PRACTICE_STATUS_KEY = ["adminWriteCuratedPracticeStatus"];
-const GROUP_STATUS_KEY = ["adminWriteCuratedGroupStatus"];
-const STRUCTURE_SCOPE = { id: "admin-curated-catalog-structure" };
+const PRACTICE_STATUS_KEY = ["adminWriteCatalogPracticeStatus"];
+const GROUP_STATUS_KEY = ["adminWriteCatalogGroupStatus"];
+const STRUCTURE_SCOPE = { id: "admin-catalog-structure" };
 
 function detailKey(kind: "practice" | "group", slug: string) {
 	return kind === "practice"
-		? adminGetCuratedPracticeQueryKey({ path: { slug } })
-		: adminGetCuratedGroupQueryKey({ path: { slug } });
+		? getCatalogPracticeQueryKey({ path: { slug } })
+		: getCatalogGroupQueryKey({ path: { slug } });
 }
 
 function structureError(error: unknown) {
 	toast.error(
-		problemStatusOf(error) === 412
+		problemStatusOf(error) === 409
 			? "The catalog order changed before this move was saved. We reloaded the latest order."
 			: "We could not save the catalog order",
 		{ description: problemDetailOf(error) },
@@ -86,7 +78,7 @@ function structureError(error: unknown) {
 }
 
 /** Why offering a practice may not reach workspaces yet: its group decides. */
-function availabilityMessage(practice: CuratedPracticeSummary, groups: CuratedCatalog["groups"]) {
+function availabilityMessage(practice: CatalogPractice, groups: Catalog["groups"]) {
 	if (!hasText(practice.groupSlug)) {
 		return;
 	}
@@ -94,28 +86,28 @@ function availabilityMessage(practice: CuratedPracticeSummary, groups: CuratedCa
 	if (!parent) {
 		return "Move the practice to an included group first";
 	}
-	return parent.status.offered ? undefined : "Practice will be included when its group is included";
+	return parent.excluded ? "Practice will be included when its group is included" : undefined;
 }
 
-function AdminCuratedCatalogPage() {
+function AdminCatalogPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const { detail, ...search } = Route.useSearch();
 	const queryClient = useQueryClient();
-	const detailStack = parseDetailStack(detail, CURATED_LEVEL_KINDS);
+	const detailStack = parseDetailStack(detail, CATALOG_LEVEL_KINDS);
 	const stackControls = useDetailStack();
 	const pathAt = levelPathAt(detailStack, {
 		pageLabel: "Practice catalog",
-		labelOf: (entry) => CURATED_LEVEL_LABELS[entry.kind],
+		labelOf: (entry) => CATALOG_LEVEL_LABELS[entry.kind],
 		onClose: stackControls.close,
 	});
-	const catalogQuery = useQuery({ ...adminGetCuratedCatalogOptions() });
+	const catalogQuery = useQuery({ ...getInstanceCatalogOptions() });
 
 	const invalidateCatalog = () => {
-		void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
+		void queryClient.invalidateQueries({ queryKey: getInstanceCatalogQueryKey() });
 	};
 
 	const onPracticeStatusSettled = (slug: string, offered: boolean, successMessage?: string) => ({
-		onSuccess: (updated: CuratedPractice) => {
+		onSuccess: (updated: CatalogPractice) => {
 			queryClient.setQueryData(detailKey("practice", slug), updated);
 			invalidateCatalog();
 			toast.success(
@@ -127,7 +119,7 @@ function AdminCuratedCatalogPage() {
 			queryClient.removeQueries({ queryKey: detailKey("practice", slug), exact: true });
 			invalidateCatalog();
 			toast.error(
-				problemStatusOf(error) === 412
+				problemStatusOf(error) === 409
 					? "The catalog changed before this action was saved. We reloaded the practice."
 					: "We could not update the practice",
 				{ description: problemDetailOf(error) },
@@ -135,8 +127,8 @@ function AdminCuratedCatalogPage() {
 		},
 	});
 	const onGroupStatusSettled = (slug: string, offered: boolean) => ({
-		onSuccess: (catalog: CuratedCatalog) => {
-			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
+		onSuccess: (catalog: Catalog) => {
+			queryClient.setQueryData(getInstanceCatalogQueryKey(), catalog);
 			queryClient.removeQueries({ queryKey: detailKey("group", slug), exact: true });
 			toast.success(offered ? "Group included for workspaces" : "Group excluded from workspaces");
 		},
@@ -144,7 +136,7 @@ function AdminCuratedCatalogPage() {
 			queryClient.removeQueries({ queryKey: detailKey("group", slug), exact: true });
 			invalidateCatalog();
 			toast.error(
-				problemStatusOf(error) === 412
+				problemStatusOf(error) === 409
 					? "The catalog changed before this action was saved. We reloaded the group."
 					: "We could not update the group",
 				{ description: problemDetailOf(error) },
@@ -153,72 +145,47 @@ function AdminCuratedCatalogPage() {
 	});
 
 	const updatePracticeStatus = useMutation(
-		filedUnder(PRACTICE_STATUS_KEY, adminUpdateCuratedPracticeStatusMutation()),
+		filedUnder(PRACTICE_STATUS_KEY, setCatalogPracticeStatusMutation()),
 	);
 	const updateGroupStatus = useMutation(
-		filedUnder(GROUP_STATUS_KEY, adminUpdateCuratedGroupStatusMutation()),
+		filedUnder(GROUP_STATUS_KEY, setCatalogGroupStatusMutation()),
 	);
-	const invalidateStructure = invalidateCatalog;
 	const reorderGroups = useMutation({
-		...adminReorderCuratedGroupsMutation(),
+		...reorderCatalogGroupsMutation(),
 		scope: STRUCTURE_SCOPE,
 		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			const previous = queryClient.getQueryData<CuratedCatalog>(adminGetCuratedCatalogQueryKey());
+			await queryClient.cancelQueries({ queryKey: getInstanceCatalogQueryKey() });
+			const previous = queryClient.getQueryData<Catalog>(getInstanceCatalogQueryKey());
 			if (previous) {
 				queryClient.setQueryData(
-					adminGetCuratedCatalogQueryKey(),
-					reorderCuratedGroups(previous, variables.body.orderedSlugs),
+					getInstanceCatalogQueryKey(),
+					reorderCatalogGroups(previous, variables.body.slugs),
 				);
 			}
 			return { previous };
 		},
-		onSuccess: (catalog) => queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog),
+		onSuccess: (catalog) => queryClient.setQueryData(getInstanceCatalogQueryKey(), catalog),
 		onError: (error, _variables, context) => {
 			if (context?.previous) {
-				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
+				queryClient.setQueryData(getInstanceCatalogQueryKey(), context.previous);
 			}
 			structureError(error);
 		},
-		onSettled: invalidateStructure,
-	});
-	const reorderPractices = useMutation({
-		...adminReorderCuratedPracticesMutation(),
-		scope: STRUCTURE_SCOPE,
-		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			const previous = queryClient.getQueryData<CuratedCatalog>(adminGetCuratedCatalogQueryKey());
-			if (previous) {
-				const groupSlug = variables.body.groupSlug ?? null;
-				queryClient.setQueryData(
-					adminGetCuratedCatalogQueryKey(),
-					reorderCuratedPractices(previous, groupSlug, variables.body.orderedSlugs),
-				);
-			}
-			return { previous };
-		},
-		onSuccess: (catalog) => queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog),
-		onError: (error, _variables, context) => {
-			if (context?.previous) {
-				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
-			}
-			structureError(error);
-		},
-		onSettled: invalidateStructure,
+		onSettled: invalidateCatalog,
 	});
 	const placePractice = useMutation({
-		...adminPlaceCuratedPracticeMutation(),
+		...placeCatalogPracticeMutation(),
 		scope: STRUCTURE_SCOPE,
 		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			const previous = queryClient.getQueryData<CuratedCatalog>(adminGetCuratedCatalogQueryKey());
+			await queryClient.cancelQueries({ queryKey: getInstanceCatalogQueryKey() });
+			const previous = queryClient.getQueryData<Catalog>(getInstanceCatalogQueryKey());
 			if (previous) {
 				queryClient.setQueryData(
-					adminGetCuratedCatalogQueryKey(),
-					placeCuratedPractice(
+					getInstanceCatalogQueryKey(),
+					placeCatalogPractice(
 						previous,
 						variables.path.slug,
-						variables.body.groupSlug ?? null,
+						variables.body.groupSlug,
 						variables.body.position,
 					),
 				);
@@ -226,29 +193,29 @@ function AdminCuratedCatalogPage() {
 			return { previous };
 		},
 		onSuccess: (catalog, variables) => {
-			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
+			queryClient.setQueryData(getInstanceCatalogQueryKey(), catalog);
 			queryClient.removeQueries({
-				queryKey: adminGetCuratedPracticeQueryKey({ path: { slug: variables.path.slug } }),
+				queryKey: getCatalogPracticeQueryKey({ path: { slug: variables.path.slug } }),
 				exact: true,
 			});
 		},
 		onError: (error, _variables, context) => {
 			if (context?.previous) {
-				queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), context.previous);
+				queryClient.setQueryData(getInstanceCatalogQueryKey(), context.previous);
 			}
 			structureError(error);
 		},
-		onSettled: invalidateStructure,
+		onSettled: invalidateCatalog,
 	});
 	const resetOrder = useMutation({
-		...adminResetCuratedCatalogOrderMutation(),
+		...resetCatalogOrderMutation(),
 		scope: STRUCTURE_SCOPE,
 		onSuccess: (catalog) => {
-			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
+			queryClient.setQueryData(getInstanceCatalogQueryKey(), catalog);
 			toast.success("Hephaestus order restored");
 		},
 		onError: structureError,
-		onSettled: invalidateStructure,
+		onSettled: invalidateCatalog,
 	});
 	const pendingPracticeSlugs = usePendingMutationIds(PRACTICE_STATUS_KEY, (variables) =>
 		pathString(variables, "slug"),
@@ -257,10 +224,7 @@ function AdminCuratedCatalogPage() {
 		pathString(variables, "slug"),
 	);
 	const structurePending =
-		reorderGroups.isPending ||
-		reorderPractices.isPending ||
-		placePractice.isPending ||
-		resetOrder.isPending;
+		reorderGroups.isPending || placePractice.isPending || resetOrder.isPending;
 	const writePending =
 		structurePending || pendingGroupSlugs.size > 0 || pendingPracticeSlugs.size > 0;
 
@@ -279,24 +243,22 @@ function AdminCuratedCatalogPage() {
 		);
 	} else {
 		body = (
-			<CuratedCatalogPage
+			<CatalogPage
 				groups={catalogQuery.data.groups}
 				practices={catalogQuery.data.practices}
-				summary={catalogQuery.data.summary}
 				search={search}
-				customOrder={catalogQuery.data.customOrder}
 				pendingPracticeSlugs={pendingPracticeSlugs}
 				pendingGroupSlugs={pendingGroupSlugs}
 				writePending={writePending}
-				onSearchChange={(next: CuratedCatalogSearch) => {
+				onSearchChange={(next: CatalogSearch) => {
 					void navigate({ search: (previous) => ({ ...previous, ...next }), replace: true });
 				}}
-				onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
+				onPracticeStatusChange={(practice: CatalogPractice, offered) => {
 					updatePracticeStatus.mutate(
 						{
 							path: { slug: practice.slug },
-							headers: { "If-Match": `"${practice.status.etag}"` },
-							body: { status: offered ? "AVAILABLE" : "RETIRED" },
+							headers: { "If-Match": `"${practice.etag}"` },
+							body: { excluded: !offered },
 						},
 						onPracticeStatusSettled(
 							practice.slug,
@@ -305,53 +267,32 @@ function AdminCuratedCatalogPage() {
 						),
 					);
 				}}
-				onGroupStatusChange={(group: CuratedGroup, offered) =>
+				onGroupStatusChange={(group: CatalogGroup, offered) =>
 					updateGroupStatus.mutate(
 						{
 							path: { slug: group.slug },
-							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-							body: { status: offered ? "AVAILABLE" : "RETIRED" },
+							headers: { "If-Match": `"${group.etag}"` },
+							body: { excluded: !offered },
 						},
 						onGroupStatusSettled(group.slug, offered),
 					)
 				}
-				onReorderGroups={(orderedSlugs) =>
+				onReorderGroups={(slugs) =>
 					reorderGroups.mutate({
 						headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-						body: { orderedSlugs },
+						body: { slugs },
 					})
 				}
 				onResetOrder={() =>
-					resetOrder.mutate({
-						headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-					})
+					resetOrder.mutate({ headers: { "If-Match": `"${catalogQuery.data.etag}"` } })
 				}
-				onPlacePractice={(practiceSlug, groupSlug, position) => {
-					const practice = catalogQuery.data.practices.find(
-						(candidate) => candidate.slug === practiceSlug,
-					);
-					if (!practice) {
-						return;
-					}
-					const optimistic = placeCuratedPractice(
-						catalogQuery.data,
-						practiceSlug,
-						groupSlug,
-						position,
-					);
-					if ((practice.groupSlug ?? null) === groupSlug) {
-						reorderPractices.mutate({
-							headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-							body: { groupSlug, orderedSlugs: orderedPracticeSlugs(optimistic, groupSlug) },
-						});
-						return;
-					}
+				onPlacePractice={(practiceSlug, groupSlug, position) =>
 					placePractice.mutate({
 						path: { slug: practiceSlug },
 						headers: { "If-Match": `"${catalogQuery.data.etag}"` },
-						body: { groupSlug: groupSlug ?? undefined, position },
-					});
-				}}
+						body: { groupSlug, position },
+					})
+				}
 			/>
 		);
 	}
@@ -371,7 +312,7 @@ function AdminCuratedCatalogPage() {
 							</Button>
 						) : (
 							<DetailStackLink
-								entry={curatedGroupLevel()}
+								entry={catalogGroupLevel()}
 								className={buttonVariants({ variant: "outline" })}
 							>
 								<Plus className="mr-1.5 size-4" aria-hidden />
@@ -384,7 +325,7 @@ function AdminCuratedCatalogPage() {
 								Create practice
 							</Button>
 						) : (
-							<DetailStackLink entry={curatedPracticeLevel()} className={buttonVariants()}>
+							<DetailStackLink entry={catalogPracticeLevel()} className={buttonVariants()}>
 								<Plus className="mr-1.5 size-4" aria-hidden />
 								Create practice
 							</DetailStackLink>
@@ -397,22 +338,22 @@ function AdminCuratedCatalogPage() {
 
 			<DetailDrawerStack
 				stack={detailStack}
-				guardedKinds={GUARDED_CURATED_LEVEL_KINDS}
+				guardedKinds={GUARDED_CATALOG_LEVEL_KINDS}
 				onClose={stackControls.close}
 			>
 				{(entry, level) => {
 					const done = () => stackControls.close(level.depth);
-					const placement = { nested: level.nested, path: pathAt(level.depth), onDone: done };
+					const levelProps = { nested: level.nested, path: pathAt(level.depth), onDone: done };
 					if (entry.kind === "practice-new") {
-						return <CuratedPracticeCreateLevel {...placement} />;
+						return <CatalogPracticeCreateLevel {...levelProps} />;
 					}
 					if (entry.kind === "practice-edit") {
-						return <CuratedPracticeEditLevel practiceSlug={entry.id} {...placement} />;
+						return <CatalogPracticeEditLevel practiceSlug={entry.id} {...levelProps} />;
 					}
 					if (entry.kind === "group-new") {
-						return <CuratedGroupCreateLevel {...placement} />;
+						return <CatalogGroupCreateLevel {...levelProps} />;
 					}
-					return <CuratedGroupEditLevel groupSlug={entry.id} {...placement} />;
+					return <CatalogGroupEditLevel groupSlug={entry.id} {...levelProps} />;
 				}}
 			</DetailDrawerStack>
 		</PageLayout>

@@ -4,6 +4,8 @@ import { HttpResponse, http } from "msw";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { client } from "@/api/client.gen";
+import type { PageResponseDtoUserViewAccount, UserViewAccount } from "@/api/types.gen";
+import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { server } from "@/mocks/server";
 import {
@@ -22,13 +24,48 @@ const workspace = {
 	displayName: "Engineering",
 	practicesEnabled: true,
 };
-const users = { content: [{ userId: 11, login: "never-signed-in", name: "Sam" }], totalPages: 1 };
+/**
+ * One unclaimed account with a GitHub and a GitLab identity. Its account id is not its provider
+ * login, so a view keyed on the login would select nobody.
+ */
+const sam: Wire<UserViewAccount> = {
+	accountId: "11",
+	providerLogin: "never-signed-in",
+	account: {
+		id: "11",
+		status: "UNCLAIMED",
+		displayName: "Sam",
+		avatarUrl: null,
+		identities: [
+			{ provider: "GITHUB", login: "never-signed-in", displayName: "Sam", avatarUrl: null },
+			{ provider: "GITLAB", login: "sam-lrz", displayName: "Sam", avatarUrl: null },
+		],
+	},
+};
+/** One full page of view-as accounts, as the server pages them. */
+function usersPage(content: Wire<UserViewAccount>[]): Wire<PageResponseDtoUserViewAccount> {
+	const sort = { empty: true, sorted: false, unsorted: true };
+	return {
+		content,
+		empty: content.length === 0,
+		first: true,
+		last: true,
+		number: 0,
+		numberOfElements: content.length,
+		pageable: { offset: 0, pageNumber: 0, pageSize: 20, paged: true, unpaged: false, sort },
+		size: 20,
+		sort,
+		totalElements: content.length,
+		totalPages: 1,
+	};
+}
+const users = usersPage([sam]);
 const viewedProfile = "/w/engineering/user/never-signed-in";
 
 async function submitReason() {
 	const user = userEvent.setup();
 	await user.click(
-		await screen.findByRole("button", { name: "View as user: never-signed-in" }, ROUTE_RENDER_WAIT),
+		await screen.findByRole("button", { name: "View as user: Sam" }, ROUTE_RENDER_WAIT),
 	);
 	const dialog = screen.getByRole("dialog", { name: "View as Sam" });
 	await user.type(
@@ -53,33 +90,59 @@ describe("view as user entry", () => {
 		restoreNavigation();
 	});
 
-	it("opens the normal app for an accountless user after an audited read", async () => {
-		let reasonHeader: string | null = null;
+	it("views one multi-provider account by its account id after an audited read", async () => {
+		let read: { accountId: unknown; reason: string | null } | undefined;
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/user-view/users/:userId", ({ request }) => {
-				reasonHeader = request.headers.get("X-User-View-Reason");
-				return HttpResponse.json(users.content[0]);
+			http.get("*/workspaces/:workspaceSlug/user-view/users/:accountId", ({ params, request }) => {
+				read = { accountId: params.accountId, reason: request.headers.get("X-User-View-Reason") };
+				return HttpResponse.json(sam);
 			}),
 		);
 		renderRouteAt("/admin/workspaces/engineering/users");
+		// Two identities, one account: one row to view.
+		await expect(
+			screen.findAllByRole("button", { name: /^View as user/u }, ROUTE_RENDER_WAIT),
+		).resolves.toHaveLength(1);
 		await submitReason();
 		await waitFor(() => expect(assigned).toStrictEqual([viewedProfile]));
-		expect(reasonHeader).toBe("Check%20Sam's%20profile");
+		expect(read).toStrictEqual({ accountId: "11", reason: "Check%20Sam's%20profile" });
 		expect(getUserViewSession()).toStrictEqual({
 			operatorAccountId: 42,
 			workspaceSlug: "engineering",
 			workspaceName: "Engineering",
-			userId: 11,
-			login: "never-signed-in",
+			accountId: "11",
+			providerLogin: "never-signed-in",
 			name: "Sam",
-			hasAccount: false,
+			unclaimed: true,
 			reason: "Check Sam's profile",
 		});
 	});
 
+	it("opens the workspace home for an account with no login in this workspace", async () => {
+		const noLogin = { ...sam, providerLogin: null };
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/user-view/users", () =>
+				HttpResponse.json(usersPage([noLogin])),
+			),
+			http.get("*/workspaces/:workspaceSlug/user-view/users/:accountId", () =>
+				HttpResponse.json(noLogin),
+			),
+		);
+		renderRouteAt("/admin/workspaces/engineering/users");
+		await submitReason();
+		await waitFor(() => expect(assigned).toStrictEqual(["/w/engineering"]));
+		expect(getUserViewSession()?.providerLogin).toBeNull();
+	});
+
+	it("does not take a provider login for an account id", async () => {
+		renderRouteAt("/admin/workspaces/engineering/users?account=never-signed-in");
+		await screen.findByRole("button", { name: "View as user: Sam" }, ROUTE_RENDER_WAIT);
+		expect(screen.queryByRole("dialog")).toBeNull();
+	});
+
 	it("does not start when the audited read fails", async () => {
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/user-view/users/:userId", () =>
+			http.get("*/workspaces/:workspaceSlug/user-view/users/:accountId", () =>
 				HttpResponse.json(
 					{ status: 503, detail: "User view audit is unavailable" },
 					{ status: 503 },
@@ -95,7 +158,7 @@ describe("view as user entry", () => {
 
 	it("asks for a new sign-in when the audited read requires it", async () => {
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/user-view/users/:userId", () =>
+			http.get("*/workspaces/:workspaceSlug/user-view/users/:accountId", () =>
 				HttpResponse.json(
 					{ status: 403, code: "step_up_required", maxAgeSeconds: 300 },
 					{ status: 403 },
@@ -114,10 +177,10 @@ describe("view as user entry", () => {
 		const pendingRead = deferred();
 		const started = deferred();
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/user-view/users/:userId", async () => {
+			http.get("*/workspaces/:workspaceSlug/user-view/users/:accountId", async () => {
 				started.resolve();
 				await pendingRead.promise;
-				return HttpResponse.json(users.content[0]);
+				return HttpResponse.json(sam);
 			}),
 		);
 		const { queryClient, router } = renderRouteAtWithRouter("/admin/workspaces/engineering/users");
@@ -131,15 +194,15 @@ describe("view as user entry", () => {
 			});
 		});
 		server.use(
-			http.get("*/workspaces/:workspaceSlug/user-view/users/:userId", () =>
-				HttpResponse.json(users.content[0]),
+			http.get("*/workspaces/:workspaceSlug/user-view/users/:accountId", () =>
+				HttpResponse.json(sam),
 			),
 		);
 		await act(async () => {
 			await router.navigate({
 				to: "/admin/workspaces/$workspaceSlug/users",
 				params: { workspaceSlug: "engineering" },
-				search: { page: 0, user: 11 },
+				search: { page: 0, account: "11" },
 			});
 		});
 		const dialog = await screen.findByRole("dialog", { name: "View as Sam" });
@@ -170,11 +233,11 @@ describe("user view guard", () => {
 	it("drops a view another account left in the tab before any request carries it", async () => {
 		storeUserView({ operatorAccountId: 7 });
 		server.use(http.get("*/user", () => HttpResponse.json({ ...currentUser, id: 8 })));
-		const requests: { path: string; viewedUser: string | null }[] = [];
+		const requests: { path: string; viewedAccount: string | null }[] = [];
 		const record = ({ request }: { request: Request }) => {
 			requests.push({
 				path: new URL(request.url).pathname,
-				viewedUser: request.headers.get("X-User-View-User"),
+				viewedAccount: request.headers.get("X-User-View-Account"),
 			});
 		};
 		server.events.on("request:start", record);
@@ -185,7 +248,7 @@ describe("user view guard", () => {
 		);
 		server.events.removeListener("request:start", record);
 
-		expect(requests.filter(({ viewedUser }) => viewedUser !== null)).toStrictEqual([]);
+		expect(requests.filter(({ viewedAccount }) => viewedAccount !== null)).toStrictEqual([]);
 		expect(getUserViewSession()).toBeUndefined();
 	});
 

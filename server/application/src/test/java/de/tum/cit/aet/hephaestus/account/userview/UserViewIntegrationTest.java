@@ -356,7 +356,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
         sessionRequest(
                         "/workspaces/acme/activity/work?login=" + gitLabNamesake.getLogin(),
                         token(),
-                        gitLabNamesake.getId())
+                        accountId(gitLabNamesake))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -653,7 +653,7 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 null,
                 AboutRole.AUTHOR,
                 new PracticeReads(
-                        "source-use/2.0.0",
+                        "2.0.0",
                         List.of(new PracticeReadSource(new SourceKind("scm.pull-request.core"), ReadNeed.REQUIRED))),
                 new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
                 "Keep each change focused.",
@@ -664,8 +664,10 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         null,
                         null,
                         null,
-                        new PracticeVisual("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "Two changes"),
+                        new PracticeVisual(
+                                "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 320\"/>", "Two changes"),
                         new PracticeGuide("# Keep changes separate", Map.of())));
-        versions.create(ownerWorkspace, "guided-practice", new ItemKind("scm.pull_request"), definition, null, 0, null);
+        versions.create(new PracticeVersionService.NewPractice(
+                ownerWorkspace, "guided-practice", new ItemKind("scm.pull_request"), definition, null, 0, null));
     }
 }

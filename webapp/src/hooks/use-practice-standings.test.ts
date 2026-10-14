@@ -1,26 +1,39 @@
 import { describe, expect, it } from "vitest";
 
-import type { PracticeGroup } from "@/api/types.gen";
+import type { GroupRef, ReviewedPractice } from "@/api/types.gen";
 import { practiceStandings } from "@/stories/practice-profile-story-mock-data";
 
-import { partitionGroupsByPractices } from "./use-practice-standings";
+import { groupsOfReviewedPractices, partitionGroupsByPractices } from "./use-practice-standings";
 
-function group(slug: string): PracticeGroup {
-	return {
-		id: slug.length,
-		slug,
-		name: slug,
-		displayOrder: 0,
-		visibleInPracticeDashboards: true,
-		autonomy: { effective: "AUTOMATIC", inherited: true, source: "WORKSPACE" },
-		createdAt: new Date("2026-01-01T00:00:00Z"),
-	};
+function group(slug: string): GroupRef {
+	return { slug, name: slug, icon: null, color: null };
+}
+
+function reviewed(slug: string, inGroup: GroupRef | null): ReviewedPractice {
+	return { slug, name: slug, group: inGroup, whyItMatters: null, whatGoodLooksLike: null };
 }
 
 const [practice] = practiceStandings;
 if (!practice) {
 	throw new Error("The fixtures carry at least one practice with a standing");
 }
+
+describe("groupsOfReviewedPractices", () => {
+	it("lists each group of a reviewed practice once, in the catalog's order", () => {
+		const packaging = group("packaging");
+		const testing = group("testing");
+
+		const groups = groupsOfReviewedPractices([
+			reviewed("scope", packaging),
+			reviewed("tests", testing),
+			reviewed("describe", packaging),
+			// A practice in no group adds none.
+			reviewed("loose", null),
+		]);
+
+		expect(groups.map((entry) => entry.slug)).toStrictEqual(["packaging", "testing"]);
+	});
+});
 
 describe("partitionGroupsByPractices", () => {
 	it("shows a group with a practice and leaves out one with none, in catalog order", () => {

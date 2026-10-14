@@ -10,32 +10,34 @@ import { USER_VIEW_STORAGE_KEY } from "@/runtime/user-view/session";
 import { useReviewTabCounts } from "./use-review-tab-counts";
 
 const MINUTE = 60_000;
-const initial = { runs: 10, results: 20, observations: 25, feedback: 30 };
+const initial = { reviews: 10, results: 20, problems: 25, feedback: 30 };
 
 function countReads(status = 200) {
 	let totals = initial;
 	const reads: URL[] = [];
+	const paged = (total: number) => ({
+		content: [],
+		page: { size: 1, number: 0, totalElements: total, totalPages: 1 },
+	});
 	const endpoints = [
-		["runs", ""],
-		["results", "/results"],
-		["observations", "/result-observations"],
-		["feedback", "/feedback"],
+		["reviews", "", paged],
+		["results", "/results", paged],
+		["problems", "/problems", paged],
+		// The feedback list answers with a flat page.
+		["feedback", "/feedback", (total: number) => ({ content: [], totalElements: total })],
 	] as const;
 	server.use(
-		...endpoints.map(([kind, suffix]) =>
+		...endpoints.map(([kind, suffix, body]) =>
 			http.get(`*/workspaces/:workspaceSlug/practices/reviews${suffix}`, ({ request }) => {
 				reads.push(new URL(request.url));
-				return HttpResponse.json(
-					{ content: [], page: { size: 1, number: 0, totalElements: totals[kind], totalPages: 1 } },
-					{ status },
-				);
+				return HttpResponse.json(body(totals[kind]), { status });
 			}),
 		),
 	);
 	return {
 		reads,
 		change: () => {
-			totals = { runs: 11, results: 22, observations: 27, feedback: 33 };
+			totals = { reviews: 11, results: 22, problems: 27, feedback: 33 };
 		},
 	};
 }
@@ -43,7 +45,7 @@ function countReads(status = 200) {
 function mountCounts() {
 	const client = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false } } });
 	const hook = renderHook(
-		() => useReviewTabCounts("demo", { subjectUserId: 7, practiceSlug: ["testing"] }),
+		() => useReviewTabCounts("demo", { developerId: "7", practiceSlug: ["testing"] }),
 		{
 			wrapper: ({ children }: { children: ReactNode }) => (
 				<QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -76,9 +78,9 @@ describe("practice review tab totals", () => {
 			});
 			await waitFor(() =>
 				expect(result.current).toStrictEqual({
-					runs: 11,
+					reviews: 11,
 					results: 22,
-					observations: 27,
+					problems: 27,
 					feedback: 33,
 				}),
 			);
@@ -88,16 +90,9 @@ describe("practice review tab totals", () => {
 				expect(url.searchParams.get("size")).toBe("1");
 				expect(url.searchParams.get("practiceSlug")).toBe("testing");
 			}
-			expect(
-				wire.reads
-					.filter((url) => url.pathname.endsWith("/feedback"))
-					.map((url) => url.searchParams.get("recipientUserId")),
-			).toStrictEqual(["7", "7"]);
-			expect(
-				wire.reads
-					.filter((url) => !url.pathname.endsWith("/feedback"))
-					.map((url) => url.searchParams.get("subjectUserId")),
-			).toStrictEqual(["7", "7", "7", "7", "7", "7"]);
+			expect(wire.reads.map((url) => url.searchParams.get("developerId"))).toStrictEqual(
+				Array.from({ length: 8 }, () => "7"),
+			);
 		} finally {
 			cleanup();
 			client.clear();
@@ -132,9 +127,9 @@ describe("practice review tab totals", () => {
 		{
 			status: 500,
 			expected: {
-				runs: undefined,
+				reviews: undefined,
 				results: undefined,
-				observations: undefined,
+				problems: undefined,
 				feedback: undefined,
 			},
 		},
@@ -147,10 +142,10 @@ describe("practice review tab totals", () => {
 					operatorAccountId: 1,
 					workspaceSlug: "demo",
 					workspaceName: "Demo",
-					userId: 7,
-					login: "developer",
+					accountId: "7",
+					providerLogin: "developer",
 					name: "Developer",
-					hasAccount: true,
+					unclaimed: false,
 					reason: "Inspect own synthetic fixture",
 				}),
 			);

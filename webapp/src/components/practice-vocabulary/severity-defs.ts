@@ -1,10 +1,10 @@
 import { CircleAlertIcon, InfoIcon, OctagonAlertIcon, TriangleAlertIcon } from "lucide-react";
 
-import type { Observation } from "@/api/types.gen";
+import type { Problem } from "@/api/types.gen";
 
 import type { StatusDefs } from "@/components/common/status-def";
 
-export type Severity = Observation["severity"];
+export type Severity = Problem["severity"];
 
 /**
  * How much a gap costs, ordered worst first. Every value is a real gap: a result's severity is at
@@ -32,7 +32,7 @@ export const SEVERITY_DEFS: StatusDefs<Severity> = {
 		badgeVariant: "warning",
 		description: "Worth knowing about, but it does not block anything.",
 	},
-	INFO: {
+	TRIVIAL: {
 		label: "Trivial",
 		icon: InfoIcon,
 		badgeVariant: "secondary",

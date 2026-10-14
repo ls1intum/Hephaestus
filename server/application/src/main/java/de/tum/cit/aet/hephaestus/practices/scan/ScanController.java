@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.scan;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.CancelScanRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanReportDTO;
@@ -9,14 +11,12 @@ import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanReportItemsPageDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanReportProblemsPageDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ScanSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.StartScanRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.ProblemBaselineState;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
-import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -24,8 +24,8 @@ import java.net.URI;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.web.PagedModel;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -50,13 +50,13 @@ public class ScanController {
 
     @GetMapping
     @Operation(operationId = "listScans", summary = "List repository scans")
-    public PagedModel<ScanSummaryDTO> listScans(
+    public PageResponseDTO<ScanSummaryDTO> listScans(
             WorkspaceContext context,
             @RequestParam(required = false) @Nullable String repositoryItemId,
             @RequestParam(required = false) @Nullable ReviewStatus status,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
-        return new PagedModel<>(query.list(
+        return PageResponseDTO.from(query.list(
                 context.id(),
                 repositoryItemId == null ? null : Long.parseLong(repositoryItemId),
                 status,
@@ -65,6 +65,8 @@ public class ScanController {
 
     @PostMapping
     @Operation(operationId = "startScan", summary = "Start a repository scan")
+    @AuditExempt(reason = "This operation changes execution state recorded on the review, not configuration or access")
+    @ApiResponse(responseCode = "202", description = "Accepted")
     public ResponseEntity<ScanSummaryDTO> startScan(
             WorkspaceContext context,
             @RequestHeader("Idempotency-Key") UUID key,
@@ -82,7 +84,10 @@ public class ScanController {
     }
 
     @PatchMapping("/{scanId}/status")
-    @Operation(operationId = "cancelScan", summary = "Cancel a repository scan")
+    @Operation(operationId = "updateScanStatus", summary = "Cancel a repository scan")
+    @AuditExempt(reason = "This operation changes execution state recorded on the review, not configuration or access")
+    @ApiResponse(responseCode = "200", description = "Completed")
+    @ApiResponse(responseCode = "202", description = "Accepted")
     public ResponseEntity<ScanDetailDTO> cancelScan(
             WorkspaceContext context, @PathVariable UUID scanId, @Valid @RequestBody CancelScanRequestDTO request) {
         var detail = query.cancel(context.id(), scanId);
@@ -102,19 +107,8 @@ public class ScanController {
     public ScanReportItemsPageDTO listScanReportItems(
             WorkspaceContext context,
             @PathVariable UUID scanId,
-            @RequestParam(required = false) @Nullable String cursor,
-            @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
-            @RequestParam(required = false) @Nullable String practiceSlug,
-            @RequestParam(required = false) @Nullable ResultOutcome outcome,
-            @RequestParam(required = false) @Nullable String status,
-            @RequestParam(required = false) @Nullable Boolean reused,
-            @RequestParam(required = false) @Nullable String path) {
-        return query.items(
-                context.id(),
-                scanId,
-                cursor,
-                size,
-                new ScanQueryService.ItemFilter(practiceSlug, outcome, status, reused, path));
+            @Valid @ParameterObject ScanReportItemFilterParams filter) {
+        return query.items(context.id(), scanId, filter.getCursor(), filter.getSize(), filter.filter());
     }
 
     @GetMapping("/{scanId}/report/problems")
@@ -122,19 +116,8 @@ public class ScanController {
     public ScanReportProblemsPageDTO listScanReportProblems(
             WorkspaceContext context,
             @PathVariable UUID scanId,
-            @RequestParam(required = false) @Nullable String cursor,
-            @RequestParam(defaultValue = "50") @Min(1) @Max(200) int size,
-            @RequestParam(required = false) @Nullable String practiceSlug,
-            @RequestParam(required = false) @Nullable Severity severity,
-            @RequestParam(required = false) @Nullable String path,
-            @RequestParam(required = false) @Nullable ProblemBaselineState baselineState,
-            @RequestParam(defaultValue = "true") boolean openOnly) {
-        return query.problems(
-                context.id(),
-                scanId,
-                cursor,
-                size,
-                new ScanQueryService.ProblemFilter(practiceSlug, severity, path, baselineState, openOnly));
+            @Valid @ParameterObject ScanReportProblemFilterParams filter) {
+        return query.problems(context.id(), scanId, filter.getCursor(), filter.getSize(), filter.filter());
     }
 
     @GetMapping(value = "/{scanId}/report/sarif", produces = "application/sarif+json")

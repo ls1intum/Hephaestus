@@ -14,6 +14,8 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -57,8 +59,9 @@ public class PracticeGroupController {
     @PostMapping
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_GROUP")
     @Operation(operationId = "createPracticeGroup")
+    @ApiResponse(responseCode = "201", description = "Practice group created")
     public ResponseEntity<PracticeGroupDTO> create(
-            WorkspaceContext ctx, @RequestBody CreatePracticeGroupRequestDTO input) {
+            WorkspaceContext ctx, @RequestBody @Valid CreatePracticeGroupRequestDTO input) {
         var group = groups.createGroup(
                 ctx,
                 input.slug(),
@@ -73,7 +76,9 @@ public class PracticeGroupController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_GROUP")
     @Operation(operationId = "updatePracticeGroup")
     public PracticeGroupDTO update(
-            WorkspaceContext ctx, @PathVariable String groupSlug, @RequestBody UpdatePracticeGroupRequestDTO input) {
+            WorkspaceContext ctx,
+            @PathVariable String groupSlug,
+            @RequestBody @Valid UpdatePracticeGroupRequestDTO input) {
         return presenter.present(
                 ctx.id(),
                 groups.updateGroup(
@@ -87,14 +92,15 @@ public class PracticeGroupController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_GROUP")
     @Operation(operationId = "setGroupFeedbackMode")
     public PracticeGroupDTO mode(
-            WorkspaceContext ctx, @PathVariable String groupSlug, @RequestBody SetFeedbackModeRequestDTO input) {
+            WorkspaceContext ctx, @PathVariable String groupSlug, @RequestBody @Valid SetFeedbackModeRequestDTO input) {
         return presenter.present(ctx.id(), groups.setFeedbackMode(ctx, groupSlug, input.feedbackMode()));
     }
 
     @PatchMapping("/reorder")
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderPracticeGroups")
-    public List<PracticeGroupDTO> reorder(WorkspaceContext ctx, @RequestBody ReorderPracticeGroupsRequestDTO input) {
+    public List<PracticeGroupDTO> reorder(
+            WorkspaceContext ctx, @RequestBody @Valid ReorderPracticeGroupsRequestDTO input) {
         groups.reorder(ctx, input.slugs());
         return presenter.presentGroups(ctx.id(), groups.listGroups(ctx, null));
     }
@@ -102,6 +108,7 @@ public class PracticeGroupController {
     @DeleteMapping("/{groupSlug}")
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_GROUP")
     @Operation(operationId = "deletePracticeGroup")
+    @ApiResponse(responseCode = "204", description = "Practice group deleted")
     public ResponseEntity<Void> delete(WorkspaceContext ctx, @PathVariable String groupSlug) {
         groups.deleteGroup(ctx, groupSlug);
         return ResponseEntity.noContent().build();

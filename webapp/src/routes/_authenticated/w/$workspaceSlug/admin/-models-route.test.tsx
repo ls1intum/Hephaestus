@@ -15,6 +15,7 @@ import type {
 import { SERVED_ALONE } from "@/components/admin/workspace-llm/fixtures";
 import type { Wire } from "@/lib/dates";
 import { workspaceOnboarding } from "@/mocks/fixtures/onboarding";
+import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { levelsOpenedBy } from "@/test/detail-stack";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -94,7 +95,7 @@ function mockModelsRoute(
 ) {
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
-			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
+			HttpResponse.json(ownMembership("ADMIN")),
 		),
 		http.get("*/workspaces/:workspaceSlug/onboarding/settings", () =>
 			HttpResponse.json({
@@ -650,9 +651,9 @@ it("counts the practices whose scripts use a model, from the workspace's practic
 		{
 			practiceSlug: "comment-quality",
 			practiceName: "Comment quality",
-			asOf: { jobId: "job-1", finishedAt: "2026-10-03T09:00:00Z" },
+			asOf: { reviewId: "review-1", jobId: "job-1", finishedAt: "2026-10-03T09:00:00Z" },
 			scriptChanged: false,
-			needs: [{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers: ["IN_HOUSE"] }],
+			needs: [{ slot: "decision", need: "required", unmetTiers: ["IN_HOUSE"] }],
 		},
 	]);
 	renderRouteAt("/w/acme/admin/models");
@@ -673,9 +674,9 @@ type UnmetTiers = PracticeScriptSummary["needs"][number]["unmetTiers"];
 const commentQualityNeeds = (unmetTiers: UnmetTiers): Wire<PracticeScriptSummary> => ({
 	practiceSlug: "comment-quality",
 	practiceName: "Comment quality",
-	asOf: { jobId: "job-1", finishedAt: "2026-10-03T09:00:00Z" },
+	asOf: { reviewId: "review-1", jobId: "job-1", finishedAt: "2026-10-03T09:00:00Z" },
 	scriptChanged: false,
-	needs: [{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers }],
+	needs: [{ slot: "decision", need: "required", unmetTiers }],
 });
 
 it("keeps the page usable when the practice script needs fail, and says so in their section only", async () => {

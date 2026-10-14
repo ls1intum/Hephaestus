@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus;
 
 import de.tum.cit.aet.hephaestus.core.UserViewRead;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.workspace.validation.WorkspaceSlugValidator;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
@@ -64,7 +65,8 @@ import org.springframework.data.web.PagedModel;
             @Tag(
                     name = "Practice review trace",
                     description =
-                            "Why each practice did or did not run on one piece of work. Any workspace member can read it."),
+                            "Why each practice did or did not run on one piece of work. Any workspace member can read"
+                                    + " it."),
         },
         servers = {@Server(url = "/", description = "Default Server URL")},
         security = {@SecurityRequirement(name = "bearerAuth")})
@@ -83,11 +85,29 @@ public class OpenAPIConfiguration {
      * Domain objects to include even without DTO suffix
      */
     private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of(
-            "PageableObject", "SortObject", "ProblemDetail", "PageMetadata",
-            "PracticeDefinition", "ReviewOn", "AppliesWhen", "AppliesWhenClause", "PracticeReads",
-            "PracticeReadSource", "ReviewedBy", "ReviewLimit", "ScanDefinition", "PracticeGuidance",
-            "PracticeVisual", "PracticeGuide", "PracticeDefinitionField", "PracticeReleaseChoice",
-            "SourceContractVersion", "SourceKind", "WorkspaceReviewScope", "ReviewRepositoryTarget", "TimeBucketSize");
+            "PageableObject",
+            "SortObject",
+            "ProblemDetail",
+            "PageMetadata",
+            "PracticeDefinition",
+            "ReviewOn",
+            "AppliesWhen",
+            "AppliesWhenClause",
+            "PracticeReads",
+            "PracticeReadSource",
+            "ReviewedBy",
+            "ReviewLimit",
+            "ScanDefinition",
+            "PracticeGuidance",
+            "PracticeVisual",
+            "PracticeGuide",
+            "PracticeDefinitionField",
+            "PracticeReleaseChoice",
+            "SourceContractVersion",
+            "SourceKind",
+            "WorkspaceReviewScope",
+            "ReviewRepositoryTarget",
+            "TimeBucketSize");
 
     /**
      * Zalando's non-standard-but-conventional {@code format} for an exact decimal, which stops a client
@@ -105,7 +125,8 @@ public class OpenAPIConfiguration {
                         .name(UserViewContextHolder.REASON_HEADER)
                         .required(true)
                         .schema(new StringSchema())
-                        .description("Why the administrator views this account: percent-encoded UTF-8, 1–500 characters"));
+                        .description(
+                                "Why the administrator views this account: percent-encoded UTF-8, 1–500 characters"));
             }
             return operation;
         };
@@ -117,36 +138,50 @@ public class OpenAPIConfiguration {
         return openApi -> {
             openApi.getInfo().setVersion(appVersion);
             includeSpringDataPageMetadata(openApi);
-            processApplicationServerSchemas(openApi);
-            processAllPaths(openApi);
+            Map<String, String> schemaNames = processApplicationServerSchemas(openApi);
+            processAllPaths(openApi, schemaNames);
+            normalizeDiscriminatedUnions(openApi);
             declareExactDecimals(openApi);
+            declareProviderIdentityKinds(openApi);
         };
     }
 
     private void includeSpringDataPageMetadata(OpenAPI openApi) {
-        ModelConverters.getInstance()
-                .read(PagedModel.PageMetadata.class)
-                .forEach((name, schema) -> openApi.getComponents().addSchemas(name, schema));
+        ModelConverters.getInstance().read(PagedModel.PageMetadata.class).forEach((name, schema) -> {
+            Schema<?> metadata = schema;
+            if (metadata.getProperties() != null)
+                metadata.setRequired(new ArrayList<>(metadata.getProperties().keySet()));
+            openApi.getComponents().addSchemas(name, schema);
+        });
     }
 
-    /**
+    /*
      * Process server schemas: include DTOs and remove suffix.
      */
     // Swagger exposes Map<String, Schema> publicly; stream element types inherit that raw schema type.
     @SuppressWarnings("rawtypes")
-    private void processApplicationServerSchemas(OpenAPI openApi) {
+    private Map<String, String> processApplicationServerSchemas(OpenAPI openApi) {
         var components = openApi.getComponents();
         if (components == null || components.getSchemas() == null) {
             log.warn("No schemas found in server OpenAPI spec");
-            return;
+            return Map.of();
         }
 
         Map<String, Schema> filteredSchemas = new HashMap<>();
+        Map<String, String> schemaNames = new HashMap<>();
+        components.getSchemas().keySet().forEach(original -> {
+            String candidate = original.endsWith("DTO") ? original.substring(0, original.length() - 3) : original;
+            schemaNames.put(
+                    original,
+                    !candidate.equals(original) && components.getSchemas().containsKey(candidate)
+                            ? original
+                            : candidate);
+        });
 
         components.getSchemas().entrySet().stream()
                 .filter(e -> e.getKey().endsWith("DTO"))
                 .forEach(e -> {
-                    String nameWithoutDto = e.getKey().substring(0, e.getKey().length() - 3);
+                    String nameWithoutDto = schemaNames.getOrDefault(e.getKey(), e.getKey());
                     e.getValue().setName(nameWithoutDto);
                     filteredSchemas.put(nameWithoutDto, e.getValue());
                 });
@@ -158,36 +193,50 @@ public class OpenAPIConfiguration {
         var remaining = new ArrayList<>(filteredSchemas.values());
         Set<Schema> seen = new HashSet<>();
         for (int index = 0; index < remaining.size(); index++) {
-            retainReferencedSchemas(remaining.get(index), components.getSchemas(), filteredSchemas, remaining, seen);
+            retainReferencedSchemas(
+                    remaining.get(index), components.getSchemas(), filteredSchemas, remaining, seen, schemaNames);
         }
-        filteredSchemas.values().forEach(this::removeDtoSuffixFromRefs);
+        filteredSchemas.values().forEach(schema -> normalizeSchemaReferences(schema, schemaNames));
         components.setSchemas(filteredSchemas);
+        return schemaNames;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void retainReferencedSchemas(Schema schema, Map<String, Schema> source,
-            Map<String, Schema> retained, List<Schema> pending, Set<Schema> seen) {
+    private void retainReferencedSchemas(
+            Schema schema,
+            Map<String, Schema> source,
+            Map<String, Schema> retained,
+            List<Schema> pending,
+            Set<Schema> seen,
+            Map<String, String> schemaNames) {
         if (schema == null || !seen.add(schema)) return;
         String ref = schema.get$ref();
         if (ref != null && ref.startsWith("#/components/schemas/")) {
             String original = ref.substring("#/components/schemas/".length());
-            String name = original.endsWith("DTO") ? original.substring(0, original.length() - 3) : original;
+            String name = schemaNames.getOrDefault(original, original);
             Schema target = source.get(original);
             if (target != null && retained.putIfAbsent(name, target) == null) pending.add(target);
         }
         Map<String, Schema> properties = schema.getProperties();
-        if (properties != null) properties.values().forEach(child -> retainReferencedSchemas(child, source, retained, pending, seen));
-        retainReferencedSchemas(schema.getItems(), source, retained, pending, seen);
-        retainReferencedSchemas(schema.getNot(), source, retained, pending, seen);
-        Stream.of(schema.getAllOf(), schema.getAnyOf(), schema.getOneOf()).filter(Objects::nonNull)
-                .flatMap(List::stream).forEach(child -> retainReferencedSchemas((Schema) child, source, retained, pending, seen));
-        if (schema.getAdditionalProperties() instanceof Schema child) retainReferencedSchemas(child, source, retained, pending, seen);
+        if (properties != null)
+            properties
+                    .values()
+                    .forEach(child -> retainReferencedSchemas(child, source, retained, pending, seen, schemaNames));
+        retainReferencedSchemas(schema.getItems(), source, retained, pending, seen, schemaNames);
+        retainReferencedSchemas(schema.getNot(), source, retained, pending, seen, schemaNames);
+        Stream.of(schema.getAllOf(), schema.getAnyOf(), schema.getOneOf())
+                .filter(Objects::nonNull)
+                .flatMap(List::stream)
+                .forEach(
+                        child -> retainReferencedSchemas((Schema) child, source, retained, pending, seen, schemaNames));
+        if (schema.getAdditionalProperties() instanceof Schema child)
+            retainReferencedSchemas(child, source, retained, pending, seen, schemaNames);
     }
 
-    /**
+    /*
      * Process all paths: clean up tags, parameters, ensure workspaceSlug.
      */
-    private void processAllPaths(OpenAPI openApi) {
+    private void processAllPaths(OpenAPI openApi, Map<String, String> schemaNames) {
         var paths = openApi.getPaths();
         if (paths == null) return;
 
@@ -198,7 +247,7 @@ public class OpenAPIConfiguration {
                         if (response.getContent() != null) {
                             response.getContent().forEach((type, media) -> {
                                 if (media.getSchema() != null) {
-                                    removeDtoSuffixFromRefs(media.getSchema());
+                                    normalizeSchemaReferences(media.getSchema(), schemaNames);
                                 }
                             });
                         }
@@ -209,7 +258,7 @@ public class OpenAPIConfiguration {
                         && operation.getRequestBody().getContent() != null) {
                     operation.getRequestBody().getContent().forEach((type, media) -> {
                         if (media.getSchema() != null) {
-                            removeDtoSuffixFromRefs(media.getSchema());
+                            normalizeSchemaReferences(media.getSchema(), schemaNames);
                         }
                     });
                 }
@@ -221,6 +270,11 @@ public class OpenAPIConfiguration {
                 }
 
                 if (operation.getParameters() != null) {
+                    operation.getParameters().stream()
+                            .filter(parameter -> "itemId".equals(parameter.getName())
+                                    || "repositoryItemId".equals(parameter.getName()))
+                            .forEach(parameter -> parameter.setSchema(
+                                    new StringSchema().pattern("^[1-9][0-9]*$").maxLength(19)));
                     operation.setParameters(operation.getParameters().stream()
                             .filter(p -> !isWorkspaceContextParam(p))
                             .collect(Collectors.toCollection(ArrayList::new)));
@@ -234,14 +288,17 @@ public class OpenAPIConfiguration {
 
         // Also normalize refs inside component schemas (not only request/response bodies)
         if (openApi.getComponents() != null && openApi.getComponents().getSchemas() != null) {
-            openApi.getComponents().getSchemas().values().forEach(this::removeDtoSuffixFromRefs);
+            openApi.getComponents()
+                    .getSchemas()
+                    .values()
+                    .forEach(schema -> normalizeSchemaReferences(schema, schemaNames));
         }
     }
 
-    /**
-     * Labels every {@code BigDecimal} on the API as an exact decimal. springdoc emits
-     * {@code format: double}/{@code float} for the binary types, so a bare formatless {@code type: number}
-     * can only have come from a {@code BigDecimal}.
+    /*
+     * Labels every BigDecimal on the API as an exact decimal. springdoc emits
+     * format: double/float for the binary types, so a bare formatless type: number
+     * can only have come from a BigDecimal.
      */
     private void declareExactDecimals(OpenAPI openApi) {
         if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) {
@@ -275,9 +332,9 @@ public class OpenAPIConfiguration {
         }
     }
 
-    /**
-     * OpenAPI 3.1 moved the type into the {@code types} set (a nullable number is {@code [number, null]})
-     * and leaves {@code getType()} populated only in the 3.0 shape, so both have to be read.
+    /*
+     * OpenAPI 3.1 moved the type into the types set (a nullable number is [number, null])
+     * and leaves getType() populated only in the 3.0 shape, so both have to be read.
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     private boolean isFormatlessNumber(Schema schema) {
@@ -327,43 +384,98 @@ public class OpenAPIConfiguration {
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void removeDtoSuffixFromRefs(Schema schema) {
+    private void normalizeSchemaReferences(Schema schema, Map<String, String> schemaNames) {
         if (schema == null) return;
 
-        if (schema.get$ref() != null && schema.get$ref().endsWith("DTO")) {
-            schema.set$ref(schema.get$ref().substring(0, schema.get$ref().length() - 3));
+        if (schema.get$ref() != null) {
+            schema.set$ref(normalizeSchemaReference(schema.get$ref(), schemaNames));
         }
 
         if (schema.getDiscriminator() != null && schema.getDiscriminator().getMapping() != null) {
-            schema.getDiscriminator().getMapping().replaceAll((key, ref) -> ref.endsWith("DTO")
-                    ? ref.substring(0, ref.length() - 3) : ref);
+            schema.getDiscriminator().getMapping().replaceAll((key, ref) -> normalizeSchemaReference(ref, schemaNames));
         }
         Map<String, Schema> props = schema.getProperties();
         if (props != null) {
-            props.values().forEach(this::removeDtoSuffixFromRefs);
+            props.values().forEach(property -> normalizeSchemaReferences(property, schemaNames));
         }
 
         if (schema.getItems() != null) {
-            removeDtoSuffixFromRefs(schema.getItems());
+            normalizeSchemaReferences(schema.getItems(), schemaNames);
         }
 
         if (schema.getAllOf() != null) {
-            schema.getAllOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+            schema.getAllOf().forEach(s -> normalizeSchemaReferences((Schema) s, schemaNames));
         }
         if (schema.getAnyOf() != null) {
-            schema.getAnyOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+            schema.getAnyOf().forEach(s -> normalizeSchemaReferences((Schema) s, schemaNames));
         }
         if (schema.getOneOf() != null) {
-            schema.getOneOf().forEach(s -> removeDtoSuffixFromRefs((Schema) s));
+            schema.getOneOf().forEach(s -> normalizeSchemaReferences((Schema) s, schemaNames));
         }
 
         Object additional = schema.getAdditionalProperties();
         if (additional instanceof Schema additionalSchema) {
-            removeDtoSuffixFromRefs(additionalSchema);
+            normalizeSchemaReferences(additionalSchema, schemaNames);
         }
 
         if (schema.getNot() != null) {
-            removeDtoSuffixFromRefs(schema.getNot());
+            normalizeSchemaReferences(schema.getNot(), schemaNames);
         }
+    }
+
+    private static String normalizeSchemaReference(String ref, Map<String, String> schemaNames) {
+        String prefix = "#/components/schemas/";
+        if (!ref.startsWith(prefix)) return ref;
+        String original = ref.substring(prefix.length());
+        return prefix + schemaNames.getOrDefault(original, original);
+    }
+
+    private static void declareProviderIdentityKinds(OpenAPI openApi) {
+        if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) return;
+        Schema<?> identity = openApi.getComponents().getSchemas().get("ProviderIdentityRef");
+        if (identity == null || identity.getProperties() == null) return;
+        Schema<String> provider = new StringSchema();
+        provider.setEnum(
+                Stream.of(IntegrationKind.values()).map(IntegrationKind::name).toList());
+        identity.addProperty("provider", provider);
+    }
+
+    private static void normalizeDiscriminatedUnions(OpenAPI openApi) {
+        if (openApi.getComponents() == null || openApi.getComponents().getSchemas() == null) return;
+        var schemas = openApi.getComponents().getSchemas();
+        schemas.forEach((parentName, rawParent) -> {
+            Schema<?> parent = rawParent;
+            if (parent.getDiscriminator() == null || parent.getOneOf() == null) return;
+            String parentRef = "#/components/schemas/" + parentName;
+            parent.getOneOf().forEach(alternative -> {
+                String childRef = alternative.get$ref();
+                if (childRef == null || !childRef.startsWith("#/components/schemas/")) return;
+                Schema<?> child = schemas.get(childRef.substring("#/components/schemas/".length()));
+                if (child == null
+                        || child.getAllOf() == null
+                        || child.getAllOf().stream().noneMatch(branch -> parentRef.equals(branch.get$ref()))) return;
+                // A concrete alternative cannot also inherit the union that contains it.
+                // Keep common fields and their required keys without the reverse union reference.
+                var concrete = child.getAllOf().stream()
+                        .filter(branch -> !parentRef.equals(branch.get$ref()))
+                        .toList();
+                if (parent.getProperties() != null) {
+                    parent.getProperties().forEach((name, property) -> {
+                        boolean declared = (child.getProperties() != null
+                                        && child.getProperties().containsKey(name))
+                                || concrete.stream()
+                                        .anyMatch(branch -> branch.getProperties() != null
+                                                && branch.getProperties().containsKey(name));
+                        if (!declared) child.addProperty(name, property);
+                    });
+                }
+                if (parent.getRequired() != null)
+                    parent.getRequired().forEach(field -> {
+                        if (child.getRequired() == null || !child.getRequired().contains(field))
+                            child.addRequiredItem(field);
+                    });
+                child.setAllOf(concrete.isEmpty() ? null : concrete);
+            });
+        });
     }
 }

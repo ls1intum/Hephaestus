@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.scan;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
@@ -45,6 +46,7 @@ public class ScanDriver {
 
     @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.SECONDS)
     @SchedulerLock(name = "practice-scan-driver", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1S")
+    @WorkspaceAgnostic("Enumerates bounded active scan identities; each mutation carries its workspace")
     public void tick() {
         boolean enumerated = false;
         for (var candidate : scans.active(20)) {

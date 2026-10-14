@@ -1,18 +1,32 @@
 import type {
-	AutonomyAssignment,
+	AccountRef,
+	CatalogOrigin,
+	FeedbackModeAssignment,
 	Practice,
+	PracticeDefinition,
 	PracticeGroup,
+	PracticeReleaseProposal,
 	PracticeReviewSettings,
-	ReviewBackfillRun,
-	ReviewSweepSchedule,
+	PracticeVersion,
+	ReviewBatch,
+	ReviewSchedule,
 } from "@/api/types.gen";
-import type { PracticeAutonomy } from "@/lib/practice-autonomy";
-import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockMergeReviewFields,
-	mockPullRequestReviewFields,
-	mockPullRequestPolicy,
-} from "@/mocks/fixtures/practice";
+import { definitionOf, mockScan } from "@/components/admin/practice-editor/fixtures";
+import type { FeedbackMode } from "@/lib/practice-feedback-mode";
+
+/**
+ * Real `Date`s, not ISO strings: these go straight to a prop rather than through MSW, and a `Date`
+ * is what the generated client's response transformer hands a screen at runtime. A route test
+ * serves them as `Wire<T>` JSON instead.
+ */
+
+export const mockAdmin: AccountRef = {
+	id: "7",
+	displayName: "Ada Lovelace",
+	avatarUrl: null,
+	status: "ACTIVE",
+	identities: [{ provider: "GITHUB", login: "ada", displayName: "Ada Lovelace", avatarUrl: null }],
+};
 
 export function mockReviewSettings(
 	overrides: Partial<PracticeReviewSettings> = {},
@@ -20,22 +34,25 @@ export function mockReviewSettings(
 	return {
 		etag: '"0"',
 		generatedPaths: {},
-		revision: 0,
+		revision: "0",
 		cooldownMinutes: 30,
-		defaultAutonomy: "HUMAN_APPROVAL",
+		cooldownMinutesOverride: null,
+		defaultFeedbackMode: "APPROVE_FIRST",
+		defaultFeedbackModeOverride: null,
 		deliverToMerged: true,
+		deliverToMergedOverride: null,
 		deliveryStatus: "ACTIVE",
 		reviewScope: {
-			repositoryMode: "ALL_MONITORED",
-			personMode: "ALL_ELIGIBLE",
-			repositories: [],
-			personUserIds: [],
+			repositories: "ALL",
+			people: "ALL",
+			selectedRepositories: [],
+			accountIds: [],
 		},
-		coverageSummary: {
+		scopeSummary: {
 			monitoredRepositories: 3,
-			coveredRepositories: 3,
+			selectedRepositories: 3,
 			eligiblePeople: 8,
-			coveredPeople: 8,
+			selectedPeople: 8,
 			recentReviewVolume: 42,
 			estimateWindowDays: 30,
 		},
@@ -43,151 +60,147 @@ export function mockReviewSettings(
 	};
 }
 
-/**
- * Real `Date`s, not ISO strings: these go straight to a prop rather than through MSW, and a `Date`
- * is what the generated client's response transformer hands a screen at runtime.
- */
-export function sweepSchedule(overrides: Partial<ReviewSweepSchedule> = {}): ReviewSweepSchedule {
+export function reviewSchedule(overrides: Partial<ReviewSchedule> = {}): ReviewSchedule {
 	return {
 		id: "22222222-2222-2222-2222-222222222222",
-		artifactKind: "scm.pull_request",
+		itemKind: "scm.pull_request",
 		cadence: "DAILY",
 		lookbackDays: 2,
+		budgetUsd: null,
 		enabled: true,
 		nextRunAt: new Date("2026-08-10T02:17:00Z"),
 		lastRunAt: new Date("2026-08-09T02:17:00Z"),
-		createdByAccountId: 7,
+		createdBy: mockAdmin,
 		createdAt: new Date("2026-08-01T09:00:00Z"),
+		updatedAt: new Date("2026-08-01T09:00:00Z"),
+		version: "0",
 		...overrides,
 	};
 }
 
-export function backfillRun(overrides: Partial<ReviewBackfillRun> = {}): ReviewBackfillRun {
+export function reviewBatch(overrides: Partial<ReviewBatch> = {}): ReviewBatch {
 	return {
 		id: "11111111-1111-1111-1111-111111111111",
-		artifactKind: "scm.pull_request",
-		fromAt: new Date("2026-07-08T00:00:00Z"),
-		toAt: new Date("2026-08-07T00:00:00Z"),
+		itemKind: "scm.pull_request",
+		origin: "BACKFILL",
+		from: new Date("2026-07-08T00:00:00Z"),
+		to: new Date("2026-08-07T00:00:00Z"),
 		status: "AWAITING_CONFIRMATION",
-		discoveredVia: "BACKFILL",
-		estimatedArtifacts: 128,
-		estimatedCostUsd: 15.36,
+		pauseReason: null,
+		estimatedItems: 128,
+		estimatedCostUsd: "15.36",
+		budgetUsd: null,
 		submittedCount: 0,
-		passedCount: 0,
+		skippedCount: 0,
 		failedCount: 0,
-		requestedByAccountId: 7,
+		reviewIds: [],
+		scheduleId: null,
+		targetItemIds: "",
+		requestedBy: mockAdmin,
+		confirmedBy: null,
 		createdAt: new Date("2026-08-07T09:00:00Z"),
+		startedAt: null,
+		finishedAt: null,
+		etag: '"0"',
+		version: "0",
 		...overrides,
 	};
 }
 
-export function inheritedAutonomy(effective: PracticeAutonomy = "AUTOMATIC"): AutonomyAssignment {
-	return { effective, source: "WORKSPACE", inherited: true };
+/** A feedback mode handed down from the workspace default, or from a group when `source` says so. */
+export function inheritedFeedbackMode(
+	effective: FeedbackMode = "AUTOMATIC",
+	source: "GROUP" | "WORKSPACE" = "WORKSPACE",
+): FeedbackModeAssignment {
+	return { effective, override: null, source };
 }
 
-export function groupAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
-	return { effective, source: "GROUP", inherited: true };
+/** A feedback mode chosen on the practice or group itself. */
+export function chosenFeedbackMode(
+	effective: FeedbackMode,
+	source: "PRACTICE" | "GROUP" = "PRACTICE",
+): FeedbackModeAssignment {
+	return { effective, override: effective, source };
 }
 
-export function chosenAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
-	return { effective, override: effective, source: "PRACTICE", inherited: false };
+/** A practice this workspace wrote itself. */
+export const OWN_ORIGIN: CatalogOrigin = {
+	catalogSlug: null,
+	state: "YOURS",
+	localEdits: [],
+	offeredDigest: null,
+};
+
+/** A practice or group from the catalog, in the given state. */
+export function catalogOrigin(
+	catalogSlug: string,
+	state: CatalogOrigin["state"] = "FROM_HEPHAESTUS",
+	localEdits: CatalogOrigin["localEdits"] = [],
+): CatalogOrigin {
+	return {
+		catalogSlug,
+		state,
+		localEdits,
+		offeredDigest: state === "NO_LONGER_SHIPPED" ? null : `sha256:${catalogSlug}`,
+	};
 }
 
-export const mockPractice: Practice = {
-	id: 1,
-	slug: "pr-description-quality",
-	name: "PR Description Quality",
-	...mockPullRequestReviewFields,
-	criteria:
-		"## The standard\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
-	whyItMatters:
-		"A clear description lets reviewers understand intent without reverse-engineering the diff, speeding up review and reducing back-and-forth.",
-	whatGoodLooksLike:
-		"A PR opens with a one-paragraph summary, links the issue, and lists the exact steps a reviewer ran to verify it.",
-	artifactKind: "scm.pull_request",
-	deliveryBehavior: { summaryOnly: false },
-	automatedReviewPolicy: mockPullRequestPolicy,
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	displayOrder: 0,
-	autonomy: inheritedAutonomy(),
-	createdAt: new Date("2025-06-01"),
-	updatedAt: new Date("2025-06-15"),
-};
+export function practiceVersion(
+	definition: PracticeDefinition,
+	overrides: Partial<PracticeVersion> = {},
+): PracticeVersion {
+	return {
+		id: "101",
+		number: 1,
+		name: definition.name,
+		definition,
+		definitionAvailable: true,
+		historicalDefinition: null,
+		reviewDigest: "sha256:review",
+		createdAt: new Date("2025-06-15"),
+		createdBy: mockAdmin,
+		changed: [],
+		reviewChanged: false,
+		...overrides,
+	};
+}
 
-export const mockPractices: Practice[] = [
-	mockPractice,
-	{
-		id: 2,
-		slug: "code-review-thoroughness",
-		name: "Code Review Thoroughness",
-		...mockPullRequestReviewFields,
-		signals: ["scm.pull_request.reviewed"],
-		criteria:
-			"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
-		artifactKind: "scm.pull_request",
-		deliveryBehavior: { summaryOnly: false },
-		automatedReviewPolicy: mockPullRequestPolicy,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		displayOrder: 0,
-		autonomy: inheritedAutonomy(),
-		createdAt: new Date("2025-06-02"),
-		updatedAt: new Date("2025-06-14"),
-	},
-	{
-		id: 3,
-		slug: "test-coverage",
-		name: "Test Coverage",
-		...mockPullRequestReviewFields,
-		signals: ["scm.pull_request.opened", "scm.pull_request.synchronized"],
-		criteria:
-			"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
-		artifactKind: "scm.pull_request",
-		deliveryBehavior: { summaryOnly: false },
-		automatedReviewPolicy: mockPullRequestPolicy,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		displayOrder: 0,
-		autonomy: chosenAutonomy("OFF"),
-		createdAt: new Date("2025-06-03"),
-		updatedAt: new Date("2025-06-10"),
-	},
-];
+interface MockPracticeInput {
+	id: string;
+	slug: string;
+	kind?: string;
+	groupSlug?: string | null;
+	position?: number;
+	definition: PracticeDefinition;
+	feedbackMode?: FeedbackModeAssignment;
+	catalogOrigin?: CatalogOrigin;
+	version?: Partial<PracticeVersion>;
+}
 
-export const mockUnassignedPractice: Practice = {
-	id: 5,
-	slug: "error-state-handling",
-	name: "Error State Handling",
-	...mockPullRequestReviewFields,
-	signals: ["scm.pull_request.opened"],
-	reviewWhen: {},
-	criteria:
-		"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
-	artifactKind: "scm.pull_request",
-	deliveryBehavior: { summaryOnly: false },
-	automatedReviewPolicy: mockPullRequestPolicy,
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	displayOrder: 0,
-	autonomy: inheritedAutonomy(),
-	createdAt: new Date("2025-06-05"),
-	updatedAt: new Date("2025-06-17"),
-};
-
-export const mockPracticeLongText: Practice = {
-	id: 6,
-	slug: "very-long-practice-name-to-test-overflow-in-card-layouts",
-	name: "Extremely Verbose Practice Name That Tests Text Wrapping and Overflow Behavior in Card Layouts",
-	...mockPullRequestReviewFields,
-	signals: [...mockPullRequestReviewFields.signals, ...mockMergeReviewFields.signals],
-	criteria:
-		"## Very Long Criteria\n\nThis is a multi-paragraph criteria block designed to test the line-clamp behavior on the card preview.\n\n### Section 1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n### Section 2\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n### Section 3\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-	artifactKind: "scm.pull_request",
-	deliveryBehavior: { summaryOnly: false },
-	automatedReviewPolicy: mockPullRequestPolicy,
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	displayOrder: 0,
-	autonomy: inheritedAutonomy(),
-	createdAt: new Date("2025-06-06"),
-	updatedAt: new Date("2025-06-18"),
-};
+export function mockPracticeOf({
+	id,
+	slug,
+	kind = "scm.pull_request",
+	groupSlug = "review-ready-work",
+	position = 0,
+	definition,
+	feedbackMode = inheritedFeedbackMode(),
+	catalogOrigin: origin = OWN_ORIGIN,
+	version,
+}: MockPracticeInput): Practice {
+	return {
+		id,
+		slug,
+		kind,
+		groupSlug,
+		position,
+		currentVersion: practiceVersion(definition, { id: `${id}01`, ...version }),
+		feedbackMode,
+		catalogOrigin: origin,
+		createdAt: new Date("2025-06-01"),
+		updatedAt: new Date("2025-06-15"),
+	};
+}
 
 /** The model slots a script declares in `meta.models`, each `"required"` or `"optional"`. */
 type PracticeScriptModelSlots = Partial<
@@ -217,46 +230,153 @@ export function practiceScript(models: PracticeScriptModelSlots = {}): string {
 	].join("\n");
 }
 
-export const mockPracticeWithAllTriggers: Practice = {
-	id: 4,
+export const mockPractice = mockPracticeOf({
+	id: "1",
+	slug: "pr-description-quality",
+	catalogOrigin: catalogOrigin("pr-description-quality"),
+	definition: definitionOf({
+		name: "PR Description Quality",
+		criteria:
+			"## The standard\n\nEvaluate whether the pull request description provides sufficient context, motivation, and testing steps.\n\n### Required elements\n- Summary of changes\n- Motivation / why\n- Testing steps\n- Link to issue",
+		guidance: {
+			whyItMatters:
+				"A clear description lets reviewers understand intent without reverse-engineering the diff, speeding up review and reducing back-and-forth.",
+			whatGoodLooksLike:
+				"A PR opens with a one-paragraph summary, links the issue, and lists the exact steps a reviewer ran to verify it.",
+			goingWell: "Your pull requests say what changed and why.",
+			visual: null,
+			guide: null,
+		},
+	}),
+});
+
+export const mockPractices: Practice[] = [
+	mockPractice,
+	mockPracticeOf({
+		id: "2",
+		slug: "code-review-thoroughness",
+		kind: "scm.pull_request_review",
+		position: 1,
+		definition: definitionOf({
+			name: "Code Review Thoroughness",
+			reviewOn: { events: ["scm.pull_request_review.submitted"], state: {} },
+			about: "REVIEWER",
+			criteria:
+				"## Code Review Thoroughness\n\nEvaluate depth and quality of code reviews. Reviewers should engage with logic and design, not just style.",
+		}),
+	}),
+	mockPracticeOf({
+		id: "3",
+		slug: "test-coverage",
+		position: 2,
+		feedbackMode: chosenFeedbackMode("OFF"),
+		definition: definitionOf({
+			name: "Test Coverage",
+			reviewOn: { events: ["scm.pull_request.opened", "scm.pull_request.synchronized"], state: {} },
+			criteria:
+				"## Test Coverage\n\nChecks that new code includes appropriate test coverage. Critical paths and edge cases should be tested.",
+			scan: mockScan,
+		}),
+	}),
+];
+
+export const mockUnassignedPractice = mockPracticeOf({
+	id: "5",
+	slug: "error-state-handling",
+	groupSlug: null,
+	definition: definitionOf({
+		name: "Error State Handling",
+		reviewOn: { events: ["scm.pull_request.opened"], state: {} },
+		criteria:
+			"## Error State Handling\n\nEvaluates whether the code properly handles and surfaces errors to the user instead of silently swallowing them.",
+	}),
+});
+
+export const mockPracticeLongText = mockPracticeOf({
+	id: "6",
+	slug: "very-long-practice-name-to-test-overflow-in-card-layouts",
+	definition: definitionOf({
+		name: "Extremely Verbose Practice Name That Tests Text Wrapping and Overflow Behavior in Card Layouts",
+		criteria:
+			"## Very Long Criteria\n\nThis is a multi-paragraph criteria block designed to test the line-clamp behavior on the card preview.\n\n### Section 1\nLorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.\n\n### Section 2\nUt enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.\n\n### Section 3\nDuis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
+	}),
+});
+
+export const mockScriptedPractice = mockPracticeOf({
+	id: "4",
 	slug: "commit-discipline",
-	name: "Commit Discipline",
-	...mockPullRequestReviewFields,
-	signals: [...mockPullRequestReviewFields.signals, ...mockMergeReviewFields.signals],
-	criteria:
-		"## Commit Discipline\n\nEach commit message must:\n- Start with a type prefix (feat, fix, refactor, etc.)\n- Have a descriptive subject (not just issue numbers)\n- Reference the related issue\n\n### Anti-patterns to Flag\n- `fixes #123` with no description\n- Branch-slug-format titles like `feature/ABC-123`\n- Single-word messages like `update` or `fix`",
-	practiceScript: practiceScript(),
-	artifactKind: "scm.pull_request",
-	deliveryBehavior: { summaryOnly: false },
-	automatedReviewPolicy: mockPullRequestPolicy,
-	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-	displayOrder: 0,
-	autonomy: inheritedAutonomy(),
-	createdAt: new Date("2025-06-04"),
-	updatedAt: new Date("2025-06-16"),
-};
+	position: 3,
+	definition: definitionOf({
+		name: "Commit Discipline",
+		criteria:
+			"## Commit Discipline\n\nEach commit message must:\n- Start with a type prefix (feat, fix, refactor, etc.)\n- Have a descriptive subject (not just issue numbers)\n- Reference the related issue",
+		script: practiceScript(),
+	}),
+});
+
+/** A catalog practice this workspace changed, then declined the catalog's next version of. */
+export const mockEditedHerePractice = mockPracticeOf({
+	id: "8",
+	slug: "explain-the-change",
+	catalogOrigin: catalogOrigin("explain-the-change", "EDITED_HERE", ["CRITERIA"]),
+	version: { number: 3 },
+	definition: definitionOf({ name: "Explain the change", criteria: "Our criteria" }),
+});
 
 export const mockGroups: PracticeGroup[] = [
 	{
-		id: 1,
+		id: "1",
 		slug: "review-ready-work",
 		name: "Submitting review-ready work",
 		description: "Make each change easy and fast to review.",
-		visibleInPracticeDashboards: true,
-		displayOrder: 1,
-		autonomy: inheritedAutonomy(),
+		icon: null,
+		color: null,
+		shownToDevelopers: true,
+		position: 1,
+		feedbackMode: inheritedFeedbackMode(),
+		catalogOrigin: catalogOrigin("review-ready-work"),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-01"),
 	},
 	{
-		id: 2,
+		id: "2",
 		slug: "actionable-issue-authoring",
 		name: "Writing issues a maintainer can act on",
 		description: "Give a maintainer enough to start work.",
-		visibleInPracticeDashboards: true,
-		displayOrder: 3,
-		autonomy: inheritedAutonomy(),
+		icon: null,
+		color: null,
+		shownToDevelopers: true,
+		position: 3,
+		feedbackMode: inheritedFeedbackMode(),
+		catalogOrigin: OWN_ORIGIN,
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-01"),
 	},
 ];
+
+/** A catalog update to a practice this workspace also edited: base, ours, and the offer. */
+/** The version this workspace adopted, which every release proposal fixture starts from. */
+export const releaseBase = definitionOf({
+	name: "Explain the change",
+	criteria: "Earlier criteria",
+});
+
+export function releaseProposal(
+	overrides: Partial<PracticeReleaseProposal> = {},
+): PracticeReleaseProposal {
+	const base = releaseBase;
+	return {
+		practiceSlug: "explain-the-change",
+		currentVersionId: "801",
+		base,
+		current: { ...base, criteria: "Our criteria" },
+		offered: { ...base, criteria: "New catalog criteria", lineNotes: false },
+		offeredDigest: "sha256:offered",
+		etag: "reviewed-offer",
+		fields: [
+			{ field: "CRITERIA", changedLocally: true, offeredChanged: true, conflict: true },
+			{ field: "LINE_NOTES", changedLocally: false, offeredChanged: true, conflict: false },
+		],
+		...overrides,
+	};
+}

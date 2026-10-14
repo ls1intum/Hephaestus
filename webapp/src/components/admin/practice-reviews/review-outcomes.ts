@@ -1,4 +1,4 @@
-import type { ReviewFeedbackCounts, ReviewResultCounts, ReviewRunCounts } from "@/api/types.gen";
+import type { ReviewFeedbackCounts, ReviewResultCounts, ReviewStatusCounts } from "@/api/types.gen";
 import { type StatusDef, statusValues } from "@/components/common/status-def";
 import {
 	DELIVERY_FAMILY_DEFS,
@@ -8,20 +8,20 @@ import {
 import {
 	DELIVERY_STATE_DEFS,
 	type DeliveryState,
-} from "@/components/practice-vocabulary/delivery-outcome-defs";
+} from "@/components/practice-vocabulary/delivery-state-defs";
 import { OUTCOME_DEFS, outcomeCountNoun } from "@/components/practice-vocabulary/outcome-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
+import { RESULT_MARK_DEFS } from "@/components/practice-vocabulary/result-mark-defs";
 import {
 	REVIEW_STATUS_DEFS,
 	type ReviewStatus,
 } from "@/components/practice-vocabulary/review-status-defs";
 import { toDayParam } from "@/lib/date-range-search";
 
-import type { FeedbackSearch, ResultsSearch, RunsSearch } from "./review-search";
+import type { FeedbackSearch, ResultsSearch, ReviewsSearch } from "./review-search";
 
 /** A list tab, filtered: where a count opens. */
 export type ReviewListTarget =
-	| { list: "runs"; search: Partial<RunsSearch> }
+	| { list: "runs"; search: Partial<ReviewsSearch> }
 	| { list: "results"; search: Partial<ResultsSearch> }
 	| { list: "feedback"; search: Partial<FeedbackSearch> };
 
@@ -47,7 +47,7 @@ export interface OutcomeScope {
 	to?: string;
 	practiceSlug?: string;
 	/** The developer feedback is addressed to. Only feedback counts carry it. */
-	recipientUserId?: number;
+	developerId?: string;
 }
 
 /**
@@ -66,21 +66,21 @@ export const OUTCOME_LEGEND_LABELS = {
 
 const lower = (def: StatusDef) => def.label.toLowerCase();
 
-const REVIEW_COUNT: Record<ReviewStatus, keyof ReviewRunCounts> = {
+const REVIEW_COUNT: Record<ReviewStatus, keyof ReviewStatusCounts> = {
 	QUEUED: "queued",
 	RUNNING: "running",
-	COMPLETED: "completed",
+	COMPLETE: "complete",
+	PARTIAL: "partial",
 	FAILED: "failed",
-	TIMED_OUT: "timedOut",
 	CANCELLED: "cancelled",
 };
 
 /** A slot built with a scope, which always names the list it opens. */
 type ScopedOutcomeSlot = OutcomeSlot & { target: ReviewListTarget };
 
-export function reviewSlots(counts: ReviewRunCounts, scope: OutcomeScope): ScopedOutcomeSlot[];
-export function reviewSlots(counts: ReviewRunCounts, scope?: OutcomeScope): OutcomeSlot[];
-export function reviewSlots(counts: ReviewRunCounts, scope?: OutcomeScope): OutcomeSlot[] {
+export function reviewSlots(counts: ReviewStatusCounts, scope: OutcomeScope): ScopedOutcomeSlot[];
+export function reviewSlots(counts: ReviewStatusCounts, scope?: OutcomeScope): OutcomeSlot[];
+export function reviewSlots(counts: ReviewStatusCounts, scope?: OutcomeScope): OutcomeSlot[] {
 	return statusValues(REVIEW_STATUS_DEFS).map((status) => ({
 		key: status,
 		def: REVIEW_STATUS_DEFS[status],
@@ -91,13 +91,14 @@ export function reviewSlots(counts: ReviewRunCounts, scope?: OutcomeScope): Outc
 }
 
 /**
- * The statuses of a review that finished: it ran to an end. A canceled review ended without
- * finishing, so the queue's "finished" and the failure share leave it out, as the server does.
+ * The statuses of a review that finished: it ran to an end, whole or partial. A cancelled review
+ * ended without finishing, so the queue's "finished" and the failure share leave it out, as the
+ * server does.
  */
 export const FINISHED_REVIEW_STATUSES = [
-	"COMPLETED",
+	"COMPLETE",
+	"PARTIAL",
 	"FAILED",
-	"TIMED_OUT",
 ] as const satisfies readonly ReviewStatus[];
 
 /** The statuses a review ends in, which is what a count of reviews in a range splits into. */
@@ -107,8 +108,8 @@ export const ENDED_REVIEW_STATUSES = [
 ] as const satisfies readonly ReviewStatus[];
 
 /** The reviews that finished, by `FINISHED_REVIEW_STATUSES`. */
-export function finishedCount(counts: ReviewRunCounts): number {
-	return counts.completed + counts.failed + counts.timedOut;
+export function finishedCount(counts: ReviewStatusCounts): number {
+	return counts.complete + counts.partial + counts.failed;
 }
 
 /**
@@ -132,11 +133,11 @@ export function resultSlots(counts: ReviewResultCounts, scope?: OutcomeScope): O
 			count: counts.notMet,
 			target: search && { list: "results", search: { ...search, outcome: ["NOT_MET"] } },
 		},
-		...(["NOT_APPLICABLE", "UNDETERMINED"] as const).map((status) => ({
+		...(["DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const).map((status) => ({
 			key: status,
 			def: OUTCOME_DEFS[status],
 			label: lower(OUTCOME_DEFS[status]),
-			count: status === "NOT_APPLICABLE" ? counts.notApplicable : counts.undetermined,
+			count: status === "DOES_NOT_APPLY" ? counts.doesNotApply : counts.couldNotDetermine,
 			target: search && {
 				list: "results" as const,
 				search: { ...search, outcome: [status] },
@@ -152,27 +153,25 @@ export function resultSlots(counts: ReviewResultCounts, scope?: OutcomeScope): O
 export function markedIncorrectSlot(count: number, scope?: OutcomeScope): OutcomeSlot {
 	return {
 		key: "markedIncorrect",
-		def: MARKED_INCORRECT_DEF,
-		label: lower(MARKED_INCORRECT_DEF),
+		def: RESULT_MARK_DEFS.INCORRECT,
+		label: lower(RESULT_MARK_DEFS.INCORRECT),
 		count,
 		target: scope && {
 			list: "results",
-			search: { ...scopeSearch(scope, "results"), invalidated: true },
+			search: { ...scopeSearch(scope, "results"), markedIncorrect: true },
 		},
 	};
 }
 
 const FEEDBACK_COUNT: Record<DeliveryState, keyof ReviewFeedbackCounts> = {
 	AWAITING_APPROVAL: "awaitingApproval",
+	READY: "ready",
 	DELIVERED: "delivered",
-	PREPARED: "prepared",
-	PARTIALLY_DELIVERED: "partiallyDelivered",
-	PARTIALLY_FAILED: "partiallyFailed",
-	SUPERSEDED: "superseded",
-	SUPPRESSED: "suppressed",
-	FAILED: "failed",
-	DISCARDED: "discarded",
 	UNCONFIRMED: "unconfirmed",
+	WITHHELD: "withheld",
+	REJECTED: "rejected",
+	REPLACED: "replaced",
+	FAILED: "failed",
 };
 
 /** How many pieces of feedback are in one delivery family. */
@@ -198,7 +197,7 @@ export function feedbackSlots(counts: ReviewFeedbackCounts, scope?: OutcomeScope
 			list: "feedback",
 			search: {
 				...scopeSearch(scope, "feedback"),
-				deliveryState: [...DELIVERY_FAMILY_STATES[family]],
+				state: [...DELIVERY_FAMILY_STATES[family]],
 			},
 		},
 	}));
@@ -207,16 +206,17 @@ export function feedbackSlots(counts: ReviewFeedbackCounts, scope?: OutcomeScope
 /**
  * Feedback by delivery family as the overview counts it: replaced feedback is no loss, so it leaves
  * the withheld count and stands apart in a neutral word, and withheld itself is neutral too, since
- * most of it is the review working as meant. Why it was withheld is the By channel and reason card's.
+ * most of it is the review working as meant. Why it was withheld is the By destination and reason
+ * card's.
  */
 export function overviewFeedbackSlots(
 	counts: ReviewFeedbackCounts,
 	scope?: OutcomeScope,
 ): OutcomeSlot[] {
-	const search = (deliveryState: DeliveryState[]): ReviewListTarget | undefined =>
+	const search = (state: DeliveryState[]): ReviewListTarget | undefined =>
 		scope && {
 			list: "feedback",
-			search: { ...scopeSearch(scope, "feedback"), deliveryState },
+			search: { ...scopeSearch(scope, "feedback"), state },
 		};
 	const slots = feedbackSlots(counts, scope).map((slot): OutcomeSlot => {
 		if (slot.key !== "WITHHELD") {
@@ -225,18 +225,18 @@ export function overviewFeedbackSlots(
 		return {
 			...slot,
 			def: { ...slot.def, badgeVariant: "outline" },
-			count: counts.suppressed + counts.discarded,
-			target: search(["SUPPRESSED", "DISCARDED"]),
+			count: counts.withheld + counts.rejected,
+			target: search(["WITHHELD", "REJECTED"]),
 		};
 	});
 	return [
 		...slots,
 		{
-			key: "SUPERSEDED",
-			def: DELIVERY_STATE_DEFS.SUPERSEDED,
-			label: lower(DELIVERY_STATE_DEFS.SUPERSEDED),
-			count: counts.superseded,
-			target: search(["SUPERSEDED"]),
+			key: "REPLACED",
+			def: DELIVERY_STATE_DEFS.REPLACED,
+			label: lower(DELIVERY_STATE_DEFS.REPLACED),
+			count: counts.replaced,
+			target: search(["REPLACED"]),
 		},
 	];
 }
@@ -252,16 +252,16 @@ export function rangeScope(from: Date, nowMs: number): OutcomeScope {
 
 /**
  * The list search a scope stands for, which every count's link starts from so it matches its count:
- * the days and the practice, and on the Feedback list the recipient.
+ * the days and the practice, and on the Feedback list the developer.
  */
 export function scopeSearch(
 	scope: OutcomeScope,
 	list: ReviewListTarget["list"],
-): Pick<FeedbackSearch, "from" | "to" | "practiceSlug" | "recipientUserId"> {
+): Pick<FeedbackSearch, "from" | "to" | "practiceSlug" | "developerId"> {
 	return {
 		from: scope.from,
 		to: scope.to,
 		practiceSlug: scope.practiceSlug === undefined ? undefined : [scope.practiceSlug],
-		recipientUserId: list === "feedback" ? scope.recipientUserId : undefined,
+		developerId: list === "feedback" ? scope.developerId : undefined,
 	};
 }

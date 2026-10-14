@@ -126,12 +126,7 @@ class ReviewSummaryControllerIntegrationTest extends BaseIntegrationTest {
         var result = data.result(scenario, ResultOutcome.MET, Instant.now());
         var mark = data.mark(result, ResultMarkKind.INCORRECT, scenarioAccountId);
         String path = "/practices/reviews?practiceSlug=" + scenario.practice().getSlug();
-        get(path)
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.page.totalElements")
-                .isEqualTo(0);
+        get(path).expectStatus().isOk().expectBody().jsonPath("$.totalElements").isEqualTo(0);
         marks.remove(
                 scenario.workspace().getId(),
                 result.getId(),
@@ -142,7 +137,7 @@ class ReviewSummaryControllerIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].id")
                 .isEqualTo(result.getReviewId().toString());
@@ -156,7 +151,7 @@ class ReviewSummaryControllerIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(1);
     }
 }

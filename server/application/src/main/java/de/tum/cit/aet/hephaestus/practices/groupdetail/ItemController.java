@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.groupdetail;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.profile.PracticeProfileReviewService;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileReviewDTO;
@@ -23,7 +24,6 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.data.web.PagedModel;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,7 +45,7 @@ public class ItemController {
     @GetMapping
     @RequireAtLeastWorkspaceAdmin
     @Operation(operationId = "listReviewItems", summary = "List items in the workspace")
-    public PagedModel<ItemRefDTO> list(
+    public PageResponseDTO<ItemRefDTO> list(
             WorkspaceContext ws,
             @RequestParam(required = false) @Nullable String itemKind,
             @RequestParam(defaultValue = "0") int page,
@@ -70,7 +70,7 @@ public class ItemController {
                 .query((rs, n) -> rs.getLong(1))
                 .list();
         var refs = references.items(ws.id(), ids);
-        return new PagedModel<>(new PageImpl<>(
+        return PageResponseDTO.from(new PageImpl<>(
                 ids.stream().map(refs::get).filter(Objects::nonNull).toList(), pagination, total));
     }
 
@@ -99,22 +99,22 @@ public class ItemController {
     @GetMapping("/{itemId}/events")
     @RequireAtLeastWorkspaceAdmin
     @Operation(operationId = "listItemEvents", summary = "List item events")
-    public PagedModel<ItemEventDTO> events(
+    public PageResponseDTO<ItemEventDTO> events(
             WorkspaceContext ws,
             @PathVariable long itemId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size) {
-        return new PagedModel<>(trace.events(ws.id(), itemId, PageRequest.of(page, size)));
+        return PageResponseDTO.from(trace.events(ws.id(), itemId, PageRequest.of(page, size)));
     }
 
     @GetMapping("/{itemId}/reviews")
     @PreAuthorize("@workspaceSecure.isMember()")
     @Operation(operationId = "listOwnItemReviews", summary = "List your reviews of an item")
-    public PagedModel<ProfileReviewDTO> reviews(
+    public PageResponseDTO<ProfileReviewDTO> reviews(
             WorkspaceContext ws,
             @PathVariable long itemId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return new PagedModel<>(reviews.list(ws, null, itemId, null, null, PageRequest.of(page, size)));
+        return PageResponseDTO.from(reviews.list(ws, null, itemId, null, null, PageRequest.of(page, size)));
     }
 }

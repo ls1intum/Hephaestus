@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeQueryAdapter;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -35,7 +36,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -57,7 +57,7 @@ class ScanReviewIntegrationTest extends BaseIntegrationTest {
     private ReviewQueue runtimeQueue;
 
     @Autowired
-    private JdbcClient runtimeJdbc;
+    private ReviewRuntimeRepository runtimeRows;
 
     private ReviewJob job(long workspace, UUID review) {
         var job = new ReviewJob();
@@ -189,7 +189,7 @@ class ScanReviewIntegrationTest extends BaseIntegrationTest {
                                 false)));
         when(facts.facts(workspace.getId(), List.of(first.getReviewId(), retained), from, to))
                 .thenReturn(new ReviewTimingFacts(0, 0, 0, 0, 0));
-        var adapter = new ReviewRuntimeQueryAdapter(jobs, mock(ReviewAssignmentQuery.class), runtimeJdbc, facts);
+        var adapter = new ReviewRuntimeQueryAdapter(jobs, mock(ReviewAssignmentQuery.class), runtimeRows, facts);
         var timing = adapter.timing(workspace.getId(), from, to, at.plusSeconds(10));
         assertThat(Objects.requireNonNull(timing.stages().get("ASKED")).count()).isEqualTo(2);
         assertThat(timing.waitingLong()).isZero();

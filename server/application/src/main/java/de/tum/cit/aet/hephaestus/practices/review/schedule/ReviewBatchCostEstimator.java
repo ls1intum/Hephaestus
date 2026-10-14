@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review.schedule;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.math.BigDecimal;
+import java.sql.Timestamp;
 import java.time.Clock;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -27,7 +28,7 @@ public class ReviewBatchCostEstimator {
             """)
                 .param("ws", ws)
                 .param("kind", itemKind)
-                .param("since", clock.instant().minus(properties.costHistoryWindow()))
+                .param("since", Timestamp.from(clock.instant().minus(properties.costHistoryWindow())))
                 .query(BigDecimal.class)
                 .optional()
                 .orElse(null);

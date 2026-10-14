@@ -53,14 +53,7 @@ public class FeedbackDecisionService {
     @Transactional
     public FeedbackDecision decide(
             long workspaceId, UUID feedbackId, long actorAccountId, CreateFeedbackDecisionRequestDTO request) {
-        return decide(
-                workspaceId,
-                feedbackId,
-                actorAccountId,
-                request.action(),
-                request.reasonCode(),
-                request.note(),
-                request.contentDigest());
+        return recordDecision(workspaceId, feedbackId, actorAccountId, request);
     }
 
     @Transactional
@@ -72,6 +65,19 @@ public class FeedbackDecisionService {
             @Nullable FeedbackDecisionReason reason,
             @Nullable String note,
             @Nullable String contentDigest) {
+        return recordDecision(
+                workspaceId,
+                feedbackId,
+                actorAccountId,
+                new CreateFeedbackDecisionRequestDTO(action, reason, note, contentDigest));
+    }
+
+    private FeedbackDecision recordDecision(
+            long workspaceId, UUID feedbackId, long actorAccountId, CreateFeedbackDecisionRequestDTO request) {
+        var action = request.action();
+        var reason = request.reasonCode();
+        var note = request.note();
+        var contentDigest = request.contentDigest();
         if (actorAccountId <= 0) throw new IllegalArgumentException("A decision requires an authenticated account.");
         validate(action, reason, note, contentDigest);
         if (!privacy.holdForAccountWrite(actorAccountId)) {

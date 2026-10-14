@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Serializes exact identity ownership before account rows are locked. */
 @Component
+@ConditionalOnServerRole
 @WorkspaceAgnostic("Exact provider identity ownership spans workspaces")
 @RequiredArgsConstructor
 class IdentityKeyLock {

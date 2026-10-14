@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureServ
 import de.tum.cit.aet.hephaestus.integration.slack.item.ThreadItemSource;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import jakarta.persistence.EntityManagerFactory;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -95,6 +96,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                         "hephaestus.runtime.server.enabled=true", "hephaestus.integration.outline.enabled=false")
                 .withBean(OutlineDocumentRepository.class, () -> mock(OutlineDocumentRepository.class))
                 .withBean(ConnectionService.class, () -> mock(ConnectionService.class))
+                .withBean(EntityManagerFactory.class, () -> mock(EntityManagerFactory.class))
                 .withBean(GitProviderRegistry.class, () -> mock(GitProviderRegistry.class))
                 .withBean(AccountDirectory.class, () -> mock(AccountDirectory.class))
                 .withBean(PersonIdentityResolver.class, () -> mock(PersonIdentityResolver.class))
@@ -133,6 +135,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                 .withBean(OutlineDocumentRepository.class, () -> mock(OutlineDocumentRepository.class))
                 .withBean(OutlineDocumentProjector.class, () -> mock(OutlineDocumentProjector.class))
                 .withBean(ConnectionService.class, () -> mock(ConnectionService.class))
+                .withBean(EntityManagerFactory.class, () -> mock(EntityManagerFactory.class))
                 .withBean(GitProviderRegistry.class, () -> mock(GitProviderRegistry.class))
                 .withBean(AccountDirectory.class, () -> mock(AccountDirectory.class))
                 .withBean(PersonIdentityResolver.class, () -> mock(PersonIdentityResolver.class))

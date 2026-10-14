@@ -81,9 +81,11 @@ public abstract class AbstractFeedbackIntegrationTest extends AbstractWorkspaceI
         workspace = createWorkspace("feedback-tests", "Feedback tests", "feedback-org", AccountType.ORG, owner);
         developerId = Objects.requireNonNull(ensureAdminMembership(workspace).getAccountId());
         itemId = Objects.requireNonNull(jdbc.queryForObject(
-                "INSERT INTO item(workspace_id,kind,source_id) VALUES" + " (?,'scm.pull_request',42) RETURNING id",
+                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES"
+                        + " (?,'scm.pull_request',42,?) RETURNING id",
                 Long.class,
-                workspace.getId()));
+                workspace.getId(),
+                Timestamp.from(AT)));
         reviewId = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO"

@@ -156,8 +156,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
                 .hasMessageContaining("Slack account is not linked");
     }
 
-    private static AccountIdentityQuery.IdentityView link(
-            long providerId, String subject, @Nullable String teamId) {
+    private static AccountIdentityQuery.IdentityView link(long providerId, String subject, @Nullable String teamId) {
         return new AccountIdentityQuery.IdentityView(1L, providerId, subject, teamId == null ? "" : teamId);
     }
 

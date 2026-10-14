@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewRuntimeRepository;
 import de.tum.cit.aet.hephaestus.agent.scan.ScanBudget;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
@@ -125,7 +126,9 @@ class ScanCallGuardTest extends BaseUnitTest {
                         1,
                         List.of(pinned))));
         lenient().when(reviews.budgetUsd(1, job.getReviewId())).thenReturn(Optional.of(BigDecimal.ONE));
-        lenient().when(budget.spent(1, job.getReviewId())).thenReturn(new ScanBudget.Spend(BigDecimal.ZERO, true));
+        lenient()
+                .when(budget.spent(1, job.getReviewId()))
+                .thenReturn(new ReviewRuntimeRepository.Spend(BigDecimal.ZERO, true));
         lenient().when(budget.inFlight(any(), any())).thenReturn(BigDecimal.ZERO);
     }
 
@@ -150,13 +153,13 @@ class ScanCallGuardTest extends BaseUnitTest {
 
     @Test
     void refusesTheNextCallAfterTheCapIsSpent() {
-        when(budget.spent(1, job.getReviewId())).thenReturn(new ScanBudget.Spend(BigDecimal.ONE, true));
+        when(budget.spent(1, job.getReviewId())).thenReturn(new ReviewRuntimeRepository.Spend(BigDecimal.ONE, true));
         refused("{\"max_tokens\":10}");
     }
 
     @Test
     void refusesUnverifiableSpend() {
-        when(budget.spent(1, job.getReviewId())).thenReturn(new ScanBudget.Spend(BigDecimal.ZERO, false));
+        when(budget.spent(1, job.getReviewId())).thenReturn(new ReviewRuntimeRepository.Spend(BigDecimal.ZERO, false));
         refused("{}");
     }
 

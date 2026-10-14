@@ -1,7 +1,7 @@
 import { ClipboardCheckIcon } from "lucide-react";
 import { Fragment, type ReactNode, useState } from "react";
 
-import type { PracticeGroup, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
+import type { GroupRef, PracticeGroupStanding, PracticeStanding } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
@@ -26,7 +26,7 @@ import { DrawerBody } from "@/components/ui/drawer";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell } from "@/components/ui/table";
-import { capitalise, hasText } from "@/lib/text";
+import { capitalise } from "@/lib/text";
 
 import {
 	type FoldReason,
@@ -43,7 +43,7 @@ export interface PracticeGroupDetailLevelProps {
 	nested?: boolean;
 	/** Where the level sits, from the drawer. */
 	path: LevelPath;
-	group?: PracticeGroup;
+	group?: GroupRef;
 	standing?: PracticeGroupStanding;
 	/** The group's practices, as the standings carry them; left out while they load. */
 	practices?: PracticeStanding[];
@@ -101,8 +101,8 @@ const loadingRow = (
 const NO_SENTENCES: NonNullable<PracticeGroupDetailLevelProps["practiceSentences"]> = {};
 
 /**
- * One practice group as the profile's first detail level, in one column: the catalog's words on
- * the group, then the practices it reviews. Where the reader stands in it is the header's. What the
+ * One practice group as the profile's first detail level, in one column: the practices it
+ * reviews. Where the reader stands in it is the header's. What the
  * reviews found stays one level deeper, on the practice.
  */
 export function PracticeGroupDetailLevel({
@@ -159,8 +159,8 @@ export function PracticeGroupDetailLevel({
 				) : (
 					<StandingCell
 						standing={practice.standing}
-						direction={practice.direction}
-						support={practice.trendSupport}
+						direction={practice.direction ?? undefined}
+						support={practice.trendSupport ?? undefined}
 						scope="practice"
 					/>
 				)}
@@ -244,18 +244,13 @@ export function PracticeGroupDetailLevel({
 		body = <GroupWithoutPractices />;
 	} else if (group) {
 		body = (
-			<>
-				{hasText(group.description) && (
-					<p className="max-w-2xl text-base text-pretty">{group.description}</p>
-				)}
-				<Section
-					size="lg"
-					title="Practices in this group"
-					description="Each practice with its standing and trend. Open one for the work behind it."
-				>
-					{practicesTable}
-				</Section>
-			</>
+			<Section
+				size="lg"
+				title="Practices in this group"
+				description="Each practice with its standing and trend. Open one for the work behind it."
+			>
+				{practicesTable}
+			</Section>
 		);
 	} else {
 		body = <NoSuchGroup />;
@@ -273,8 +268,8 @@ export function PracticeGroupDetailLevel({
 						size="lg"
 						slug={group?.slug}
 						name={group?.name}
-						icon={group?.icon}
-						color={group?.color}
+						icon={group?.icon ?? undefined}
+						color={group?.color ?? undefined}
 					/>
 				}
 				chips={
@@ -287,11 +282,11 @@ export function PracticeGroupDetailLevel({
 							<StandingBadge
 								standing={standing?.standing ?? "NOT_OBSERVED"}
 								scope="group"
-								support={standing?.trendSupport}
+								support={standing?.trendSupport ?? undefined}
 							/>
 							<TrendNote
-								direction={standing?.direction}
-								support={standing?.trendSupport}
+								direction={standing?.direction ?? undefined}
+								support={standing?.trendSupport ?? undefined}
 								scope="group"
 							/>
 						</>

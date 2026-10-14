@@ -33,9 +33,10 @@ Identity linking uses the same OAuth exchange but binds its sealed intent to the
 signed-in account. It cannot create an authenticated link from an anonymous request. Slack and
 Outline support linking only, not sign-in.
 
-Sign-in and linking also fill [`identity_link.external_actor_id`](./auth-glossary.md), the synced
-git-provider user the link denotes. User views, Slack identity resolution and account erasure use
-this association rather than comparing login names.
+Each [`identity`](./auth-glossary.md) row keys an account to one provider user by
+`(provider_id, provider_user_key, team_key)`. Roster sync creates an unclaimed account for each new
+provider user, and sign-in claims it. User views, Slack identity resolution and account erasure use
+this key rather than comparing login names.
 
 ## Key properties
 
@@ -56,7 +57,7 @@ this association rather than comparing login names.
   DB visibility lag. The cache is a *negative* cache (REVOKED verdicts only) that merely sheds
   replay load; no cross-pod cache invalidation is needed.
 - **Account lookup is `(provider, subject)`, never email.** This is the structural defence
-  against the nOAuth (Descope 2023) account-takeover class. `IdentityLinkRepository` has no
+  against the nOAuth (Descope 2023) account-takeover class. `IdentityRepository` has no
   `findByEmail`.
 - **Login providers are instance-scoped.**
   A sign-in option — GitHub, GitLab.com, or a self-hosted GitLab — is a row in the instance

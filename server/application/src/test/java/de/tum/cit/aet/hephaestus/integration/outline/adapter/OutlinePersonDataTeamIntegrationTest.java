@@ -61,7 +61,9 @@ class OutlinePersonDataTeamIntegrationTest extends BaseIntegrationTest {
                 .orElseGet(() ->
                         providers.save(new IdentityProvider(IdentityProviderType.OUTLINE, "https://wiki.example.com")));
         var person = new PersonScope(
-                null, List.of(new PersonIdentity(Objects.requireNonNull(provider.getId()), "same-native-subject", firstTeam)), List.of());
+                null,
+                List.of(new PersonIdentity(Objects.requireNonNull(provider.getId()), "same-native-subject", firstTeam)),
+                List.of());
         var store = catalog.contributors().stream()
                 .filter(candidate -> candidate.store().equals(storeName))
                 .findFirst()
@@ -100,7 +102,7 @@ class OutlinePersonDataTeamIntegrationTest extends BaseIntegrationTest {
                 team,
                 new ConnectionConfig.OutlineConfig("https://wiki.example.com", null, null, Set.of()));
         connection.setState(IntegrationState.ACTIVE);
-        connections.saveAndFlush(connection);
+        connection = connections.saveAndFlush(connection);
         var doc = new OutlineDocument();
         doc.setWorkspaceId(workspace.getId());
         doc.setConnectionId(connection.getId());

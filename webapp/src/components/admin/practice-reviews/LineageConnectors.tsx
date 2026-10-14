@@ -1,11 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
 
 import { cn } from "cn";
-import type { ReviewLineageFeedback } from "@/api/types.gen";
 import { type BadgeVariant, statusToneClass } from "@/components/common/status-def";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 
-import type { NumberedResult } from "./lineage-chain";
+import type { LineageFeedback, NumberedResult } from "./lineage-chain";
 import type { Traced } from "./review-trace";
 
 /**
@@ -28,9 +27,9 @@ const MOST_LANES = 10;
  */
 export function connectorLanes(
 	numbered: readonly NumberedResult[],
-	feedback: readonly ReviewLineageFeedback[],
+	feedback: readonly LineageFeedback[],
 ): string[] {
-	const used = new Set(feedback.flatMap((entry) => entry.practiceResultIds));
+	const used = new Set(feedback.flatMap((entry) => entry.basis));
 	const lanes = numbered
 		.filter((entry) => used.has(entry.result.id))
 		.map((entry) => entry.result.id);

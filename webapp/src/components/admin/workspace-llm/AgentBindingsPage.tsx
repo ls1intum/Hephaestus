@@ -459,22 +459,33 @@ interface PurposeView {
  */
 const { badgeVariant: UNMET_NEED_TONE, icon: UnmetNeedIcon } = PURPOSE_STATUS_DEFS.NEEDS_ATTENTION;
 
-const unmetRequired = (entry: UsedBy) => entry.need === "REQUIRED" && entry.unmetTiers.length > 0;
+const unmetRequired = (entry: UsedBy) => entry.need === "required" && entry.unmetTiers.length > 0;
 
 /** Unmet first, then required, then by name: the practice to fix leads the list. */
 function usedByOrder(a: UsedBy, b: UsedBy): number {
 	return (
 		Number(unmetRequired(b)) - Number(unmetRequired(a)) ||
-		Number(b.need === "REQUIRED") - Number(a.need === "REQUIRED") ||
+		Number(b.need === "required") - Number(a.need === "required") ||
 		a.practiceName.localeCompare(b.practiceName)
 	);
 }
+
+/**
+ * The purpose whose binding serves a script's model slot. A script's chat slot is the review model,
+ * which is not a model for practice scripts, so no row lists it.
+ */
+const SLOT_PURPOSES: Record<PracticeScriptNeed["slot"], AgentPurpose> = {
+	chat: "PRACTICE_REVIEW",
+	decision: "PRACTICE_DECISION",
+	embedding: "PRACTICE_EMBEDDING",
+	reranking: "PRACTICE_RERANKING",
+};
 
 function usedByOf(purpose: AgentPurpose, summaries: PracticeScriptSummary[]): UsedBy[] {
 	return summaries
 		.flatMap((summary) =>
 			summary.needs
-				.filter((need) => need.purpose === purpose)
+				.filter((need) => SLOT_PURPOSES[need.slot] === purpose)
 				.map((need) => ({
 					practiceSlug: summary.practiceSlug,
 					practiceName: summary.practiceName,
@@ -591,10 +602,10 @@ function PurposeGroups({
 		<Link
 			to="/w/$workspaceSlug/admin/practices/review"
 			params={{ workspaceSlug }}
-			search={{ section: "when-and-where" }}
+			search={{ section: "automated-review" }}
 			className="underline underline-offset-4"
 		>
-			Open Review: When and where
+			Open Review: Automated review
 		</Link>
 	);
 	const off = !props.practicesEnabled;

@@ -7,7 +7,7 @@ import {
 } from "@/components/practice-vocabulary/feedback-location-defs";
 
 export interface FeedbackLocationLabelProps {
-	feedback: Pick<ReviewFeedback, "location" | "reviewedWork">;
+	feedback: Pick<ReviewFeedback, "location" | "item">;
 	className?: string;
 }
 
@@ -22,7 +22,7 @@ export function FeedbackLocationLabel({ feedback, className }: FeedbackLocationL
 		<span className={cn("inline-flex max-w-full min-w-0 items-center gap-1.5", className)}>
 			<Icon aria-hidden className={cn("size-3.5 shrink-0", statusToneClass(def.badgeVariant))} />
 			<span className="min-w-0 break-words">
-				{feedbackLocationSentence(feedback.location, feedback.reviewedWork)}
+				{feedbackLocationSentence(feedback.location, feedback.item)}
 			</span>
 		</span>
 	);

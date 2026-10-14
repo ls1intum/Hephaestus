@@ -1,8 +1,8 @@
 import { CircleHelp, ClockAlert } from "lucide-react";
 
-import type { PracticeResultDetail } from "@/api/types.gen";
+import type { ResultList } from "@/api/types.gen";
 
-export type Currentness = PracticeResultDetail["claimCurrentness"];
+export type Currentness = ResultList["currentness"];
 
 const STALE_NOTE = "The practice or the reviewed work changed after this result.";
 
@@ -40,3 +40,10 @@ export const NON_CURRENT = {
 export function claimCurrentnessNote(currentness: Currentness): string | undefined {
 	return currentness === "CURRENT" ? undefined : NON_CURRENT[currentness].note;
 }
+
+/** Every currentness, in the order a filter offers it. */
+export const CURRENTNESS_VALUES = [
+	"CURRENT",
+	"STALE",
+	"UNVERIFIABLE",
+] as const satisfies readonly Currentness[];

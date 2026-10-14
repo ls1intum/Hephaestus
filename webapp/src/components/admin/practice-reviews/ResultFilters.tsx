@@ -1,18 +1,22 @@
+import type { ReactNode } from "react";
+
+import type { Practice } from "@/api/types.gen";
+
 import type { FacetOption, FacetSource } from "@/components/common/FacetMultiSelect";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { statusFacetOptions } from "@/components/common/status-def";
 import { OUTCOME_DEFS } from "@/components/practice-vocabulary/outcome-defs";
 import {
-	DEVELOPER_RESPONSE_DEFS,
-	type DeveloperResponse,
-} from "@/components/practice-vocabulary/result-dispute-defs";
-import { MARKED_INCORRECT_DEF } from "@/components/practice-vocabulary/result-invalidation-defs";
-import { RESULT_ORIGIN_DEFS } from "@/components/practice-vocabulary/result-origin-defs";
+	DISAGREEMENT_DEFS,
+	type Disagreement,
+	RESULT_MARK_DEFS,
+	type ResultMarkKind,
+} from "@/components/practice-vocabulary/result-mark-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { nonEmpty } from "@/lib/search-params";
 
-import { listFacet } from "./AppliedFacetPills";
-import { clearedScope, hasAppliedScope, readScope, scopeSearch } from "./review-scope";
+import { type ListFacet, listFacet } from "./AppliedFacetPills";
+import { clearedScope, hasAppliedScope, readScope } from "./review-scope";
 import type { ResultSort, ResultsSearch } from "./review-search";
 import { ReviewFilterBar } from "./ReviewFilterBar";
 import type { ReviewPeople } from "./ReviewPersonFacet";
@@ -22,19 +26,70 @@ import { type ReviewSortItem, ReviewSortSelect } from "./ReviewSortSelect";
 /** Every option wears the badge its rows wear; see the note on `FeedbackFilters`' facets. */
 const OUTCOME_OPTIONS = statusFacetOptions(OUTCOME_DEFS);
 const SEVERITY_OPTIONS = statusFacetOptions(SEVERITY_DEFS);
-const ORIGIN_OPTIONS = statusFacetOptions(RESULT_ORIGIN_DEFS);
-const RESPONSE_OPTIONS = statusFacetOptions(DEVELOPER_RESPONSE_DEFS);
+const DISAGREEMENT_OPTIONS = statusFacetOptions(DISAGREEMENT_DEFS);
 
-/** The one boolean the server filters by, as the facet's selection: both or neither is no filter. */
-function responseSelection(disputed: boolean | undefined): DeveloperResponse[] {
-	if (disputed === undefined) {
-		return [];
-	}
-	return [disputed ? "DISPUTED" : "UNDISPUTED"];
+/** The filters that the results and the problems lists share: an admin's marks and a developer's disagreement. */
+export interface AssessmentSearch {
+	markedIncorrect?: boolean;
+	accepted?: boolean;
+	disagreed?: boolean;
 }
 
-function disputedFrom(values: DeveloperResponse[]): boolean | undefined {
-	return values.length === 1 ? values[0] === "DISPUTED" : undefined;
+/** The one boolean the server filters by, as the facet's selection: both or neither is no filter. */
+function disagreementSelection(disagreed: boolean | undefined): Disagreement[] {
+	if (disagreed === undefined) {
+		return [];
+	}
+	return [disagreed ? "DISAGREED" : "NOT_DISAGREED"];
+}
+
+export function disagreementFacet(
+	search: AssessmentSearch,
+	onPatch: (patch: AssessmentSearch) => void,
+): ListFacet {
+	return listFacet(
+		"Disagreement",
+		DISAGREEMENT_OPTIONS,
+		disagreementSelection(search.disagreed),
+		(values) =>
+			onPatch({ disagreed: values.length === 1 ? values[0] === "DISAGREED" : undefined }),
+	);
+}
+
+const MARK_FILTERS: readonly { kind: ResultMarkKind; key: "markedIncorrect" | "accepted" }[] = [
+	{ kind: "INCORRECT", key: "markedIncorrect" },
+	{ kind: "ACCEPTED", key: "accepted" },
+];
+
+/**
+ * The mark filters. No facet offers them: a link from a count sets them, so they show as pills that
+ * clear them.
+ */
+export function markFilterPills(
+	search: AssessmentSearch,
+	onPatch: (patch: AssessmentSearch) => void,
+): ReactNode {
+	return MARK_FILTERS.map(({ kind, key }) => {
+		const value = search[key];
+		return (
+			value !== undefined && (
+				<ReferenceFilterPill
+					key={key}
+					label={RESULT_MARK_DEFS[kind].label}
+					value={value ? "Only" : "Excluded"}
+					onClear={() => onPatch({ [key]: undefined })}
+				/>
+			)
+		);
+	});
+}
+
+export function hasAssessmentFilter(search: AssessmentSearch): boolean {
+	return (
+		search.markedIncorrect !== undefined ||
+		search.accepted !== undefined ||
+		search.disagreed !== undefined
+	);
 }
 
 const SORT_ITEMS: [ReviewSortItem<ResultSort>, ...ReviewSortItem<ResultSort>[]] = [
@@ -49,10 +104,11 @@ const SORT_ITEMS: [ReviewSortItem<ResultSort>, ...ReviewSortItem<ResultSort>[]] 
 export function clearedResultFacets(): Partial<ResultsSearch> {
 	return {
 		outcome: undefined,
-		invalidated: undefined,
-		disputed: undefined,
 		severity: undefined,
-		origin: undefined,
+		currentness: undefined,
+		markedIncorrect: undefined,
+		accepted: undefined,
+		disagreed: undefined,
 	};
 }
 
@@ -64,10 +120,9 @@ export function clearedResultFilters(): Partial<ResultsSearch> {
 function hasResultFacet(search: ResultsSearch): boolean {
 	return (
 		(search.outcome?.length ?? 0) > 0 ||
-		search.invalidated !== undefined ||
-		search.disputed !== undefined ||
 		(search.severity?.length ?? 0) > 0 ||
-		(search.origin?.length ?? 0) > 0
+		search.currentness !== undefined ||
+		hasAssessmentFilter(search)
 	);
 }
 
@@ -86,7 +141,7 @@ export function groupFacetOptions(groups: readonly NamedGroup[] | undefined): Fa
 
 /**
  * A practice as a facet offers it, with its group, so a chosen group can narrow the offer, and
- * whether it is turned off today, so the facet can leave it out.
+ * whether its feedback is turned off today, so the facet can leave it out.
  */
 export interface PracticeFacetOption extends FacetOption {
 	groupSlug?: string;
@@ -94,22 +149,15 @@ export interface PracticeFacetOption extends FacetOption {
 }
 
 export function practiceFacetOptions(
-	practices:
-		| readonly {
-				slug: string;
-				name: string;
-				groupSlug?: string;
-				autonomy?: { effective: string };
-		  }[]
-		| undefined,
+	practices: readonly Pick<Practice, "slug" | "groupSlug" | "currentVersion" | "feedbackMode">[] | undefined,
 	groups: readonly NamedGroup[] | undefined,
 ): PracticeFacetOption[] {
 	return (practices ?? []).map((practice) => ({
 		value: practice.slug,
-		label: practice.name,
+		label: practice.currentVersion.name ?? practice.slug,
 		description: (groups ?? []).find((group) => group.slug === practice.groupSlug)?.name,
-		groupSlug: practice.groupSlug,
-		turnedOff: practice.autonomy?.effective === "OFF",
+		groupSlug: practice.groupSlug ?? undefined,
+		turnedOff: practice.feedbackMode.effective === "OFF",
 	}));
 }
 
@@ -128,7 +176,7 @@ export interface ResultFiltersProps {
 	/** The one record the scope is filtered to, by name; absent for none, or for a selection. */
 	record?: ScopeRecordFilter;
 	/**
-	 * The name of the person `subjectUserId` identifies. It must name *that* person: reading it off
+	 * The name of the developer `developerId` identifies. It must name *that* person: reading it off
 	 * the first row is right only while the filter is on.
 	 */
 	subjectName?: string;
@@ -152,25 +200,15 @@ export function ResultFilters({
 	const severity = listFacet("Severity", SEVERITY_OPTIONS, search.severity, (values) =>
 		onPatch({ severity: nonEmpty(values) }),
 	);
-	const response = listFacet(
-		"Developer response",
-		RESPONSE_OPTIONS,
-		responseSelection(search.disputed),
-		(values) => onPatch({ disputed: disputedFrom(values) }),
-	);
-	// Every origin is offered, live included, though a row badges only the other two: a reader
-	// comparing live reviews with requested ones has to be able to pick either.
-	const origin = listFacet("Origin", ORIGIN_OPTIONS, search.origin, (values) =>
-		onPatch({ origin: nonEmpty(values) }),
-	);
+	const disagreement = disagreementFacet(search, onPatch);
 	return (
 		<ReviewFilterBar
 			tab="results"
 			scope={readScope(search)}
-			onChange={(patch) => onPatch(scopeSearch("results", patch))}
+			onChange={onPatch}
 			onClearScope={onClearScope}
-			// "Recorded", not "Date": this range filters `observedAt`, while the same control on the
-			// feedback list filters when the feedback was composed.
+			// "Recorded", not "Date": this range filters when the result was recorded, while the same
+			// control on the feedback list filters when the feedback was composed.
 			dateTitle="Recorded"
 			groups={groups}
 			practices={practices}
@@ -181,8 +219,7 @@ export function ResultFilters({
 				<>
 					{outcome.control}
 					{severity.control}
-					{response.control}
-					{origin.control}
+					{disagreement.control}
 					{/* `Reset` leaves the sort alone: it orders the set and does not narrow it. */}
 					<ReviewSortSelect
 						items={SORT_ITEMS}
@@ -191,16 +228,8 @@ export function ResultFilters({
 					/>
 				</>
 			}
-			pills={[...outcome.pills, ...severity.pills, ...response.pills, ...origin.pills]}
-			referencePills={
-				search.invalidated !== undefined && (
-					<ReferenceFilterPill
-						label={MARKED_INCORRECT_DEF.label}
-						value={search.invalidated ? "Only" : "Excluded"}
-						onClear={() => onPatch({ invalidated: undefined })}
-					/>
-				)
-			}
+			pills={[...outcome.pills, ...severity.pills, ...disagreement.pills]}
+			referencePills={markFilterPills(search, onPatch)}
 			hasFacet={hasResultFacet(search)}
 			onReset={onReset}
 			total={total}

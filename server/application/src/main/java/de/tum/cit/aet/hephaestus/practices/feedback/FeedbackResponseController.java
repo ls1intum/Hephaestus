@@ -61,11 +61,7 @@ public class FeedbackResponseController {
 
     @GetMapping("/{feedbackId}/response")
     @Operation(operationId = "getOwnFeedbackResponse", summary = "Get the current feedback response")
-    @ApiResponse(responseCode = "200", description = "Current response returned")
-    @ApiResponse(
-            responseCode = "200",
-            description = "No response is currently recorded",
-            content = @Content(schema = @Schema(hidden = true)))
+    @ApiResponse(responseCode = "200", description = "Complete current response returned")
     @ApiResponse(
             responseCode = "404",
             description = "Delivered feedback not found for the current recipient",
@@ -77,10 +73,7 @@ public class FeedbackResponseController {
 
     @DeleteMapping("/{feedbackId}/response")
     @Operation(operationId = "clearOwnFeedbackResponse", summary = "Clear the response to delivered feedback")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Complete cleared response returned",
-            content = @Content(schema = @Schema(hidden = true)))
+    @ApiResponse(responseCode = "200", description = "Complete cleared response returned")
     @ApiResponse(
             responseCode = "404",
             description = "Delivered feedback not found for the current recipient",

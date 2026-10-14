@@ -11,9 +11,11 @@ import { ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-
 import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
 
 import type { TeamInfo } from "@/api/types.gen";
+import { ACCOUNT_STATUS_LABELS } from "@/components/admin/users/account-labels";
 import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
 import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { TablePagination } from "@/components/common/TablePagination";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -33,17 +35,29 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { formatDate } from "@/lib/dates";
+import { getProviderLabel } from "@/lib/provider/provider-labels";
 import { hasText } from "@/lib/text";
+import type { WorkspaceRole } from "@/lib/workspace-roles";
 
-import type { ExtendedUserTeams } from "./user-teams";
+import { WORKSPACE_ROLE_LABELS, type WorkspaceMemberRow } from "./workspace-members";
 
-const columnHelper = createColumnHelper<DataTableFeatures, ExtendedUserTeams>();
+const columnHelper = createColumnHelper<DataTableFeatures, WorkspaceMemberRow>();
+
+const ROLE_ITEMS = (["OWNER", "ADMIN", "MEMBER"] satisfies WorkspaceRole[]).map((role) => ({
+	value: role,
+	label: WORKSPACE_ROLE_LABELS[role],
+}));
 
 interface WorkspaceMembersTableProps {
-	users: ExtendedUserTeams[];
+	members: WorkspaceMemberRow[];
 	teams: TeamInfo[];
 	isLoading?: boolean;
-	onToggleHidden?: (userId: number, hidden: boolean) => void;
+	onToggleHidden?: (accountId: string, hidden: boolean) => void;
+	/** Present for an admin, who can give a member another workspace role. */
+	onRoleChange?: (accountId: string, role: WorkspaceRole) => void;
+	/** The member whose role change is in flight; only that member's role control waits. */
+	pendingRoleAccountId?: string;
 	view: WorkspaceMembersTableView;
 	onViewChange: (patch: Partial<WorkspaceMembersTableView>) => void;
 	renderPageLink?: (page: number, props: ComponentProps<"a">) => ReactElement;
@@ -58,11 +72,29 @@ export interface WorkspaceMembersTableView {
 	size: number;
 }
 
+/** Unclaimed accounts have not signed in, so they read as neutral rather than as a problem. */
+function AccountStatus({ row }: { row: WorkspaceMemberRow }) {
+	const { account, leftAt } = row.membership;
+	if (leftAt !== null) {
+		return <span className="text-muted-foreground">Left {formatDate(leftAt)}</span>;
+	}
+	if (account.status === "ACTIVE") {
+		return <span className="text-muted-foreground">{ACCOUNT_STATUS_LABELS.ACTIVE}</span>;
+	}
+	return (
+		<Badge variant={account.status === "UNCLAIMED" ? "outline" : "destructive"}>
+			{ACCOUNT_STATUS_LABELS[account.status]}
+		</Badge>
+	);
+}
+
 export function WorkspaceMembersTable({
-	users,
+	members,
 	teams,
 	isLoading = false,
 	onToggleHidden,
+	onRoleChange,
+	pendingRoleAccountId,
 	view,
 	onViewChange,
 	renderPageLink,
@@ -80,15 +112,85 @@ export function WorkspaceMembersTable({
 	const columns = useMemo(
 		() =>
 			columnHelper.columns([
-				columnHelper.accessor((row) => row.user.name, {
+				columnHelper.accessor((row) => row.name, {
 					id: "name",
 					header: "Name",
-					cell: ({ row }) => <div className="font-medium">{row.original.user.name}</div>,
+					cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
 				}),
-				columnHelper.accessor((row) => row.user.login, {
+				columnHelper.accessor((row) => row.logins.join(" "), {
 					id: "username",
 					header: "Username",
-					cell: ({ row }) => <div className="text-muted-foreground">{row.original.user.login}</div>,
+					cell: ({ row }) => (
+						<ul className="space-y-0.5">
+							{row.original.membership.account.identities
+								.filter((identity) => hasText(identity.login))
+								.map((identity) => (
+									<li key={`${identity.provider}:${identity.login ?? ""}`}>
+										{identity.login}{" "}
+										<span className="text-muted-foreground">
+											({getProviderLabel(identity.provider)})
+										</span>
+									</li>
+								))}
+						</ul>
+					),
+				}),
+				columnHelper.display({
+					id: "account",
+					header: () => "Account",
+					cell: ({ row }) => <AccountStatus row={row.original} />,
+				}),
+				columnHelper.display({
+					id: "role",
+					header: () => "Role",
+					cell: ({ row }) => {
+						const { accountId, role } = row.original.membership;
+						if (!onRoleChange) {
+							return WORKSPACE_ROLE_LABELS[role];
+						}
+						return (
+							<Select
+								value={role}
+								items={ROLE_ITEMS}
+								disabled={pendingRoleAccountId === accountId}
+								onValueChange={(next) => {
+									if (next !== null && next !== role) {
+										onRoleChange(accountId, next);
+									}
+								}}
+							>
+								<SelectTrigger size="sm" aria-label={`Role of ${row.original.name}`}>
+									{pendingRoleAccountId === accountId && <Spinner />}
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent aria-label={`Role of ${row.original.name}`}>
+									{ROLE_ITEMS.map((item) => (
+										<SelectItem key={item.value} value={item.value}>
+											{item.label}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						);
+					},
+				}),
+				columnHelper.display({
+					id: "joined",
+					header: () => "Joined",
+					cell: ({ row }) => (
+						<span className="text-muted-foreground">
+							{formatDate(row.original.membership.joinedAt)}
+						</span>
+					),
+				}),
+				columnHelper.display({
+					id: "review scope",
+					header: () => "Review scope",
+					cell: ({ row }) => (
+						<span className="text-muted-foreground">
+							{row.original.membership.reviewSelected ? "Included" : "Excluded"}
+						</span>
+					),
 				}),
 				...(onToggleHidden
 					? [
@@ -102,15 +204,18 @@ export function WorkspaceMembersTable({
 										variant="ghost"
 										size="icon-xs"
 										onClick={() =>
-											onToggleHidden(Number(row.original.user.id), !row.original.hidden)
+											onToggleHidden(
+												row.original.membership.accountId,
+												!row.original.membership.hidden,
+											)
 										}
 										aria-label={
-											row.original.hidden
-												? `Show ${row.original.user.name} in workspace activity`
-												: `Hide ${row.original.user.name} from workspace activity`
+											row.original.membership.hidden
+												? `Show ${row.original.name} in workspace activity`
+												: `Hide ${row.original.name} from workspace activity`
 										}
 									>
-										{row.original.hidden ? (
+										{row.original.membership.hidden ? (
 											<EyeOffIcon className="size-4 text-muted-foreground" />
 										) : (
 											<EyeIcon className="size-4" />
@@ -121,20 +226,20 @@ export function WorkspaceMembersTable({
 						]
 					: []),
 			]),
-		[onToggleHidden],
+		[onToggleHidden, onRoleChange, pendingRoleAccountId],
 	);
 
 	// The table's `data`, keyed the same way `columns` is: the core row model is cached against this
 	// array's identity.
 	const filteredData = useMemo(
 		() =>
-			users.filter((user) => {
+			members.filter((member) => {
 				if (view.team === "all") {
 					return true;
 				}
-				return user.teams.some((team) => team.id.toString() === view.team);
+				return member.teams.some((team) => team.id.toString() === view.team);
 			}),
-		[users, view.team],
+		[members, view.team],
 	);
 
 	const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));

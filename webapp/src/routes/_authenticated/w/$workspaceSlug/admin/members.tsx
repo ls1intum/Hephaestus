@@ -1,22 +1,34 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import {
+	assignMemberRoleMutation,
 	getAllTeamsOptions,
-	getUsersWithTeamsOptions,
+	getOwnMembershipQueryKey,
 	getUsersWithTeamsQueryKey,
-	updateMemberVisibilityMutation,
+	listMembershipsInfiniteOptions,
+	listMembershipsInfiniteQueryKey,
+	setMemberHiddenMutation,
 } from "@/api/@tanstack/react-query.gen";
-import { adaptApiUserTeams } from "@/components/admin/members/user-teams";
+import type { WorkspaceMembership } from "@/api/types.gen";
+import {
+	WORKSPACE_ROLE_LABELS,
+	workspaceMemberRows,
+} from "@/components/admin/members/workspace-members";
 import { WorkspaceMembersPage } from "@/components/admin/members/WorkspaceMembersPage";
 import type { WorkspaceMembersTableView } from "@/components/admin/members/WorkspaceMembersTable";
+import { accountName } from "@/components/admin/users/account-labels";
 import { NoWorkspace } from "@/components/common/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
+
+/** The server's largest page: the table filters and sorts every member, so it reads them all. */
+const MEMBER_PAGE_SIZE = 100;
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/members")({
 	head: workspaceAdminHead("Members"),
@@ -47,18 +59,23 @@ function AdminMembersContainer() {
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
-	const usersQueryOptions = getUsersWithTeamsOptions({
+	const membersQueryOptions = listMembershipsInfiniteOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
+		query: { size: MEMBER_PAGE_SIZE },
 	});
-	const {
-		data: usersData,
-		isLoading: usersLoading,
-		error: usersError,
-		refetch: refetchUsers,
-	} = useQuery({
-		...usersQueryOptions,
-		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
+	const membersQuery = useInfiniteQuery({
+		...membersQueryOptions,
+		initialPageParam: 0,
+		getNextPageParam: (lastPage: WorkspaceMembership[], allPages: WorkspaceMembership[][]) =>
+			lastPage.length < MEMBER_PAGE_SIZE ? undefined : allPages.length,
+		enabled: Boolean(workspaceSlug),
 	});
+	const { hasNextPage, isFetchingNextPage, isError: membersFailed, fetchNextPage } = membersQuery;
+	useEffect(() => {
+		if (hasNextPage && !isFetchingNextPage && !membersFailed) {
+			void fetchNextPage();
+		}
+	}, [hasNextPage, isFetchingNextPage, membersFailed, fetchNextPage]);
 
 	const teamsQueryOptions = getAllTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
@@ -74,38 +91,60 @@ function AdminMembersContainer() {
 	});
 
 	const queryClient = useQueryClient();
+	const membersKey = listMembershipsInfiniteQueryKey({
+		path: { workspaceSlug: workspaceSlug ?? "" },
+		query: { size: MEMBER_PAGE_SIZE },
+	});
 	const toggleHidden = useMutation({
-		...updateMemberVisibilityMutation(),
+		...setMemberHiddenMutation(),
 		onSuccess: () => {
+			void queryClient.invalidateQueries({ queryKey: membersKey });
+			// Workspace activity lists the same people and leaves hidden ones out.
 			void queryClient.invalidateQueries({
 				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 			});
 		},
 		onError: (error) => {
 			toast.error("We could not update visibility in workspace activity", {
-				description: error.message,
+				description: problemDetailOf(error),
 			});
 		},
 	});
+	const assignRole = useMutation({
+		...assignMemberRoleMutation(),
+		onSuccess: (updated) => {
+			toast.success(
+				`${accountName(updated.account)}’s role is now ${WORKSPACE_ROLE_LABELS[updated.role]}`,
+			);
+			void queryClient.invalidateQueries({ queryKey: membersKey });
+			// The admin may have changed their own role, which the navigation and guards read.
+			void queryClient.invalidateQueries({
+				queryKey: getOwnMembershipQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+			});
+		},
+		onError: (error) => {
+			toast.error("We could not change the role", { description: problemDetailOf(error) });
+		},
+	});
 
-	const handleToggleHidden = (userId: number, hidden: boolean) => {
+	const handleToggleHidden = (accountId: string, hidden: boolean) => {
 		if (!hasText(workspaceSlug)) {
 			return;
 		}
-		toggleHidden.mutate({
-			path: { workspaceSlug, userId },
-			query: { hidden },
-		});
+		toggleHidden.mutate({ path: { workspaceSlug, accountId }, body: { hidden } });
 	};
 
-	const users = (usersData?.map(adaptApiUserTeams) ?? [])
-		.map((user) => ({
-			...user,
-			teams: [...user.teams].sort((a, b) => a.name.localeCompare(b.name)),
-		}))
-		.sort((a, b) => a.user.name.localeCompare(b.user.name));
+	const handleRoleChange = (accountId: string, role: WorkspaceMembership["role"]) => {
+		if (!hasText(workspaceSlug)) {
+			return;
+		}
+		assignRole.mutate({ path: { workspaceSlug }, body: { accountId, role } });
+	};
+
 	const teams = [...(teamsData ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
+	const members = workspaceMemberRows(membersQuery.data?.pages.flat() ?? [], teams);
+	// Until every page is in, a count or an empty filter result would be a claim about part of the list.
+	const isLoading = isWorkspaceLoading || membersQuery.isPending || hasNextPage || teamsLoading;
 	const selectedTeam =
 		hasText(search.team) && teams.some((team) => team.id.toString() === search.team)
 			? search.team
@@ -131,15 +170,17 @@ function AdminMembersContainer() {
 
 	return (
 		<WorkspaceMembersPage
-			users={users}
+			members={members}
 			teams={teams}
 			isLoading={isLoading || !hasText(workspaceSlug)}
-			error={workspaceError ?? usersError ?? teamsError}
+			error={workspaceError ?? membersQuery.error ?? teamsError}
 			onRetry={() => {
-				void refetchUsers();
+				void membersQuery.refetch();
 				void refetchTeams();
 			}}
 			onToggleHidden={handleToggleHidden}
+			onRoleChange={handleRoleChange}
+			pendingRoleAccountId={assignRole.isPending ? assignRole.variables.body.accountId : undefined}
 			view={view}
 			onViewChange={(patch) => {
 				void navigate({

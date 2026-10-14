@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -48,7 +49,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
         return history(
                 workspaceId,
                 "r.developer_id=:developer AND r.recorded_at>=:since",
-                Map.of("developer", developerAccountId, "since", since),
+                Map.of("developer", developerAccountId, "since", Timestamp.from(since)),
                 SourceUsePurpose.CONVERSATIONAL_MENTORING,
                 limit);
     }

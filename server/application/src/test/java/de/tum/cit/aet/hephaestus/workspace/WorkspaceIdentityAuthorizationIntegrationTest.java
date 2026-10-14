@@ -11,6 +11,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
@@ -39,6 +41,9 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     private AccountIdentityQuery identityQuery;
+
+    @Autowired
+    private PeopleRegistry people;
 
     @Autowired
     private WorkspaceRepository workspaces;
@@ -128,14 +133,13 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var workspace = createWorkspace("identity-http", "Identity", "identity", AccountType.ORG, owner);
         workspace.setPublicActivityEnabled(false);
         workspaces.saveAndFlush(workspace);
-        var account = accounts.saveAndFlush(new Account("Verified owner"));
+        people.claim(new PersonIdentity(providerId, owner.getNativeId().toString(), null));
+        var account = accounts.findById(accountId(owner)).orElseThrow();
         var accountId = account.getId();
         assertNotNull(accountId);
-        var link = new Identity();
-        link.setAccount(account);
-        link.setProviderId(providerId);
-        link.setProviderUserKey(owner.getNativeId().toString());
-        link = identities.saveAndFlush(link);
+        var link = identities
+                .findActiveByProviderSubject(providerId, owner.getNativeId().toString(), null)
+                .orElseThrow();
         String token = "mock-jwt-user-sub-" + accountId;
         String path = "/workspaces/identity-http/members/me";
 
@@ -184,12 +188,9 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var actor = userRepository.saveAndFlush(TestUserFactory.createUser(989L, "shared-profile", provider));
         var workspace = createWorkspace("identity-profile", "Profile", "profile", AccountType.ORG, namesake);
         ensureMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
-        var account = accounts.saveAndFlush(new Account("GitLab namesake"));
-        var link = new Identity();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(provider.getId()));
-        link.setProviderUserKey(actor.getNativeId().toString());
-        identities.saveAndFlush(link);
+        people.claim(new PersonIdentity(
+                Objects.requireNonNull(provider.getId()), actor.getNativeId().toString(), null));
+        var account = accounts.findById(accountId(actor)).orElseThrow();
         connectActivitySource(workspace, provider);
         recordIssueOpened(workspace, namesake);
         recordIssueOpened(workspace, actor);
@@ -208,11 +209,9 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
     }
 
     @Test
-    void shouldReportUnionedRoleWithoutChangingTheFirstLinkedActor() {
+    void shouldUseOneAccountMembershipWithoutChangingTheFirstLinkedActor() {
         var olderActor = persistUser("older-http-actor");
         var firstActor = persistUser("first-http-actor");
-        var workspace = createWorkspace("identity-http-roles", "Roles", "roles", AccountType.ORG, olderActor);
-        ensureMembership(workspace, firstActor, Membership.WorkspaceRole.MEMBER);
         var account = accounts.saveAndFlush(new Account("Multi-identity member"));
         var accountId = account.getId();
         assertNotNull(accountId);
@@ -223,6 +222,7 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
             link.setProviderUserKey(actor.getNativeId().toString());
             identities.saveAndFlush(link);
         }
+        createWorkspace("identity-http-roles", "Roles", "roles", AccountType.ORG, olderActor);
         client.get()
                 .uri("/workspaces/identity-http-roles/members/me")
                 .headers(headers -> headers.setBearerAuth("mock-jwt-user-sub-" + accountId))

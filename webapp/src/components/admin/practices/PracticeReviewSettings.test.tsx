@@ -3,8 +3,8 @@ import { useState } from "react";
 import { assert, describe, expect, it, vi } from "vitest";
 import type { AgentBinding, PracticeReviewSettings as Settings } from "@/api/types.gen";
 import { renderWithRouter } from "@/test/router-harness";
-import { mockReviewSettings } from "./fixtures";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
+import { reviewSettings } from "./review/fixtures";
 
 const readyBinding: AgentBinding = {
 	dataHandlingTier: "IN_HOUSE",
@@ -14,19 +14,19 @@ const readyBinding: AgentBinding = {
 	instanceModelId: 20,
 	servedTiers: ["IN_HOUSE", "CLOUD"],
 };
-const settings = mockReviewSettings({ deliverToMerged: false, cooldownMinutes: 15 });
+const settings = reviewSettings({ deliverToMerged: false, cooldownMinutes: 15 });
 const repositories = {
 	status: "ready" as const,
 	options: [
-		{ value: "acme/widgets", label: "acme/widgets" },
-		{ value: "acme/gadgets", label: "acme/gadgets" },
+		{ itemId: "101", name: "acme/widgets" },
+		{ itemId: "102", name: "acme/gadgets" },
 	],
 };
 const people = {
 	status: "ready" as const,
 	options: [
-		{ value: 7, label: "Ada" },
-		{ value: 8, label: "Grace" },
+		{ value: "7", label: "Ada" },
+		{ value: "8", label: "Grace" },
 	],
 };
 
@@ -42,16 +42,16 @@ async function renderSettings(
 			}}
 			workspace={{
 				enabled: true,
-				autoTriggerEnabled: true,
-				manualTriggerEnabled: true,
+				startsFromActivity: true,
+				startsOnRequest: true,
 				isSaving: false,
 				onUpdate: vi.fn(),
 			}}
 			policy={{ settings, isSaving: false, onUpdate: vi.fn(), onReset: vi.fn() }}
-			coverage={{
+			scope={{
 				preview: vi.fn(async () => ({
-					current: settings.coverageSummary,
-					proposed: settings.coverageSummary,
+					current: settings.scopeSummary,
+					proposed: settings.scopeSummary,
 					widens: true,
 				})),
 				repositories,
@@ -64,12 +64,12 @@ async function renderSettings(
 }
 
 function selectedSettings(overrides: Partial<Settings> = {}): Settings {
-	return mockReviewSettings({
+	return reviewSettings({
 		reviewScope: {
-			repositoryMode: "SELECTED",
-			personMode: "SELECTED",
-			repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
-			personUserIds: [7],
+			repositories: "SELECTED",
+			people: "SELECTED",
+			selectedRepositories: [{ repositoryItemId: "101", baseBranches: ["main"] }],
+			accountIds: ["7"],
 		},
 		...overrides,
 	});
@@ -78,19 +78,19 @@ function selectedSettings(overrides: Partial<Settings> = {}): Settings {
 describe("PracticeReviewSettings", () => {
 	it("collects a cumulative draft before previewing or saving", async () => {
 		const preview = vi.fn(async () => ({
-			current: settings.coverageSummary,
-			proposed: settings.coverageSummary,
+			current: settings.scopeSummary,
+			proposed: settings.scopeSummary,
 			widens: true,
 		}));
 		const onUpdate = vi.fn();
 		const persisted = selectedSettings();
 		await renderSettings({
 			policy: { settings: persisted, isSaving: false, onUpdate, onReset: vi.fn() },
-			coverage: { preview, repositories, people },
+			scope: { preview, repositories, people },
 		});
 
 		fireEvent.click(screen.getByRole("radio", { name: "All monitored repositories" }));
-		fireEvent.click(screen.getByRole("radio", { name: "All eligible linked members" }));
+		fireEvent.click(screen.getByRole("radio", { name: "All eligible members" }));
 		expect(preview).not.toHaveBeenCalled();
 		expect(onUpdate).not.toHaveBeenCalled();
 
@@ -98,15 +98,15 @@ describe("PracticeReviewSettings", () => {
 		await screen.findByRole("alertdialog");
 		expect(preview).toHaveBeenCalledOnce();
 		await act(async () => {
-			fireEvent.click(screen.getByRole("button", { name: "Widen coverage" }));
+			fireEvent.click(screen.getByRole("button", { name: "Widen review scope" }));
 		});
 		expect(onUpdate).toHaveBeenCalledWith(
 			{
 				reviewScope: {
-					repositoryMode: "ALL_MONITORED",
-					personMode: "ALL_ELIGIBLE",
-					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
-					personUserIds: [7],
+					repositories: "ALL",
+					people: "ALL",
+					selectedRepositories: [{ repositoryItemId: "101", baseBranches: ["main"] }],
+					accountIds: ["7"],
 				},
 			},
 			persisted.etag,
@@ -115,20 +115,20 @@ describe("PracticeReviewSettings", () => {
 
 	it("previews a narrowing once and saves it without a confirmation", async () => {
 		const preview = vi.fn(async () => ({
-			current: settings.coverageSummary,
-			proposed: { ...settings.coverageSummary, coveredRepositories: 0, coveredPeople: 0 },
+			current: settings.scopeSummary,
+			proposed: { ...settings.scopeSummary, selectedRepositories: 0, selectedPeople: 0 },
 			widens: false,
 		}));
 		const onUpdate = vi.fn();
 		await renderSettings({
 			policy: { settings, isSaving: false, onUpdate, onReset: vi.fn() },
-			coverage: { preview, repositories, people },
+			scope: { preview, repositories, people },
 		});
 
 		fireEvent.click(screen.getByRole("radio", { name: "Selected repositories" }));
 		fireEvent.click(screen.getByRole("radio", { name: "Selected people" }));
-		screen.getByText(/An empty repository selection covers no repository work/u);
-		screen.getByText(/An empty people selection covers nobody/u);
+		screen.getByText(/With no repositories selected, Heph reviews no repository work/u);
+		screen.getByText(/With no people selected, Heph reviews nobody’s work/u);
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
 
 		await act(async () => {
@@ -139,7 +139,7 @@ describe("PracticeReviewSettings", () => {
 		expect(screen.queryByRole("alertdialog")).toBeNull();
 	});
 
-	it("preserves an unsaved coverage draft when an unrelated etag changes", async () => {
+	it("preserves an unsaved review scope draft when an unrelated etag changes", async () => {
 		const persisted = selectedSettings();
 		const policy = {
 			settings: persisted,
@@ -162,13 +162,13 @@ describe("PracticeReviewSettings", () => {
 						}}
 						workspace={{
 							enabled: true,
-							autoTriggerEnabled: true,
-							manualTriggerEnabled: true,
+							startsFromActivity: true,
+							startsOnRequest: true,
 							isSaving: false,
 							onUpdate: vi.fn(),
 						}}
 						policy={{ ...policy, settings: current }}
-						coverage={{ preview: vi.fn(), repositories, people }}
+						scope={{ preview: vi.fn(), repositories, people }}
 					/>
 				</>
 			);
@@ -182,30 +182,30 @@ describe("PracticeReviewSettings", () => {
 				.getByRole("radio", { name: "All monitored repositories" })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		screen.getByText("You have unsaved coverage changes.");
+		screen.getByText("You have unsaved review scope changes.");
 	});
 
-	it("does not save a dirty draft over coverage changed by another admin", async () => {
+	it("does not save a dirty draft over a review scope changed by another admin", async () => {
 		const onUpdate = vi.fn();
 		function ConflictHarness() {
 			const [current, setCurrent] = useState(settings);
 			return (
 				<>
 					<button type="button" onClick={() => setCurrent({ ...selectedSettings(), etag: '"v2"' })}>
-						Publish other coverage
+						Publish another review scope
 					</button>
 					<PracticeReviewSettings
 						workspaceSlug="acme"
 						model={{ status: "ready", binding: readyBinding }}
 						workspace={{
 							enabled: true,
-							autoTriggerEnabled: true,
-							manualTriggerEnabled: true,
+							startsFromActivity: true,
+							startsOnRequest: true,
 							isSaving: false,
 							onUpdate: vi.fn(),
 						}}
 						policy={{ settings: current, isSaving: false, onUpdate, onReset: vi.fn() }}
-						coverage={{ preview: vi.fn(), repositories, people }}
+						scope={{ preview: vi.fn(), repositories, people }}
 					/>
 				</>
 			);
@@ -213,9 +213,9 @@ describe("PracticeReviewSettings", () => {
 
 		await renderWithRouter(<ConflictHarness />, "/w/acme/admin/practices");
 		fireEvent.click(screen.getByRole("radio", { name: "Selected repositories" }));
-		fireEvent.click(screen.getByRole("button", { name: "Publish other coverage" }));
+		fireEvent.click(screen.getByRole("button", { name: "Publish another review scope" }));
 
-		await screen.findByText("Coverage changed elsewhere");
+		await screen.findByText("Review scope changed elsewhere");
 		fireEvent.click(screen.getByRole("radio", { name: "Selected people" }));
 		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Review changes" }).disabled).toBe(
 			true,
@@ -232,8 +232,8 @@ describe("PracticeReviewSettings", () => {
 					model={{ status: "ready", binding: readyBinding }}
 					workspace={{
 						enabled: true,
-						autoTriggerEnabled: true,
-						manualTriggerEnabled: true,
+						startsFromActivity: true,
+						startsOnRequest: true,
 						isSaving: false,
 						onUpdate: vi.fn(),
 					}}
@@ -249,10 +249,10 @@ describe("PracticeReviewSettings", () => {
 							throw new Error("conflict");
 						},
 					}}
-					coverage={{
+					scope={{
 						preview: vi.fn(async () => ({
-							current: settings.coverageSummary,
-							proposed: settings.coverageSummary,
+							current: settings.scopeSummary,
+							proposed: settings.scopeSummary,
 							widens: false,
 						})),
 						repositories,
@@ -267,7 +267,7 @@ describe("PracticeReviewSettings", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
 
 		const alert = await screen.findByRole("alert");
-		expect(alert.textContent).toMatch(/^We could not save the coverage\./u);
+		expect(alert.textContent).toMatch(/^We could not save the review scope\./u);
 		expect(
 			screen.getByRole("radio", { name: "Selected repositories" }).getAttribute("aria-checked"),
 		).toBe("true");
@@ -276,7 +276,7 @@ describe("PracticeReviewSettings", () => {
 		).toBe("true");
 	});
 
-	it("rebases a clean draft when newer coverage arrives after a save", async () => {
+	it("rebases a clean draft when a newer review scope arrives after a save", async () => {
 		function RebaseHarness() {
 			const [current, setCurrent] = useState(settings);
 			return (
@@ -290,15 +290,15 @@ describe("PracticeReviewSettings", () => {
 							})
 						}
 					>
-						Receive newer coverage
+						Receive a newer review scope
 					</button>
 					<PracticeReviewSettings
 						workspaceSlug="acme"
 						model={{ status: "ready", binding: readyBinding }}
 						workspace={{
 							enabled: true,
-							autoTriggerEnabled: true,
-							manualTriggerEnabled: true,
+							startsFromActivity: true,
+							startsOnRequest: true,
 							isSaving: false,
 							onUpdate: vi.fn(),
 						}}
@@ -311,10 +311,10 @@ describe("PracticeReviewSettings", () => {
 								setCurrent({ ...current, reviewScope: request.reviewScope, etag: '"saved"' });
 							},
 						}}
-						coverage={{
+						scope={{
 							preview: vi.fn(async () => ({
-								current: settings.coverageSummary,
-								proposed: settings.coverageSummary,
+								current: settings.scopeSummary,
+								proposed: settings.scopeSummary,
 								widens: false,
 							})),
 							repositories,
@@ -328,13 +328,13 @@ describe("PracticeReviewSettings", () => {
 		await renderWithRouter(<RebaseHarness />, "/w/acme/admin/practices");
 		fireEvent.click(screen.getByRole("radio", { name: "Selected repositories" }));
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
-		await screen.findByText("Coverage is up to date.");
+		await screen.findByText("Review scope is up to date.");
 
-		fireEvent.click(screen.getByRole("button", { name: "Receive newer coverage" }));
+		fireEvent.click(screen.getByRole("button", { name: "Receive a newer review scope" }));
 		expect(
 			screen.getByRole("radio", { name: "Selected people" }).getAttribute("aria-checked"),
 		).toBe("true");
-		screen.getByText("Coverage is up to date.");
+		screen.getByText("Review scope is up to date.");
 	});
 
 	it("does not call unavailable persisted targets missing while option lists are unresolved", async () => {
@@ -342,24 +342,24 @@ describe("PracticeReviewSettings", () => {
 			policy: {
 				settings: selectedSettings({
 					reviewScope: {
-						repositoryMode: "SELECTED",
-						personMode: "SELECTED",
-						repositories: [{ nameWithOwner: "acme/archived", baseBranches: ["main"] }],
-						personUserIds: [99],
+						repositories: "SELECTED",
+						people: "SELECTED",
+						selectedRepositories: [{ repositoryItemId: "199", baseBranches: ["main"] }],
+						accountIds: ["99"],
 					},
 				}),
 				isSaving: false,
 				onUpdate: vi.fn(),
 				onReset: vi.fn(),
 			},
-			coverage: {
+			scope: {
 				preview: vi.fn(),
 				repositories: { status: "loading" },
 				people: { status: "loading" },
 			},
 		});
 
-		await screen.findByText("acme/archived");
+		await screen.findByText("Repository 199");
 		expect(screen.queryByText("Not monitored")).toBeNull();
 		expect(screen.queryByTitle(/unavailable/u)).toBeNull();
 	});
@@ -369,10 +369,10 @@ describe("PracticeReviewSettings", () => {
 			policy: {
 				settings: selectedSettings({
 					reviewScope: {
-						repositoryMode: "SELECTED",
-						personMode: "SELECTED",
-						repositories: [{ nameWithOwner: "acme/archived", baseBranches: ["main"] }],
-						personUserIds: [99],
+						repositories: "SELECTED",
+						people: "SELECTED",
+						selectedRepositories: [{ repositoryItemId: "199", baseBranches: ["main"] }],
+						accountIds: ["99"],
 					},
 				}),
 				isSaving: false,
@@ -385,7 +385,7 @@ describe("PracticeReviewSettings", () => {
 		screen.getByTitle("Member 99 (unavailable)");
 	});
 
-	it("keeps the coverage draft available while an unrelated policy field saves", async () => {
+	it("keeps the review scope draft available while an unrelated policy field saves", async () => {
 		await renderSettings({
 			policy: { settings, isSaving: true, onUpdate: vi.fn(), onReset: vi.fn() },
 		});

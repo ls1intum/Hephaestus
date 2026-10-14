@@ -1,6 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.slack;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
@@ -29,6 +34,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,6 +42,22 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Workspace-scoped Slack source and product review fixtures. */
 public final class SlackConversationTestSupport {
+
+    public static long accountWithIdentity(
+            AccountRepository accounts,
+            IdentityRepository identities,
+            IdentityProvider provider,
+            long nativeId,
+            String login) {
+        var account = accounts.saveAndFlush(new Account(login));
+        var identity = new Identity();
+        identity.setAccount(account);
+        identity.setProviderId(Objects.requireNonNull(provider.getId()));
+        identity.setProviderUserKey(Long.toString(nativeId));
+        identity.setLinkedVia(Identity.LinkedVia.SIGN_IN);
+        identities.saveAndFlush(identity);
+        return Objects.requireNonNull(account.getId());
+    }
 
     private final JdbcTemplate jdbc;
 
@@ -101,8 +123,8 @@ public final class SlackConversationTestSupport {
              "reviewedBy":{"by":"HEPHAESTUS","humanReason":null,"limits":[]},"criteria":"Give a clear answer.",
              "script":null,"scan":null,"lineNotes":false,"guidance":{"whyItMatters":null,"whatGoodLooksLike":null,"goingWell":null,"visual":null,"guide":null}}
             """), PracticeDefinition.class);
-        return versions.create(
-                workspace, slugPrefix + "-" + UUID.randomUUID(), ThreadEvents.THREAD, definition, null, 0, null);
+        return versions.create(new PracticeVersionService.NewPractice(
+                workspace, slugPrefix + "-" + UUID.randomUUID(), ThreadEvents.THREAD, definition, null, 0, null));
     }
 
     public static UUID seedResult(

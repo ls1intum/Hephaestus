@@ -12,7 +12,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
     @Test
@@ -22,6 +21,7 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
         workspace.setPracticeCatalogInstalledAt(Instant.parse("2026-10-01T12:00:00Z"));
         when(workspaces.findByIdForUpdate(10L)).thenReturn(Optional.of(workspace));
         var installer = new PracticeCatalogInstallationManager(
+                true,
                 mock(CatalogService.class),
                 mock(CatalogLock.class),
                 workspaces,
@@ -29,7 +29,6 @@ class PracticeCatalogInstallationManagerTest extends BaseUnitTest {
                 mock(PracticeGroupRepository.class),
                 mock(PracticeService.class),
                 mock(PracticeRepository.class));
-        ReflectionTestUtils.setField(installer, "enabled", true);
         installer.install(10L);
         assertThat(workspace.getPracticeCatalogInstalledAt()).isEqualTo(Instant.parse("2026-10-01T12:00:00Z"));
     }

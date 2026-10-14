@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import type { ComponentProps } from "react";
 import { expect, within } from "storybook/test";
 
 import { EvidenceFileBlock } from "./EvidenceFileBlock";
@@ -37,7 +36,6 @@ export const Default: Story = {
 			startLine: 60,
 			endLine: 64,
 			sourceKind: "scm.pull-request.diff",
-			redacted: false,
 			snippet: [
 				"  public DeliveryResult handoff(ReviewRequest request) {",
 				"    var context = contextBuilder.build(request);",
@@ -48,51 +46,29 @@ export const Default: Story = {
 		},
 	},
 };
-/** A code citation withheld by the reviewer: its caption still names the path and the lines. */
-const withheldCode = {
-	location: {
-		path: "docs/contributor/practice-catalogue.md",
-		startLine: 31,
-		endLine: 44,
-		sourceKind: "scm.pull-request.diff",
-		redacted: true,
-	},
-} satisfies ComponentProps<typeof EvidenceFileBlock>;
-
-const withheldObject = {
-	location: {
-		path: "conversation_thread.json",
-		startLine: 62,
-		endLine: 70,
-		sourceKind: "slack.conversation.thread",
-		redacted: true,
-	},
-} satisfies ComponentProps<typeof EvidenceFileBlock>;
-
 /**
- * A quote withheld on a code source and on an object one. A code source's caption names a path and
- * a line, so its sentence may point at them; an object source's caption names neither, so its
- * sentence promises nothing it does not show.
+ * Citations that recorded only their place: a code source still names its path and lines, and a
+ * historical one that recorded no file is named by its source alone. Neither shows an empty quote.
  */
-export const Redactions: Story = {
-	args: withheldCode,
+export const PlaceWithoutQuote: Story = {
+	args: {
+		location: {
+			path: "docs/contributor/practice-catalogue.md",
+			startLine: 31,
+			endLine: 44,
+			sourceKind: "scm.pull-request.diff",
+		},
+	},
 	render: (args) => (
 		<div className="flex flex-col gap-3">
-			{[args, withheldObject].map((props) => (
-				<EvidenceFileBlock key={props.location.path} {...props} />
-			))}
+			<EvidenceFileBlock {...args} />
+			<EvidenceFileBlock location={{ sourceKind: "scm.pull-request.diff" }} />
 		</div>
 	),
-	play: async ({ canvas }) => {
-		await expect(
-			canvas.getAllByText(/^Not quoted\./u).map((sentence) => sentence.textContent),
-		).toStrictEqual([
-			"Not quoted. The passage was withheld, so only its location was kept.",
-			"Not quoted. The passage was withheld.",
-		]);
+	play: async ({ canvas, canvasElement }) => {
 		await expect(canvas.getByText("lines 31 to 44")).toBeVisible();
-		await expect(canvas.getByText("The conversation")).toBeVisible();
-		await expect(canvas.queryByText("lines 62 to 70")).toBeNull();
+		await expect(canvas.getByText("The code changes")).toBeVisible();
+		await expect(canvasElement.querySelector("pre")).toBeNull();
 	},
 };
 export const BareFileName: Story = {
@@ -102,7 +78,6 @@ export const BareFileName: Story = {
 			startLine: 1,
 			endLine: 1,
 			sourceKind: "scm.pull-request.diff",
-			redacted: false,
 			snippet: "## 0.14.0",
 		},
 	},
@@ -114,10 +89,9 @@ export const LongLines: Story = {
 			startLine: 1,
 			endLine: 2,
 			sourceKind: "scm.pull-request.diff",
-			redacted: false,
 			snippet: [
-				'SELECT o.agent_job_id AS "jobId", MAX(o.observed_at) AS "reviewedAt" FROM practice_result o JOIN practice p ON p.id = o.practice_id JOIN practice_group g ON g.id = p.practice_group_id',
-				"WHERE o.about_user_id = :aboutUserId AND p.workspace_id = :workspaceId AND g.slug = :groupSlug AND o.presence <> 'NOT_APPLICABLE'",
+				'SELECT r.review_id AS "reviewId", MAX(r.recorded_at) AS "reviewedAt" FROM result r JOIN practice p ON p.id = r.practice_id JOIN practice_group g ON g.id = p.practice_group_id',
+				"WHERE r.developer_id = :developerId AND p.workspace_id = :workspaceId AND g.slug = :groupSlug AND r.outcome <> 'DOES_NOT_APPLY'",
 			].join("\n"),
 		},
 	},
@@ -133,7 +107,6 @@ export const ObjectSourceNamesTheSource: Story = {
 			startLine: 9,
 			endLine: 9,
 			sourceKind: "scm.pull-request.core",
-			redacted: false,
 			snippet: '"body" : ""',
 		},
 	},
@@ -157,7 +130,6 @@ export const CodeSourceKeepsItsLines: Story = {
 			endLine: 4,
 			sourceKind: "scm.pull-request.diff",
 			side: "NEW",
-			redacted: false,
 			snippet: "+export const PAGE_SIZE = 20;",
 		},
 	},
@@ -183,7 +155,6 @@ export const OneChangedLine: Story = {
 			startLine: 4,
 			endLine: 4,
 			sourceKind: "scm.pull-request.diff",
-			redacted: false,
 			change: {
 				before: "-export const PAGE_SIZE = 25;",
 				after: "+export const PAGE_SIZE = 20;",
@@ -219,12 +190,11 @@ export const OneChangedLine: Story = {
 export const QuotedFromBeforeTheChange: Story = {
 	args: {
 		location: {
-			path: "webapp/src/components/profile/ReviewRunCard.tsx",
+			path: "webapp/src/components/profile/ReviewCard.tsx",
 			startLine: 23,
 			endLine: 24,
 			sourceKind: "scm.pull-request.diff",
 			side: "OLD",
-			redacted: false,
 			snippet: [
 				'if (kind === "PULL_REQUEST") return GitPullRequestIcon;',
 				"return undefined;",
@@ -245,7 +215,6 @@ export const FoldedObjectSource: Story = {
 			startLine: 4,
 			endLine: 4,
 			sourceKind: "scm.pull-request.core",
-			redacted: false,
 			snippet: ['"title" : "Page size"', '"body" : ""'].join("\n"),
 		},
 	},
@@ -271,7 +240,6 @@ export const HistoricalSource: Story = {
 			sourceKind: "scm.repository.tree",
 			revision: "b".repeat(40),
 			snippet: "return previousValue;",
-			redacted: false,
 		},
 	},
 	play: async ({ canvas }) => {

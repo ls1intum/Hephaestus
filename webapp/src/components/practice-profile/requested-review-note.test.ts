@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { PracticeResultDetail } from "@/api/types.gen";
+import type { ResultList } from "@/api/types.gen";
 
 import { requestedReviewNote } from "./requested-review-note";
 
@@ -11,38 +11,43 @@ const developing = {
 	trendSupport: { opportunities: 4 },
 } satisfies Practice;
 
-function run(
-	origin: PracticeResultDetail["origin"],
-	...outcomes: PracticeResultDetail["outcome"][]
-) {
-	return { practiceResults: outcomes.map((outcome) => ({ origin, outcome })) };
+function review(origin: ResultList["origin"], ...outcomes: ResultList["outcome"][]) {
+	return { results: outcomes.map((outcome) => ({ origin, outcome })) };
 }
 
 describe("requestedReviewNote", () => {
 	it("says that a requested review does not move the standing when the newest one found no problem", () => {
-		expect(requestedReviewNote(developing, [run("MANUAL", "MET"), run("LIVE", "NOT_MET")])).toBe(
-			"A requested review is evidence only and does not change your standing.",
-		);
+		expect(
+			requestedReviewNote(developing, [review("REQUEST", "MET"), review("EVENT", "NOT_MET")]),
+		).toBe("A requested review is evidence only and does not change your standing.");
 	});
 
-	it.each<[string, Practice, ReturnType<typeof run>[]]>([
+	it.each<[string, Practice, ReturnType<typeof review>[]]>([
 		["there is no review", developing, []],
-		["the newest review is live", developing, [run("LIVE", "MET"), run("MANUAL", "MET")]],
-		["the newest review is a backfill", developing, [run("BACKFILL", "MET")]],
-		["the requested review found a problem", developing, [run("MANUAL", "MET", "NOT_MET")]],
-		["the requested review reached no verdict", developing, [run("MANUAL", "UNDETERMINED")]],
+		[
+			"the newest review followed an event",
+			developing,
+			[review("EVENT", "MET"), review("REQUEST", "MET")],
+		],
+		["the newest review is a backfill", developing, [review("BACKFILL", "MET")]],
+		["the requested review found a problem", developing, [review("REQUEST", "MET", "NOT_MET")]],
+		[
+			"the requested review reached no verdict",
+			developing,
+			[review("REQUEST", "COULD_NOT_DETERMINE")],
+		],
 		[
 			"the standing is not Needs attention",
 			{ ...developing, standing: "MIXED" },
-			[run("MANUAL", "MET")],
+			[review("REQUEST", "MET")],
 		],
 		[
 			"only requested reviews judged the practice",
 			{ standing: "DEVELOPING", trendSupport: { opportunities: 0 } },
-			[run("MANUAL", "MET")],
+			[review("REQUEST", "MET")],
 		],
-		["the standing has no count of work", { standing: "DEVELOPING" }, [run("MANUAL", "MET")]],
-	])("says nothing when %s", (_case, practice, runs) => {
-		expect(requestedReviewNote(practice, runs)).toBeUndefined();
+		["the standing has no count of work", { standing: "DEVELOPING" }, [review("REQUEST", "MET")]],
+	])("says nothing when %s", (_case, practice, reviews) => {
+		expect(requestedReviewNote(practice, reviews)).toBeUndefined();
 	});
 });

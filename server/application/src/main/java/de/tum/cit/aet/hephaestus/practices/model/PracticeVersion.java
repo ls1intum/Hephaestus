@@ -74,11 +74,17 @@ public class PracticeVersion {
     private JsonNode definition;
 
     @GeneratedColumn("(definition ->> 'name')::varchar(128)")
-    @Column(length = 128, insertable = false, updatable = false)
+    @Column(length = 128, insertable = false, updatable = false, options = "STORED")
     private @Nullable String name;
 
     @GeneratedColumn("practice_review_digest(definition)")
-    @Column(name = "review_digest", length = 96, nullable = false, insertable = false, updatable = false)
+    @Column(
+            name = "review_digest",
+            length = 96,
+            nullable = false,
+            insertable = false,
+            updatable = false,
+            options = "STORED")
     @Getter(AccessLevel.NONE)
     private @Nullable String reviewDigest;
 

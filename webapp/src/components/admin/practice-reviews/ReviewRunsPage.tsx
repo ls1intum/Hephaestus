@@ -18,7 +18,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { reviewedWorkName } from "@/lib/artifact-kinds";
+import { itemName } from "@/lib/item-kinds";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
 
 import { REQUEST_BLOCKED, type RowReviewRequest } from "./RequestReviewAction";
@@ -237,7 +237,7 @@ export function ReviewRunsPage({
 									reviewWork(review),
 									review.target.reviewedWork === undefined
 										? review.target.title
-										: reviewedWorkName(review.target.reviewedWork),
+										: itemName(review.target.reviewedWork),
 									activeWork,
 								)
 							}
@@ -360,7 +360,7 @@ function UnreviewedWorkResults({ search, work, actions }: UnreviewedWorkResultsP
 							work={row}
 							request={
 								actions &&
-								rowReviewRequest(actions, row, reviewedWorkName(row.reviewedWork), NO_ACTIVE_WORK)
+								rowReviewRequest(actions, row, itemName(row.reviewedWork), NO_ACTIVE_WORK)
 							}
 							refusal={actions?.refusalFor(row)}
 						/>

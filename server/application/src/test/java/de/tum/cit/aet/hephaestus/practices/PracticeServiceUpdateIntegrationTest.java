@@ -26,14 +26,14 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
     void shouldRejectAStaleVersionWithoutAppendingAnotherVersion() {
         var owner = persistUser("admin");
         var workspace = createWorkspace("edit-stale", "Edits", "edit-org", AccountType.ORG, owner);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "edit-practice",
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
         String initialId =
                 Objects.requireNonNull(practice.getCurrentVersion().getId()).toString();
         var ctx = WorkspaceContext.fromWorkspace(workspace, Set.of(), null);

@@ -725,12 +725,12 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         message(workspace, "TCACHE", "100.1", "100.1", "UCACHE", target, "Captured contribution");
         PersonIdentity gitlabKey = new PersonIdentity(Objects.requireNonNull(scm.getId()), "42", null);
         PersonIdentity slackKey = new PersonIdentity(Objects.requireNonNull(slack.getId()), "UCACHE", "TCACHE");
-        assertThatThrownBy(() -> resolver.resolve(null, List.of(gitlabKey)))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("exact Slack identity");
-        assertThatThrownBy(() -> resolver.resolve(null, List.of(slackKey)))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("exact SCM provider identity");
+        var scmScope = resolver.resolve(null, List.of(gitlabKey));
+        assertThat(scmScope.userIds()).containsExactly(target.getId());
+        assertThat(scmScope.identities()).doesNotContain(slackKey);
+        var slackScope = resolver.resolve(null, List.of(slackKey));
+        assertThat(slackScope.userIds()).isEmpty();
+        assertThat(slackScope.identities()).doesNotContain(gitlabKey);
         assertThat(resolver.resolve(null, List.of(gitlabKey, slackKey)).userIds())
                 .containsExactly(target.getId());
     }

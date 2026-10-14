@@ -1,19 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { evidenceSourceLabel } from "@/components/admin/practice-editor/evidence-presentation";
+import { readSourceLabel } from "@/components/admin/practice-editor/reads-presentation";
 import {
-	WITHDRAWN_MOMENT_LABEL,
-	withdrawnMoments,
-} from "@/components/admin/practice-editor/occasion-moments";
+	WITHDRAWN_EVENT_LABEL,
+	withdrawnEvents,
+} from "@/components/admin/practice-editor/review-events";
 import { facetPills } from "@/components/admin/practice-reviews/AppliedFacetPills";
-import { holdReasonCopy } from "@/components/admin/practice-reviews/job-utils";
-import { artifactKindLabel, artifactKindNoun, reviewedWorkName } from "@/lib/artifact-kinds";
-import { mockDocumentWorkType } from "@/mocks/fixtures/practice";
+import { itemKindLabel, itemKindNoun, itemName } from "@/lib/item-kinds";
+import { mockDocumentItemType } from "@/mocks/fixtures/practice";
 
 import { evidenceSourceDef } from "./evidence-source-defs";
 
 /**
- * The server's vocabularies are open: a kind of work, a moment, an evidence source or a hold reason
+ * The server's vocabularies are open: a kind of work, an event or a read source
  * can reach this build before it has words for them. Each helper below must still answer in words,
  * and none of them may hand the reader the id it was given.
  */
@@ -21,25 +20,21 @@ describe("a value this build has no words for", () => {
 	const unknownKind = "tracker.ticket";
 
 	it("names a kind of work generically, in every form", () => {
-		expect(artifactKindLabel(unknownKind)).toBe("Other work");
-		expect(artifactKindLabel(unknownKind, 2)).toBe("Other work");
-		expect(artifactKindNoun(unknownKind, 1)).toBe("piece of work");
-		expect(artifactKindNoun(unknownKind, 3)).toBe("pieces of work");
-		expect(reviewedWorkName({ kind: unknownKind, label: "T-88" })).toBe("Other work");
+		expect(itemKindLabel(unknownKind)).toBe("Other work");
+		expect(itemKindLabel(unknownKind, 2)).toBe("Other work");
+		expect(itemKindNoun(unknownKind, 1)).toBe("piece of work");
+		expect(itemKindNoun(unknownKind, 3)).toBe("pieces of work");
+		expect(itemName({ kind: unknownKind, label: "T-88", provider: null })).toBe("Other work");
 	});
 
-	it("names a moment generically", () => {
-		const [withdrawn] = withdrawnMoments(mockDocumentWorkType, ["docs.document.forked"]);
-		expect(withdrawn?.displayName).toBe(WITHDRAWN_MOMENT_LABEL);
+	it("names an event generically", () => {
+		const [withdrawn] = withdrawnEvents(mockDocumentItemType, ["docs.document.forked"]);
+		expect(withdrawn?.label).toBe(WITHDRAWN_EVENT_LABEL);
 	});
 
-	it("names an evidence source generically, the same way in the editor and on the evidence", () => {
+	it("names a read source generically, the same way in the editor and on the evidence", () => {
 		expect(evidenceSourceDef("scm.future-source").label).toBe("Another source");
-		expect(evidenceSourceLabel("scm.future-source", [])).toBe("Another source");
-	});
-
-	it("names a hold generically", () => {
-		expect(holdReasonCopy("PROVIDER_OUTAGE").label).toBe("On hold");
+		expect(readSourceLabel("scm.future-source", [])).toBe("Another source");
 	});
 
 	it("keeps a filter pill whose value the options cannot name, without printing the value", () => {
@@ -50,28 +45,44 @@ describe("a value this build has no words for", () => {
 
 describe("the words for a kind of work", () => {
 	it("says pull or merge request until the provider decides", () => {
-		expect(artifactKindNoun("scm.pull_request", 1)).toBe("pull or merge request");
-		expect(artifactKindNoun("scm.pull_request", 2, "GITHUB")).toBe("pull requests");
-		expect(artifactKindNoun("scm.pull_request", 1, "GITLAB")).toBe("merge request");
-		expect(artifactKindLabel("scm.pull_request", 1, "GITLAB")).toBe("Merge request");
-		expect(artifactKindLabel("scm.pull_request", 2)).toBe("Pull or merge requests");
+		expect(itemKindNoun("scm.pull_request", 1)).toBe("pull or merge request");
+		expect(itemKindNoun("scm.pull_request", 2, "GITHUB")).toBe("pull requests");
+		expect(itemKindNoun("scm.pull_request", 1, "GITLAB")).toBe("merge request");
+		expect(itemKindLabel("scm.pull_request", 1, "GITLAB")).toBe("Merge request");
+		expect(itemKindLabel("scm.pull_request", 2)).toBe("Pull or merge requests");
 	});
 
 	it("names numbered work the way its provider writes it, and other work by its kind", () => {
-		expect(reviewedWorkName({ kind: "scm.pull_request", provider: "GITHUB", label: "#1423" })).toBe(
+		expect(itemName({ kind: "scm.pull_request", provider: "GITHUB", label: "#1423" })).toBe(
 			"Pull request #1423",
 		);
-		expect(reviewedWorkName({ kind: "scm.pull_request", provider: "GITLAB", label: "!1423" })).toBe(
+		expect(itemName({ kind: "scm.pull_request", provider: "GITLAB", label: "!1423" })).toBe(
 			"Merge request !1423",
 		);
-		expect(reviewedWorkName({ kind: "scm.issue", provider: "GITLAB", label: "#7" })).toBe(
-			"Issue #7",
+		expect(itemName({ kind: "scm.issue", provider: "GITLAB", label: "#7" })).toBe("Issue #7");
+		expect(itemName({ kind: "docs.document", label: "Onboarding", provider: "OUTLINE" })).toBe(
+			"Document",
 		);
-		expect(reviewedWorkName({ kind: "docs.document", label: "Onboarding" })).toBe("Document");
 	});
 
 	it("names work whose kind is missing as reviewed work", () => {
-		expect(artifactKindLabel(undefined)).toBe("Reviewed work");
-		expect(artifactKindNoun(undefined, 2)).toBe("pieces of reviewed work");
+		expect(itemKindLabel(undefined)).toBe("Reviewed work");
+		expect(itemKindNoun(undefined, 2)).toBe("pieces of reviewed work");
+	});
+});
+
+describe("the words for the kinds a scan and a reviewer read", () => {
+	it("names a pull request review by its provider's noun", () => {
+		expect(itemKindLabel("scm.pull_request_review", 1, "GITHUB")).toBe("Pull request review");
+		expect(itemKindLabel("scm.pull_request_review", 1, "GITLAB")).toBe("Merge request review");
+	});
+
+	it("names a repository and a file by their labels", () => {
+		expect(
+			itemName({ kind: "scm.repository", provider: "GITHUB", label: "ls1intum/Hephaestus" }),
+		).toBe("Repository ls1intum/Hephaestus");
+		expect(itemName({ kind: "scm.file", provider: "GITLAB", label: "src/app.ts" })).toBe(
+			"File src/app.ts",
+		);
 	});
 });

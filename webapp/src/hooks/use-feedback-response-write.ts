@@ -8,29 +8,30 @@ import {
 import { toast } from "sonner";
 
 import {
-	deleteFeedbackResponseMutation,
-	getInAppFeedbackQueryKey,
-	getPracticeProfileOverviewQueryKey,
-	listPracticeGroupReviewRunsInfiniteQueryKey,
-	replaceFeedbackResponseMutation,
+	clearOwnFeedbackResponseMutation,
+	replaceOwnFeedbackResponseMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { FeedbackResponseRequest, PracticeResultDetail } from "@/api/types.gen";
-import { isEmptyFeedbackResponse } from "@/components/profile/review-runs";
+import type { FeedbackResponse, FeedbackResponseRequest } from "@/api/types.gen";
+import {
+	type FeedbackResponseControls,
+	isEmptyFeedbackResponse,
+	responseRequestOf,
+} from "@/components/profile/reviews";
 import { filedUnder } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
 /**
- * Every write of a feedback response, whatever surface it was made on, so the rating buttons of
+ * Every write of a feedback response, whatever surface it was made on, so the response buttons of
  * the piece of feedback being written wait wherever it is on screen — a card on the page and the
- * same feedback on a practice level are one write.
+ * same feedback in a review's card are one write.
  */
 const FEEDBACK_RESPONSE_WRITE_KEY = ["feedback-response", "write"];
 
 /**
- * What `write` hands either mutation: a replace carries the response, a withdrawal none. Only
- * `write` files mutations under the key, so these are the variables the cache holds for it.
+ * What either mutation is handed: a replace carries the response, a clear none. Only this hook
+ * files mutations under the key, so these are the variables the cache holds for it.
  */
 interface FeedbackResponseWriteVariables {
 	path: { feedbackId: string };
@@ -38,74 +39,56 @@ interface FeedbackResponseWriteVariables {
 }
 
 /**
- * Every query that carries the developer's response to a piece of feedback: the cards, the
- * overview and — when the feedback's group is known — that group's review-run feed, whose
- * results carry the response too. A write on any surface refreshes them all, so a card
- * behind the drawer never reads a response the level has already replaced. The feed's key is
- * built with no `query`, which matches the feed at every page size and practice.
+ * Every read that carries a response or counts one: the practice-page cards, the resolution
+ * counts, the overview, and each list or detail of the reader's reviews and results, whose
+ * feedback refs carry the response. A reader who is also an admin has the review drawer's
+ * disagreements cached, so those refresh too. By operation, so a list is refreshed whatever its
+ * filters.
  */
-async function invalidateFeedbackResponses(
-	queryClient: QueryClient,
-	workspaceSlug: string,
-	groupSlug: string | undefined,
-) {
-	return Promise.all([
-		queryClient.invalidateQueries({
-			queryKey: getInAppFeedbackQueryKey({ path: { workspaceSlug } }),
-		}),
-		queryClient.invalidateQueries({
-			queryKey: getPracticeProfileOverviewQueryKey({ path: { workspaceSlug } }),
-		}),
-		hasText(groupSlug) &&
-			queryClient.invalidateQueries({
-				queryKey: listPracticeGroupReviewRunsInfiniteQueryKey({
-					path: { workspaceSlug, groupSlug },
-				}),
-			}),
-		invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_REVIEWED_WORK),
-	]);
-}
+const READS_OF_FEEDBACK_RESPONSES: ReadonlySet<string> = new Set([
+	"getOwnPracticePageFeedback",
+	"getOwnFeedbackResponse",
+	"getOwnFeedbackResolutionCounts",
+	"getPracticeProfileOverview",
+	"listOwnGroupReviews",
+	"listOwnReviews",
+	"getOwnReview",
+	"listOwnItemReviews",
+	"listOwnResults",
+	"getOwnResult",
+	"listReviewFeedback",
+	"getReviewFeedback",
+	"listReviewResults",
+	"getReviewResult",
+	"listReviewProblems",
+]);
 
-/** A piece of work's own review-run feed, the page a note on the work links to, whatever the work. */
-const READS_OF_REVIEWED_WORK: ReadonlySet<string> = new Set(["listReviewedWorkReviewRuns"]);
+export type FeedbackResponseWrite = FeedbackResponseControls;
 
-export interface FeedbackResponseWrite {
-	/** Writes the complete response; one with nothing left in it is withdrawn. */
-	write: (feedbackId: string, response: FeedbackResponseRequest) => void;
-	/** Writes the response to the feedback a result was delivered as; one with none has none. */
-	respond: (result: PracticeResultDetail, response: FeedbackResponseRequest) => void;
-	/**
-	 * The response being written to each piece of feedback, from whichever surface; a withdrawal is
-	 * the empty response. A surface shows it over the recorded one until the write has landed.
-	 */
-	pendingResponses: ReadonlyMap<string, FeedbackResponseRequest>;
-}
+/** Said where the server would refuse it: a disagreement is written for an admin to read. */
+const DISAGREEMENT_NEEDS_REASON = "Add your reason so a workspace admin can read it.";
 
 /**
- * The developer's response to a piece of feedback, written from any surface. A write stays pending
- * until the queries that carry the response have refetched, so its buttons show the answer being
- * written until the refetch carries it, rather than flicker back to the one they showed before.
+ * The developer's response to a piece of feedback, written from any surface. The endpoint
+ * replaces both dimensions at once, so every write carries the complete response that stands with
+ * the change applied over it. A write stays pending until the reads that carry the response have
+ * refetched, so its buttons show the response being written until the refetch carries it, rather
+ * than flicker back to the one they showed before.
  */
-export function useFeedbackResponseWrite(
-	workspaceSlug: string,
-	groupSlugOf: (feedbackId: string) => string | undefined,
-): FeedbackResponseWrite {
+export function useFeedbackResponseWrite(workspaceSlug: string): FeedbackResponseWrite {
 	const queryClient = useQueryClient();
-	const written = async (_result: unknown, variables: { path: { feedbackId: string } }) =>
-		invalidateFeedbackResponses(queryClient, workspaceSlug, groupSlugOf(variables.path.feedbackId));
+	const written = async () => refreshResponses(queryClient, workspaceSlug);
 	const replaceMutation = useMutation({
-		...filedUnder(FEEDBACK_RESPONSE_WRITE_KEY, replaceFeedbackResponseMutation()),
+		...filedUnder(FEEDBACK_RESPONSE_WRITE_KEY, replaceOwnFeedbackResponseMutation()),
 		onSuccess: written,
 		onError: (error) =>
-			toast.error(problemDetailOf(error, "We could not save your feedback response. Try again.")),
+			toast.error(problemDetailOf(error, "We could not save your response. Try again.")),
 	});
-	const deleteMutation = useMutation({
-		...filedUnder(FEEDBACK_RESPONSE_WRITE_KEY, deleteFeedbackResponseMutation()),
+	const clearMutation = useMutation({
+		...filedUnder(FEEDBACK_RESPONSE_WRITE_KEY, clearOwnFeedbackResponseMutation()),
 		onSuccess: written,
 		onError: (error) =>
-			toast.error(
-				problemDetailOf(error, "We could not withdraw your feedback response. Try again."),
-			),
+			toast.error(problemDetailOf(error, "We could not clear your response. Try again.")),
 	});
 	const pending = useMutationState<
 		[string, FeedbackResponseRequest] | undefined,
@@ -115,23 +98,33 @@ export function useFeedbackResponseWrite(
 		select: ({ state: { variables } }) =>
 			variables && [variables.path.feedbackId, variables.body ?? {}],
 	});
-	const write = (feedbackId: string, response: FeedbackResponseRequest) => {
-		if (isEmptyFeedbackResponse(response)) {
-			deleteMutation.mutate({ path: { workspaceSlug, feedbackId } });
-			return;
-		}
-		replaceMutation.mutate({ path: { workspaceSlug, feedbackId }, body: response });
+	// The cache lists mutations oldest first, so a later write to the same feedback wins.
+	const pendingResponses = new Map(pending.filter((entry) => entry !== undefined));
+	const responseOf = (feedbackId: string, recorded: FeedbackResponse | null) =>
+		pendingResponses.get(feedbackId) ?? responseRequestOf(recorded);
+	const clear = (feedbackId: string) => {
+		clearMutation.mutate({ path: { workspaceSlug, feedbackId } });
 	};
 
 	return {
-		write,
-		respond: (result, response) => {
-			const feedbackId = result.feedbackResponse?.feedbackId;
-			if (hasText(feedbackId)) {
-				write(feedbackId, response);
+		write: (feedbackId, recorded, change) => {
+			const response = { ...responseOf(feedbackId, recorded), ...change };
+			if (isEmptyFeedbackResponse(response)) {
+				clear(feedbackId);
+				return;
 			}
+			if (response.resolution === "DISAGREE" && !hasText(response.comment?.trim())) {
+				toast.error(DISAGREEMENT_NEEDS_REASON);
+				return;
+			}
+			replaceMutation.mutate({ path: { workspaceSlug, feedbackId }, body: response });
 		},
-		// The cache lists mutations oldest first, so a later write to the same feedback wins.
-		pendingResponses: new Map(pending.filter((entry) => entry !== undefined)),
+		clear,
+		responseOf,
+		pendingResponses,
 	};
+}
+
+async function refreshResponses(queryClient: QueryClient, workspaceSlug: string) {
+	return invalidateWorkspaceReads(queryClient, workspaceSlug, READS_OF_FEEDBACK_RESPONSES);
 }

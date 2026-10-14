@@ -20,7 +20,7 @@ import {
 	tracedWorkState,
 } from "@/components/practice-vocabulary/traced-work-defs";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import { artifactKindLabel, reviewedWorkName } from "@/lib/artifact-kinds";
+import { itemKindLabel, itemName } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
@@ -149,7 +149,7 @@ export function WorkLevel({
 				<SheetSection part="what">
 					<ReviewFactGrid>
 						<ReviewFact label="Kind">
-							{artifactKindLabel(work.artifactKind, 1, work.reviewedWork.provider)}
+							{itemKindLabel(work.artifactKind, 1, work.reviewedWork.provider)}
 						</ReviewFact>
 						{hasText(work.reviewedWork.container) &&
 							!work.reviewedWork.label.includes(work.reviewedWork.container) && (
@@ -219,7 +219,7 @@ export function WorkLevel({
 					<RequestReviewAction
 						label="Request review"
 						request={{
-							work: reviewedWorkName(work.reviewedWork),
+							work: itemName(work.reviewedWork),
 							onRequest: onRequestReview,
 							requesting,
 							blocked: requestBlocked,

@@ -11,7 +11,7 @@ import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody } from "@/components/ui/table";
-import { ARTIFACT_KIND, artifactKindNoun } from "@/lib/artifact-kinds";
+import { ITEM_KIND, itemKindNoun } from "@/lib/item-kinds";
 import { getProviderTerms, type ProviderType } from "@/lib/provider/provider-terms";
 
 import { coverageNote } from "./activity-coverage";
@@ -76,7 +76,7 @@ export function PublicActivityPage({
 	personActivity,
 }: PublicActivityPageProps) {
 	const terms = getProviderTerms(providerType);
-	const pullRequests = artifactKindNoun(ARTIFACT_KIND.pullRequest, 2, providerType);
+	const pullRequests = itemKindNoun(ITEM_KIND.pullRequest, 2, providerType);
 	const note = coverage && coverageNote(coverage);
 	// A repository the URL names but the workspace does not list stays in the picker, so it can be cleared.
 	const repositoryKeys = [...new Set([...repositories.map(({ key }) => key), ...repo])];

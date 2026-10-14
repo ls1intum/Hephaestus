@@ -15,7 +15,7 @@ const base = {
 
 const active: SlackMonitoredChannel = {
 	...base,
-	id: 1,
+	id: "1",
 	slackChannelId: "C02ACTIVE002",
 	channelName: "team-standup",
 	consentState: "ACTIVE",

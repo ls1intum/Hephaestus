@@ -518,7 +518,7 @@ public class ScanReportService {
     private List<ReasonCountDTO> reasons(Review review, ReviewItemState state) {
         return jdbc.sql("SELECT COALESCE(reason,:fallback) AS reason,COUNT(*) AS count FROM review_item WHERE"
                         + " workspace_id=:ws AND review_id=:scan AND state=:state GROUP BY"
-                        + " COALESCE(reason,:fallback) ORDER BY reason")
+                        + " 1 ORDER BY 1")
                 .param("ws", review.getWorkspaceId())
                 .param("scan", review.getId())
                 .param("state", state.name())

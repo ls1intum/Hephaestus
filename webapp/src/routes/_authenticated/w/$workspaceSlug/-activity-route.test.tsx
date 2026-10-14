@@ -8,7 +8,9 @@ import type {
 	ActivityWork,
 	ActivityWorkPage,
 	OpenWork,
+	ReviewRequestOutcome,
 	WorkItem,
+	WorkspaceMembership,
 } from "@/api/types.gen";
 import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
@@ -142,8 +144,28 @@ function pagedWork(record: (request: Request) => void) {
 	});
 }
 
+/** Ada's membership; the workspace's GitHub instance knows her as `ada-lrz`. */
+function adaMembership(
+	role: WorkspaceMembership["role"],
+	identities: WorkspaceMembership["account"]["identities"] = [
+		{ provider: "GITHUB", login: "ada-lrz", displayName: "Ada", avatarUrl: null },
+	],
+): Wire<WorkspaceMembership> {
+	return {
+		accountId: "7",
+		account: { id: "7", status: "ACTIVE", displayName: "Ada", avatarUrl: null, identities },
+		role,
+		joinedAt: "2026-01-01T00:00:00Z",
+		leftAt: null,
+		hidden: false,
+		reviewSelected: true,
+		eligibleForPracticeReview: true,
+	};
+}
+
 const ownPullRequest = {
 	id: 3101,
+	itemId: "9101",
 	type: "PULL_REQUEST",
 	number: 42,
 	title: "Retry webhook delivery",
@@ -155,6 +177,7 @@ const ownPullRequest = {
 } satisfies WorkItem;
 const ownIssue = {
 	id: 3102,
+	itemId: "9102",
 	type: "ISSUE",
 	number: 43,
 	title: "Document the restore drill",
@@ -165,6 +188,7 @@ const reviewRequested = {
 	...ownPullRequest,
 	reviewDecision: undefined,
 	id: 3103,
+	itemId: "9103",
 	number: 44,
 	title: "Bob's pull request",
 	author: { id: 8, login: "bob", name: "Bob", avatarUrl: "", htmlUrl: "" },
@@ -193,7 +217,7 @@ describe("Activity", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(workspaceListItem("acme"))),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+				HttpResponse.json(adaMembership("MEMBER")),
 			),
 			http.get("*/workspaces/:workspaceSlug/activity/people", ({ request }) => {
 				record(request);
@@ -237,6 +261,12 @@ describe("Activity", () => {
 	});
 
 	describe("Request review", () => {
+		const submitted = {
+			status: "SUBMITTED",
+			reason: null,
+			reasonDescription: null,
+			reviewId: "5b1e7c2a-3d4f-4a6b-8c9d-0e1f2a3b4c5d",
+		} satisfies ReviewRequestOutcome;
 		let asked: unknown[] = [];
 		beforeEach(() => {
 			asked = [];
@@ -246,13 +276,13 @@ describe("Activity", () => {
 				),
 				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
 					asked.push(await request.json());
-					return HttpResponse.json({ status: "SUBMITTED", jobId: "job-1" });
+					return HttpResponse.json(submitted);
 				}),
 			);
 		});
 		afterEach(clearUserView);
 
-		it("asks for a review of your own work by its kind and id, and of nobody else's", async () => {
+		it("asks for a review of your own work by its item, and of nobody else's", async () => {
 			const user = userEvent.setup();
 			renderRouteAtWithRouter("/w/acme/activity");
 
@@ -261,12 +291,7 @@ describe("Activity", () => {
 			);
 			await user.click(screen.getByRole("button", { name: "Request review: #43" }));
 
-			await waitFor(() =>
-				expect(asked).toStrictEqual([
-					{ artifactKind: "scm.pull_request", artifactId: 3101 },
-					{ artifactKind: "scm.issue", artifactId: 3102 },
-				]),
-			);
+			await waitFor(() => expect(asked).toStrictEqual([{ itemId: "9101" }, { itemId: "9102" }]));
 			expect(screen.queryByRole("button", { name: "Request review: #44" })).toBeNull();
 		});
 
@@ -277,7 +302,8 @@ describe("Activity", () => {
 						status: "REFUSED",
 						reason: "REQUEST_COOLDOWN_ACTIVE",
 						reasonDescription: "A review of this was already asked for a moment ago.",
-					}),
+						reviewId: null,
+					} satisfies ReviewRequestOutcome),
 				),
 			);
 			const user = userEvent.setup();
@@ -302,9 +328,10 @@ describe("Activity", () => {
 						status: "REFUSED",
 						reason: "REQUEST_COOLDOWN_ACTIVE",
 						reasonDescription: "A review of this was already asked for a moment ago.",
-					};
+						reviewId: null,
+					} satisfies ReviewRequestOutcome;
 				},
-				async () => ({ status: "SUBMITTED", jobId: "job-2" }),
+				async () => submitted,
 			];
 			server.use(
 				http.post("*/workspaces/:workspaceSlug/practices/review-requests", async ({ request }) => {
@@ -440,7 +467,11 @@ describe("Activity", () => {
 	it("tells a member with no connected account in the workspace how to connect one", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role: "MEMBER", userId: 7, userName: "Ada" }),
+				HttpResponse.json(
+					adaMembership("MEMBER", [
+						{ provider: "SLACK", login: null, displayName: "Ada", avatarUrl: null },
+					]),
+				),
 			),
 		);
 		renderRouteAtWithRouter("/w/acme/activity");
@@ -528,7 +559,7 @@ describe("Workspace activity", () => {
 	let reads: URL[] = [];
 	let automation: URL[] = [];
 	let visibility: URL[] = [];
-	let role = "MEMBER";
+	let role: WorkspaceMembership["role"] = "MEMBER";
 	const record = (request: Request) => {
 		reads.push(new URL(request.url));
 	};
@@ -543,7 +574,7 @@ describe("Workspace activity", () => {
 			http.get("*/workspaces", () => HttpResponse.json([workspaceListItem("acme")])),
 			http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(workspaceListItem("acme"))),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
-				HttpResponse.json({ role, userId: 7, userLogin: "ada-lrz", userName: "Ada" }),
+				HttpResponse.json(adaMembership(role)),
 			),
 			// Ada is the only member; Bob contributes without a membership.
 			http.get("*/workspaces/:workspaceSlug/users", () =>

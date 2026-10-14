@@ -3,57 +3,56 @@ import { Badge } from "@/components/ui/badge";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 
 export interface CatalogOriginProps {
-	origin?: CatalogOrigin | null;
+	origin: CatalogOrigin;
 	kind: "practice" | "group";
 }
 
 /**
- * What the badge says, and the sentence that goes with it. The badge sits inside accordion triggers
+ * What the badge says, and the sentence that goes with it. The badge sits inside accordion headers
  * and list rows, where a focusable control cannot nest, so only the label travels there. The
- * sentence is written out where the thing is opened, the practice's panel and the group's edit dialog,
- * where it is read rather than hovered.
+ * sentence is written out where the thing is opened, the practice's panel and the group's edit
+ * dialog, where it is read rather than hovered. A practice or group written here has no catalog to
+ * relate to, so it says nothing.
  */
 function describeOrigin({ origin, kind }: CatalogOriginProps) {
-	if (!origin) {
-		return null;
-	}
 	const noun = kind === "practice" ? "practice" : "group";
+	switch (origin.state) {
+		case "YOURS": {
+			return null;
+		}
+		case "FROM_HEPHAESTUS": {
+			return {
+				label: "Same as the catalog",
+				explanation: `${kind === "practice" ? "This practice matches" : "These group details match"} the catalog. A later catalog change does not edit your copy without your decision.`,
+			};
+		}
+		case "EDITED_HERE": {
+			return {
+				label: "Edited here",
+				explanation: `This workspace changed the ${noun}. Reset to catalog brings back the catalog’s version.`,
+			};
+		}
+		case "UPDATE_WAITING": {
+			return {
+				label: "Catalog update waiting",
+				explanation:
+					kind === "practice"
+						? "The catalog has a newer version. Your copy is untouched. Review it in Practice updates."
+						: "The catalog now has different group details. Your copy is untouched. Reset to catalog brings them across.",
+			};
+		}
+		case "NO_LONGER_SHIPPED": {
+			return {
+				label: "No longer in the catalog",
+				explanation: `New workspaces no longer receive this ${noun}. Yours keeps working exactly as it is.`,
+			};
+		}
+	}
+}
 
-	if (!origin.sourceOffered) {
-		return {
-			label: "No longer in the catalog",
-			explanation: `New workspaces no longer receive this ${noun}. Yours keeps working exactly as it is.`,
-		};
-	}
-	if (origin.link === "UPDATE_AVAILABLE") {
-		return {
-			label: "Catalog changed, yours did not",
-			explanation:
-				kind === "practice"
-					? "The catalog changed. Your copy is untouched. Review the proposed fields in Practice updates."
-					: "The catalog now has different group details. Your copy is untouched. Edit it to bring anything you want across.",
-		};
-	}
-	if (origin.link === "DECLINED") {
-		return {
-			label: "Update declined",
-			explanation:
-				"You declined this catalog version. Your copy is unchanged. A different version can be proposed later.",
-		};
-	}
-	if (origin.link === "IN_SYNC") {
-		return {
-			label: "Same as the catalog",
-			explanation: `${kind === "practice" ? "This practice matches" : "These group details match"} the catalog now. A later catalog change will not edit your copy without your decision.`,
-		};
-	}
-	return {
-		label: "Edited here",
-		explanation:
-			kind === "practice"
-				? "This workspace changed the practice. A separate catalog update may also be waiting in Practice updates."
-				: "The group details differ from the version copied into this workspace.",
-	};
+/** Whether a reset to the catalog would change anything: the catalog still offers a different version. */
+export function canResetToCatalog(origin: CatalogOrigin): boolean {
+	return origin.state === "EDITED_HERE" || origin.state === "UPDATE_WAITING";
 }
 
 export function CatalogOriginBadge({
@@ -71,8 +70,14 @@ export function CatalogOriginBadge({
 	);
 }
 
-/** The badge's label as a heading and its explanation in full. Renders nothing without provenance. */
-export function CatalogOriginNote(props: CatalogOriginProps) {
+/**
+ * The badge's label as a heading and its explanation in full. Renders nothing for a practice or
+ * group written here. `action` sits under the explanation, such as the way to reset it.
+ */
+export function CatalogOriginNote({
+	action,
+	...props
+}: CatalogOriginProps & { action?: React.ReactNode }) {
 	const text = describeOrigin(props);
 	if (text === null) {
 		return null;
@@ -82,6 +87,7 @@ export function CatalogOriginNote(props: CatalogOriginProps) {
 			<ItemContent>
 				<ItemTitle>{text.label}</ItemTitle>
 				<ItemDescription className="line-clamp-none">{text.explanation}</ItemDescription>
+				{action}
 			</ItemContent>
 		</Item>
 	);

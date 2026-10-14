@@ -3,7 +3,7 @@ import { Fragment, type ReactNode } from "react";
 import { cn } from "cn";
 import type { StatusDef } from "@/components/common/status-def";
 import { useNow } from "@/components/common/use-now";
-import { groupReviewRunsByDay } from "@/components/practice-trace/review-run-groups";
+import { groupByDay } from "@/components/practice-trace/review-groups";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
 	Table,
@@ -151,13 +151,8 @@ export interface RecordDayTableProps<TRow> extends RecordRowsProps<TRow> {
  * results and feedback are drawn in it, so a record reads alike in every stream.
  */
 export function RecordDayTable<TRow>({ dateOf, rows, ...props }: RecordDayTableProps<TRow>) {
-	const days = groupReviewRunsByDay(rows, dateOf, new Date(useNow()));
-	return (
-		<RecordGroupedTable
-			{...props}
-			groups={days.map((day) => ({ label: day.label, rows: day.runs }))}
-		/>
-	);
+	const days = groupByDay(rows, dateOf, new Date(useNow()));
+	return <RecordGroupedTable {...props} groups={days} />;
 }
 
 export interface RecordGroupedTableProps<TRow> extends Omit<RecordRowsProps<TRow>, "rows"> {

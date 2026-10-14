@@ -18,8 +18,8 @@ import {
 } from "./SortableCatalogTree";
 
 const groups: SortableCatalogGroup[] = [
-	{ slug: "delivery", name: "Delivery", displayOrder: 0 },
-	{ slug: "quality", name: "Quality", displayOrder: 1 },
+	{ slug: "delivery", name: "Delivery", position: 0 },
+	{ slug: "quality", name: "Quality", position: 1 },
 ];
 
 const entries: SortableCatalogEntry[] = [
@@ -27,27 +27,27 @@ const entries: SortableCatalogEntry[] = [
 		slug: "small-changes",
 		name: "Small, reviewable changes",
 		groupSlug: "delivery",
-		displayOrder: 0,
+		position: 0,
 	},
 	{
 		slug: "explain-why",
 		name: "Explain what changed and why",
 		groupSlug: "delivery",
-		displayOrder: 1,
+		position: 1,
 	},
 	{
 		slug: "no-stale-drafts",
 		name: "Drafts are not left open",
 		groupSlug: "delivery",
-		displayOrder: 2,
+		position: 2,
 	},
 	{
 		slug: "tests-with-changes",
 		name: "Tests ship with the change",
 		groupSlug: "quality",
-		displayOrder: 0,
+		position: 0,
 	},
-	{ slug: "orphan", name: "Not filed anywhere yet", displayOrder: 0 },
+	{ slug: "orphan", name: "Not filed anywhere yet", groupSlug: null, position: 0 },
 ];
 
 interface HarnessProps {
@@ -93,15 +93,13 @@ function CatalogTreeHarness({
 			}
 			const rest = previous.filter((row) => row.slug !== entrySlug);
 			const destination = rest
-				.filter((row) => (row.groupSlug ?? null) === groupSlug)
-				.sort((a, b) => a.displayOrder - b.displayOrder);
-			destination.splice(position, 0, { ...moved, groupSlug: groupSlug ?? undefined });
+				.filter((row) => row.groupSlug === groupSlug)
+				.sort((a, b) => a.position - b.position);
+			destination.splice(position, 0, { ...moved, groupSlug });
 			const renumbered = new Map(destination.map((row, index) => [row.slug, index]));
 			return [...rest, moved].map((row) => {
 				const order = renumbered.get(row.slug);
-				return order == null
-					? row
-					: { ...row, groupSlug: groupSlug ?? undefined, displayOrder: order };
+				return order == null ? row : { ...row, groupSlug, position: order };
 			});
 		});
 	};

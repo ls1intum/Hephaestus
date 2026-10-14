@@ -2,7 +2,7 @@ import { BookUser } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 
 import type { TeamInfo } from "@/api/types.gen";
-import type { ExtendedUserTeams } from "@/components/admin/members/user-teams";
+import type { WorkspaceMemberRow } from "@/components/admin/members/workspace-members";
 import {
 	WorkspaceMembersTable,
 	type WorkspaceMembersTableView,
@@ -10,26 +10,31 @@ import {
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
+import type { WorkspaceRole } from "@/lib/workspace-roles";
 
 interface WorkspaceMembersPageProps {
-	users: ExtendedUserTeams[];
+	members: WorkspaceMemberRow[];
 	teams: TeamInfo[];
 	isLoading: boolean;
 	error?: unknown;
 	onRetry?: () => void;
-	onToggleHidden?: (userId: number, hidden: boolean) => void;
+	onToggleHidden?: (accountId: string, hidden: boolean) => void;
+	onRoleChange?: (accountId: string, role: WorkspaceRole) => void;
+	pendingRoleAccountId?: string;
 	view: WorkspaceMembersTableView;
 	onViewChange: (patch: Partial<WorkspaceMembersTableView>) => void;
 	renderPageLink: (page: number, props: ComponentProps<"a">) => ReactElement;
 }
 
 export function WorkspaceMembersPage({
-	users,
+	members,
 	teams,
 	isLoading,
 	error,
 	onRetry,
 	onToggleHidden,
+	onRoleChange,
+	pendingRoleAccountId,
 	view,
 	onViewChange,
 	renderPageLink,
@@ -39,14 +44,16 @@ export function WorkspaceMembersPage({
 			<PageHeader
 				icon={<BookUser />}
 				title="Members"
-				description="Browse workspace members and filter by team."
+				description="Browse workspace members, filter by team, and change their roles."
 			/>
 			{error == null ? (
 				<WorkspaceMembersTable
-					users={users}
+					members={members}
 					teams={teams}
 					isLoading={isLoading}
 					onToggleHidden={onToggleHidden}
+					onRoleChange={onRoleChange}
+					pendingRoleAccountId={pendingRoleAccountId}
 					view={view}
 					onViewChange={onViewChange}
 					renderPageLink={renderPageLink}

@@ -5,10 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 
 /** What decides whether a practice is turned off: its practice setup as it is now. */
-export type CurrentPractice = Pick<Practice, "slug" | "autonomy">;
+export type CurrentPractice = Pick<Practice, "slug" | "feedbackMode">;
 
 /**
- * Whether a practice is turned off in this workspace today: its autonomy is Off now, whatever it was
+ * Whether a practice is turned off in this workspace today: its feedback mode is Off now, whatever it was
  * when its results were made. A practice that is no longer in the workspace is turned off too.
  * While the practices load, nothing is: a list must not hide rows on a guess.
  */
@@ -20,7 +20,7 @@ export function isTurnedOff(
 		return false;
 	}
 	const practice = practices.find((candidate) => candidate.slug === slug);
-	return practice === undefined || practice.autonomy.effective === "OFF";
+	return practice === undefined || practice.feedbackMode.effective === "OFF";
 }
 
 export interface ShowTurnedOffSwitchProps {

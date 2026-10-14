@@ -1,4 +1,4 @@
-import type { FeedbackModeAssignment } from "@/api/types.gen";
+import type { FeedbackModeAssignment, FeedbackModeRollup } from "@/api/types.gen";
 
 import { andList } from "@/lib/text";
 
@@ -52,12 +52,21 @@ export function feedbackModeSourceSentence(source: FeedbackModeSource): string {
 	return source.kind === "inherited" ? `Follows ${source.from}` : "Set for this practice";
 }
 
+/** The rollup's three counts, keyed by the mode they count. */
+export function feedbackModeCounts(
+	rollup: Pick<FeedbackModeRollup, "off" | "approveFirst" | "automatic">,
+): Record<FeedbackMode, number> {
+	return { OFF: rollup.off, APPROVE_FIRST: rollup.approveFirst, AUTOMATIC: rollup.automatic };
+}
+
 export interface FeedbackModeCount {
 	feedbackMode: FeedbackMode;
 	count: number;
 }
 
-export function feedbackModeDistribution(counts: Record<FeedbackMode, number>): FeedbackModeCount[] {
+export function feedbackModeDistribution(
+	counts: Record<FeedbackMode, number>,
+): FeedbackModeCount[] {
 	return FEEDBACK_MODE_ORDER.map((feedbackMode) => ({
 		feedbackMode,
 		count: counts[feedbackMode],
@@ -70,7 +79,8 @@ export function feedbackModeTotal(counts: Record<FeedbackMode, number>): number 
 
 export function feedbackModeDistributionSentence(counts: Record<FeedbackMode, number>): string {
 	const parts = feedbackModeDistribution(counts).map(
-		({ feedbackMode, count }) => `${count} set to ${FEEDBACK_MODE_LABELS[feedbackMode].toLowerCase()}`,
+		({ feedbackMode, count }) =>
+			`${count} set to ${FEEDBACK_MODE_LABELS[feedbackMode].toLowerCase()}`,
 	);
 	if (parts.length === 0) {
 		return "No practices yet.";

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.context;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryScope;
+import de.tum.cit.aet.hephaestus.integration.core.framework.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import jakarta.persistence.QueryHint;
 import java.util.stream.Stream;

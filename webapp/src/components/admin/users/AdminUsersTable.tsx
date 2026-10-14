@@ -46,9 +46,12 @@ function roleBadgeVariant(appRole: AppRole) {
 	return appRole === "APP_ADMIN" ? "default" : "secondary";
 }
 
-// Active is neutral; suspended and being-deleted are not normal states and read as destructive.
+// Active and unclaimed are normal states and read as neutral; the others read as destructive.
 function statusBadgeVariant(status: AdminAccountView["status"]) {
-	return status === "ACTIVE" ? "secondary" : "destructive";
+	if (status === "ACTIVE") {
+		return "secondary";
+	}
+	return status === "UNCLAIMED" ? "outline" : "destructive";
 }
 
 function changeRoleLabel(isSelfAdmin: boolean, appRole: AppRole) {

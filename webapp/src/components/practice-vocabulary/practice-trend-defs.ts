@@ -1,10 +1,10 @@
 import { CircleDashedIcon, CircleHelpIcon, TrendingDownIcon, TrendingUpIcon } from "lucide-react";
 
-import type { PracticeTrend } from "@/api/types.gen";
+import type { PracticeStanding } from "@/api/types.gen";
 
 import type { StatusDefs } from "@/components/common/status-def";
 
-export type TrendDirection = PracticeTrend["direction"];
+export type TrendDirection = NonNullable<PracticeStanding["direction"]>;
 export const PRACTICE_TREND_DEFS: StatusDefs<TrendDirection> = {
 	IMPROVING: {
 		label: "More positive recently",

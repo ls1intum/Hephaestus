@@ -1,4 +1,4 @@
-import { FileCodeIcon, FileIcon, MessageSquareTextIcon } from "lucide-react";
+import { FEEDBACK_COPY_KIND_DEFS } from "@/components/practice-vocabulary/feedback-copy-defs";
 
 import { cn } from "cn";
 import { formatDateTime, formatRelative } from "~/components/common/format";
@@ -40,11 +40,7 @@ function Comment({
 	pageOrigin: string;
 	now: string;
 }) {
-	const Icon = {
-		LINE_NOTE: FileCodeIcon,
-		FILE_NOTE: FileIcon,
-		SUMMARY: MessageSquareTextIcon,
-	}[comment.kind];
+	const Icon = FEEDBACK_COPY_KIND_DEFS[comment.kind].icon;
 	const label = where(comment, false);
 	const { postedAt } = comment;
 	return (

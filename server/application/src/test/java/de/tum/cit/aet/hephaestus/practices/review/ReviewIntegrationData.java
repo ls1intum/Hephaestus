@@ -39,6 +39,7 @@ import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -91,14 +92,14 @@ public class ReviewIntegrationData {
         item.setSourceId(ThreadLocalRandom.current().nextLong(1000000000000L, Long.MAX_VALUE));
         item.setCreatedAt(Instant.now().minusSeconds(3600));
         items.saveAndFlush(item);
-        var practice = versions.create(
+        var practice = versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "s5-practice-" + UUID.randomUUID().toString().substring(0, 8),
                 item.getKind(),
                 definition,
                 null,
                 0,
-                account.getId());
+                account.getId()));
         return new Scenario(workspace, account, practice, item);
     }
 
@@ -213,7 +214,7 @@ public class ReviewIntegrationData {
                 .kind(kind)
                 .reason("Recorded review decision")
                 .createdById(account)
-                .createdAt(result.getRecordedAt().plusSeconds(1))
+                .createdAt(result.getRecordedAt())
                 .build());
     }
 
@@ -221,8 +222,8 @@ public class ReviewIntegrationData {
     public UUID job(Result result) {
         var id = UUID.randomUUID();
         jdbc.sql("""
-            INSERT INTO review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,completed_at)
-            VALUES(:id,:review,:ws,'COMPLETED',1,'DONE',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at)
+            INSERT INTO review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,available_at,started_at,completed_at)
+            VALUES(:id,:review,:ws,'COMPLETED',1,'DONE',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,:at)
             """)
                 .param("id", id)
                 .param("review", result.getReviewId())
@@ -236,7 +237,7 @@ public class ReviewIntegrationData {
                                 "assignments",
                                 List.of(new ReviewAssignmentId(
                                         result.getReviewId(), result.getPracticeId(), result.getItemId())))))
-                .param("at", result.getRecordedAt())
+                .param("at", Timestamp.from(result.getRecordedAt()))
                 .update();
         return id;
     }

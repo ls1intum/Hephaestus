@@ -18,27 +18,23 @@ public final class ScmVersion {
     }
 
     public static ItemVersion pullRequestReview(
-            String base,
-            String head,
-            String title,
-            @Nullable String body,
-            String reviewCommit,
-            @Nullable String reviewBody,
-            String state) {
+            String base, String head, String title, @Nullable String body, ReviewContent review) {
         requireObjectId(base);
         requireObjectId(head);
-        requireObjectId(reviewCommit);
+        requireObjectId(review.commit());
         return new ItemVersion(
                 "scm.pull_request_review:v1:"
                         + base
                         + ":"
                         + head
                         + ":"
-                        + reviewCommit
+                        + review.commit()
                         + ":"
-                        + digest(title, body, reviewBody, state),
+                        + digest(title, body, review.body(), review.state()),
                 base);
     }
+
+    public record ReviewContent(String commit, @Nullable String body, String state) {}
 
     public static ItemVersion withContext(ItemVersion version, ItemVersion context) {
         reviewedHead(version);

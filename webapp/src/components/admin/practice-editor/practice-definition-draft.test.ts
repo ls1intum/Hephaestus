@@ -1,0 +1,177 @@
+import { describe, expect, it, vi } from "vitest";
+
+import {
+	definitionOf,
+	mockDefinitionOptions,
+	mockPullRequestItemType,
+	mockScan,
+	practiceValueOf,
+} from "./fixtures";
+import {
+	blankDraft,
+	clearedBySave,
+	definitionOfDraft,
+	draftErrors,
+	draftOf,
+	NO_GROUP,
+	type PracticeDefinitionDraft,
+} from "./practice-definition-draft";
+import { scanDraftOf } from "./scan-settings";
+
+const reveals = { revealTechnical: vi.fn(), revealGuide: vi.fn(), revealScript: vi.fn() };
+
+function draft(overrides: Partial<PracticeDefinitionDraft> = {}): PracticeDefinitionDraft {
+	return { ...draftOf(practiceValueOf(), mockPullRequestItemType), ...overrides };
+}
+
+function saved(value: PracticeDefinitionDraft) {
+	return definitionOfDraft(value, mockPullRequestItemType, mockDefinitionOptions.sourceContract);
+}
+
+describe("definitionOfDraft", () => {
+	it("gives back an untouched practice exactly as it was loaded", () => {
+		expect(saved(draft())).toStrictEqual(practiceValueOf());
+		expect(
+			saved(draftOf(practiceValueOf({ scan: mockScan }), mockPullRequestItemType)),
+		).toStrictEqual(practiceValueOf({ scan: mockScan }));
+	});
+
+	it("saves a blank script as the built-in review", () => {
+		expect(saved(draft({ script: "  \n" })).definition.script).toBeNull();
+		expect(saved(draft({ script: "export default 1;" })).definition.script).toBe(
+			"export default 1;",
+		);
+	});
+
+	it("keeps no reads, script, scan or limits when people review the practice", () => {
+		const value = saved(
+			draft({
+				script: "export default 1;",
+				scan: { enabled: true, draft: scanDraftOf(mockScan) },
+				reviewedBy: {
+					by: "PEOPLE",
+					humanReason: { code: "MEETING_NOT_CAPTURED", description: " Decided in a meeting. " },
+					limits: [{ code: "RUNTIME_NOT_OBSERVED", description: "Runtime not observed." }],
+				},
+			}),
+		).definition;
+
+		expect(value.reads.sources).toStrictEqual([]);
+		expect(value.script).toBeNull();
+		expect(value.scan).toBeNull();
+		expect(value.reviewedBy).toStrictEqual({
+			by: "PEOPLE",
+			humanReason: { code: "MEETING_NOT_CAPTURED", description: "Decided in a meeting." },
+			limits: [],
+		});
+	});
+
+	it("drops a saved human reason when the practice goes back to Hephaestus", () => {
+		const people = practiceValueOf({
+			reviewedBy: {
+				by: "PEOPLE",
+				humanReason: { code: "MEETING_NOT_CAPTURED", description: "Decided in a meeting." },
+				limits: [],
+			},
+		});
+		const value = draftOf(people, mockPullRequestItemType);
+		expect(
+			saved({ ...value, reviewedBy: { ...value.reviewedBy, by: "HEPHAESTUS" } }).definition
+				.reviewedBy,
+		).toStrictEqual({ by: "HEPHAESTUS", humanReason: null, limits: [] });
+	});
+
+	it("saves Going well and the other guidance trimmed, and blank guidance as null", () => {
+		const { guidance } = saved(
+			draft({ goingWell: "  You keep changes small.  ", whyItMatters: " " }),
+		).definition;
+		expect(guidance.goingWell).toBe("You keep changes small.");
+		expect(guidance.whyItMatters).toBeNull();
+	});
+
+	it("writes the source contract the options offer and moves the practice out of its group", () => {
+		const value = saved(draft({ groupSlug: NO_GROUP }));
+		expect(value.groupSlug).toBeNull();
+		expect(
+			definitionOfDraft(draft(), mockPullRequestItemType, "2.1.0").definition.reads.contract,
+		).toBe("2.1.0");
+	});
+
+	it("turns scans off without losing the draft, and saves no scan", () => {
+		const scanned = draft({ scan: { enabled: false, draft: scanDraftOf(mockScan) } });
+		expect(saved(scanned).definition.scan).toBeNull();
+		expect(
+			saved({ ...scanned, scan: { ...scanned.scan, enabled: true } }).definition.scan,
+		).toStrictEqual(mockScan);
+	});
+});
+
+describe("clearedBySave", () => {
+	it("names nothing while Hephaestus reviews the practice", () => {
+		expect(clearedBySave(draft({ script: "export default 1;" }))).toStrictEqual([]);
+	});
+
+	it("names what a save with Nobody removes", () => {
+		const value = draft({
+			script: "export default 1;",
+			scan: { enabled: true, draft: scanDraftOf(mockScan) },
+		});
+		expect(
+			clearedBySave({ ...value, reviewedBy: { ...value.reviewedBy, by: "NOBODY" } }),
+		).toStrictEqual(["the read sources", "the practice script", "the scan settings"]);
+	});
+});
+
+describe("draftErrors", () => {
+	const errorsOf = (value: PracticeDefinitionDraft, mode: "create" | "edit" = "edit") =>
+		draftErrors(value, mode, mockDefinitionOptions, reveals).summary.map((entry) => entry.message);
+
+	it("accepts a loaded practice", () => {
+		expect(errorsOf(draft())).toStrictEqual([]);
+	});
+
+	it("requires a reason when people review the practice", () => {
+		const value = draft();
+		expect(
+			errorsOf({
+				...value,
+				reviewedBy: { ...value.reviewedBy, by: "PEOPLE" },
+			}),
+		).toStrictEqual(["Say why people review this practice, in at most 500 characters."]);
+	});
+
+	it("requires a source Hephaestus must read", () => {
+		expect(errorsOf(draft({ settings: { ...draft().settings, reads: [] } }))).toStrictEqual([
+			"Set at least one source to Required. A review cannot run without one.",
+		]);
+	});
+
+	it("checks the scan only while it is turned on", () => {
+		const scan = { ...scanDraftOf(mockScan), include: "" };
+		expect(errorsOf(draft({ scan: { enabled: false, draft: scan } }))).toStrictEqual([]);
+		expect(errorsOf(draft({ scan: { enabled: true, draft: scan } }))).toStrictEqual([
+			"Include at least one path pattern, such as **/*.ts.",
+		]);
+	});
+
+	it("refuses a role the item type does not have, and accepts the work itself", () => {
+		expect(errorsOf(draft({ about: "REVIEWER" }))).toStrictEqual([
+			"Choose a role this kind of item has, or The work.",
+		]);
+		expect(errorsOf(draft({ about: null }))).toStrictEqual([]);
+	});
+
+	it("lists every refused field of a blank practice in the order the form shows them", () => {
+		expect(errorsOf(blankDraft(mockPullRequestItemType), "create")).toStrictEqual([
+			"Enter a name of 3 to 128 characters.",
+			"Enter what to look for.",
+			"Set at least one source to Required. A review cannot run without one.",
+			"Enter an identifier of 3–64 lowercase letters, numbers and single hyphens.",
+		]);
+	});
+
+	it("keeps MERGER where the item type offers it", () => {
+		expect(errorsOf(draft({ about: "MERGER" }))).toStrictEqual([]);
+		expect(definitionOf({ about: "MERGER" }).about).toBe("MERGER");
+	});
+});

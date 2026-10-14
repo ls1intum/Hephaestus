@@ -27,7 +27,7 @@ export interface ReviewPageProps {
 
 /**
  * Tabs, not a stack: only the open section is in the document, so a section's data is fetched when
- * somebody asks for it, and the autonomy section's sticky summary strip cannot hang over another
+ * somebody asks for it, and the feedback mode section's sticky summary strip cannot hang over another
  * section's settings.
  */
 export function ReviewPage({ section, onSectionChange, running, sections }: ReviewPageProps) {

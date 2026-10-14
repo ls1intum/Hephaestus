@@ -5,8 +5,8 @@
  * sentence in the overview card or a card body is a list of segments, so a practice name inside
  * it is the same pill and a work reference the same link everywhere without the text being HTML.
  */
-import type { ReviewedWorkRef } from "@/api/types.gen";
-import { artifactKindNoun, type WorkProvider } from "@/lib/artifact-kinds";
+import type { ItemRef } from "@/api/types.gen";
+import { itemKindNoun, type ItemProvider } from "@/lib/item-kinds";
 import { andList } from "@/lib/text";
 
 /**
@@ -19,7 +19,7 @@ export type FeedbackTextSegment =
 	| { type: "text"; text: string }
 	| { type: "practice"; slug: string; name: string }
 	| { type: "group"; slug: string; name: string }
-	| { type: "work"; ref: ReviewedWorkRef };
+	| { type: "work"; ref: ItemRef };
 
 export function text(value: string): FeedbackTextSegment {
 	return { type: "text", text: value };
@@ -39,7 +39,7 @@ export function group(slug: string, name: string): FeedbackTextSegment {
 	return { type: "group", slug, name };
 }
 
-export function work(ref: ReviewedWorkRef): FeedbackTextSegment {
+export function work(ref: ItemRef): FeedbackTextSegment {
 	return { type: "work", ref };
 }
 
@@ -61,10 +61,10 @@ const WORK_REFERENCE = /[#!]\d+/gu;
  * only when exactly one known piece carries that number, which is what lets a body written with "#"
  * reach a merge request; where two do, the reference is ambiguous and stays words.
  */
-export function linkWork(body: string, known: ReviewedWorkRef[]): FeedbackTextSegment[] {
+export function linkWork(body: string, known: ItemRef[]): FeedbackTextSegment[] {
 	const labelled = known.filter((ref) => /^[#!]\d+$/u.test(ref.label));
 	const byLabel = new Map(labelled.map((ref) => [ref.label, ref] as const));
-	const byNumber = new Map<string, ReviewedWorkRef | undefined>();
+	const byNumber = new Map<string, ItemRef | undefined>();
 	for (const ref of labelled) {
 		const number = ref.label.slice(1);
 		byNumber.set(number, byNumber.has(number) ? undefined : ref);
@@ -119,8 +119,8 @@ export function countsTogether(
  * "four pull requests", "four merge requests" on GitLab: the registry's noun for the kind of work
  * at its provider, under the number rule.
  */
-export const countedWork = (kind: string | undefined, n: number, provider?: WorkProvider): string =>
-	`${spell(n)} ${artifactKindNoun(kind, n, provider)}`;
+export const countedWork = (kind: string | undefined, n: number, provider?: ItemProvider): string =>
+	`${spell(n)} ${itemKindNoun(kind, n, provider)}`;
 
 /** "A", "A and B", "A, B and C", each item keeping its own segments. */
 export function list(items: FeedbackTextSegment[][]): FeedbackTextSegment[] {
@@ -133,7 +133,7 @@ export function list(items: FeedbackTextSegment[][]): FeedbackTextSegment[] {
 }
 
 /** The work references listed, each as a link: "!421, !423 and !425". */
-export const refs = (evidence: ReviewedWorkRef[]): FeedbackTextSegment[] =>
+export const refs = (evidence: ItemRef[]): FeedbackTextSegment[] =>
 	list(evidence.map((ref) => [work(ref)]));
 
 /**

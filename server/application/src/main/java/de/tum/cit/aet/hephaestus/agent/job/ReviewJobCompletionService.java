@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
@@ -43,6 +44,7 @@ public class ReviewJobCompletionService {
 
     @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.SECONDS)
     @SchedulerLock(name = "practice-job-completion", lockAtMostFor = "PT2M", lockAtLeastFor = "PT1S")
+    @WorkspaceAgnostic("Enumerates bounded terminal job identities; each settlement carries its workspace")
     public void tick() {
         for (var candidate : jobs.findTerminalForProcessing(100))
             try {

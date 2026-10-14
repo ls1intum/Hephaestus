@@ -8,7 +8,7 @@ import {
 	signalCountsLabel,
 } from "@/components/practice-trace/trace-format";
 import { TRACED_WORK_DEFS } from "@/components/practice-vocabulary/traced-work-defs";
-import { isKnownArtifactKind, reviewedWorkName } from "@/lib/artifact-kinds";
+import { isKnownItemKind, itemName } from "@/lib/item-kinds";
 
 import { RecordRowActions } from "./RecordRowActions";
 import type { RowReviewRequest } from "./RequestReviewAction";
@@ -40,16 +40,12 @@ export function UnreviewedWorkRow({ work, request, refusal }: UnreviewedWorkRowP
 	const title = work.reviewedWork.title ?? work.reviewedWork.label;
 	const kind = work.artifactKind;
 	const moment = work.lastSignal;
-	const record = isKnownArtifactKind(kind) ? workRecord(kind, work.artifactId) : undefined;
+	const record = isKnownItemKind(kind) ? workRecord(kind, work.artifactId) : undefined;
 	return (
 		<ReviewRow
 			actions={
 				record && (
-					<RecordRowActions
-						record={record}
-						name={reviewedWorkName(work.reviewedWork)}
-						request={request}
-					/>
+					<RecordRowActions record={record} name={itemName(work.reviewedWork)} request={request} />
 				)
 			}
 			status={TRACED_WORK_DEFS.NO_REVIEW_STARTED}

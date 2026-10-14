@@ -1,38 +1,27 @@
-import type { KnownArtifactKind } from "@/lib/artifact-kinds";
+import type { KnownItemKind } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
-/**
- * The tabs under Practice reviews, each of which keeps the shared scope in its URL, and the Reviews
- * tab's second list, the work no review started on (`unreviewed`), which applies less of it.
- */
-export type ReviewTab =
-	| "overview"
-	| "runs"
-	| "unreviewed"
-	| "results"
-	| "observations"
-	| "feedback";
+/** The tabs under Practice reviews, each of which keeps the shared scope in its URL. */
+export type ReviewTab = "overview" | "reviews" | "results" | "problems" | "feedback";
 
 /**
- * The narrowing that follows the reader from tab to tab: one person, a set of practices and groups, a
- * range of days, and the selection — the work, the review or the result a list was opened for
- * (`review-selection.ts`).
- *
- * The person has one value but two URL names. The feedback list names the person a piece of feedback
- * is addressed to, `recipientUserId`. Every other tab names the developer a result is about,
- * `subjectUserId`. Thus, an address that worked before the scope was shared still works.
+ * The narrowing that follows the reader from tab to tab: one developer, a set of practices and
+ * groups, a range of days, a kind of item, and the selection — the item, the review, the result,
+ * the problem or the feedback a list was opened for (`review-selection.ts`). Every tab names the
+ * developer `developerId`: feedback has one developer, as a result does.
  */
 export interface ReviewScope {
-	personId?: number;
+	developerId?: string;
 	groupSlug?: string[];
 	practiceSlug?: string[];
 	from?: string;
 	to?: string;
-	agentJobId?: string;
-	artifactKind?: KnownArtifactKind;
-	artifactId?: number;
-	practiceResultId?: string;
-	/** A tracked piece of feedback; its review is `agentJobId`. */
+	itemKind?: KnownItemKind;
+	itemId?: string;
+	reviewId?: string;
+	resultId?: string;
+	problemId?: string;
+	/** A tracked piece of feedback; its review is `reviewId`. */
 	feedbackId?: string;
 	/** A tracked practice: every list narrows to it, whatever the practice filter holds. */
 	selectedPractice?: string;
@@ -40,17 +29,23 @@ export interface ReviewScope {
 	selected?: true;
 }
 
-/** The scope as a tab's URL holds it. */
-export interface ReviewScopeSearch extends Omit<ReviewScope, "personId"> {
-	subjectUserId?: number;
-	recipientUserId?: number;
-}
+/** The scope as a tab's URL holds it: the same names. */
+export type ReviewScopeSearch = ReviewScope;
 
 /** One part of the scope, as the toolbar shows it. */
-export type ScopeFacet = "person" | "group" | "practice" | "dates" | "review" | "work" | "result";
+export type ScopeFacet =
+	| "developer"
+	| "group"
+	| "practice"
+	| "dates"
+	| "kind"
+	| "review"
+	| "item"
+	| "result"
+	| "problem";
 
 /** The selection applies on every list: each one narrows to what follows from it. */
-const SELECTION: readonly ScopeFacet[] = ["review", "work", "result"];
+const SELECTION: readonly ScopeFacet[] = ["review", "item", "result"];
 
 /**
  * Which parts of the scope each tab's endpoint can filter by. A part a tab cannot apply stays in its
@@ -58,12 +53,10 @@ const SELECTION: readonly ScopeFacet[] = ["review", "work", "result"];
  */
 export const SCOPE_APPLIES: Record<ReviewTab, readonly ScopeFacet[]> = {
 	overview: [],
-	// Work no review read has no developer, practice or group yet: only when it happened, and which.
-	unreviewed: ["dates", "work"],
-	runs: ["person", "group", "practice", "dates", ...SELECTION],
-	results: ["person", "group", "practice", "dates", ...SELECTION],
-	observations: ["person", "group", "practice", "dates", ...SELECTION],
-	feedback: ["person", "group", "practice", "dates", ...SELECTION],
+	reviews: ["developer", "group", "practice", "dates", "review", "item"],
+	results: ["developer", "group", "practice", "dates", "kind", ...SELECTION],
+	problems: ["developer", "group", "practice", "dates", "kind", ...SELECTION, "problem"],
+	feedback: ["developer", "group", "practice", "dates", "kind", "review", "item"],
 };
 
 function present<T>(values: T[] | undefined): T[] | undefined {
@@ -72,56 +65,43 @@ function present<T>(values: T[] | undefined): T[] | undefined {
 
 export function readScope(search: ReviewScopeSearch): ReviewScope {
 	return {
-		personId: search.subjectUserId ?? search.recipientUserId,
+		developerId: search.developerId,
 		groupSlug: present(search.groupSlug),
 		practiceSlug: present(search.practiceSlug),
 		from: search.from,
 		to: search.to,
-		agentJobId: search.agentJobId,
-		artifactKind: search.artifactKind,
-		artifactId: search.artifactKind ? search.artifactId : undefined,
-		practiceResultId: search.practiceResultId,
+		itemKind: search.itemKind,
+		itemId: search.itemId,
+		reviewId: search.reviewId,
+		resultId: search.resultId,
+		problemId: search.problemId,
 		feedbackId: search.feedbackId,
 		selectedPractice: search.selectedPractice,
 		selected: search.selected,
 	};
 }
 
-/**
- * A scope patch in the URL names of `tab`. Both person names are written, so a change never leaves
- * the other name behind with an old value.
- */
-export function scopeSearch(tab: ReviewTab, scope: Partial<ReviewScope>): ReviewScopeSearch {
-	const { personId, ...rest } = scope;
-	if (!("personId" in scope)) {
-		return rest;
-	}
-	return tab === "feedback"
-		? { ...rest, recipientUserId: personId, subjectUserId: undefined }
-		: { ...rest, subjectUserId: personId, recipientUserId: undefined };
-}
-
-/** The search that a link to `tab` carries: the scope of the tab the reader is on, and nothing else. */
-export function carriedScope(tab: ReviewTab, previous: ReviewScopeSearch): ReviewScopeSearch {
-	const scope = readScope(previous);
-	const search = scopeSearch(tab, scope);
+/** The search that a link to another tab carries: the scope of the tab the reader is on, and nothing else. */
+export function carriedScope(previous: ReviewScopeSearch): ReviewScopeSearch {
 	// Only the keys with a value, so a link does not spell out every empty one.
-	return Object.fromEntries(Object.entries(search).filter(([, value]) => value !== undefined));
+	return Object.fromEntries(
+		Object.entries(readScope(previous)).filter(([, value]) => value !== undefined),
+	);
 }
 
 /** Every part of the scope, cleared. */
 export function clearedScope(): ReviewScopeSearch {
 	return {
-		subjectUserId: undefined,
-		recipientUserId: undefined,
+		developerId: undefined,
 		groupSlug: undefined,
 		practiceSlug: undefined,
 		from: undefined,
 		to: undefined,
-		agentJobId: undefined,
-		artifactKind: undefined,
-		artifactId: undefined,
-		practiceResultId: undefined,
+		itemKind: undefined,
+		itemId: undefined,
+		reviewId: undefined,
+		resultId: undefined,
+		problemId: undefined,
 		feedbackId: undefined,
 		selectedPractice: undefined,
 		selected: undefined,
@@ -131,8 +111,8 @@ export function clearedScope(): ReviewScopeSearch {
 /** The parts of the scope that hold a value. */
 export function setScopeFacets(scope: ReviewScope): ScopeFacet[] {
 	const set: ScopeFacet[] = [];
-	if (scope.personId !== undefined) {
-		set.push("person");
+	if (hasText(scope.developerId)) {
+		set.push("developer");
 	}
 	if ((scope.groupSlug?.length ?? 0) > 0) {
 		set.push("group");
@@ -143,14 +123,20 @@ export function setScopeFacets(scope: ReviewScope): ScopeFacet[] {
 	if (hasText(scope.from)) {
 		set.push("dates");
 	}
-	if (hasText(scope.agentJobId)) {
+	if (scope.itemKind !== undefined) {
+		set.push("kind");
+	}
+	if (hasText(scope.reviewId)) {
 		set.push("review");
 	}
-	if (scope.artifactKind !== undefined) {
-		set.push("work");
+	if (hasText(scope.itemId)) {
+		set.push("item");
 	}
-	if (hasText(scope.practiceResultId)) {
+	if (hasText(scope.resultId)) {
 		set.push("result");
+	}
+	if (hasText(scope.problemId)) {
+		set.push("problem");
 	}
 	return set;
 }

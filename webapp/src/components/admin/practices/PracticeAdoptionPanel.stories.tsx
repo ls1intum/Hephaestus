@@ -2,44 +2,38 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
 import type { CatalogPracticePreview } from "@/api/types.gen";
-import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeDefinitionOptions,
-	mockPullRequestReviewFields,
-	mockPullRequestPolicy,
-} from "@/mocks/fixtures/practice";
+import { definitionOf, mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
 import { expectNoPanelOverflow } from "@/stories/reflow";
 import { expectGenuinelyDisabled } from "@/test/controls";
 
+import { practiceScript } from "./fixtures";
 import { PracticeAdoptionPanel, type PracticeAdoptionState } from "./PracticeAdoptionPanel";
 
 const preview: CatalogPracticePreview = {
 	slug: "describe-what-and-why",
+	kind: "scm.pull_request",
 	availability: "AVAILABLE",
 	etag: '"adoption-plan"',
-	initialAutonomy: "HUMAN_APPROVAL",
-	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
+	initialFeedbackMode: "APPROVE_FIRST",
+	offeredDigest: "sha256:describe-what-and-why",
 	group: {
 		slug: "review-ready-work",
 		disposition: "CREATE_CATALOG_GROUP",
-		definition: { name: "Review-ready work", description: "Work prepared for useful review." },
+		definition: {
+			name: "Review-ready work",
+			description: "Work prepared for useful review.",
+			icon: null,
+			color: null,
+		},
 	},
-	definition: {
+	definition: definitionOf({
 		name: "Describe what changed and why",
-		artifactKind: "scm.pull_request",
-		...mockPullRequestReviewFields,
 		criteria: "Confirm the pull request explains both the change and its motivation.",
-		deliveryBehavior: { summaryOnly: false },
-		automatedReviewPolicy: mockPullRequestPolicy,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		practiceScript: "export default { hasDescription: pullRequest.body.length > 0 };",
-		whyItMatters: "Reviewers need intent to assess whether the change solves the right problem.",
-		whatGoodLooksLike: "A concise summary, motivation, and verification steps.",
-		groupSlug: "review-ready-work",
-	},
+		script: practiceScript(),
+	}),
 };
 
 type ReadyState = Extract<PracticeAdoptionState, { status: "ready" }>;
@@ -47,7 +41,7 @@ type ReadyState = Extract<PracticeAdoptionState, { status: "ready" }>;
 const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 	status: "ready",
 	preview,
-	definitionOptions: mockPracticeDefinitionOptions,
+	definitionOptions: mockDefinitionOptions,
 	action: "idle",
 	...over,
 });
@@ -86,7 +80,7 @@ export const Available: Story = {
 	play: async ({ args }) => {
 		const adopt = await screen.findByRole("button", { name: "Add practice" });
 		await expectSettledVisible(adopt);
-		await expect(screen.getByText("Review before sending")).toBeVisible();
+		await expect(screen.getByText("Approve first")).toBeVisible();
 		await expect(screen.getByText("Create “Review-ready work”")).toBeVisible();
 		await userEvent.click(adopt);
 		await expect(args.onAdopt).toHaveBeenCalledOnce();
@@ -147,12 +141,21 @@ export const PreviewWentStale: Story = {
 export const UnassignedAndOff: Story = {
 	args: {
 		state: ready({
-			preview: { ...preview, initialAutonomy: "OFF", group: { disposition: "UNASSIGNED" } },
+			preview: {
+				...preview,
+				initialFeedbackMode: "OFF",
+				group: { disposition: "UNASSIGNED", slug: null, definition: null },
+			},
 		}),
 	},
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("Stay unassigned"));
 		await expect(screen.getByText("Off")).toBeVisible();
+		await expect(
+			screen.getByText(
+				"Off keeps results and stops feedback on the work, on practice pages, and in conversation.",
+			),
+		).toBeVisible();
 	},
 };
 
@@ -189,7 +192,7 @@ export const LongContent: Story = {
 			preview: {
 				...preview,
 				definition: {
-					...preview.definition,
+					...definitionOf(),
 					criteria:
 						"Confirm that the pull request explains the behavior change, the operational constraints that shaped it, the alternatives considered, and the evidence used to verify the result. Stay silent when the change is generated automatically and no meaningful author decision exists.",
 				},

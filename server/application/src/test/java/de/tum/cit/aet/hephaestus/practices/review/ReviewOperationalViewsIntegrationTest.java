@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingStage;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingSums;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -141,8 +142,8 @@ class ReviewOperationalViewsIntegrationTest extends BaseIntegrationTest {
                 .param("item", result.getItemId())
                 .param("developer", result.getDeveloperId())
                 .param("state", state.name())
-                .param("at", result.getRecordedAt())
-                .param("delivered", state == FeedbackState.DELIVERED ? result.getRecordedAt() : null)
+                .param("at", Timestamp.from(result.getRecordedAt()))
+                .param("delivered", state == FeedbackState.DELIVERED ? Timestamp.from(result.getRecordedAt()) : null)
                 .param("stop", state == FeedbackState.WITHHELD ? "COMPOSER_WITHHELD" : null)
                 .update();
         jdbc.sql("INSERT INTO feedback_basis(id,workspace_id,feedback_id,developer_id,result_id,ordinal)"

@@ -14,16 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.GeneralReviewCommentContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -31,7 +24,6 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 class ScmItemRecordTest extends BaseUnitTest {
@@ -48,19 +40,12 @@ class ScmItemRecordTest extends BaseUnitTest {
             repositories,
             issues,
             reviews,
-            mock(UserRepository.class),
             mock(IssueEvidenceVersion.class),
             mock(ScmGitTree.class),
             mock(ScmFileVersions.class),
-            mock(ScmCaptureConsent.class),
-            mock(JdbcTemplate.class),
             mapper,
-            mock(PullRequestContentSource.class),
-            mock(IssueContentSource.class),
-            mock(GeneralReviewCommentContentSource.class),
-            mock(ReviewThreadContentSource.class),
-            mock(LinkedWorkItemContentSource.class),
-            mock(RepositoryTreeContentSource.class));
+            mock(ScmWorkCapture.class),
+            mock(ScmCaptureContributors.class));
 
     @ParameterizedTest
     @ValueSource(strings = {"scm.issue", "scm.pull_request", "scm.pull_request_review", "scm.repository", "scm.file"})
@@ -134,7 +119,8 @@ class ScmItemRecordTest extends BaseUnitTest {
                     case "scm.repository" -> new ItemVersion(HEAD, null);
                     case "scm.pull_request" -> ScmVersion.pullRequest(BASE, HEAD, "Title", null);
                     case "scm.pull_request_review" ->
-                        ScmVersion.pullRequestReview(BASE, HEAD, "Title", null, HEAD, "Review", "COMMENTED");
+                        ScmVersion.pullRequestReview(
+                                BASE, HEAD, "Title", null, new ScmVersion.ReviewContent(HEAD, "Review", "COMMENTED"));
                     default -> new ItemVersion("opaque", null);
                 };
         return new ItemSnapshot(

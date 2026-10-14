@@ -172,7 +172,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         binding.setInstanceModel(instanceModel);
         agentBindingRepository.save(binding);
 
-        practice = runtimePracticeVersions.create(
+        practice = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "orphan-recovery-practice",
                 new ItemKind("scm.pull_request"),
@@ -180,7 +180,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                         new ItemKind("scm.pull_request"), "Orphan recovery practice", "The first definition", null),
                 null,
                 0,
-                null);
+                null));
         practice.setFeedbackMode(FeedbackMode.AUTOMATIC);
         IdentityProvider provider = identityProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")

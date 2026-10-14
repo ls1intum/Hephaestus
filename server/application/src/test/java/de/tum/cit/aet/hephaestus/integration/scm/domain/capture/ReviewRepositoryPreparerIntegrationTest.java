@@ -6,7 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -21,8 +21,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,18 @@ class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityProviderRepository providers;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private RepositoryToMonitorRepository monitors;
+
+    @Autowired
+    private ConnectionRepository connectionRows;
+
+    @Autowired
+    private ConnectionService connections;
 
     private static final String HEAD = "a".repeat(40);
     private PullRequest pullRequest;
@@ -72,8 +85,12 @@ class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
         pr.setUpdatedAt(Instant.parse("2026-10-01T12:00:00.123Z"));
         pr.setHeadRefOid(HEAD);
         pullRequest = pullRequests.save(pr);
-        var workspace = new Workspace();
-        workspace.setId(1L);
+        var workspace = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaces, connectionRows, WorkspaceTestFixtures.gitLabPatWorkspace("owner"), "https://scm.example");
+        var monitor = WorkspaceTestFixtures.repositoryMonitor(workspace, "owner/repo");
+        monitor.setNativeId(repository.getNativeId());
+        monitors.save(monitor);
+        long workspaceId = workspace.getId();
         context = ScmCaptureFixtures.context(
                 JsonMapper.builder()
                         .build()
@@ -83,14 +100,14 @@ class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
                         .put("repository_full_name", "owner/repo")
                         .put("commit_sha", HEAD)
                         .put("base_ref_oid", "b".repeat(40)),
-                1L,
+                workspaceId,
                 false);
         var previous = context.pinned();
         context = new ScmCaptureContext(
                 new ItemSnapshot(
                         previous.item(),
                         previous.version(),
-                        new IntegrationRef(IntegrationKind.GITLAB, 1L, null),
+                        new IntegrationRef(IntegrationKind.GITLAB, workspaceId, null),
                         previous.state(),
                         previous.roles(),
                         previous.label()),
@@ -98,22 +115,14 @@ class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
                 context.work(),
                 context.preparation(),
                 context.capturedAt());
-        var connections = mock(ConnectionService.class);
-        when(connections.findActiveProviderKind(1L)).thenReturn(Optional.of(IntegrationKind.GITLAB));
-        var connection = mock(Connection.class);
-        when(connection.getId()).thenReturn(10L);
-        when(connections.findActive(1L, IntegrationKind.GITLAB)).thenReturn(Optional.of(connection));
-        var monitors = mock(RepositoryToMonitorRepository.class);
-        when(monitors.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo")).thenReturn(true);
         var tokens = mock(ScmTokenSource.class);
         when(tokens.kind()).thenReturn(IntegrationKind.GITLAB);
-        when(tokens.serverUrl(1L)).thenReturn(Optional.of("https://scm.example"));
+        when(tokens.serverUrl(workspaceId)).thenReturn(Optional.of("https://scm.example"));
         when(tokens.recordsReviewDiffBase()).thenReturn(true);
-        when(tokens.accessToken(1L)).thenReturn(Optional.of("private-token"));
+        when(tokens.accessToken(workspaceId)).thenReturn(Optional.of("private-token"));
         var git = mock(GitRepositoryManager.class);
         when(git.commitExists(any(), anyString())).thenReturn(true);
-        preparer =
-                new ReviewRepositoryPreparer(git, pullRequests, monitors, connections, List.of(tokens), repositories);
+        preparer = new ReviewRepositoryPreparer(git, pullRequests, connections, List.of(tokens), repositories);
     }
 
     @Test

@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -99,7 +100,7 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
                 .param("item", result.getItemId())
                 .param("developer", scenarioAccountId)
                 .param("state", state)
-                .param("at", result.getRecordedAt())
+                .param("at", Timestamp.from(result.getRecordedAt()))
                 .update();
         jdbc.sql("INSERT INTO feedback_basis(id,workspace_id,feedback_id,result_id,developer_id,ordinal)"
                         + " VALUES(:id,:ws,:feedback,:result,:developer,0)")
@@ -123,12 +124,12 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
                 .param("feedback", feedback)
                 .param("position", position)
                 .param("state", posted ? "POSTED" : "WRITE_STARTED")
-                .param("at", result.getRecordedAt())
+                .param("at", Timestamp.from(result.getRecordedAt()))
                 .param("key", id.toString())
                 .param("marker", FeedbackIds.writeMarker(id))
                 .param("ref", posted ? "comment-" + position : null)
                 .param("url", posted ? "https://example.test/comment/" + position : null)
-                .param("posted", posted ? result.getRecordedAt() : null)
+                .param("posted", posted ? Timestamp.from(result.getRecordedAt()) : null)
                 .update();
     }
 }

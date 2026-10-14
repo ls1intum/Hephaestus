@@ -63,7 +63,7 @@ class PracticeReviewItemFactsIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(0);
     }
 }

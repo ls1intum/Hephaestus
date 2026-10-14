@@ -1,8 +1,8 @@
 import { HttpResponse, http } from "msw";
 import { assert, describe, expect, it } from "vitest";
 
-import { adminListAuthEvents, getAgentJob, listBackfillRuns } from "@/api/sdk.gen";
-import { reviewJob } from "@/components/admin/practice-reviews/fixtures";
+import { adminListAuthEvents, getReview, listReviewBatches } from "@/api/sdk.gen";
+import { reviewDetailCompleted } from "@/components/admin/practice-reviews/fixtures";
 import { server } from "@/mocks/server";
 
 /**
@@ -29,62 +29,65 @@ describe("generated SDK response transformers", () => {
 		expect(occurredAt.toISOString()).toBe(ISO);
 	});
 
-	it("revives dates nested in a list payload, where the recursion could quietly stop", async () => {
-		server.use(http.get("*/workspaces/:slug/practices/backfill-runs", () => runsResponse()));
+	it("revives dates nested in a page payload, where the recursion could quietly stop", async () => {
+		server.use(http.get("*/workspaces/:slug/practices/review-batches", () => batchesResponse()));
 
-		const { data } = await listBackfillRuns({ path: { workspaceSlug: "acme" } });
+		const { data } = await listReviewBatches({ path: { workspaceSlug: "acme" } });
 
-		expect(data?.[0]?.fromAt).toBeInstanceOf(Date);
-		expect(data?.[0]?.createdAt).toBeInstanceOf(Date);
+		expect(data?.content?.[0]?.from).toBeInstanceOf(Date);
+		expect(data?.content?.[0]?.createdAt).toBeInstanceOf(Date);
 	});
 
-	it("leaves an omitted optional date undefined rather than an Invalid Date", async () => {
+	it("leaves a null date null rather than the epoch", async () => {
 		server.use(
-			// `finishedAt` deliberately absent: a run still in flight has not finished.
-			http.get("*/workspaces/:slug/practices/backfill-runs", () => runsResponse("RUNNING")),
+			// `finishedAt` is null: a batch still running has not finished.
+			http.get("*/workspaces/:slug/practices/review-batches", () => batchesResponse("RUNNING")),
 		);
 
-		const { data } = await listBackfillRuns({ path: { workspaceSlug: "acme" } });
+		const { data } = await listReviewBatches({ path: { workspaceSlug: "acme" } });
 
-		// `new Date(undefined)` is an Invalid Date, which renders as the literal text "Invalid Date"
-		// instead of the em dash a screen shows for "not yet". The transformer must skip the field.
-		expect(data?.[0]?.finishedAt).toBeUndefined();
+		// `new Date(null)` is 1 January 1970, which renders as a real instant instead of the em dash a
+		// screen shows for "not yet". The transformer must skip the field.
+		expect(data?.content?.[0]?.finishedAt).toBeNull();
 	});
 
-	it("revives a review's execution boundary only when the server recorded it", async () => {
-		const job = reviewJob("11111111-1111-1111-1111-111111111111");
-		const path = { workspaceSlug: "acme", jobId: job.id };
-		const endpoint = "*/workspaces/:slug/agents/jobs/:jobId";
-		server.use(http.get(endpoint, () => HttpResponse.json({ ...job, executionStartedAt: ISO })));
+	it("revives a review's completion only when the server recorded it", async () => {
+		const review = reviewDetailCompleted;
+		const path = { workspaceSlug: "acme", reviewId: review.id };
+		const endpoint = "*/workspaces/:slug/practices/reviews/:reviewId";
+		server.use(http.get(endpoint, () => HttpResponse.json({ ...review, completedAt: ISO })));
 
-		const recorded = await getAgentJob({ path });
-		const boundary = recorded.data?.executionStartedAt;
-		assert(boundary instanceof Date);
-		expect(boundary.toISOString()).toBe(ISO);
+		const completed = await getReview({ path });
+		const completedAt = completed.data?.completedAt;
+		assert(completedAt instanceof Date);
+		expect(completedAt.toISOString()).toBe(ISO);
 
-		server.use(
-			http.get(endpoint, () => HttpResponse.json({ ...job, executionStartedAt: undefined })),
-		);
-		const legacy = await getAgentJob({ path });
-		expect(legacy.data?.executionStartedAt).toBeUndefined();
+		server.use(http.get(endpoint, () => HttpResponse.json({ ...review, completedAt: null })));
+		const running = await getReview({ path });
+		expect(running.data?.completedAt).toBeNull();
 	});
 });
 
 const ISO = "2026-07-24T10:30:00.000Z";
 
-function runsResponse(status = "COMPLETED") {
-	return HttpResponse.json([
-		{
-			id: "11111111-1111-1111-1111-111111111111",
-			artifactKind: "scm.pull_request",
-			status,
-			discoveredVia: "BACKFILL",
-			submittedCount: 0,
-			passedCount: 0,
-			failedCount: 0,
-			fromAt: ISO,
-			toAt: ISO,
-			createdAt: ISO,
-		},
-	]);
+function batchesResponse(status = "COMPLETED") {
+	return HttpResponse.json({
+		content: [
+			{
+				id: "11111111-1111-1111-1111-111111111111",
+				itemKind: "scm.pull_request",
+				origin: "BACKFILL",
+				status,
+				submittedCount: 0,
+				skippedCount: 0,
+				failedCount: 0,
+				from: ISO,
+				to: ISO,
+				createdAt: ISO,
+				startedAt: ISO,
+				finishedAt: status === "COMPLETED" ? ISO : null,
+			},
+		],
+		page: { number: 0, size: 20, totalElements: 1, totalPages: 1 },
+	});
 }

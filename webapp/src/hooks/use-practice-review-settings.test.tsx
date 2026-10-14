@@ -5,14 +5,14 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { getPracticeReviewSettingsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { PracticeReviewSettings } from "@/api/types.gen";
-import { mockReviewSettings } from "@/components/admin/practices/fixtures";
+import { reviewSettings } from "@/components/admin/practices/review/fixtures";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { usePracticeReviewSettingsMutation } from "./use-practice-review-settings";
 
 const workspaceSlug = "acme";
 const queryKey = getPracticeReviewSettingsQueryKey({ path: { workspaceSlug } });
-const settings = mockReviewSettings({ etag: '"v1"', deliveryStatus: "ACTIVE" });
+const settings = reviewSettings({ etag: '"v1"', deliveryStatus: "ACTIVE" });
 
 function createClient() {
 	return new QueryClient({

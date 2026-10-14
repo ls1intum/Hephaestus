@@ -2,12 +2,12 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
 import {
-	DESCRIPTIVE_PRACTICE,
 	LONG_PAGE,
 	MET_ROW,
 	NO_FEEDBACK,
 	NOT_MET_ROW,
 	OWN_PAGE,
+	OWN_TRACE,
 	READY,
 	READY_ADMIN,
 	READY_ON_GITHUB,
@@ -20,7 +20,7 @@ import { expectNoHorizontalOverflow } from "~/stories/reflow";
 
 const ADMIN_ON_GITHUB = {
 	...READY_ADMIN,
-	work: READY_ON_GITHUB.work,
+	item: READY_ON_GITHUB.item,
 	pageUrl: READY_ON_GITHUB.pageUrl,
 };
 
@@ -110,7 +110,7 @@ export const OneHeightInEveryState: Story = {
 			{ state: { status: "not-found", instanceHost: "heph.example.test", workLabel: "!1" } },
 			{ feedback: { status: "ready", data: NO_FEEDBACK } },
 			{ feedback: { status: "error", message: "We could not load." } },
-			{ activity: "pending" },
+			{ activity: "RUNNING" },
 		];
 		return (
 			<div className="flex flex-col divide-y divide-border">
@@ -240,17 +240,6 @@ export const CommentsWithoutResults: Story = {
 	},
 };
 
-/** More feedback than one answer holds: the count is a floor, and the list says it is not all. */
-export const OlderCommentsNotListed: Story = {
-	args: { expanded: true, feedback: { status: "ready", data: { ...WORK_FEEDBACK, more: true } } },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { expanded: true })).toHaveAccessibleName(
-			/^Practice review At least 3 comments for you/u,
-		);
-		await expect(canvas.getByText("Older comments are not listed here.")).toBeVisible();
-	},
-};
-
 export const FeedbackLoading: Story = {
 	args: { expanded: true, feedback: { status: "loading" }, results: { status: "loading" } },
 };
@@ -322,52 +311,73 @@ export const ManyResults: Story = {
 	},
 };
 
-/** A recorded own-review decision is pending. */
-export const DecisionPending: Story = {
-	args: { activity: "pending", expanded: true },
+/** The reader's latest own review is running. */
+export const ReviewRunning: Story = {
+	args: { activity: "RUNNING", expanded: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { expanded: true })).toHaveAccessibleName(
-			/^Practice review Review decision pending · 3 comments for you/u,
+			/^Practice review Review running · 3 comments for you/u,
 		);
 		await expect(canvas.getByRole("button", { name: "Request review" })).toBeVisible();
 	},
 };
 
-/** A practice the review could not finish is named as incomplete, and nothing more is claimed. */
+/** A review that could not finish every practice is named as incomplete, and nothing more is claimed. */
 export const ReviewIncomplete: Story = {
 	args: {
 		expanded: true,
 		state: {
 			...READY_ON_GITHUB,
-			trace:
-				READY_ON_GITHUB.trace === null
-					? null
-					: {
-							...READY_ON_GITHUB.trace,
-							practices: [
-								...READY_ON_GITHUB.trace.practices,
-								{
-									...DESCRIPTIVE_PRACTICE,
-									practiceSlug: "tests-cover-the-change",
-									practiceName: "Tests cover the change",
-									outcome: "FAILED",
-									decidedAt: undefined,
-								},
-							],
-						},
+			trace: { ...OWN_TRACE, review: { ...OWN_TRACE.review, status: "PARTIAL" } },
 		},
 	},
 	play: async ({ canvas }) => {
 		// An unfinished review is said on the line itself, not only inside.
 		await expect(canvas.getByRole("button", { expanded: true })).toHaveAccessibleName(
-			/· 1 practice incomplete$/u,
+			/· review did not finish$/u,
 		);
+	},
+};
+
+/** A review that failed recorded no result: the report says so and dates no review. */
+export const ReviewFailed: Story = {
+	args: {
+		expanded: true,
+		state: {
+			...READY_ON_GITHUB,
+			trace: {
+				...OWN_TRACE,
+				review: { ...OWN_TRACE.review, status: "FAILED", completedAt: null },
+			},
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { expanded: true })).toHaveAccessibleName(
+			/^Practice review 3 comments for you · review failed$/u,
+		);
+		await expect(canvas.getByText("No completed practice review recorded.")).toBeVisible();
+	},
+};
+
+/** A met result with no summary still names its practice and outcome. */
+export const MetWithoutSummary: Story = {
+	args: {
+		expanded: true,
+		results: {
+			status: "ready",
+			data: { ...OWN_PAGE, rows: [{ ...MET_ROW, summary: null }], total: 1 },
+		},
+	},
+	play: async ({ canvas }) => {
+		const results = canvas.getByRole("region", { name: "Your results" });
+		await expect(resultRows(results)).toHaveLength(1);
+		await expect(resultRows(results)[0]).toHaveTextContent(/^Small, focused changesMet$/u);
 	},
 };
 
 /**
  * A workspace admin sees what a developer sees: their own comments and results. Every
- * developer's records, delivery and runs are the web app's, one link away — not a panel in the page.
+ * developer's records, delivery and reviews are the web app's, one link away — not a panel in the page.
  */
 export const WorkspaceAdmin: Story = {
 	args: { state: ADMIN_ON_GITHUB, expanded: true },

@@ -10,29 +10,19 @@ import type { ChatMessage, ChatTurn } from "@/lib/types";
  * `text` showed nothing and proves nothing.
  */
 export const resultLinkDataSchema = z.object({
-	practiceResultId: z.uuid(),
+	resultId: z.uuid(),
 	text: z.string().optional(),
 });
 
-/** A `data-result-observation` part's data: the same link, narrowed to one observation of the result. */
-export const resultObservationLinkDataSchema = resultLinkDataSchema.extend({
-	observationId: z.uuid(),
-});
-
-/**
- * A `data-observation` part's data, as threads saved before results had observations stored it.
- * Its id names the result, so it reads as a result link.
- */
-const savedResultLinkDataSchema = z.object({
-	observationId: z.uuid(),
-	text: z.string().optional(),
+/** A `data-problem` part's data: the same link, narrowed to one problem of the result. */
+export const problemLinkDataSchema = resultLinkDataSchema.extend({
+	problemId: z.uuid(),
 });
 
 /** Every part kind that links feedback, with the check its payload must pass. */
 const FEEDBACK_LINK_SCHEMAS: Record<string, z.ZodType<{ text?: string }> | undefined> = {
 	"data-result": resultLinkDataSchema,
-	"data-result-observation": resultObservationLinkDataSchema,
-	"data-observation": savedResultLinkDataSchema,
+	"data-problem": problemLinkDataSchema,
 };
 
 /** A `data-mentor-status` part's data. */

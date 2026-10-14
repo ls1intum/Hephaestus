@@ -1,0 +1,115 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, within } from "storybook/test";
+
+import { withStandardPage } from "@/stories/decorators";
+import { StatefulPatch } from "@/stories/stateful";
+
+import { ITEM_ENTRIES, LISTED_ENTRY, WITHHELD_ENTRY } from "./fixtures";
+import { ScanItemTable } from "./ScanItemTable";
+
+const ready = (entries = ITEM_ENTRIES, hasNext = false) => ({
+	status: "ready" as const,
+	entries,
+	hasNext,
+	loadingMore: false,
+	onLoadMore: fn(),
+});
+
+const meta = {
+	component: ScanItemTable,
+	decorators: [withStandardPage],
+	args: { state: ready(), filter: undefined, onFilterChange: fn() },
+	argTypes: { state: { control: false } },
+	render: (args) => (
+		<StatefulPatch initial={{ filter: args.filter }}>
+			{(value, patch) => (
+				<ScanItemTable
+					{...args}
+					filter={value.filter}
+					onFilterChange={(filter) => {
+						patch({ filter });
+						args.onFilterChange(filter);
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
+	tags: ["autodocs"],
+} satisfies Meta<typeof ScanItemTable>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/** Reviewed, reused, withheld, not reviewed, and a file the repository no longer has. */
+export const Default: Story = {
+	play: async ({ canvas, userEvent, args }) => {
+		const rows = canvas.getAllByRole("row").slice(1);
+		const [judged, reused, withheld, notReviewed, removed] = rows;
+		if (!judged || !reused || !withheld || !notReviewed || !removed) {
+			return;
+		}
+		await expect(within(judged).getByText("Not met")).toBeVisible();
+		await expect(within(judged).getByText("2 problems")).toBeVisible();
+		await expect(within(reused).getByText(/Reused from a review on/u)).toBeVisible();
+		// The withheld reason is a sentence, never the recorded code.
+		await expect(
+			within(withheld).getByText("The assigned AI model was unavailable."),
+		).toBeVisible();
+		await expect(withheld).not.toHaveTextContent("MODEL_UNAVAILABLE");
+		await expect(
+			within(notReviewed).getByText("The scan ended before this file was reviewed."),
+		).toBeVisible();
+		// An earlier result stays visible, labelled as evidence from before this scan.
+		await expect(
+			within(notReviewed).getByText(/Earlier evidence, not from this scan/u),
+		).toBeVisible();
+		await expect(within(removed).getByText("Removed")).toBeVisible();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Withheld" }));
+		await expect(args.onFilterChange).toHaveBeenCalledWith("WITHHELD");
+		await expect(canvas.getByRole("button", { name: "Withheld" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+	},
+};
+
+/** A scan that is still running has files it has not reached yet. */
+export const Waiting: Story = {
+	args: { state: ready([LISTED_ENTRY, WITHHELD_ENTRY], true) },
+	play: async ({ canvas }) => {
+		const [listed] = canvas.getAllByRole("row").slice(1);
+		if (listed) {
+			await expect(within(listed).getByText("Waiting")).toBeVisible();
+			await expect(within(listed).getByText("Not reviewed yet.")).toBeVisible();
+		}
+		await expect(canvas.getByRole("button", { name: "Show more files" })).toBeVisible();
+	},
+};
+
+export const NoMatches: Story = {
+	args: { state: ready([]), filter: "NOT_REVIEWED" },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("heading", { name: "No files match this filter." }),
+		).toBeVisible();
+	},
+};
+
+export const Loading: Story = {
+	args: { state: { status: "loading" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("table", { name: "Files and practices" })).toHaveAttribute(
+			"aria-busy",
+			"true",
+		);
+	},
+};
+
+export const Error: Story = {
+	args: { state: { status: "error", error: { status: 500 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load the files")).toBeVisible();
+		await expect(canvas.queryByRole("table")).not.toBeInTheDocument();
+	},
+};

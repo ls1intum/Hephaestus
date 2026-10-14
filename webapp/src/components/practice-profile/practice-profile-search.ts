@@ -74,14 +74,14 @@ export function reviewLevel(reviewId: string): DetailStackEntry<PracticeProfileD
 }
 
 /**
- * One review's own tab and filters, cleared when another review takes its place: a filter chosen
- * for one review could hide every practice of the next. The reviews list's filters stay.
+ * One review's own tab, filters and focus, cleared when another review takes its place: a filter
+ * chosen for one review could hide every practice of the next. The reviews list's filters stay.
  */
 export const REVIEW_SELECTION_CLEARED = {
 	reviewTab: undefined,
 	reviewGroup: undefined,
 	reviewPractice: undefined,
-	reviewWatches: undefined,
+	reviewResult: undefined,
 } satisfies PracticeGroupDetailSelection;
 
 /** The review level's tabs, from the `reviewTab` search param. */
@@ -145,7 +145,8 @@ export interface PracticeGroupDetailSelection {
 	reviewTab?: ReviewTab;
 	reviewGroup?: string;
 	reviewPractice?: string;
-	reviewWatches?: string;
+	/** The result a link opened the review at; its row opens on arrival. */
+	reviewResult?: string;
 }
 
 /**
@@ -160,7 +161,7 @@ export const DEFAULT_FEEDBACK_TAB: FeedbackTab = "open";
 
 /**
  * What the page itself reads out of the URL: the table's sort, the feedback tab, and the selection
- * inside the open levels — the practice level's tab, and the review levels' filters and tab. A
+ * inside the open levels — the practice level's tab, and the review levels' filters, tab and focus. A
  * hand-typed value a surface cannot show reads as the default. Which results are open is not
  * here: every one arrives open and closes on its own, and nothing addresses one.
  */
@@ -177,8 +178,7 @@ const practiceProfileFilterSchema = z.object({
 	reviewTab: z.enum(REVIEW_TABS).default(DEFAULT_REVIEW_TAB).catch(DEFAULT_REVIEW_TAB),
 	reviewGroup: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
 	reviewPractice: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
-	// A signal name, free for the reason `reviewKind` is.
-	reviewWatches: z.string().min(1).max(REVIEW_FILTER_MAX_LENGTH).optional().catch(undefined),
+	reviewResult: z.uuid().optional().catch(undefined),
 });
 
 /** Each param at its default, which the route leaves out of the URL. */
@@ -206,5 +206,5 @@ export const PRACTICE_PROFILE_LEVEL_PARAMS = [
 	"reviewTab",
 	"reviewGroup",
 	"reviewPractice",
-	"reviewWatches",
+	"reviewResult",
 ] as const satisfies readonly (keyof PracticeGroupDetailSelection)[];

@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
-import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -30,12 +30,12 @@ public class ScmFeedbackTargetResolver {
     private final IssueRepository issues;
     private final PullRequestRepository pullRequests;
     private final PullRequestReviewRepository reviews;
-    private final RepositoryToMonitorRepository monitors;
+    private final RepositoryRepository repositories;
     private final ConnectionService connections;
 
     @Transactional(readOnly = true)
     public String serverUrl(FeedbackTarget target, IntegrationKind provider) {
-        subject(target, provider);
+        resolveSubject(target, provider);
         var connection = connections
                 .findActive(target.item().workspaceId(), provider)
                 .orElseThrow(() -> new FeedbackNotSentException("SCM connection is unavailable"));
@@ -47,6 +47,10 @@ public class ScmFeedbackTargetResolver {
 
     @Transactional(readOnly = true)
     public String subject(FeedbackTarget target, IntegrationKind provider) {
+        return resolveSubject(target, provider);
+    }
+
+    private String resolveSubject(FeedbackTarget target, IntegrationKind provider) {
         try {
             items.require(target.item());
         } catch (ItemCaptureException e) {
@@ -78,8 +82,7 @@ public class ScmFeedbackTargetResolver {
         if (repository == null
                 || work.getDeletedAt() != null
                 || repository.getProvider().kind() != provider
-                || !monitors.existsByWorkspaceIdAndNameWithOwner(
-                        target.item().workspaceId(), repository.getNameWithOwner()))
+                || !repositories.isMonitored(target.item().workspaceId(), repository.getId()))
             throw new FeedbackNotSentException("Workspace cannot access feedback target");
         var connection = connections
                 .findActive(target.item().workspaceId(), provider)

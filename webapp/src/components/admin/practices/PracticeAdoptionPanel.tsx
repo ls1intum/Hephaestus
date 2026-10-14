@@ -13,8 +13,8 @@ import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { LevelHeader } from "@/components/layout/detail-drawer/LevelHeader";
 import { Section } from "@/components/layout/Section";
-import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
+import { FeedbackModeBadge } from "@/components/practice-vocabulary/FeedbackModeBadge";
 import { GroupPill } from "@/components/practice-vocabulary/GroupPill";
 import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import {
@@ -35,6 +35,7 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
+import { FEEDBACK_MODE_DESCRIPTIONS } from "@/lib/practice-feedback-mode";
 import { hasText } from "@/lib/text";
 
 export type PracticeAdoptionState = PanelState<{
@@ -84,7 +85,7 @@ export function PracticeAdoptionPanel({
 				}
 				title={preview.definition.name}
 				chips={availability.badged && <StatusBadge def={availability} />}
-				description={<WorkTypeLabel artifactKind={preview.definition.artifactKind} />}
+				description={<WorkTypeLabel itemKind={preview.kind} />}
 			/>
 
 			<DrawerBody className="space-y-6">
@@ -105,7 +106,12 @@ export function PracticeAdoptionPanel({
 					</Alert>
 				)}
 
-				<PracticeDefinitionPreview definition={preview.definition} options={definitionOptions} />
+				<PracticeDefinitionPreview
+					slug={preview.slug}
+					kind={preview.kind}
+					definition={preview.definition}
+					options={definitionOptions}
+				/>
 
 				{!unavailable && (
 					<>
@@ -125,7 +131,7 @@ export function PracticeAdoptionPanel({
 									</ItemContent>
 								</Item>
 								<GroupOutcome preview={preview} />
-								<AutonomyOutcome preview={preview} />
+								<FeedbackModeOutcome preview={preview} />
 							</ItemGroup>
 						</Section>
 					</>
@@ -139,8 +145,8 @@ export function PracticeAdoptionPanel({
 								<DetailRow label="Source">
 									<code>{preview.slug}</code>
 								</DetailRow>
-								<DetailRow label="Review version">
-									<code>{preview.sourceReviewRuleFingerprint}</code>
+								<DetailRow label="Catalog version">
+									<code className="break-all">{preview.offeredDigest}</code>
 								</DetailRow>
 							</dl>
 						</AccordionContent>
@@ -219,7 +225,7 @@ function GroupOutcome({ preview }: { preview: CatalogPracticePreview }) {
 				<ItemTitle>{groupTitle(preview)}</ItemTitle>
 				{hasText(preview.group.definition?.description) && (
 					<ItemDescription className="line-clamp-none">
-						{preview.group.definition.description}
+						{preview.group.definition?.description}
 					</ItemDescription>
 				)}
 			</ItemContent>
@@ -227,17 +233,18 @@ function GroupOutcome({ preview }: { preview: CatalogPracticePreview }) {
 	);
 }
 
-function AutonomyOutcome({ preview }: { preview: CatalogPracticePreview }) {
-	const autonomy = AUTONOMY_DEFS[preview.initialAutonomy];
+function FeedbackModeOutcome({ preview }: { preview: CatalogPracticePreview }) {
 	return (
-		// No bare icon beside the badge: `StatusBadge` already renders the registry's icon, and the
+		// No bare icon beside the badge: the badge already renders the registry's icon, and the
 		// same mark twice in one row reads as two facts.
 		<Item variant="muted" size="sm" role="listitem">
 			<ItemContent>
 				<ItemTitle>
-					<StatusBadge def={autonomy} />
+					<FeedbackModeBadge feedbackMode={preview.initialFeedbackMode} />
 				</ItemTitle>
-				<ItemDescription className="line-clamp-none">{autonomy.description}</ItemDescription>
+				<ItemDescription className="line-clamp-none">
+					{FEEDBACK_MODE_DESCRIPTIONS[preview.initialFeedbackMode]}
+				</ItemDescription>
 			</ItemContent>
 		</Item>
 	);

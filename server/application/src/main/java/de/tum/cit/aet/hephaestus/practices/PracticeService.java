@@ -34,6 +34,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PracticeService {
     private final PracticeRepository practices;
     private final PracticeGroupRepository groups;
@@ -43,7 +44,6 @@ public class PracticeService {
     private final ConfigAuditPort audit;
     private final JsonMapper mapper;
 
-    @Transactional(readOnly = true)
     public List<Practice> listPractices(WorkspaceContext ctx, @Nullable FeedbackMode feedbackMode) {
         var mode = defaults.rawDefaultFeedbackMode(ctx.id());
         return practices.findAllForCatalog(ctx.id()).stream()
@@ -52,7 +52,6 @@ public class PracticeService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
         return practices.findAllForCatalog(ctx.id()).stream()
                 .filter(practice -> versions.definitionOf(practice.getCurrentVersion())
@@ -62,7 +61,6 @@ public class PracticeService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
     public Practice getPractice(WorkspaceContext ctx, String slug) {
         return practices
                 .findByWorkspaceIdAndSlug(ctx.id(), slug)
@@ -128,7 +126,8 @@ public class PracticeService {
         Long groupId = group == null ? null : group.getId();
         int order = position == null ? practices.findMaxPosition(ctx.id(), groupId) + 1 : position;
         if (order < 0) throw new IllegalArgumentException("Use a nonnegative position.");
-        Practice practice = versions.create(workspace, slug, kind, definition, groupId, order, creator);
+        Practice practice = versions.create(
+                new PracticeVersionService.NewPractice(workspace, slug, kind, definition, groupId, order, creator));
         practice.setFeedbackMode(mode);
         if (catalogDocument != null) {
             practice.setCatalogSlug(slug);

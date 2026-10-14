@@ -49,7 +49,9 @@ class ReviewLineageIntegrationTest extends BaseIntegrationTest {
     @Test
     void resultLineageUsesDurableReviewAndProblemIds() {
         var r = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
-        var graph = lineage.graph(r.getWorkspaceId(), LineageKind.RESULT, null, null, r.getId(), null, null);
+        var graph = lineage.graph(
+                r.getWorkspaceId(),
+                new ReviewLineageFilterParams(LineageKind.RESULT, null, null, r.getId(), null, null));
         assertThat(graph.rootId()).isEqualTo("result:" + r.getId());
         assertThat(graph.nodes())
                 .extracting(n -> n.kind())
@@ -63,7 +65,8 @@ class ReviewLineageIntegrationTest extends BaseIntegrationTest {
     void wrongWorkspaceCannotExpandResult() {
         var r = data.result(data.scenario(), ResultOutcome.MET, Instant.now());
         assertThatThrownBy(() -> lineage.graph(
-                        scenario.workspace().getId(), LineageKind.RESULT, null, null, r.getId(), null, null))
+                        scenario.workspace().getId(),
+                        new ReviewLineageFilterParams(LineageKind.RESULT, null, null, r.getId(), null, null)))
                 .isInstanceOf(EntityNotFoundException.class);
     }
 
@@ -71,10 +74,12 @@ class ReviewLineageIntegrationTest extends BaseIntegrationTest {
     void ambiguousAndMismatchedRootsAreRejected() {
         var r = data.result(scenario, ResultOutcome.MET, Instant.now());
         assertThatThrownBy(() -> lineage.graph(
-                        r.getWorkspaceId(), LineageKind.RESULT, r.getItemId(), null, r.getId(), null, null))
+                        r.getWorkspaceId(),
+                        new ReviewLineageFilterParams(LineageKind.RESULT, r.getItemId(), null, r.getId(), null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(
-                        () -> lineage.graph(r.getWorkspaceId(), LineageKind.REVIEW, null, null, r.getId(), null, null))
+        assertThatThrownBy(() -> lineage.graph(
+                        r.getWorkspaceId(),
+                        new ReviewLineageFilterParams(LineageKind.REVIEW, null, null, r.getId(), null, null)))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

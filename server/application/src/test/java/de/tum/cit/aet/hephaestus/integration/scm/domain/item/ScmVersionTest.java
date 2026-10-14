@@ -22,9 +22,17 @@ class ScmVersionTest extends BaseUnitTest {
     @Test
     void shouldChangeReviewVersionWhenSubmittedWordsChange() {
         var first = ScmVersion.pullRequestReview(
-                "a".repeat(40), "b".repeat(40), "Title", null, "b".repeat(40), "First", "COMMENTED");
+                "a".repeat(40),
+                "b".repeat(40),
+                "Title",
+                null,
+                new ScmVersion.ReviewContent("b".repeat(40), "First", "COMMENTED"));
         var second = ScmVersion.pullRequestReview(
-                "a".repeat(40), "b".repeat(40), "Title", null, "b".repeat(40), "Edited", "COMMENTED");
+                "a".repeat(40),
+                "b".repeat(40),
+                "Title",
+                null,
+                new ScmVersion.ReviewContent("b".repeat(40), "Edited", "COMMENTED"));
         assertThat(first).isNotEqualTo(second);
     }
 }

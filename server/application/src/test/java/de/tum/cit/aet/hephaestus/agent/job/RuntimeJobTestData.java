@@ -28,7 +28,8 @@ public final class RuntimeJobTestData {
         if (Boolean.TRUE.equals(present)) return job;
         long sourceId = (job.getReviewId().getLeastSignificantBits() & Long.MAX_VALUE) | 1;
         Long itemId = jdbc.queryForObject(
-                "INSERT INTO item(workspace_id,kind,source_id) VALUES (?, 'test.item', ?) RETURNING id",
+                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES (?, 'test.item', ?, now()) RETURNING"
+                        + " id",
                 Long.class,
                 job.getWorkspaceId(),
                 sourceId);

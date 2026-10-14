@@ -51,6 +51,10 @@ export const ExpandedNavigation: Story = {
 
 		canvas.getByRole("link", { name: "Practice setup" });
 		canvas.getByRole("link", { name: "Practice reviews" });
+		await expect(canvas.getByRole("link", { name: "Scans" })).toHaveAttribute(
+			"href",
+			"/w/aet/admin/practices/scans",
+		);
 		canvas.getByRole("link", { name: "Overview" });
 		canvas.getByRole("link", { name: "GitHub" });
 	},

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingFacts;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingFactsQuery;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -45,15 +46,15 @@ public class ReviewTimingFactsQueryService implements ReviewTimingFactsQuery {
             var page = after == null
                     ? jdbc.sql(sql + " ORDER BY created_at,id::text LIMIT :limit")
                             .param("ws", workspaceId)
-                            .param("from", from)
-                            .param("to", to)
+                            .param("from", Timestamp.from(from))
+                            .param("to", Timestamp.from(to))
                             .param("limit", PAGE_SIZE)
                     : jdbc.sql(sql
                                     + " AND (created_at,id::text)>(:afterTime,:afterId) ORDER BY"
                                     + " created_at,id::text LIMIT :limit")
                             .param("ws", workspaceId)
-                            .param("from", from)
-                            .param("to", to)
+                            .param("from", Timestamp.from(from))
+                            .param("to", Timestamp.from(to))
                             .param("limit", PAGE_SIZE)
                             .param("afterTime", after.createdAt())
                             .param("afterId", after.id().toString());
@@ -91,8 +92,8 @@ public class ReviewTimingFactsQueryService implements ReviewTimingFactsQuery {
         long withheld = jdbc.sql("SELECT COUNT(*) FROM feedback WHERE workspace_id=:ws AND stop_reason='ITEM_MERGED'"
                         + " AND created_at>=:from AND created_at<:to")
                 .param("ws", workspaceId)
-                .param("from", from)
-                .param("to", to)
+                .param("from", Timestamp.from(from))
+                .param("to", Timestamp.from(to))
                 .query((rs, n) -> rs.getLong(1))
                 .single();
         return new ReviewTimingFacts(asked, finishedAsked, afterMerge, startedByMerge, withheld);

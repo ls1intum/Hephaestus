@@ -1,5 +1,5 @@
 import { SelectFilter } from "@/components/common/SelectFilter";
-import { ARTIFACT_KIND_VALUES, artifactKindLabel } from "@/lib/artifact-kinds";
+import { ITEM_KIND_VALUES, itemKindLabel } from "@/lib/item-kinds";
 import { hasText } from "@/lib/text";
 
 export interface TraceKindFilterProps {
@@ -18,12 +18,12 @@ export interface TraceKindFilterProps {
 export function TraceKindFilter({ seen, value, onChange }: TraceKindFilterProps) {
 	// No endpoint enumerates the kinds, so the choices are the ones this build knows plus any the
 	// list shows — and always the active filter, so a filter arriving by link can be seen and cleared.
-	const kinds = new Set([...ARTIFACT_KIND_VALUES, ...seen, ...(hasText(value) ? [value] : [])]);
+	const kinds = new Set([...ITEM_KIND_VALUES, ...seen, ...(hasText(value) ? [value] : [])]);
 	return (
 		<SelectFilter
 			label="Show"
 			allLabel="All work"
-			options={[...kinds].map((kind) => ({ value: kind, label: artifactKindLabel(kind, 2) }))}
+			options={[...kinds].map((kind) => ({ value: kind, label: itemKindLabel(kind, 2) }))}
 			value={value}
 			onChange={onChange}
 		/>

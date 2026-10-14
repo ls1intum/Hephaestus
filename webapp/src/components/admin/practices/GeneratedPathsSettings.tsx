@@ -7,11 +7,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
-import type { RepositoryCoverageOptions } from "./PracticeReviewCoverageSettings";
+import type { RepositoryScopeOptions } from "./PracticeReviewScopeSettings";
 
 export interface GeneratedPathsSettingsProps {
 	settings: PracticeReviewSettings;
-	repositories: RepositoryCoverageOptions;
+	repositories: RepositoryScopeOptions;
 	isSaving: boolean;
 	onSave: (patch: UpdatePracticeReviewSettingsRequest, sourceEtag?: string) => Promise<void>;
 }
@@ -26,7 +26,8 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					Mark intentionally committed generated output for each repository. Reviews keep it as
-					generated content, not hand-written work. Coverage changes do not clear these settings.
+					generated content, not hand-written work, in item reviews and in scans. Review scope
+					changes do not clear these settings.
 				</p>
 			</div>
 			{repositories.status === "loading" && <Skeleton className="h-32 w-full" />}
@@ -42,7 +43,7 @@ export function GeneratedPathsSettings(props: GeneratedPathsSettingsProps) {
 			)}
 			{repositories.status === "ready" &&
 				repositories.options.map((option) => (
-					<RepositoryGeneratedPaths key={option.value} {...props} repository={option.value} />
+					<RepositoryGeneratedPaths key={option.itemId} {...props} repository={option.name} />
 				))}
 		</section>
 	);

@@ -210,6 +210,25 @@ export const LoadForbidden: Story = {
 	},
 };
 
+const retryLoad = fn();
+
+/** A failed read keeps the page header and offers Retry; no row claims a model or a need. */
+export const LoadFailed: Story = {
+	args: {
+		state: {
+			status: "error",
+			error: { status: 503, title: "Service Unavailable" },
+			onRetry: retryLoad,
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("We could not load AI models")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Decision model" })).toBeNull();
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retryLoad).toHaveBeenCalledOnce();
+	},
+};
+
 /**
  * Nothing asks for the admin: every row stays closed and no row draws a badge. A Cloud member's
  * cell names the In-house model that serves them, with its tier's icon.
@@ -651,10 +670,10 @@ export const ProjectReviewsDisabled: Story = {
 		await expect(
 			canvas.getByText(/Practice reviews are off, so these models are not used\./u),
 		).toBeVisible();
-		for (const link of canvas.getAllByRole("link", { name: "Open Review: When and where" })) {
+		for (const link of canvas.getAllByRole("link", { name: "Open Review: Automated review" })) {
 			await expect(link).toHaveAttribute(
 				"href",
-				"/w/acme/admin/practices/review?section=when-and-where",
+				"/w/acme/admin/practices/review?section=automated-review",
 			);
 		}
 

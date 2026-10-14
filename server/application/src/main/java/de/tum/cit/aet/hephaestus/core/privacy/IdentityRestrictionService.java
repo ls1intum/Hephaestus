@@ -173,7 +173,8 @@ public class IdentityRestrictionService implements PersonProcessingSuppression {
         if (erased) return true;
         return jdbc
                 .query(
-                        "SELECT provider_id,provider_user_key,team_key FROM identity WHERE" + " account_id=?",
+                        "SELECT provider_id,provider_user_key,NULLIF(team_key,'') FROM identity WHERE"
+                                + " account_id=?",
                         (rs, row) -> new PersonIdentity(
                                 rs.getLong(1), Objects.requireNonNull(rs.getString(2)), rs.getString(3)),
                         accountId)

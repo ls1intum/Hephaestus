@@ -1,5 +1,10 @@
 // The palette this page and its levels share is `webapp/AGENTS.md` § Practice surfaces palette.
-import type { PracticeGroup, PracticeStanding, ReviewRunRef } from "@/api/types.gen";
+import type {
+	GoingWellPractice,
+	GroupRef,
+	PracticeStanding,
+	ProfileReviewRef,
+} from "@/api/types.gen";
 import type { LoadState } from "@/components/common/panel-state";
 import {
 	PracticeTabsList,
@@ -18,18 +23,21 @@ import {
 import { countPracticeStandings } from "@/components/practice-vocabulary/standing-counts";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 
+import { GoingWellPractices } from "./GoingWellPractices";
 import { newestFirst } from "./practice-feedback-cards";
 import { FeedbackEmpty, type FeedbackEmptyProps } from "./practice-profile-blocks";
 import { FEEDBACK_TABS, type FeedbackTab } from "./practice-profile-search";
 import { PracticeProfilePageHeader } from "./PracticeProfilePageHeader";
 
 export interface PracticeProfilePageProps {
-	/** The review run the header's latest-run chip names; absent before the first run. */
-	latestRun?: ReviewRunRef;
+	/** The review the header's latest-review chip names; absent before the first review. */
+	latestReview?: ProfileReviewRef;
+	/** The practices going well, with the results that show them, between the header and the feedback. */
+	goingWell: GoingWellPractice[];
 	/** Every practice with a standing, for the header's overview ring. */
 	practices: PracticeStanding[];
 	/** The groups a card's group name can open; the header counts them. */
-	groups: PracticeGroup[];
+	groups: GroupRef[];
 	/** The developer's practice feedback, open and resolved alike; the tabs split it by state. */
 	feedbackCards: PracticeFeedbackCardEntry[];
 	/**
@@ -37,7 +45,7 @@ export interface PracticeProfilePageProps {
 	 * rated.
 	 */
 	ratingProps?: (feedbackId: string) => FeedbackRatingProps;
-	onOpenGroup?: (group: PracticeGroup) => void;
+	onOpenGroup?: (group: GroupRef) => void;
 	/**
 	 * Opens a practice's detail level from a feedback card. The level opens on the feedback written
 	 * about the practice, under the catalog's words on it, so a card's "Learn more about this
@@ -87,11 +95,13 @@ function feedbackCardsByTab(
 }
 
 /**
- * The developer's own practice profile: the overview header, then the feedback cards under a tab
- * row that filters them in place, with the table of every practice one level over the page.
+ * The developer's own practice profile: the overview header, the practices going well, then the
+ * feedback cards under a tab row that filters them in place, with the table of every practice one
+ * level over the page.
  */
 export function PracticeProfilePage({
-	latestRun,
+	latestReview,
+	goingWell,
 	practices,
 	groups,
 	feedbackCards,
@@ -128,12 +138,13 @@ export function PracticeProfilePage({
 	return (
 		<div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
 			<PracticeProfilePageHeader
-				latestRun={latestRun}
+				latestReview={latestReview}
 				counts={countPracticeStandings(practices)}
 				practiceCount={practices.length}
 				groupCount={groups.length}
 				isLoading={isLoading}
 			/>
+			<GoingWellPractices practices={goingWell} state={state} />
 			<Section
 				size="lg"
 				title="Your feedback"

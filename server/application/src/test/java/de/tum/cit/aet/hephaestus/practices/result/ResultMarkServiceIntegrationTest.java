@@ -55,6 +55,9 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     ResultRepository results;
 
+    @Autowired
+    ResultMarkRepository marks;
+
     @Test
     void incorrectMarkAndRemovalDoNotChangeCurrentOccupancy() {
         var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
@@ -86,9 +89,10 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
                 "Intentional tradeoff");
         var first = service.remove(
                 result.getWorkspaceId(), result.getId(), mark.getId(), scenarioAccountId, "Reconsidered");
+        var firstStored = marks.findById(first.getId()).orElseThrow();
         var second = service.remove(
                 result.getWorkspaceId(), result.getId(), mark.getId(), scenarioAccountId, "Second request");
-        assertThat(second.getRemovedAt()).isEqualTo(first.getRemovedAt());
+        assertThat(second.getRemovedAt()).isEqualTo(firstStored.getRemovedAt());
         assertThat(second.getRemovalReason()).isEqualTo("Reconsidered");
         assertThat(second.getRemovedById()).isEqualTo(first.getRemovedById());
     }

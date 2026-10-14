@@ -35,7 +35,10 @@ public class AccountAbsorptionService {
         var sourceIdentities = identities.findByAccount_Id(unclaimedAccountId);
         if (sourceIdentities.isEmpty()) throw conflict("The unclaimed account has no identity.");
         var sourceKeys = sourceIdentities.stream()
-                .map(i -> new PersonIdentity(i.getProviderId(), i.getProviderUserKey(), i.getTeamKey()))
+                .map(i -> new PersonIdentity(
+                        i.getProviderId(),
+                        i.getProviderUserKey(),
+                        i.getTeamKey().isEmpty() ? null : i.getTeamKey()))
                 .toList();
         if (!writeFence.holdForWrite(sourceKeys)) throw conflict("This identity is being erased.");
         identityKeys.lock(sourceKeys);

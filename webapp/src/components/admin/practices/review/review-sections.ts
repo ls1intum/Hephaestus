@@ -1,25 +1,25 @@
 import { z } from "zod";
 
 /**
- * The ids are in the URL, so they are part of the contract with anyone's bookmarks and with the
- * redirects that point here. Renaming one is a breaking change to a link.
+ * The ids are in the URL, so bookmarks and the links that point here depend on them. Renaming one
+ * breaks those links.
  */
-const REVIEW_SECTION_IDS = ["how-much", "when-and-where", "past-work"] as const;
+const REVIEW_SECTION_IDS = ["feedback-mode", "automated-review", "past-work"] as const;
 
 export type ReviewSectionId = (typeof REVIEW_SECTION_IDS)[number];
 
 export const REVIEW_SECTIONS = [
 	{
-		id: "how-much",
-		label: "How much",
+		id: "feedback-mode",
+		label: "Feedback mode",
 		description:
-			"Set how far reviews go without you for the whole workspace. Override it for a group or a single practice only where it needs something different.",
+			"Choose how feedback reaches developers for the whole workspace. Override it for a group or a single practice only where it needs something different.",
 	},
 	{
-		id: "when-and-where",
-		label: "When and where",
+		id: "automated-review",
+		label: "Automated review",
 		description:
-			"Choose what starts a review, which work it may look at, and how often to keep checking.",
+			"Choose the review model, what starts a review, which work Heph may review, and how often to keep checking.",
 	},
 	{
 		id: "past-work",
@@ -29,7 +29,7 @@ export const REVIEW_SECTIONS = [
 	},
 ] as const satisfies readonly { id: ReviewSectionId; label: string; description: string }[];
 
-export const DEFAULT_REVIEW_SECTION: ReviewSectionId = "how-much";
+export const DEFAULT_REVIEW_SECTION: ReviewSectionId = "feedback-mode";
 
 /**
  * `catch` rather than a hard failure: a stale bookmark naming a section that no longer exists should

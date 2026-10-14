@@ -24,7 +24,7 @@ public class ReviewScheduleBatchOpener {
     private final ReviewScheduleRepository schedules;
     private final ReviewBatchRepository batches;
     private final ReviewBatchService batchService;
-    private final ReviewBatchScopeRepository scope;
+    private final ReviewBatchScopeQuery scope;
     private final ReviewBatchCostEstimator costs;
     private final ReviewBatchProperties properties;
     private final WorkspaceRepository workspaces;

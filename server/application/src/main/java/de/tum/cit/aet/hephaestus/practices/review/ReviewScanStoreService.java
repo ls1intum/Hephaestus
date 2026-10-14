@@ -1,17 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.review.model.Review;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
-import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
-import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
-import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.RemovalGuardState;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
@@ -24,6 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanExecutionSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
@@ -48,10 +43,9 @@ public class ReviewScanStoreService implements ReviewScanStore {
     private final ReviewRepository reviews;
     private final ReviewPracticeRepository practices;
     private final ReviewItemRepository items;
+    private final ScanReuseCandidateQuery reuseCandidates;
     private final ReviewAssignmentQuery assignments;
     private final ResultRepository results;
-    private final EvidenceAuthorization authorization;
-    private final ResultSourceAuthorization sourceAuthorization;
     private final ItemWriter writer;
     private final JdbcClient jdbc;
     private final JsonMapper json;
@@ -161,7 +155,7 @@ public class ReviewScanStoreService implements ReviewScanStore {
                                 + " removed_at IS NULL AND created_at<:before ORDER BY id FOR UPDATE")
                 .param("ws", workspaceId)
                 .param("parent", review.getItemId())
-                .param("before", review.getCreatedAt())
+                .param("before", Timestamp.from(review.getCreatedAt()))
                 .query((rs, n) -> rs.getLong(1))
                 .list();
         if (!present.isEmpty()) {
@@ -256,24 +250,10 @@ public class ReviewScanStoreService implements ReviewScanStore {
                 .orElseThrow();
         if (member.getState() == ReviewItemState.REUSED) return Optional.ofNullable(member.getResultId());
         if (member.getState() != ReviewItemState.LISTED || member.getJobId() != null) return Optional.empty();
-        var assignment = assignments.find(workspaceId, id).orElseThrow();
-        var candidate = results.findReuseCandidate(
-                workspaceId,
-                id.reviewId(),
-                id.practiceId(),
-                assignment.practice().practiceVersionId(),
-                id.itemId(),
-                assignment.version().value(),
-                assignment.developerId());
+        var candidate = reuseCandidates.find(workspaceId, id);
         if (candidate.isEmpty()) return Optional.empty();
-        var result = candidate.orElseThrow();
-        if (result.getCoverage() == null
-                || !(json.convertValue(result.getCoverage(), ResultCoverage.class) instanceof HostCoverage host)
-                || !trusted(host)
-                || !authorization.permits(workspaceId, result, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
-            return Optional.empty();
-        var captured = sourceAuthorization.custody(result);
-        if (!captured.complete()) return Optional.empty();
+        var result = candidate.orElseThrow().result();
+        var captured = candidate.orElseThrow().custody();
         var detail = member.getDetail() == null
                 ? json.createObjectNode()
                 : (ObjectNode) member.getDetail().deepCopy();
@@ -282,18 +262,6 @@ public class ReviewScanStoreService implements ReviewScanStore {
         member.setState(ReviewItemState.REUSED);
         member.setResultId(result.getId());
         return Optional.of(result.getId());
-    }
-
-    public static boolean trusted(HostCoverage coverage) {
-        return coverage.complete()
-                && coverage.failedReads() == 0
-                && coverage.truncatedReads() == 0
-                && !coverage.receipts().isEmpty()
-                && coverage.receipts().stream()
-                        .allMatch(r -> r.status() == ReadReceiptStatus.ABSENT
-                                || (r.status() == ReadReceiptStatus.COMPLETE
-                                        && r.contentDigest() != null
-                                        && r.contentDigest().matches("[0-9a-f]{64}")));
     }
 
     private Review active(long workspaceId, UUID reviewId) {

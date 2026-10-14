@@ -1,8 +1,8 @@
 import { CircleCheckIcon, CircleDashedIcon, CircleHelpIcon, WrenchIcon } from "lucide-react";
-import type { PracticeResultDetail } from "@/api/types.gen";
+import type { ResultList } from "@/api/types.gen";
 import type { StatusDefs } from "@/components/common/status-def";
 
-export type Outcome = PracticeResultDetail["outcome"];
+export type Outcome = ResultList["outcome"];
 export const OUTCOME_DEFS: StatusDefs<Outcome> = {
 	MET: {
 		label: "Met",
@@ -16,13 +16,13 @@ export const OUTCOME_DEFS: StatusDefs<Outcome> = {
 		badgeVariant: "destructive",
 		description: "The applicable practice standard is not met in the reviewed evidence.",
 	},
-	NOT_APPLICABLE: {
+	DOES_NOT_APPLY: {
 		label: "Does not apply",
 		icon: CircleDashedIcon,
 		badgeVariant: "secondary",
 		description: "Nothing in this work calls for this practice.",
 	},
-	UNDETERMINED: {
+	COULD_NOT_DETERMINE: {
 		label: "Could not determine",
 		icon: CircleHelpIcon,
 		badgeVariant: "secondary",
@@ -38,8 +38,8 @@ export function outcomeCountNoun(outcome: Outcome, count: number): string {
 }
 
 /**
- * "3 problems": the observations under a not met result. Every observation is a problem at a place
- * in the work, so the count is the number of rows and needs no other word.
+ * "3 problems": the problems under a not met result. Every problem is at a place in the work, so
+ * the count is the number of rows and needs no other word.
  */
 export function problemCount(count: number): string {
 	return `${count} ${count === 1 ? "problem" : "problems"}`;

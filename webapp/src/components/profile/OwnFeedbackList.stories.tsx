@@ -1,0 +1,205 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ComponentProps } from "react";
+import { expect, within } from "storybook/test";
+
+import { useStoryFeedbackResponses } from "@/stories/feedback-ratings";
+import { detailFeedback, ownFeedback } from "@/stories/practice-detail-story-mock-data";
+import { daysBefore } from "@/stories/story-clock";
+import { expectGenuinelyDisabled } from "@/test/controls";
+
+import { OwnFeedbackList } from "./OwnFeedbackList";
+
+/** The list with responses a story holds in place of the server. */
+function Answerable({
+	pending = false,
+	...props
+}: ComponentProps<typeof OwnFeedbackList> & { pending?: boolean }) {
+	const responses = useStoryFeedbackResponses({ pending });
+	return <OwnFeedbackList {...props} responses={responses} />;
+}
+
+/** The feedback on the work, already rated helpful on the practice page. */
+const ratedHelpful = {
+	...detailFeedback,
+	response: { usefulness: "HELPFUL", resolution: null, comment: null, createdAt: daysBefore(1) },
+} satisfies ComponentProps<typeof OwnFeedbackList>["feedback"][number];
+
+const meta = {
+	component: OwnFeedbackList,
+	tags: ["autodocs"],
+	parameters: { layout: "padded" },
+	args: { feedback: [ratedHelpful] },
+	render: (args) => <Answerable {...args} />,
+} satisfies Meta<typeof OwnFeedbackList>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+/**
+ * One piece of feedback posted on the work as a summary and a line note: where it went, a link to
+ * each comment, and the three answers. The comment band stays closed until an answer is pressed.
+ */
+export const Default: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("On the work")).toBeVisible();
+		await expect(
+			canvas.getByRole("link", { name: /^Read feedback comment 1(?: \(opens in a new tab\))?$/u }),
+		).toHaveAttribute("href", detailFeedback.copies[0]?.externalUrl);
+		await expect(
+			canvas.getByRole("link", { name: /^Read feedback comment 2(?: \(opens in a new tab\))?$/u }),
+		).toHaveAttribute("href", detailFeedback.copies[1]?.externalUrl);
+		const response = canvas.getByRole("group", {
+			name: "Your response to the feedback on the work",
+		});
+		await expect(
+			within(response)
+				.getAllByRole("button")
+				.map((button) => button.textContent),
+		).toStrictEqual(["Addressed", "Disagree", "Not applicable", "Clear response"]);
+		await expect(canvas.getByText("Helpful")).toBeVisible();
+		await expect(canvas.queryByRole("textbox")).toBeNull();
+	},
+};
+
+/**
+ * A press opens the band. Skip records the answer without a comment and keeps the rating the
+ * reader gave on the practice page; Send records it with the comment written under it.
+ */
+export const RecordsAResponse: Story = {
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Addressed" }));
+		const field = canvas.getByRole("textbox", { name: "Anything to add?" });
+		await expect(field).not.toBeRequired();
+		await userEvent.click(canvas.getByRole("button", { name: "Skip" }));
+		await expect(canvas.getByRole("button", { name: "Addressed" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await expect(canvas.getByText("Helpful")).toBeVisible();
+		await expect(canvas.queryByRole("textbox")).toBeNull();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Not applicable" }));
+		await userEvent.type(
+			canvas.getByRole("textbox", { name: "Anything to add?" }),
+			"Adopted in the follow-up.",
+		);
+		await userEvent.click(canvas.getByRole("button", { name: "Send" }));
+		await expect(canvas.getByRole("button", { name: "Not applicable" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await expect(canvas.getByText("Adopted in the follow-up.")).toBeVisible();
+		await expect(canvas.getByText("Helpful")).toBeVisible();
+	},
+};
+
+/** A disagreement needs its reason, says who reads it, and Skip only closes the band. */
+export const DisagreementNeedsAReason: Story = {
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Disagree" }));
+		const field = canvas.getByRole("textbox", { name: "Why do you disagree?" });
+		await expect(field).toBeRequired();
+		await expect(field).toHaveAccessibleDescription(
+			/Add your reason so a workspace admin can read it\./u,
+		);
+		// An empty reason does not send.
+		await userEvent.click(canvas.getByRole("button", { name: "Send" }));
+		await expect(canvas.getByRole("textbox", { name: "Why do you disagree?" })).toBeVisible();
+		await userEvent.type(field, "The value is derived, not chosen.");
+		await userEvent.click(canvas.getByRole("button", { name: "Send" }));
+		await expect(canvas.getByRole("button", { name: "Disagree" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await expect(canvas.getByText("The value is derived, not chosen.")).toBeVisible();
+		await expect(canvas.getByText("Helpful")).toBeVisible();
+	},
+};
+
+/** What the reader already said stands pressed and shown; "Clear response" restores no response. */
+export const ClearResponse: Story = {
+	args: {
+		feedback: [
+			{
+				...detailFeedback,
+				response: {
+					usefulness: "HELPFUL",
+					resolution: "ADDRESSED",
+					comment: "Split the change into two commits.",
+					createdAt: daysBefore(1),
+				},
+			},
+		],
+	},
+	play: async ({ canvas, userEvent }) => {
+		await expect(canvas.getByRole("button", { name: "Addressed" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		await expect(canvas.getByText("Split the change into two commits.")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Clear response" }));
+		await expect(canvas.getByRole("button", { name: "Addressed" })).toHaveAttribute(
+			"aria-pressed",
+			"false",
+		);
+		await expect(canvas.queryByText("Helpful")).toBeNull();
+		await expect(canvas.queryByText("Split the change into two commits.")).toBeNull();
+		await expect(canvas.queryByRole("button", { name: "Clear response" })).toBeNull();
+	},
+};
+
+/**
+ * A response on its way: every control waits, and the pressed answer is the one being written,
+ * not the one it replaces.
+ */
+export const ResponsePending: Story = {
+	render: (args) => <Answerable {...args} pending />,
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Not applicable" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Skip" }));
+		const response = canvas.getByRole("group", {
+			name: "Your response to the feedback on the work",
+		});
+		await expect(within(response).getByRole("button", { name: "Not applicable" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+		for (const button of within(response).getAllByRole("button")) {
+			await expectGenuinelyDisabled(button);
+		}
+	},
+};
+
+/** One review's feedback on the work and on the practice page: each piece is answered on its own. */
+export const SeveralPieces: Story = {
+	args: {
+		feedback: [
+			ratedHelpful,
+			ownFeedback("00000000-0000-0000-0000-0000000001d1", { destination: "PRACTICE_PAGE" }),
+		],
+	},
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getAllByRole("group", { name: /^Your response to the feedback/u }),
+		).toHaveLength(2);
+		await expect(canvas.getAllByRole("link")).toHaveLength(2);
+	},
+};
+
+/** A user view reads the feedback and answers nothing: no response controls at all. */
+export const ReadOnly: Story = {
+	render: (args) => <OwnFeedbackList {...args} />,
+	play: async ({ canvas }) => {
+		await expect(canvas.getAllByRole("link")).toHaveLength(2);
+		await expect(canvas.queryByRole("group")).toBeNull();
+		await expect(canvas.queryByRole("button")).toBeNull();
+	},
+};
+
+/** No feedback from this review: nothing is drawn, not even an empty list. */
+export const Empty: Story = {
+	args: { feedback: [] },
+	play: async ({ canvasElement }) => {
+		await expect(canvasElement.querySelector("ul")).toBeNull();
+	},
+};

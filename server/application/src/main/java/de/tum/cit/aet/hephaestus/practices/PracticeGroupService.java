@@ -20,20 +20,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PracticeGroupService {
     private final PracticeGroupRepository groups;
     private final PracticeRepository practices;
     private final WorkspaceRepository workspaces;
     private final ConfigAuditPort audit;
 
-    @Transactional(readOnly = true)
     public List<PracticeGroup> listGroups(WorkspaceContext ctx, @Nullable Boolean shownOnly) {
         return Boolean.TRUE.equals(shownOnly)
                 ? groups.findByWorkspaceIdAndShownToDevelopersTrueOrderByPositionAscNameAsc(ctx.id())
                 : groups.findByWorkspaceIdOrderByPositionAscNameAsc(ctx.id());
     }
 
-    @Transactional(readOnly = true)
     public PracticeGroup getGroup(WorkspaceContext ctx, String slug) {
         return groups.findByWorkspaceIdAndSlug(ctx.id(), slug)
                 .orElseThrow(() -> new EntityNotFoundException("Practice group", slug));
@@ -75,11 +74,16 @@ public class PracticeGroupService {
     @Transactional
     public PracticeGroup createGroupFromCatalog(
             WorkspaceContext ctx, String slug, GroupDefinition definition, int position) {
-        return adoptGroupFromCatalog(ctx, slug, definition, position);
+        return createCatalogGroup(ctx, slug, definition, position);
     }
 
     @Transactional
     public PracticeGroup adoptGroupFromCatalog(
+            WorkspaceContext ctx, String slug, GroupDefinition definition, int position) {
+        return createCatalogGroup(ctx, slug, definition, position);
+    }
+
+    private PracticeGroup createCatalogGroup(
             WorkspaceContext ctx, String slug, GroupDefinition definition, int position) {
         PracticeGroup group = create(
                 ctx,
@@ -139,7 +143,7 @@ public class PracticeGroupService {
                 .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
         var before = PracticeDefinitionSnapshot.of(practice);
-        if (applyBinding(ctx, practice, groupSlug)) {
+        if (changeBinding(ctx, practice, groupSlug)) {
             practices.save(practice);
             audit.record(ConfigAuditEntry.updated(
                     ConfigAuditEntityType.PRACTICE_DEFINITION,
@@ -151,7 +155,13 @@ public class PracticeGroupService {
         return practice;
     }
 
-    boolean applyBinding(WorkspaceContext ctx, Practice practice, @Nullable String groupSlug) {
+    @Transactional
+    public void restoreCatalogBinding(WorkspaceContext ctx, Practice practice, @Nullable String groupSlug) {
+        lock(ctx);
+        if (changeBinding(ctx, practice, groupSlug)) practices.save(practice);
+    }
+
+    private boolean changeBinding(WorkspaceContext ctx, Practice practice, @Nullable String groupSlug) {
         PracticeGroup group = groupSlug == null ? null : getGroup(ctx, groupSlug);
         if (Objects.equals(
                 practice.getGroup() == null ? null : practice.getGroup().getId(), group == null ? null : group.getId()))

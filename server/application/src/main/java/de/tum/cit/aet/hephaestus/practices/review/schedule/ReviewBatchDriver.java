@@ -29,7 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 @WorkspaceAgnostic("Selects active batches across workspaces; each mutation retains its workspace")
 public class ReviewBatchDriver {
     private final ReviewBatchRepository batches;
-    private final ReviewBatchScopeRepository scope;
+    private final ReviewBatchScopeQuery scope;
     private final ReviewBatchSubmitter submitter;
     private final WorkspaceRepository workspaces;
     private final ReviewBudget budget;

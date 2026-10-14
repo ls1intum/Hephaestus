@@ -9,13 +9,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
-import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -24,7 +23,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RequiredArgsConstructor
 public class ScmRepositoryAccess {
     private final ConnectionService connections;
-    private final RepositoryToMonitorRepository monitors;
+    private final RepositoryRepository repositories;
     private final List<ScmTokenSource> tokens;
     private final GitRepositoryManager git;
 
@@ -32,10 +31,8 @@ public class ScmRepositoryAccess {
         var provider = repository.getProvider();
         if (provider.kind() != IntegrationKind.GITHUB && provider.kind() != IntegrationKind.GITLAB)
             throw unavailable("Repository does not belong to an SCM provider");
-        var monitor = monitors.findByWorkspaceIdAndNameWithOwner(workspaceId, repository.getNameWithOwner())
-                .orElseThrow(() -> unavailable("Workspace does not monitor this repository"));
-        if (monitor.getNativeId() != null && !Objects.equals(monitor.getNativeId(), repository.getNativeId()))
-            throw unavailable("Monitored repository native identity changed");
+        if (!repositories.isMonitored(workspaceId, repository.getId()))
+            throw unavailable("Workspace does not monitor this repository identity");
         var connection = connections
                 .findActive(workspaceId, provider.kind())
                 .orElseThrow(() -> unavailable("SCM connection is unavailable"));

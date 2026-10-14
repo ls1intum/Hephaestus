@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import io.swagger.v3.oas.annotations.Hidden;
+import jakarta.validation.Valid;
 import java.util.function.Supplier;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -35,7 +36,8 @@ public class ResultAdmissionController {
 
     @PostMapping("/admit-results")
     @WorkspaceAgnostic("The worker credential supplies the workspace and exact job attempt")
-    public AdmissionResponseDTO admitResults(@RequestBody AdmissionRequestDTO request, Authentication authentication) {
+    public AdmissionResponseDTO admitResults(
+            @Valid @RequestBody AdmissionRequestDTO request, Authentication authentication) {
         var identity = attemptOf(authentication);
         return checked(() -> admission.admit(identity, request));
     }
@@ -43,7 +45,7 @@ public class ResultAdmissionController {
     @PostMapping("/prepare-feedback")
     @WorkspaceAgnostic("The worker credential supplies the workspace and exact job attempt")
     public PrepareFeedbackResponseDTO prepareFeedback(
-            @RequestBody PrepareFeedbackRequestDTO request, Authentication authentication) {
+            @Valid @RequestBody PrepareFeedbackRequestDTO request, Authentication authentication) {
         var identity = attemptOf(authentication);
         return checked(() -> admission.prepareFeedback(identity, request));
     }

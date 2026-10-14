@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
@@ -38,7 +39,7 @@ public class ReviewRequestPolicy {
                                         + " requested_by_id=:account AND origin='REQUEST' AND created_at>=:since")
                                 .param("ws", workspaceId)
                                 .param("account", accountId)
-                                .param("since", now.minus(Duration.ofHours(1)))
+                                .param("since", Timestamp.from(now.minus(Duration.ofHours(1))))
                                 .query((rs, n) -> rs.getLong(1))
                                 .single()
                         >= quota) return Optional.of(ReviewRequestReason.REQUESTER_QUOTA_EXHAUSTED);
@@ -48,7 +49,7 @@ public class ReviewRequestPolicy {
                                 + " origin='REQUEST' AND created_at>=:since)")
                         .param("ws", workspaceId)
                         .param("item", itemId)
-                        .param("since", now.minus(Duration.ofMinutes(cooldown)))
+                        .param("since", Timestamp.from(now.minus(Duration.ofMinutes(cooldown))))
                         .query(Boolean.class)
                         .single()) return Optional.of(ReviewRequestReason.REQUEST_COOLDOWN_ACTIVE);
         if (jdbc.sql("SELECT EXISTS(SELECT 1 FROM review WHERE workspace_id=:ws AND item_id=:item AND status IN"

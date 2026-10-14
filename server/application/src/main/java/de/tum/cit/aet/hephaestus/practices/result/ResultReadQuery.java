@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.model.Problem;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultSort;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -122,7 +123,7 @@ public class ResultReadQuery {
                         + " ORDER BY r.recorded_at DESC,r.id::text DESC")
                 .param("ws", workspaceId)
                 .param("developers", developers)
-                .param("since", since)
+                .param("since", Timestamp.from(since))
                 .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
                 .list();
         return ordered(workspaceId, ids);
@@ -179,7 +180,7 @@ public class ResultReadQuery {
             StringBuilder where, Map<String, Object> params, String clause, String name, @Nullable Object value) {
         if (value != null) {
             where.append(" AND " + clause);
-            params.put(name, value);
+            params.put(name, value instanceof Instant at ? Timestamp.from(at) : value);
         }
     }
 

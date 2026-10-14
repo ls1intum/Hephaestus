@@ -53,7 +53,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -77,7 +76,7 @@ public class FeedbackReadService {
     private final ResultVisibilityPolicy evidence;
     private final ReviewResultQueryService resultPresentation;
     private final ReviewRepository reviews;
-    private final JdbcClient jdbc;
+    private final FeedbackQueryRepository queries;
 
     public Page<ReviewFeedbackDTO> list(long workspaceId, FeedbackQueryFilter filter, Pageable pageable) {
         var spec = specification(workspaceId, filter);
@@ -283,16 +282,7 @@ public class FeedbackReadService {
                             case SLACK, OUTLINE -> FeedbackLocation.OTHER_WORK;
                         };
             case CONVERSATION ->
-                jdbc.sql("""
-                    SELECT t.surface FROM feedback_copy c JOIN chat_message m ON m.id=c.chat_message_id AND m.workspace_id=c.workspace_id
-                    JOIN chat_thread t ON t.id=m.thread_id AND t.workspace_id=m.workspace_id
-                    WHERE c.workspace_id=:workspaceId AND c.feedback_id=:id AND c.kind='CHAT_TURN' AND c.state='POSTED'
-                    ORDER BY c.position,c.id LIMIT 1
-                    """)
-                        .param("workspaceId", row.getWorkspaceId())
-                        .param("id", row.getId())
-                        .query(String.class)
-                        .optional()
+                queries.conversationSurface(row.getWorkspaceId(), row.getId())
                         .map(surface -> "SLACK_DM".equals(surface) ? FeedbackLocation.SLACK : FeedbackLocation.HEPH)
                         .orElse(FeedbackLocation.NEXT_CONVERSATION);
         };
@@ -332,12 +322,7 @@ public class FeedbackReadService {
             if (filter.itemId() != null) predicates.add(cb.equal(root.get("itemId"), filter.itemId()));
             if (filter.developerId() != null) predicates.add(cb.equal(root.get("developerId"), filter.developerId()));
             if (filter.itemKind() != null)
-                predicates.add(root.get("itemId")
-                        .in(jdbc.sql("SELECT id FROM item WHERE" + " workspace_id=:workspaceId AND" + " kind=:kind")
-                                .param("workspaceId", workspaceId)
-                                .param("kind", filter.itemKind())
-                                .query(Long.class)
-                                .list()));
+                predicates.add(root.get("itemId").in(queries.itemIds(workspaceId, filter.itemKind())));
             if (filter.withdrawn() != null) {
                 var exists = visibilityPredicate(root, Objects.requireNonNull(query), cb, workspaceId);
                 predicates.add(filter.withdrawn() ? exists : cb.not(exists));

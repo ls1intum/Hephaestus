@@ -2,45 +2,46 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
-import {
-	getArtifactTraceQueryKey,
-	getPracticeProfileOverviewQueryKey,
-	requestPracticeReviewMutation,
-} from "@/api/@tanstack/react-query.gen";
+import { requestReviewMutation } from "@/api/@tanstack/react-query.gen";
 import type { CreateReviewRequest, ReviewRequestOutcome } from "@/api/types.gen";
 import { PRACTICE_REVIEW_READS } from "@/components/admin/practice-reviews/review-search";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 
-/** A started review moves every count, the queue and the timing, and adds a row to the list of work. */
+/**
+ * A started review moves every count, the queue and the timing, the item's trace, and the
+ * developer's own reviews and practice profile.
+ */
 const READS_OF_STARTED_REVIEW: ReadonlySet<string> = new Set([
 	...PRACTICE_REVIEW_READS,
-	"listTracedArtifacts",
+	"getOwnItemTrace",
+	"listOwnItemReviews",
+	"listOwnReviews",
+	"getPracticeProfileOverview",
 ]);
 
-/** Why an ask about one piece of work started nothing, for the level that shows that work. */
+/** Why an ask about one item started nothing, for the level that shows that item. */
 export interface ReviewRefusal {
-	work: CreateReviewRequest;
+	itemId: string;
 	outcome: ReviewRequestOutcome;
 }
 
 interface RequestPracticeReviewOptions {
 	/**
-	 * Whether a level on screen shows this work, and so says its refusal inline; asked when the
+	 * Whether a level on screen shows this item, and so says its refusal inline; asked when the
 	 * answer lands, since the reader may have moved on by then. Anywhere else a refusal is a toast.
 	 */
-	showsInline?: (work: CreateReviewRequest) => boolean;
+	showsInline?: (itemId: string) => boolean;
 }
 
 /**
- * "Request review", and the one home of what its answer shows. A started review refreshes the
- * asked-about work's trace, the practice profile's latest-review chip, the list of work and every
- * read of reviews (counts, queue, timing); a refusal is `refusal`
- * where a level shows the work, and a toast carrying the server's sentence otherwise.
+ * "Request review", and the one home of what its answer shows. A started review refreshes every
+ * read the new review moves; a refusal is `refusal` where a level shows the item, and a toast
+ * carrying the server's sentence otherwise.
  *
  * Both are handled here rather than in callbacks passed to `mutate`, which TanStack Query calls only
- * for the latest ask and only while the caller is mounted: a refusal of one piece of work answered
- * after a second was asked for would say nothing at all.
+ * for the latest ask and only while the caller is mounted: a refusal of one item answered after a
+ * second was asked for would say nothing at all.
  */
 export function useRequestPracticeReview(
 	workspaceSlug: string,
@@ -57,24 +58,18 @@ export function useRequestPracticeReview(
 		};
 	}, []);
 	const mutation = useMutation({
-		...requestPracticeReviewMutation(),
+		...requestReviewMutation(),
 		onSuccess: (outcome, { path, body }) => {
 			if (outcome.status === "REFUSED") {
-				if (mounted.current && showsInline?.(body) === true) {
-					setRefusal({ work: body, outcome });
+				if (mounted.current && showsInline?.(body.itemId) === true) {
+					setRefusal({ itemId: body.itemId, outcome });
 				} else {
-					toast.warning("No review was started", { description: outcome.reasonDescription });
+					toast.warning("No review was started", {
+						description: outcome.reasonDescription ?? undefined,
+					});
 				}
 				return;
 			}
-			void queryClient.invalidateQueries({
-				queryKey: getArtifactTraceQueryKey({
-					path: { ...path, artifactKind: body.artifactKind, artifactId: body.artifactId },
-				}),
-			});
-			void queryClient.invalidateQueries({
-				queryKey: getPracticeProfileOverviewQueryKey({ path }),
-			});
 			void invalidateWorkspaceReads(queryClient, path.workspaceSlug, READS_OF_STARTED_REVIEW);
 			toast.success("Review started");
 		},
@@ -84,13 +79,14 @@ export function useRequestPracticeReview(
 			}),
 	});
 	return {
-		ask: (work: CreateReviewRequest) => {
+		ask: (itemId: string) => {
 			// A new ask replaces the answer to the last one, so an alert never outlives its refusal.
 			setRefusal(undefined);
-			mutation.mutate({ path: { workspaceSlug }, body: work });
+			const body: CreateReviewRequest = { itemId };
+			mutation.mutate({ path: { workspaceSlug }, body });
 		},
-		/** The work the latest ask is about, while it is in flight. */
-		asking: mutation.isPending ? mutation.variables.body : undefined,
+		/** The item the latest ask is about, while it is in flight. */
+		asking: mutation.isPending ? mutation.variables.body.itemId : undefined,
 		refusal,
 		/** Forgets the refusal, for a surface whose level moved on to something else. */
 		forgetRefusal: () => setRefusal(undefined),

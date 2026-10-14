@@ -30,7 +30,7 @@ class ReviewScheduleBatchOpenerTest extends BaseUnitTest {
     final ReviewScheduleRepository schedules = mock(ReviewScheduleRepository.class);
     final ReviewBatchRepository batches = mock(ReviewBatchRepository.class);
     final ReviewBatchService batchService = mock(ReviewBatchService.class);
-    final ReviewBatchScopeRepository scope = mock(ReviewBatchScopeRepository.class);
+    final ReviewBatchScopeQuery scope = mock(ReviewBatchScopeQuery.class);
     final ReviewBatchCostEstimator costs = mock(ReviewBatchCostEstimator.class);
     final WorkspaceRepository workspaces = mock(WorkspaceRepository.class);
     final ReviewScheduleBatchOpener opener = new ReviewScheduleBatchOpener(

@@ -26,6 +26,9 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspace
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -77,7 +80,9 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     @Operation(operationId = "createPractice")
-    public ResponseEntity<PracticeDTO> create(WorkspaceContext ctx, @RequestBody CreatePracticeRequestDTO input) {
+    @ApiResponse(responseCode = "201", description = "Practice created")
+    public ResponseEntity<PracticeDTO> create(
+            WorkspaceContext ctx, @RequestBody @Valid CreatePracticeRequestDTO input) {
         var created = practices.createPractice(ctx, input);
         return ResponseEntity.created(URI.create("/api/workspaces/" + ctx.slug() + "/practices/" + created.getSlug()))
                 .body(presenter.present(ctx.id(), created));
@@ -88,7 +93,9 @@ public class PracticeCatalogController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     @Operation(operationId = "updatePractice")
     public PracticeDTO update(
-            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody UpdatePracticeRequestDTO input) {
+            WorkspaceContext ctx,
+            @PathVariable String practiceSlug,
+            @RequestBody @Valid UpdatePracticeRequestDTO input) {
         return presenter.present(ctx.id(), practices.updatePractice(ctx, practiceSlug, input));
     }
 
@@ -96,6 +103,7 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     @Operation(operationId = "deletePractice")
+    @ApiResponse(responseCode = "204", description = "Practice deleted")
     public ResponseEntity<Void> delete(WorkspaceContext ctx, @PathVariable String practiceSlug) {
         practices.deletePractice(ctx, practiceSlug);
         return ResponseEntity.noContent().build();
@@ -134,7 +142,9 @@ public class PracticeCatalogController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_USAGE")
     @Operation(operationId = "setPracticeFeedbackMode")
     public PracticeDTO mode(
-            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody SetFeedbackModeRequestDTO input) {
+            WorkspaceContext ctx,
+            @PathVariable String practiceSlug,
+            @RequestBody @Valid SetFeedbackModeRequestDTO input) {
         return presenter.present(ctx.id(), practices.setFeedbackMode(ctx, practiceSlug, input.feedbackMode()));
     }
 
@@ -142,7 +152,7 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "Order changes presentation only")
     @Operation(operationId = "reorderPractices")
-    public List<PracticeDTO> reorder(WorkspaceContext ctx, @RequestBody ReorderPracticesRequestDTO input) {
+    public List<PracticeDTO> reorder(WorkspaceContext ctx, @RequestBody @Valid ReorderPracticesRequestDTO input) {
         practices.reorderPractices(ctx, input.slugs());
         return presenter.presentPractices(ctx.id(), practices.listPractices(ctx, null));
     }
@@ -152,7 +162,9 @@ public class PracticeCatalogController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     @Operation(operationId = "bindPracticeGroup")
     public PracticeDTO bind(
-            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody BindPracticeGroupRequestDTO input) {
+            WorkspaceContext ctx,
+            @PathVariable String practiceSlug,
+            @RequestBody @Valid BindPracticeGroupRequestDTO input) {
         return presenter.present(ctx.id(), groups.bindPractice(ctx, practiceSlug, input.groupSlug()));
     }
 
@@ -161,7 +173,9 @@ public class PracticeCatalogController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
     @Operation(operationId = "placePractice")
     public List<PracticeDTO> place(
-            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody PlacePracticeRequestDTO input) {
+            WorkspaceContext ctx,
+            @PathVariable String practiceSlug,
+            @RequestBody @Valid PlacePracticeRequestDTO input) {
         return presenter.presentPractices(
                 ctx.id(), practices.placePractice(ctx, practiceSlug, input.groupSlug(), input.position()));
     }
@@ -203,6 +217,8 @@ public class PracticeCatalogController {
     @GetMapping("/{practiceSlug}/guidance")
     @PreAuthorize("@workspaceSecure.isMember()")
     @Operation(operationId = "getPracticeGuidance")
+    @ApiResponse(responseCode = "200", description = "Practice guidance")
+    @ApiResponse(responseCode = "304", description = "Guidance is unchanged", content = @Content)
     public ResponseEntity<PracticeGuidanceDTO> guidance(
             WorkspaceContext ctx,
             @PathVariable String practiceSlug,

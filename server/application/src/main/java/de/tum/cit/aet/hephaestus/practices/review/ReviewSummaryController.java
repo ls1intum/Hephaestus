@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.time.TimeBucketParams;
 import de.tum.cit.aet.hephaestus.core.time.TimeBuckets;
 import de.tum.cit.aet.hephaestus.core.time.TimeRange;
 import de.tum.cit.aet.hephaestus.core.time.TimeRangeFilterParams;
+import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewEvidenceOutcomeDTO;
@@ -35,7 +37,6 @@ import lombok.RequiredArgsConstructor;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PagedModel;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -68,6 +69,9 @@ public class ReviewSummaryController {
 
     @PostMapping("/{reviewId}/cancel")
     @Operation(operationId = "cancelReview", summary = "Cancel a practice review")
+    @AuditExempt(reason = "This operation changes execution state recorded on the review, not configuration or access")
+    @ApiResponse(responseCode = "200", description = "Completed")
+    @ApiResponse(responseCode = "202", description = "Accepted")
     public ResponseEntity<ReviewDTO> cancelReview(WorkspaceContext context, @PathVariable UUID reviewId) {
         reviews.cancel(context.id(), reviewId, "CANCELLED_BY_ADMIN");
         var review = queryService.view(context.id(), reviewId);
@@ -89,14 +93,14 @@ public class ReviewSummaryController {
                     @Content(
                             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                             schema = @Schema(implementation = ProblemDetail.class)))
-    public ResponseEntity<PagedModel<ReviewSummaryDTO>> listReviews(
+    public ResponseEntity<PageResponseDTO<ReviewSummaryDTO>> listReviews(
             WorkspaceContext workspaceContext,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
             @Valid @ParameterObject ReviewFilterParams filter) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
         return ResponseEntity.ok(
-                new PagedModel<>(queryService.list(workspaceContext.id(), filter.validated(), pageable)));
+                PageResponseDTO.from(queryService.list(workspaceContext.id(), filter.validated(), pageable)));
     }
 
     @GetMapping("/evidence-outcomes")

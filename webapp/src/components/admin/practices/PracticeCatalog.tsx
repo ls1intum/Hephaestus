@@ -3,14 +3,8 @@ import { GripVertical, Library, ListChecks, MoreHorizontal, Plus } from "lucide-
 import { type ReactNode, useState } from "react";
 
 import { cn } from "cn";
-import type {
-	CatalogPracticeSummary,
-	Practice,
-	PracticeDefinitionOptions,
-	PracticeGroup,
-} from "@/api/types.gen";
-import { WORK_TYPE_FILTER_OPTIONS } from "@/components/admin/practice-editor/constants";
-import { automatedReviewUnavailableLabel } from "@/components/admin/practice-editor/evidence-presentation";
+import type { CatalogPracticeSummary, Practice, PracticeGroup } from "@/api/types.gen";
+import { ITEM_KIND_TOGGLE_OPTIONS } from "@/components/admin/practice-editor/constants";
 import {
 	type GroupDetails,
 	GroupDetailsDialog,
@@ -24,6 +18,10 @@ import {
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-editor/SortableCatalogTree";
 import { AvailablePracticeList } from "@/components/admin/practices/AvailablePracticeList";
+import {
+	currentDefinition,
+	REVIEWED_BY_LABELS,
+} from "@/components/admin/practices/practice-definition-fields";
 import { practiceFormLevel } from "@/components/admin/practices/practice-search";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { FilterToggle } from "@/components/common/FilterToggle";
@@ -33,11 +31,10 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import { Section } from "@/components/layout/Section";
-import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
-import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
 import { DASHBOARD_VISIBILITY_DEFS } from "@/components/practice-vocabulary/dashboard-visibility-defs";
+import { FeedbackModeBadge } from "@/components/practice-vocabulary/FeedbackModeBadge";
+import { FeedbackModeSourceNote } from "@/components/practice-vocabulary/FeedbackModeSourceNote";
 import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
-import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	DropdownMenu,
@@ -61,13 +58,22 @@ import {
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
-import { artifactKindNoun, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import { autonomySourceOf } from "@/lib/practice-autonomy";
+import { itemKindNoun, type KnownItemKind } from "@/lib/item-kinds";
+import { feedbackModeSourceOf } from "@/lib/practice-feedback-mode";
 import { hasText } from "@/lib/text";
 
-import { CatalogOriginBadge } from "./CatalogOriginBadge";
+import { CatalogOriginBadge, canResetToCatalog } from "./CatalogOriginBadge";
 
-export type FocusFilter = "ALL" | KnownArtifactKind;
+export type FocusFilter = "ALL" | KnownItemKind;
+
+/** A practice as the tree sorts and labels it: its name lives on its current version. */
+interface PracticeRow {
+	slug: string;
+	groupSlug: string | null;
+	position: number;
+	name: string;
+	practice: Practice;
+}
 
 export interface PracticeCatalogPendingState {
 	groupSlugs: ReadonlySet<string>;
@@ -90,18 +96,19 @@ export interface PracticeCatalogProps {
 	workspaceSlug: string;
 	groups: PracticeGroup[];
 	practices: Practice[];
-	definitionOptions: PracticeDefinitionOptions;
 	pending: PracticeCatalogPendingState;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (f: FocusFilter) => void;
 	onCreateGroup: (details: GroupDetails) => Promise<boolean>;
 	onUpdateGroup: (slug: string, details: GroupDetails) => Promise<boolean>;
-	onSetGroupDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
+	onSetGroupShownToDevelopers: (slug: string, shownToDevelopers: boolean) => void;
 	onDeleteGroup: (slug: string) => void;
+	/** Opens the comparison for resetting a group's details to the catalog's. */
+	onResetGroup: (slug: string) => void;
 	onReorderGroups: (orderedSlugs: string[]) => void;
 	onSetGroupVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
-	onPlacePractice: (practiceSlug: string, groupSlug: string | null, position: number) => void;
+	onMovePractice: (practiceSlug: string, groupSlug: string | null, position: number) => void;
 	library?: PracticeLibrary;
 }
 
@@ -109,30 +116,37 @@ export function PracticeCatalog({
 	workspaceSlug,
 	groups,
 	practices,
-	definitionOptions,
 	pending,
 	focusFilter,
 	onFocusFilterChange,
 	onCreateGroup,
 	onUpdateGroup,
-	onSetGroupDashboardVisibility,
+	onSetGroupShownToDevelopers,
 	onDeleteGroup,
+	onResetGroup,
 	onReorderGroups,
 	onSetGroupVisual,
 	onDeletePractice,
-	onPlacePractice,
+	onMovePractice,
 	library,
 }: PracticeCatalogProps) {
 	const [namingGroup, setNamingGroup] = useState<PracticeGroup | null | undefined>(undefined);
+	const rows: PracticeRow[] = practices.map((practice) => ({
+		slug: practice.slug,
+		groupSlug: practice.groupSlug,
+		position: practice.position,
+		name: currentDefinition(practice).name,
+		practice,
+	}));
 	const visiblePracticeSlugs = new Set(
 		practices
-			.filter((practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter)
+			.filter((practice) => focusFilter === "ALL" || practice.kind === focusFilter)
 			.map((practice) => practice.slug),
 	);
 	const visibleCatalogPractices =
 		library?.state.status === "ready"
 			? library.state.practices.filter(
-					(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
+					(practice) => focusFilter === "ALL" || practice.kind === focusFilter,
 				)
 			: undefined;
 	const forceOpenGroupSlugs =
@@ -144,9 +158,6 @@ export function PracticeCatalog({
 						.map((practice) => practice.groupSlug)
 						.filter((slug): slug is string => Boolean(slug)),
 				);
-	const supportedModesFor = (practice: Practice) =>
-		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
-			?.supportedAutomatedReviewModes ?? [];
 	const groupNames = new Map(groups.map((group) => [group.slug, group.name]));
 	const inheritedFromFor = (practice: Practice) =>
 		(hasText(practice.groupSlug) ? groupNames.get(practice.groupSlug) : null) ?? null;
@@ -200,7 +211,7 @@ export function PracticeCatalog({
 
 			<SortableCatalogTree
 				groups={groups}
-				entries={practices}
+				entries={rows}
 				visibleEntrySlugs={visiblePracticeSlugs}
 				forceOpenGroupSlugs={forceOpenGroupSlugs}
 				groupReorderDisabled={pending.groupStructure}
@@ -210,7 +221,7 @@ export function PracticeCatalog({
 				blockedMoveDestinationSlugs={pending.blockedMoveDestinationSlugs}
 				showEntryReorderHandles={focusFilter === "ALL"}
 				onReorderGroups={onReorderGroups}
-				onPlaceEntry={onPlacePractice}
+				onPlaceEntry={onMovePractice}
 				renderGroupLeading={(group) => (
 					<GroupVisualPicker
 						name={group.name}
@@ -222,9 +233,7 @@ export function PracticeCatalog({
 				)}
 				renderGroupMeta={(group) => (
 					<>
-						{!group.visibleInPracticeDashboards && (
-							<StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />
-						)}
+						{!group.shownToDevelopers && <StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />}
 						<CatalogOriginBadge origin={group.catalogOrigin} kind="group" />
 					</>
 				)}
@@ -236,41 +245,40 @@ export function PracticeCatalog({
 						pending={pending.groupSlugs.has(group.slug)}
 						structurePending={pending.groupStructure}
 						onRename={() => setNamingGroup(group)}
-						onSetDashboardVisibility={onSetGroupDashboardVisibility}
+						onSetShownToDevelopers={onSetGroupShownToDevelopers}
 						onDelete={onDeleteGroup}
+						onReset={onResetGroup}
 					/>
 				)}
-				renderEntryContent={(practice) => (
+				renderEntryContent={(row) => (
 					<PracticeRowDetails
-						practice={practice}
-						supportedModes={supportedModesFor(practice)}
-						inheritedFrom={inheritedFromFor(practice)}
+						practice={row.practice}
+						inheritedFrom={inheritedFromFor(row.practice)}
 						title={
 							<DetailStackLink
-								entry={{ kind: "practice", id: practice.slug }}
+								entry={{ kind: "practice", id: row.slug }}
 								className="rounded-sm break-words hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
 							>
-								{practice.name}
+								{row.name}
 							</DetailStackLink>
 						}
 					/>
 				)}
-				renderEntryActions={(practice, move, actionTriggerRef) => (
+				renderEntryActions={(row, move, actionTriggerRef) => (
 					<PracticeActions
-						practice={practice}
+						practice={row.practice}
 						workspaceSlug={workspaceSlug}
 						groups={groups}
 						move={move}
 						actionTriggerRef={actionTriggerRef}
-						pending={pending.practiceSlugs.has(practice.slug)}
+						pending={pending.practiceSlugs.has(row.slug)}
 						onDelete={onDeletePractice}
 					/>
 				)}
-				renderEntryPreview={(practice) => (
+				renderEntryPreview={(row) => (
 					<PracticeDragPreview
-						practice={practice}
-						supportedModes={supportedModesFor(practice)}
-						inheritedFrom={inheritedFromFor(practice)}
+						practice={row.practice}
+						inheritedFrom={inheritedFromFor(row.practice)}
 					/>
 				)}
 				getEmptyLabel={(groupSlug, total) => {
@@ -311,7 +319,7 @@ export function PracticeCatalog({
 							</EmptyMedia>
 							<EmptyTitle>No practices match this filter</EmptyTitle>
 							<EmptyDescription>
-								Nothing in this workspace reviews {artifactKindNoun(focusFilter, 2)}.
+								Nothing in this workspace reviews {itemKindNoun(focusFilter, 2)}.
 							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>
@@ -360,7 +368,7 @@ function CatalogToolbar({
 			<FilterToggle
 				className="sm:shrink-0"
 				label="Filter by kind of work"
-				options={WORK_TYPE_FILTER_OPTIONS}
+				options={ITEM_KIND_TOGGLE_OPTIONS}
 				value={focusFilter}
 				onChange={onFocusFilterChange}
 			/>
@@ -400,8 +408,9 @@ function GroupActions({
 	pending,
 	structurePending,
 	onRename,
-	onSetDashboardVisibility,
+	onSetShownToDevelopers,
 	onDelete,
+	onReset,
 }: {
 	group: PracticeGroup;
 	move: CatalogMoveActions;
@@ -409,16 +418,17 @@ function GroupActions({
 	pending: boolean;
 	structurePending: boolean;
 	onRename: () => void;
-	onSetDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
+	onSetShownToDevelopers: (slug: string, shownToDevelopers: boolean) => void;
 	onDelete: (slug: string) => void;
+	onReset: (slug: string) => void;
 }) {
 	return (
 		<>
 			<Switch
 				className="hidden sm:inline-flex"
-				checked={group.visibleInPracticeDashboards}
-				onCheckedChange={(visibleInPracticeDashboards) =>
-					onSetDashboardVisibility(group.slug, visibleInPracticeDashboards)
+				checked={group.shownToDevelopers}
+				onCheckedChange={(shownToDevelopers) =>
+					onSetShownToDevelopers(group.slug, shownToDevelopers)
 				}
 				disabled={pending}
 				aria-label={`Show ${group.name} on practice profiles`}
@@ -443,12 +453,15 @@ function GroupActions({
 					</DropdownMenuItem>
 					<DropdownMenuItem
 						disabled={pending}
-						onClick={() => onSetDashboardVisibility(group.slug, !group.visibleInPracticeDashboards)}
+						onClick={() => onSetShownToDevelopers(group.slug, !group.shownToDevelopers)}
 					>
-						{group.visibleInPracticeDashboards
-							? "Hide from practice profiles"
-							: "Show on practice profiles"}
+						{group.shownToDevelopers ? "Hide from practice profiles" : "Show on practice profiles"}
 					</DropdownMenuItem>
+					{canResetToCatalog(group.catalogOrigin) && (
+						<DropdownMenuItem disabled={pending} onClick={() => onReset(group.slug)}>
+							Reset to catalog
+						</DropdownMenuItem>
+					)}
 					<DropdownMenuSeparator />
 					<DropdownMenuGroup>
 						<DropdownMenuLabel>Order</DropdownMenuLabel>
@@ -498,7 +511,7 @@ function PracticeActions({
 						ref={actionTriggerRef}
 						variant="ghost"
 						size="icon-sm"
-						aria-label={`More actions for ${practice.name}`}
+						aria-label={`More actions for ${currentDefinition(practice).name}`}
 					>
 						<MoreHorizontal className="size-4" />
 					</Button>
@@ -574,31 +587,34 @@ function PracticeActions({
 function PracticeRowDetails({
 	practice,
 	title,
-	supportedModes,
 	inheritedFrom,
 }: {
 	practice: Practice;
 	title: ReactNode;
-	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
 	inheritedFrom: string | null;
 }) {
-	const unavailableLabel = practice.automatedReviewWithdrawal
-		? "Human review needed"
-		: automatedReviewUnavailableLabel(practice.automatedReviewPolicy, supportedModes);
-	const autonomySource = autonomySourceOf(practice.autonomy, inheritedFrom);
+	const { by } = currentDefinition(practice).reviewedBy;
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="line-clamp-none w-full min-w-0">{title}</ItemTitle>
 			<ItemDescription>
 				<MetaRow
 					captions={[
-						<WorkTypeLabel key="work" artifactKind={practice.artifactKind} />,
-						<AutonomySourceNote key="source" source={autonomySource} />,
+						<WorkTypeLabel key="work" itemKind={practice.kind} />,
+						<FeedbackModeSourceNote
+							key="source"
+							source={feedbackModeSourceOf(practice.feedbackMode, "PRACTICE", inheritedFrom)}
+						/>,
+						// Heph is the default reviewer; a practice people or nobody review says so.
+						...(by === "HEPHAESTUS"
+							? []
+							: [
+									<span key="reviewed-by">Reviewed by {REVIEWED_BY_LABELS[by].toLowerCase()}</span>,
+								]),
 					]}
 					badges={
 						<>
-							<AutonomyBadge autonomy={practice.autonomy.effective} />
-							{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
+							<FeedbackModeBadge feedbackMode={practice.feedbackMode.effective} />
 							<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 						</>
 					}
@@ -610,11 +626,9 @@ function PracticeRowDetails({
 
 function PracticeDragPreview({
 	practice,
-	supportedModes,
 	inheritedFrom,
 }: {
 	practice: Practice;
-	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
 	inheritedFrom: string | null;
 }) {
 	return (
@@ -624,9 +638,8 @@ function PracticeDragPreview({
 			</div>
 			<PracticeRowDetails
 				practice={practice}
-				supportedModes={supportedModes}
 				inheritedFrom={inheritedFrom}
-				title={<span className="break-words">{practice.name}</span>}
+				title={<span className="break-words">{currentDefinition(practice).name}</span>}
 			/>
 		</Item>
 	);

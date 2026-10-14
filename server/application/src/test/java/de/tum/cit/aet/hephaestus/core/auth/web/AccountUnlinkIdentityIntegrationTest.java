@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.HephaestusJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.TokenConstraints;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -55,8 +57,11 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Autowired
     private HephaestusJwtIssuer jwtIssuer;
 
+    @Autowired
+    private PeopleRegistry people;
+
     @Test
-    void unlinkSecondaryIdentityDeletesItAndKeepsTheRest() {
+    void unlinkSecondaryIdentityDisablesItAndKeepsTheRest() {
         Account account = accountRepository.save(new Account("Two-provider User"));
         Identity github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-1");
         Identity gitlab = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-1");
@@ -71,9 +76,11 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
                 .isNoContent()
                 .expectBody(Void.class);
 
-        // Hard delete: the unlinked row is gone (not soft-disabled), the other identity stays
-        // active.
-        assertThat(identityRepository.findById(persistedId(github.getId()))).isEmpty();
+        assertThat(identityRepository
+                        .findById(persistedId(github.getId()))
+                        .orElseThrow()
+                        .getDisabledAt())
+                .isNotNull();
         assertThat(identityRepository.findActiveByAccountId(persistedId(account.getId())))
                 .extracting(Identity::getId)
                 .containsExactly(persistedId(gitlab.getId()));
@@ -95,12 +102,12 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
                 .isNoContent()
                 .expectBody(Void.class);
 
-        // The row is gone, so the global (provider, subject) uniqueness is freed and the SAME
-        // GitHub
-        // identity can be linked again — the promise the disconnect dialog makes. A soft-delete
-        // regression would leave the key occupied and this re-link would throw a unique violation.
-        assertThat(identityRepository.findById(persistedId(github.getId()))).isEmpty();
-        Identity relinked = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev");
+        var disabled = identityRepository.findById(persistedId(github.getId())).orElseThrow();
+        assertThat(disabled.getDisabledAt()).isNotNull();
+        long claimed = people.claim(new PersonIdentity(disabled.getProviderId(), disabled.getProviderUserKey(), null));
+        assertThat(claimed).isEqualTo(persistedId(account.getId()));
+        var relinked = identityRepository.findById(persistedId(github.getId())).orElseThrow();
+        assertThat(relinked.getDisabledAt()).isNull();
         assertThat(identityRepository.findActiveByAccountId(persistedId(account.getId())))
                 .extracting(Identity::getId)
                 .contains(persistedId(relinked.getId()));

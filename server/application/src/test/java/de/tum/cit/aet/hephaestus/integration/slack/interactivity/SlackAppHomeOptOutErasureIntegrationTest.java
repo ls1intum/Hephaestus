@@ -8,13 +8,14 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
@@ -38,7 +39,6 @@ import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
@@ -102,7 +102,10 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private AccountRepository accounts;
+
+    @Autowired
+    private IdentityRepository identities;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -134,13 +137,11 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         Workspace workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-optout-erase"));
         workspaceId = workspace.getId();
-        meMemberId = memberships.accountIdForUser(userRepository
-                .save(TestUserFactory.createUser(100L, "opting-out-user", provider))
-                .getId());
+        meMemberId = SlackConversationTestSupport.accountWithIdentity(
+                accounts, identities, provider, 100L, "opting-out-user");
         memberships.createMembership(workspace, meMemberId, Membership.WorkspaceRole.MEMBER);
-        otherMemberId = memberships.accountIdForUser(userRepository
-                .save(TestUserFactory.createUser(200L, "co-participant", provider))
-                .getId());
+        otherMemberId = SlackConversationTestSupport.accountWithIdentity(
+                accounts, identities, provider, 200L, "co-participant");
         memberships.createMembership(workspace, otherMemberId, Membership.WorkspaceRole.MEMBER);
         practice = savePractice(workspace);
 

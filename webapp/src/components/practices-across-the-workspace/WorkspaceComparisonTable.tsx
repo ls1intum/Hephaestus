@@ -1,8 +1,7 @@
 import { ClipboardCheckIcon } from "lucide-react";
-import { type ReactNode, useId } from "react";
+import type { ReactNode } from "react";
 
-import type { WorkspaceSplit } from "@/api/types.gen";
-import type { PracticeGroupStandingValue } from "@/components/practice-vocabulary/practice-group-standing-defs";
+import type { OutcomeVector } from "@/api/types.gen";
 import {
 	OPEN_ROW_BAR,
 	PracticeTableFrame,
@@ -13,8 +12,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableHead } from "@/components/ui/table";
 
-import { NOBODY_YET } from "./across-workspace-copy";
-import { EmptyTrack, WorkspaceSplitBar, WorkspaceSplitBarSkeleton } from "./WorkspaceSplitBar";
+import { OutcomeCounts, OutcomeCountsSkeleton } from "./OutcomeCounts";
 
 /** The hidden words of the marked row, read after its name. */
 export const CAME_FROM_YOUR_PROFILE = ", where you came from in your Practice profile";
@@ -26,9 +24,9 @@ export interface ComparisonRow {
 	name: string;
 	/** The name as the subject cell draws it: a group's pill, a practice's pill. */
 	subject: ReactNode;
-	/** The part the You marker is on; absent where the split marks no one. */
-	yourStanding?: PracticeGroupStandingValue;
-	split: WorkspaceSplit;
+	/** What the row counts beside its results: "5 practices" for a group, "12 developers" for a practice. */
+	count: string;
+	outcomes: OutcomeVector;
 }
 
 export type ComparisonTableState =
@@ -39,6 +37,8 @@ export interface WorkspaceComparisonTableProps {
 	"aria-label": string;
 	/** "Practice group", "Practice". */
 	subjectHead: string;
+	/** The head of the {@link ComparisonRow.count} column. */
+	countHead: string;
 	state: ComparisonTableState;
 	/** The link at the row's end, which a press anywhere on the row also follows. */
 	rowLink: (row: ComparisonRow) => { text: string; onOpen: () => void };
@@ -53,94 +53,83 @@ export interface WorkspaceComparisonTableProps {
 }
 
 /**
- * Practice groups or practices, each beside its split, in the practice table frame. Every row is
- * listed with no paging, as the Practice profile lists them. When no split counts anybody yet, the
- * reason shows once above the table, not once per row.
+ * Practice groups or practices, each with its count and its results, in the practice table frame.
+ * Every row is listed with no paging, as the Practice profile lists them.
  */
 export function WorkspaceComparisonTable({
 	"aria-label": label,
 	subjectHead,
+	countHead,
 	state,
 	rowLink,
 	openKey,
 	markedKey,
 	empty,
 }: WorkspaceComparisonTableProps) {
-	const rows = state.status === "ready" ? state.rows : [];
-	const nobodyYet = rows.length > 0 && rows.every((row) => row.split.developers === 0);
-	// Each cell then holds only a hidden track, so the table is described by the one reason.
-	const reasonId = useId();
 	return (
-		<>
-			{nobodyYet && (
-				<p id={reasonId} className="text-sm text-muted-foreground">
-					{NOBODY_YET}.
-				</p>
-			)}
-			<PracticeTableFrame
-				aria-label={label}
-				aria-describedby={nobodyYet ? reasonId : undefined}
-				columns={3}
-				// On a phone a row stacks as PracticeTable's do, so the bar never scrolls out of sight.
-				tableClassName={STACKED}
-				head={
-					<>
-						<TableHead className="w-96">{subjectHead}</TableHead>
-						<TableHead>Developers in this workspace</TableHead>
-						<TableHead className="w-32">
-							<span className="sr-only">Open</span>
-						</TableHead>
-					</>
-				}
-				rows={rows}
-				rowKey={(row) => row.key}
-				renderRow={(row) => (
-					<PracticeTableRow
-						open={row.key === openKey}
-						marked={row.key === markedKey}
-						link={{ ...rowLink(row), name: row.name }}
-					>
-						<SubjectCell
-							badge={
-								row.key === markedKey ? (
-									<>
-										{row.subject}
-										<span className="sr-only">{CAME_FROM_YOUR_PROFILE}</span>
-									</>
-								) : (
-									row.subject
-								)
-							}
-							className={OPEN_ROW_BAR}
-						/>
-						<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
-							{nobodyYet ? (
-								<EmptyTrack />
+		<PracticeTableFrame
+			aria-label={label}
+			columns={4}
+			// On a phone a row stacks as PracticeTable's do, so the counts never scroll out of sight.
+			tableClassName={STACKED}
+			head={
+				<>
+					<TableHead className="w-80">{subjectHead}</TableHead>
+					<TableHead className="w-36">{countHead}</TableHead>
+					<TableHead>Results</TableHead>
+					<TableHead className="w-32">
+						<span className="sr-only">Open</span>
+					</TableHead>
+				</>
+			}
+			rows={state.status === "ready" ? state.rows : []}
+			rowKey={(row) => row.key}
+			renderRow={(row) => (
+				<PracticeTableRow
+					open={row.key === openKey}
+					marked={row.key === markedKey}
+					link={{ ...rowLink(row), name: row.name }}
+				>
+					<SubjectCell
+						badge={
+							row.key === markedKey ? (
+								<>
+									{row.subject}
+									<span className="sr-only">{CAME_FROM_YOUR_PROFILE}</span>
+								</>
 							) : (
-								<WorkspaceSplitBar split={row.split} yourStanding={row.yourStanding} />
-							)}
-						</TableCell>
-					</PracticeTableRow>
-				)}
-				empty={{ icon: <ClipboardCheckIcon />, ...empty }}
-				isLoading={state.status === "loading"}
-				loadingRow={
-					<>
-						<TableCell>
-							<span className="flex items-center gap-2">
-								<Skeleton className="size-4 shrink-0 rounded-full" />
-								<Skeleton className="h-4 w-48" />
-							</span>
-						</TableCell>
-						<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
-							<WorkspaceSplitBarSkeleton />
-						</TableCell>
-						<TableCell>
-							<Skeleton className="ml-auto h-4 w-24" />
-						</TableCell>
-					</>
-				}
-			/>
-		</>
+								row.subject
+							)
+						}
+						className={OPEN_ROW_BAR}
+					/>
+					<TableCell className="align-top text-sm tabular-nums">{row.count}</TableCell>
+					<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
+						<OutcomeCounts outcomes={row.outcomes} />
+					</TableCell>
+				</PracticeTableRow>
+			)}
+			empty={{ icon: <ClipboardCheckIcon />, ...empty }}
+			isLoading={state.status === "loading"}
+			loadingRow={
+				<>
+					<TableCell>
+						<span className="flex items-center gap-2">
+							<Skeleton className="size-4 shrink-0 rounded-full" />
+							<Skeleton className="h-4 w-48" />
+						</span>
+					</TableCell>
+					<TableCell>
+						<Skeleton className="h-4 w-24" />
+					</TableCell>
+					<TableCell className="align-top whitespace-normal @max-[38rem]:basis-full">
+						<OutcomeCountsSkeleton />
+					</TableCell>
+					<TableCell>
+						<Skeleton className="ml-auto h-4 w-24" />
+					</TableCell>
+				</>
+			}
+		/>
 	);
 }

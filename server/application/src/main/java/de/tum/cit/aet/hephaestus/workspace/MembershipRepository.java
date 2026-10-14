@@ -69,8 +69,8 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO membership (workspace_id, account_id, role, hidden, joined_at)
-        VALUES (:workspaceId, :accountId, :role, :hidden, CURRENT_TIMESTAMP)
+        INSERT INTO membership (workspace_id, account_id, role, hidden, review_selected, public_activity_seen, joined_at)
+        VALUES (:workspaceId, :accountId, :role, :hidden, false, false, CURRENT_TIMESTAMP)
         ON CONFLICT (workspace_id, account_id) DO NOTHING
         """, nativeQuery = true)
     int insertIfAbsent(

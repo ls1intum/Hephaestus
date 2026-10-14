@@ -4,9 +4,9 @@ import type { ReactNode } from "react";
 import { HephMark } from "@/components/brand/HephaestusLogo";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { itemKindNoun } from "@/lib/item-kinds";
 import { Button } from "~/components/common/Button";
 import type { ActionOutcome, ActionPreview } from "~/shared/review-actions";
-import { workNoun } from "~/shared/work-noun";
 
 export type ActionConfirmationState =
 	| { status: "loading" }
@@ -27,17 +27,17 @@ export interface ActionConfirmationProps {
 }
 
 function WorkCard({ preview }: { preview: ActionPreview }) {
-	const { work, workspace, instanceHost } = preview;
+	const { item, workspace, instanceHost } = preview;
 	return (
 		<dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 rounded-lg border border-border bg-card p-3.5 text-sm">
 			<dt className="text-muted-foreground">Work</dt>
 			<dd className="min-w-0 break-words">
 				<span className="font-medium">
-					{work.container === undefined ? "" : `${work.container} `}
-					{work.label}
+					{item.container === null ? "" : `${item.container} `}
+					{item.label}
 				</span>
-				{work.title === undefined ? null : (
-					<span className="block text-muted-foreground">{work.title}</span>
+				{item.title === null ? null : (
+					<span className="block text-muted-foreground">{item.title}</span>
 				)}
 			</dd>
 			<dt className="text-muted-foreground">Workspace</dt>
@@ -49,7 +49,7 @@ function WorkCard({ preview }: { preview: ActionPreview }) {
 }
 
 function explanation(preview: ActionPreview): string {
-	return `Hephaestus reviews this ${workNoun(preview.work)} against the practices ${preview.workspace.displayName} follows. The workspace’s settings decide what the review records and whether feedback is posted where the developer sees it.`;
+	return `Hephaestus reviews this ${itemKindNoun(preview.item.kind, 1, preview.item.provider)} against the practices ${preview.workspace.displayName} follows. The workspace’s settings decide what the review records and whether feedback is posted where the developer sees it.`;
 }
 
 function outcomeText(outcome: ActionOutcome): { title: string; body: string; done: boolean } {

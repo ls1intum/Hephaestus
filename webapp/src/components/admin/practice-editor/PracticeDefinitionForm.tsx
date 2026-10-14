@@ -1,72 +1,19 @@
 import deepEqual from "fast-deep-equal";
 import { ChevronRight, RotateCcw } from "lucide-react";
-import { type ReactElement, type ReactNode, useId, useRef, useState } from "react";
+import { type ReactElement, type ReactNode, useRef, useState } from "react";
 
 import type {
-	PracticeAutomatedReviewPolicy,
-	PracticePrecondition,
-	PracticeEvidenceRequirement,
-	PracticeDeliveryBehavior,
-	UpdatePracticeRequest,
+	PracticeDefinition,
 	PracticeDefinitionOptions,
-	PracticeEvidenceOutcome,
-	PracticeGuide,
-	PracticeVisual,
-	PracticeWorkTypeDefinitionOptions,
+	PracticeItemTypeOption,
 } from "@/api/types.gen";
-import {
-	generateSlug,
-	isValidSlug,
-	workArtifactHint,
-} from "@/components/admin/practice-editor/constants";
-import { canAttemptAutomatedReview } from "@/components/admin/practice-editor/evidence-presentation";
-import {
-	FIGURE_PLACEHOLDER,
-	hasFigurePlaceholder,
-	hasGuide,
-	hasVisual,
-	MAX_SVG_SIZE,
-	NO_GUIDE,
-	NO_VISUAL,
-	svgProblem,
-} from "@/components/admin/practice-editor/practice-guidance-draft";
-import {
-	gatePresentation,
-	parseGate,
-} from "@/components/admin/practice-editor/practice-precondition";
-import {
-	PracticeGuideEditor,
-	type PracticeGuideView,
-} from "@/components/admin/practice-editor/PracticeGuideEditor";
-import {
-	PracticeMentoringSupportEditor,
-	practicePolicyError,
-	practicePolicyErrorTarget,
-} from "@/components/admin/practice-editor/PracticeMentoringSupportEditor";
-import {
-	PracticeReviewSettingsEditor,
-	type PracticeOccasionMode,
-	withoutEvidence,
-	withRecommendedEvidence,
-} from "@/components/admin/practice-editor/PracticeReviewSettingsEditor";
-import { PracticeVisualEditor } from "@/components/admin/practice-editor/PracticeVisualEditor";
-import {
-	artifactKindOfSignals,
-	type ReviewSettingsProblem,
-	reviewSettingsProblem,
-	EMPTY_REVIEW_SETTINGS,
-	normalizeReviewSettings,
-	orderedWorkTypes,
-	recommendedReviewSettings,
-	workTypeOptionsFor,
-} from "@/components/admin/practice-editor/review-settings";
 import { CodeEditor } from "@/components/common/CodeEditor";
-import { type FormError, FormErrorSummary } from "@/components/common/FormErrorSummary";
+import { FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { InlineLink } from "@/components/common/InlineLink";
 import {
-	ACTOR_ROLE_LABELS,
-	type ActorRole,
-} from "@/components/practice-vocabulary/actor-role-labels";
+	ABOUT_ROLE_LABELS,
+	type AboutRole,
+} from "@/components/practice-vocabulary/about-role-labels";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
@@ -95,42 +42,52 @@ import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
-import { artifactKindLabel, artifactKindNoun, isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { hasText } from "@/lib/text";
 
-type DefinitionChange = NonNullable<UpdatePracticeRequest["definitionChanges"]>[number];
-
-const NO_GROUP = "__none__";
+import { appliesWhenPresentation, MAX_OTHERWISE_LENGTH } from "./applies-when";
+import { generateSlug, itemKindHint } from "./constants";
+import {
+	blankDraft,
+	clearedBySave,
+	definitionOfDraft,
+	draftErrors,
+	draftOf,
+	FIELD_IDS,
+	freshKindDraft,
+	type KindDraft,
+	kindDraftOf,
+	MAX_GUIDANCE_LENGTH,
+	NO_GROUP,
+	type PracticeDefinitionDraft,
+} from "./practice-definition-draft";
+import { PracticeGuideEditor, type PracticeGuideView } from "./PracticeGuideEditor";
+import { PracticeReviewedByEditor } from "./PracticeReviewedByEditor";
+import { PracticeReviewSettingsEditor } from "./PracticeReviewSettingsEditor";
+import { PracticeScanSettingsEditor } from "./PracticeScanSettingsEditor";
+import { PracticeVisualEditor } from "./PracticeVisualEditor";
+import { itemTypeFor, orderedItemTypes } from "./review-settings";
 
 const PRACTICE_SCRIPT_GUIDE_URL = "https://docs.hephaestus.build/admin/practice-scripts";
+
+/** The About select's value for a practice about the work itself: a `Select` must hold a string. */
+const ABOUT_THE_WORK = "__work__";
 
 export interface PracticeDefinitionGroupOption {
 	slug: string;
 	name: string;
 }
 
+/**
+ * One practice as both editor consoles read and write it: its identity, its group, and the one
+ * closed definition. Feedback mode and review scope are workspace settings and never enter it.
+ */
 export interface PracticeDefinitionValue {
 	slug: string;
-	name: string;
-	groupSlug?: string;
-	/**
-	 * The settings that determine when this practice is reviewed. The kind of
-	 * work is read off its signals; it is not carried separately.
-	 */
-	signals: string[];
-	evidenceRequirements: PracticeEvidenceRequirement[];
-	reviewWhen: Record<string, string[]>;
-	subject: ActorRole;
-	precondition?: PracticePrecondition;
-	definitionChanges?: DefinitionChange[];
-	criteria: string;
-	whyItMatters?: string;
-	whatGoodLooksLike?: string;
-	visual?: PracticeVisual;
-	guide?: PracticeGuide;
-	practiceScript?: string;
-	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
-	deliveryBehavior?: PracticeDeliveryBehavior;
+	/** The kind of item the practice reviews. Chosen on create; it never changes afterwards. */
+	kind: string;
+	/** Where the practice is listed. Not part of the definition, so it never makes a new version. */
+	groupSlug: string | null;
+	definition: PracticeDefinition;
 }
 
 interface PracticeDefinitionFormBaseProps {
@@ -139,9 +96,9 @@ interface PracticeDefinitionFormBaseProps {
 	disabled?: boolean;
 	isSubmitDisabled?: boolean;
 	/** Sits at the top of the scrolling body, so a host's banner shares the fields' padding. */
-	beforeFields?: React.ReactNode;
-	afterFields?: React.ReactNode;
-	cancelAction: React.ReactNode;
+	beforeFields?: ReactNode;
+	afterFields?: ReactNode;
+	cancelAction: ReactNode;
 	/**
 	 * Return a promise that rejects when the save failed: the unsaved-changes guard then stays down
 	 * from submit until it hears otherwise, so a caller navigating straight after an awaited save is
@@ -149,7 +106,6 @@ interface PracticeDefinitionFormBaseProps {
 	 */
 	onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>;
 	definitionOptions: PracticeDefinitionOptions;
-	evidenceOutcome?: PracticeEvidenceOutcome;
 	/**
 	 * A link to the AI models page, rendered as *AI models* in the practice script's help. Only a
 	 * workspace has that page; without it the words stay plain.
@@ -171,244 +127,14 @@ export type PracticeDefinitionFormProps =
 	| PracticeDefinitionFormCreateProps
 	| PracticeDefinitionFormEditProps;
 
-interface FormState {
-	name: string;
-	slug: string;
-	groupSlug: string;
-	/**
-	 * Held rather than read off the signals: the occasion's signals are what the author is editing,
-	 * and unticking the last of them would otherwise take the kind of work — and with it the editor
-	 * that is the only way to tick one again — off the screen.
-	 */
-	artifactKind: string;
-	signals: string[];
-	evidenceRequirements: PracticeEvidenceRequirement[];
-	reviewWhen: Record<string, string[]>;
-	subject: ActorRole;
-	precondition?: PracticePrecondition;
-	definitionChanges: DefinitionChange[];
-	gateText: string;
-	criteria: string;
-	whyItMatters: string;
-	whatGoodLooksLike: string;
-	visual: PracticeVisual;
-	guide: PracticeGuide;
-	practiceScript: string;
-	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
-	deliveryBehavior: PracticeDeliveryBehavior;
-}
-
-/** Everything a work type owns, stashed so switching away and back does not discard the work. */
-interface WorkTypeDraft {
-	signals: string[];
-	evidenceRequirements: PracticeEvidenceRequirement[];
-	reviewWhen: Record<string, string[]>;
-	subject: ActorRole;
-	precondition?: PracticePrecondition;
-	gateText: string;
-	practiceScript: string;
-	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
-}
-
-function initialState(
+function initialDraft(
 	definitionOptions: PracticeDefinitionOptions,
-	initialData?: PracticeDefinitionValue,
-): FormState {
-	const fallback = orderedWorkTypes(definitionOptions)[0];
-	return initialData ? stateOf(initialData, fallback) : blankState(fallback);
-}
-
-function blankState(fallback: PracticeWorkTypeDefinitionOptions | undefined): FormState {
-	return {
-		name: "",
-		slug: "",
-		groupSlug: NO_GROUP,
-		artifactKind: fallback?.artifactKind ?? "",
-		...(fallback ? recommendedReviewSettings(fallback) : EMPTY_REVIEW_SETTINGS),
-		definitionChanges: [],
-		gateText: "",
-		criteria: "",
-		whyItMatters: "",
-		whatGoodLooksLike: "",
-		visual: NO_VISUAL,
-		guide: NO_GUIDE,
-		practiceScript: "",
-		automatedReviewPolicy: fallback?.recommendedPolicy ?? EMPTY_POLICY,
-		deliveryBehavior: { summaryOnly: false },
-	};
-}
-
-function stateOf(
-	initialData: PracticeDefinitionValue,
-	fallback: PracticeWorkTypeDefinitionOptions | undefined,
-): FormState {
-	return {
-		name: initialData.name,
-		slug: initialData.slug,
-		groupSlug: initialData.groupSlug ?? NO_GROUP,
-		artifactKind: artifactKindOfSignals(initialData.signals) ?? fallback?.artifactKind ?? "",
-		...normalizeReviewSettings(initialData),
-		definitionChanges: [],
-		gateText: initialData.precondition ? JSON.stringify(initialData.precondition, null, 2) : "",
-		criteria: initialData.criteria,
-		whyItMatters: initialData.whyItMatters ?? "",
-		whatGoodLooksLike: initialData.whatGoodLooksLike ?? "",
-		visual: initialData.visual ?? NO_VISUAL,
-		guide: initialData.guide ?? NO_GUIDE,
-		practiceScript: initialData.practiceScript ?? "",
-		automatedReviewPolicy: initialData.automatedReviewPolicy,
-		deliveryBehavior: { summaryOnly: false, ...initialData.deliveryBehavior },
-	};
-}
-
-function draftOf(form: FormState): WorkTypeDraft {
-	return {
-		...normalizeReviewSettings(form),
-		gateText: form.gateText,
-		practiceScript: form.practiceScript,
-		automatedReviewPolicy: form.automatedReviewPolicy,
-	};
-}
-
-/**
- * Guidance-only leads, because it is the only one of the three that forbids evidence outright — and
- * `canAttemptAutomatedReview` can still say yes to a policy whose mode is NONE.
- */
-function occasionModeOf(
-	policy: PracticeAutomatedReviewPolicy,
-	canRunMentoring: boolean,
-): PracticeOccasionMode {
-	if (policy.automatedReview.mode === "NONE") {
-		return "guidance-only";
+	initialData: PracticeDefinitionValue | undefined,
+): PracticeDefinitionDraft {
+	if (initialData) {
+		return draftOf(initialData, itemTypeFor(definitionOptions, initialData.kind));
 	}
-	return canRunMentoring ? "reviewed" : "human-review";
-}
-
-interface FormErrors {
-	name?: string;
-	slug?: string;
-	criteria?: string;
-	policy?: string;
-	reviewSettings?: ReviewSettingsProblem;
-	gate?: string;
-	subject?: string;
-	delivery?: string;
-	visualSvg?: string;
-	visualAlt?: string;
-	guide?: string;
-	/**
-	 * One list, in the order the fields appear, so the summary reads down the form and the first
-	 * entry is also the field to focus. The summary and the focus target both come from it, so they
-	 * cannot disagree; the messages beside each control are worded for that control and are not.
-	 */
-	summary: FormError[];
-}
-
-const NO_ERRORS: FormErrors = { summary: [] };
-
-function formErrors(
-	form: FormState,
-	mode: PracticeDefinitionFormProps["mode"],
-	selectedWorkType: PracticeWorkTypeDefinitionOptions | undefined,
-	revealSlug: () => void,
-	revealGuide: () => void,
-	deliveryId: string,
-): FormErrors {
-	const nameTooShort = form.name.trim().length < 3;
-	const criteriaTooShort = form.criteria.trim().length < 3;
-	const slugInvalid = mode === "create" && !isValidSlug(form.slug);
-	const policy = practicePolicyError(form.automatedReviewPolicy);
-	const reviewSettings = reviewSettingsProblem(form, form.automatedReviewPolicy, selectedWorkType);
-	const gateError = parseGate(form.gateText, selectedWorkType).error;
-	const subjectError =
-		selectedWorkType && !selectedWorkType.subjectRoles.includes(form.subject)
-			? "Choose a person this kind of work can identify."
-			: undefined;
-	const preferredSlug = form.deliveryBehavior.redundantToSlug?.trim();
-	const deliveryError =
-		hasText(preferredSlug) && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(preferredSlug)
-			? "Use lowercase letters, numbers and single hyphens."
-			: undefined;
-	const visualSvg = visualSvgError(form.visual);
-	const visualAlt =
-		hasVisual(form.visual) && !hasText(form.visual.alt.trim())
-			? "Describe what the visual shows."
-			: undefined;
-	const guide = guideError(form.guide);
-	const summary = [
-		nameTooShort && {
-			fieldId: "practice-name",
-			message: "Enter a name of at least 3 characters.",
-		},
-		criteriaTooShort && {
-			fieldId: "practice-criteria",
-			message: "Enter at least 3 characters in What to look for.",
-		},
-		hasText(visualSvg) && { fieldId: "practice-visual-svg", message: visualSvg },
-		hasText(visualAlt) && { fieldId: "practice-visual-alt", message: visualAlt },
-		hasText(guide) && { fieldId: "practice-guide-markdown", message: guide, reveal: revealGuide },
-		policy && {
-			fieldId: practicePolicyErrorTarget(form.automatedReviewPolicy),
-			message: policy,
-		},
-		reviewSettings && { fieldId: reviewSettings.focusId, message: reviewSettings.message },
-		hasText(subjectError) && { fieldId: "practice-subject", message: subjectError },
-		hasText(gateError) && { fieldId: "practice-gate", message: gateError },
-		slugInvalid && {
-			fieldId: "practice-slug",
-			message: "Enter an identifier of 3–64 lowercase letters, numbers and single hyphens.",
-			// Lives inside the collapsed Technical settings panel, which unmounts its contents.
-			reveal: revealSlug,
-		},
-		hasText(deliveryError) && {
-			fieldId: `${deliveryId}-redundant`,
-			message: deliveryError,
-			reveal: revealSlug,
-		},
-	].filter((entry): entry is FormError => Boolean(entry));
-	return {
-		name: nameTooShort ? "Enter a name of at least 3 characters." : undefined,
-		slug: slugInvalid ? "Use 3–64 lowercase letters, numbers and single hyphens." : undefined,
-		criteria: criteriaTooShort ? "Enter at least 3 characters." : undefined,
-		policy,
-		reviewSettings,
-		gate: gateError,
-		subject: subjectError,
-		delivery: deliveryError,
-		visualSvg,
-		visualAlt,
-		guide,
-		summary,
-	};
-}
-
-function visualSvgError(visual: PracticeVisual): string | undefined {
-	if (!hasVisual(visual)) {
-		return undefined;
-	}
-	switch (svgProblem(visual.svg)) {
-		case "not-svg": {
-			return "Enter SVG markup with an <svg> root element.";
-		}
-		case "too-large": {
-			return `Use an SVG of ${MAX_SVG_SIZE} or less. Simplify the drawing.`;
-		}
-		case undefined: {
-			return undefined;
-		}
-	}
-}
-
-function guideError(guide: PracticeGuide): string | undefined {
-	if (!hasGuide(guide)) {
-		return undefined;
-	}
-	if (!hasText(guide.markdown.trim())) {
-		return "Write the guide, or remove it.";
-	}
-	return hasFigurePlaceholder(guide.markdown)
-		? `Replace “${FIGURE_PLACEHOLDER}” with what the figure shows.`
-		: undefined;
+	return blankDraft(orderedItemTypes(definitionOptions)[0]);
 }
 
 function submitLabel(mode: PracticeDefinitionFormProps["mode"], isPending: boolean): string {
@@ -416,66 +142,6 @@ function submitLabel(mode: PracticeDefinitionFormProps["mode"], isPending: boole
 		return isPending ? "Creating…" : "Create practice";
 	}
 	return isPending ? "Saving…" : "Save changes";
-}
-
-/** Only reachable on an instance that offers no reviewable work type at all. */
-const EMPTY_POLICY: PracticeAutomatedReviewPolicy = {
-	sourceContractVersion: "",
-	automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
-	knownLimitations: [],
-};
-
-/**
- * Keeps the answer the author already gave about how far automated review may go: changing what is
- * reviewed is not a decision to start reviewing it.
- */
-function recommendedPolicyWithCurrentSupport(
-	recommended: PracticeAutomatedReviewPolicy,
-	current: PracticeAutomatedReviewPolicy,
-): PracticeAutomatedReviewPolicy {
-	if (current.automatedReview.mode === "NONE") {
-		return {
-			...recommended,
-			automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-			knownLimitations: [],
-		};
-	}
-	if (current.automatedReview.evidenceSufficiency === "DECLARED_EVIDENCE_INSUFFICIENT") {
-		return {
-			...recommended,
-			automatedReview: {
-				mode: "LANGUAGE_MODEL",
-				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
-			},
-			knownLimitations: current.knownLimitations,
-			insufficiencyReason: current.insufficiencyReason,
-		};
-	}
-	return recommended;
-}
-
-/**
- * Only a reviewed practice runs a script, so its section hides under any other support choice. The
- * script stays in the draft until a save, and the note says so.
- */
-function HeldScriptNote({ script, reviewed }: { script: string; reviewed: boolean }) {
-	if (reviewed || script.trim() === "") {
-		return null;
-	}
-	return (
-		<p className="max-w-2xl text-sm text-muted-foreground">
-			A practice script needs a practice that Hephaestus can review. Your script stays in this
-			draft, and saving with this choice removes it.
-		</p>
-	);
-}
-
-/** A kind the instance no longer offers, named where this build still has words for it. */
-function withdrawnKindSentence(artifactKind: string): string {
-	return isKnownArtifactKind(artifactKind)
-		? `This practice reviews ${artifactKindNoun(artifactKind, 2)}, which this instance no longer offers.`
-		: "This practice reviews a kind of work this instance no longer offers.";
 }
 
 export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
@@ -490,67 +156,35 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		cancelAction,
 		initialData,
 		definitionOptions,
-		evidenceOutcome,
 		practiceScriptModelsLink,
 	} = props;
 	const formDisabled = isPending || disabled;
-	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
-	const deliveryId = useId();
+	const [draft, setDraft] = useState(() => initialDraft(definitionOptions, initialData));
 	// Counts refused submits, not "has submitted": it re-keys the summary so a second refusal
 	// focuses it again.
 	const [refusals, setRefusals] = useState(0);
-	const [showAdvanced, setShowAdvanced] = useState(false);
-	const [showPracticeScript, setShowPracticeScript] = useState(() =>
-		hasText(initialData?.practiceScript),
-	);
+	const [showTechnical, setShowTechnical] = useState(false);
+	const [showScript, setShowScript] = useState(() => hasText(initialData?.definition.script));
 	const [guideView, setGuideView] = useState<PracticeGuideView>("write");
-	const workTypes = orderedWorkTypes(definitionOptions);
-	const groupItems = [
-		{ value: NO_GROUP, label: "Unassigned" },
-		...groups.map((group) => ({ value: group.slug, label: group.name })),
-	];
-	const { artifactKind } = form;
-	const selectedWorkType = workTypeOptionsFor(definitionOptions, artifactKind);
-	// Recorded history belongs to the work type the practice was reviewed under: switching work type
-	// changes which sources are allowed, so the same rows would resolve to "Another source".
-	const workTypeUnchanged = artifactKindOfSignals(initialData?.signals ?? []) === artifactKind;
+	const itemType = itemTypeFor(definitionOptions, draft.kind);
+	const automated = draft.reviewedBy.by === "HEPHAESTUS";
 	// `useRef` takes no lazy initialiser, so the map is built on the first render and every later one
 	// is spared building a map to discard.
 	// https://react.dev/reference/react/useRef#avoiding-recreating-the-ref-contents
-	const draftsRef = useRef<Map<string, WorkTypeDraft>>(null);
-	if (draftsRef.current === null) {
-		draftsRef.current = new Map(artifactKind ? [[artifactKind, draftOf(form)]] : []);
+	const kindDraftsRef = useRef<Map<string, KindDraft>>(null);
+	if (kindDraftsRef.current === null) {
+		kindDraftsRef.current = new Map([[draft.kind, kindDraftOf(draft)]]);
 	}
-	const workTypeDrafts = draftsRef.current;
-	const supportedAutomatedReviewModes = selectedWorkType?.supportedAutomatedReviewModes ?? [];
-	const canRunMentoring = canAttemptAutomatedReview(
-		form.automatedReviewPolicy,
-		supportedAutomatedReviewModes,
-	);
-	const occasionMode = occasionModeOf(form.automatedReviewPolicy, canRunMentoring);
-	const gateHelp = gatePresentation(selectedWorkType);
-	const subjectRole = form.subject;
-	const subjectRoles =
-		selectedWorkType?.subjectRoles.includes(subjectRole) === true
-			? selectedWorkType.subjectRoles
-			: [subjectRole, ...(selectedWorkType?.subjectRoles ?? [])];
-	const subjectItems = subjectRoles.map((role) => ({
-		value: role,
-		label:
-			selectedWorkType?.subjectRoles.includes(role) === true
-				? ACTOR_ROLE_LABELS[role]
-				: `${ACTOR_ROLE_LABELS[role]} (not available for this work)`,
-	}));
+	const kindDrafts = kindDraftsRef.current;
 	const unsavedChanges = useUnsavedChanges({
-		isDirty: !deepEqual(
-			{ ...form, definitionChanges: [] },
-			initialState(definitionOptions, initialData),
-		),
+		isDirty: !deepEqual(draft, initialDraft(definitionOptions, initialData)),
 		disabled: formDisabled,
 	});
+	const update = (patch: Partial<PracticeDefinitionDraft>) =>
+		setDraft((previous) => ({ ...previous, ...patch }));
 
 	const handleNameChange = (name: string) => {
-		setForm((previous) => {
+		setDraft((previous) => {
 			const slugWasEdited = mode === "create" && previous.slug !== generateSlug(previous.name);
 			return {
 				...previous,
@@ -560,76 +194,30 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		});
 	};
 
-	const selectWorkType = (next: PracticeWorkTypeDefinitionOptions) => {
-		// Each work type keeps its own script. A switch that swaps the script in or out opens its
-		// section, so the change is not made out of sight.
-		const nextScript = workTypeDrafts.get(next.artifactKind)?.practiceScript ?? "";
-		if (next.artifactKind !== artifactKind && nextScript !== form.practiceScript) {
-			setShowPracticeScript(true);
+	// Only on create: the kind of an existing practice never changes.
+	const selectKind = (next: PracticeItemTypeOption) => {
+		if (next.kind === draft.kind) {
+			return;
 		}
-		setForm((previous) => {
-			const previousKind = previous.artifactKind;
-			if (previousKind === next.artifactKind) {
-				return previous;
-			}
-			if (previousKind) {
-				workTypeDrafts.set(previousKind, draftOf(previous));
-			}
-			const draft = workTypeDrafts.get(next.artifactKind);
-			const automatedReviewPolicy =
-				draft?.automatedReviewPolicy ??
-				recommendedPolicyWithCurrentSupport(next.recommendedPolicy, previous.automatedReviewPolicy);
-			const reviewFields = draft ?? {
-				...recommendedReviewSettings(next),
-				subject: previous.subject,
-				precondition: previous.precondition,
-			};
-			return {
-				...previous,
-				artifactKind: next.artifactKind,
-				automatedReviewPolicy,
-				gateText:
-					draft?.gateText ??
-					(reviewFields.precondition ? JSON.stringify(reviewFields.precondition, null, 2) : ""),
-				...(automatedReviewPolicy.automatedReview.mode === "NONE"
-					? withoutEvidence(reviewFields)
-					: reviewFields),
-				precondition: reviewFields.precondition,
-				practiceScript: draft?.practiceScript ?? "",
-			};
-		});
+		kindDrafts.set(draft.kind, kindDraftOf(draft));
+		const restored = kindDrafts.get(next.kind) ?? freshKindDraft(next);
+		// Each kind keeps its own script. A switch that swaps the script in or out opens its section,
+		// so the change is not made out of sight.
+		if (restored.script !== draft.script) {
+			setShowScript(true);
+		}
+		setDraft((previous) => ({ ...previous, kind: next.kind, ...restored }));
 	};
 
-	// Evidence is forbidden while no review runs and mandatory as soon as one does, so the support
-	// choice has to reach into the occasion rather than leave the author to be refused on save.
-	const updatePolicy = (automatedReviewPolicy: PracticeAutomatedReviewPolicy) => {
-		setForm((previous) => {
-			const nowGuidanceOnly = automatedReviewPolicy.automatedReview.mode === "NONE";
-			const wasGuidanceOnly = previous.automatedReviewPolicy.automatedReview.mode === "NONE";
-			let reviewFields = normalizeReviewSettings(previous);
-			if (nowGuidanceOnly) {
-				reviewFields = withoutEvidence(reviewFields);
-			} else if (wasGuidanceOnly && selectedWorkType) {
-				reviewFields = withRecommendedEvidence(reviewFields, selectedWorkType);
-			}
-			return {
-				...previous,
-				automatedReviewPolicy,
-				...normalizeReviewSettings(reviewFields),
-			};
-		});
-	};
-
-	const errors = formErrors(
-		form,
-		mode,
-		selectedWorkType,
-		() => setShowAdvanced(true),
-		() => setGuideView("write"),
-		deliveryId,
-	);
+	const errors = draftErrors(draft, mode, definitionOptions, {
+		revealTechnical: () => setShowTechnical(true),
+		revealGuide: () => setGuideView("write"),
+		revealScript: () => setShowScript(true),
+	});
 	const valid = errors.summary.length === 0;
-	const shownErrors = refusals > 0 ? errors : NO_ERRORS;
+	// Nothing is marked invalid until a submit is refused.
+	const shown = refusals > 0 ? errors : undefined;
+	const fieldError = (fieldId: string) => shown?.byField[fieldId];
 
 	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
@@ -642,48 +230,25 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			}
 			return;
 		}
-
-		const overlapGroup = form.deliveryBehavior.overlapGroup?.trim();
-		const redundantToSlug = form.deliveryBehavior.redundantToSlug?.trim();
-		const submission = props.onSubmit({
-			slug: form.slug,
-			name: form.name.trim(),
-			...normalizeReviewSettings(form),
-			definitionChanges: form.definitionChanges.length > 0 ? form.definitionChanges : undefined,
-			criteria: form.criteria.trim(),
-			...(form.groupSlug === NO_GROUP ? {} : { groupSlug: form.groupSlug }),
-			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
-			...(form.whatGoodLooksLike.trim()
-				? { whatGoodLooksLike: form.whatGoodLooksLike.trim() }
-				: {}),
-			// The markup and the Markdown go back as loaded: trimming them would turn an unrelated save
-			// into a change of the visual or the guide.
-			...(hasVisual(form.visual)
-				? { visual: { svg: form.visual.svg, alt: form.visual.alt.trim() } }
-				: {}),
-			...(hasGuide(form.guide) ? { guide: form.guide } : {}),
-			// The script stays in the draft across support choices, so choosing back restores it. Only
-			// the save decides: a policy that cannot be reviewed sends no script, and an edit clears it.
-			...(canRunMentoring && form.practiceScript.trim()
-				? { practiceScript: form.practiceScript.trim() }
-				: {}),
-			automatedReviewPolicy: form.automatedReviewPolicy,
-			deliveryBehavior: {
-				summaryOnly: form.deliveryBehavior.summaryOnly,
-				overlapGroup: hasText(overlapGroup) ? overlapGroup : undefined,
-				redundantToSlug: hasText(redundantToSlug) ? redundantToSlug : undefined,
-			},
-		});
-		// After dispatch, not before: `track` needs the promise the dispatch returns.
+		const submission = props.onSubmit(
+			definitionOfDraft(draft, itemType, definitionOptions.sourceContract),
+		);
+		// After the submit, not before: `track` needs the promise the submit returns.
 		unsavedChanges.track(submission);
 	};
+
+	const groupItems = [
+		{ value: NO_GROUP, label: "Unassigned" },
+		...groups.map((group) => ({ value: group.slug, label: group.name })),
+	];
+	const appliesWhenHelp = appliesWhenPresentation(itemType);
 
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
 			{unsavedChanges.dialog}
 			<DrawerBody className="flex flex-col gap-8">
 				{beforeFields}
-				<FormErrorSummary key={refusals} errors={shownErrors.summary} />
+				<FormErrorSummary key={refusals} errors={shown?.summary ?? []} />
 				<fieldset disabled={formDisabled} className="contents">
 					{/* The panel is the measure. Capping the controls narrower than the panel they sit in
 					    strands the footer's buttons to their right, and the drawer is already sized for
@@ -698,30 +263,22 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<div>
 								<h2 className="text-lg font-semibold">Practice</h2>
 								<p className="text-sm text-muted-foreground">
-									Name the practice and choose where it applies. Fields marked{" "}
+									Name the practice and choose what it reviews. Fields marked{" "}
 									<span aria-hidden>*</span>
 									<span className="sr-only">with an asterisk</span> are required.
 								</p>
 							</div>
 							<FieldGroup className="gap-4">
-								<Field data-invalid={hasText(shownErrors.name) ? "true" : undefined}>
-									<FieldLabel htmlFor="practice-name">Name *</FieldLabel>
-									<Input
-										id="practice-name"
-										value={form.name}
-										onChange={(event) => handleNameChange(event.target.value)}
-										placeholder="e.g. Explain what changed and why"
-										required
-										minLength={3}
-										maxLength={128}
-										aria-invalid={hasText(shownErrors.name)}
-										aria-describedby={hasText(shownErrors.name) ? "practice-name-error" : undefined}
-									/>
-									<FieldDescription>Start with a verb and keep it short.</FieldDescription>
-									{hasText(shownErrors.name) && (
-										<FieldError id="practice-name-error">{shownErrors.name}</FieldError>
-									)}
-								</Field>
+								<TextField
+									id={FIELD_IDS.name}
+									label="Name *"
+									value={draft.name}
+									onChange={handleNameChange}
+									placeholder="e.g. Explain what changed and why"
+									maxLength={128}
+									description="Start with a verb and keep it short."
+									error={fieldError(FIELD_IDS.name)}
+								/>
 
 								<Field>
 									<FieldLabel id="practice-group-label" htmlFor="practice-group">
@@ -729,10 +286,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									</FieldLabel>
 									<Select
 										items={groupItems}
-										value={form.groupSlug}
-										onValueChange={(value) =>
-											setForm((previous) => ({ ...previous, groupSlug: value ?? NO_GROUP }))
-										}
+										value={draft.groupSlug}
+										onValueChange={(value) => update({ groupSlug: value ?? NO_GROUP })}
 									>
 										<SelectTrigger
 											id="practice-group"
@@ -752,6 +307,48 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										Optional. A group collects related practices.
 									</FieldDescription>
 								</Field>
+
+								{mode === "create" ? (
+									<FieldSet>
+										<FieldLegend variant="label">Reviews</FieldLegend>
+										<FieldDescription>
+											The kind of item cannot change after the practice exists.
+										</FieldDescription>
+										<RadioGroup
+											value={draft.kind}
+											onValueChange={(value) => {
+												const next = itemTypeFor(definitionOptions, value);
+												if (next) {
+													selectKind(next);
+												}
+											}}
+											className="gap-2"
+										>
+											{orderedItemTypes(definitionOptions).map((option) => (
+												<FieldLabel key={option.kind} htmlFor={`practice-kind-${option.kind}`}>
+													<Field orientation="horizontal">
+														<RadioGroupItem
+															id={`practice-kind-${option.kind}`}
+															value={option.kind}
+														/>
+														<FieldContent>
+															<FieldTitle>{option.label}</FieldTitle>
+															<FieldDescription>{itemKindHint(option.kind)}</FieldDescription>
+														</FieldContent>
+													</Field>
+												</FieldLabel>
+											))}
+										</RadioGroup>
+									</FieldSet>
+								) : (
+									<div className="text-sm">
+										<p className="font-medium">Reviews</p>
+										<p className="text-muted-foreground">
+											{itemType?.label ?? "A kind of item this instance no longer offers."} The kind
+											of item cannot change after the practice exists.
+										</p>
+									</div>
+								)}
 							</FieldGroup>
 						</section>
 
@@ -761,11 +358,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<div>
 								<h2 className="text-lg font-semibold">Review guidance</h2>
 								<p className="text-sm text-muted-foreground">
-									Explain the practice in plain language before configuring how it is reviewed.
+									Explain the practice in plain language before you choose how it is reviewed.
 								</p>
 							</div>
-							<Field data-invalid={hasText(shownErrors.criteria) ? "true" : undefined}>
-								<FieldLabel htmlFor="practice-criteria">What to look for *</FieldLabel>
+							<Field data-invalid={hasText(fieldError(FIELD_IDS.criteria)) ? "true" : undefined}>
+								<FieldLabel htmlFor={FIELD_IDS.criteria}>What to look for *</FieldLabel>
 								<FieldDescription id="practice-criteria-description">
 									Describe what shows this practice and when a reviewer should stay silent. Do not
 									ask the reviewer to infer intent or facts outside the selected work. For example:
@@ -773,247 +370,190 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									automated dependency updates.” Markdown is supported.
 								</FieldDescription>
 								<Textarea
-									id="practice-criteria"
-									value={form.criteria}
-									onChange={(event) =>
-										setForm((previous) => ({ ...previous, criteria: event.target.value }))
-									}
-									placeholder="Describe the standard, signals of doing it well or poorly, and cases where it does not apply…"
+									id={FIELD_IDS.criteria}
+									value={draft.criteria}
+									onChange={(event) => update({ criteria: event.target.value })}
+									placeholder="Describe the standard, what doing it well or poorly looks like, and where it does not apply…"
 									className="min-h-56"
 									required
-									minLength={3}
 									maxLength={50_000}
-									aria-invalid={hasText(shownErrors.criteria)}
+									aria-invalid={hasText(fieldError(FIELD_IDS.criteria))}
 									aria-describedby={`practice-criteria-description${
-										hasText(shownErrors.criteria) ? " practice-criteria-error" : ""
+										hasText(fieldError(FIELD_IDS.criteria)) ? " practice-criteria-error" : ""
 									}`}
 								/>
-								{hasText(shownErrors.criteria) && (
-									<FieldError id="practice-criteria-error">{shownErrors.criteria}</FieldError>
+								{hasText(fieldError(FIELD_IDS.criteria)) && (
+									<FieldError id="practice-criteria-error">
+										{fieldError(FIELD_IDS.criteria)}
+									</FieldError>
 								)}
 							</Field>
 
-							<Field>
-								<FieldLabel htmlFor="practice-why">Why it matters</FieldLabel>
-								<Textarea
-									id="practice-why"
-									value={form.whyItMatters}
-									onChange={(event) =>
-										setForm((previous) => ({ ...previous, whyItMatters: event.target.value }))
-									}
-									placeholder="Explain why this practice is worth caring about…"
-									className="min-h-24"
-									maxLength={2000}
-								/>
-								<FieldDescription>
-									Shown to developers. It does not change review rules.
-								</FieldDescription>
-							</Field>
-							<Field>
-								<FieldLabel htmlFor="practice-good">What good looks like</FieldLabel>
-								<Textarea
-									id="practice-good"
-									value={form.whatGoodLooksLike}
-									onChange={(event) =>
-										setForm((previous) => ({ ...previous, whatGoodLooksLike: event.target.value }))
-									}
-									placeholder="Describe a concrete example of doing this well…"
-									className="min-h-24"
-									maxLength={2000}
-								/>
-								<FieldDescription>
-									Give one concrete example a developer can act on.
-								</FieldDescription>
-							</Field>
+							<GuidanceField
+								id="practice-why"
+								label="Why it matters"
+								value={draft.whyItMatters}
+								onChange={(whyItMatters) => update({ whyItMatters })}
+								placeholder="Explain why this practice is worth caring about…"
+								description="Shown to developers. It does not change how the practice is reviewed."
+							/>
+							<GuidanceField
+								id="practice-good"
+								label="What good looks like"
+								value={draft.whatGoodLooksLike}
+								onChange={(whatGoodLooksLike) => update({ whatGoodLooksLike })}
+								placeholder="Describe a concrete example of doing this well…"
+								description="Give one concrete example a developer can act on."
+							/>
+							<GuidanceField
+								id="practice-going-well"
+								label="Going well"
+								value={draft.goingWell}
+								onChange={(goingWell) => update({ goingWell })}
+								placeholder="e.g. You keep each change small enough to review in one sitting."
+								description="Shown to a developer whose work meets this practice. Say what they keep doing."
+							/>
 							<PracticeVisualEditor
-								value={form.visual}
-								onChange={(visual) => setForm((previous) => ({ ...previous, visual }))}
-								svgError={shownErrors.visualSvg}
-								altError={shownErrors.visualAlt}
+								value={draft.visual}
+								onChange={(visual) => update({ visual })}
+								svgError={fieldError(FIELD_IDS.visualSvg)}
+								altError={fieldError(FIELD_IDS.visualAlt)}
 							/>
 							<PracticeGuideEditor
-								value={form.guide}
-								onChange={(guide) => setForm((previous) => ({ ...previous, guide }))}
+								value={draft.guide}
+								onChange={(guide) => update({ guide })}
 								view={guideView}
 								onViewChange={setGuideView}
-								error={shownErrors.guide}
+								error={fieldError(FIELD_IDS.guide)}
 							/>
 						</section>
 
 						<Separator />
 
-						<div className="space-y-4">
-							<PracticeMentoringSupportEditor
-								value={form.automatedReviewPolicy}
-								recommended={selectedWorkType?.recommendedPolicy ?? form.automatedReviewPolicy}
-								supportedAutomatedReviewModes={supportedAutomatedReviewModes}
-								disabled={formDisabled}
-								onChange={updatePolicy}
-								error={shownErrors.policy}
-							/>
-							<HeldScriptNote script={form.practiceScript} reviewed={canRunMentoring} />
-						</div>
+						<PracticeReviewedByEditor
+							value={draft.reviewedBy}
+							onChange={(reviewedBy) => update({ reviewedBy })}
+							cleared={clearedBySave(draft)}
+							error={shown?.reviewedBy?.message}
+							errorFocusId={shown?.reviewedBy?.focusId}
+							disabled={formDisabled}
+						/>
 
 						<Separator />
 
-						<section className="space-y-4" aria-labelledby="practice-occasions-heading">
+						<section className="space-y-4" aria-labelledby="practice-review-heading">
 							<div>
-								<h2 id="practice-occasions-heading" className="text-lg font-semibold">
+								<h2 id="practice-review-heading" className="text-lg font-semibold">
 									When this practice is reviewed
 								</h2>
 								<p className="text-sm text-muted-foreground">
-									A practice is reviewed on one occasion: the moments that start a review, and what
-									that review reads. If a way of working needs a different judgment at a different
-									moment, make it a second practice, not a second occasion. For example, what is in
-									front of you when the work arrives differs from what the merge never resolved.
+									A practice is reviewed on the events you choose, and only when it applies. If a
+									way of working needs a different judgment at a different event, make it a second
+									practice.
 								</p>
 							</div>
 
-							<FieldSet>
-								<FieldLegend variant="label">Review this kind of work</FieldLegend>
-								<FieldDescription>
-									Changing this resets the review moments and the evidence to the recommended ones.
-								</FieldDescription>
-								<RadioGroup
-									value={artifactKind}
-									onValueChange={(value) => {
-										const next = workTypes.find((option) => option.artifactKind === value);
-										if (next) {
-											selectWorkType(next);
-										}
-									}}
-									className="gap-2"
-								>
-									{workTypes.map((option) => (
-										<FieldLabel
-											key={option.artifactKind}
-											htmlFor={`practice-artifact-${option.artifactKind}`}
-										>
-											<Field orientation="horizontal">
-												<RadioGroupItem
-													id={`practice-artifact-${option.artifactKind}`}
-													value={option.artifactKind}
-												/>
-												<FieldContent>
-													<FieldTitle>{artifactKindLabel(option.artifactKind)}</FieldTitle>
-													<FieldDescription>
-														{workArtifactHint(option.artifactKind)}
-													</FieldDescription>
-												</FieldContent>
-											</Field>
-										</FieldLabel>
-									))}
-								</RadioGroup>
-							</FieldSet>
-
-							{selectedWorkType ? (
+							{itemType ? (
 								<PracticeReviewSettingsEditor
-									options={selectedWorkType}
-									reviewFields={form}
-									mode={occasionMode}
-									outcome={workTypeUnchanged ? evidenceOutcome : undefined}
+									itemType={itemType}
+									value={draft.settings}
+									onChange={(settings) => update({ settings })}
+									reviewedBy={draft.reviewedBy.by}
+									error={shown?.settings?.message}
+									errorFocusId={shown?.settings?.focusId}
 									disabled={formDisabled}
-									error={shownErrors.reviewSettings?.message}
-									errorFocusId={shownErrors.reviewSettings?.focusId}
-									onChange={(reviewFields) =>
-										setForm((previous) => ({ ...previous, ...reviewFields }))
-									}
 								/>
 							) : (
 								<p className="text-sm text-muted-foreground">
-									{withdrawnKindSentence(artifactKind)} Choose a kind of work above to say when it
-									is reviewed.
+									This practice reviews a kind of item this instance no longer offers, so its review
+									settings cannot be changed here.
 								</p>
 							)}
-							{selectedWorkType && (
-								<div className="space-y-4">
-									<FieldGroup>
-										<Field
-											orientation="responsive"
-											data-invalid={hasText(shownErrors.subject) ? "true" : undefined}
-										>
-											<FieldLabel htmlFor="practice-subject">
-												Person this practice judges
-											</FieldLabel>
-											<Select
-												items={subjectItems}
-												value={subjectRole}
-												onValueChange={(value) =>
-													setForm((previous) => ({
-														...previous,
-														definitionChanges: [
-															...new Set([...previous.definitionChanges, "SUBJECT" as const]),
-														],
-														subject:
-															selectedWorkType.subjectRoles.find((role) => role === value) ??
-															previous.subject,
-													}))
-												}
-											>
-												<SelectTrigger
-													id="practice-subject"
-													aria-invalid={hasText(shownErrors.subject)}
-													aria-describedby={
-														hasText(shownErrors.subject) ? "practice-subject-error" : undefined
-													}
-													className="w-full @md/field-group:w-56"
-												>
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent aria-label="Person this practice judges">
-													{subjectItems.map((item) => (
-														<SelectItem key={item.value} value={item.value}>
-															{item.label}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-											{hasText(shownErrors.subject) && (
-												<FieldError id="practice-subject-error">{shownErrors.subject}</FieldError>
-											)}
-										</Field>
-									</FieldGroup>
-									<Field>
-										<FieldLabel htmlFor="practice-gate">Only review when</FieldLabel>
-										<FieldDescription>{gateHelp.description}</FieldDescription>
-										<Textarea
-											id="practice-gate"
-											aria-invalid={hasText(errors.gate)}
-											aria-describedby={hasText(errors.gate) ? "practice-gate-error" : undefined}
-											value={form.gateText}
-											onChange={(event) => {
-												const gateText = event.target.value;
-												const parsed = parseGate(gateText);
-												setForm((previous) => ({
-													...previous,
-													gateText,
-													definitionChanges: [
-														...new Set([...previous.definitionChanges, "PRECONDITION" as const]),
-													],
-													precondition: hasText(parsed.error)
-														? previous.precondition
-														: parsed.value,
-												}));
-											}}
-											rows={7}
-											placeholder={gateHelp.example}
-										/>
-										{hasText(errors.gate) && (
-											<FieldError id="practice-gate-error">{errors.gate}</FieldError>
-										)}
-									</Field>
-								</div>
+
+							{itemType && (
+								<AboutField
+									itemType={itemType}
+									about={draft.about}
+									onChange={(about) => update({ about })}
+									error={fieldError(FIELD_IDS.about)}
+								/>
+							)}
+
+							<Field data-invalid={hasText(fieldError(FIELD_IDS.appliesWhen)) ? "true" : undefined}>
+								<FieldLabel htmlFor={FIELD_IDS.appliesWhen}>Applies when</FieldLabel>
+								<FieldDescription id="practice-applies-when-description">
+									{appliesWhenHelp.description}
+								</FieldDescription>
+								<Textarea
+									id={FIELD_IDS.appliesWhen}
+
+									aria-invalid={hasText(fieldError(FIELD_IDS.appliesWhen))}
+									aria-describedby={`practice-applies-when-description${
+										hasText(fieldError(FIELD_IDS.appliesWhen)) ? " practice-applies-when-error" : ""
+									}`}
+									value={draft.appliesWhen.clauses}
+									onChange={(event) =>
+										update({ appliesWhen: { ...draft.appliesWhen, clauses: event.target.value } })
+									}
+									rows={6}
+									spellCheck={false}
+									placeholder={appliesWhenHelp.example}
+								/>
+								{hasText(fieldError(FIELD_IDS.appliesWhen)) && (
+									<FieldError id="practice-applies-when-error">
+										{fieldError(FIELD_IDS.appliesWhen)}
+									</FieldError>
+								)}
+							</Field>
+							{hasText(draft.appliesWhen.clauses.trim()) && (
+								<TextField
+									id={FIELD_IDS.otherwise}
+									label="Otherwise *"
+									value={draft.appliesWhen.otherwise}
+									onChange={(otherwise) =>
+										update({ appliesWhen: { ...draft.appliesWhen, otherwise } })
+									}
+									placeholder="e.g. the change touches no Swift source file"
+									maxLength={MAX_OTHERWISE_LENGTH}
+									description="Why the practice does not apply when no condition holds. Developers and admins read it."
+									error={fieldError(FIELD_IDS.otherwise)}
+								/>
 							)}
 						</section>
 
-						{canRunMentoring && (
+						{automated && itemType && (itemType.scanSupported || draft.scan.enabled) && (
+							<>
+								<Separator />
+								<section className="space-y-4" aria-labelledby="practice-scan-heading">
+									<h2 id="practice-scan-heading" className="text-lg font-semibold">
+										Scans
+									</h2>
+									<PracticeScanSettingsEditor
+										itemType={itemType}
+										value={draft.scan}
+										onChange={(scan) => update({ scan })}
+										readSources={
+											itemTypeFor(definitionOptions, draft.scan.draft.itemKind)?.readSources ?? []
+										}
+										problem={shown?.scan}
+										disabled={formDisabled}
+									/>
+								</section>
+							</>
+						)}
+
+						{automated && (
 							<>
 								<Separator />
 								<CollapsibleSection
 									title="Script"
-									subtitle="Optional. The program that reviews this practice."
-									open={showPracticeScript}
-									onOpenChange={setShowPracticeScript}
+									subtitle={
+										hasText(draft.script.trim())
+											? "The program that reviews this practice."
+											: "Built-in. Add a program to review this practice your own way."
+									}
+									open={showScript}
+									onOpenChange={setShowScript}
 								>
 									<p className="max-w-2xl text-sm text-muted-foreground">
 										TypeScript that reviews this practice and returns its result. It can decide in
@@ -1031,15 +571,16 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										.
 									</p>
 									<CodeEditor
-										value={form.practiceScript}
-										onChange={(value) =>
-											setForm((previous) => ({ ...previous, practiceScript: value }))
-										}
+										value={draft.script}
+										onChange={(script) => update({ script })}
 										language="typescript"
 										ariaLabel="Practice script"
 										className="h-[400px]"
 										readOnly={formDisabled}
 									/>
+									{hasText(fieldError(FIELD_IDS.script)) && (
+										<FieldError id={FIELD_IDS.script}>{fieldError(FIELD_IDS.script)}</FieldError>
+									)}
 								</CollapsibleSection>
 							</>
 						)}
@@ -1050,95 +591,33 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 						<CollapsibleSection
 							title="Technical settings"
-							subtitle="Identifier and feedback delivery"
-							open={showAdvanced}
-							onOpenChange={setShowAdvanced}
+							subtitle="Identifier and line notes"
+							open={showTechnical}
+							onOpenChange={setShowTechnical}
 						>
 							<PracticeIdentifierField
 								mode={mode}
-								name={form.name}
-								slug={form.slug}
-								error={shownErrors.slug}
-								onChange={(slug) => setForm((previous) => ({ ...previous, slug }))}
+								name={draft.name}
+								slug={draft.slug}
+								error={fieldError(FIELD_IDS.slug)}
+								onChange={(slug) => update({ slug })}
 							/>
-
-							<div className="space-y-4">
-								<div>
-									<p className="font-medium">Feedback delivery</p>
-									<p className="text-sm text-muted-foreground">
-										Use these choices when feedback from this practice overlaps with other feedback.
-									</p>
-								</div>
-								<label
-									className="flex items-center justify-between gap-4 text-sm"
-									htmlFor={`${deliveryId}-summary`}
-								>
-									<span>Show this practice in the summary, not beside a diff line</span>
-									<Switch
-										id={`${deliveryId}-summary`}
-										checked={form.deliveryBehavior.summaryOnly}
-										disabled={formDisabled}
-										onCheckedChange={(summaryOnly) =>
-											setForm((previous) => ({
-												...previous,
-												deliveryBehavior: { ...previous.deliveryBehavior, summaryOnly },
-											}))
-										}
-									/>
-								</label>
-								<Field>
-									<FieldLabel htmlFor={`${deliveryId}-overlap`}>Overlap group</FieldLabel>
-									<Input
-										id={`${deliveryId}-overlap`}
-										value={form.deliveryBehavior.overlapGroup ?? ""}
-										disabled={formDisabled}
-										onChange={(event) =>
-											setForm((previous) => ({
-												...previous,
-												deliveryBehavior: {
-													...previous.deliveryBehavior,
-													overlapGroup: event.target.value,
-												},
-											}))
-										}
-									/>
-									<FieldDescription>
-										On an issue, only the first practice that is not met in this group is shown.
+							<Field orientation="horizontal">
+								<Switch
+									id="practice-line-notes"
+									checked={draft.lineNotes}
+									disabled={formDisabled}
+									onCheckedChange={(lineNotes) => update({ lineNotes })}
+									aria-describedby="practice-line-notes-description"
+								/>
+								<FieldContent>
+									<FieldLabel htmlFor="practice-line-notes">Line notes</FieldLabel>
+									<FieldDescription id="practice-line-notes-description">
+										Show this practice’s feedback beside the lines it is about. Off keeps it in the
+										summary.
 									</FieldDescription>
-								</Field>
-								<Field>
-									<FieldLabel htmlFor={`${deliveryId}-redundant`}>
-										Preferred practice identifier
-									</FieldLabel>
-									<Input
-										id={`${deliveryId}-redundant`}
-										pattern="[a-z0-9]+(-[a-z0-9]+)*"
-										title="Use lowercase letters, numbers and single hyphens."
-										aria-invalid={hasText(shownErrors.delivery)}
-										aria-describedby={
-											hasText(shownErrors.delivery) ? `${deliveryId}-redundant-error` : undefined
-										}
-										value={form.deliveryBehavior.redundantToSlug ?? ""}
-										disabled={formDisabled}
-										onChange={(event) =>
-											setForm((previous) => ({
-												...previous,
-												deliveryBehavior: {
-													...previous.deliveryBehavior,
-													redundantToSlug: event.target.value,
-												},
-											}))
-										}
-									/>
-									<FieldDescription>
-										When both practices are not met, show feedback from the preferred practice
-										instead of this one.
-									</FieldDescription>
-									<FieldError id={`${deliveryId}-redundant-error`}>
-										{shownErrors.delivery}
-									</FieldError>
-								</Field>
-							</div>
+								</FieldContent>
+							</Field>
 						</CollapsibleSection>
 					</div>
 				</fieldset>
@@ -1155,6 +634,140 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	);
 }
 
+interface TextFieldProps {
+	id: string;
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	placeholder: string;
+	maxLength: number;
+	description: string;
+	error?: string;
+}
+
+function TextField({
+	id,
+	label,
+	value,
+	onChange,
+	placeholder,
+	maxLength,
+	description,
+	error,
+}: TextFieldProps) {
+	return (
+		<Field data-invalid={hasText(error) ? "true" : undefined}>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+			<Input
+				id={id}
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				placeholder={placeholder}
+				maxLength={maxLength}
+				aria-invalid={hasText(error)}
+				aria-describedby={`${id}-description${hasText(error) ? ` ${id}-error` : ""}`}
+			/>
+			<FieldDescription id={`${id}-description`}>{description}</FieldDescription>
+			{hasText(error) && <FieldError id={`${id}-error`}>{error}</FieldError>}
+		</Field>
+	);
+}
+
+interface GuidanceFieldProps {
+	id: string;
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	placeholder: string;
+	description: string;
+}
+
+function GuidanceField({
+	id,
+	label,
+	value,
+	onChange,
+	placeholder,
+	description,
+}: GuidanceFieldProps) {
+	return (
+		<Field>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+			<Textarea
+				id={id}
+				value={value}
+				onChange={(event) => onChange(event.target.value)}
+				placeholder={placeholder}
+				className="min-h-24"
+				maxLength={MAX_GUIDANCE_LENGTH}
+				aria-describedby={`${id}-description`}
+			/>
+			<FieldDescription id={`${id}-description`}>{description}</FieldDescription>
+		</Field>
+	);
+}
+
+interface AboutFieldProps {
+	itemType: PracticeItemTypeOption;
+	about: AboutRole | null;
+	onChange: (about: AboutRole | null) => void;
+	error?: string;
+}
+
+/**
+ * Whose work the result is about, or the work itself. A saved role the item type no longer offers
+ * stays listed and named as such, so it is changed rather than silently replaced.
+ */
+function AboutField({ itemType, about, onChange, error }: AboutFieldProps) {
+	const roles: AboutRole[] =
+		about === null || itemType.aboutRoles.includes(about)
+			? itemType.aboutRoles
+			: [about, ...itemType.aboutRoles];
+	const items = [
+		{ value: ABOUT_THE_WORK, label: "The work" },
+		...roles.map((role) => ({
+			value: role,
+			label: itemType.aboutRoles.includes(role)
+				? ABOUT_ROLE_LABELS[role]
+				: `${ABOUT_ROLE_LABELS[role]} (not available for this item)`,
+		})),
+	];
+	return (
+		<FieldGroup>
+			<Field orientation="responsive" data-invalid={hasText(error) ? "true" : undefined}>
+				<FieldContent>
+					<FieldLabel htmlFor={FIELD_IDS.about}>About</FieldLabel>
+					<FieldDescription id="practice-about-description">
+						Whose work a result is about. The work means no developer.
+					</FieldDescription>
+				</FieldContent>
+				<Select
+					items={items}
+					value={about ?? ABOUT_THE_WORK}
+					onValueChange={(value) => onChange(roles.find((role) => role === value) ?? null)}
+				>
+					<SelectTrigger
+						id={FIELD_IDS.about}
+						aria-invalid={hasText(error)}
+						aria-describedby={`practice-about-description${hasText(error) ? " practice-about-error" : ""}`}
+						className="w-full @md/field-group:w-56"
+					>
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent aria-label="About">
+						{items.map((item) => (
+							<SelectItem key={item.value} value={item.value}>
+								{item.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+				{hasText(error) && <FieldError id="practice-about-error">{error}</FieldError>}
+			</Field>
+		</FieldGroup>
+	);
+}
+
 interface CollapsibleSectionProps {
 	title: string;
 	subtitle: string;
@@ -1164,7 +777,7 @@ interface CollapsibleSectionProps {
 }
 
 /**
- * A part of the form most authors skip: its title and what it holds, then its fields, unframed like
+ * A section of the form most authors skip: its title and what it holds, then its fields, unframed like
  * the sections around it. A control that needs a frame, such as the code editor, draws its own.
  */
 function CollapsibleSection({
@@ -1216,10 +829,10 @@ function PracticeIdentifierField({
 	const wasEdited = mode === "create" && slug !== generateSlug(name);
 	return (
 		<Field data-invalid={hasText(error) ? "true" : undefined}>
-			<FieldLabel htmlFor="practice-slug">Identifier</FieldLabel>
+			<FieldLabel htmlFor={FIELD_IDS.slug}>Identifier</FieldLabel>
 			<div className="flex items-center gap-2">
 				<Input
-					id="practice-slug"
+					id={FIELD_IDS.slug}
 					value={slug}
 					onChange={(event) => onChange(event.target.value)}
 					disabled={mode === "edit"}
@@ -1227,11 +840,7 @@ function PracticeIdentifierField({
 					minLength={3}
 					maxLength={64}
 					aria-invalid={hasText(error)}
-					aria-describedby={
-						["practice-slug-description", hasText(error) ? "practice-slug-error" : undefined]
-							.filter(Boolean)
-							.join(" ") || undefined
-					}
+					aria-describedby={`practice-slug-description${hasText(error) ? " practice-slug-error" : ""}`}
 				/>
 				{wasEdited && (
 					<Button

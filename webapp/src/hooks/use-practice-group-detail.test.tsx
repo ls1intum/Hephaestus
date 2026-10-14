@@ -4,9 +4,9 @@ import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { PracticeStanding } from "@/api/types.gen";
-import { EMPTY_REVIEW_RUN_FEED, type ReviewRunFeedState } from "@/components/profile/review-runs";
+import { EMPTY_REVIEW_FEED, type ReviewFeedState } from "@/components/profile/reviews";
 import { server } from "@/mocks/server";
+import { practiceStandingOf } from "@/stories/practice-profile-story-mock-data";
 import { sleep } from "@/test/async";
 
 import { usePracticeGroupDetail } from "./use-practice-group-detail";
@@ -14,13 +14,15 @@ import { usePracticeGroupDetail } from "./use-practice-group-detail";
 const workspaceSlug = "acme";
 
 /** A practice the workspace files in a group, and one it files in none. */
-const standing = (slug: string, groupSlug?: string): PracticeStanding => ({
-	name: slug,
-	slug,
-	groupSlug,
-	standing: "NOT_OBSERVED",
-	strengths: [],
-	toWorkOn: [],
+const standing = (slug: string, groupSlug: string | null = null) =>
+	practiceStandingOf({ name: slug, slug, groupSlug, standing: "NOT_OBSERVED" });
+
+const REVIEWS = "*/workspaces/:workspaceSlug/practice-groups/:groupSlug/reviews";
+
+/** One page of reviews out of `totalPages`, empty. */
+const page = (number: number, totalPages = 1) => ({
+	content: [],
+	page: { number, size: 10, totalElements: 0, totalPages },
 });
 
 const practiceStandings = [standing("scope-one-concern", "packaging"), standing("write-tests")];
@@ -28,7 +30,13 @@ const practiceStandings = [standing("scope-one-concern", "packaging"), standing(
 function renderDetail(selection: { groupSlug?: string; practiceSlug?: string }) {
 	const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 	return renderHook(
-		() => usePracticeGroupDetail({ workspaceSlug, ...selection, practiceStandings }),
+		() =>
+			usePracticeGroupDetail({
+				workspaceSlug,
+				...selection,
+				practiceStandings,
+				reviewedPractices: [],
+			}),
 		{
 			wrapper: ({ children }: { children: ReactNode }) => (
 				<QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -38,28 +46,26 @@ function renderDetail(selection: { groupSlug?: string; practiceSlug?: string }) 
 }
 
 /** The feed once its first page is in; a test that reads it earlier fails here. */
-function readyFeed(feed: ReviewRunFeedState): Extract<ReviewRunFeedState, { status: "ready" }> {
+function readyFeed(feed: ReviewFeedState): Extract<ReviewFeedState, { status: "ready" }> {
 	if (feed.status !== "ready") {
 		throw new Error(`Expected a ready feed, got ${feed.status}.`);
 	}
 	return feed;
 }
 
-/** Two pages of runs, the first saying another follows; every page asked for is recorded. */
+/** Two pages of reviews; every page asked for is recorded. */
 function twoPages(pagesAsked: string[]) {
 	return ({ request }: { request: Request }) => {
-		const page = new URL(request.url).searchParams.get("page") ?? "0";
-		pagesAsked.push(page);
-		return HttpResponse.json({ content: [], hasNext: page === "0", page: Number(page), size: 10 });
+		const asked = new URL(request.url).searchParams.get("page") ?? "0";
+		pagesAsked.push(asked);
+		return HttpResponse.json(page(Number(asked), 2));
 	};
 }
 
 describe("usePracticeGroupDetail", () => {
-	it("reads the open practice's runs once its group is open", async () => {
-		const runs = vi.fn(() => HttpResponse.json({ content: [], hasNext: false, page: 0, size: 10 }));
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs", runs),
-		);
+	it("reads the open practice's reviews once its group is open", async () => {
+		const reviews = vi.fn(() => HttpResponse.json(page(0)));
+		server.use(http.get(REVIEWS, reviews));
 
 		const { result } = renderDetail({
 			groupSlug: "packaging",
@@ -67,18 +73,13 @@ describe("usePracticeGroupDetail", () => {
 		});
 
 		await waitFor(() => expect(result.current.feed.status).toBe("ready"));
-		expect(runs).toHaveBeenCalledOnce();
+		expect(reviews).toHaveBeenCalledOnce();
 		expect(result.current.practice?.slug).toBe("scope-one-concern");
 	});
 
 	it("asks for the page after the last one when the feed loads more", async () => {
 		const pagesAsked: string[] = [];
-		server.use(
-			http.get(
-				"*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs",
-				twoPages(pagesAsked),
-			),
-		);
+		server.use(http.get(REVIEWS, twoPages(pagesAsked)));
 
 		const { result } = renderDetail({ groupSlug: "packaging", practiceSlug: "scope-one-concern" });
 		await waitFor(() => expect(readyFeed(result.current.feed).hasMore).toBe(true));
@@ -89,16 +90,13 @@ describe("usePracticeGroupDetail", () => {
 		expect(pagesAsked).toStrictEqual(["0", "1"]);
 	});
 
-	it("reads a practice's runs through its own group when the level opens on its own", async () => {
+	it("reads a practice's reviews through its own group when the level opens on its own", async () => {
 		const groupsRead: unknown[] = [];
 		server.use(
-			http.get(
-				"*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs",
-				({ params }) => {
-					groupsRead.push(params.groupSlug);
-					return HttpResponse.json({ content: [], hasNext: false, page: 0, size: 10 });
-				},
-			),
+			http.get(REVIEWS, ({ params }) => {
+				groupsRead.push(params.groupSlug);
+				return HttpResponse.json(page(0));
+			}),
 		);
 
 		const { result } = renderDetail({ practiceSlug: "scope-one-concern" });
@@ -108,18 +106,16 @@ describe("usePracticeGroupDetail", () => {
 	});
 
 	it("opens a practice in no group, with a settled feed and no request", async () => {
-		const runs = vi.fn(() => HttpResponse.json({ content: [], hasNext: false, page: 0, size: 10 }));
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practice-groups/:groupSlug/review-runs", runs),
-		);
+		const reviews = vi.fn(() => HttpResponse.json(page(0)));
+		server.use(http.get(REVIEWS, reviews));
 
 		// The level opened alone: nothing is in flight, so a feed that said "loading" would leave a
 		// skeleton on screen that no response can ever resolve.
 		const { result } = renderDetail({ practiceSlug: "write-tests" });
 
 		expect(result.current.practice?.slug).toBe("write-tests");
-		expect(result.current.feed).toStrictEqual(EMPTY_REVIEW_RUN_FEED);
+		expect(result.current.feed).toStrictEqual(EMPTY_REVIEW_FEED);
 		await sleep(0);
-		expect(runs).not.toHaveBeenCalled();
+		expect(reviews).not.toHaveBeenCalled();
 	});
 });

@@ -1,11 +1,11 @@
 ---
 id: artifact-source-contract
 sidebar_position: 6
-title: Artifact-source contract
+title: Source contract
 description: Versioned evidence sources, explicit absence states, practice evidence requirements, and conservative skipping.
 ---
 
-# Artifact-source contract
+# Source contract
 
 Hephaestus may review work against a practice only from evidence with explicit semantics.
 Contract `1.3.0` defines the logical source catalog, its capture states, and how well each source must be captured.
@@ -335,10 +335,9 @@ Currentness is derived:
 - erasure or expiry may make a claim unreplayable without making the historical result false.
 
 Semantic currentness, automated-review-validation status, governance eligibility, and replayability remain separate.
-Result and review APIs expose `claimCurrentness` as `CURRENT`, `STALE`, or `UNVERIFIABLE`.
-They compare the evaluated practice version's review-rule fingerprint with the current revision's fingerprint.
-Once the result carries a superseded marker, they expose `STALE`. `IssueResultSuperseder` sets that marker on an issue's results in the transaction that records a change to its reviewable content.
-This occurs before and independently of any new review.
+Result and review APIs expose `currentness` as `CURRENT`, `STALE`, or `UNVERIFIABLE`.
+They compare the review digest of the evaluated practice version with the review digest of the current practice version.
+A result with an end time is `STALE`.
 
 Presentation-only edits retain semantic currentness.
 Rows without comparable versioned fingerprints are `UNVERIFIABLE`.

@@ -589,14 +589,14 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     /** The practice whose program is the every-slot fixture. */
     private Practice practice(Workspace workspace, String program) {
 
-        Practice practice = runtimePracticeVersions.create(
+        Practice practice = runtimePracticeVersions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 SLUG,
                 new ItemKind("scm.pull_request"),
                 RuntimePracticeTestData.definition(new ItemKind("scm.pull_request"), "Every slot", CRITERIA, program),
                 null,
                 0,
-                null);
+                null));
         practice.setFeedbackMode(FeedbackMode.AUTOMATIC);
         return practiceRepository.saveAndFlush(practice);
     }

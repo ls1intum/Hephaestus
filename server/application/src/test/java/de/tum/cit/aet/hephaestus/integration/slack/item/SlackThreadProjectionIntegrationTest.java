@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.integration.slack.item;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -10,14 +12,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRep
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationCandidateSource;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
@@ -73,7 +73,10 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Autowired
-    private UserRepository userRepository;
+    private AccountRepository accounts;
+
+    @Autowired
+    private IdentityRepository identities;
 
     @Autowired
     private IdentityProviderRepository identityProviderRepository;
@@ -87,9 +90,8 @@ class SlackThreadProjectionIntegrationTest extends BaseIntegrationTest {
                 .orElseGet(() -> identityProviderRepository.save(
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         long nativeId = USER_SEQ.incrementAndGet();
-        long accountId = memberships.accountIdForUser(userRepository
-                .save(TestUserFactory.createUser(nativeId, login + "-" + nativeId, provider))
-                .getId());
+        long accountId = SlackConversationTestSupport.accountWithIdentity(
+                accounts, identities, provider, nativeId, login + "-" + nativeId);
         memberships.createMembership(
                 workspaceRepository.findById(workspaceId).orElseThrow(), accountId, Membership.WorkspaceRole.MEMBER);
         return accountId;

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { listWorkspacesQueryKey } from "@/api/@tanstack/react-query.gen";
+import { ownMembership } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 import { renderWithRouter } from "@/test/router-harness";
@@ -18,9 +19,7 @@ vi.mock("sonner", () => ({
 const WAIT = { timeout: 8000 };
 
 function membershipHandler(role: "OWNER" | "ADMIN") {
-	return http.get("*/workspaces/demo/members/me", () =>
-		HttpResponse.json({ role, userLogin: "ada" }),
-	);
+	return http.get("*/workspaces/demo/members/me", () => HttpResponse.json(ownMembership(role)));
 }
 
 async function renderContainer() {
@@ -130,7 +129,7 @@ describe("WorkspaceDangerZoneSettings", () => {
 		server.use(
 			http.get("*/workspaces/demo/members/me", async () => {
 				await roleReady.promise;
-				return HttpResponse.json({ role: "OWNER", userLogin: "ada" });
+				return HttpResponse.json(ownMembership("OWNER"));
 			}),
 		);
 		await renderContainer();
@@ -149,9 +148,7 @@ describe("WorkspaceDangerZoneSettings", () => {
 				() => HttpResponse.json({ status: 403, detail: "Forbidden" }, { status: 403 }),
 				{ once: true },
 			),
-			http.get("*/workspaces/demo/members/me", () =>
-				HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
-			),
+			http.get("*/workspaces/demo/members/me", () => HttpResponse.json(ownMembership("OWNER"))),
 		);
 		await renderContainer();
 

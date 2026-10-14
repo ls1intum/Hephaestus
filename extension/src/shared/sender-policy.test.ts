@@ -143,11 +143,11 @@ describe("requestSchema", () => {
 		{ type: "cancel-review", tabId: 1, workspaceSlug: "team", jobId: "not-a-uuid" },
 		{ type: "sign-in", registrationId: "a b" },
 		{ type: "sign-in-dev", username: "x;drop", admin: false },
-		{ type: "list-results", workspaceSlug: "team", artifactId: 9 },
-		// Every developer's records, one result's detail, feedback bodies and run changes are
+		{ type: "list-results", workspaceSlug: "team", itemId: "9" },
+		// Every developer's records, one result's detail, feedback bodies and review changes are
 		// the web app's: the extension has no command for them.
 		{ type: "list-results", workspaceSlug: "team", scope: "workspace" },
-		{ type: "get-result", workspaceSlug: "team", practiceResultId: JOB },
+		{ type: "get-result", workspaceSlug: "team", resultId: JOB },
 		{ type: "get-feedback", workspaceSlug: "team", feedbackId: JOB },
 		{ type: "get-review-details", workspaceSlug: "team" },
 		{ type: "open-action", workspaceSlug: "team", action: { kind: "cancel-review", jobId: JOB } },

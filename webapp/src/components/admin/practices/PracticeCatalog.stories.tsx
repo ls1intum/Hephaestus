@@ -1,18 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
-import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
-import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockPracticeDefinitionOptions,
-} from "@/mocks/fixtures/practice";
+import type { Practice, PracticeDefinition } from "@/api/types.gen";
+import { FEEDBACK_MODE_LABELS } from "@/lib/practice-feedback-mode";
 import { expectNoPageOverflow } from "@/stories/reflow";
 import { StatefulPatch } from "@/stories/stateful";
 
 import {
-	chosenAutonomy,
-	groupAutonomy,
-	inheritedAutonomy,
+	catalogOrigin,
+	chosenFeedbackMode,
+	inheritedFeedbackMode,
 	mockGroups,
 	mockPracticeLongText,
 	mockPractices,
@@ -32,32 +30,37 @@ if (
 	throw new Error("The shared practice fixtures no longer cover two groups and three practices");
 }
 
+/** A practice with its current version's definition changed, as the server would serve it. */
+function withDefinition(practice: Practice, definition: Partial<PracticeDefinition>): Practice {
+	return {
+		...practice,
+		currentVersion: {
+			...practice.currentVersion,
+			definition: { ...currentDefinition(practice), ...definition },
+		},
+	};
+}
+
+const nameOf = (practice: Practice) => currentDefinition(practice).name;
+
 const longNamedGroup = {
 	...reviewReadyGroup,
 	name: "Packaging work so reviewers can understand its purpose without reconstructing context",
-	visibleInPracticeDashboards: false,
+	shownToDevelopers: false,
 };
 
 const groups = [longNamedGroup, issueAuthoringGroup];
 
 const longTextPractice = {
-	...mockPracticeLongText,
+	...withDefinition(mockPracticeLongText, { script: "export default {};" }),
 	groupSlug: longNamedGroup.slug,
-	practiceScript: "export default {};",
 };
 
-const issuePractice = {
-	...mockUnassignedPractice,
-	artifactKind: "scm.issue" as const,
-};
+const issuePractice = { ...mockUnassignedPractice, kind: "scm.issue" };
 
 const practices = [
 	longTextPractice,
-	{
-		...testCoveragePractice,
-		groupSlug: longNamedGroup.slug,
-		displayOrder: 1,
-	},
+	{ ...testCoveragePractice, groupSlug: longNamedGroup.slug, position: 1 },
 	issuePractice,
 ];
 
@@ -73,10 +76,10 @@ const scaleGroups = [
 	"Dependencies and supply chain",
 ].map((name, index) => ({
 	...reviewReadyGroup,
-	id: 100 + index,
+	id: String(100 + index),
 	slug: `scale-group-${index}`,
 	name,
-	displayOrder: index,
+	position: index,
 }));
 
 const scalePractices = scaleGroups.flatMap((group, groupIndex) =>
@@ -86,12 +89,11 @@ const scalePractices = scaleGroups.flatMap((group, groupIndex) =>
 		"lists the steps a reviewer ran",
 		"keeps the change reviewable in one sitting",
 	].map((suffix, practiceIndex) => ({
-		...prDescriptionPractice,
-		id: 1000 + groupIndex * 10 + practiceIndex,
+		...withDefinition(prDescriptionPractice, { name: `${group.name}: ${suffix}` }),
+		id: String(1000 + groupIndex * 10 + practiceIndex),
 		slug: `${group.slug}-${practiceIndex}`,
-		name: `${group.name}: ${suffix}`,
 		groupSlug: group.slug,
-		displayOrder: practiceIndex,
+		position: practiceIndex,
 	})),
 );
 
@@ -115,18 +117,18 @@ const meta = {
 		workspaceSlug: "demo",
 		groups,
 		practices,
-		definitionOptions: mockPracticeDefinitionOptions,
 		pending: idlePending,
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),
 		onCreateGroup: fn(async () => true),
 		onUpdateGroup: fn(async () => true),
-		onSetGroupDashboardVisibility: fn(),
+		onSetGroupShownToDevelopers: fn(),
 		onDeleteGroup: fn(),
+		onResetGroup: fn(),
 		onReorderGroups: fn(),
 		onSetGroupVisual: fn(),
 		onDeletePractice: fn(),
-		onPlacePractice: fn(),
+		onMovePractice: fn(),
 	},
 	decorators: [
 		(Story) => (
@@ -155,11 +157,11 @@ const meta = {
 							),
 						});
 					}}
-					onSetGroupDashboardVisibility={(slug, visibleInPracticeDashboards) => {
-						args.onSetGroupDashboardVisibility(slug, visibleInPracticeDashboards);
+					onSetGroupShownToDevelopers={(slug, shownToDevelopers) => {
+						args.onSetGroupShownToDevelopers(slug, shownToDevelopers);
 						patch({
 							groups: view.groups.map((group) =>
-								group.slug === slug ? { ...group, visibleInPracticeDashboards } : group,
+								group.slug === slug ? { ...group, shownToDevelopers } : group,
 							),
 						});
 					}}
@@ -184,22 +186,62 @@ export const Populated: Story = {
 /** Each group header is one button, so its provenance badge has to be plain text inside it. */
 export const WithCatalogProvenance: Story = {
 	args: {
-		groups: groups.map((group) => ({
-			...group,
-			catalogOrigin: { slug: group.slug, link: "IN_SYNC" as const, sourceOffered: true },
-		})),
+		groups: groups.map((group) => ({ ...group, catalogOrigin: catalogOrigin(group.slug) })),
 		practices: practices.map((practice) => ({
 			...practice,
-			catalogOrigin: {
-				slug: practice.slug,
-				link: "UPDATE_AVAILABLE" as const,
-				sourceOffered: true,
-			},
+			catalogOrigin: catalogOrigin(practice.slug, "UPDATE_WAITING"),
 		})),
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("Same as the catalog")).not.toHaveLength(0);
-		await expect(canvas.getAllByText("Catalog changed, yours did not")).not.toHaveLength(0);
+		await expect(canvas.getAllByText("Catalog update waiting")).not.toHaveLength(0);
+	},
+};
+
+/** A group edited here can go back to the catalog's details; one that matches cannot. */
+export const GroupResetToCatalog: Story = {
+	args: {
+		groups: [
+			{ ...longNamedGroup, catalogOrigin: catalogOrigin(longNamedGroup.slug, "EDITED_HERE") },
+			{ ...issueAuthoringGroup, catalogOrigin: catalogOrigin(issueAuthoringGroup.slug) },
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(
+			canvas.getByRole("button", { name: `More actions for ${issueAuthoringGroup.name}` }),
+		);
+		await expect(
+			within(await screen.findByRole("menu")).queryByRole("menuitem", { name: "Reset to catalog" }),
+		).not.toBeInTheDocument();
+		await userEvent.keyboard("{Escape}");
+		await userEvent.click(
+			canvas.getByRole("button", { name: `More actions for ${longNamedGroup.name}` }),
+		);
+		await userEvent.click(await screen.findByRole("menuitem", { name: "Reset to catalog" }));
+		await expect(args.onResetGroup).toHaveBeenCalledWith(longNamedGroup.slug);
+	},
+};
+
+/** A practice people or nobody review says so in its row; Heph, the default, goes unsaid. */
+export const ReviewedByPeople: Story = {
+	args: {
+		practices: [
+			withDefinition(
+				{ ...prDescriptionPractice, groupSlug: longNamedGroup.slug },
+				{
+					reviewedBy: {
+						by: "PEOPLE",
+						humanReason: { code: "DESIGN_JUDGEMENT", description: "Design choices need a person." },
+						limits: [],
+					},
+				},
+			),
+			{ ...testCoveragePractice, groupSlug: longNamedGroup.slug, position: 1 },
+		],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getAllByText("Reviewed by people")).toHaveLength(1);
 	},
 };
 
@@ -214,22 +256,23 @@ export const WithInstanceCatalog: Story = {
 					{
 						slug: "explain-change",
 						name: "Explain what changed and why",
-						artifactKind: "scm.pull_request",
+						kind: "scm.pull_request",
 						whyItMatters:
 							"A reviewer who has to reconstruct intent from the diff reviews the code and not the decision.",
 						groupSlug: "review-ready-work",
 						groupName: "Review-ready work",
 						availability: "AVAILABLE",
-						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+						reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 					},
 					{
 						slug: longTextPractice.slug,
-						name: longTextPractice.name,
-						artifactKind: longTextPractice.artifactKind,
+						name: nameOf(longTextPractice),
+						kind: longTextPractice.kind,
+						whyItMatters: null,
 						groupSlug: longTextPractice.groupSlug,
 						groupName: longNamedGroup.name,
 						availability: "ADOPTED",
-						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+						reviewedBy: { by: "HEPHAESTUS", humanReason: null, limits: [] },
 					},
 				],
 			},
@@ -288,7 +331,7 @@ export const InstanceCatalogFailed: Story = {
 	},
 	play: async ({ args, canvas, userEvent }) => {
 		// The workspace's own practices are still readable beside the failed library.
-		await expect(canvas.getByRole("link", { name: longTextPractice.name })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: nameOf(longTextPractice) })).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		const state = args.library?.state;
 		await expect(state?.status === "error" && state.onRetry).toHaveBeenCalledOnce();
@@ -331,13 +374,13 @@ export const AtScale: Story = {
 export const PracticeNameOpensTheDetailLevel: Story = {
 	args: {
 		practices: [
-			{ ...prDescriptionPractice, groupSlug: longNamedGroup.slug, displayOrder: 0 },
-			{ ...mockUnassignedPractice, groupSlug: longNamedGroup.slug, displayOrder: 1 },
+			{ ...prDescriptionPractice, groupSlug: longNamedGroup.slug, position: 0 },
+			{ ...mockUnassignedPractice, groupSlug: longNamedGroup.slug, position: 1 },
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		const link = canvas.getByRole("link", { name: prDescriptionPractice.name });
+		const link = canvas.getByRole("link", { name: nameOf(prDescriptionPractice) });
 		await expect(
 			new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
 		).toBe("practice:pr-description-quality");
@@ -352,7 +395,7 @@ export const Filtered: Story = {
 		// The row the filter keeps loses its handle; the group's own handle stays, because only entry
 		// handles are gated on the filter.
 		await expect(
-			canvas.queryByRole("button", { name: `Reorder ${issuePractice.name}` }),
+			canvas.queryByRole("button", { name: `Reorder ${nameOf(issuePractice)}` }),
 		).not.toBeInTheDocument();
 		await expect(
 			canvas.getByRole("button", { name: `Reorder ${longNamedGroup.name}` }),
@@ -364,10 +407,10 @@ export const MoveToUnassigned: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(
-			canvas.getByRole("button", { name: `More actions for ${mockPracticeLongText.name}` }),
+			canvas.getByRole("button", { name: `More actions for ${nameOf(mockPracticeLongText)}` }),
 		);
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(mockPracticeLongText.slug, null, 1);
+		await expect(args.onMovePractice).toHaveBeenCalledWith(mockPracticeLongText.slug, null, 1);
 	},
 };
 
@@ -375,10 +418,10 @@ export const MoveWithoutDragging: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(
-			canvas.getByRole("button", { name: `More actions for ${mockPracticeLongText.name}` }),
+			canvas.getByRole("button", { name: `More actions for ${nameOf(mockPracticeLongText)}` }),
 		);
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Move down" }));
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+		await expect(args.onMovePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
 			longNamedGroup.slug,
 			1,
@@ -404,17 +447,17 @@ export const KeyboardReordering: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas }) => {
 		const handle = canvas.getByRole("button", {
-			name: `Reorder ${mockPracticeLongText.name}`,
+			name: `Reorder ${nameOf(mockPracticeLongText)}`,
 		});
 		handle.focus();
 		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
-		await screen.findByText(`Picked up ${mockPracticeLongText.name}.`);
+		await screen.findByText(`Picked up ${nameOf(mockPracticeLongText)}.`);
 		handle.dispatchEvent(
 			new KeyboardEvent("keydown", { key: "ArrowDown", code: "ArrowDown", bubbles: true }),
 		);
-		await screen.findByText(new RegExp(`Moving ${mockPracticeLongText.name}`, "u"));
+		await screen.findByText(new RegExp(`Moving ${nameOf(mockPracticeLongText)}`, "u"));
 		handle.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", bubbles: true }));
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+		await expect(args.onMovePractice).toHaveBeenCalledWith(
 			mockPracticeLongText.slug,
 			longNamedGroup.slug,
 			1,
@@ -432,12 +475,12 @@ export const Reordering: Story = {
 	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByRole("button", {
-				name: `Reorder ${mockPracticeLongText.name}`,
+				name: `Reorder ${nameOf(mockPracticeLongText)}`,
 			}),
 		).toBeDisabled();
 		await expect(
 			canvas.getByRole("button", {
-				name: `Reorder ${mockUnassignedPractice.name}`,
+				name: `Reorder ${nameOf(mockUnassignedPractice)}`,
 			}),
 		).toBeEnabled();
 	},
@@ -455,7 +498,7 @@ export const DeletingGroup: Story = {
 	},
 	play: async ({ canvas, userEvent }) => {
 		const actions = canvas.getByRole("button", {
-			name: `More actions for ${mockUnassignedPractice.name}`,
+			name: `More actions for ${nameOf(mockUnassignedPractice)}`,
 		});
 		await userEvent.click(actions);
 		await expect(
@@ -502,7 +545,7 @@ export const CrossGroupDrag: Story = {
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
-		const handle = canvas.getByRole("button", { name: `Reorder ${prDescriptionPractice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${nameOf(prDescriptionPractice)}` });
 		const destinationGroup = canvas
 			.getByText(issueAuthoringGroup.name)
 			.closest('[data-slot="accordion-item"]');
@@ -531,7 +574,7 @@ export const CrossGroupDrag: Story = {
 		await expect(handle).toBeVisible();
 		const preview = await waitFor(async () => {
 			const rows = screen
-				.getAllByText(prDescriptionPractice.name)
+				.getAllByText(nameOf(prDescriptionPractice))
 				.map((name) => name.closest('[data-slot="item"]'))
 				.filter((row): row is HTMLElement => row instanceof HTMLElement && row !== sourceRow);
 			await expect(rows).toHaveLength(1);
@@ -552,7 +595,7 @@ export const CrossGroupDrag: Story = {
 			{ target: destination, keys: "[/MouseLeft]" },
 		]);
 
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+		await expect(args.onMovePractice).toHaveBeenCalledWith(
 			prDescriptionPractice.slug,
 			issueAuthoringGroup.slug,
 			0,
@@ -565,16 +608,16 @@ export const BetweenRowsDrag: Story = {
 		groups: mockGroups,
 		practices: [
 			{ ...prDescriptionPractice, groupSlug: reviewReadyGroup.slug },
-			{ ...reviewThoroughnessPractice, groupSlug: issueAuthoringGroup.slug, displayOrder: 0 },
-			{ ...testCoveragePractice, groupSlug: issueAuthoringGroup.slug, displayOrder: 1 },
+			{ ...reviewThoroughnessPractice, groupSlug: issueAuthoringGroup.slug, position: 0 },
+			{ ...testCoveragePractice, groupSlug: issueAuthoringGroup.slug, position: 1 },
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
 		const source = prDescriptionPractice;
 		const anchor = testCoveragePractice;
-		const handle = canvas.getByRole("button", { name: `Reorder ${source.name}` });
-		const anchorRow = canvas.getByText(anchor.name).closest<HTMLElement>('[data-slot="item"]');
+		const handle = canvas.getByRole("button", { name: `Reorder ${nameOf(source)}` });
+		const anchorRow = canvas.getByText(nameOf(anchor)).closest<HTMLElement>('[data-slot="item"]');
 		if (!anchorRow) {
 			throw new Error("Destination practice row not rendered");
 		}
@@ -598,7 +641,7 @@ export const BetweenRowsDrag: Story = {
 			{ target: anchorRow, keys: "[/MouseLeft]" },
 		]);
 
-		await expect(args.onPlacePractice).toHaveBeenCalledWith(
+		await expect(args.onMovePractice).toHaveBeenCalledWith(
 			source.slug,
 			issueAuthoringGroup.slug,
 			1,
@@ -609,7 +652,7 @@ export const BetweenRowsDrag: Story = {
 export const BlockedDestinationDrag: Story = {
 	args: {
 		groups: mockGroups,
-		practices: [{ ...prDescriptionPractice, groupSlug: undefined }],
+		practices: [{ ...prDescriptionPractice, groupSlug: null }],
 		pending: {
 			...idlePending,
 			blockedMoveDestinationSlugs: new Set([issueAuthoringGroup.slug]),
@@ -617,7 +660,7 @@ export const BlockedDestinationDrag: Story = {
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
-		const handle = canvas.getByRole("button", { name: `Reorder ${prDescriptionPractice.name}` });
+		const handle = canvas.getByRole("button", { name: `Reorder ${nameOf(prDescriptionPractice)}` });
 		const destinationGroup = canvas
 			.getByText(issueAuthoringGroup.name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');
@@ -645,31 +688,28 @@ export const BlockedDestinationDrag: Story = {
 			{ target: destination, keys: "[/MouseLeft]" },
 		]);
 
-		await expect(args.onPlacePractice).not.toHaveBeenCalled();
+		await expect(args.onMovePractice).not.toHaveBeenCalled();
 	},
 };
 
-export const AutonomyLevels: Story = {
+export const FeedbackModeLevels: Story = {
 	args: {
 		groups: mockGroups,
 		practices: [
 			{
-				...prDescriptionPractice,
+				...withDefinition(prDescriptionPractice, { name: "Nobody has touched this one" }),
 				slug: "from-workspace",
-				name: "Nobody has touched this one",
-				autonomy: inheritedAutonomy("AUTOMATIC"),
+				feedbackMode: inheritedFeedbackMode("AUTOMATIC"),
 			},
 			{
-				...prDescriptionPractice,
+				...withDefinition(prDescriptionPractice, { name: "Its group decided" }),
 				slug: "from-group",
-				name: "Its group decided",
-				autonomy: groupAutonomy("HUMAN_APPROVAL"),
+				feedbackMode: inheritedFeedbackMode("APPROVE_FIRST", "GROUP"),
 			},
 			{
-				...prDescriptionPractice,
+				...withDefinition(prDescriptionPractice, { name: "Singled out" }),
 				slug: "held",
-				name: "Singled out",
-				autonomy: chosenAutonomy("OFF"),
+				feedbackMode: chosenFeedbackMode("OFF"),
 			},
 		].map((practice) => ({ ...practice, groupSlug: reviewReadyGroup.slug })),
 	},
@@ -677,35 +717,35 @@ export const AutonomyLevels: Story = {
 		// Scoped row by row: asserting that all three sentences exist somewhere on the page would pass
 		// just as well if every row carried the same one, which is the mix-up this story is about.
 		const expected = [
-			["Nobody has touched this one", "Send automatically", "Follows the workspace default"],
-			["Its group decided", "Review before sending", `Follows ${reviewReadyGroup.name}`],
+			["Nobody has touched this one", "Automatic", "Follows the workspace default"],
+			["Its group decided", "Approve first", `Follows ${reviewReadyGroup.name}`],
 			["Singled out", "Off", "Set for this practice"],
 		] as const;
 
-		for (const [name, autonomy, decidedBy] of expected) {
+		for (const [name, feedbackMode, decidedBy] of expected) {
 			const listitem = canvas.getByText(name).closest('[role="listitem"]');
 			if (!(listitem instanceof HTMLElement)) {
 				throw new Error(`No row for ${name}`);
 			}
 			const row = within(listitem);
-			await expect(row.getByText(autonomy).closest('[data-slot="badge"]')).toBeVisible();
+			await expect(row.getByText(feedbackMode).closest('[data-slot="badge"]')).toBeVisible();
 			await expect(row.getByText(decidedBy)).toBeVisible();
 		}
 		await expectNoPageOverflow();
 	},
 };
 
-export const AutonomyIsReadOnlyHere: Story = {
+export const FeedbackModeIsReadOnlyHere: Story = {
 	args: {
 		groups: mockGroups,
 		practices: [
 			{
-				...prDescriptionPractice,
+				...withDefinition(prDescriptionPractice, { name: "Set here" }),
 				slug: "held",
-				name: "Set here",
-				autonomy: chosenAutonomy("HUMAN_APPROVAL"),
+				groupSlug: reviewReadyGroup.slug,
+				feedbackMode: chosenFeedbackMode("APPROVE_FIRST"),
 			},
-		].map((practice) => ({ ...practice, groupSlug: reviewReadyGroup.slug })),
+		],
 	},
 	parameters: {
 		chromatic: { disableSnapshot: true },
@@ -718,7 +758,7 @@ export const AutonomyIsReadOnlyHere: Story = {
 			"href",
 			"/w/demo/admin/practices/review",
 		);
-		for (const { label } of Object.values(AUTONOMY_DEFS)) {
+		for (const label of Object.values(FEEDBACK_MODE_LABELS)) {
 			await expect(menu.queryByRole("menuitemradio", { name: label })).not.toBeInTheDocument();
 			await expect(menu.queryByRole("menuitem", { name: label })).not.toBeInTheDocument();
 		}

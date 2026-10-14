@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 
+import { RefusalFixLink } from "./RefusalFixLink";
 import { TraceRefusalAlert } from "./TraceRefusalAlert";
 
 /**
@@ -8,28 +9,29 @@ import { TraceRefusalAlert } from "./TraceRefusalAlert";
  * so it is shown on the page rather than as a toast — a toast is gone before the reader has
  * finished reading it.
  *
- * The sentence is the server's, verbatim; the fix link is keyed on the coded reason beside it, so
- * re-worded prose can never cost a reader the way out.
+ * The sentence is the server's, verbatim. The fix is a node the route renders beside it, keyed on
+ * the coded reason, so re-worded prose can never cost a reader the way out.
  */
 const meta = {
 	component: TraceRefusalAlert,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		workspaceSlug: "demo",
-		canAdminister: true,
 		refusal: {
 			status: "REFUSED",
+			reviewId: null,
 			reason: "REVIEW_MODEL_UNBOUND",
 			reasonDescription: "No AI model is set up to run reviews in this workspace.",
 		},
+		fix: <RefusalFixLink workspaceSlug="demo" reason="REVIEW_MODEL_UNBOUND" />,
 	},
+	argTypes: { fix: { control: false } },
 } satisfies Meta<typeof TraceRefusalAlert>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** An admin can go and undo this one, so the way out travels with the sentence. */
+/** An admin can go and undo this one, so the route passes the way out with the sentence. */
 export const OffersTheFixToAnAdmin: Story = {
 	play: async ({ canvas }) => {
 		const alert = within(canvas.getByRole("alert"));
@@ -44,11 +46,11 @@ export const OffersTheFixToAnAdmin: Story = {
 };
 
 /**
- * The same refusal for a member. The link is withheld rather than shown-and-bounced: `/admin` turns
- * every non-admin away, losing the page they were reading.
+ * The same refusal for a member. The route passes no link rather than one that bounces: `/admin`
+ * turns every non-admin away, losing the page they were reading.
  */
-export const WithholdsTheFixFromAMember: Story = {
-	args: { canAdminister: false },
+export const WithoutAFix: Story = {
+	args: { fix: undefined },
 	play: async ({ canvas }) => {
 		const alert = within(canvas.getByRole("alert"));
 		await expect(
@@ -58,26 +60,12 @@ export const WithholdsTheFixFromAMember: Story = {
 	},
 };
 
-/** An allowance that refills is not something anybody can go and change, so nothing is offered. */
-export const NoFixExists: Story = {
-	args: {
-		refusal: {
-			status: "REFUSED",
-			reason: "REQUESTER_QUOTA_EXHAUSTED",
-			reasonDescription:
-				"The person who asked used all of their review requests for this hour. The allowance refills later.",
-		},
-	},
-	play: async ({ canvas }) => {
-		const alert = within(canvas.getByRole("alert"));
-		await expect(alert.getByText(/The allowance refills later/u)).toBeVisible();
-		await expect(alert.queryByRole("link")).not.toBeInTheDocument();
-	},
-};
-
 /** A server that sent no sentence still gets a heading and a body rather than an empty alert. */
 export const WithoutASentence: Story = {
-	args: { refusal: { status: "REFUSED" } },
+	args: {
+		refusal: { status: "REFUSED", reviewId: null, reason: null, reasonDescription: null },
+		fix: undefined,
+	},
 	play: async ({ canvas }) => {
 		const alert = within(canvas.getByRole("alert"));
 		await expect(alert.getByText("No reason was given.")).toBeVisible();

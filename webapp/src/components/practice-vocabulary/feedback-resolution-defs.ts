@@ -12,16 +12,19 @@ export const FEEDBACK_RESOLUTION_DEFS: StatusDefs<FeedbackResolution> = {
 		badgeVariant: "success",
 		description: "You changed the work in response to this.",
 	},
-	DISPUTED: {
-		label: "Disputed",
+	DISAGREE: {
+		label: "Disagree",
 		icon: MessageCircleQuestionMarkIcon,
 		badgeVariant: "warning",
-		description: "You disagree with this result. Say why, so workspace admins can weigh it.",
+		description: "Add your reason so a workspace admin can read it.",
 	},
 	NOT_APPLICABLE: {
 		label: "Not applicable",
 		icon: CircleSlashIcon,
 		badgeVariant: "outline",
-		description: "The result does not apply to this work.",
+		description: "The feedback does not apply to this work.",
 	},
 };
+
+/** What the reader is told once they disagreed. */
+export const DISAGREED_SENTENCE = "You disagreed with this feedback.";

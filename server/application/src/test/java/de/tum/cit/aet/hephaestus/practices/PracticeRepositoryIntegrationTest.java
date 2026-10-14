@@ -20,14 +20,14 @@ class PracticeRepositoryIntegrationTest extends AbstractWorkspaceIntegrationTest
     private Practice create(String suffix) {
         var owner = persistUser("version-owner");
         var workspace = createWorkspace("version-" + suffix, "Versions", "version-org", AccountType.ORG, owner);
-        return versions.create(
+        return versions.create(new PracticeVersionService.NewPractice(
                 workspace,
                 "owned-" + suffix,
                 new ItemKind("scm.pull_request"),
                 DefinitionTestFixtures.definition(),
                 null,
                 0,
-                null);
+                null));
     }
 
     @Test

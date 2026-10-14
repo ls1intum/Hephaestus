@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 export interface UserViewBannerProps {
 	name: string;
 	workspace: string;
-	hasAccount: boolean;
+	/** The person has not signed in yet, so the view shows no choice of theirs. */
+	unclaimed: boolean;
 	onExit: () => void;
 }
 
 /** The viewed identity is a persistent landmark, not an urgent alert. */
-export function UserViewBanner({ name, workspace, hasAccount, onExit }: UserViewBannerProps) {
+export function UserViewBanner({ name, workspace, unclaimed, onExit }: UserViewBannerProps) {
 	const titleId = useId();
 	return (
 		<Alert role="region" aria-labelledby={titleId} className="sticky top-0 z-20">
@@ -23,8 +24,8 @@ export function UserViewBanner({ name, workspace, hasAccount, onExit }: UserView
 			<AlertDescription className="min-w-0 break-words">
 				You remain signed in as yourself. This access is audited. You cannot change this user’s
 				account or settings.
-				{!hasAccount &&
-					" This user has no Hephaestus account yet. Existing practice information is still available."}
+				{unclaimed &&
+					" This user has not signed in yet. Existing practice information is still available."}
 			</AlertDescription>
 			<AlertAction>
 				<Button type="button" variant="outline" size="sm" onClick={onExit}>

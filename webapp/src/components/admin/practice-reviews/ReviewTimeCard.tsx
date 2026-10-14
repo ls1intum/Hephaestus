@@ -2,7 +2,7 @@ import { TimerIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { cn } from "cn";
-import type { PracticeReviewTiming } from "@/api/types.gen";
+import type { ReviewTiming } from "@/api/types.gen";
 import { STALE } from "@/components/activity/activity-tones";
 import { InfoLines, InfoTip } from "@/components/common/InfoTip";
 import { InlineLink } from "@/components/common/InlineLink";
@@ -24,7 +24,7 @@ import {
 import { ReviewListLink } from "./ReviewListLink";
 
 /** The timing once it is in: current, or the previous range's, standing in while this one loads. */
-export type ReviewTimingState = PanelState<{ timing: PracticeReviewTiming; stale: boolean }>;
+export type ReviewTimingState = PanelState<{ timing: ReviewTiming; stale: boolean }>;
 
 /** The reviews of the range on screen that finished, counted as the overview counts them. */
 export interface FinishedInRange {
@@ -121,7 +121,7 @@ export function ReviewTimeCard({
  * The card's (i), one short line a term: what the figure is, each stage, then each figure of the
  * range. What a stage leaves out, such as an admin's approval, is in the docs, not here.
  */
-function timeInfo(timing: PracticeReviewTiming | undefined) {
+function timeInfo(timing: ReviewTiming | undefined) {
 	const byMerge = timing?.finishedAfterMergeStartedByMerge ?? 0;
 	const typical = timing === undefined ? undefined : typicalReview(timing);
 	// A stage only some ranges have, the unsplit run of older reviews, is explained where it shows.
@@ -213,7 +213,7 @@ function StageBar({ typical }: { typical: TypicalReview }) {
 	);
 }
 
-function TimeFigures({ timing, during }: { timing: PracticeReviewTiming; during: string }) {
+function TimeFigures({ timing, during }: { timing: ReviewTiming; during: string }) {
 	const typical = typicalReview(timing);
 	if (typical === undefined) {
 		return <p className={OVERVIEW_TYPE.empty}>No review finished {during}.</p>;
@@ -248,7 +248,7 @@ function RangeFigures({
 }: {
 	workspaceSlug: string;
 	scope: OutcomeScope;
-	timing: PracticeReviewTiming | undefined;
+	timing: ReviewTiming | undefined;
 	finished: FinishedInRange | undefined;
 }) {
 	const figures: CardFigure[] = [];

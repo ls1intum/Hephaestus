@@ -197,36 +197,7 @@
 											"enum": ["AUTHOR", "REVIEWER", "ASSIGNEE", "MERGER", null]
 										},
 										"reads": {
-											"type": "object",
-											"additionalProperties": false,
-											"required": ["contract", "sources"],
-											"properties": {
-												"contract": {
-													"type": "string",
-													"minLength": 1,
-													"maxLength": 32
-												},
-												"sources": {
-													"type": "array",
-													"items": {
-														"type": "object",
-														"additionalProperties": false,
-														"required": ["source", "need"],
-														"properties": {
-															"source": {
-																"type": "string",
-																"minLength": 1,
-																"maxLength": 4096
-															},
-															"need": {
-																"enum": ["REQUIRED", "COMPLETE", "OPTIONAL"]
-															}
-														}
-													},
-													"minItems": 0,
-													"maxItems": 100
-												}
-											}
+											"$ref": "#/$defs/practiceReads"
 										},
 										"reviewedBy": {
 											"type": "object",
@@ -345,7 +316,7 @@
 												{
 													"type": "object",
 													"additionalProperties": false,
-													"required": ["itemKind", "include", "exclude", "context"],
+													"required": ["itemKind", "include", "exclude", "context", "reads"],
 													"properties": {
 														"itemKind": {
 															"type": "string",
@@ -384,6 +355,9 @@
 															"minItems": 0,
 															"maxItems": 64,
 															"uniqueItems": true
+														},
+														"reads": {
+															"$ref": "#/$defs/practiceReads"
 														}
 													}
 												},
@@ -484,6 +458,40 @@
 															"type": "null"
 														}
 													]
+												}
+											}
+										}
+									},
+									"$defs": {
+										"practiceReads": {
+											"type": "object",
+											"additionalProperties": false,
+											"required": ["contract", "sources"],
+											"properties": {
+												"contract": {
+													"type": "string",
+													"minLength": 1,
+													"maxLength": 32
+												},
+												"sources": {
+													"type": "array",
+													"items": {
+														"type": "object",
+														"additionalProperties": false,
+														"required": ["source", "need"],
+														"properties": {
+															"source": {
+																"type": "string",
+																"minLength": 1,
+																"maxLength": 4096
+															},
+															"need": {
+																"enum": ["REQUIRED", "COMPLETE", "OPTIONAL"]
+															}
+														}
+													},
+													"minItems": 0,
+													"maxItems": 100
 												}
 											}
 										}

@@ -1,12 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent } from "storybook/test";
 
-import type { CatalogGroupAdoptionPreview } from "@/api/types.gen";
-import {
-	mockAuthorDeclaredEvidenceValidation,
-	mockPullRequestReviewFields,
-	mockPullRequestPolicy,
-} from "@/mocks/fixtures/practice";
+import type { CatalogGroupAdoptionPreview, CatalogPracticePreview } from "@/api/types.gen";
+import { definitionOf } from "@/components/admin/practice-editor/fixtures";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -15,23 +11,18 @@ import { expectGenuinelyDisabled } from "@/test/controls";
 
 import { GroupAdoptionPanel } from "./GroupAdoptionPanel";
 
-const practice = {
+const practice: CatalogPracticePreview = {
 	slug: "describe-what-and-why",
-	availability: "AVAILABLE" as const,
+	kind: "scm.pull_request",
+	availability: "AVAILABLE",
 	etag: '"practice-preview"',
-	initialAutonomy: "HUMAN_APPROVAL" as const,
-	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
-	group: { slug: "review-ready-work", disposition: "CREATE_CATALOG_GROUP" as const },
-	definition: {
+	initialFeedbackMode: "APPROVE_FIRST",
+	offeredDigest: "sha256:describe-what-and-why",
+	group: { slug: "review-ready-work", disposition: "CREATE_CATALOG_GROUP", definition: null },
+	definition: definitionOf({
 		name: "Describe what changed and why",
-		artifactKind: "scm.pull_request" as const,
-		...mockPullRequestReviewFields,
 		criteria: "Confirm the pull request explains both the change and its motivation.",
-		deliveryBehavior: { summaryOnly: false },
-		automatedReviewPolicy: mockPullRequestPolicy,
-		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-		groupSlug: "review-ready-work",
-	},
+	}),
 };
 
 const preview: CatalogGroupAdoptionPreview = {
@@ -39,6 +30,8 @@ const preview: CatalogGroupAdoptionPreview = {
 	definition: {
 		name: "Review-ready work",
 		description: "Practices that make proposed changes easier to understand and review.",
+		icon: null,
+		color: null,
 	},
 	disposition: "CREATE_CATALOG_GROUP",
 	etag: '"group-preview"',
@@ -53,13 +46,13 @@ const preview: CatalogGroupAdoptionPreview = {
 			...practice,
 			slug: "focused-changes",
 			availability: "ADOPTED",
-			definition: { ...practice.definition, name: "Keep changes focused" },
+			definition: definitionOf({ name: "Keep changes focused" }),
 		},
 		{
 			...practice,
 			slug: "clear-context",
 			availability: "SLUG_CONFLICT",
-			definition: { ...practice.definition, name: "Provide clear context" },
+			definition: definitionOf({ name: "Provide clear context" }),
 		},
 	],
 };
@@ -186,6 +179,8 @@ export const LongContent: Story = {
 				name: "Decisions, documentation, and long-lived operational knowledge",
 				description:
 					"Practices cover how a team records the reasoning behind a change. They keep operational runbooks current. They make the resulting knowledge findable long after the original authors have moved on.",
+				icon: null,
+				color: null,
 			},
 		}),
 	},

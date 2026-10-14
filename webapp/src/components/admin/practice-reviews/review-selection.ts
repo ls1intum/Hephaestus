@@ -1,37 +1,45 @@
 import { z } from "zod";
 
-import { ARTIFACT_KIND_VALUES, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { hasText } from "@/lib/text";
 
 import type { ReviewScope, ReviewScopeSearch } from "./review-scope";
 
 /**
- * The one record the reader tracks with a row's crosshair, which every tab then narrows to: a piece
- * of work, a review, a result or a piece of feedback with the review that recorded it, or a
- * practice. It lives in the shared scope's URL names plus `selected=true`. The same names without `selected` are a plain filter,
- * as a "See all" link or an address from before the selection writes them: the lists narrow the
- * same way, and the toolbar shows a filter pill instead of the selection bar.
+ * The one record the reader tracks with a row's crosshair, which every tab then narrows to: an
+ * item, a review, a result or a piece of feedback with the review that recorded it, or a practice.
+ * It lives in the shared scope's URL names plus `selected=true`. The same names without `selected`
+ * are a plain filter, as a "See all" link writes them: the lists narrow the same way, and the
+ * toolbar shows a filter pill instead of the selection bar.
  */
 export type ReviewSelection =
-	| { kind: "work"; artifactKind: KnownArtifactKind; artifactId: number }
-	| { kind: "review"; agentJobId: string }
-	| { kind: "result"; practiceResultId: string; agentJobId?: string }
-	| { kind: "feedback"; feedbackId: string; agentJobId?: string }
+	| { kind: "item"; itemId: string }
+	| { kind: "review"; reviewId: string }
+	| { kind: "result"; resultId: string; reviewId?: string }
+	| { kind: "feedback"; feedbackId: string; reviewId?: string }
 	| { kind: "practice"; practiceSlug: string };
 
 export type ReviewSelectionKind = ReviewSelection["kind"];
 
+/** A workspace item or account id: a positive decimal, never a provider's own number. */
+export const positiveIdParam = z
+	.string()
+	.regex(/^[1-9]\d{0,18}$/u)
+	.optional()
+	.catch(undefined);
+
+/** A review, result, problem or feedback id. */
+export const uuidParam = z.uuid().optional().catch(undefined);
+
 /**
  * The selection's part of any route's search, read loosely: a row reads it from whichever route
- * renders it. Each tab's own schema has already dropped an id it cannot filter by.
+ * renders it. A malformed id reads as none, so a bad address closes nothing it should not.
  */
 const selectionSearchSchema = z.object({
-	agentJobId: z.string().min(1).optional().catch(undefined),
-	practiceResultId: z.string().min(1).optional().catch(undefined),
-	feedbackId: z.string().min(1).optional().catch(undefined),
+	reviewId: uuidParam,
+	resultId: uuidParam,
+	feedbackId: uuidParam,
+	itemId: positiveIdParam,
 	selectedPractice: z.string().min(1).optional().catch(undefined),
-	artifactKind: z.enum(ARTIFACT_KIND_VALUES).optional().catch(undefined),
-	artifactId: z.coerce.number().int().positive().optional().catch(undefined),
 	selected: z.literal(true).optional().catch(undefined),
 });
 
@@ -42,13 +50,7 @@ export function parseSelectionSearch(search: unknown): Partial<ReviewScopeSearch
 
 type RecordScope = Pick<
 	ReviewScope,
-	| "agentJobId"
-	| "practiceResultId"
-	| "feedbackId"
-	| "selectedPractice"
-	| "artifactKind"
-	| "artifactId"
-	| "selected"
+	"reviewId" | "resultId" | "feedbackId" | "selectedPractice" | "itemId" | "selected"
 >;
 
 /** The selection the scope holds: its record, when a crosshair picked it (`selected`). */
@@ -57,25 +59,21 @@ export function readSelection(scope: RecordScope): ReviewSelection | undefined {
 }
 
 /**
- * The one record the scope narrows to, picked or filtered. A result names its review too, and
- * a review the work it read, so the most specific part is the record.
+ * The one record the scope narrows to, picked or filtered. A result names its review too, and a
+ * review the item it read, so the most specific part is the record.
  */
 export function readScopedRecord(scope: RecordScope): ReviewSelection | undefined {
 	if (hasText(scope.feedbackId)) {
-		return { kind: "feedback", feedbackId: scope.feedbackId, agentJobId: scope.agentJobId };
+		return { kind: "feedback", feedbackId: scope.feedbackId, reviewId: scope.reviewId };
 	}
-	if (hasText(scope.practiceResultId)) {
-		return {
-			kind: "result",
-			practiceResultId: scope.practiceResultId,
-			agentJobId: scope.agentJobId,
-		};
+	if (hasText(scope.resultId)) {
+		return { kind: "result", resultId: scope.resultId, reviewId: scope.reviewId };
 	}
-	if (hasText(scope.agentJobId)) {
-		return { kind: "review", agentJobId: scope.agentJobId };
+	if (hasText(scope.reviewId)) {
+		return { kind: "review", reviewId: scope.reviewId };
 	}
-	if (scope.artifactKind !== undefined && scope.artifactId !== undefined) {
-		return { kind: "work", artifactKind: scope.artifactKind, artifactId: scope.artifactId };
+	if (hasText(scope.itemId)) {
+		return { kind: "item", itemId: scope.itemId };
 	}
 	if (hasText(scope.selectedPractice)) {
 		return { kind: "practice", practiceSlug: scope.selectedPractice };
@@ -84,29 +82,19 @@ export function readScopedRecord(scope: RecordScope): ReviewSelection | undefine
 }
 
 /** The search that makes `selection` the only one; `undefined` clears it. */
-export function selectionSearch(
-	selection: ReviewSelection | undefined,
-): Pick<
-	ReviewScopeSearch,
-	| "agentJobId"
-	| "practiceResultId"
-	| "feedbackId"
-	| "selectedPractice"
-	| "artifactKind"
-	| "artifactId"
-	| "selected"
-> {
+export function selectionSearch(selection: ReviewSelection | undefined): Required<{
+	[K in keyof RecordScope]: RecordScope[K] | undefined;
+}> {
 	return {
 		selected: selection === undefined ? undefined : true,
-		agentJobId:
+		reviewId:
 			selection?.kind === "review" || selection?.kind === "result" || selection?.kind === "feedback"
-				? selection.agentJobId
+				? selection.reviewId
 				: undefined,
-		practiceResultId: selection?.kind === "result" ? selection.practiceResultId : undefined,
+		resultId: selection?.kind === "result" ? selection.resultId : undefined,
 		feedbackId: selection?.kind === "feedback" ? selection.feedbackId : undefined,
 		selectedPractice: selection?.kind === "practice" ? selection.practiceSlug : undefined,
-		artifactKind: selection?.kind === "work" ? selection.artifactKind : undefined,
-		artifactId: selection?.kind === "work" ? selection.artifactId : undefined,
+		itemId: selection?.kind === "item" ? selection.itemId : undefined,
 	};
 }
 
@@ -118,18 +106,14 @@ export function isSameSelection(
 		return false;
 	}
 	switch (candidate.kind) {
-		case "work": {
-			return (
-				current.kind === "work" &&
-				current.artifactKind === candidate.artifactKind &&
-				current.artifactId === candidate.artifactId
-			);
+		case "item": {
+			return current.kind === "item" && current.itemId === candidate.itemId;
 		}
 		case "review": {
-			return current.kind === "review" && current.agentJobId === candidate.agentJobId;
+			return current.kind === "review" && current.reviewId === candidate.reviewId;
 		}
 		case "result": {
-			return current.kind === "result" && current.practiceResultId === candidate.practiceResultId;
+			return current.kind === "result" && current.resultId === candidate.resultId;
 		}
 		case "feedback": {
 			return current.kind === "feedback" && current.feedbackId === candidate.feedbackId;

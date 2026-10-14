@@ -1,0 +1,65 @@
+package de.tum.cit.aet.hephaestus.practices.review;
+
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultSourceAuthorization;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
+import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
+import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
+import java.util.Optional;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.json.JsonMapper;
+
+@Component
+@ConditionalOnServerRole
+@RequiredArgsConstructor
+public class ScanReuseCandidateQuery {
+    private final ReviewAssignmentQuery assignments;
+    private final ResultRepository results;
+    private final EvidenceAuthorization authorization;
+    private final ResultSourceAuthorization sourceAuthorization;
+    private final JsonMapper json;
+
+    record ReusableResult(Result result, HistoryCustody custody) {}
+
+    Optional<ReusableResult> find(long workspaceId, ReviewAssignmentId id) {
+        var assignment = assignments.find(workspaceId, id).orElseThrow();
+        var candidate = results.findReuseCandidate(
+                workspaceId,
+                id.reviewId(),
+                id.practiceId(),
+                assignment.practice().practiceVersionId(),
+                id.itemId(),
+                assignment.version().value(),
+                assignment.developerId());
+        if (candidate.isEmpty()) return Optional.empty();
+        var result = candidate.orElseThrow();
+        if (result.getCoverage() == null
+                || !(json.convertValue(result.getCoverage(), ResultCoverage.class) instanceof HostCoverage host)
+                || !trusted(host)
+                || !authorization.permits(workspaceId, result, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+            return Optional.empty();
+        var captured = sourceAuthorization.custody(result);
+        if (!captured.complete()) return Optional.empty();
+        return Optional.of(new ReusableResult(result, captured));
+    }
+
+    public static boolean trusted(HostCoverage coverage) {
+        return coverage.complete()
+                && coverage.failedReads() == 0
+                && coverage.truncatedReads() == 0
+                && !coverage.receipts().isEmpty()
+                && coverage.receipts().stream()
+                        .allMatch(r -> r.status() == ReadReceiptStatus.ABSENT
+                                || (r.status() == ReadReceiptStatus.COMPLETE
+                                        && r.contentDigest() != null
+                                        && r.contentDigest().matches("[0-9a-f]{64}")));
+    }
+}

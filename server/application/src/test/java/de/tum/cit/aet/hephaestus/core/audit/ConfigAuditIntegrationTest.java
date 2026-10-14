@@ -641,7 +641,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 Map.entry("criteria", criteria),
                 Map.entry("reviewOn", Map.of("events", List.of(), "state", Map.of())),
                 Map.entry("about", "AUTHOR"),
-                Map.entry("reads", Map.of("contract", "source-use/2.0.0", "sources", List.of())),
+                Map.entry("reads", Map.of("contract", "2.0.0", "sources", List.of())),
                 Map.entry("reviewedBy", Map.of("by", "HEPHAESTUS", "limits", List.of())),
                 Map.entry("lineNotes", false),
                 Map.entry("guidance", Map.of()));

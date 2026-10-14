@@ -1,26 +1,41 @@
 import type {
-	AgentJob,
+	ItemRef,
+	ProblemSummary,
+	ReviewBoundFeedback,
+	ReviewBoundResult,
+	ReviewDetail,
 	ReviewLineage,
-	ReviewLineageFeedback,
-	ReviewLineageResult,
+	ReviewPractice,
+	ReviewRef,
 } from "@/api/types.gen";
-import type { FeedbackLocation } from "@/components/practice-vocabulary/feedback-location-defs";
-import type { ReviewTrigger } from "@/components/practice-vocabulary/review-trigger-defs";
 
-import { gitlabMergeRequest, mockJobCompleted } from "./fixtures";
+import {
+	gitlabMergeRequest,
+	outlineDocument,
+	practiceNameOf,
+	pullRequestReviewItem,
+	reviewAccounts,
+	reviewDetailCompleted,
+	reviewDetailScanManyJobs,
+	reviewDevelopers,
+	reviewItem,
+	scannedFiles,
+	scannedRepository,
+	slackConversation,
+} from "./fixtures";
 import {
 	at,
 	dayAt,
 	EARLIER_REVIEW_ID,
 	LINEAGE_REVIEW_ID,
-	lineageFeedback,
-	lineageResult,
+	type LineageFeedbackSpec,
+	type LineageResultSpec,
 	storyLineage,
 } from "./lineage-fixtures";
 
 /**
- * Every state the story can meet, one small chain per state, grouped the way the state matrix
- * stories show them. Each chain is the same pull request, reviewed from 13:35, so only the state in
+ * Every state the graph can meet, one small graph per state, grouped the way the state matrix
+ * stories show them. Each graph is the same pull request, reviewed from 13:35, so only the state in
  * question differs between two of them.
  */
 export interface LineageStateCase {
@@ -28,838 +43,530 @@ export interface LineageStateCase {
 	/** What the case shows, as its heading in the matrix. */
 	title: string;
 	lineage: ReviewLineage;
-	/** Why a completed review assessed nothing; the review’s page reads it from the job. */
-	reviewOutcome?: AgentJob["reviewOutcome"];
-	/** The review's own record, where the case needs what only it says: an error, a first read. */
-	job?: AgentJob;
+	/**
+	 * The review's own detail, where the case needs what only it says: a stop reason, a withheld
+	 * practice, the runtime jobs or their absence.
+	 */
+	review?: ReviewDetail;
 }
 
 export type LineageStateGroup =
 	| "review"
-	| "trigger"
-	| "merge"
+	| "origin"
+	| "item"
 	| "results"
-	| "location"
+	| "destination"
 	| "delivery"
-	| "withholding"
-	| "decision"
-	| "response"
 	| "volume";
 
 const id = (group: number, index: number) =>
 	`5e5e${String(group).padStart(4, "0")}-0000-4000-8000-${String(index).padStart(12, "0")}`;
 
-const OBS_A = id(1, 1);
-const OBS_B = id(1, 2);
-const OBS_C = id(1, 3);
+const RESULT_A = id(1, 1);
+const RESULT_B = id(1, 2);
+const RESULT_C = id(1, 3);
+const FEEDBACK_A = id(2, 1);
 
-/** Three results: one not met behind the feedback, one met, one not applicable. */
-const threeResults = (overrides: Partial<ReviewLineageResult> = {}) => [
-	lineageResult(OBS_A, {
-		summary: "A cache miss and a permission failure come back as the same 404",
-		severity: "MAJOR",
-		observedAt: at("13:39:00"),
-		feedbackCount: 1,
-		...overrides,
-	}),
-	lineageResult(OBS_B, {
-		summary: "The controller delegates before it does anything else",
+/** A result of the graph's review, about Ada's pull request unless the case says otherwise. */
+function stateResult(
+	resultId: string,
+	overrides: Partial<ReviewBoundResult> = {},
+	problems: ProblemSummary[] = [],
+): LineageResultSpec {
+	const practiceSlug = overrides.practiceSlug ?? "errors-carry-context";
+	return {
+		result: {
+			id: resultId,
+			reviewId: LINEAGE_REVIEW_ID,
+			item: reviewItem,
+			developer: reviewDevelopers.ada,
+			practiceSlug,
+			practiceName: practiceNameOf(practiceSlug),
+			outcome: "NOT_MET",
+			severity: "MAJOR",
+			summary: "A cache miss and a permission failure come back as the same 404",
+			recordedAt: at("13:39:00"),
+			currentness: "CURRENT",
+			...overrides,
+		},
+		problems,
+	};
+}
+
+const problemOf = (resultId: string, position: number, severity: ProblemSummary["severity"]) => ({
+	id: `${resultId.slice(0, -2)}${String(position).padStart(2, "0")}`,
+	severity,
+	summary: `Problem ${position + 1}`,
+});
+
+/** Three results: one not met behind the feedback, one met, one that does not apply. */
+const threeResults = (overrides: Partial<ReviewBoundResult> = {}): LineageResultSpec[] => [
+	stateResult(RESULT_A, overrides, [problemOf(RESULT_A, 0, "MAJOR"), problemOf(RESULT_A, 1, "MINOR")]),
+	stateResult(RESULT_B, {
 		practiceSlug: "thin-controllers",
-		practiceName: "Thin controllers",
 		outcome: "MET",
-		observedAt: at("13:40:00"),
+		severity: null,
+		summary: "The controller delegates before it does anything else",
+		recordedAt: at("13:40:00"),
 	}),
-	lineageResult(OBS_C, {
-		summary: "The work changes no public interface, so there is nothing to document",
-		practiceSlug: "public-interfaces-are-documented",
-		practiceName: "Public interfaces are documented",
-		outcome: "NOT_APPLICABLE",
-		observedAt: at("13:40:20"),
+	stateResult(RESULT_C, {
+		practiceSlug: "the-change-explains-itself",
+		outcome: "DOES_NOT_APPLY",
+		severity: null,
+		summary: "The change is a dependency bump with nothing to explain",
+		recordedAt: at("13:40:20"),
 	}),
 ];
 
-const FB_A = id(2, 1);
-
-/** One comment on the pull request from the not-met result, delivered 30 s later. */
-const oneComment = (overrides: Partial<ReviewLineageFeedback> = {}) =>
-	lineageFeedback(FB_A, [OBS_A], { createdAt: at("13:41:00"), ...overrides });
-
-const finished = at("13:44:00");
-
-const chain = (overrides: Partial<ReviewLineage> = {}): ReviewLineage =>
-	storyLineage({
-		review: {
-			id: LINEAGE_REVIEW_ID,
-			status: "COMPLETED",
-			phase: "COMPLETED",
-			createdAt: at("13:35:00"),
-			startedAt: at("13:35:10"),
-			finishedAt: finished,
-			model: "claude-sonnet-4-5",
-		},
-		reviewTrigger: "READY",
-		workMoments: [
-			{ kind: "READY", occurredAt: at("13:34:50"), startedReview: true, joinedReview: false },
-		],
-		results: threeResults(),
-		feedback: [oneComment()],
-		...overrides,
-	});
-
-const { review } = chain();
-if (review === undefined) {
-	throw new Error("The state fixtures need a review");
-}
-const baseReview = review;
-
-/** The review's own record for a chain, with what the case needs on top. */
-function jobOf(lineage: ReviewLineage, overrides: Partial<AgentJob> = {}): AgentJob {
-	const run = lineage.review ?? baseReview;
+function stateFeedback(
+	feedbackId: string,
+	basis: string[],
+	overrides: Partial<ReviewBoundFeedback> = {},
+): LineageFeedbackSpec {
 	return {
-		...mockJobCompleted,
-		id: run.id,
-		status: run.phase,
-		createdAt: run.createdAt,
-		availableAt: run.createdAt,
-		startedAt: run.startedAt,
-		completedAt: run.finishedAt,
-		model: run.model,
+		feedback: {
+			id: feedbackId,
+			destination: "ON_WORK",
+			state: "DELIVERED",
+			deliveredAt: at("13:41:30"),
+			withdrawn: false,
+			...overrides,
+		},
+		basis,
+	};
+}
+
+/** One comment on the pull request from the not met result. */
+const oneComment = (overrides: Partial<ReviewBoundFeedback> = {}) =>
+	stateFeedback(FEEDBACK_A, [RESULT_A], overrides);
+
+const baseReview: ReviewRef = {
+	id: LINEAGE_REVIEW_ID,
+	kind: "ITEM",
+	item: reviewItem,
+	itemVersion: "27f4e88c9f5a",
+	origin: "EVENT",
+	status: "COMPLETE",
+	createdAt: at("13:35:00"),
+	completedAt: at("13:44:00"),
+};
+
+interface ChainSpec {
+	item?: ItemRef;
+	/** The review's ref; `null` when its record is gone. */
+	review?: Partial<ReviewRef> | null;
+	results?: LineageResultSpec[];
+	feedback?: LineageFeedbackSpec[];
+}
+
+/** A graph asked for by its review, or by its item once the review's record is gone. */
+function chain({ item = reviewItem, review = {}, results, feedback }: ChainSpec = {}): ReviewLineage {
+	const ref = review === null ? null : { ...baseReview, item, ...review };
+	const resultsOf = (results ?? threeResults()).map((entry) => ({
+		...entry,
+		result: { ...entry.result, item: entry.result.item.id === reviewItem.id ? item : entry.result.item },
+	}));
+	return storyLineage({
+		root: ref === null ? { kind: "ITEM", id: item.id } : { kind: "REVIEW", id: ref.id },
+		item,
+		reviews: ref === null ? [] : [ref],
+		results: resultsOf,
+		feedback: feedback ?? [oneComment()],
+	});
+}
+
+/** The review's detail for a case, built on the completed review with what the case needs on top. */
+function detailOf(lineage: ReviewLineage, overrides: Partial<ReviewDetail> = {}): ReviewDetail {
+	const ref = lineage.nodes.find((entry) => entry.review !== null)?.review ?? baseReview;
+	return {
+		...reviewDetailCompleted,
+		id: ref.id,
+		item: ref.item,
+		origin: ref.origin,
+		status: ref.status,
+		createdAt: ref.createdAt,
+		orderedAt: ref.createdAt,
+		completedAt: ref.completedAt,
 		...overrides,
 	};
 }
 
-const failedChain = chain({
-	review: { ...baseReview, status: "FAILED", phase: "FAILED", finishedAt: at("13:43:00") },
-	results: [],
-	feedback: [],
-});
-
-const slowQueueChain = chain({
-	review: { ...baseReview, startedAt: at("15:45:00"), finishedAt: at("15:52:00") },
-	results: threeResults().map((entry) => ({ ...entry, observedAt: at("15:50:00") })),
-	feedback: [oneComment({ createdAt: at("15:51:00"), deliveredAt: at("15:51:20") })],
-});
-
-const cancelledChain = chain({
-	review: {
-		...baseReview,
-		status: "FAILED",
-		phase: "CANCELLED",
-		startedAt: undefined,
-		finishedAt: at("13:35:04"),
-	},
-	results: [],
-	feedback: [],
-});
+const withCase = (
+	key: string,
+	title: string,
+	lineage: ReviewLineage,
+	review?: (lineage: ReviewLineage) => ReviewDetail,
+): LineageStateCase => ({ key, title, lineage, review: review?.(lineage) });
 
 // ------------------------------------------------------------------------------------------------
 // The review: where it is or how it ended
 // ------------------------------------------------------------------------------------------------
 
+const withheldPractice: ReviewPractice = {
+	practiceSlug: "product-language",
+	practiceName: practiceNameOf("product-language"),
+	practiceVersionId: "201",
+	number: 1,
+	status: "WITHHELD",
+	reason: "The practice reads the review threads, and the provider did not return them.",
+	itemCounts: { listed: 1, reviewed: 0, reused: 0, withheld: 1, notReviewed: 0 },
+	results: { met: 0, notMet: 0, doesNotApply: 0, couldNotDetermine: 0 },
+	script: null,
+};
+
 const reviewCases: LineageStateCase[] = [
-	{
-		key: "queued",
-		title: "Queued",
-		lineage: chain({
-			review: {
-				...baseReview,
-				status: "IN_PROGRESS",
-				phase: "QUEUED",
-				startedAt: undefined,
-				finishedAt: undefined,
-			},
-			results: [],
-			feedback: [],
-		}),
-	},
-	{
-		key: "on-hold",
-		title: "Held on the AI budget",
-		lineage: chain({
-			review: {
-				...baseReview,
-				status: "IN_PROGRESS",
-				phase: "QUEUED",
-				holdReason: "BUDGET",
-				startedAt: undefined,
-				finishedAt: undefined,
-			},
-			results: [],
-			feedback: [],
-		}),
-	},
-	{
-		key: "running",
-		title: "Running, two results so far",
-		lineage: chain({
-			review: { ...baseReview, status: "IN_PROGRESS", phase: "RUNNING", finishedAt: undefined },
+	withCase(
+		"queued",
+		"Queued",
+		chain({ review: { status: "QUEUED", completedAt: null }, results: [], feedback: [] }),
+	),
+	withCase(
+		"running",
+		"Running, two results so far",
+		chain({
+			review: { status: "RUNNING", completedAt: null },
 			results: threeResults().slice(0, 2),
 			feedback: [],
 		}),
-	},
-	{ key: "completed", title: "Completed", lineage: chain() },
+	),
+	withCase("complete", "Complete", chain()),
+	withCase(
+		"failed",
+		"Failed after recording one result",
+		chain({ review: { status: "FAILED" }, results: threeResults().slice(0, 1), feedback: [] }),
+		(lineage) => detailOf(lineage, { stopReason: "EXECUTION_FAILED" }),
+	),
+	withCase(
+		"timed-out",
+		"Timed out with nothing recorded",
+		chain({ review: { status: "FAILED", completedAt: at("13:55:10") }, results: [], feedback: [] }),
+		(lineage) => detailOf(lineage, { stopReason: "TIMED_OUT" }),
+	),
+	withCase(
+		"cancelled",
+		"Canceled by an admin",
+		chain({ review: { status: "CANCELLED", completedAt: at("13:36:00") }, results: [], feedback: [] }),
+		(lineage) => detailOf(lineage, { stopReason: "CANCELLED_BY_ADMIN" }),
+	),
+	withCase(
+		"withheld-practice",
+		"A practice withheld, with no result",
+		chain({ results: threeResults().slice(0, 2) }),
+		(lineage) =>
+			detailOf(lineage, { practices: [...reviewDetailCompleted.practices, withheldPractice] }),
+	),
+	withCase(
+		"expired-runtime",
+		"Execution details expired",
+		chain({ review: { completedAt: dayAt("05-02", "13:44:00"), createdAt: dayAt("05-02", "13:35:00") } }),
+		(lineage) => detailOf(lineage, { runtime: null, stageTiming: [] }),
+	),
 	{
-		key: "failed",
-		title: "Failed after recording one result",
+		key: "scan-many-jobs",
+		title: "A scan carried by four jobs",
 		lineage: chain({
-			review: { ...baseReview, status: "FAILED", phase: "FAILED" },
-			results: threeResults().slice(0, 1),
+			item: scannedRepository,
+			review: {
+				id: reviewDetailScanManyJobs.id,
+				kind: "SCAN",
+				status: "PARTIAL",
+				origin: "REQUEST",
+				itemVersion: null,
+			},
+			results: scannedFiles.map((file, index) =>
+				stateResult(id(3, index + 1), {
+					reviewId: reviewDetailScanManyJobs.id,
+					item: file,
+					developer: null,
+					outcome: index === 0 ? "NOT_MET" : "MET",
+					severity: index === 0 ? "MAJOR" : null,
+					summary: index === 0 ? "The give-up line names no event" : null,
+				}),
+			),
 			feedback: [],
 		}),
+		review: reviewDetailScanManyJobs,
 	},
-	{
-		key: "timed-out",
-		title: "Timed out with nothing recorded",
-		lineage: chain({
-			review: { ...baseReview, status: "FAILED", phase: "TIMED_OUT", finishedAt: at("13:55:10") },
-			results: [],
-			feedback: [],
-		}),
-	},
-	{
-		key: "cancelled",
-		title: "Canceled",
-		lineage: chain({
-			review: { ...baseReview, status: "FAILED", phase: "CANCELLED", finishedAt: at("13:36:00") },
-			results: [],
-			feedback: [],
-		}),
-	},
-	{
-		key: "insufficient-evidence",
-		title: "Completed, nothing assessed for lack of evidence",
-		reviewOutcome: "INSUFFICIENT_EVIDENCE",
-		lineage: chain({ results: [], feedback: [] }),
-	},
-	{
-		key: "coalesced",
-		title: "Answered by an earlier review on the same code",
-		reviewOutcome: "COALESCED",
-		lineage: chain({
-			results: threeResults().map((entry) => ({
-				...entry,
-				agentJobId: EARLIER_REVIEW_ID,
-				observedAt: at("11:02:00"),
-			})),
-			feedback: [],
-		}),
-	},
-	{
-		key: "folded",
-		title: "A later push folded into the review",
-		lineage: chain({
-			workMoments: [
-				{ kind: "READY", occurredAt: at("13:34:50"), startedReview: true, joinedReview: false },
-				{ kind: "PUSHED", occurredAt: at("13:36:30"), startedReview: false, joinedReview: true },
-			],
-		}),
-	},
-	{
-		key: "waited",
-		title: "Waited 19 minutes in the queue",
-		lineage: chain({
-			review: { ...baseReview, startedAt: at("13:54:00"), finishedAt: at("14:03:00") },
-			results: threeResults().map((entry) => ({ ...entry, observedAt: at("13:58:00") })),
-			feedback: [oneComment({ createdAt: at("14:00:00"), deliveredAt: at("14:00:20") })],
-		}),
-	},
-	{
-		key: "failed-with-error",
-		title: "Failed with its error, after a retry",
-		lineage: failedChain,
-		job: jobOf(failedChain, {
-			retryCount: 1,
-			errorMessage:
-				"The model output did not match the review schema twice: results[2].evidence[0].quote was not found in the diff.",
-		}),
-	},
-	{
-		key: "slow-queue",
-		title: "Waited 2 hours in the queue",
-		lineage: slowQueueChain,
-		job: jobOf(slowQueueChain, { firstFeedbackReadAt: at("16:30:00") }),
-	},
-	{
-		key: "cancelled-declined",
-		title: "Canceled: a developer declined AI review",
-		lineage: cancelledChain,
-		job: jobOf(cancelledChain, { cancellationReason: "MEMBER_AI_DECLINED" }),
-	},
-	{
-		key: "record-gone",
-		title: "The record of the review is gone",
-		lineage: chain({ review: undefined }),
-	},
+	withCase("record-gone", "The record of the review is gone", chain({ review: null })),
 ];
 
 // ------------------------------------------------------------------------------------------------
 // What started it
 // ------------------------------------------------------------------------------------------------
 
-const TRIGGERS: readonly ReviewTrigger[] = [
-	"OPENED",
-	"READY",
-	"PUSHED",
-	"EDITED",
-	"REVIEWED",
-	"MERGED",
-	"CLOSED",
-	"PUBLISHED",
-	"SETTLED",
-	"REQUESTED",
-	"BACKFILL",
-	"SWEEP",
-];
-
-const triggerCases: LineageStateCase[] = [
-	...TRIGGERS.map((trigger) => ({
-		key: `trigger-${trigger.toLowerCase()}`,
-		title: trigger.charAt(0) + trigger.slice(1).toLowerCase(),
-		lineage: chain({
-			reviewTrigger: trigger,
-			workMergedAt: trigger === "MERGED" ? at("13:34:50") : undefined,
-			workMoments: [
-				{ kind: trigger, occurredAt: at("13:34:50"), startedReview: true, joinedReview: false },
-			],
-		}),
-	})),
-	{
-		key: "trigger-unknown",
-		title: "No moment on the work names the review",
-		lineage: chain({ reviewTrigger: undefined, workMoments: [] }),
-	},
+const originCases: LineageStateCase[] = [
+	withCase("origin-event", "Started by an event", chain()),
+	withCase(
+		"origin-request",
+		"Requested by an admin",
+		chain({ review: { origin: "REQUEST" } }),
+		(lineage) =>
+			detailOf(lineage, { startedBy: null, requestedBy: reviewAccounts.grace }),
+	),
+	withCase(
+		"origin-schedule",
+		"Started by a schedule",
+		chain({ review: { origin: "SCHEDULE" } }),
+		(lineage) => detailOf(lineage, { startedBy: null }),
+	),
+	withCase(
+		"origin-backfill",
+		"One of a batch over past work",
+		chain({ review: { origin: "BACKFILL" }, feedback: [oneComment({ state: "WITHHELD", deliveredAt: null })] }),
+		(lineage) =>
+			detailOf(lineage, { startedBy: null, batchId: "0b0b0b0b-1111-4111-8111-111111111111" }),
+	),
 ];
 
 // ------------------------------------------------------------------------------------------------
-// The merge against the review
+// The item reviewed
 // ------------------------------------------------------------------------------------------------
 
-const withheldAsMerged = (createdAt: Date) =>
-	oneComment({
-		createdAt,
-		deliveryState: "SUPPRESSED",
-		suppressionReason: "ARTIFACT_MERGED",
-		deliveredAt: undefined,
-		placementCount: 0,
-	});
-
-const mergeCases: LineageStateCase[] = [
-	{
-		key: "merged-before",
-		title: "Merged before the review was asked for",
-		lineage: chain({
-			workMergedAt: at("12:10:00"),
-			feedback: [withheldAsMerged(at("13:41:00"))],
-		}),
-	},
-	{
-		key: "merged-in-queue",
-		title: "Merged while the review waited in the queue",
-		lineage: chain({
-			review: { ...baseReview, startedAt: at("13:50:00"), finishedAt: at("13:58:00") },
-			workMergedAt: at("13:42:00"),
-			results: threeResults().map((entry) => ({ ...entry, observedAt: at("13:54:00") })),
-			feedback: [withheldAsMerged(at("13:56:00"))],
-		}),
-	},
-	{
-		key: "merged-during",
-		title: "Merged while the review ran: its comment was withheld",
-		lineage: chain({
-			review: { ...baseReview, finishedAt: at("15:02:00") },
-			workMergedAt: at("14:51:00"),
-			workMoments: [
-				{ kind: "READY", occurredAt: at("13:34:50"), startedReview: true, joinedReview: false },
-				{ kind: "MERGED", occurredAt: at("14:51:00"), startedReview: false, joinedReview: false },
-			],
-			feedback: [
-				lineageFeedback(id(2, 9), [OBS_B], { createdAt: at("13:41:00") }),
-				withheldAsMerged(at("14:58:00")),
-			],
-		}),
-	},
-	{
-		key: "merged-after",
-		title: "Merged a day after the review",
-		lineage: chain({ workMergedAt: dayAt("07-29", "09:00:00") }),
-	},
-	{ key: "never-merged", title: "Not merged", lineage: chain() },
-	{
-		key: "started-by-merge",
-		title: "The merge started the review",
-		lineage: chain({
-			reviewTrigger: "MERGED",
-			workMergedAt: at("13:34:50"),
-			workMoments: [
-				{ kind: "MERGED", occurredAt: at("13:34:50"), startedReview: true, joinedReview: false },
-			],
-			feedback: [withheldAsMerged(at("13:41:00"))],
-		}),
-	},
-];
-
-// ------------------------------------------------------------------------------------------------
-// Results: verdict by severity, corrections, an earlier review’s answers, none, many
-// ------------------------------------------------------------------------------------------------
-
-const verdictGrid: ReviewLineageResult[] = [
-	...(["CRITICAL", "MAJOR", "MINOR", "INFO"] as const).map((severity, index) =>
-		lineageResult(id(3, index + 1), {
-			summary: `Not met, ${severity.toLowerCase()}`,
-			severity,
-			observedAt: at(`13:3${6 + (index % 3)}:00`),
+const itemCases: LineageStateCase[] = [
+	withCase("item-github", "A pull request on GitHub", chain()),
+	withCase("item-gitlab", "A merge request on GitLab", chain({ item: gitlabMergeRequest })),
+	withCase(
+		"item-slack",
+		"A Slack thread",
+		chain({
+			item: slackConversation,
+			feedback: [oneComment({ destination: "CONVERSATION" })],
 		}),
 	),
-	lineageResult(id(3, 5), {
+	withCase("item-outline", "An Outline document", chain({ item: outlineDocument })),
+	withCase(
+		"item-pull-request-review",
+		"A review of a pull request, under its pull request",
+		chain({
+			item: pullRequestReviewItem,
+			results: [
+				stateResult(RESULT_A, {
+					practiceSlug: "review-comments-explain",
+					outcome: "MET",
+					severity: null,
+					developer: reviewDevelopers.grace,
+					summary: "Each comment says what to change and why",
+				}),
+			],
+			feedback: [oneComment({ destination: "PRACTICE_PAGE", state: "WITHHELD", deliveredAt: null })],
+		}),
+	),
+];
+
+// ------------------------------------------------------------------------------------------------
+// Results: outcome by severity, currentness, an earlier review's answers, none, many
+// ------------------------------------------------------------------------------------------------
+
+const outcomeGrid: LineageResultSpec[] = [
+	...(["CRITICAL", "MAJOR", "MINOR", "TRIVIAL"] as const).map((severity, index) =>
+		stateResult(
+			id(4, index + 1),
+			{
+				summary: `Not met, ${severity.toLowerCase()}`,
+				severity,
+				recordedAt: at(`13:3${6 + (index % 3)}:00`),
+			},
+			[problemOf(id(4, index + 1), 0, severity)],
+		),
+	),
+	stateResult(id(4, 5), {
 		summary: "Met",
 		outcome: "MET",
+		severity: null,
 		practiceSlug: "thin-controllers",
-		practiceName: "Thin controllers",
-		observedAt: at("13:39:00"),
+		recordedAt: at("13:39:00"),
 	}),
-	lineageResult(id(3, 6), {
-		summary: "Not applicable",
-		outcome: "NOT_APPLICABLE",
-		practiceSlug: "public-interfaces-are-documented",
-		practiceName: "Public interfaces are documented",
-		observedAt: at("13:39:10"),
+	stateResult(id(4, 6), {
+		summary: null,
+		outcome: "MET",
+		severity: null,
+		practiceSlug: "tests-name-the-behaviour",
+		recordedAt: at("13:39:05"),
 	}),
-	lineageResult(id(3, 7), {
-		summary: "Undetermined: the diff does not say whether the migration runs first",
-		outcome: "UNDETERMINED",
-		practiceSlug: "workspace-scoped-queries",
-		practiceName: "Queries are scoped to the workspace",
-		observedAt: at("13:39:20"),
+	stateResult(id(4, 7), {
+		summary: "Does not apply",
+		outcome: "DOES_NOT_APPLY",
+		severity: null,
+		practiceSlug: "the-change-explains-itself",
+		recordedAt: at("13:39:10"),
+	}),
+	stateResult(id(4, 8), {
+		summary: "Could not determine whether the migration runs first",
+		outcome: "COULD_NOT_DETERMINE",
+		severity: null,
+		practiceSlug: "product-language",
+		recordedAt: at("13:39:20"),
 	}),
 ];
 
-const manyResults: ReviewLineageResult[] = Array.from({ length: 24 }, (_, index) =>
-	lineageResult(id(4, index + 1), {
-		summary: `Result ${index + 1} of a large review`,
-		outcome: (["NOT_MET", "MET", "MET", "NOT_APPLICABLE", "UNDETERMINED"] as const)[index % 5],
-		severity: index % 5 === 0 ? "MINOR" : undefined,
-		practiceSlug: `practice-${index % 8}`,
-		practiceName: `Practice ${(index % 8) + 1}`,
-		observedAt: at(
-			`13:${String(36 + Math.floor(index / 6)).padStart(2, "0")}:${String((index % 6) * 10).padStart(2, "0")}`,
-		),
-		feedbackCount: index % 5 === 0 ? 1 : 0,
-	}),
-);
+const OUTCOMES = ["NOT_MET", "MET", "MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const;
+
+const manyResults: LineageResultSpec[] = Array.from({ length: 24 }, (_, index) => {
+	const outcome = OUTCOMES[index % OUTCOMES.length] ?? "MET";
+	const resultId = id(5, index + 1);
+	return stateResult(
+		resultId,
+		{
+			summary: `Result ${index + 1} of a large review`,
+			outcome,
+			severity: outcome === "NOT_MET" ? "MINOR" : null,
+			recordedAt: at(
+				`13:${String(36 + Math.floor(index / 6)).padStart(2, "0")}:${String((index % 6) * 10).padStart(2, "0")}`,
+			),
+		},
+		outcome === "NOT_MET" ? [problemOf(resultId, 0, "MINOR")] : [],
+	);
+});
 
 const resultCases: LineageStateCase[] = [
-	{
-		key: "verdicts",
-		title: "Every verdict, and not met by severity",
-		lineage: chain({ results: verdictGrid, feedback: [] }),
-	},
-	{
-		key: "marked-incorrect",
-		title: "Marked incorrect, so its card was withheld",
-		lineage: chain({
-			results: threeResults({
-				invalidated: true,
-				markedIncorrectAt: at("13:58:00"),
-			}),
-			feedback: [
-				oneComment({ deliveredAt: at("13:41:30") }),
-				lineageFeedback(id(2, 2), [OBS_A], {
-					channel: "IN_APP",
-					createdAt: at("13:42:00"),
-					deliveryState: "SUPPRESSED",
-					suppressionReason: "OBSERVATION_INVALIDATED",
-					deliveredAt: undefined,
-					placementCount: 0,
-				}),
-			],
-		}),
-	},
-	{
-		key: "answered-earlier",
-		title: "Two practices answered by an earlier review",
-		lineage: chain({
+	withCase(
+		"outcomes",
+		"Every outcome, and not met by severity",
+		chain({ results: outcomeGrid, feedback: [] }),
+	),
+	withCase(
+		"stale",
+		"Stale: the work changed after the review",
+		chain({ results: threeResults({ currentness: "STALE" }) }),
+	),
+	withCase(
+		"unverifiable",
+		"Unverifiable: whether the work changed cannot be told",
+		chain({ results: threeResults({ currentness: "UNVERIFIABLE" }) }),
+	),
+	withCase(
+		"answered-earlier",
+		"Two practices answered by an earlier review",
+		chain({
 			results: [
 				...threeResults().slice(0, 1),
 				...threeResults()
 					.slice(1)
 					.map((entry) => ({
 						...entry,
-						agentJobId: EARLIER_REVIEW_ID,
-						observedAt: at("11:02:00"),
+						result: { ...entry.result, reviewId: EARLIER_REVIEW_ID, recordedAt: at("11:02:00") },
 					})),
 			],
 		}),
-	},
-	{
-		key: "not-met-silent",
-		title: "Not met, and no feedback written from it",
-		lineage: chain({ results: threeResults({ feedbackCount: 0 }), feedback: [] }),
-	},
-	{
-		key: "later-review-wrote",
-		title: "Feedback a later review wrote counts for that review only",
-		lineage: chain({
-			results: threeResults({ feedbackCount: 1, ownFeedbackCount: 0 }),
-			feedback: [],
+	),
+	withCase(
+		"evidence-hidden",
+		"Not met, its evidence withheld from admins",
+		chain({
+			results: [
+				stateResult(RESULT_A, {}, [{ id: problemOf(RESULT_A, 0, "MAJOR").id, severity: "MAJOR", summary: "Evidence hidden" }]),
+			],
 		}),
-	},
-	{
-		key: "empty",
-		title: "Completed with no result",
-		lineage: chain({ results: [], feedback: [] }),
-	},
-	{
-		key: "results-no-feedback",
-		title: "Results, but no feedback",
-		lineage: chain({ results: verdictGrid.slice(4), feedback: [] }),
-	},
-	{
-		key: "many-results",
-		title: "24 results",
-		lineage: chain({
+	),
+	withCase(
+		"not-met-silent",
+		"Not met, and no feedback written from it",
+		chain({ feedback: [] }),
+	),
+	withCase("empty", "Complete with no result", chain({ results: [], feedback: [] })),
+	withCase(
+		"many-results",
+		"24 results",
+		chain({
 			results: manyResults,
 			feedback: manyResults
-				.filter((entry) => entry.feedbackCount > 0)
+				.filter((entry) => entry.result.outcome === "NOT_MET")
 				.map((entry, index) =>
-					lineageFeedback(id(5, index + 1), [entry.id], {
-						createdAt: at(`13:4${index}:30`),
+					stateFeedback(id(6, index + 1), [entry.result.id], {
 						deliveredAt: at(`13:4${index}:50`),
 					}),
 				),
 		}),
-	},
+	),
 ];
 
 // ------------------------------------------------------------------------------------------------
-// Feedback: where it went, what became of it, and an admin’s hand
+// Feedback: where it went, and what became of it
 // ------------------------------------------------------------------------------------------------
 
-const LOCATIONS: readonly {
-	location: FeedbackLocation;
-	channel: ReviewLineageFeedback["channel"];
-}[] = [
-	{ location: "GITHUB", channel: "IN_CONTEXT" },
-	{ location: "GITLAB", channel: "IN_CONTEXT" },
-	{ location: "OTHER_WORK", channel: "IN_CONTEXT" },
-	{ location: "PRACTICE_PAGES", channel: "IN_APP" },
-	{ location: "HEPH", channel: "IN_CHAT" },
-	{ location: "SLACK", channel: "IN_CHAT" },
-	{ location: "NEXT_CONVERSATION", channel: "IN_CHAT" },
-];
+const DESTINATIONS = ["ON_WORK", "PRACTICE_PAGE", "CONVERSATION"] as const;
 
-const locationCases: LineageStateCase[] = [
-	{
-		key: "locations",
-		title: "Every place feedback goes",
-		lineage: chain({
-			feedback: LOCATIONS.map(({ location, channel }, index) =>
-				lineageFeedback(id(6, index + 1), [OBS_A], {
-					channel,
-					location,
-					createdAt: at(`13:4${index}:00`),
-					deliveryState: location === "NEXT_CONVERSATION" ? "PREPARED" : "DELIVERED",
-					deliveredAt: location === "NEXT_CONVERSATION" ? undefined : at(`13:4${index}:20`),
+const destinationCases: LineageStateCase[] = [
+	withCase(
+		"destinations",
+		"Every destination",
+		chain({
+			feedback: DESTINATIONS.map((destination, index) =>
+				stateFeedback(id(7, index + 1), [RESULT_A], {
+					destination,
+					deliveredAt: at(`13:4${index}:20`),
 				}),
 			),
 		}),
-	},
-	{
-		key: "gitlab-work",
-		title: "A merge request on GitLab",
-		lineage: chain({
-			work: gitlabMergeRequest.reviewedWork,
-			feedback: [oneComment({ location: "GITLAB" })],
-		}),
-	},
+	),
+	...DESTINATIONS.map((destination) =>
+		withCase(
+			`destination-${destination.toLowerCase().replaceAll("_", "-")}`,
+			`Only ${destination.toLowerCase().replaceAll("_", " ")}`,
+			chain({ feedback: [oneComment({ destination })] }),
+		),
+	),
 ];
 
-/** The reason a stopped piece carries, where its state needs one. */
-const STOPPED_BY: Partial<
-	Record<ReviewLineageFeedback["deliveryState"], ReviewLineageFeedback["suppressionReason"]>
-> = {
-	SUPPRESSED: "VOLUME_CAPPED",
-	PARTIALLY_FAILED: "ARTIFACT_CLOSED",
-};
-
-const DELIVERY_STATES: readonly ReviewLineageFeedback["deliveryState"][] = [
+const STATES = [
 	"AWAITING_APPROVAL",
-	"PREPARED",
-	"PARTIALLY_DELIVERED",
-	"PARTIALLY_FAILED",
+	"READY",
 	"DELIVERED",
-	"SUPERSEDED",
-	"SUPPRESSED",
-	"FAILED",
-	"DISCARDED",
 	"UNCONFIRMED",
-];
-
-/** A card on the practice pages that no developer has opened, which only the review's record tells. */
-function inAppUnopened(): LineageStateCase {
-	const lineage = chain({
-		feedback: [
-			oneComment({
-				channel: "IN_APP",
-				location: "PRACTICE_PAGES",
-				deliveryState: "DELIVERED",
-				deliveredAt: at("13:41:10"),
-			}),
-		],
-	});
-	return {
-		key: "in-app-unopened",
-		title: "A card on their practice pages, not opened yet",
-		lineage,
-		job: jobOf(lineage),
-	};
-}
+	"WITHHELD",
+	"REJECTED",
+	"REPLACED",
+	"FAILED",
+] as const satisfies readonly ReviewBoundFeedback["state"][];
 
 const deliveryCases: LineageStateCase[] = [
-	{
-		key: "delivery-states",
-		title: "Every delivery state",
-		lineage: chain({
-			feedback: DELIVERY_STATES.map((deliveryState, index) =>
-				lineageFeedback(id(7, index + 1), [OBS_A], {
-					createdAt: at(`13:4${index}:00`),
-					deliveryState,
-					channel: deliveryState === "UNCONFIRMED" ? "IN_CHAT" : "IN_CONTEXT",
-					suppressionReason: STOPPED_BY[deliveryState],
-					deliveredAt: [
-						"DELIVERED",
-						"PARTIALLY_DELIVERED",
-						"PARTIALLY_FAILED",
-						"SUPERSEDED",
-					].includes(deliveryState)
-						? at(`13:4${index}:30`)
-						: undefined,
-					replacedAt: deliveryState === "SUPERSEDED" ? dayAt("07-29", "09:00:00") : undefined,
+	withCase(
+		"delivery-states",
+		"Every delivery state",
+		chain({
+			feedback: STATES.map((state, index) =>
+				stateFeedback(id(8, index + 1), [RESULT_A], {
+					state,
+					destination: state === "UNCONFIRMED" ? "CONVERSATION" : "ON_WORK",
+					deliveredAt: state === "DELIVERED" || state === "REPLACED" ? at(`13:4${index}:30`) : null,
 				}),
 			),
 		}),
-	},
-	{
-		key: "replaced",
-		title: "An earlier review’s comment, replaced by this one",
-		lineage: chain({
+	),
+	withCase(
+		"withdrawn",
+		"Shown on their practice pages, then withdrawn",
+		chain({
+			feedback: [oneComment({ destination: "PRACTICE_PAGE", withdrawn: true })],
+		}),
+	),
+	withCase(
+		"replaced",
+		"An earlier comment, replaced by this one",
+		chain({
 			feedback: [
-				oneComment({ replacesId: id(8, 1) }),
-				lineageFeedback(id(8, 1), [id(8, 2)], {
-					agentJobId: EARLIER_REVIEW_ID,
-					createdAt: at("09:12:00"),
+				oneComment(),
+				stateFeedback(id(9, 1), [RESULT_A], {
+					state: "REPLACED",
 					deliveredAt: at("09:12:20"),
-					deliveryState: "SUPERSEDED",
-					replacedById: FB_A,
-					replacedAt: at("13:41:00"),
 				}),
 			],
 		}),
-	},
-	{
-		key: "shown-then-withheld",
-		title: "Shown on their practice pages, then withheld",
-		lineage: chain({
-			feedback: [
-				oneComment({
-					channel: "IN_APP",
-					deliveryState: "SUPPRESSED",
-					suppressionReason: "OUTSIDE_CURRENT_COVERAGE",
-					deliveredAt: at("13:42:00"),
-				}),
-			],
-		}),
-	},
-	{
-		key: "partly-withheld",
-		title: "Partly delivered, the rest withheld as a draft",
-		lineage: chain({
-			feedback: [
-				oneComment({
-					deliveryState: "PARTIALLY_DELIVERED",
-					suppressionReason: "ARTIFACT_DRAFT",
-					deliveredAt: at("13:41:20"),
-				}),
-			],
-		}),
-	},
-	inAppUnopened(),
-	{
-		key: "in-chat-waiting",
-		title: "A brief waiting for a conversation",
-		lineage: chain({
-			feedback: [
-				oneComment({
-					channel: "IN_CHAT",
-					location: "NEXT_CONVERSATION",
-					deliveryState: "PREPARED",
-					deliveredAt: undefined,
-				}),
-			],
-		}),
-	},
-];
-
-/** Every reason feedback can be withheld for, as the API names them. */
-const WITHHOLDING_REASONS: readonly NonNullable<ReviewLineageFeedback["suppressionReason"]>[] = [
-	"VOLUME_CAPPED",
-	"COMPOSER_DEDUPED",
-	"COMPOSER_WITHHELD",
-	"REPEATS_DELIVERED_NOTE",
-	"REACTED_DISPUTED",
-	"REACTED_NOT_APPLICABLE",
-	"CONVERSATION_EXPIRED",
-	"ARTIFACT_GONE",
-	"ARTIFACT_CLOSED",
-	"ISSUE_SNAPSHOT_CHANGED",
-	"ARTIFACT_MERGED",
-	"ARTIFACT_DRAFT",
-	"RECIPIENT_OPTED_OUT",
-	"EMPTY_AFTER_SANITIZE",
-	"INSTANCE_SILENCED",
-	"WORKSPACE_DISABLED",
-	"WORKSPACE_DELIVERY_PAUSED",
-	"STALE_ROLLOUT_REVISION",
-	"OUTSIDE_CURRENT_COVERAGE",
-	"APPROVAL_STALE",
-	"APPROVAL_NO_LONGER_ELIGIBLE",
-	"PRACTICE_REQUIRES_APPROVAL",
-	"BACKFILL_QUIET",
-	"OBSERVATION_INVALIDATED",
-];
-
-/** The reasons only a conversation brief can meet. */
-const CHAT_ONLY: ReadonlySet<string> = new Set(["CONVERSATION_EXPIRED"]);
-
-/** One reason from each family of reasons feedback is withheld for. */
-const withholdingCases: LineageStateCase[] = [
-	{
-		key: "withholding-families",
-		title: "Withheld, one reason of each kind",
-		lineage: chain({
-			feedback: (
-				[
-					"ARTIFACT_CLOSED",
-					"VOLUME_CAPPED",
-					"RECIPIENT_OPTED_OUT",
-					"OBSERVATION_INVALIDATED",
-					"COMPOSER_DEDUPED",
-				] as const
-			).map((suppressionReason, index) =>
-				lineageFeedback(id(9, index + 1), [OBS_A], {
-					createdAt: at(`13:4${index}:00`),
-					deliveryState: "SUPPRESSED",
-					suppressionReason,
-					deliveredAt: undefined,
-					placementCount: 0,
-				}),
-			),
-		}),
-	},
-	...WITHHOLDING_REASONS.map((suppressionReason) => {
-		const lineage = chain({
-			workMergedAt: suppressionReason === "ARTIFACT_MERGED" ? at("13:39:30") : undefined,
-			feedback: [
-				oneComment({
-					channel: CHAT_ONLY.has(suppressionReason) ? "IN_CHAT" : "IN_CONTEXT",
-					deliveryState: "SUPPRESSED",
-					suppressionReason,
-					deliveredAt: undefined,
-					placementCount: 0,
-				}),
-			],
-		});
-		return {
-			key: `withheld-${suppressionReason.toLowerCase().replaceAll("_", "-")}`,
-			title: `Withheld: ${suppressionReason}`,
-			lineage,
-			job: jobOf(lineage),
-		};
-	}),
-];
-
-const decisionCases: LineageStateCase[] = [
-	{
-		key: "decisions",
-		title: "Awaiting approval, approved, rejected, withdrawn",
-		lineage: chain({
-			feedback: [
-				lineageFeedback(id(10, 1), [OBS_A], {
-					createdAt: at("13:41:00"),
-					deliveryState: "AWAITING_APPROVAL",
-					suppressionReason: "PRACTICE_REQUIRES_APPROVAL",
-					deliveredAt: undefined,
-				}),
-				lineageFeedback(id(10, 2), [OBS_A], {
-					createdAt: at("13:42:00"),
-					decision: "APPROVED",
-					decidedAt: at("14:30:00"),
-					deliveredAt: at("14:30:20"),
-				}),
-				lineageFeedback(id(10, 3), [OBS_A], {
-					createdAt: at("13:43:00"),
-					deliveryState: "DISCARDED",
-					decision: "REJECTED",
-					decidedAt: at("14:31:00"),
-					deliveredAt: undefined,
-				}),
-				lineageFeedback(id(10, 4), [OBS_A], {
-					channel: "IN_APP",
-					createdAt: at("13:44:00"),
-					deliveredAt: at("13:50:00"),
-					withdrawnAt: dayAt("07-29", "10:00:00"),
-				}),
-			],
-		}),
-	},
-];
-
-// ------------------------------------------------------------------------------------------------
-// The developer’s answer
-// ------------------------------------------------------------------------------------------------
-
-const answered = (
-	index: number,
-	response: ReviewLineageFeedback["response"],
-	overrides: Partial<ReviewLineageFeedback> = {},
-) =>
-	lineageFeedback(id(11, index), [OBS_A], {
-		createdAt: at(`13:4${index}:00`),
-		deliveredAt: at(`13:4${index}:30`),
-		response,
-		...overrides,
-	});
-
-const responseCases: LineageStateCase[] = [
-	{
-		key: "responses",
-		title: "Every answer, and none",
-		lineage: chain({
-			feedback: [
-				// What an admin may know of an answer: that it was given, or that it disputes the
-				// feedback. Ratings and other decisions stay private to the developer.
-				answered(1, { disputed: false, respondedAt: at("15:00:00") }),
-				answered(2, { disputed: false, respondedAt: at("15:10:00") }),
-				answered(3, {
-					disputed: true,
-					respondedAt: at("16:05:00"),
-					disputeExplanation: "The two cases share a cause, so one status is right here.",
-				}),
-				answered(4, { disputed: false, respondedAt: dayAt("07-29", "08:00:00") }),
-				answered(5, { disputed: false, respondedAt: at("15:30:00") }),
-				answered(
-					6,
-					{ disputed: false, resolvedByWorkAt: dayAt("08-06", "11:02:00") },
-					{ channel: "IN_APP" },
-				),
-				answered(7, undefined),
-				answered(8, undefined, {
-					deliveryState: "SUPPRESSED",
-					suppressionReason: "COMPOSER_DEDUPED",
-					deliveredAt: undefined,
-				}),
-			],
-		}),
-	},
+	),
+	...STATES.map((state) =>
+		withCase(
+			`state-${state.toLowerCase().replaceAll("_", "-")}`,
+			`Only ${state.toLowerCase().replaceAll("_", " ")}`,
+			chain({
+				feedback: [
+					oneComment({
+						state,
+						deliveredAt: state === "DELIVERED" || state === "REPLACED" ? at("13:41:30") : null,
+					}),
+				],
+			}),
+		),
+	),
 ];
 
 // ------------------------------------------------------------------------------------------------
@@ -867,48 +574,41 @@ const responseCases: LineageStateCase[] = [
 // ------------------------------------------------------------------------------------------------
 
 const volumeCases: LineageStateCase[] = [
-	{
-		key: "many-feedback",
-		title: "Ten pieces of feedback from three results",
-		lineage: chain({
+	withCase(
+		"many-feedback",
+		"Ten pieces of feedback from three results",
+		chain({
 			feedback: Array.from({ length: 10 }, (_, index) =>
-				lineageFeedback(
-					id(12, index + 1),
-					index % 3 === 0 ? [OBS_A, OBS_B] : [[OBS_A, OBS_B, OBS_C][index % 3] ?? OBS_A],
+				stateFeedback(
+					id(10, index + 1),
+					index % 3 === 0 ? [RESULT_A, RESULT_B] : [[RESULT_A, RESULT_B, RESULT_C][index % 3] ?? RESULT_A],
 					{
-						channel: index % 2 === 0 ? "IN_CONTEXT" : "IN_APP",
-						createdAt: at(`13:4${index}:00`),
+						destination: index % 2 === 0 ? "ON_WORK" : "PRACTICE_PAGE",
 						deliveredAt: at(`13:4${index}:40`),
 					},
 				),
 			),
 		}),
-	},
+	),
 ];
 
 export const LINEAGE_STATE_CASES: Record<LineageStateGroup, LineageStateCase[]> = {
 	review: reviewCases,
-	trigger: triggerCases,
-	merge: mergeCases,
+	origin: originCases,
+	item: itemCases,
 	results: resultCases,
-	location: locationCases,
+	destination: destinationCases,
 	delivery: deliveryCases,
-	withholding: withholdingCases,
-	decision: decisionCases,
-	response: responseCases,
 	volume: volumeCases,
 };
 
 export const LINEAGE_STATE_GROUP_TITLES: Record<LineageStateGroup, string> = {
 	review: "How the review ran",
-	trigger: "What started it",
-	merge: "The merge against the review",
+	origin: "What started it",
+	item: "The work reviewed",
 	results: "Results",
-	location: "Where feedback went",
+	destination: "Where feedback went",
 	delivery: "What became of feedback",
-	withholding: "Why feedback was withheld",
-	decision: "An admin’s decision",
-	response: "The developer’s answer",
 	volume: "Many records",
 };
 
@@ -923,5 +623,5 @@ export function lineageStateCase(key: string): LineageStateCase {
 	throw new Error(`No lineage state case ${key}`);
 }
 
-export const STATE_FEEDBACK_ID = FB_A;
-export const STATE_RESULT_ID = OBS_A;
+export const STATE_FEEDBACK_ID = FEEDBACK_A;
+export const STATE_RESULT_ID = RESULT_A;

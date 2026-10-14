@@ -1,36 +1,61 @@
 import { HttpResponse, http } from "msw";
+import { z } from "zod";
 
-import type { PracticeReviewObservationRow, ReviewFeedback, ReviewResult } from "@/api/types.gen";
-import { artifactTrace, tracedArtifacts } from "@/components/practice-trace/fixtures";
+import type {
+	ItemRef,
+	ResultMark,
+	ReviewEvidenceOutcome,
+	ReviewFeedback,
+	ReviewProblem,
+	ReviewResult,
+	ReviewSummary,
+} from "@/api/types.gen";
+import { itemTrace } from "@/components/practice-trace/fixtures";
 import { hasText } from "@/lib/text";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { ownMembership } from "@/mocks/fixtures/workspaces";
 
 import {
+	busyReviewQueue,
+	disagreedResultIds,
+	feedbackDecisions,
 	feedbackDetail,
 	feedbackIdsFrom,
+	feedbackPracticeSlugs,
+	itemEventsOf,
+	itemTraceOf,
 	locationCounts,
 	mergedPullRequestFacts,
-	mockJobUsageTwoAttempts,
-	resultDetail,
 	openIssueFacts,
+	practiceCounts,
 	practiceGroups,
+	practiceGroupSlug,
 	practiceReviewOverview,
 	practiceReviewTiming,
-	practiceRevisions,
-	busyReviewQueue,
+	practiceVersions,
+	problemDetail,
 	reasonCounts,
+	resultDetail,
+	resultMarks,
+	reviewAccounts,
+	reviewDetail,
+	reviewDeveloperOf,
 	reviewFeedback,
-	reviewJob,
-	reviewObservations,
+	reviewFeedbackChecksOf,
+	reviewPracticeScripts,
+	reviewProblems,
 	reviewResults,
-	reviewRuns,
+	reviews,
+	reviewUsageTwoAttempts,
 	workspaceMembers,
 	workspacePractices,
 } from "./fixtures";
-import { reviewLineage } from "./lineage-fixtures";
+import { type LineageKind, reviewLineage } from "./lineage-fixtures";
 
 // These handlers filter, sort and paginate the fixture the way the server does. A mock that answers
-// every URL with the same array leaves a story that clicks a facet testing nothing.
+// every URL with the same array leaves a story that clicks a facet testing nothing. MSW matches the
+// first handler that fits, and `:reviewId` fits any segment, so every fixed path under
+// `/practices/reviews/` comes before the review's own.
 
 const PAGE_SIZE = 25;
 
@@ -49,29 +74,35 @@ function single(url: URL, name: string): string | undefined {
 	return url.searchParams.get(name) ?? undefined;
 }
 
-function matches(selected: string[], actual: string | undefined): boolean {
-	return selected.length === 0 || (actual !== undefined && selected.includes(actual));
+function matches(selected: string[], actual: string | null | undefined): boolean {
+	return selected.length === 0 || (hasText(actual) && selected.includes(actual));
 }
 
-function withinScope(
-	url: URL,
-	row: { agentJobId: string; reviewedWork?: { id: string; kind: string } },
-) {
-	const agentJobId = single(url, "agentJobId");
-	const artifactKind = single(url, "artifactKind");
-	const artifactId = single(url, "artifactId");
-	if (hasText(agentJobId) && row.agentJobId !== agentJobId) {
-		return false;
-	}
-	if (hasText(artifactKind) && row.reviewedWork?.kind !== artifactKind) {
-		return false;
-	}
-	if (hasText(artifactId) && row.reviewedWork?.id !== artifactId) {
-		return false;
-	}
-	return true;
+function matchesAny(selected: string[], actual: readonly (string | null)[]): boolean {
+	return selected.length === 0 || actual.some((value) => hasText(value) && selected.includes(value));
 }
 
+/** A boolean filter: unset selects every row, `true`/`false` the rows that are or are not. */
+function flag(url: URL, name: string, actual: boolean): boolean {
+	const asked = single(url, name);
+	return asked === undefined || asked === String(actual);
+}
+
+function equals(url: URL, name: string, actual: string | null | undefined): boolean {
+	const asked = single(url, name);
+	return !hasText(asked) || asked === actual;
+}
+
+/** The scope every list shares: one review, one item, one kind of item. */
+function withinScope(url: URL, row: { reviewId: string; item: ItemRef | null }) {
+	return (
+		equals(url, "reviewId", row.reviewId) &&
+		equals(url, "itemId", row.item?.id) &&
+		equals(url, "itemKind", row.item?.kind)
+	);
+}
+
+/** `from` inclusive, `to` exclusive. */
 function withinDates(url: URL, at: Date) {
 	const from = single(url, "from");
 	const to = single(url, "to");
@@ -84,66 +115,111 @@ function withinDates(url: URL, at: Date) {
 	return true;
 }
 
-function page(rows: unknown[], url: URL) {
+function pageOf<T>(rows: readonly T[], url: URL) {
 	const number = Number(single(url, "page") ?? 0);
 	const size = Number(single(url, "size") ?? PAGE_SIZE);
-	return HttpResponse.json({
+	return {
 		content: rows.slice(number * size, number * size + size),
-		page: {
-			number,
-			size,
-			totalElements: rows.length,
-			totalPages: Math.max(1, Math.ceil(rows.length / size)),
-		},
+		number,
+		size,
+		totalElements: rows.length,
+		totalPages: Math.max(1, Math.ceil(rows.length / size)),
+	};
+}
+
+/** A `PagedModel` page: the rows, and the page facts under `page`. */
+function paged(rows: readonly unknown[], url: URL) {
+	const { content, ...page } = pageOf(rows, url);
+	return HttpResponse.json({ content, page });
+}
+
+/** A Spring `Page`, as the feedback list returns it: the page facts beside the rows. */
+function springPage(rows: readonly unknown[], url: URL) {
+	const page = pageOf(rows, url);
+	return HttpResponse.json({
+		...page,
+		numberOfElements: page.content.length,
+		first: page.number === 0,
+		last: page.number >= page.totalPages - 1,
+		empty: page.content.length === 0,
 	});
 }
 
-function filterResults(rows: ReviewResult[], url: URL) {
-	const subjectUserId = single(url, "subjectUserId");
-	const invalidated = single(url, "invalidated");
-	const disputed = single(url, "disputed");
+function inPracticeScope(url: URL, practiceSlugs: readonly string[]) {
+	return (
+		matchesAny(values(url, "practiceSlug"), practiceSlugs) &&
+		matchesAny(values(url, "groupSlug"), practiceSlugs.map(practiceGroupSlug))
+	);
+}
+
+function filterResults(rows: readonly ReviewResult[], url: URL) {
+	const disagreed = disagreedResultIds();
 	return rows.filter(
 		(row) =>
 			withinScope(url, row) &&
-			withinDates(url, row.observedAt) &&
-			matches(values(url, "groupSlug"), row.group?.slug) &&
-			matches(values(url, "practiceSlug"), row.practiceSlug) &&
+			withinDates(url, row.recordedAt) &&
+			inPracticeScope(url, [row.practiceSlug]) &&
+			equals(url, "developerId", row.developer?.accountId) &&
 			matches(values(url, "outcome"), row.outcome) &&
-			(invalidated === undefined || invalidated === String(row.invalidatedAt !== undefined)) &&
-			(disputed === undefined || disputed === String(row.disputedAt !== undefined)) &&
 			matches(values(url, "severity"), row.severity) &&
-			(!hasText(subjectUserId) || String(row.subject?.id) === subjectUserId),
+			equals(url, "currentness", row.currentness) &&
+			flag(url, "markedIncorrect", row.markedIncorrectAt !== null) &&
+			flag(url, "accepted", row.acceptedAt !== null) &&
+			flag(url, "disagreed", disagreed.has(row.id)),
 	);
 }
 
-function filterObservations(rows: PracticeReviewObservationRow[], url: URL) {
-	const subjectUserId = single(url, "subjectUserId");
-	const practiceResultId = single(url, "practiceResultId");
+function filterProblems(rows: readonly ReviewProblem[], url: URL) {
 	return rows.filter(
 		(row) =>
 			withinScope(url, row) &&
-			(!hasText(practiceResultId) || row.practiceResultId === practiceResultId) &&
-			withinDates(url, row.observedAt) &&
-			matches(values(url, "groupSlug"), row.group?.slug) &&
-			matches(values(url, "practiceSlug"), row.practiceSlug) &&
+			equals(url, "resultId", row.resultId) &&
+			equals(url, "path", row.path) &&
+			withinDates(url, row.recordedAt) &&
+			inPracticeScope(url, [row.practiceSlug]) &&
+			equals(url, "developerId", row.developer?.accountId) &&
 			matches(values(url, "severity"), row.severity) &&
-			(!hasText(subjectUserId) || String(row.subject?.id) === subjectUserId),
+			equals(url, "currentness", row.currentness) &&
+			flag(url, "markedIncorrect", row.markedIncorrectAt !== null) &&
+			flag(url, "accepted", row.acceptedAt !== null) &&
+			flag(url, "disagreed", row.disagreedAt !== null) &&
+			(single(url, "openOnly") !== "true" || row.markedIncorrectAt === null),
 	);
 }
 
-function filterFeedback(rows: ReviewFeedback[], url: URL) {
-	const recipientUserId = single(url, "recipientUserId");
-	const practiceResultId = single(url, "practiceResultId");
-	const fromResult = hasText(practiceResultId) ? feedbackIdsFrom(practiceResultId) : undefined;
+function filterFeedback(rows: readonly ReviewFeedback[], url: URL) {
+	const resultId = single(url, "resultId");
+	const fromResult = hasText(resultId) ? feedbackIdsFrom(resultId) : undefined;
 	return rows.filter(
 		(row) =>
 			withinScope(url, row) &&
 			(fromResult === undefined || fromResult.has(row.id)) &&
 			withinDates(url, row.createdAt) &&
-			matches(values(url, "deliveryState"), row.deliveryState) &&
-			matches(values(url, "channel"), row.channel) &&
-			matches(values(url, "suppressionReason"), row.suppressionReason) &&
-			(!hasText(recipientUserId) || String(row.recipient?.id) === recipientUserId),
+			inPracticeScope(url, feedbackPracticeSlugs(row.id)) &&
+			equals(url, "developerId", row.developer.accountId) &&
+			matches(values(url, "destination"), row.destination) &&
+			matches(values(url, "state"), row.state) &&
+			equals(url, "location", row.location) &&
+			matches(values(url, "stopReason"), row.stopReason) &&
+			flag(url, "withdrawn", row.withdrawn) &&
+			flag(url, "disagreed", row.disagreedAt !== null),
+	);
+}
+
+function filterReviews(rows: readonly ReviewSummary[], url: URL) {
+	return rows.filter(
+		(row) =>
+			// Every filter, intersected, exactly as the endpoint applies them. Honouring only
+			// `status` here would let a story "prove" a date range that the screen never sent.
+			withinScope(url, { reviewId: row.id, item: row.item }) &&
+			matches(values(url, "status"), row.status) &&
+			equals(url, "kind", row.kind) &&
+			inPracticeScope(
+				url,
+				row.practices.map((practice) => practice.practiceSlug),
+			) &&
+			equals(url, "developerId", reviewDeveloperOf(row.id)?.accountId) &&
+			withinDates(url, row.createdAt),
 	);
 }
 
@@ -152,24 +228,24 @@ function filterFeedback(rows: ReviewFeedback[], url: URL) {
  * only that the parameter was sent would pass a story whose control sets the wrong value, or whose
  * screen re-orders the answer on the way in.
  */
-const ACTIONABILITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
+const ACTIONABILITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, TRIVIAL: 3 };
 
 function actionability(row: ReviewResult): number {
 	switch (row.outcome) {
 		case "NOT_MET": {
-			return ACTIONABILITY_RANK[row.severity ?? "INFO"] ?? 4;
+			return ACTIONABILITY_RANK[row.severity ?? "TRIVIAL"] ?? 4;
 		}
 		case "MET": {
 			return 5;
 		}
-		case "NOT_APPLICABLE":
-		case "UNDETERMINED": {
+		case "DOES_NOT_APPLY":
+		case "COULD_NOT_DETERMINE": {
 			return 6;
 		}
 	}
 }
 
-function sortResults(rows: ReviewResult[], url: URL) {
+function sortResults(rows: readonly ReviewResult[], url: URL) {
 	if (single(url, "sort") !== "ACTIONABILITY") {
 		return rows;
 	}
@@ -177,9 +253,63 @@ function sortResults(rows: ReviewResult[], url: URL) {
 	return [...rows].sort(
 		(a, b) =>
 			actionability(a) - actionability(b) ||
-			new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime(),
+			new Date(b.recordedAt).getTime() - new Date(a.recordedAt).getTime(),
 	);
 }
+
+/** The items the fixture's reviews looked at, each once, as `listReviewItems` pages them. */
+function reviewedItems(): ItemRef[] {
+	const byId = new Map<string, ItemRef>();
+	for (const review of reviews) {
+		byId.set(review.item.id, review.item);
+	}
+	return [...byId.values()];
+}
+
+function itemNamed(itemId: string): ItemRef {
+	return reviewedItems().find((item) => item.id === itemId) ?? { ...itemTrace.item, id: itemId };
+}
+
+/** The review whose item is this one, so an item's trace and events agree with a real review. */
+function reviewOfItem(itemId: string): ReviewSummary | undefined {
+	return reviews.find((review) => review.item.id === itemId);
+}
+
+const LINEAGE_KINDS = ["ITEM", "REVIEW", "RESULT", "PROBLEM", "FEEDBACK"] as const satisfies readonly LineageKind[];
+const lineageKindSchema = z.enum(LINEAGE_KINDS);
+
+const LINEAGE_ID_PARAM: Record<LineageKind, string> = {
+	ITEM: "itemId",
+	REVIEW: "reviewId",
+	RESULT: "resultId",
+	PROBLEM: "problemId",
+	FEEDBACK: "feedbackId",
+};
+
+const createMarkSchema = z.object({
+	kind: z.enum(["INCORRECT", "ACCEPTED"]),
+	reason: z.string().min(1),
+});
+
+const removeMarkSchema = z.object({ reason: z.string().min(1) });
+
+const createDecisionSchema = z.object({
+	action: z.enum(["APPROVE", "REJECT", "WITHDRAW", "RESTORE"]),
+	reasonCode: z
+		.enum(["INCORRECT", "MISSING_CONTEXT", "UNHELPFUL", "DUPLICATE", "INAPPROPRIATE_PLACEMENT", "OTHER"])
+		.optional(),
+	note: z.string().optional(),
+	contentDigest: z.string().optional(),
+});
+
+/** The practices' outcome and operational counts, as `getReviewEvidenceOutcomes` returns them. */
+const evidenceOutcomes: ReviewEvidenceOutcome[] = practiceCounts.map((counts) => ({
+	practiceSlug: counts.practiceSlug,
+	practiceName: counts.practiceName,
+	outcomes: counts.results,
+	withheld: counts.feedback.withheld,
+	notReviewed: 0,
+}));
 
 export interface ReviewMockOptions {
 	results?: ReviewResult[];
@@ -190,13 +320,20 @@ export interface ReviewMockOptions {
 	 * `sort` answers a screen that forgot to ask exactly as it answers one that remembered.
 	 */
 	requireResultSort?: string;
+	/** The role `members/me` answers with; an admin by default, as these screens need one. */
+	role?: Parameters<typeof ownMembership>[0];
 }
 
 /**
- * Spread into a story's `msw.handlers` with the handlers that story overrides placed *before* it:
- * MSW matches the first handler that fits.
+ * Spread into a story's or a route test's handlers with the handlers it overrides placed *before*
+ * these: MSW matches the first handler that fits.
  */
-export function reviewHandlers({ results, feedback, requireResultSort }: ReviewMockOptions = {}) {
+export function reviewHandlers({
+	results,
+	feedback,
+	requireResultSort,
+	role = "ADMIN",
+}: ReviewMockOptions = {}) {
 	const resultRows = results ?? reviewResults;
 	const feedbackRows = feedback ?? reviewFeedback;
 	return [
@@ -211,124 +348,146 @@ export function reviewHandlers({ results, feedback, requireResultSort }: ReviewM
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/queue", () =>
 			HttpResponse.json(busyReviewQueue),
 		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/evidence-outcomes", () =>
+			HttpResponse.json(evidenceOutcomes),
+		),
+		...resultHandlers(resultRows, requireResultSort),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/problems", ({ request }) =>
+			paged(filterProblems(reviewProblems, new URL(request.url)), new URL(request.url)),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/problems/:problemId", ({ params }) =>
+			HttpResponse.json(problemDetail(String(params.problemId))),
+		),
+		...feedbackHandlers(feedbackRows),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", ({ request }) => {
+			const url = new URL(request.url);
+			const kind = lineageKindSchema.safeParse(single(url, "kind"));
+			if (!kind.success) {
+				return HttpResponse.json({ detail: "Unknown lineage kind" }, { status: 400 });
+			}
+			const id = single(url, LINEAGE_ID_PARAM[kind.data]);
+			if (!hasText(id)) {
+				return HttpResponse.json(
+					{ detail: "The selected id must match the lineage kind." },
+					{ status: 400 },
+				);
+			}
+			return HttpResponse.json(reviewLineage(kind.data, id));
+		}),
+		...reviewDetailHandlers(),
+		...itemHandlers(),
+		...catalogHandlers(),
+		http.get("*/workspaces/:workspaceSlug/members/me", () => HttpResponse.json(ownMembership(role))),
+		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
+	];
+}
+
+function resultHandlers(rows: readonly ReviewResult[], requireResultSort: string | undefined) {
+	return [
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/results", ({ request }) => {
 			const url = new URL(request.url);
 			if (hasText(requireResultSort) && single(url, "sort") !== requireResultSort) {
 				return HttpResponse.json({ detail: `Expected sort=${requireResultSort}` }, { status: 400 });
 			}
-			return page(sortResults(filterResults(resultRows, url), url), url);
+			return paged(sortResults(filterResults(rows, url), url), url);
 		}),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/result-observations", ({ request }) => {
-			const url = new URL(request.url);
-			return page(filterObservations(reviewObservations, url), url);
-		}),
-		http.get(
-			"*/workspaces/:workspaceSlug/practices/reviews/results/:practiceResultId",
-			({ params }) => HttpResponse.json(resultDetail(String(params.practiceResultId))),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId", ({ params }) =>
+			HttpResponse.json(resultDetail(String(params.resultId))),
 		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/results/:resultId/marks", ({ params }) =>
+			HttpResponse.json(resultMarks(String(params.resultId))),
+		),
+		http.post(
+			"*/workspaces/:workspaceSlug/practices/reviews/results/:resultId/marks",
+			async ({ params, request }) => {
+				const body = createMarkSchema.safeParse(await request.json());
+				if (!body.success) {
+					return HttpResponse.json({ detail: "A mark needs a kind and a reason." }, { status: 400 });
+				}
+				const resultId = String(params.resultId);
+				const mark: ResultMark = {
+					id: `${resultId.slice(0, -3)}b00`,
+					resultId,
+					kind: body.data.kind,
+					reason: body.data.reason,
+					createdBy: reviewAccounts.grace,
+					createdAt: new Date(),
+					removedBy: null,
+					removedAt: null,
+					removalReason: null,
+				};
+				return HttpResponse.json(mark, { status: 201 });
+			},
+		),
+		http.delete(
+			"*/workspaces/:workspaceSlug/practices/reviews/results/:resultId/marks/:markId",
+			async ({ params, request }) => {
+				const body = removeMarkSchema.safeParse(await request.json());
+				const mark = resultMarks(String(params.resultId)).find(
+					(entry) => entry.id === String(params.markId),
+				);
+				if (!body.success || mark === undefined) {
+					return HttpResponse.json({ detail: "No such mark, or no reason." }, { status: 400 });
+				}
+				return HttpResponse.json({
+					...mark,
+					removedBy: reviewAccounts.grace,
+					removedAt: new Date(),
+					removalReason: body.data.reason,
+				});
+			},
+		),
+	];
+}
+
+/**
+ * The feedback list, its counts by location and by reason, and one piece's detail, decisions and
+ * retry. The counts come before the detail, whose path would take them too.
+ */
+export function feedbackHandlers(rows: readonly ReviewFeedback[] = reviewFeedback) {
+	return [
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", ({ request }) => {
 			const url = new URL(request.url);
-			const rows = filterFeedback(feedbackRows, url);
+			const filtered = filterFeedback(rows, url);
 			// The fixture is newest first, as the endpoint's default order is.
-			return page(single(url, "sort") === "OLDEST" ? [...rows].reverse() : rows, url);
+			return springPage(single(url, "sort") === "OLDEST" ? [...filtered].reverse() : filtered, url);
 		}),
-		...feedbackCountHandlers(feedbackRows),
+		...feedbackCountHandlers(rows),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", ({ params }) =>
 			HttpResponse.json(feedbackDetail(String(params.feedbackId))),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/lineage", ({ request }) => {
-			const url = new URL(request.url);
-			return HttpResponse.json(
-				reviewLineage(single(url, "kind") ?? "REVIEW", single(url, "id") ?? ""),
-			);
-		}),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
-			const url = new URL(request.url);
-			return page(
-				// Every filter, intersected, exactly as the endpoint applies them. Honouring only
-				// `status` here would let a story "prove" a date range that the screen never sent.
-				reviewRuns.filter(
-					(run) =>
-						withinScope(url, { agentJobId: run.id, reviewedWork: run.target.reviewedWork }) &&
-						// "On hold" and "Waiting" join the listed statuses as more alternatives.
-						((values(url, "status").length === 0 &&
-							single(url, "onHold") !== "true" &&
-							single(url, "waiting") !== "true") ||
-							values(url, "status").includes(run.status) ||
-							(single(url, "onHold") === "true" &&
-								run.status === "QUEUED" &&
-								hasText(run.holdReason)) ||
-							(single(url, "waiting") === "true" &&
-								run.status === "QUEUED" &&
-								run.holdReason !== "BUDGET")) &&
-						matches(values(url, "resultProcessing"), run.resultProcessing) &&
-						withinDates(url, run.createdAt),
-				),
-				url,
-			);
-		}),
-		http.get("*/workspaces/:workspaceSlug/practices/trace", ({ request }) => {
-			const url = new URL(request.url);
-			const kind = single(url, "artifactKind");
-			const id = single(url, "artifactId");
-			return page(
-				tracedArtifacts.filter(
-					(work) =>
-						(!hasText(kind) || work.artifactKind === kind) &&
-						(!hasText(id) || String(work.artifactId) === id) &&
-						(single(url, "withoutReview") !== "true" || work.reviewedSignalCount === 0),
-				),
-				url,
-			);
-		}),
-		// Whichever work is asked for is named as asked, so a level reads as that work's own trace.
 		http.get(
-			"*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:artifactId",
-			({ params }) =>
-				HttpResponse.json({
-					...artifactTrace,
-					artifactKind: String(params.artifactKind),
-					artifactId: Number(params.artifactId),
-				}),
+			"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions",
+			({ params }) => HttpResponse.json(feedbackDecisions(String(params.feedbackId))),
 		),
-		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", ({ params }) =>
-			HttpResponse.json(reviewJob(String(params.jobId))),
-		),
-		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/usage", () =>
-			HttpResponse.json(mockJobUsageTwoAttempts),
-		),
-		http.get("*/workspaces/:workspaceSlug/practices/reviews/runs/:jobId/delivery-checks", () =>
-			HttpResponse.json([]),
-		),
-		// A pull request reads as merged and an issue as open; other work has no provider facts.
-		http.get(
-			"*/workspaces/:workspaceSlug/practices/reviews/work/:artifactKind/:artifactId",
-			({ params }) => {
-				const artifactId = Number(params.artifactId);
-				if (params.artifactKind === "scm.pull_request") {
-					return HttpResponse.json({ ...mergedPullRequestFacts, artifactId });
+		http.post(
+			"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/decisions",
+			async ({ params, request }) => {
+				const body = createDecisionSchema.safeParse(await request.json());
+				if (!body.success) {
+					return HttpResponse.json({ detail: "Unknown decision." }, { status: 400 });
 				}
-				if (params.artifactKind === "scm.issue") {
-					return HttpResponse.json({ ...openIssueFacts, artifactId });
-				}
-				return HttpResponse.json({ detail: "No such work" }, { status: 404 });
+				const feedbackId = String(params.feedbackId);
+				return HttpResponse.json(
+					{
+						id: `${feedbackId.slice(0, -3)}d99`,
+						feedbackId,
+						action: body.data.action,
+						actor: reviewAccounts.grace,
+						reasonCode: body.data.reasonCode ?? null,
+						note: body.data.note ?? null,
+						contentDigest: body.data.contentDigest ?? null,
+						decidedAt: new Date(),
+					},
+					{ status: 201 },
+				);
 			},
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/revisions", () =>
-			HttpResponse.json(practiceRevisions),
+		http.post(
+			"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/retry",
+			({ params }) =>
+				HttpResponse.json(feedbackDetail(String(params.feedbackId)), { status: 202 }),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
-			HttpResponse.json(mockPracticeDefinitionOptions),
-		),
-		// No practice in the fixture has a practice script.
-		http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId/practice-scripts", () =>
-			HttpResponse.json([]),
-		),
-		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),
-		http.get("*/workspaces/:workspaceSlug/practice-groups", () =>
-			HttpResponse.json(practiceGroups),
-		),
-		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
 	];
 }
 
@@ -336,13 +495,105 @@ export function reviewHandlers({ results, feedback, requireResultSort }: ReviewM
  * The counts the feedback list's own filter selects, by location and by reason. A test that answers
  * `feedback/:feedbackId` itself puts these before it, since that path would take them too.
  */
-export function feedbackCountHandlers(feedbackRows: ReviewFeedback[] = reviewFeedback) {
+export function feedbackCountHandlers(rows: readonly ReviewFeedback[] = reviewFeedback) {
 	return [
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/locations", ({ request }) =>
-			HttpResponse.json(locationCounts(filterFeedback(feedbackRows, new URL(request.url)))),
+			HttpResponse.json(locationCounts(filterFeedback(rows, new URL(request.url)))),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/reasons", ({ request }) =>
-			HttpResponse.json(reasonCounts(filterFeedback(feedbackRows, new URL(request.url)))),
+			HttpResponse.json(reasonCounts(filterFeedback(rows, new URL(request.url)))),
+		),
+	];
+}
+
+/** The reviews list and one review's detail, usage, scripts, checks and cancellation. */
+function reviewDetailHandlers() {
+	return [
+		http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+			const url = new URL(request.url);
+			return paged(filterReviews(reviews, url), url);
+		}),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId", ({ params }) =>
+			HttpResponse.json(reviewDetail(String(params.reviewId))),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/usage", () =>
+			HttpResponse.json(reviewUsageTwoAttempts),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/practice-scripts", () =>
+			HttpResponse.json(Object.values(reviewPracticeScripts)),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/feedback-checks", ({ params }) =>
+			HttpResponse.json(reviewFeedbackChecksOf(reviewDetail(String(params.reviewId)))),
+		),
+		// Already ended answers 200 with the review as it is; asking jobs to stop answers 202.
+		http.post("*/workspaces/:workspaceSlug/practices/reviews/:reviewId/cancel", ({ params }) => {
+			const review = reviewDetail(String(params.reviewId));
+			const active = review.status === "QUEUED" || review.status === "RUNNING";
+			return HttpResponse.json(
+				{
+					...review,
+					status: active ? "CANCELLED" : review.status,
+					stopReason: active ? "CANCELLED_BY_ADMIN" : review.stopReason,
+					activeJobCount: 0,
+				},
+				{ status: active ? 202 : 200 },
+			);
+		}),
+	];
+}
+
+/** The items reviewed, and one item's trace, provider facts and events. */
+function itemHandlers() {
+	return [
+		http.get("*/workspaces/:workspaceSlug/practices/items", ({ request }) => {
+			const url = new URL(request.url);
+			const kind = single(url, "itemKind");
+			return paged(
+				reviewedItems().filter((item) => !hasText(kind) || item.kind === kind),
+				url,
+			);
+		}),
+		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId", ({ params }) =>
+			HttpResponse.json(itemNamed(String(params.itemId))),
+		),
+		// Whichever item is asked for is named as asked, so a level reads as that item's own trace.
+		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/trace", ({ params }) => {
+			const itemId = String(params.itemId);
+			const review = reviewOfItem(itemId);
+			return HttpResponse.json(
+				review === undefined ? { ...itemTrace, item: itemNamed(itemId) } : itemTraceOf(review),
+			);
+		}),
+		// A pull request reads as merged and an issue as open; other work reports no facts.
+		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/facts", ({ params }) => {
+			const item = itemNamed(String(params.itemId));
+			if (item.kind === "scm.pull_request") {
+				return HttpResponse.json({ ...mergedPullRequestFacts, item });
+			}
+			if (item.kind === "scm.issue") {
+				return HttpResponse.json({ ...openIssueFacts, item });
+			}
+			return HttpResponse.json({ item, facts: [] });
+		}),
+		http.get("*/workspaces/:workspaceSlug/practices/items/:itemId/events", ({ params, request }) => {
+			const review = reviewOfItem(String(params.itemId));
+			return paged(review === undefined ? [] : itemEventsOf(review), new URL(request.url));
+		}),
+	];
+}
+
+/** The catalog every review surface names practices and groups from. */
+function catalogHandlers() {
+	return [
+		http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+			HttpResponse.json(mockPracticeDefinitionOptions),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug/versions", () =>
+			HttpResponse.json(practiceVersions),
+		),
+		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(workspacePractices)),
+		http.get("*/workspaces/:workspaceSlug/practice-groups", () =>
+			HttpResponse.json(practiceGroups),
 		),
 	];
 }

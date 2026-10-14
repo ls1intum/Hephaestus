@@ -5964,12 +5964,12 @@ paths:
               $ref: "#/components/schemas/CreatePracticeGroupRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/PracticeGroup"
-          description: OK
+          description: Practice group created
       tags:
       - practice-group
   /workspaces/{workspaceSlug}/practice-groups/reorder:
@@ -6006,7 +6006,7 @@ paths:
     get:
       description: "Returns every active practice group's standing, direction, guidance,\
         \ and supporting results."
-      operationId: listPracticeGroupStandings
+      operationId: getOwnGroupStandings
       parameters:
       - description: Workspace slug
         in: path
@@ -6048,8 +6048,8 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Practice group deleted
       tags:
       - practice-group
     get:
@@ -6223,7 +6223,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelProfileReview"
+                $ref: "#/components/schemas/PageResponseDTOProfileReview"
           description: OK
       summary: List your reviews in a practice group
       tags:
@@ -6235,7 +6235,7 @@ paths:
         \ inside it, as structured events. The window opens at the run before the\
         \ latest one and closes now; with no such run it spans the standing's look-back\
         \ of 90 days."
-      operationId: getPracticeProfileOverview
+      operationId: getOwnPracticeProfileOverview
       parameters:
       - description: Workspace slug
         in: path
@@ -6300,7 +6300,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelProfileReview"
+                $ref: "#/components/schemas/PageResponseDTOProfileReview"
           description: OK
       summary: List reviews with results about you
       tags:
@@ -6386,12 +6386,12 @@ paths:
               $ref: "#/components/schemas/CreatePracticeRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Practice"
-          description: OK
+          description: Practice created
       tags:
       - practice-catalog
   /workspaces/{workspaceSlug}/practices/definition-options:
@@ -6544,6 +6544,10 @@ paths:
           format: uuid
       responses:
         "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
           description: Complete cleared response returned
         "404":
           description: Delivered feedback not found for the current recipient
@@ -6570,7 +6574,11 @@ paths:
           format: uuid
       responses:
         "200":
-          description: No response is currently recorded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackResponse"
+          description: Complete current response returned
         "404":
           description: Delivered feedback not found for the current recipient
       summary: Get the current feedback response
@@ -6655,7 +6663,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelItemRef"
+                $ref: "#/components/schemas/PageResponseDTOItemRef"
           description: OK
       summary: List items in the workspace
       tags:
@@ -6677,8 +6685,9 @@ paths:
         name: itemId
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           content:
@@ -6706,8 +6715,9 @@ paths:
         name: itemId
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: page
         required: false
@@ -6727,7 +6737,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelItemEvent"
+                $ref: "#/components/schemas/PageResponseDTOItemEvent"
           description: OK
       summary: List item events
       tags:
@@ -6749,8 +6759,9 @@ paths:
         name: itemId
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           content:
@@ -6778,8 +6789,9 @@ paths:
         name: itemId
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: reviewId
         required: true
@@ -6813,8 +6825,9 @@ paths:
         name: itemId
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: page
         required: false
@@ -6834,7 +6847,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelProfileReview"
+                $ref: "#/components/schemas/PageResponseDTOProfileReview"
           description: OK
       summary: List your reviews of an item
       tags:
@@ -6856,8 +6869,9 @@ paths:
         name: itemId
         required: true
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       responses:
         "200":
           content:
@@ -7085,9 +7099,9 @@ paths:
         name: itemId
         required: false
         schema:
-          type: integer
-          format: int64
-          exclusiveMinimum: 0
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: severity
         required: false
@@ -7224,7 +7238,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewBatch"
+                $ref: "#/components/schemas/PageResponseDTOReviewBatch"
           description: OK
       summary: List review batches
       tags:
@@ -7248,12 +7262,12 @@ paths:
               $ref: "#/components/schemas/CreateReviewBatchRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewBatch"
-          description: OK
+          description: Created
       summary: Create a review batch
       tags:
       - review-batch
@@ -7453,12 +7467,12 @@ paths:
               $ref: "#/components/schemas/ReviewScheduleInput"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewSchedule"
-          description: OK
+          description: Created
       summary: Create a review schedule
       tags:
       - review-schedule
@@ -7487,8 +7501,8 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Deleted
       summary: Delete an unused review schedule
       tags:
       - review-schedule
@@ -7741,8 +7755,9 @@ paths:
         name: itemId
         required: false
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: developerId
         required: false
@@ -7776,7 +7791,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewSummary"
+                $ref: "#/components/schemas/PageResponseDTOReviewSummary"
           description: Paginated review summaries returned
         "400":
           content:
@@ -7839,7 +7854,7 @@ paths:
         required: false
         schema:
           type: string
-          exclusiveMinimum: 0
+          maxLength: 19
           pattern: "^[1-9][0-9]*$"
       - in: query
         name: itemKind
@@ -8023,7 +8038,7 @@ paths:
         required: false
         schema:
           type: string
-          exclusiveMinimum: 0
+          maxLength: 19
           pattern: "^[1-9][0-9]*$"
       - in: query
         name: itemKind
@@ -8192,7 +8207,7 @@ paths:
         required: false
         schema:
           type: string
-          exclusiveMinimum: 0
+          maxLength: 19
           pattern: "^[1-9][0-9]*$"
       - in: query
         name: itemKind
@@ -8420,12 +8435,12 @@ paths:
               $ref: "#/components/schemas/CreateFeedbackDecisionRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/FeedbackDecision"
-          description: OK
+          description: Feedback decision recorded
       tags:
       - feedback-review
   /workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/retry:
@@ -8448,12 +8463,12 @@ paths:
           type: string
           format: uuid
       responses:
-        "200":
+        "202":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewFeedbackDetail"
-          description: OK
+          description: Feedback retry accepted
       tags:
       - feedback-review
   /workspaces/{workspaceSlug}/practices/reviews/lineage:
@@ -8484,8 +8499,9 @@ paths:
         name: itemId
         required: false
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: reviewId
         required: false
@@ -8608,8 +8624,9 @@ paths:
         name: itemId
         required: false
         schema:
-          type: integer
-          format: int64
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: itemKind
         required: false
@@ -8729,7 +8746,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewProblem"
+                $ref: "#/components/schemas/PageResponseDTOReviewProblem"
           description: OK
       summary: List review problems
       tags:
@@ -8812,9 +8829,9 @@ paths:
         name: itemId
         required: false
         schema:
-          type: integer
-          format: int64
-          exclusiveMinimum: 0
+          type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: itemKind
         required: false
@@ -8928,7 +8945,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewResult"
+                $ref: "#/components/schemas/PageResponseDTOReviewResult"
           description: OK
       summary: List review results
       tags:
@@ -9018,12 +9035,12 @@ paths:
               $ref: "#/components/schemas/CreateResultMarkRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResultMark"
-          description: OK
+          description: Created
       summary: Mark a result
       tags:
       - practice-review-output
@@ -9180,7 +9197,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Review"
-          description: OK
+          description: Completed
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Review"
+          description: Accepted
       summary: Cancel a practice review
       tags:
       - Practice reviews
@@ -9292,6 +9315,8 @@ paths:
         required: false
         schema:
           type: string
+          maxLength: 19
+          pattern: "^[1-9][0-9]*$"
       - in: query
         name: status
         required: false
@@ -9326,7 +9351,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelScanSummary"
+                $ref: "#/components/schemas/PageResponseDTOScanSummary"
           description: OK
       summary: List repository scans
       tags:
@@ -9356,12 +9381,12 @@ paths:
               $ref: "#/components/schemas/StartScanRequest"
         required: true
       responses:
-        "200":
+        "202":
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScanSummary"
-          description: OK
+          description: Accepted
       summary: Start a repository scan
       tags:
       - scan
@@ -9567,7 +9592,10 @@ paths:
           default: true
       responses:
         "200":
-          content: {}
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanReportProblemsPage"
           description: OK
       summary: List the problems in a scan report
       tags:
@@ -9604,7 +9632,7 @@ paths:
       - scan
   /workspaces/{workspaceSlug}/practices/scans/{scanId}/status:
     patch:
-      operationId: cancelScan
+      operationId: updateScanStatus
       parameters:
       - description: Workspace slug
         in: path
@@ -9633,7 +9661,13 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ScanDetail"
-          description: OK
+          description: Completed
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScanDetail"
+          description: Accepted
       summary: Cancel a repository scan
       tags:
       - scan
@@ -9641,7 +9675,7 @@ paths:
     get:
       description: "Returns each practice's standing, direction, supporting results,\
         \ and developer guidance."
-      operationId: listPracticeStandings
+      operationId: getOwnPracticeStandings
       parameters:
       - description: Workspace slug
         in: path
@@ -9731,8 +9765,8 @@ paths:
         schema:
           type: string
       responses:
-        "200":
-          description: OK
+        "204":
+          description: Practice deleted
       tags:
       - practice-catalog
     get:
@@ -9919,8 +9953,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PracticeGuidance"
-          description: OK
+                $ref: "#/components/schemas/PracticeGuidanceDTO"
+          description: Practice guidance
+        "304":
+          description: Guidance is unchanged
       tags:
       - practice-catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/placement:
@@ -12048,7 +12084,7 @@ components:
         model:
           anyOf:
           - $ref: "#/components/schemas/FrozenModel"
-          - {}
+          - type: "null"
         slot:
           type: string
       required:
@@ -12125,8 +12161,9 @@ components:
           type: integer
           format: int32
         shipped:
-          type: "null"
-          $ref: "#/components/schemas/CatalogGroupDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/CatalogGroupDefinition"
+          - type: "null"
         slug:
           type: string
         state:
@@ -12228,8 +12265,8 @@ components:
           type: string
         position:
           type:
-          - integer
           - "null"
+          - integer
           format: int32
         slug:
           type: string
@@ -12323,8 +12360,9 @@ components:
           type: integer
           format: int32
         shipped:
-          type: "null"
-          $ref: "#/components/schemas/PracticeDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/PracticeDefinition"
+          - type: "null"
         slug:
           type: string
         state:
@@ -12360,8 +12398,8 @@ components:
           type: string
         position:
           type:
-          - integer
           - "null"
+          - integer
           format: int32
         slug:
           type: string
@@ -12402,8 +12440,9 @@ components:
       type: object
       properties:
         base:
-          type: "null"
-          $ref: "#/components/schemas/PracticeDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/PracticeDefinition"
+          - type: "null"
         current:
           $ref: "#/components/schemas/PracticeDefinition"
         etag:
@@ -13378,8 +13417,8 @@ components:
           type: string
         position:
           type:
-          - integer
           - "null"
+          - integer
           format: int32
         shownToDevelopers:
           type: boolean
@@ -13406,8 +13445,8 @@ components:
           type: string
         position:
           type:
-          - integer
           - "null"
+          - integer
           format: int32
         slug:
           type: string
@@ -13801,7 +13840,7 @@ components:
         item:
           anyOf:
           - $ref: "#/components/schemas/ItemRef"
-          - {}
+          - type: "null"
       required:
       - feedback
       - item
@@ -14018,7 +14057,7 @@ components:
         verification:
           anyOf:
           - $ref: "#/components/schemas/CitationProof"
-          - {}
+          - type: "null"
       required:
       - endLine
       - path
@@ -14386,7 +14425,7 @@ components:
         actor:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         contentDigest:
           type:
           - string
@@ -14501,6 +14540,7 @@ components:
           - "OFF"
           - APPROVE_FIRST
           - AUTOMATIC
+          - null
         source:
           type: string
           enum:
@@ -15005,16 +15045,19 @@ components:
           - REVIEWER
           - ASSIGNEE
           - MERGER
+          - null
         appliesWhen:
-          type: "null"
-          $ref: "#/components/schemas/AppliesWhen"
+          anyOf:
+          - $ref: "#/components/schemas/AppliesWhen"
+          - type: "null"
         criteria:
           type:
           - string
           - "null"
         guidance:
-          type: "null"
-          $ref: "#/components/schemas/PracticeGuidance"
+          anyOf:
+          - $ref: "#/components/schemas/PracticeGuidance"
+          - type: "null"
         knownFields:
           type: array
           items:
@@ -15040,17 +15083,21 @@ components:
           - string
           - "null"
         reads:
-          type: "null"
-          $ref: "#/components/schemas/PracticeReads"
+          anyOf:
+          - $ref: "#/components/schemas/PracticeReads"
+          - type: "null"
         reviewOn:
-          type: "null"
-          $ref: "#/components/schemas/ReviewOn"
+          anyOf:
+          - $ref: "#/components/schemas/ReviewOn"
+          - type: "null"
         reviewedBy:
-          type: "null"
-          $ref: "#/components/schemas/ReviewedBy"
+          anyOf:
+          - $ref: "#/components/schemas/ReviewedBy"
+          - type: "null"
         scan:
-          type: "null"
-          $ref: "#/components/schemas/ScanDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/ScanDefinition"
+          - type: "null"
         script:
           type:
           - string
@@ -15585,7 +15632,6 @@ components:
           type: boolean
     JudgedScanReportItem:
       allOf:
-      - $ref: "#/components/schemas/ScanReportItem"
       - type: object
         properties:
           currentness:
@@ -15706,7 +15752,6 @@ components:
           type: string
     ListedScanReportItem:
       allOf:
-      - $ref: "#/components/schemas/ScanReportItem"
       - type: object
         properties:
           item:
@@ -15716,7 +15761,7 @@ components:
           lastResult:
             anyOf:
             - $ref: "#/components/schemas/ResultList"
-            - {}
+            - type: "null"
           practiceName:
             type: string
           practiceSlug:
@@ -16261,7 +16306,6 @@ components:
       - updatedAt
     NotReviewedScanReportItem:
       allOf:
-      - $ref: "#/components/schemas/ScanReportItem"
       - type: object
         properties:
           item:
@@ -16271,7 +16315,7 @@ components:
           lastResult:
             anyOf:
             - $ref: "#/components/schemas/ResultList"
-            - {}
+            - type: "null"
           practiceName:
             type: string
           practiceSlug:
@@ -16333,7 +16377,7 @@ components:
         citation:
           anyOf:
           - $ref: "#/components/schemas/EvidenceCitation"
-          - {}
+          - type: "null"
         openQuestion:
           type: string
         wouldSettleIt:
@@ -16616,7 +16660,7 @@ components:
         response:
           anyOf:
           - $ref: "#/components/schemas/FeedbackResponse"
-          - {}
+          - type: "null"
         state:
           type: string
           enum:
@@ -16680,6 +16724,11 @@ components:
         totalPages:
           type: integer
           format: int64
+      required:
+      - number
+      - size
+      - totalElements
+      - totalPages
     PageResponseDTOAuthEventView:
       type: object
       description: |-
@@ -16716,6 +16765,18 @@ components:
         totalPages:
           type: integer
           format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     PageResponseDTOConfigAuditEntryView:
       type: object
       description: |-
@@ -16752,6 +16813,162 @@ components:
         totalPages:
           type: integer
           format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOItemEvent:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemEvent"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOItemRef:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ItemRef"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOProfileReview:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProfileReview"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     PageResponseDTOResultList:
       type: object
       description: |-
@@ -16788,6 +17005,66 @@ components:
         totalPages:
           type: integer
           format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOReviewBatch:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewBatch"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     PageResponseDTOReviewFeedback:
       type: object
       description: |-
@@ -16824,6 +17101,210 @@ components:
         totalPages:
           type: integer
           format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOReviewProblem:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewProblem"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOReviewResult:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewResult"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOReviewSummary:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewSummary"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
+    PageResponseDTOScanSummary:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanSummary"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     PageResponseDTOSyncJob:
       type: object
       description: |-
@@ -16860,6 +17341,18 @@ components:
         totalPages:
           type: integer
           format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     PageResponseDTOUserViewAccount:
       type: object
       description: |-
@@ -16896,6 +17389,18 @@ components:
         totalPages:
           type: integer
           format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     Pageable:
       type: object
       properties:
@@ -16914,6 +17419,13 @@ components:
           $ref: "#/components/schemas/Sort"
         unpaged:
           type: boolean
+      required:
+      - offset
+      - pageNumber
+      - pageSize
+      - paged
+      - sort
+      - unpaged
     PagedModelFeedbackItem:
       type: object
       properties:
@@ -16921,78 +17433,6 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FeedbackItem"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelItemEvent:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ItemEvent"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelItemRef:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ItemRef"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelProfileReview:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ProfileReview"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewBatch:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ReviewBatch"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewProblem:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ReviewProblem"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewResult:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ReviewResult"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewSummary:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ReviewSummary"
-        page:
-          $ref: "#/components/schemas/PageMetadata"
-    PagedModelScanSummary:
-      type: object
-      properties:
-        content:
-          type: array
-          items:
-            $ref: "#/components/schemas/ScanSummary"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PagedModelSurvey:
@@ -17171,7 +17611,7 @@ components:
         appliesWhen:
           anyOf:
           - $ref: "#/components/schemas/AppliesWhen"
-          - {}
+          - type: "null"
         criteria:
           type: string
         guidance:
@@ -17189,7 +17629,7 @@ components:
         scan:
           anyOf:
           - $ref: "#/components/schemas/ScanDefinition"
-          - {}
+          - type: "null"
         script:
           type:
           - string
@@ -17327,7 +17767,7 @@ components:
         trendSupport:
           anyOf:
           - $ref: "#/components/schemas/TrendSupport"
-          - {}
+          - type: "null"
       required:
       - direction
       - feedbackSince
@@ -17350,11 +17790,11 @@ components:
         guide:
           anyOf:
           - $ref: "#/components/schemas/PracticeGuide"
-          - {}
+          - type: "null"
         visual:
           anyOf:
           - $ref: "#/components/schemas/PracticeVisual"
-          - {}
+          - type: "null"
         whatGoodLooksLike:
           type:
           - string
@@ -17369,6 +17809,23 @@ components:
       - visual
       - whatGoodLooksLike
       - whyItMatters
+    PracticeGuidanceDTO:
+      type: object
+      properties:
+        guide:
+          anyOf:
+          - $ref: "#/components/schemas/PracticeGuide"
+          - type: "null"
+        practiceSlug:
+          type: string
+        visual:
+          anyOf:
+          - $ref: "#/components/schemas/PracticeVisual"
+          - type: "null"
+      required:
+      - guide
+      - practiceSlug
+      - visual
     PracticeGuide:
       type: object
       additionalProperties: false
@@ -17546,7 +18003,7 @@ components:
         response:
           anyOf:
           - $ref: "#/components/schemas/FeedbackResponse"
-          - {}
+          - type: "null"
         whatGoodLooksLike:
           type:
           - string
@@ -17591,7 +18048,7 @@ components:
         latestReview:
           anyOf:
           - $ref: "#/components/schemas/ProfileReviewRef"
-          - {}
+          - type: "null"
         reviewedItems:
           type: array
           items:
@@ -17662,8 +18119,9 @@ components:
       type: object
       properties:
         base:
-          type: "null"
-          $ref: "#/components/schemas/PracticeDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/PracticeDefinition"
+          - type: "null"
         current:
           $ref: "#/components/schemas/PracticeDefinition"
         currentVersionId:
@@ -17992,7 +18450,7 @@ components:
         asOf:
           anyOf:
           - $ref: "#/components/schemas/PracticeScriptAsOf"
-          - {}
+          - type: "null"
         needs:
           type: array
           items:
@@ -18055,7 +18513,7 @@ components:
         trendSupport:
           anyOf:
           - $ref: "#/components/schemas/TrendSupport"
-          - {}
+          - type: "null"
         whatGoodLooksLike:
           type:
           - string
@@ -18149,7 +18607,7 @@ components:
         review:
           anyOf:
           - $ref: "#/components/schemas/ReviewRef"
-          - {}
+          - type: "null"
         reviewOn:
           $ref: "#/components/schemas/ReviewOn"
         withheldReasons:
@@ -18187,16 +18645,19 @@ components:
           type: string
           format: date-time
         createdBy:
-          type: "null"
-          $ref: "#/components/schemas/AccountRef"
+          anyOf:
+          - $ref: "#/components/schemas/AccountRef"
+          - type: "null"
         definition:
-          type: "null"
-          $ref: "#/components/schemas/PracticeDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/PracticeDefinition"
+          - type: "null"
         definitionAvailable:
           type: boolean
         historicalDefinition:
-          type: "null"
-          $ref: "#/components/schemas/HistoricalPracticeDefinition"
+          anyOf:
+          - $ref: "#/components/schemas/HistoricalPracticeDefinition"
+          - type: "null"
         id:
           type: string
           pattern: "^[1-9][0-9]*$"
@@ -18262,7 +18723,7 @@ components:
         group:
           anyOf:
           - $ref: "#/components/schemas/GroupRef"
-          - {}
+          - type: "null"
         outcomes:
           $ref: "#/components/schemas/OutcomeVector"
         practiceName:
@@ -18329,7 +18790,7 @@ components:
             - $ref: "#/components/schemas/IntroducedBasis"
             - $ref: "#/components/schemas/StateBasis"
             - $ref: "#/components/schemas/WorsenedBasis"
-          - {}
+          - type: "null"
         citations:
           type: array
           items:
@@ -19414,7 +19875,7 @@ components:
           - oneOf:
             - $ref: "#/components/schemas/ClaimedCoverage"
             - $ref: "#/components/schemas/HostCoverage"
-          - {}
+          - type: "null"
         currentness:
           type: string
           enum:
@@ -19440,11 +19901,11 @@ components:
         evidence:
           anyOf:
           - $ref: "#/components/schemas/ResultEvidence"
-          - {}
+          - type: "null"
         example:
           anyOf:
           - $ref: "#/components/schemas/ResultExample"
-          - {}
+          - type: "null"
         explanation:
           type:
           - string
@@ -19554,7 +20015,7 @@ components:
         inapplicability:
           anyOf:
           - $ref: "#/components/schemas/InapplicabilityWarrant"
-          - {}
+          - type: "null"
         openQuestions:
           type: array
           items:
@@ -19562,7 +20023,7 @@ components:
         search:
           anyOf:
           - $ref: "#/components/schemas/SearchWarrant"
-          - {}
+          - type: "null"
       required:
       - citations
       - inapplicability
@@ -19668,7 +20129,7 @@ components:
         createdBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         id:
           type: string
           format: uuid
@@ -19691,7 +20152,7 @@ components:
         removedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         resultId:
           type: string
           format: uuid
@@ -19707,7 +20168,6 @@ components:
       - resultId
     ReusedScanReportItem:
       allOf:
-      - $ref: "#/components/schemas/ScanReportItem"
       - type: object
         properties:
           currentness:
@@ -19834,13 +20294,13 @@ components:
         requestedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         results:
           $ref: "#/components/schemas/ReviewResultCounts"
         startedBy:
           anyOf:
           - $ref: "#/components/schemas/ItemEvent"
-          - {}
+          - type: "null"
         status:
           type: string
           enum:
@@ -19915,7 +20375,7 @@ components:
         confirmedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         createdAt:
           type: string
           format: date-time
@@ -19963,7 +20423,7 @@ components:
         requestedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         reviewIds:
           type: array
           items:
@@ -20075,7 +20535,7 @@ components:
         developer:
           anyOf:
           - $ref: "#/components/schemas/ReviewDeveloper"
-          - {}
+          - type: "null"
         id:
           type: string
           format: uuid
@@ -20150,7 +20610,7 @@ components:
         item:
           anyOf:
           - $ref: "#/components/schemas/ItemRef"
-          - {}
+          - type: "null"
         reasonDescription:
           type:
           - string
@@ -20192,7 +20652,7 @@ components:
         generatedPaths:
           anyOf:
           - $ref: "#/components/schemas/GeneratedPathReview"
-          - {}
+          - type: "null"
         id:
           type: string
           format: uuid
@@ -20231,13 +20691,13 @@ components:
         requestedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         results:
           $ref: "#/components/schemas/ReviewResultCounts"
         runtime:
           anyOf:
           - $ref: "#/components/schemas/ReviewRuntime"
-          - {}
+          - type: "null"
         stageTiming:
           type: array
           items:
@@ -20245,7 +20705,7 @@ components:
         startedBy:
           anyOf:
           - $ref: "#/components/schemas/ItemEvent"
-          - {}
+          - type: "null"
         status:
           type: string
           enum:
@@ -20398,7 +20858,7 @@ components:
         item:
           anyOf:
           - $ref: "#/components/schemas/ItemRef"
-          - {}
+          - type: "null"
         location:
           type: string
           enum:
@@ -20587,7 +21047,7 @@ components:
         item:
           anyOf:
           - $ref: "#/components/schemas/ItemRef"
-          - {}
+          - type: "null"
         location:
           type: string
           enum:
@@ -20606,7 +21066,7 @@ components:
         response:
           anyOf:
           - $ref: "#/components/schemas/FeedbackResponse"
-          - {}
+          - type: "null"
         resultCount:
           type: integer
           format: int32
@@ -20824,13 +21284,13 @@ components:
         feedback:
           anyOf:
           - $ref: "#/components/schemas/ReviewBoundFeedback"
-          - {}
+          - type: "null"
         id:
           type: string
         item:
           anyOf:
           - $ref: "#/components/schemas/ItemRef"
-          - {}
+          - type: "null"
         kind:
           type: string
           enum:
@@ -20842,15 +21302,15 @@ components:
         problem:
           anyOf:
           - $ref: "#/components/schemas/ProblemSummary"
-          - {}
+          - type: "null"
         result:
           anyOf:
           - $ref: "#/components/schemas/ReviewBoundResult"
-          - {}
+          - type: "null"
         review:
           anyOf:
           - $ref: "#/components/schemas/ReviewRef"
-          - {}
+          - type: "null"
       required:
       - feedback
       - id
@@ -20962,7 +21422,7 @@ components:
         script:
           anyOf:
           - $ref: "#/components/schemas/PracticeScriptRun"
-          - {}
+          - type: "null"
         status:
           type: string
           enum:
@@ -20990,7 +21450,7 @@ components:
         group:
           anyOf:
           - $ref: "#/components/schemas/GroupRef"
-          - {}
+          - type: "null"
         practiceName:
           type: string
         practiceSlug:
@@ -21024,7 +21484,7 @@ components:
         developer:
           anyOf:
           - $ref: "#/components/schemas/ReviewDeveloper"
-          - {}
+          - type: "null"
         disagreedAt:
           type:
           - string
@@ -21040,7 +21500,7 @@ components:
         group:
           anyOf:
           - $ref: "#/components/schemas/GroupRef"
-          - {}
+          - type: "null"
         id:
           type: string
           format: uuid
@@ -21133,7 +21593,7 @@ components:
         developer:
           anyOf:
           - $ref: "#/components/schemas/ReviewDeveloper"
-          - {}
+          - type: "null"
         disagreedAt:
           type:
           - string
@@ -21149,7 +21609,7 @@ components:
         group:
           anyOf:
           - $ref: "#/components/schemas/GroupRef"
-          - {}
+          - type: "null"
         id:
           type: string
           format: uuid
@@ -21284,7 +21744,7 @@ components:
         developer:
           anyOf:
           - $ref: "#/components/schemas/ReviewDeveloper"
-          - {}
+          - type: "null"
         heldForBudget:
           type: boolean
         item:
@@ -21434,7 +21894,7 @@ components:
         developer:
           anyOf:
           - $ref: "#/components/schemas/ReviewDeveloper"
-          - {}
+          - type: "null"
         feedback:
           $ref: "#/components/schemas/ReviewFeedbackCounts"
         id:
@@ -21543,7 +22003,7 @@ components:
           - oneOf:
             - $ref: "#/components/schemas/ClaimedCoverage"
             - $ref: "#/components/schemas/HostCoverage"
-          - {}
+          - type: "null"
         currentness:
           type: string
           enum:
@@ -21553,7 +22013,7 @@ components:
         developer:
           anyOf:
           - $ref: "#/components/schemas/ReviewDeveloper"
-          - {}
+          - type: "null"
         disagreements:
           type: array
           items:
@@ -21577,7 +22037,7 @@ components:
         evidence:
           anyOf:
           - $ref: "#/components/schemas/ResultEvidence"
-          - {}
+          - type: "null"
         evidenceHidden:
           type: boolean
         evidenceVersion:
@@ -21586,7 +22046,7 @@ components:
         example:
           anyOf:
           - $ref: "#/components/schemas/ResultExample"
-          - {}
+          - type: "null"
         explanation:
           type:
           - string
@@ -21702,6 +22162,8 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReviewJob"
+      required:
+      - jobs
     ReviewSchedule:
       type: object
       properties:
@@ -21720,7 +22182,7 @@ components:
         createdBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         enabled:
           type: boolean
         id:
@@ -21911,13 +22373,13 @@ components:
         requestedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         results:
           $ref: "#/components/schemas/ReviewResultCounts"
         startedBy:
           anyOf:
           - $ref: "#/components/schemas/ItemEvent"
-          - {}
+          - type: "null"
         status:
           type: string
           enum:
@@ -22031,7 +22493,7 @@ components:
         finishedShares:
           anyOf:
           - $ref: "#/components/schemas/ReviewTimeShares"
-          - {}
+          - type: "null"
         from:
           type: string
           format: date-time
@@ -22053,7 +22515,7 @@ components:
         totalShares:
           anyOf:
           - $ref: "#/components/schemas/ReviewTimeShares"
-          - {}
+          - type: "null"
         waitingLong:
           type: integer
           format: int64
@@ -22183,7 +22645,7 @@ components:
         humanReason:
           anyOf:
           - $ref: "#/components/schemas/ReviewLimit"
-          - {}
+          - type: "null"
         limits:
           type: array
           items:
@@ -22196,8 +22658,9 @@ components:
       type: object
       properties:
         group:
-          type: "null"
-          $ref: "#/components/schemas/GroupRef"
+          anyOf:
+          - $ref: "#/components/schemas/GroupRef"
+          - type: "null"
         name:
           type: string
         slug:
@@ -22437,7 +22900,7 @@ components:
         requestedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         startedAt:
           type:
           - string
@@ -22650,7 +23113,7 @@ components:
         recordedCounts:
           anyOf:
           - $ref: "#/components/schemas/ScanCounts"
-          - {}
+          - type: "null"
         removalGuard:
           $ref: "#/components/schemas/RemovalGuard"
         scan:
@@ -22710,6 +23173,68 @@ components:
       - content
       - hasNext
       - nextCursor
+    ScanReportProblem:
+      type: object
+      properties:
+        absentReason:
+          type:
+          - string
+          - "null"
+          enum:
+          - REPAIRED
+          - null
+        baselineState:
+          type:
+          - string
+          - "null"
+          enum:
+          - NEW
+          - UNCHANGED
+          - UPDATED
+          - ABSENT
+          - null
+        item:
+          $ref: "#/components/schemas/ItemRef"
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        previousProblemId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        problem:
+          $ref: "#/components/schemas/Problem"
+        resultId:
+          type: string
+          format: uuid
+      required:
+      - absentReason
+      - baselineState
+      - item
+      - practiceName
+      - practiceSlug
+      - previousProblemId
+      - problem
+      - resultId
+    ScanReportProblemsPage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/ScanReportProblem"
+        hasNext:
+          type: boolean
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - content
+      - hasNext
+      - nextCursor
     ScanSummary:
       type: object
       properties:
@@ -22750,7 +23275,7 @@ components:
         requestedBy:
           anyOf:
           - $ref: "#/components/schemas/AccountRef"
-          - {}
+          - type: "null"
         startedAt:
           type:
           - string
@@ -22875,6 +23400,7 @@ components:
           - "OFF"
           - APPROVE_FIRST
           - AUTOMATIC
+          - null
       required:
       - feedbackMode
     SetMemberHiddenRequest:
@@ -23068,6 +23594,10 @@ components:
           type: boolean
         unsorted:
           type: boolean
+      required:
+      - empty
+      - sorted
+      - unsorted
     StartScanRequest:
       type: object
       properties:
@@ -24413,7 +24943,6 @@ components:
           type: string
     WithheldScanReportItem:
       allOf:
-      - $ref: "#/components/schemas/ScanReportItem"
       - type: object
         properties:
           item:

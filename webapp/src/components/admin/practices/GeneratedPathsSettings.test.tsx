@@ -3,20 +3,20 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import type { UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
 import { renderWithRouter } from "@/test/router-harness";
-import { mockReviewSettings } from "./fixtures";
 import { GeneratedPathsSettings } from "./GeneratedPathsSettings";
+import { reviewSettings } from "./review/fixtures";
 
 const repositories = {
 	status: "ready" as const,
 	options: [
-		{ value: "owner/repo", label: "owner/repo" },
-		{ value: "group/nested/project", label: "group/nested/project" },
+		{ itemId: "101", name: "owner/repo" },
+		{ itemId: "102", name: "group/nested/project" },
 	],
 };
 
 function SettingsHarness() {
 	const [settings, setSettings] = useState(
-		mockReviewSettings({
+		reviewSettings({
 			generatedPaths: { "owner/repo": ["generated/**"], "group/nested/project": ["client/**"] },
 		}),
 	);
@@ -100,7 +100,7 @@ describe("GeneratedPathsSettings", () => {
 						Save other settings
 					</button>
 					<GeneratedPathsSettings
-						settings={mockReviewSettings()}
+						settings={reviewSettings()}
 						repositories={repositories}
 						isSaving={saving}
 						onSave={async () => undefined}

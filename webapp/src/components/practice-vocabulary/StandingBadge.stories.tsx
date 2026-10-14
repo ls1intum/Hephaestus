@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor } from "storybook/test";
 
-import { ARTIFACT_KIND } from "@/lib/artifact-kinds";
+import { ITEM_KIND } from "@/lib/item-kinds";
 import { withProvider } from "@/stories/decorators";
 import { settledPopup } from "@/stories/overlay";
 
@@ -58,8 +58,13 @@ const fourPieces = {
 	previousOpportunities: 4,
 	standingWork: 4,
 	reviewedWork: 11,
-	reviewedWorkKind: ARTIFACT_KIND.pullRequest,
+	reviewedWorkKind: ITEM_KIND.pullRequest,
 	ropeHalfWidth: 0.15,
+	calendarSpanDays: null,
+	comparablePractices: null,
+	eligiblePractices: null,
+	firstOpportunityAt: null,
+	lastOpportunityAt: null,
 };
 
 /**

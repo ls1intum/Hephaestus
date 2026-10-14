@@ -1,6 +1,6 @@
 import type { StatusDef, StatusDefs } from "@/components/common/status-def";
 
-import { DELIVERY_STATE_DEFS, type DeliveryState } from "./delivery-outcome-defs";
+import { DELIVERY_STATE_DEFS, type DeliveryState } from "./delivery-state-defs";
 
 /**
  * The delivery families a count of feedback uses in place of the stored delivery states. What each
@@ -10,7 +10,7 @@ import { DELIVERY_STATE_DEFS, type DeliveryState } from "./delivery-outcome-defs
  */
 export type DeliveryFamily =
 	| "AWAITING_APPROVAL"
-	| "PREPARED"
+	| "READY"
 	| "DELIVERED"
 	| "UNCONFIRMED"
 	| "WITHHELD"
@@ -19,11 +19,11 @@ export type DeliveryFamily =
 /** The stored states each family stands for. Every state is in exactly one family. */
 export const DELIVERY_FAMILY_STATES = {
 	AWAITING_APPROVAL: ["AWAITING_APPROVAL"],
-	PREPARED: ["PREPARED"],
-	DELIVERED: ["DELIVERED", "PARTIALLY_DELIVERED"],
+	READY: ["READY"],
+	DELIVERED: ["DELIVERED"],
 	UNCONFIRMED: ["UNCONFIRMED"],
-	WITHHELD: ["SUPPRESSED", "DISCARDED", "SUPERSEDED"],
-	FAILED: ["FAILED", "PARTIALLY_FAILED"],
+	WITHHELD: ["WITHHELD", "REJECTED", "REPLACED"],
+	FAILED: ["FAILED"],
 } as const satisfies Record<DeliveryFamily, readonly DeliveryState[]>;
 
 /**
@@ -37,23 +37,23 @@ function familyDef(family: DeliveryFamily, description: string): StatusDef {
 export const DELIVERY_FAMILY_DEFS: StatusDefs<DeliveryFamily> = {
 	AWAITING_APPROVAL: familyDef(
 		"AWAITING_APPROVAL",
-		"An authorized reviewer must approve or reject it before anything is sent.",
+		"A workspace admin must approve or reject it before anything is sent.",
 	),
-	PREPARED: familyDef(
-		"PREPARED",
-		"Composed and waiting for the moment that delivers it, which differs by channel.",
+	READY: familyDef(
+		"READY",
+		"Composed and waiting for the moment that delivers it, which differs by destination.",
 	),
 	DELIVERED: familyDef(
 		"DELIVERED",
-		"It reached the developer where it was placed, in full or in part.",
+		"It reached the developer at its destination. Its copy counts say whether every copy landed.",
 	),
 	UNCONFIRMED: familyDef(
 		"UNCONFIRMED",
-		"Raised in a conversation with no record that it was shown, so it counts as neither delivered nor withheld.",
+		"The conversation linked it, but its appearance was not recorded, so it counts as neither delivered nor withheld.",
 	),
 	WITHHELD: familyDef(
 		"WITHHELD",
-		"Deliberately not sent: a delivery check held it back, a reviewer rejected it, or newer feedback replaced it.",
+		"Deliberately not sent: a delivery check held it back, a workspace admin rejected it, or newer feedback replaced it.",
 	),
-	FAILED: familyDef("FAILED", "Sending was attempted and did not succeed, in full or in part."),
+	FAILED: familyDef("FAILED", "Sending was attempted and did not succeed."),
 };

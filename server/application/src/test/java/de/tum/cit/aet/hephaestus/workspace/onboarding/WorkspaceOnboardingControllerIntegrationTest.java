@@ -74,16 +74,20 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .isEqualTo(AiChoice.NO_AI);
         // Answering is not finishing a workspace's setup; neither workspace gets a setup row.
         assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), accountId(user)))
-                .isEmpty();
+                .get()
+                .extracting(Membership::getOnboardingSeenRevision)
+                .isNull();
         assertThat(members.findByWorkspace_IdAndAccount_Id(second.getId(), accountId(user)))
-                .isEmpty();
-        assertThat(preferences.forDeveloper(first.getId(), user.getId()).permitsAi())
+                .get()
+                .extracting(Membership::getOnboardingSeenRevision)
+                .isNull();
+        assertThat(preferences.forDeveloper(first.getId(), accountId(user)).permitsAi())
                 .isFalse();
-        assertThat(preferences.forDeveloper(second.getId(), user.getId()).permitsAi())
+        assertThat(preferences.forDeveloper(second.getId(), accountId(user)).permitsAi())
                 .isFalse();
         // A developer no account resolves to has not answered; the choice is optional here.
         assertThat(preferences.forDeveloper(first.getId(), null).permitsAi()).isTrue();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(first.getId(), user.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(first.getId(), accountId(user)))
                 .isPresent();
 
         // The account endpoint reads and writes the same answer without a workspace.
@@ -118,7 +122,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .expectBody()
                 .jsonPath("$.aiChoice")
                 .isEqualTo("IN_HOUSE_ONLY");
-        assertThat(preferences.forDeveloper(second.getId(), user.getId()).permitsAi())
+        assertThat(preferences.forDeveloper(second.getId(), accountId(user)).permitsAi())
                 .isTrue();
     }
 
@@ -207,7 +211,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .returnResult()
                 .getResponseBody());
         assertThat(policy.aiChoiceRequired()).isTrue();
-        assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
+        assertThat(preferences.forDeveloper(workspace.getId(), accountId(user)).permitsAi())
                 .isFalse();
         client.get()
                 .uri("/workspaces/{slug}/onboarding/me", workspace.getWorkspaceSlug())
@@ -229,7 +233,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .expectStatus()
                 .isOk()
                 .expectBody(Void.class);
-        assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
+        assertThat(preferences.forDeveloper(workspace.getId(), accountId(user)).permitsAi())
                 .isFalse();
         client.get()
                 .uri("/workspaces/{slug}/onboarding/settings", workspace.getWorkspaceSlug())
@@ -248,7 +252,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
     void shouldPreserveLegacyAiPermissionsWhenDismissingWithoutAnEnabledSetupPage() {
         var user = persistUser("testuser");
         var workspace = workspace("onboarding-legacy-dismiss", user);
-        assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
+        assertThat(preferences.forDeveloper(workspace.getId(), accountId(user)).permitsAi())
                 .isTrue();
         assertThat(preferences.forDeveloper(workspace.getId(), null).permitsAi())
                 .isTrue();
@@ -266,8 +270,8 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .isEqualTo(false);
 
         assertThat(members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user)))
-                .isEmpty();
-        assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
+                .isPresent();
+        assertThat(preferences.forDeveloper(workspace.getId(), accountId(user)).permitsAi())
                 .isTrue();
         assertThat(preferences.forDeveloper(workspace.getId(), null).permitsAi())
                 .isTrue();
@@ -296,8 +300,11 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
         var member = members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user))
                 .orElseThrow();
         assertThat(member.getOnboardingSeenRevision()).isEqualTo(policy.getRevision());
-        assertThat(choices.findById(accountId(user))).isEmpty();
-        assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
+        assertThat(choices.findById(accountId(user)))
+                .get()
+                .extracting(Account::getAiChoice)
+                .isNull();
+        assertThat(preferences.forDeveloper(workspace.getId(), accountId(user)).permitsAi())
                 .isFalse();
     }
 }

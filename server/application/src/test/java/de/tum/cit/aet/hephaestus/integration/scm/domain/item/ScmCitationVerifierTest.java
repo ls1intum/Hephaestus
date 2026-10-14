@@ -138,7 +138,8 @@ class ScmCitationVerifierTest extends BaseUnitTest {
     void shouldUseTheSubmittedReviewItemRange() throws Exception {
         range(BASE, HEAD);
         var review = new ItemRef(1, 2, ScmItemEvents.PULL_REQUEST_REVIEW, 3L, 4L, null);
-        var version = ScmVersion.pullRequestReview(BASE, HEAD, "Title", null, HEAD, "Review", "COMMENTED");
+        var version = ScmVersion.pullRequestReview(
+                BASE, HEAD, "Title", null, new ScmVersion.ReviewContent(HEAD, "Review", "COMMENTED"));
         assertThat(verifier.verify(new CitationCheck(
                         1,
                         review,

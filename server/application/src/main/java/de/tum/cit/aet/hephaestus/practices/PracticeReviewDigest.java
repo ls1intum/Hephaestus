@@ -12,18 +12,17 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class PracticeReviewDigest {
     private final JsonMapper mapper;
 
     @PersistenceContext
     private @Nullable EntityManager entityManager;
 
-    @Transactional(readOnly = true)
     public String of(PracticeDefinition definition) {
         return of(mapper.valueToTree(definition));
     }
 
-    @Transactional(readOnly = true)
     public String of(JsonNode definition) {
         return (String) Objects.requireNonNull(entityManager)
                 .createNativeQuery("SELECT practice_review_digest(CAST(:definition AS jsonb))", String.class)

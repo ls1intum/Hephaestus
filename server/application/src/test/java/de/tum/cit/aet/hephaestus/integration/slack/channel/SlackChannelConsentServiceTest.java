@@ -362,7 +362,11 @@ class SlackChannelConsentServiceTest extends BaseUnitTest {
                 .thenReturn(Optional.empty());
         when(connectionService.findSlackConfig(WS))
                 .thenReturn(Optional.of(new ConnectionConfig.SlackConfig("T1", null, null, Set.of())));
-        when(monitoredChannelRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(monitoredChannelRepository.save(any())).thenAnswer(inv -> {
+            SlackMonitoredChannel saved = inv.getArgument(0);
+            saved.setId(1L);
+            return saved;
+        });
 
         SlackChannelConsentService.RegistrationOutcome outcome = service().register(WS, CHANNEL, "general");
 

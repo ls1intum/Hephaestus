@@ -1,26 +1,44 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent } from "storybook/test";
 
-import type { UserViewUser } from "@/api/types.gen";
+import type { AccountRef, UserViewAccount } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/stories/reflow";
 
 import { UserViewUsersTable } from "./UserViewUsersTable";
 
-const linked: UserViewUser = {
-	userId: 10,
-	login: "alex",
-	name: "Alex Rivera",
-	accountId: 1,
-	accountStatus: "ACTIVE",
-};
-const accountless: UserViewUser = { userId: 11, login: "sam", name: "Sam" };
-const suspended: UserViewUser = {
-	userId: 12,
-	login: "kim",
-	name: "Kim Park",
-	accountId: 2,
-	accountStatus: "SUSPENDED",
-};
+function viewable(
+	accountId: string,
+	providerLogin: string | null,
+	account: Partial<AccountRef>,
+): UserViewAccount {
+	return {
+		accountId,
+		providerLogin,
+		account: {
+			id: accountId,
+			status: "ACTIVE",
+			displayName: null,
+			avatarUrl: null,
+			identities: [],
+			...account,
+		},
+	};
+}
+
+/** One account with a GitHub and a GitLab identity: one row, viewed by its account. */
+const linked = viewable("10", "alex", {
+	displayName: "Alex Rivera",
+	identities: [
+		{ provider: "GITHUB", login: "alex", displayName: "Alex Rivera", avatarUrl: null },
+		{ provider: "GITLAB", login: "arivera", displayName: null, avatarUrl: null },
+	],
+});
+/** Roster sync created the account; its workspace identity names it. */
+const unclaimed = viewable("11", "sam", {
+	status: "UNCLAIMED",
+	identities: [{ provider: "GITHUB", login: "sam", displayName: "Sam", avatarUrl: null }],
+});
+const suspended = viewable("12", "kim", { status: "SUSPENDED", displayName: "Kim Park" });
 
 const retry = fn();
 
@@ -29,7 +47,7 @@ const meta = {
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		state: { status: "ready", users: [linked, accountless], totalPages: 1 },
+		state: { status: "ready", users: [linked, unclaimed], totalPages: 1 },
 		page: 0,
 		onPageChange: fn(),
 		onView: fn(),
@@ -41,16 +59,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ args, canvas }) => {
-		await expect(canvas.getByText("No account yet")).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "View as user: sam" }));
-		await expect(args.onView).toHaveBeenCalledWith(accountless);
+		await expect(canvas.getByText("Unclaimed")).toBeVisible();
+		await expect(canvas.getAllByRole("button", { name: /^View as user/u })).toHaveLength(2);
+		await userEvent.click(canvas.getByRole("button", { name: "View as user: Sam" }));
+		await expect(args.onView).toHaveBeenCalledWith(unclaimed);
 	},
 };
 
 export const AccountUnavailable: Story = {
 	args: { state: { status: "ready", users: [suspended], totalPages: 1 } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Account not active")).toBeVisible();
+		await expect(canvas.getByText("Suspended")).toBeVisible();
 	},
 };
 
@@ -59,11 +78,9 @@ export const LongName: Story = {
 		state: {
 			status: "ready",
 			users: [
-				{
-					...linked,
-					name: "Maximilian Alexander von Hohenzollern-Sigmaringen-Weiler",
-					login: "maximilian-alexander-von-hohenzollern-sigmaringen-weiler",
-				},
+				viewable("13", "maximilian-alexander-von-hohenzollern-sigmaringen-weiler", {
+					displayName: "Maximilian Alexander von Hohenzollern-Sigmaringen-Weiler",
+				}),
 			],
 			totalPages: 1,
 		},
@@ -71,7 +88,7 @@ export const LongName: Story = {
 };
 
 export const Paged: Story = {
-	args: { state: { status: "ready", users: [linked, accountless], totalPages: 4 }, page: 1 },
+	args: { state: { status: "ready", users: [linked, unclaimed], totalPages: 4 }, page: 1 },
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Go to next page" }));
 		await expect(args.onPageChange).toHaveBeenCalledWith(2);
@@ -102,7 +119,7 @@ export const LoadFailed: Story = {
 };
 
 export const Reflow: Story = {
-	args: { state: { status: "ready", users: [linked, accountless, suspended], totalPages: 3 } },
+	args: { state: { status: "ready", users: [linked, unclaimed, suspended], totalPages: 3 } },
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: expectNoPageOverflow,
 };

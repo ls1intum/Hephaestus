@@ -70,7 +70,7 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].review.id")
                 .isEqualTo(r.getReviewId().toString());
@@ -92,7 +92,7 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(0)
                 .jsonPath("$.content.length()")
                 .isEqualTo(0);
@@ -108,7 +108,7 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(0);
     }
 
@@ -120,7 +120,7 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.page.totalElements")
+                .jsonPath("$.totalElements")
                 .isEqualTo(1);
     }
 }

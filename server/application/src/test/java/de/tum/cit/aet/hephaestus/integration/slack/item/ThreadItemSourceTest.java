@@ -81,8 +81,8 @@ class ThreadItemSourceTest extends BaseUnitTest {
     private static Connection connection(String team, long id) {
         var workspace = new Workspace();
         workspace.setId(7L);
-        var connection = new Connection(workspace, IntegrationKind.SLACK, team,
-                new ConnectionConfig.SlackConfig(team, null, null, Set.of()));
+        var connection = new Connection(
+                workspace, IntegrationKind.SLACK, team, new ConnectionConfig.SlackConfig(team, null, null, Set.of()));
         ReflectionTestUtils.setField(connection, "id", id);
         connection.setState(IntegrationState.ACTIVE);
         return connection;
@@ -298,10 +298,13 @@ class ThreadItemSourceTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseThreadAccessWhenTheOwningTeamDiffersFromTheActiveConnection() {
-        var candidate = readableThread();
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of(connection("T1", 21L)));
+        var candidate = mock(SlackThreadRepository.SettledCandidateRow.class);
         when(candidate.getSlackTeamId()).thenReturn("T2");
+        when(threads.findConsentedCandidateRow(7L, 19L)).thenReturn(Optional.of(candidate));
         assertThat(source.permits(item, SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isFalse();
+        verifyNoInteractions(messages);
     }
 
     @Test

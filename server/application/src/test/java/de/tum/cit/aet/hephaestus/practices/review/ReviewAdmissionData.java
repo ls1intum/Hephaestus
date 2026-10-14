@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.Severity;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -100,12 +101,13 @@ public class ReviewAdmissionData {
                         scenario.practice().getId(),
                         scenario.item().getId())));
         jdbc.sql("INSERT INTO"
-            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot)"
-            + " VALUES(:id,:review,:ws,'RUNNING',0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb)")
+            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,available_at,started_at)"
+            + " VALUES(:id,:review,:ws,'RUNNING',0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at)")
                 .param("id", job)
                 .param("review", review.getId())
                 .param("ws", review.getWorkspaceId())
-                .param("trace", job.toString())
+                .param("trace", job.toString().replace("-", ""))
+                .param("at", Timestamp.from(now))
                 .param("input", json.writeValueAsString(input))
                 .update();
         var detail = json.createObjectNode();

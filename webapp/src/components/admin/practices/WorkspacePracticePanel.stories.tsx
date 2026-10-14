@@ -1,10 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { currentDefinition } from "@/components/admin/practices/practice-definition-fields";
 
 import type { PracticeScriptSummary } from "@/api/types.gen";
-import { mockPractices, practiceScript } from "@/components/admin/practices/fixtures";
+import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+import {
+	catalogOrigin,
+	inheritedFeedbackMode,
+	mockPractices,
+	practiceScript,
+} from "@/components/admin/practices/fixtures";
 import { PURPOSE_STATUS_DEFS } from "@/components/practice-vocabulary/purpose-status-defs";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
 import { InLevelStack } from "@/stories/level-stack";
 import { expectSettledVisible, settledDrawerPanel } from "@/stories/overlay";
@@ -26,28 +32,38 @@ if (!practice) {
 
 type ReadyState = Extract<WorkspacePracticeState, { status: "ready" }>;
 
+const { name } = currentDefinition(practice);
+
 const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 	status: "ready",
 	practice,
-	definitionOptions: mockPracticeDefinitionOptions,
+	definitionOptions: mockDefinitionOptions,
 	groupName: "Review-ready work",
 	...over,
 });
 
 /** A practice whose script declares these models, the way the practice script guide teaches. */
 const scriptedWith = (models: Parameters<typeof practiceScript>[0]) =>
-	ready({ practice: { ...practice, practiceScript: practiceScript(models) } });
+	ready({
+		practice: {
+			...practice,
+			currentVersion: {
+				...practice.currentVersion,
+				definition: { ...currentDefinition(practice), script: practiceScript(models) },
+			},
+		},
+	});
 
 const scripted = scriptedWith({ decision: "required" });
 
-const REVIEW_JOB_ID = "6f1c2b7a-0d3e-4c55-9a51-2f7a3e8b9c10";
+const REVIEW_ID = "6f1c2b7a-0d3e-4c55-9a51-2f7a3e8b9c10";
 
 const needs = (over: Partial<PracticeScriptSummary> = {}): PracticeScriptNeedsState => ({
 	status: "ready",
 	summary: {
 		practiceSlug: practice.slug,
-		practiceName: practice.name,
-		asOf: { jobId: REVIEW_JOB_ID, finishedAt: daysBefore(7) },
+		practiceName: name,
+		asOf: { jobId: "41", reviewId: REVIEW_ID, finishedAt: daysBefore(7) },
 		scriptChanged: false,
 		needs: [],
 		...over,
@@ -73,6 +89,7 @@ const meta = {
 		state: ready(),
 		practiceScript: { status: "ready", summary: undefined },
 		path: { behind: [{ label: "Practice setup", depth: 0 }], onClose: fn() },
+		onResetToCatalog: fn(),
 	},
 	argTypes: {
 		state: { control: false },
@@ -98,7 +115,8 @@ export const Default: Story = {
 		// it was opened from rather than on the bare tree.
 		await expect(levelsOpenedBy(edit).at(-1)).toBe(`practice-edit:${practice.slug}`);
 		// Level 2 is the panel's own title; criteria headings render below it at level 4.
-		await expect(screen.getByRole("heading", { name: practice.name, level: 2 })).toBeVisible();
+		await expect(screen.getByRole("heading", { name, level: 2 })).toBeVisible();
+		await expect(screen.getByText("Version 1")).toBeVisible();
 		// The path says where the level sits, and its crumb closes back down to the page.
 		const path = screen.getByRole("list", { name: "Path" });
 		await expect(path).toHaveTextContent(/Practice setup.*Practice/u);
@@ -109,30 +127,40 @@ export const Default: Story = {
 
 export const FromTheCatalog: Story = {
 	args: {
-		state: ready({
-			practice: {
-				...practice,
-				catalogOrigin: { slug: practice.slug, link: "IN_SYNC", sourceOffered: true },
-			},
-		}),
+		state: ready({ practice: { ...practice, catalogOrigin: catalogOrigin(practice.slug) } }),
 	},
 	play: async () => {
 		// What the badge in the catalog list can only label is spelled out here, in the page it opens.
-		await expectSettledVisible(await screen.findByText(/will not edit your copy/u));
+		await expectSettledVisible(await screen.findByText(/does not edit your copy/u));
+		// Nothing to reset while the practice matches the catalog.
+		await expect(
+			screen.queryByRole("button", { name: "Reset to catalog" }),
+		).not.toBeInTheDocument();
 	},
 };
 
-export const InheritedAutonomy: Story = {
+/** Edited here, also after declining the catalog's version: the way back stays open. */
+export const EditedHere: Story = {
 	args: {
 		state: ready({
 			practice: {
 				...practice,
-				autonomy: {
-					effective: "HUMAN_APPROVAL",
-					inherited: true,
-					source: "GROUP",
-				},
+				catalogOrigin: catalogOrigin(practice.slug, "EDITED_HERE", ["CRITERIA"]),
 			},
+		}),
+	},
+	play: async ({ args }) => {
+		const reset = await screen.findByRole("button", { name: "Reset to catalog" });
+		await expectSettledVisible(reset);
+		await userEvent.click(reset);
+		await expect(args.onResetToCatalog).toHaveBeenCalledOnce();
+	},
+};
+
+export const InheritedFeedbackMode: Story = {
+	args: {
+		state: ready({
+			practice: { ...practice, feedbackMode: inheritedFeedbackMode("APPROVE_FIRST", "GROUP") },
 		}),
 	},
 	play: async () => {
@@ -143,7 +171,7 @@ export const InheritedAutonomy: Story = {
 
 export const Unassigned: Story = {
 	args: {
-		state: ready({ practice: { ...practice, groupSlug: undefined }, groupName: undefined }),
+		state: ready({ practice: { ...practice, groupSlug: null }, groupName: undefined }),
 	},
 };
 
@@ -208,7 +236,7 @@ export const PracticeScriptUsesNoModel: Story = {
 		// The needs speak for one review, and the reader can open it.
 		const asOf = screen.getByRole("link", { name: /^As of the review on \d{1,2} \w{3}$/u });
 		await expect(asOf.getAttribute("href")).toMatch(/^\/w\/demo\/admin\/practices\/reviews\?/u);
-		await expect(levelsOpenedBy(asOf)).toStrictEqual([`review:${REVIEW_JOB_ID}`]);
+		await expect(levelsOpenedBy(asOf)).toStrictEqual([`review:${REVIEW_ID}`]);
 	},
 };
 
@@ -217,7 +245,7 @@ export const PracticeScriptOptionalMet: Story = {
 	args: {
 		state: scriptedWith({ embedding: "optional" }),
 		practiceScript: needs({
-			needs: [{ purpose: "PRACTICE_EMBEDDING", need: "OPTIONAL", unmetTiers: [] }],
+			needs: [{ slot: "embedding", need: "optional", unmetTiers: [] }],
 		}),
 	},
 	play: async () => {
@@ -242,13 +270,9 @@ export const PracticeScriptRequiredUnmet: Story = {
 		state: scriptedWith({ chat: "required", decision: "required", reranking: "optional" }),
 		practiceScript: needs({
 			needs: [
-				{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers: ["IN_HOUSE"] },
-				{ purpose: "PRACTICE_REVIEW", need: "REQUIRED", unmetTiers: [] },
-				{
-					purpose: "PRACTICE_RERANKING",
-					need: "OPTIONAL",
-					unmetTiers: ["CLOUD", "UNDECLARED"],
-				},
+				{ slot: "decision", need: "required", unmetTiers: ["IN_HOUSE"] },
+				{ slot: "chat", need: "required", unmetTiers: [] },
+				{ slot: "reranking", need: "optional", unmetTiers: ["CLOUD", "UNDECLARED"] },
 			],
 		}),
 	},
@@ -290,7 +314,7 @@ export const PracticeScriptUsesOnlyTheReviewModel: Story = {
 	args: {
 		state: scriptedWith({ chat: "required" }),
 		practiceScript: needs({
-			needs: [{ purpose: "PRACTICE_REVIEW", need: "REQUIRED", unmetTiers: [] }],
+			needs: [{ slot: "chat", need: "required", unmetTiers: [] }],
 		}),
 	},
 	play: async () => {
@@ -303,27 +327,15 @@ export const PracticeScriptUsesOnlyTheReviewModel: Story = {
 	},
 };
 
-/** The script's disclosure sits where a review would reach it: after scope, before delivery. */
+/** The settings come first, then how it decides, then the script that runs before it. */
 export const DisclosureOrder: Story = {
-	args: {
-		state: ready({
-			practice: {
-				...practice,
-				practiceScript: practiceScript(),
-				deliveryBehavior: { summaryOnly: true },
-			},
-		}),
-		practiceScript: needs(),
-	},
+	args: { state: scriptedWith({}), practiceScript: needs() },
 	play: async () => {
 		const decides = await screen.findByRole("button", { name: "How it decides" });
 		await expectSettledVisible(decides);
-		const scope = screen.getByRole("button", { name: "Review scope and evidence" });
+		const settings = screen.getByRole("region", { name: "Review settings" });
 		const script = screen.getByRole("button", { name: "Practice script" });
-		const delivery = screen.getByRole("button", { name: "How feedback is delivered" });
-		await expect(
-			precedes(decides, scope) && precedes(scope, script) && precedes(script, delivery),
-		).toBe(true);
+		await expect(precedes(settings, decides) && precedes(decides, script)).toBe(true);
 	},
 };
 
@@ -344,9 +356,9 @@ export const PracticeScriptChanged: Story = {
 	args: {
 		state: scripted,
 		practiceScript: needs({
-			asOf: undefined,
+			asOf: null,
 			scriptChanged: true,
-			needs: [{ purpose: "PRACTICE_DECISION", need: "REQUIRED", unmetTiers: ["IN_HOUSE"] }],
+			needs: [{ slot: "decision", need: "required", unmetTiers: ["IN_HOUSE"] }],
 		}),
 	},
 	play: async () => {

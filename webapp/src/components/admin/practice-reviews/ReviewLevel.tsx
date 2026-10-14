@@ -35,9 +35,9 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerFooter } from "@/components/ui/drawer";
-import { reviewedWorkName } from "@/lib/artifact-kinds";
 import { copyToClipboard } from "@/lib/clipboard";
 import { asDate, durationText } from "@/lib/dates";
+import { itemName } from "@/lib/item-kinds";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
@@ -275,7 +275,7 @@ export function ReviewLevel({
 								work:
 									job.target.reviewedWork === undefined
 										? "this work"
-										: reviewedWorkName(job.target.reviewedWork),
+										: itemName(job.target.reviewedWork),
 								onRequest: onRequestReview,
 								requesting: requestingReview,
 								blocked: requestBlocked,

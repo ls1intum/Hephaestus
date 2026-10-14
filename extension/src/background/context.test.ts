@@ -1,14 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type {
-	ArtifactTrace,
 	DeliveredWorkFeedback,
+	DeliveredWorkFeedbackCopy,
 	DeliveredWorkFeedbackItem,
-	DeliveredWorkFeedbackPlacement,
-	PracticeResultList,
+	ItemRef,
+	OwnItemTrace,
+	PageResponseDtoResultList,
+	ResultList,
 	ReviewContext as ReviewContextDTO,
 	Workspace,
 	WorkspaceListItem,
+	WorkspaceMembership,
 } from "~/api/types.gen";
 import {
 	type ContextApi,
@@ -63,21 +66,70 @@ function workspace(slug: string, serverUrl: string | undefined): Workspace {
 	};
 }
 
-function dto(id: string, kind = "scm.pull_request"): ReviewContextDTO {
+function itemRef(id: string, kind = "scm.pull_request"): ItemRef {
 	return {
-		work: { id, kind, label: `!${id}`, title: "Add login", container: "team/app" },
-		canRequestReview: true,
-		canInspectReviewDetails: false,
+		id,
+		kind,
+		parentId: null,
+		provider: "GITLAB",
+		label: `!${id}`,
+		title: "Add login",
+		url: null,
+		container: "team/app",
+		path: null,
+		removedAt: null,
 	};
 }
 
-const TRACE: ArtifactTrace = {
-	artifactId: 4009,
-	artifactKind: "scm.pull_request",
-	reviewedWork: { id: "4009", kind: "scm.pull_request", label: "!4", title: "Add login" },
-	practices: [],
-	signals: [],
-};
+function dto(id: string, kind = "scm.pull_request"): ReviewContextDTO {
+	return {
+		workspaceId: "1001",
+		workspaceSlug: "team",
+		item: itemRef(id, kind),
+		requestAllowed: true,
+		reasonDescription: null,
+	};
+}
+
+function ownTrace(itemId: string): OwnItemTrace {
+	const item = itemRef(itemId);
+	return {
+		item,
+		review: {
+			id: "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c",
+			kind: "ITEM",
+			item,
+			itemVersion: "abc",
+			origin: "REQUEST",
+			status: "COMPLETE",
+			createdAt: "2026-09-26T11:00:00Z",
+			completedAt: "2026-09-26T11:05:00Z",
+		},
+		events: [{ name: "Review requested", occurredAt: "2026-09-26T11:00:00Z" }],
+		results: [],
+	};
+}
+
+const TRACE = ownTrace("4009");
+
+function membership(role: WorkspaceMembership["role"]): WorkspaceMembership {
+	return {
+		account: {
+			id: "1002",
+			displayName: "Reader",
+			avatarUrl: null,
+			identities: [],
+			status: "ACTIVE",
+		},
+		accountId: "1002",
+		eligibleForPracticeReview: true,
+		hidden: false,
+		joinedAt: "2026-01-01T00:00:00Z",
+		leftAt: null,
+		reviewSelected: true,
+		role,
+	};
+}
 
 interface Setup {
 	url: string;
@@ -89,6 +141,7 @@ interface Setup {
 function environment(setup: Setup) {
 	let { url } = setup;
 	const trace = vi.fn<ContextApi["trace"]>().mockResolvedValue(TRACE);
+	const member = vi.fn<ContextApi["membership"]>().mockResolvedValue(membership("MEMBER"));
 	const resolve = vi
 		.fn<ContextApi["resolve"]>()
 		.mockImplementation(async (slug) => setup.resolved?.[slug]);
@@ -99,6 +152,7 @@ function environment(setup: Setup) {
 		workspace: async (slug) =>
 			workspace(slug, setup.servers?.[slug] ?? "https://gitlab.example.test"),
 		resolve,
+		membership: member,
 		trace,
 	};
 	const env: ContextEnvironment = {
@@ -116,6 +170,7 @@ function environment(setup: Setup) {
 		env,
 		trace,
 		resolve,
+		membership: member,
 		navigate: (next: string) => {
 			url = next;
 		},
@@ -150,6 +205,19 @@ describe("resolveContext", () => {
 			status: "no-workspace",
 			siteOrigin: "https://gitlab.other.test",
 		});
+	});
+
+	it("reports an answer that names no item as work nobody can see", async () => {
+		const { env, trace } = environment({
+			url: ISSUE,
+			resolved: { team: { ...dto("4"), item: null } },
+		});
+		await expect(resolveContext(env, 1)).resolves.toStrictEqual({
+			status: "not-found",
+			instanceHost: "heph.example.test",
+			workLabel: "team/app #4",
+		});
+		expect(trace).not.toHaveBeenCalled();
 	});
 
 	it("reports work nobody can see without saying why", async () => {
@@ -187,12 +255,45 @@ describe("resolveContext", () => {
 		});
 	});
 
-	it("links into the web app, not the API", async () => {
-		const { env } = environment({ url: MR, resolved: { team: dto("4009") } });
+	it("answers with the item, the reader's standing and own trace as the server gave them", async () => {
+		const { env } = environment({
+			url: MR,
+			resolved: { team: { ...dto("4009"), requestAllowed: false } },
+		});
 		await expect(resolveContext(env, 1)).resolves.toMatchObject({
-			links: { trace: "https://heph.example.test/w/team/feedback/scm.pull_request/4009" },
+			status: "ready",
+			item: itemRef("4009"),
+			requestAllowed: false,
+			trace: TRACE,
+			pageUrl: MR,
 		});
 	});
+
+	it("links a developer into the web app, not the API, with no review details", async () => {
+		const { env } = environment({ url: MR, resolved: { team: dto("4009") } });
+		const context = await resolveContext(env, 1);
+		expect(context).toHaveProperty("canInspectReviewDetails", false);
+		expect(context).toHaveProperty("links", {
+			trace: "https://heph.example.test/w/team/feedback/4009",
+		});
+	});
+
+	it.each(["OWNER", "ADMIN"] as const)(
+		"links a workspace %s to the item's review details too",
+		async (role) => {
+			const { env, membership: member } = environment({ url: MR, resolved: { team: dto("4009") } });
+			member.mockResolvedValue(membership(role));
+			await expect(resolveContext(env, 1)).resolves.toMatchObject({
+				canInspectReviewDetails: true,
+				links: {
+					trace: "https://heph.example.test/w/team/feedback/4009",
+					reviewDetails:
+						"https://heph.example.test/w/team/admin/practices/reviews/reviews?itemId=4009&detail=item%3A4009",
+				},
+			});
+			expect(member).toHaveBeenCalledWith("team");
+		},
+	);
 
 	it("keeps own records readable when their review trace is unavailable", async () => {
 		const { env, trace } = environment({ url: MR, resolved: { team: dto("4009") } });
@@ -202,7 +303,7 @@ describe("resolveContext", () => {
 
 	it("drops the answer for page A when the tab moved on to page B meanwhile", async () => {
 		const { env, trace, navigate } = environment({ url: MR, resolved: { team: dto("4009") } });
-		const released = Promise.withResolvers<ArtifactTrace | null>();
+		const released = Promise.withResolvers<OwnItemTrace | null>();
 		trace.mockReturnValue(released.promise);
 		const pending = resolveContext(env, 1);
 		await vi.waitFor(() => {
@@ -213,9 +314,29 @@ describe("resolveContext", () => {
 		await expect(pending).rejects.toMatchObject({ code: "stale" });
 	});
 
+	it("drops the answer when the tab moved on while the reader's membership loaded", async () => {
+		const {
+			env,
+			membership: member,
+			navigate,
+		} = environment({
+			url: MR,
+			resolved: { team: dto("4009") },
+		});
+		const released = Promise.withResolvers<WorkspaceMembership>();
+		member.mockReturnValue(released.promise);
+		const pending = resolveContext(env, 1);
+		await vi.waitFor(() => {
+			expect(member).toHaveBeenCalledOnce();
+		});
+		navigate(ISSUE);
+		released.resolve(membership("ADMIN"));
+		await expect(pending).rejects.toMatchObject({ code: "stale" });
+	});
+
 	it("keeps the answer when only the sub-page changed", async () => {
 		const { env, trace, navigate } = environment({ url: MR, resolved: { team: dto("4009") } });
-		const released = Promise.withResolvers<ArtifactTrace | null>();
+		const released = Promise.withResolvers<OwnItemTrace | null>();
 		trace.mockReturnValue(released.promise);
 		const pending = resolveContext(env, 1);
 		await vi.waitFor(() => {
@@ -229,44 +350,68 @@ describe("resolveContext", () => {
 
 const MR1 = "https://gitlab.example.test/team/app/-/merge_requests/1";
 const MR2 = "https://gitlab.example.test/team/app/-/merge_requests/2";
-const JOB = "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c";
 
-function adminDto(id: string): ReviewContextDTO {
-	return { ...dto(id), canInspectReviewDetails: true };
-}
-
-const WORK = { id: "101", kind: "scm.pull_request", label: "!1" };
-const OTHER_WORK = { id: "999", kind: "scm.pull_request", label: "!9" };
+const ITEM = itemRef("101");
+const OTHER_ITEM = itemRef("999");
 const RESULT = "1a2b3c4d-0000-4000-8000-000000000001";
 
-function ownRow(overrides: Partial<PracticeResultList> = {}): PracticeResultList {
+function ownRow(overrides: Partial<ResultList> = {}): ResultList {
 	return {
 		id: RESULT,
-		artifactId: 101,
-		artifactKind: "scm.pull_request",
-
-		claimCurrentness: "CURRENT",
-		observedAt: "2026-09-26T11:00:00Z",
-		origin: "LIVE",
+		item: ITEM,
+		reviewId: "0b7c1a52-0d3e-4c55-8a0b-1d2e3f4a5b6c",
+		origin: "EVENT",
+		acceptedAt: null,
+		markedIncorrectAt: null,
+		currentness: "CURRENT",
+		recordedAt: "2026-09-26T11:00:00Z",
 		practiceName: "Descriptive merge request",
 		practiceSlug: "descriptive-merge-request",
 		outcome: "NOT_MET",
 		severity: "MAJOR",
 		summary: "The description never says why.",
 		problems: [
-			{ severity: "MAJOR", summary: "The description never says which issue it closes." },
-			{ severity: "MINOR", summary: "The description lists files instead of the change." },
+			{
+				id: "2b3c4d5e-0000-4000-8000-000000000001",
+				severity: "MAJOR",
+				summary: "The description never says which issue it closes.",
+			},
+			{
+				id: "2b3c4d5e-0000-4000-8000-000000000002",
+				severity: "MINOR",
+				summary: "The description lists files instead of the change.",
+			},
 		],
 		...overrides,
 	};
 }
 
-/** Two merge requests: MR1 is work 101 whose trace names JOB, MR2 is work 102. */
-function adminEnvironment() {
+function resultResponse(
+	content: ResultList[],
+	totalElements = content.length,
+): PageResponseDtoResultList {
+	const sort = { empty: false, sorted: true, unsorted: false };
+	return {
+		content,
+		totalElements,
+		totalPages: Math.ceil(totalElements / 10),
+		number: 0,
+		size: 10,
+		numberOfElements: content.length,
+		first: true,
+		last: totalElements <= 10,
+		empty: content.length === 0,
+		sort,
+		pageable: { offset: 0, pageNumber: 0, pageSize: 10, paged: true, unpaged: false, sort },
+	};
+}
+
+/** Two merge requests: MR1 is item 101, MR2 is item 102. */
+function detailsEnvironment() {
 	let url = MR1;
 	const byPage: Record<string, ReviewContextDTO> = {
-		[MR1]: adminDto("101"),
-		[MR2]: adminDto("102"),
+		[MR1]: dto("101"),
+		[MR2]: dto("102"),
 	};
 	const api = {
 		generation: 1,
@@ -274,29 +419,12 @@ function adminEnvironment() {
 		workspaces: async () => [listItem("team", "GITLAB")],
 		workspace: async (slug: string) => workspace(slug, "https://gitlab.example.test"),
 		resolve: vi.fn<ContextApi["resolve"]>(async (_slug, page) => byPage[page]),
-		trace: vi.fn<ContextApi["trace"]>(async () => ({
-			...TRACE,
-			signals: [
-				{
-					id: "s1",
-					discoveredVia: "MANUAL",
-					displayName: "Review requested",
-					occurredAt: "2026-09-26T11:00:00Z",
-					revision: "abc",
-					signal: "manual",
-					state: "TRIGGERED",
-					reviewId: JOB,
-				},
-			],
-		})),
-		ownResults: vi.fn<DetailsApi["ownResults"]>(async () => ({
-			content: [ownRow()],
-			totalElements: 1,
-		})),
+		membership: vi.fn<ContextApi["membership"]>(async () => membership("MEMBER")),
+		trace: vi.fn<ContextApi["trace"]>(async (_slug, itemId) => ownTrace(itemId)),
+		ownResults: vi.fn<DetailsApi["ownResults"]>(async () => resultResponse([ownRow()])),
 		workFeedback: vi.fn<DetailsApi["workFeedback"]>(async () => ({
-			work: WORK,
+			item: ITEM,
 			feedback: [],
-			hasMore: false,
 		})),
 	} satisfies DetailsApi;
 	const env: ContextEnvironment<typeof api> = {
@@ -316,76 +444,78 @@ function adminEnvironment() {
 		navigate: (next: string) => {
 			url = next;
 		},
-		/** The same pages, answered for an ordinary developer. */
-		asDeveloper: () => {
-			byPage[MR1] = dto("101");
-			byPage[MR2] = dto("102");
-		},
 	};
 }
 
-describe("the reader's own results on the tab's work", () => {
-	it.each([
-		["a developer", dto("101")],
-		["a workspace admin", adminDto("101")],
-	])("asks for %s's own results with the exact work", async (_reader, answer) => {
-		const { env, api } = adminEnvironment();
-		api.resolve.mockResolvedValue(answer);
-		const page = await resultPage(env, 10, "team");
-		expect(api.ownResults).toHaveBeenCalledWith("team", "scm.pull_request", 101, 25);
-		expect(page).toMatchObject({ total: 1 });
-		expect(page.rows[0]).toStrictEqual({
-			id: RESULT,
-			practiceName: "Descriptive merge request",
-			practiceSlug: "descriptive-merge-request",
-			summary: "The description never says why.",
-			outcome: "NOT_MET",
-			severity: "MAJOR",
+describe("the reader's own results on the tab's item", () => {
+	it.each(["MEMBER", "ADMIN"] as const)(
+		"asks for a %s's own results on the exact item",
+		async (role) => {
+			const { env, api } = detailsEnvironment();
+			api.membership.mockResolvedValue(membership(role));
+			const page = await resultPage(env, 10, "team");
+			expect(api.ownResults).toHaveBeenCalledWith("team", "101", 25);
+			expect(page).toMatchObject({ total: 1 });
+			expect(page.rows[0]).toStrictEqual({
+				id: RESULT,
+				practiceName: "Descriptive merge request",
+				practiceSlug: "descriptive-merge-request",
+				summary: "The description never says why.",
+				outcome: "NOT_MET",
+				severity: "MAJOR",
+				currentness: "CURRENT",
+				recordedAt: "2026-09-26T11:00:00Z",
+				problems: [
+					{
+						id: "2b3c4d5e-0000-4000-8000-000000000001",
+						severity: "MAJOR",
+						summary: "The description never says which issue it closes.",
+					},
+					{
+						id: "2b3c4d5e-0000-4000-8000-000000000002",
+						severity: "MINOR",
+						summary: "The description lists files instead of the change.",
+					},
+				],
+			});
+		},
+	);
 
-			claimCurrentness: "CURRENT",
-			observedAt: "2026-09-26T11:00:00Z",
-			problems: [
-				{ severity: "MAJOR", summary: "The description never says which issue it closes." },
-				{ severity: "MINOR", summary: "The description lists files instead of the change." },
-			],
-		});
-	});
-
-	it("keeps only the severity and the one line of each problem", async () => {
-		const { env, api } = adminEnvironment();
-		api.resolve.mockResolvedValue(dto("101"));
+	it("keeps only the id, severity and one line of each problem", async () => {
+		const { env, api } = detailsEnvironment();
 		const wider = {
+			id: "2b3c4d5e-0000-4000-8000-000000000003",
 			severity: "CRITICAL",
 			summary: "The change drops the error.",
 			explanation: "A longer text that a list row never carries.",
 		} as const;
-		api.ownResults.mockResolvedValue({
-			content: [ownRow({ problems: [wider] })],
-			totalElements: 1,
-		});
+		api.ownResults.mockResolvedValue(resultResponse([ownRow({ problems: [wider] })]));
 		const page = await resultPage(env, 10, "team");
 		expect(page.rows[0]?.problems).toStrictEqual([
-			{ severity: "CRITICAL", summary: "The change drops the error." },
+			{
+				id: "2b3c4d5e-0000-4000-8000-000000000003",
+				severity: "CRITICAL",
+				summary: "The change drops the error.",
+			},
 		]);
 	});
 
 	it("refuses the results of another workspace before asking any server", async () => {
-		const { env, api } = adminEnvironment();
+		const { env, api } = detailsEnvironment();
 		await expect(resultPage(env, 10, "other")).rejects.toMatchObject({ code: "stale" });
 		expect(api.ownResults).not.toHaveBeenCalled();
 	});
 
-	it("refuses a list that holds any other work, as a server without the exact filter returns", async () => {
-		const { env, api } = adminEnvironment();
-		api.ownResults.mockResolvedValue({
-			content: [ownRow(), ownRow({ id: "other", artifactId: 999 })],
-			totalElements: 2,
-		});
+	it("refuses a list that holds any other item, as a server without the exact filter returns", async () => {
+		const { env, api } = detailsEnvironment();
+		api.ownResults.mockResolvedValue(
+			resultResponse([ownRow(), ownRow({ id: "other", item: OTHER_ITEM })]),
+		);
 		await expect(resultPage(env, 10, "team")).rejects.toMatchObject({ code: "server" });
 	});
 
-	it("drops a list whose tab moved to other work while it loaded", async () => {
-		const { env, api, navigate } = adminEnvironment();
+	it("drops a list whose tab moved to another item while it loaded", async () => {
+		const { env, api, navigate } = detailsEnvironment();
 		const answer = Promise.withResolvers<Awaited<ReturnType<DetailsApi["ownResults"]>>>();
 		api.ownResults.mockReturnValueOnce(answer.promise);
 		const pending = resultPage(env, 10, "team");
@@ -393,15 +523,15 @@ describe("the reader's own results on the tab's work", () => {
 			expect(api.ownResults).toHaveBeenCalledOnce();
 		});
 		navigate(MR2);
-		answer.resolve({ content: [ownRow()], totalElements: 1 });
+		answer.resolve(resultResponse([ownRow()]));
 		await expect(pending).rejects.toMatchObject({ code: "stale" });
 	});
 
-	it.each([undefined, -1, 0, 1.5, Number.NaN])(
+	it.each([-1, 0, 1.5, Number.NaN])(
 		"rejects unusable result total %s instead of claiming completeness",
 		async (total) => {
-			const { env, api } = adminEnvironment();
-			api.ownResults.mockResolvedValue({ content: [ownRow()], totalElements: total });
+			const { env, api } = detailsEnvironment();
+			api.ownResults.mockResolvedValue(resultResponse([ownRow()], total));
 			await expect(resultPage(env, 10, "team")).rejects.toMatchObject({ code: "server" });
 		},
 	);
@@ -415,7 +545,7 @@ describe("a row of the list the tab shows", () => {
 	const LIST = "https://gitlab.example.test/team/app/-/merge_requests?state=opened";
 
 	it("resolves the row's work when the tab really shows that repository's list", async () => {
-		const { env, api, navigate } = adminEnvironment();
+		const { env, api, navigate } = detailsEnvironment();
 		navigate(LIST);
 		const context = await resolveContext(env, 10, undefined, listRow(MR1));
 		expect(context).toMatchObject({ status: "ready", pageUrl: MR1, view: "overview" });
@@ -429,7 +559,7 @@ describe("a row of the list the tab shows", () => {
 		["a sub-page", `${MR1}/diffs`],
 		["a query", `${MR1}?x=1`],
 	])("refuses a row selector for %s without asking any server", async (_name, url) => {
-		const { env, api, navigate } = adminEnvironment();
+		const { env, api, navigate } = detailsEnvironment();
 		navigate(LIST);
 		await expect(resolveContext(env, 10, undefined, listRow(url))).resolves.toStrictEqual({
 			status: "unsupported-page",
@@ -438,7 +568,7 @@ describe("a row of the list the tab shows", () => {
 	});
 
 	it("refuses a row selector when the tab shows a work page, not a list", async () => {
-		const { env, api } = adminEnvironment();
+		const { env, api } = detailsEnvironment();
 		await expect(resolveContext(env, 10, undefined, listRow(MR2))).resolves.toStrictEqual({
 			status: "unsupported-page",
 		});
@@ -446,9 +576,9 @@ describe("a row of the list the tab shows", () => {
 	});
 
 	it("drops the answer when the tab left that list while it loaded", async () => {
-		const { env, api, navigate } = adminEnvironment();
+		const { env, api, navigate } = detailsEnvironment();
 		navigate(LIST);
-		const trace = Promise.withResolvers<ArtifactTrace | null>();
+		const trace = Promise.withResolvers<OwnItemTrace | null>();
 		api.trace.mockReturnValueOnce(trace.promise);
 		const pending = resolveContext(env, 10, undefined, listRow(MR1));
 		await vi.waitFor(() => {
@@ -465,7 +595,7 @@ describe("a row of the list the tab shows", () => {
 	])(
 		"drops the answer when the tab moved to %s of the same list while it loaded",
 		async (_name, url) => {
-			const { env, api, navigate } = adminEnvironment();
+			const { env, api, navigate } = detailsEnvironment();
 			navigate(LIST);
 			const answer = Promise.withResolvers<DeliveredWorkFeedback>();
 			api.workFeedback.mockReturnValueOnce(answer.promise);
@@ -474,15 +604,15 @@ describe("a row of the list the tab shows", () => {
 				expect(api.workFeedback).toHaveBeenCalledOnce();
 			});
 			navigate(url);
-			answer.resolve({ work: WORK, feedback: [], hasMore: false });
+			answer.resolve({ item: ITEM, feedback: [] });
 			await expect(pending).rejects.toMatchObject({ code: "stale" });
 		},
 	);
 
 	it("keeps the answer when only the list's fragment changed", async () => {
-		const { env, api, navigate } = adminEnvironment();
+		const { env, api, navigate } = detailsEnvironment();
 		navigate(LIST);
-		const trace = Promise.withResolvers<ArtifactTrace | null>();
+		const trace = Promise.withResolvers<OwnItemTrace | null>();
 		api.trace.mockReturnValueOnce(trace.promise);
 		const pending = resolveContext(env, 10, undefined, listRow(MR1));
 		await vi.waitFor(() => {
@@ -494,7 +624,7 @@ describe("a row of the list the tab shows", () => {
 	});
 
 	it("reads the reader's comments on the row's work, bound to the same list row", async () => {
-		const { env, api, navigate } = adminEnvironment();
+		const { env, api, navigate } = detailsEnvironment();
 		navigate(LIST);
 		await expect(workFeedback(env, 10, "team", listRow(MR1))).resolves.toMatchObject({
 			comments: [],
@@ -503,139 +633,197 @@ describe("a row of the list the tab shows", () => {
 	});
 });
 
-const item = (overrides: Partial<DeliveredWorkFeedbackItem> = {}): DeliveredWorkFeedbackItem => ({
-	id: "f",
-	deliveredAt: "2026-09-26T11:00:00Z",
-	practices: [{ slug: "descriptive-merge-request", name: "Descriptive merge request" }],
-	placements: [],
-	...overrides,
-});
-const summary = (
-	overrides: Partial<DeliveredWorkFeedbackPlacement> = {},
-): DeliveredWorkFeedbackPlacement => ({
-	id: "5c1f7a90-1b2c-4d3e-8f90-a1b2c3d4e5f6",
-	type: "SUMMARY",
-	commentRef: "gid://gitlab/Note/1",
-	permalink: `${MR1}#note_1`,
-	...overrides,
-});
+function delivered(overrides: Partial<DeliveredWorkFeedbackItem> = {}): DeliveredWorkFeedbackItem {
+	return {
+		id: "f",
+		deliveredAt: "2026-09-26T11:00:00Z",
+		practices: [{ slug: "descriptive-merge-request", name: "Descriptive merge request" }],
+		copies: [],
+		...overrides,
+	};
+}
 
-describe("the reader's own feedback on the work", () => {
-	it("asks for the work by its canonical address", async () => {
-		const { env, api } = adminEnvironment();
+function summary(overrides: Partial<DeliveredWorkFeedbackCopy> = {}): DeliveredWorkFeedbackCopy {
+	return {
+		id: "5c1f7a90-1b2c-4d3e-8f90-a1b2c3d4e5f6",
+		kind: "SUMMARY",
+		externalRef: "gid://gitlab/Note/1",
+		externalUrl: `${MR1}#note_1`,
+		path: null,
+		startLine: null,
+		endLine: null,
+		side: null,
+		postedAt: "2026-09-26T11:00:00Z",
+		...overrides,
+	};
+}
+
+describe("the reader's own feedback on the item", () => {
+	it("asks for the item by its page's canonical address", async () => {
+		const { env, api } = detailsEnvironment();
 		await workFeedback(env, 10, "team");
 		expect(api.workFeedback).toHaveBeenCalledWith("team", MR1);
 	});
 
-	it("counts one comment per provider comment, however many pieces of feedback share it", async () => {
-		const { env, api } = adminEnvironment();
+	it("counts one comment per provider comment, however many copies share it", async () => {
+		const { env, api } = detailsEnvironment();
 		api.workFeedback.mockResolvedValue({
-			work: WORK,
-			hasMore: false,
+			item: ITEM,
 			feedback: [
-				item({ id: "a", deliveredAt: "2026-09-26T11:00:00Z", placements: [summary()] }),
-				item({
+				delivered({ id: "a", copies: [summary()] }),
+				delivered({
 					id: "b",
 					deliveredAt: "2026-09-26T09:00:00Z",
 					practices: [{ slug: "small-changes", name: "Small, focused changes" }],
-					placements: [
-						// The same summary, edited in place by a later piece of feedback.
-						summary({ id: "6d2a8b01-2c3d-4e5f-9a01-b2c3d4e5f607", permalink: undefined }),
-						{
+					copies: [
+						// The same summary, edited in place later by another piece of feedback.
+						summary({
+							id: "6d2a8b01-2c3d-4e5f-9a01-b2c3d4e5f607",
+							externalUrl: null,
+							postedAt: "2026-09-26T11:30:00Z",
+						}),
+						summary({
 							id: "7e3b9c12-3d4e-4f60-8b12-c3d4e5f60718",
-							type: "INLINE",
-							commentRef: "gid://gitlab/DiffNote/2",
+							kind: "LINE_NOTE",
+							externalRef: "gid://gitlab/DiffNote/2",
+							externalUrl: `${MR1}/diffs#note_2`,
 							path: "a.ts",
 							startLine: 3,
 							side: "NEW",
-							permalink: `${MR1}/diffs#note_2`,
-						},
-						// A comment on the work that links to its lines is a comment the reader can go to.
-						{
+							postedAt: "2026-09-26T09:00:00Z",
+						}),
+						summary({
 							id: "8f4cad23-4e5f-4071-9c23-d4e5f6071829",
-							type: "LOCATION_COMMENT",
-							commentRef: "gid://gitlab/Note/3",
+							kind: "LINE_NOTE",
+							externalRef: "gid://gitlab/DiffNote/3",
+							externalUrl: `${MR1}/diffs#note_3`,
 							path: "b.ts",
 							startLine: 5,
 							endLine: 7,
 							side: "NEW",
-							permalink: `${MR1}#note_3`,
-						},
-						// Not a comment on the work, and a handle that identifies nothing: neither counts.
-						summary({ type: "CONVERSATION_TURN", commentRef: "turn-1" }),
-						summary({ commentRef: " " }),
+							postedAt: "2026-09-26T09:00:00Z",
+						}),
+						// A conversation turn and a copy with no handle are no comment the reader can go to.
+						summary({ kind: "CHAT_TURN", externalRef: "turn-1" }),
+						summary({ externalRef: " " }),
+						summary({ externalRef: null }),
 					],
 				}),
-				// Feedback with no recorded comment adds none.
-				item({ id: "c", placements: [] }),
+				// Feedback with no recorded copy adds no comment.
+				delivered({ id: "c", copies: [] }),
 			],
 		});
 		const answer = await workFeedback(env, 10, "team");
-		expect(answer.more).toBe(false);
-		expect(answer.comments).toStrictEqual([
-			{
-				kind: "SUMMARY",
-				path: undefined,
-				startLine: undefined,
-				endLine: undefined,
-				permalink: `${MR1}#note_1`,
-				practices: ["Descriptive merge request", "Small, focused changes"],
-				deliveredAt: "2026-09-26T11:00:00Z",
-			},
-			{
-				kind: "INLINE",
-				path: "a.ts",
-				startLine: 3,
-				endLine: undefined,
-				permalink: `${MR1}/diffs#note_2`,
-				practices: ["Small, focused changes"],
-				deliveredAt: "2026-09-26T09:00:00Z",
-			},
-			{
-				kind: "LOCATION_COMMENT",
-				path: "b.ts",
-				startLine: 5,
-				endLine: 7,
-				permalink: `${MR1}#note_3`,
-				practices: ["Small, focused changes"],
-				deliveredAt: "2026-09-26T09:00:00Z",
-			},
-		]);
+		expect(answer).toStrictEqual({
+			comments: [
+				{
+					kind: "SUMMARY",
+					path: undefined,
+					startLine: undefined,
+					endLine: undefined,
+					permalink: `${MR1}#note_1`,
+					practices: ["Descriptive merge request", "Small, focused changes"],
+					postedAt: "2026-09-26T11:30:00Z",
+				},
+				{
+					kind: "LINE_NOTE",
+					path: "a.ts",
+					startLine: 3,
+					endLine: undefined,
+					permalink: `${MR1}/diffs#note_2`,
+					practices: ["Small, focused changes"],
+					postedAt: "2026-09-26T09:00:00Z",
+				},
+				{
+					kind: "LINE_NOTE",
+					path: "b.ts",
+					startLine: 5,
+					endLine: 7,
+					permalink: `${MR1}/diffs#note_3`,
+					practices: ["Small, focused changes"],
+					postedAt: "2026-09-26T09:00:00Z",
+				},
+			],
+			fetchedAt: "2026-09-26T12:00:00.000Z",
+		});
 		expect(JSON.stringify(answer)).not.toContain("gid://");
+		expect(JSON.stringify(answer)).not.toContain("turn-1");
 	});
 
-	it("keeps an older verified link when a newer record of the same comment has none", async () => {
-		const { env, api } = adminEnvironment();
+	it("skips a conversation turn, even one with a handle and a link on this item", async () => {
+		const { env, api } = detailsEnvironment();
 		api.workFeedback.mockResolvedValue({
-			work: WORK,
-			hasMore: false,
+			item: ITEM,
+			feedback: [delivered({ copies: [summary({ kind: "CHAT_TURN", externalRef: "turn-1" })] })],
+		});
+		await expect(workFeedback(env, 10, "team")).resolves.toMatchObject({ comments: [] });
+	});
+
+	it("keeps a file comment's path without inventing lines", async () => {
+		const { env, api } = detailsEnvironment();
+		api.workFeedback.mockResolvedValue({
+			item: ITEM,
 			feedback: [
-				item({ id: "newer", placements: [summary({ permalink: undefined })] }),
-				item({ id: "older", deliveredAt: "2026-09-26T09:00:00Z", placements: [summary()] }),
+				delivered({
+					copies: [
+						summary({
+							kind: "FILE_NOTE",
+							externalRef: "gid://gitlab/DiffNote/4",
+							externalUrl: `${MR1}/diffs#note_4`,
+							path: "c.ts",
+						}),
+					],
+				}),
+			],
+		});
+		const answer = await workFeedback(env, 10, "team");
+		expect(answer.comments).toStrictEqual([
+			{
+				kind: "FILE_NOTE",
+				path: "c.ts",
+				startLine: undefined,
+				endLine: undefined,
+				permalink: `${MR1}/diffs#note_4`,
+				practices: ["Descriptive merge request"],
+				postedAt: "2026-09-26T11:00:00Z",
+			},
+		]);
+	});
+
+	it("keeps an older verified link when a newer copy of the same comment has none", async () => {
+		const { env, api } = detailsEnvironment();
+		api.workFeedback.mockResolvedValue({
+			item: ITEM,
+			feedback: [
+				delivered({ id: "newer", copies: [summary({ externalUrl: null })] }),
+				delivered({
+					id: "older",
+					deliveredAt: "2026-09-26T09:00:00Z",
+					copies: [summary({ postedAt: "2026-09-26T09:00:00Z" })],
+				}),
 			],
 		});
 		const answer = await workFeedback(env, 10, "team");
 		expect(answer.comments).toHaveLength(1);
 		expect(answer.comments[0]).toMatchObject({
 			permalink: `${MR1}#note_1`,
-			deliveredAt: "2026-09-26T11:00:00Z",
+			postedAt: "2026-09-26T11:00:00Z",
 		});
 	});
 
-	it("names no practice and no time for a comment the server gives neither", async () => {
-		const { env, api } = adminEnvironment();
+	it("names no practice for a comment whose feedback was posted only in part", async () => {
+		const { env, api } = detailsEnvironment();
 		api.workFeedback.mockResolvedValue({
-			work: WORK,
-			hasMore: true,
-			feedback: [item({ practices: [], deliveredAt: undefined, placements: [summary()] })],
+			item: ITEM,
+			feedback: [delivered({ practices: [], copies: [summary()] })],
 		});
 		const answer = await workFeedback(env, 10, "team");
-		expect(answer.comments[0]).toMatchObject({ practices: [], deliveredAt: undefined });
-		expect(answer.more).toBe(true);
+		expect(answer.comments).toHaveLength(1);
+		expect(answer.comments[0]).toMatchObject({ practices: [] });
 	});
 
-	it("keeps a comment link only when it is an anchor on this work's own pages", async () => {
-		const { env, api } = adminEnvironment();
+	it("keeps a comment link only when it is an anchor on this item's own pages", async () => {
+		const { env, api } = detailsEnvironment();
 		const links = [
 			`${MR1}#note_1`,
 			`${MR1}/diffs#note_2`,
@@ -648,12 +836,11 @@ describe("the reader's own feedback on the work", () => {
 			"not a url",
 		];
 		api.workFeedback.mockResolvedValue({
-			work: WORK,
-			hasMore: false,
+			item: ITEM,
 			feedback: [
-				item({
-					placements: links.map((permalink, index) =>
-						summary({ commentRef: `ref-${index}`, permalink }),
+				delivered({
+					copies: links.map((externalUrl, index) =>
+						summary({ externalRef: `ref-${index}`, externalUrl }),
 					),
 				}),
 			],
@@ -667,21 +854,17 @@ describe("the reader's own feedback on the work", () => {
 	});
 
 	it("accepts GitLab's other address of the same issue", async () => {
-		const { env, api, navigate } = adminEnvironment();
+		const { env, api, navigate } = detailsEnvironment();
 		const issue = "https://gitlab.example.test/team/app/-/issues/7";
 		navigate(issue);
-		api.resolve.mockResolvedValue({
-			...adminDto("70"),
-			work: { id: "70", kind: "scm.issue", label: "#7" },
-		});
+		api.resolve.mockResolvedValue(dto("70", "scm.issue"));
 		api.workFeedback.mockResolvedValue({
-			work: { id: "70", kind: "scm.issue", label: "#7" },
-			hasMore: false,
+			item: itemRef("70", "scm.issue"),
 			feedback: [
-				item({
-					placements: [
+				delivered({
+					copies: [
 						summary({
-							permalink: "https://gitlab.example.test/team/app/-/work_items/7#note_9",
+							externalUrl: "https://gitlab.example.test/team/app/-/work_items/7#note_9",
 						}),
 					],
 				}),
@@ -693,14 +876,17 @@ describe("the reader's own feedback on the work", () => {
 		);
 	});
 
-	it("refuses an answer about other work", async () => {
-		const { env, api } = adminEnvironment();
-		api.workFeedback.mockResolvedValue({ work: OTHER_WORK, hasMore: false, feedback: [] });
+	it.each([
+		["another item", OTHER_ITEM],
+		["no item", null],
+	])("refuses an answer about %s", async (_name, item) => {
+		const { env, api } = detailsEnvironment();
+		api.workFeedback.mockResolvedValue({ item, feedback: [delivered({ copies: [summary()] })] });
 		await expect(workFeedback(env, 10, "team")).rejects.toMatchObject({ code: "server" });
 	});
 
-	it("drops the answer when the tab moved to other work while it loaded", async () => {
-		const { env, api, navigate } = adminEnvironment();
+	it("drops the answer when the tab moved to another item while it loaded", async () => {
+		const { env, api, navigate } = detailsEnvironment();
 		const answer = Promise.withResolvers<DeliveredWorkFeedback>();
 		api.workFeedback.mockReturnValueOnce(answer.promise);
 		const pending = workFeedback(env, 10, "team");
@@ -708,7 +894,7 @@ describe("the reader's own feedback on the work", () => {
 			expect(api.workFeedback).toHaveBeenCalledOnce();
 		});
 		navigate(MR2);
-		answer.resolve({ work: WORK, feedback: [], hasMore: false });
+		answer.resolve({ item: ITEM, feedback: [] });
 		await expect(pending).rejects.toMatchObject({ code: "stale" });
 	});
 });

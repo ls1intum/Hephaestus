@@ -49,7 +49,7 @@ class ReviewBatchScopeIntegrationTest extends BaseIntegrationTest {
     ReviewBatchTargetRepository targets;
 
     @Autowired
-    ReviewBatchScopeRepository scope;
+    ReviewBatchScopeQuery scope;
 
     @Test
     void frozenTargetsIgnoreItemsAddedLater() {

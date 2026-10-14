@@ -56,3 +56,10 @@ export const ADMIN_WITHHELD_TEXT: Partial<
 			"The text was written for the developer’s own practice pages and is withheld from admins.",
 	},
 };
+
+/** The destinations in the developer's own voice, for the surfaces that list their own feedback. */
+export const OWN_FEEDBACK_DESTINATION_LABELS: Record<FeedbackDestination, string> = {
+	ON_WORK: "On your work",
+	CONVERSATION: "In your conversation with Heph",
+	PRACTICE_PAGE: "On your practice pages",
+};

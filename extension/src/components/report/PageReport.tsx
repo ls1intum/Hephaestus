@@ -11,7 +11,7 @@ import {
 	type ReportState,
 	type ReportSummary,
 	reviewedAt,
-	reviewedRevision,
+	reviewedVersion,
 	summarizeReport,
 } from "~/components/report/report-summary";
 import { ReportRow } from "~/components/report/ReportRow";
@@ -60,13 +60,13 @@ function reviewedSentence(context: ReadyContext): string {
 	if (reviewed === undefined) {
 		return "No completed practice review recorded.";
 	}
-	const revision = reviewedRevision(context);
-	return `Reviewed ${formatDateTime(reviewed) ?? reviewed}${revision === undefined ? "" : ` at ${revision}`}.`;
+	const version = reviewedVersion(context);
+	return `Reviewed ${formatDateTime(reviewed) ?? reviewed}${version === undefined ? "" : ` at ${version}`}.`;
 }
 
 /**
  * The opened report's last line: when, precisely, and where the rest is — the review's history and
- * evidence in Hephaestus, and for a workspace admin every developer's records and the review's runs.
+ * evidence in Hephaestus, and for a workspace admin every developer's records and the review itself.
  */
 function Footer({
 	context,
@@ -126,7 +126,7 @@ function Ready({
 	webAppOrigin: string;
 }) {
 	const { feedback, results, action, stale } = props;
-	const offer = context.canRequestReview;
+	const offer = context.requestAllowed;
 	return (
 		<>
 			{stale === undefined ? null : (

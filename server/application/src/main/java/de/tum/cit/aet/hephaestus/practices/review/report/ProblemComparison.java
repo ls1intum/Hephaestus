@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review.report;
 
-import de.tum.cit.aet.hephaestus.practices.review.ReviewScanStoreService;
+import de.tum.cit.aet.hephaestus.practices.review.ScanReuseCandidateQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.Comparison;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ProblemCandidate;
@@ -122,7 +122,7 @@ public class ProblemComparison {
                 && previous.practiceId() == current.practiceId()
                 && (current.outcome() == ResultOutcome.MET || current.outcome() == ResultOutcome.NOT_MET)
                 && current.coverage() instanceof HostCoverage host
-                && ReviewScanStoreService.trusted(host);
+                && ScanReuseCandidateQuery.trusted(host);
     }
 
     public record Standard(String selectorDigest, String reviewDigest, String modelDigest, int epoch) {}

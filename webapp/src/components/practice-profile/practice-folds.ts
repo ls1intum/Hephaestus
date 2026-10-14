@@ -42,7 +42,7 @@ export const NOT_OBSERVED_YET = {
 
 /** Every result in the look-back found that the practice did not apply to the work. */
 export const isNeverApplied = (practice: PracticeStanding): boolean =>
-	practice.standing === "NO_OPPORTUNITY" && practice.notApplicableOnly === true;
+	practice.standing === "NO_OPPORTUNITY" && practice.doesNotApplyOnly;
 
 /** No review has observed the practice in the reader's work yet. */
 export const isNotObservedYet = (practice: PracticeStanding): boolean =>

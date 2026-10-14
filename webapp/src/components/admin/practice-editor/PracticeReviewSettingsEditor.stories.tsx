@@ -1,54 +1,42 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
-import {
-	mockConversationReviewFields,
-	mockConversationWorkType,
-	mockDocumentReviewFields,
-	mockDocumentWorkType,
-	mockIssueReviewFields,
-	mockIssueWorkType,
-	mockMergeReviewFields,
-	mockPullRequestReviewFields,
-	mockPullRequestWorkType,
-} from "@/mocks/fixtures/practice";
 import { expectNoOverflowingElement } from "@/stories/reflow";
 import { Stateful } from "@/stories/stateful";
 
-import { outcome } from "./fixtures";
 import {
-	PracticeReviewSettingsEditor,
-	type PracticeOccasionMode,
-} from "./PracticeReviewSettingsEditor";
+	definitionOf,
+	mockDocumentItemType,
+	mockIssueItemType,
+	mockPullRequestItemType,
+	mockThreadItemType,
+} from "./fixtures";
+import { PracticeReviewSettingsEditor } from "./PracticeReviewSettingsEditor";
+
+const { reviewOn, reads } = definitionOf();
 
 const meta = {
 	component: PracticeReviewSettingsEditor,
 	args: {
-		options: mockPullRequestWorkType,
-		reviewFields: mockPullRequestReviewFields,
-		mode: "reviewed",
+		itemType: mockPullRequestItemType,
+		value: { reviewOn, reads: reads.sources },
+		reviewedBy: "HEPHAESTUS",
 		onChange: fn(),
 	},
-	// Storybook's default docgen (`react-docgen`) does no type resolution, so a locally declared
-	// string union arrives as an unknown type and infers a JSON object editor. Naming the three
-	// states here is the difference between a control that switches the editor and a text box.
 	argTypes: {
-		mode: {
-			control: "radio",
-			options: ["reviewed", "human-review", "guidance-only"] satisfies PracticeOccasionMode[],
-		},
+		reviewedBy: { control: "radio", options: ["HEPHAESTUS", "PEOPLE", "NOBODY"] },
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	render: (args) => (
-		<Stateful initial={args.reviewFields}>
-			{(reviewFields, setBinding) => (
+		<Stateful initial={args.value}>
+			{(value, setValue) => (
 				<PracticeReviewSettingsEditor
 					{...args}
-					reviewFields={reviewFields}
+					value={value}
 					onChange={(next) => {
 						args.onChange(next);
-						setBinding(next);
+						setValue(next);
 					}}
 				/>
 			)}
@@ -59,127 +47,103 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** One occasion: the moments, the draft question, and one evidence list — no card around them. */
-export const PullRequestLifecycle: Story = {
+export const PullRequest: Story = {
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
+		const strip = within(canvas.getByRole("group", { name: "Review on" }));
 		await expect(strip.getByRole("checkbox", { name: /^Opened/u })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: /^Merged/u })).not.toBeChecked();
-		await expect(
-			strip.getByRole("checkbox", { name: "New commits pushed every time" }),
-		).toBeVisible();
-		// Nothing numbers the occasion, because a practice only ever has the one.
-		await expect(canvas.queryByText(/Occasion 1/u)).toBeNull();
-		await expect(canvas.queryByRole("button", { name: /Add occasion/u })).toBeNull();
+		await expect(canvas.getByRole("checkbox", { name: "Ready for review" })).toBeChecked();
+		await expect(canvas.getByRole("group", { name: "Reads" })).toBeVisible();
 	},
 };
 
-export const IssueLifecycle: Story = {
-	args: { options: mockIssueWorkType, reviewFields: mockIssueReviewFields },
+export const Issue: Story = {
+	args: {
+		itemType: mockIssueItemType,
+		value: {
+			reviewOn: { events: ["scm.issue.opened", "scm.issue.updated"], state: {} },
+			reads: [{ source: "scm.issue.core", need: "REQUIRED" }],
+		},
+	},
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
+		const strip = within(canvas.getByRole("group", { name: "Review on" }));
 		await expect(strip.getByRole("checkbox", { name: "Details changed every time" })).toBeChecked();
 		// An issue is never a draft, so the question is not asked.
 		await expect(canvas.queryByRole("checkbox", { name: "Draft" })).toBeNull();
 	},
 };
 
-export const DocumentLifecycle: Story = {
-	args: { options: mockDocumentWorkType, reviewFields: mockDocumentReviewFields },
+export const Document: Story = {
+	args: {
+		itemType: mockDocumentItemType,
+		value: {
+			reviewOn: { events: ["docs.document.published"], state: {} },
+			reads: [{ source: "docs.document.core", need: "REQUIRED" }],
+		},
+	},
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
+		const strip = within(canvas.getByRole("group", { name: "Review on" }));
 		await expect(strip.getByRole("checkbox", { name: /^Published/u })).toBeChecked();
-		await expect(strip.getByRole("checkbox", { name: "Content changed every time" })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: /^Archived/u })).not.toBeChecked();
 	},
 };
 
-/** A conversation offers one moment, so the strip is one node and there are no bands to tell apart. */
-export const ConversationHasOneMoment: Story = {
-	args: { options: mockConversationWorkType, reviewFields: mockConversationReviewFields },
+/** A conversation offers one event, so the strip is one node and there are no bands to tell apart. */
+export const ConversationHasOneEvent: Story = {
+	args: {
+		itemType: mockThreadItemType,
+		value: {
+			reviewOn: { events: ["chat.thread.settled"], state: {} },
+			reads: [{ source: "slack.conversation.thread", need: "REQUIRED" }],
+		},
+	},
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
+		const strip = within(canvas.getByRole("group", { name: "Review on" }));
 		await expect(strip.getAllByRole("checkbox")).toHaveLength(1);
 		await expect(canvas.queryByText("Along the way")).toBeNull();
 	},
 };
 
 /**
- * At the merge the threads are read whole, which is what licenses the review to say nobody ever
- * resolved one. A practice that wants a cheaper read at a different moment is a second practice.
+ * Reading a source whole is what lets the review say that something is missing from it. A practice
+ * that wants a cheaper read at a different event is a second practice.
  */
 export const ReadingASourceWhole: Story = {
-	args: { reviewFields: mockMergeReviewFields },
+	args: {
+		value: {
+			reviewOn: { events: ["scm.pull_request.merged"], state: {} },
+			reads: [
+				{ source: "scm.pull-request.core", need: "REQUIRED" },
+				{ source: "scm.repository.tree", need: "OPTIONAL" },
+				{ source: "scm.review-threads", need: "COMPLETE" },
+			],
+		},
+	},
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
-		await expect(strip.getByRole("checkbox", { name: /^Merged/u })).toBeChecked();
 		await expect(
-			within(canvas.getByRole("group", { name: "What this review reads" })).getByText(
-				"· captured whole",
-			),
+			within(canvas.getByRole("group", { name: "Reads" })).getByText("· captured whole"),
 		).toBeVisible();
 	},
 };
 
-/**
- * Asking by hand is a second way in, not a moment nobody is allowed to tick: it is stated once, under
- * the evidence it reads, and never offered on the strip.
- */
-export const AskingByHandIsNotAMoment: Story = {
+/** A request is a second way in, stated once under what it reads and never offered on the strip. */
+export const ARequestIsNotAnEvent: Story = {
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
-		await expect(canvas.queryByRole("checkbox", { name: /Review requested by hand/u })).toBeNull();
-		await expect(strip.queryByText(/request this review with “Request review”/u)).toBeNull();
-		await expect(canvas.getByText(/request this review with “Request review”/u)).toBeVisible();
+		const strip = within(canvas.getByRole("group", { name: "Review on" }));
+		await expect(strip.queryByText(/request this review/u)).toBeNull();
+		await expect(canvas.getByText(/request this review on the work itself/u)).toBeVisible();
 	},
 };
 
-/** Nothing reviews a practice that runs no review, so nothing promises a hand-asked one either. */
-export const GuidanceOnlyPromisesNoHandAskedReview: Story = {
-	args: {
-		mode: "guidance-only",
-		reviewFields: { ...mockPullRequestReviewFields, evidenceRequirements: [] },
-	},
+/** Nothing automated reviews the practice, so it reads nothing and promises no requested review. */
+export const ReviewedByPeople: Story = {
+	args: { reviewedBy: "PEOPLE" },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/reads nothing, because no review runs/u)).toBeVisible();
-		await expect(canvas.queryByText(/request this review with “Request review”/u)).toBeNull();
-	},
-};
-
-export const IncludingDrafts: Story = {
-	args: { reviewFields: { ...mockPullRequestReviewFields, reviewWhen: {} } },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("checkbox", { name: "Draft" })).toBeChecked();
-	},
-};
-
-export const RecordedButNotReviewed: Story = {
-	args: { mode: "human-review" },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/nothing is reviewed while the practice asks/u)).toBeVisible();
-		// Asking by hand would not review it either while it waits for a human.
-		await expect(canvas.queryByText(/request this review with “Request review”/u)).toBeNull();
-	},
-};
-
-export const WithRecentOutcomes: Story = {
-	args: {
-		outcome: outcome({
-			practiceSlug: "clear-pr-description",
-			considered: 12,
-			skipped: 5,
-			blockers: [
-				{ sourceKind: "scm.pull-request.diff", reasonCode: "SOURCE_EMPTY", reviewsAffected: 4 },
-				{
-					sourceKind: "scm.pull-request.comments",
-					reasonCode: "SOURCE_INCOMPLETE",
-					reviewsAffected: 1,
-				},
-			],
-		}),
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText("7 of 12 reviews ran")).toBeVisible();
+		await expect(
+			canvas.getByText("No automated review runs, so this practice reads nothing."),
+		).toBeVisible();
+		await expect(canvas.queryByRole("group", { name: "Reads" })).toBeNull();
+		await expect(canvas.queryByText(/request this review/u)).toBeNull();
 	},
 };
 
@@ -189,77 +153,49 @@ export const WithRecentOutcomes: Story = {
  */
 export const Invalid: Story = {
 	args: {
-		reviewFields: { signals: [], evidenceRequirements: [], reviewWhen: {}, subject: "AUTHOR" },
-		error: "Choose when this practice is reviewed.",
-		errorFocusId: "practice-occasion-signals",
+		value: { reviewOn, reads: [] },
+		error: "Set at least one source to Required. A review cannot run without one.",
+		errorFocusId: "practice-review-on-reads",
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("group", { name: "Reviews when" })).toHaveAccessibleDescription(
-			"Choose when this practice is reviewed.",
+		await expect(canvas.getByRole("group", { name: "Reads" })).toHaveAccessibleDescription(
+			"Set at least one source to Required. A review cannot run without one.",
 		);
 		// Describing both groups would make the message mean "something on this form is wrong".
-		await expect(
-			canvas.getByRole("group", { name: "What this review reads" }),
-		).not.toHaveAccessibleDescription("Choose when this practice is reviewed.");
+		await expect(canvas.getByRole("group", { name: "Review on" })).not.toHaveAccessibleDescription(
+			"Set at least one source to Required. A review cannot run without one.",
+		);
 	},
 };
 
-export const InvalidReviewConditions: Story = {
+export const InvalidState: Story = {
 	args: {
-		reviewFields: { ...mockPullRequestReviewFields, reviewWhen: { draftStatus: [] } },
-		error: "Choose review conditions supported by this kind of work.",
-		errorFocusId: "practice-occasion-reviewWhen",
+		value: {
+			reviewOn: { ...reviewOn, state: { draftStatus: ["ARCHIVED"] } },
+			reads: reads.sources,
+		},
+		error: "Choose states this kind of item offers.",
+		errorFocusId: "practice-review-on-state",
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("group", { name: "Draft status" })).toHaveAccessibleDescription(
-			"Choose review conditions supported by this kind of work.",
+		await expect(canvas.getByRole("group", { name: "When" })).toHaveAccessibleDescription(
+			"Choose states this kind of item offers.",
 		);
-		await expect(
-			canvas.getByRole("group", { name: "Reviews when" }),
-		).not.toHaveAccessibleDescription("Choose review conditions supported by this kind of work.");
 	},
 };
 
-/**
- * A practice saved while asking by hand still counted as an occasion. The moment is no longer
- * offered, so it is drawn from what was saved — hiding it would leave nobody able to untick it.
- */
-export const AMomentTheWorkTypeNoLongerOffers: Story = {
-	args: {
-		reviewFields: {
-			...mockPullRequestReviewFields,
-			signals: [...mockPullRequestReviewFields.signals, "scm.pull_request.manual_review"],
-		},
-	},
+export const ChoosingAnEvent: Story = {
 	play: async ({ args, canvas }) => {
-		const stray = canvas.getByRole("checkbox", { name: /^Review requested by hand/u });
-		await expect(stray).toBeChecked();
-
-		await userEvent.click(stray);
-
-		await expect(args.onChange).toHaveBeenCalledWith({
-			...mockPullRequestReviewFields,
-			signals: mockPullRequestReviewFields.signals,
-			evidenceRequirements: mockPullRequestReviewFields.evidenceRequirements,
-		});
-	},
-};
-
-export const ChoosingAMoment: Story = {
-	play: async ({ args, canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
-		await userEvent.click(strip.getByRole("checkbox", { name: /^Review submitted/u }));
+		const strip = within(canvas.getByRole("group", { name: "Review on" }));
+		await userEvent.click(strip.getByRole("checkbox", { name: /^Merged/u }));
 
 		// Sorted on the way out, so an untouched practice does not come back looking edited.
 		await expect(args.onChange).toHaveBeenCalledWith({
-			...mockPullRequestReviewFields,
-			signals: [
-				"scm.pull_request.opened",
-				"scm.pull_request.ready",
-				"scm.pull_request.reviewed",
-				"scm.pull_request.synchronized",
-			],
-			evidenceRequirements: mockPullRequestReviewFields.evidenceRequirements,
+			reviewOn: {
+				events: ["scm.pull_request.merged", "scm.pull_request.opened", "scm.pull_request.ready"],
+				state: reviewOn.state,
+			},
+			reads: reads.sources,
 		});
 	},
 };

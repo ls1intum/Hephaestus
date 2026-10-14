@@ -14,8 +14,8 @@ import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
-import java.util.UUID;
 import java.util.Objects;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,11 +45,12 @@ class SlackAccountAbsorptionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void absorptionMovesRealAuthorReferencesAndDeduplicatesParticipantsBeforeRemovingMemberships() {
-        var workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("slack-absorption-" + UUID.randomUUID()));
+        var workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace(
+                "slack-absorption-" + UUID.randomUUID().toString().substring(0, 8)));
         var claimed = accounts.save(new Account("Claimed human"));
         var unclaimed = new Account("Roster human");
         unclaimed.setStatus(Account.Status.UNCLAIMED);
-        accounts.save(unclaimed);
+        unclaimed = accounts.save(unclaimed);
         var untouched = accounts.save(new Account("Other human"));
         long claimedId = Objects.requireNonNull(claimed.getId());
         long unclaimedId = Objects.requireNonNull(unclaimed.getId());
@@ -64,7 +65,7 @@ class SlackAccountAbsorptionIntegrationTest extends BaseIntegrationTest {
         thread.setLastTs("1700000000.000000");
         thread.setMessageCount(1);
         thread.setParticipantAccountIds(new long[] {unclaimedId, claimedId, otherId});
-        threads.saveAndFlush(thread);
+        thread = threads.saveAndFlush(thread);
         var message = new SlackMessage();
         message.setWorkspaceId(workspace.getId());
         message.setSlackTeamId("T1");
@@ -73,7 +74,7 @@ class SlackAccountAbsorptionIntegrationTest extends BaseIntegrationTest {
         message.setAuthorSlackUserId("U1");
         message.setAuthorAccountId(unclaimedId);
         message.setText("Original source text");
-        messages.saveAndFlush(message);
+        message = messages.saveAndFlush(message);
         long messageId = message.getId();
         long threadId = thread.getId();
         long workspaceId = workspace.getId();

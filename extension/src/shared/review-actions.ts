@@ -7,7 +7,7 @@ import type { WorkspaceChoice } from "~/shared/review-context";
  * The review change the practice review on a provider page can start: asking for a review. It is only
  * ever about the work the worker reads from that tab, and it does not happen there: the page asks the
  * worker to open the extension's own confirmation window (`action.html`), which no provider page can
- * frame or cover. Cancelling a run or retrying its results is a workspace admin's, in the web app.
+ * frame or cover. Cancelling a review or deciding its feedback is a workspace admin's, in the web app.
  */
 export const reviewActionSchema = z.strictObject({ kind: z.literal("request-review") });
 

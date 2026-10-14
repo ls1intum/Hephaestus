@@ -11,7 +11,7 @@ It includes the evidence and feedback delivery results. It is desktop Chrome onl
 iOS does not run desktop extensions.
 
 The extension is a place to read context, not a feedback destination. It never delivers feedback and never
-calls `GET /practices/feedback/in-app`, which marks the caller's own feedback delivered as a side
+calls `GET /practices/feedback/practice-page`, which marks the caller's own feedback delivered as a side
 effect. [The user guide](/user/browser-extension) is the product description and
 [the admin guide](/admin/browser-extension) the operator's. This page is how it is built.
 
@@ -156,13 +156,13 @@ The flow is in `docs/auth-architecture.md`.
   It uses data already synced by the workspace and returns what the caller can do.
   Unknown, unmonitored, and inaccessible work return the same `404`.
 - `GET /workspaces/{slug}/practices/feedback/on-work?url=` (`getOwnDeliveredWorkFeedback`) lists comments Hephaestus recorded posting on the work for the caller, regardless of role.
-  It returns each piece of feedback's practices, delivery time, and recorded provider placements.
+  It returns each piece of feedback's practices, delivery time, and recorded provider comments.
   It includes the provider comment handle and recorded permalink, but never a body.
   The worker counts one comment per handle and keeps handles private.
   It links only permalinks anchored on the work's own pages.
   The report shows this first.
-- Other reads reuse existing endpoints for the reader's own reviewed-work runs and results.
-  They request a trace by the latest own review id through `getOwnArtifactTrace`.
+- Other reads reuse existing endpoints for the reader's own reviews and results.
+  They request the trace of the resolved item and the latest own review through `getOwnItemTrace`.
   Results use the exact `itemId` filter when the report opens.
   The worker checks that each returned record concerns the resolved work, and refuses a list that does not.
   Admins use the same own-reader projection.
