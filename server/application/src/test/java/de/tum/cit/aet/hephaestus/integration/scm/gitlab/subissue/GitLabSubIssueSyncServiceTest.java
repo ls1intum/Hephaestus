@@ -129,7 +129,7 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
     private static Map<String, Object> workItemNode(int iid, int parentIid, String parentNamespace) {
         Map<String, Object> parent =
                 Map.of("iid", String.valueOf(parentIid), "namespace", Map.of("fullPath", parentNamespace));
-        Map<String, Object> hierarchyWidget = Map.of("type", "HIERARCHY", "parent", parent);
+        Map<String, Object> hierarchyWidget = Map.of("type", "HIERARCHY", "hasParent", true, "parent", parent);
         return Map.of("iid", String.valueOf(iid), "widgets", List.of(hierarchyWidget));
     }
 
@@ -148,6 +148,8 @@ class GitLabSubIssueSyncServiceTest extends BaseUnitTest {
         when(requestSpec.variable(anyString(), any())).thenReturn(requestSpec);
 
         ClientGraphQlResponse response = mock(ClientGraphQlResponse.class);
+        when(response.getErrors()).thenReturn(List.of());
+        when(responseHandler.isWholePage(response, "project.workItems")).thenReturn(true);
         when(requestSpec.execute()).thenReturn(Mono.just(response));
 
         ClientResponseField nodesField = mock(ClientResponseField.class);
