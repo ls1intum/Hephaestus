@@ -33,8 +33,10 @@ import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -527,13 +529,15 @@ class CitedSourceAccessTest extends BaseUnitTest {
         when(repositories.permittedRepositories(1L)).thenReturn(List.of(TestEntities.repository(2L, "acme/api")));
         when(preferences.forDeveloper(1L, 42L)).thenReturn(new MemberAiPreferences.Decision(false, null));
         when(memberships.findByWorkspace_IdAndUser_Id(1L, 42L)).thenReturn(Optional.of(new WorkspaceMembership()));
-        UUID newest = UUID.randomUUID();
-        UUID middle = UUID.randomUUID();
-        UUID oldest = UUID.randomUUID();
-        UUID refused = UUID.randomUUID();
-        UUID onRefused = UUID.randomUUID();
-        UUID onHiddenRepository = UUID.randomUUID();
-        UUID onWithdrawn = UUID.randomUUID();
+        UUID newest = new UUID(0, 1);
+        UUID middle = new UUID(0, 2);
+        UUID oldest = new UUID(0, 3);
+        UUID refused = new UUID(0, 4);
+        UUID onRefused = new UUID(0, 5);
+        UUID onHiddenRepository = new UUID(0, 6);
+        UUID onWithdrawn = new UUID(0, 7);
+        UUID missing = new UUID(0, 8);
+        UUID onMissing = new UUID(0, 9);
         var document = citation("context/document.md", "{\"records\":[{\"type\":\"document\",\"id\":7}]}");
         var docs = citation(
                 "context/docs/engineering/design.md",
@@ -553,10 +557,12 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 refused, List.of(repository(2L)),
                 onRefused, List.of(history(refused)),
                 onHiddenRepository, List.of(repository(3L)),
-                onWithdrawn, List.of(history(oldest), chat("C2", "2")));
+                onWithdrawn, List.of(history(oldest), chat("C2", "2")),
+                onMissing, List.of(history(missing)));
         // The history source as it works: a record is permitted when its owner keeps it and each citation of the
         // observation it names is permitted, checked with whatever checks the read has running.
-        Predicate<UUID> permitted = id -> !id.equals(refused)
+        Predicate<UUID> permitted = id -> cites.containsKey(id)
+                && !id.equals(refused)
                 && cites.getOrDefault(id, List.of()).stream()
                         .allMatch(citation -> access.checks(1L, purpose).permits(citation));
         when(history.permitsHistoryRecord(
@@ -589,6 +595,8 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 history(refused),
                 history(onHiddenRepository),
                 history(onWithdrawn),
+                history(missing),
+                history(onMissing),
                 chat("C1", "1"),
                 document,
                 citation(
@@ -607,7 +615,7 @@ class CitedSourceAccessTest extends BaseUnitTest {
 
         assertThat(together)
                 .isEqualTo(alone)
-                .containsExactly(true, true, false, false, false, false, true, true, false);
+                .containsExactly(true, true, false, false, false, false, false, false, true, true, false);
         Mockito.verify(conversations, Mockito.times(1))
                 .readableMessages(1L, Set.of(new MessageKey("C1", "1"), new MessageKey("C2", "2")));
         Mockito.verify(conversations, Mockito.never()).isMessageReadable(anyLong(), any(), any());
@@ -618,6 +626,220 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 .permittedHistoryRecords(Mockito.eq(1L), Mockito.eq("observation"), Mockito.any(), Mockito.eq(purpose));
         Mockito.verify(history, Mockito.never())
                 .permitsHistoryRecord(Mockito.anyLong(), Mockito.any(), Mockito.any(), Mockito.any());
+    }
+
+    @Test
+    void shouldStopHistoryReadsAt500RecordsWhenOperatorHistoryHasALongChain() {
+        var purpose = SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW;
+        Map<String, List<JsonNode>> cites = new HashMap<>();
+        for (int i = 1; i <= 503; i++) {
+            cites.put("observation:" + new UUID(0, i), i == 503 ? List.of() : List.of(history(new UUID(0, i + 1))));
+        }
+        var shortRoot = new UUID(0, 6000);
+        var shortLeaf = new UUID(0, 6001);
+        cites.put("observation:" + shortRoot, List.of(history(shortLeaf)));
+        cites.put("observation:" + shortLeaf, List.of(repository(2L)));
+        List<String> reads = new ArrayList<>();
+        var access = historyAccess(purpose, cites, reads);
+        var checks = access.checks(1L, purpose);
+        var longRoot = history(new UUID(0, 1));
+        var independent = history(shortRoot);
+        var direct = repository(2L);
+
+        checks.prepare(List.of(longRoot, independent, direct));
+
+        Set<String> allowed = new HashSet<>();
+        for (int i = 1; i <= 498; i++) allowed.add("observation:" + new UUID(0, i));
+        allowed.add("observation:" + shortRoot);
+        allowed.add("observation:" + shortLeaf);
+        assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+        assertThat(checks.permits(longRoot)).isFalse();
+        assertThat(checks.permits(independent)).isTrue();
+        assertThat(checks.permits(direct)).isTrue();
+        assertThat(checks.permits(history(new UUID(0, 499)))).isFalse();
+        assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+    }
+
+    @Test
+    void shouldKeepRootsAndStableBreadthFirstLeavesWhenOperatorHistoryHasABroadBranch() {
+        var purpose = SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW;
+        var branch = new UUID(0, 1);
+        var independent = new UUID(0, 6000);
+        Map<String, List<JsonNode>> cites = new HashMap<>();
+        List<JsonNode> leaves = new ArrayList<>();
+        for (int i = 2; i <= 502; i++) {
+            var id = new UUID(0, i);
+            leaves.add(history(id));
+            cites.put("observation:" + id, List.of());
+        }
+        cites.put("observation:" + branch, leaves);
+        cites.put("observation:" + independent, List.of(repository(2L)));
+        List<String> reads = new ArrayList<>();
+        var access = historyAccess(purpose, cites, reads);
+        var checks = access.checks(1L, purpose);
+
+        checks.prepare(List.of(history(branch), history(independent), repository(2L)));
+
+        Set<String> allowed = new HashSet<>();
+        for (int i = 1; i <= 499; i++) allowed.add("observation:" + new UUID(0, i));
+        allowed.add("observation:" + independent);
+        assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+        assertThat(checks.permits(history(branch))).isFalse();
+        assertThat(checks.permits(history(independent))).isTrue();
+        assertThat(checks.permits(repository(2L))).isTrue();
+        assertThat(checks.permits(history(new UUID(0, 499)))).isTrue();
+        assertThat(checks.permits(history(new UUID(0, 500)))).isFalse();
+        assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+    }
+
+    @Test
+    void shouldCountUniqueTypeAndIdBeforeDependenciesWhenOperatorRootsFillTheBudget() {
+        var purpose = SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW;
+        Map<String, List<JsonNode>> cites = new HashMap<>();
+        List<JsonNode> roots = new ArrayList<>();
+        Set<String> allowed = new HashSet<>();
+        for (int i = 1; i <= 499; i++) {
+            var id = new UUID(0, i);
+            roots.add(history(id));
+            cites.put("observation:" + id, List.of());
+            if (i <= 498) allowed.add("observation:" + id);
+        }
+        var first = new UUID(0, 1);
+        var duplicate = history(first);
+        ((ObjectNode) duplicate.path("sourceReference").path("records").get(0)).put("synced_at", "2026-10-01");
+        roots.add(1, duplicate);
+        roots.add(history("feedback", first));
+        allowed.add("feedback:" + first);
+        cites.put("feedback:" + first, List.of());
+        var deep = new UUID(0, 6000);
+        cites.put("observation:" + first, List.of(history(deep)));
+        cites.put("observation:" + deep, List.of());
+        var last = new UUID(0, 499);
+        roots.add(history("feedback", last));
+        cites.put("feedback:" + last, List.of());
+        allowed.add("feedback:" + last);
+
+        for (var orderedRoots : List.of(roots, roots.reversed())) {
+            List<String> reads = new ArrayList<>();
+            var access = historyAccess(purpose, cites, reads);
+            var checks = access.checks(1L, purpose);
+
+            checks.prepare(orderedRoots);
+
+            assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+            assertThat(checks.permits(history(new UUID(0, 498)))).isTrue();
+            assertThat(checks.permits(history(last))).isFalse();
+            assertThat(checks.permits(history("feedback", first))).isTrue();
+            assertThat(checks.permits(history(first))).isFalse();
+            assertThat(checks.permits(duplicate)).isFalse();
+            assertThat(checks.permits(history("feedback", last))).isTrue();
+            assertThat(checks.permits(history(deep))).isFalse();
+            assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+        }
+    }
+
+    @Test
+    void shouldKeepTheSameOperatorDependencyAllowanceWhenFeedbackCitationOrderChanges() {
+        var purpose = SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW;
+        var feedbackRoot = new UUID(0, 6000);
+        var independentRoot = new UUID(0, 6001);
+        var x = new UUID(0, 7000);
+        var y = new UUID(0, 7001);
+        Map<String, List<JsonNode>> cites = new HashMap<>();
+        List<JsonNode> roots = new ArrayList<>();
+        roots.add(history("feedback", feedbackRoot));
+        roots.add(history(independentRoot));
+        Set<String> allowed = new HashSet<>();
+        allowed.add("feedback:" + feedbackRoot);
+        allowed.add("observation:" + independentRoot);
+        for (int i = 1; i <= 497; i++) {
+            var id = new UUID(0, i);
+            roots.add(history(id));
+            cites.put("observation:" + id, List.of());
+            allowed.add("observation:" + id);
+        }
+        cites.put("observation:" + independentRoot, List.of(history(x)));
+        cites.put("observation:" + x, List.of());
+        cites.put("observation:" + y, List.of());
+        allowed.add("observation:" + x);
+
+        for (boolean reversed : List.of(false, true)) {
+            cites.put(
+                    "feedback:" + feedbackRoot,
+                    reversed ? List.of(history(y), history(x)) : List.of(history(x), history(y)));
+            List<String> reads = new ArrayList<>();
+            var access = historyAccess(purpose, cites, reads);
+            var checks = access.checks(1L, purpose);
+
+            checks.prepare(roots);
+
+            assertThat(new HashSet<>(reads)).hasSize(500);
+            assertThat(checks.permits(history(independentRoot)))
+                    .as("Independent root with %s feedback citation order", reversed ? "reversed" : "forward")
+                    .isTrue();
+            assertThat(checks.permits(history("feedback", feedbackRoot))).isFalse();
+            assertThat(checks.permits(history(x))).isTrue();
+            assertThat(checks.permits(history(y))).isFalse();
+            assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+        }
+    }
+
+    @Test
+    void shouldShareTheOperatorAllowanceAcrossNestedPreparedAndScalarChecksWhenOneReadIsActive() {
+        var purpose = SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW;
+        Map<String, List<JsonNode>> cites = new HashMap<>();
+        List<JsonNode> roots = new ArrayList<>();
+        Set<String> allowed = new HashSet<>();
+        for (int i = 1; i <= 501; i++) {
+            var id = new UUID(0, i);
+            cites.put("observation:" + id, List.of());
+            if (i <= 499) {
+                roots.add(history(id));
+                allowed.add("observation:" + id);
+            }
+        }
+        var sharedId = new UUID(0, 1);
+        cites.put("feedback:" + sharedId, List.of(history(new UUID(0, 499))));
+        allowed.add("feedback:" + sharedId);
+        List<String> reads = new ArrayList<>();
+        var access = historyAccess(purpose, cites, reads);
+
+        access.asOneRead(1L, purpose, () -> {
+            var checks = access.checks(1L, purpose);
+            checks.prepare(roots);
+            assertThat(access.asOneRead(1L, purpose, () -> {
+                        var nested = access.checks(1L, purpose);
+                        assertThat(nested).isSameAs(checks);
+                        return nested.permits(history("feedback", sharedId));
+                    }))
+                    .isTrue();
+            assertThat(access.permits(1L, history(new UUID(0, 500)), purpose)).isFalse();
+            assertThat(checks.permits(history(new UUID(0, 501)))).isFalse();
+            checks.prepare(List.of(history(sharedId)));
+            assertThat(checks.permits(history(sharedId))).isTrue();
+            assertThat(new HashSet<>(reads)).containsExactlyInAnyOrderElementsOf(allowed);
+            return true;
+        });
+
+        assertThat(access.permits(1L, history(new UUID(0, 500)), purpose)).isTrue();
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = SourceUsePurpose.class, mode = EnumSource.Mode.EXCLUDE, names = "OPERATOR_EVIDENCE_REVIEW")
+    void shouldPermitHistoryBeyond500RecordsWhenThePurposeIsNotOperatorReview(SourceUsePurpose purpose) {
+        Map<String, List<JsonNode>> cites = new HashMap<>();
+        for (int i = 1; i <= 501; i++) {
+            cites.put("observation:" + new UUID(0, i), i == 501 ? List.of() : List.of(history(new UUID(0, i + 1))));
+        }
+        List<String> reads = new ArrayList<>();
+        var access = historyAccess(purpose, cites, reads);
+        var checks = access.checks(1L, purpose);
+        var citation = history(new UUID(0, 1));
+
+        checks.prepare(List.of(citation));
+
+        assertThat(checks.permits(citation)).isTrue();
+        assertThat(new HashSet<>(reads)).hasSize(501).contains("observation:" + new UUID(0, 501));
     }
 
     @Test
@@ -636,11 +858,13 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 .isFalse();
     }
 
-    @Test
-    void shouldKeepNestedWorkspacesPurposesAndThreadsSeparate() throws Exception {
+    @ParameterizedTest
+    @EnumSource(
+            value = SourceUsePurpose.class,
+            names = {"PRACTICE_FEEDBACK_DELIVERY", "OPERATOR_EVIDENCE_REVIEW"})
+    void shouldKeepNestedWorkspacesPurposesAndThreadsSeparate(SourceUsePurpose purpose) throws Exception {
         var access = access(new JobEvidenceFiles(
                 new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
-        var purpose = SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY;
         when(repositories.permittedRepositories(1L)).thenReturn(List.of(TestEntities.repository(2L, "acme/api")));
         when(repositories.permittedRepositories(2L)).thenReturn(List.of());
         access.asOneRead(1L, purpose, () -> {
@@ -716,16 +940,16 @@ class CitedSourceAccessTest extends BaseUnitTest {
         assertThat(access.permits(1L, person, purpose)).isFalse();
     }
 
-    @Test
-    void shouldDenyHistoryCyclesAndTheirDependentsWithoutSingleRecordReads() {
+    @ParameterizedTest
+    @EnumSource(SourceUsePurpose.class)
+    void shouldDenyHistoryCyclesAndTheirDependentsWithoutSingleRecordReads(SourceUsePurpose purpose) {
         var access = access(new JobEvidenceFiles(
                 new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
-        var purpose = SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY;
         when(preferences.forDeveloper(1L, 42L)).thenReturn(new MemberAiPreferences.Decision(false, null));
         when(memberships.findByWorkspace_IdAndUser_Id(1L, 42L)).thenReturn(Optional.of(new WorkspaceMembership()));
-        UUID first = UUID.randomUUID();
-        UUID second = UUID.randomUUID();
-        UUID dependent = UUID.randomUUID();
+        UUID first = new UUID(0, 1);
+        UUID second = new UUID(0, 2);
+        UUID dependent = new UUID(0, 3);
         when(history.historyRecordCitations(Mockito.eq(1L), Mockito.eq("observation"), Mockito.any()))
                 .thenAnswer(call -> {
                     Map<UUID, List<JsonNode>> found = new HashMap<>();
@@ -744,10 +968,64 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 .permittedHistoryRecords(Mockito.anyLong(), Mockito.any(), Mockito.any(), Mockito.any());
     }
 
+    private CitedSourceAccess historyAccess(
+            SourceUsePurpose purpose, Map<String, List<JsonNode>> cites, List<String> reads) {
+        var access = access(new JobEvidenceFiles(
+                new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
+        when(repositories.permittedRepositories(1L)).thenReturn(List.of(TestEntities.repository(2L, "acme/api")));
+        when(preferences.forDeveloper(1L, 42L)).thenReturn(new MemberAiPreferences.Decision(false, null));
+        when(memberships.findByWorkspace_IdAndUser_Id(1L, 42L)).thenReturn(Optional.of(new WorkspaceMembership()));
+        when(history.historyRecordCitations(Mockito.eq(1L), Mockito.any(), Mockito.any()))
+                .thenAnswer(call -> {
+                    String type = call.getArgument(1);
+                    Map<UUID, List<JsonNode>> found = new HashMap<>();
+                    for (UUID id : call.<Collection<UUID>>getArgument(2)) {
+                        String key = type + ":" + id;
+                        reads.add(key);
+                        List<JsonNode> citations = cites.get(key);
+                        if (citations != null) found.put(id, citations);
+                    }
+                    return found;
+                });
+        // The source decides row existence and checks child citations through the active production checks.
+        when(history.permitsHistoryRecord(Mockito.eq(1L), Mockito.any(), Mockito.any(), Mockito.eq(purpose)))
+                .thenAnswer(call -> {
+                    String key = call.<String>getArgument(1) + ":" + call.<UUID>getArgument(2);
+                    reads.add(key);
+                    return cites.containsKey(key)
+                            && cites.getOrDefault(key, List.of()).stream()
+                                    .allMatch(citation ->
+                                            access.checks(1L, purpose).permits(citation));
+                });
+        when(history.permittedHistoryRecords(Mockito.eq(1L), Mockito.any(), Mockito.any(), Mockito.eq(purpose)))
+                .thenAnswer(call -> {
+                    String type = call.getArgument(1);
+                    Collection<UUID> ids = call.getArgument(2);
+                    var checks = access.checks(1L, purpose);
+                    checks.prepare(ids.stream()
+                            .flatMap(id -> cites.getOrDefault(type + ":" + id, List.of()).stream())
+                            .toList());
+                    return ids.stream()
+                            .filter(id -> {
+                                String key = type + ":" + id;
+                                reads.add(key);
+                                return cites.containsKey(key)
+                                        && cites.getOrDefault(key, List.of()).stream()
+                                                .allMatch(checks::permits);
+                            })
+                            .collect(Collectors.toSet());
+                });
+        return access;
+    }
+
     private ObjectNode history(UUID id) {
+        return history("observation", id);
+    }
+
+    private ObjectNode history(String type, UUID id) {
         return citation(
-                "context/people/42/observations.jsonl",
-                "{\"records\":[{\"type\":\"observation\",\"person\":42,\"id\":\"" + id + "\"}]}");
+                "context/people/42/" + (type.equals("observation") ? "observations" : "feedback") + ".jsonl",
+                "{\"records\":[{\"type\":\"" + type + "\",\"person\":42,\"id\":\"" + id + "\"}]}");
     }
 
     private ObjectNode repository(long id) {

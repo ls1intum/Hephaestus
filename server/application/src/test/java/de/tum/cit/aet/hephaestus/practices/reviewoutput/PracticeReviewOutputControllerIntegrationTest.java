@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -17,6 +19,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ThreadSurface;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
@@ -41,6 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ObservationInvalidation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationInvalidationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
@@ -49,8 +53,10 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.time.Instant;
@@ -89,6 +95,15 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
+
+    @Autowired
+    private RepositoryRepository repositoryRepository;
+
+    @Autowired
+    private RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
     private PracticeGroupRepository practiceGroupRepository;
@@ -204,6 +219,28 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             @Nullable String severity,
             Long artifactId,
             Instant observedAt) {
+        return insertObservation(
+                practice,
+                agentJob,
+                about,
+                title,
+                outcome,
+                severity,
+                artifactId,
+                observedAt,
+                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"context/diff.patch\",\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":50,\"quote\":\"example\",\"quoteRedacted\":false}]}");
+    }
+
+    private UUID insertObservation(
+            Practice practice,
+            AgentJob agentJob,
+            User about,
+            String title,
+            String outcome,
+            @Nullable String severity,
+            Long artifactId,
+            Instant observedAt,
+            String evidence) {
         UUID id = UUID.randomUUID();
         observationRepository.insertIfAbsent(
                 id,
@@ -218,7 +255,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 title,
                 outcome,
                 severity,
-                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"context/diff.patch\",\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":50,\"quote\":\"example\",\"quoteRedacted\":false}]}",
+                evidence,
                 "Reasoning for " + title,
                 "recurrence-" + title,
                 observedAt,
@@ -880,6 +917,121 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .isEqualTo("ARTIFACT_CLOSED")
                     .jsonPath("$.feedback[0].role")
                     .isEqualTo("PRIMARY");
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldKeepOperatorRowsAndIndependentEvidenceWhenHistoryExceedsTheReadBudget() {
+            var provider = ensureGitHubProvider();
+            var repository = new Repository();
+            repository.setNativeId(91001L);
+            repository.setProvider(provider);
+            repository.setName("history-budget");
+            repository.setNameWithOwner("review-output-org/history-budget");
+            repository.setHtmlUrl("https://github.com/review-output-org/history-budget");
+            repository.setVisibility(Repository.Visibility.PUBLIC);
+            repository.setPushedAt(Instant.parse("2026-02-09T00:00:00Z"));
+            repository = repositoryRepository.saveAndFlush(repository);
+            repositoryToMonitorRepository.saveAndFlush(
+                    WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner()));
+            connectActivitySource(workspace, provider);
+
+            var practice = persistPractice(workspace, "operator-history-budget", "Operator history budget");
+            var revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+            practice.setCurrentRevision(revision);
+            practice = practiceRepository.saveAndFlush(practice);
+            Instant from = Instant.parse("2026-02-10T00:00:00Z");
+            Instant to = from.plusSeconds(10);
+            String directEvidence = """
+                    {"citations":[{"sourceKind":"scm.pull-request.diff","artifactPath":"context/diff.patch",
+                      "path":"src/Main.java","side":"NEW","startLine":42,"endLine":50,
+                      "quote":"example","quoteRedacted":false,
+                      "sourceReference":{"records":[{"type":"repository","id":%d}]}}]}
+                    """.formatted(repository.getId());
+            String historyEvidence = """
+                    {"citations":[{"sourceKind":"hephaestus.observation-history",
+                      "artifactPath":"context/people/%d/observations.jsonl","path":"observations.jsonl",
+                      "startLine":1,"endLine":1,"quote":"Earlier observation","quoteRedacted":false,
+                      "sourceReference":{"records":[{"type":"observation","id":"%s","person":%d}]}}]}
+                    """;
+            UUID dependency = insertObservation(
+                    practice, job, alice, "History leaf", "MET", null, 7L, from.minusSeconds(2), directEvidence);
+            for (int i = 0; i < 500; i++) {
+                dependency = insertObservation(
+                        practice,
+                        job,
+                        alice,
+                        "History link " + i,
+                        "NOT_MET",
+                        "MINOR",
+                        7L,
+                        from.minusSeconds(1),
+                        historyEvidence.formatted(alice.getId(), dependency, alice.getId()));
+            }
+            UUID chainHead = dependency;
+            UUID dependent = insertObservation(
+                    practice,
+                    job,
+                    alice,
+                    "Depends on long history",
+                    "NOT_MET",
+                    "MAJOR",
+                    7L,
+                    from.plusSeconds(2),
+                    historyEvidence.formatted(alice.getId(), chainHead, alice.getId()));
+            UUID independent = insertObservation(
+                    practice, job, alice, "Independent evidence", "MET", null, 7L, from.plusSeconds(1), directEvidence);
+
+            getOk(
+                            OBSERVATIONS + "?practiceSlug={practice}&from={from}&to={to}&size=2",
+                            workspace.getWorkspaceSlug(),
+                            practice.getSlug(),
+                            from,
+                            to)
+                    .jsonPath("$.page.totalElements")
+                    .isEqualTo(2)
+                    .jsonPath("$.content.length()")
+                    .isEqualTo(2)
+                    .jsonPath("$.content[0].id")
+                    .isEqualTo(dependent.toString())
+                    .jsonPath("$.content[0].outcome")
+                    .isEqualTo("NOT_MET")
+                    .jsonPath("$.content[0].summary")
+                    .doesNotExist()
+                    .jsonPath("$.content[1].id")
+                    .isEqualTo(independent.toString())
+                    .jsonPath("$.content[1].outcome")
+                    .isEqualTo("MET")
+                    .jsonPath("$.content[1].summary")
+                    .isEqualTo("Independent evidence");
+            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), dependent)
+                    .jsonPath("$.id")
+                    .isEqualTo(dependent.toString())
+                    .jsonPath("$.outcome")
+                    .isEqualTo("NOT_MET")
+                    .jsonPath("$.claimCurrentness")
+                    .isEqualTo("CURRENT")
+                    .jsonPath("$.summary")
+                    .doesNotExist()
+                    .jsonPath("$.evidence")
+                    .doesNotExist()
+                    .jsonPath("$.evidenceRationale")
+                    .doesNotExist();
+            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), independent)
+                    .jsonPath("$.summary")
+                    .isEqualTo("Independent evidence")
+                    .jsonPath("$.evidence.citations[0].path")
+                    .isEqualTo("src/Main.java")
+                    .jsonPath("$.evidenceRationale")
+                    .isEqualTo("Reasoning for Independent evidence");
+            // The head cites exactly 500 history records, proving the chain is otherwise authorized.
+            getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), chainHead)
+                    .jsonPath("$.summary")
+                    .isEqualTo("History link 499")
+                    .jsonPath("$.evidence.citations[0].sourceKind")
+                    .isEqualTo("hephaestus.observation-history")
+                    .jsonPath("$.evidenceRationale")
+                    .isEqualTo("Reasoning for History link 499");
         }
     }
 

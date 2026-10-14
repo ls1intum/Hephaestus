@@ -42,6 +42,8 @@ import tools.jackson.databind.node.ObjectNode;
 /** Reuses source owners' live access checks; frozen quote verification never substitutes for current consent. */
 @Component
 public class CitedSourceAccess {
+    private static final int MAX_OPERATOR_HISTORY_RECORDS = 500;
+
     private final ConversationThreadProjection conversations;
     private final DocumentProjection documents;
     private final ReviewRepositoryPreparer repositories;
@@ -229,7 +231,11 @@ public class CitedSourceAccess {
 
         /**
          * Prepares source authority and history dependencies in batches before citations are asked one by one.
-         * Changes no answer, only how many statements the answers take.
+         * Operator review admits at most {@value CitedSourceAccess#MAX_OPERATOR_HISTORY_RECORDS} unique history
+         * records in these checks for one workspace, purpose, reader, and thread. All initial roots precede
+         * deeper dependencies; each complete breadth-first frontier is admitted in type and UUID key order.
+         * Records beyond that allowance are denied without history-record reads. Other purposes retain the same
+         * answers as individual checks.
          */
         default void prepare(Iterable<JsonNode> citations) {}
     }
@@ -253,6 +259,7 @@ public class CitedSourceAccess {
         private final Map<Long, Boolean> personAnswers = new HashMap<>();
         private final Map<Long, Boolean> aiAnswers = new HashMap<>();
         private final Map<String, Boolean> historyAnswers = new HashMap<>();
+        private final Set<String> admittedHistory = new HashSet<>();
         /** History records a batch of {@link #prepare} is checking right now. */
         private final Set<String> inBatch = new HashSet<>();
 
@@ -357,7 +364,7 @@ public class CitedSourceAccess {
             citations.forEach(citationList::add);
             Map<String, HistoryRecord> found = new HashMap<>();
             Map<String, Set<String>> waitsOn = new LinkedHashMap<>();
-            Set<String> frontier = unansweredHistory(citationList, found);
+            Set<String> frontier = admitHistoryFrontier(unansweredHistory(citationList, found));
             while (!frontier.isEmpty()) {
                 Set<String> next = new LinkedHashSet<>();
                 byType(frontier, found).forEach((type, ids) -> {
@@ -371,7 +378,7 @@ public class CitedSourceAccess {
                     }
                 });
                 next.removeAll(waitsOn.keySet());
-                frontier = next;
+                frontier = admitHistoryFrontier(next);
             }
             prepareDirectRecords(citationList);
             while (!waitsOn.isEmpty()) {
@@ -490,6 +497,13 @@ public class CitedSourceAccess {
             return keys;
         }
 
+        private Set<String> admitHistoryFrontier(Set<String> keys) {
+            if (purpose != SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW) return keys;
+            Set<String> admitted = new LinkedHashSet<>();
+            keys.stream().sorted().filter(this::admitHistory).forEach(admitted::add);
+            return admitted;
+        }
+
         private static Map<String, Set<UUID>> byType(Set<String> keys, Map<String, HistoryRecord> found) {
             Map<String, Set<UUID>> byType = new LinkedHashMap<>();
             for (String key : keys) {
@@ -508,11 +522,22 @@ public class CitedSourceAccess {
             String key = historyKey(type, id);
             Boolean answer = historyAnswers.get(key);
             if (answer == null) {
+                if (!admitHistory(key)) return false;
                 historyAnswers.put(key, false);
                 answer = withThisRead(() -> history.permitsHistoryRecord(workspace, type, id, purpose));
                 historyAnswers.put(key, answer);
             }
             return answer;
+        }
+
+        private boolean admitHistory(String key) {
+            if (purpose != SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW || admittedHistory.contains(key)) return true;
+            if (admittedHistory.size() >= MAX_OPERATOR_HISTORY_RECORDS) {
+                historyAnswers.put(key, false);
+                return false;
+            }
+            admittedHistory.add(key);
+            return true;
         }
 
         /** Runs a history check with this read active, so the checks nested in it share this read's answers. */
