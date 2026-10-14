@@ -8,6 +8,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -16,10 +19,14 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Unit tests for {@link ProcessingContextFactory}.
@@ -30,7 +37,10 @@ import org.junit.jupiter.api.Test;
 @Tag("unit")
 class ProcessingContextFactoryTest {
 
+    private static final long GITHUB_PROVIDER_ID = 1L;
+
     private RepositoryRepository repositoryRepository;
+    private IdentityProviderRepository identityProviderRepository;
     private ScopeIdResolver scopeIdResolver;
     private RepositoryScopeFilter repositoryScopeFilter;
     private ProcessingContextFactory factory;
@@ -38,9 +48,14 @@ class ProcessingContextFactoryTest {
     @BeforeEach
     void setUp() {
         repositoryRepository = mock(RepositoryRepository.class);
+        identityProviderRepository = mock(IdentityProviderRepository.class);
+        when(identityProviderRepository.findByTypeAndServerUrl(
+                        IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL))
+                .thenReturn(Optional.of(TestEntities.gitProvider(GITHUB_PROVIDER_ID, IdentityProviderType.GITHUB)));
         scopeIdResolver = mock(ScopeIdResolver.class);
         repositoryScopeFilter = mock(RepositoryScopeFilter.class);
-        factory = new ProcessingContextFactory(repositoryRepository, scopeIdResolver, repositoryScopeFilter);
+        factory = new ProcessingContextFactory(
+                repositoryRepository, identityProviderRepository, scopeIdResolver, repositoryScopeFilter);
     }
 
     @Nested
@@ -72,11 +87,24 @@ class ProcessingContextFactoryTest {
         }
 
         @Test
+        void shouldReturnNoContextWhenTheGitHubProviderIsUnavailable() {
+            String repoFullName = "ls1intum/Hephaestus";
+            GitHubWebhookEvent event = createEventWithRepo(repoFullName);
+            when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
+            when(identityProviderRepository.findByTypeAndServerUrl(
+                            IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL))
+                    .thenReturn(Optional.empty());
+
+            assertThat(factory.forWebhookEvent(event)).isEmpty();
+            verifyNoInteractions(repositoryRepository, scopeIdResolver);
+        }
+
+        @Test
         void returnsEmpty_whenRepositoryNotInDatabase() {
             String repoFullName = "ls1intum/Hephaestus";
             GitHubWebhookEvent event = createEventWithRepo(repoFullName);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.empty());
 
             Optional<ProcessingContext> result = factory.forWebhookEvent(event);
@@ -92,7 +120,7 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(null);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(42L));
 
@@ -139,18 +167,20 @@ class ProcessingContextFactoryTest {
             verifyNoInteractions(repositoryScopeFilter, repositoryRepository);
         }
 
-        @Test
-        void shouldUseTheNamedRepositoryWhenItIsSynchronized() {
+        @ParameterizedTest
+        @NullSource
+        @ValueSource(longs = 2L)
+        void shouldUseTheNamedRepositoryWhenItIsSynchronized(@Nullable Long nativeId) {
             String repoFullName = "ls1intum/Artemis";
             Repository named = TestEntities.repository(2L, repoFullName);
             named.setOrganization(null);
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.of(named));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(7L));
 
             Optional<ProcessingContext> result =
-                    factory.forRelatedIssue(delivering, repositoryRef(repoFullName), "blocked_by_added");
+                    factory.forRelatedIssue(delivering, repositoryRef(repoFullName, nativeId), "blocked_by_added");
 
             assertThat(result).hasValueSatisfying(context -> {
                 assertThat(context.repository()).isEqualTo(named);
@@ -158,8 +188,8 @@ class ProcessingContextFactoryTest {
             });
         }
 
-        private static GitHubRepositoryRefDTO repositoryRef(String fullName) {
-            return new GitHubRepositoryRefDTO(2L, "node_id", "repo", fullName, false, "url", null);
+        private static GitHubRepositoryRefDTO repositoryRef(String fullName, @Nullable Long nativeId) {
+            return new GitHubRepositoryRefDTO(nativeId, "node_id", "repo", fullName, false, "url", null);
         }
     }
 
@@ -177,7 +207,7 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(TestEntities.organization(1L, orgLogin));
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.of(expectedScopeId));
 
@@ -199,7 +229,7 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(null); // Personal repo - no org!
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(expectedScopeId));
 
@@ -222,7 +252,7 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(TestEntities.organization(1L, orgLogin));
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByOrgLogin(orgLogin)).thenReturn(Optional.empty());
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.of(expectedScopeId));
@@ -244,7 +274,7 @@ class ProcessingContextFactoryTest {
             repository.setOrganization(null);
 
             when(repositoryScopeFilter.isRepositoryAllowed(repoFullName)).thenReturn(true);
-            when(repositoryRepository.findByNameWithOwnerWithOrganization(repoFullName))
+            when(repositoryRepository.findByNameWithOwnerAndProviderId(repoFullName, GITHUB_PROVIDER_ID))
                     .thenReturn(Optional.of(repository));
             when(scopeIdResolver.findScopeIdByRepositoryName(repoFullName)).thenReturn(Optional.empty());
 
