@@ -9,6 +9,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
@@ -88,6 +91,7 @@ public class GitHubSubIssueSyncService {
 
     private final IssueRepository issueRepository;
     private final RepositoryRepository repositoryRepository;
+    private final IdentityProviderRepository identityProviderRepository;
     private final SyncTargetProvider syncTargetProvider;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
@@ -101,6 +105,7 @@ public class GitHubSubIssueSyncService {
     public GitHubSubIssueSyncService(
             IssueRepository issueRepository,
             RepositoryRepository repositoryRepository,
+            IdentityProviderRepository identityProviderRepository,
             SyncTargetProvider syncTargetProvider,
             GitHubGraphQlClientProvider graphQlClientProvider,
             GitHubSyncProperties syncProperties,
@@ -111,6 +116,7 @@ public class GitHubSubIssueSyncService {
             GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
+        this.identityProviderRepository = identityProviderRepository;
         this.syncTargetProvider = syncTargetProvider;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
@@ -278,6 +284,11 @@ public class GitHubSubIssueSyncService {
             return 0;
         }
 
+        var provider = identityProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl="
+                        + PersonSourceNamespace.GITHUB_DEFAULT_URL));
+        Long providerId = Objects.requireNonNull(provider.getId());
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
 
         log.info("Starting sub-issue sync: scopeId={}, repoCount={}", scopeId, repositoryNames.size());
@@ -293,7 +304,8 @@ public class GitHubSubIssueSyncService {
                 }
             }
 
-            Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
+            Optional<Repository> repoOpt =
+                    repositoryRepository.findByNameWithOwnerAndProviderId(repoNameWithOwner, providerId);
             if (repoOpt.isEmpty()) {
                 log.debug(
                         "Skipped sub-issue sync: reason=repositoryNotFound, repoName={}",
