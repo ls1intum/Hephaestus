@@ -4,8 +4,10 @@ import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resu
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageSupportReader;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
@@ -25,6 +27,9 @@ class FeedbackBasisRepositoryIntegrationTest extends AbstractFeedbackIntegration
 
     @Autowired
     private PracticePageSupportReader support;
+
+    @Autowired
+    private DeliveredCommentLookupService delivered;
 
     @Test
     void shouldReadOnlyThisWorkspacesBasisInItsStoredOrder() {
@@ -100,6 +105,32 @@ class FeedbackBasisRepositoryIntegrationTest extends AbstractFeedbackIntegration
                         .evidence())
                 .extracting(Result::getId)
                 .containsExactly(expected.getId());
+    }
+
+    @Test
+    void shouldRequireTheRequestedWorkspacesNativeRepositoryBeforeReturningReceipts() {
+        long repository = 900;
+        long parent = Objects.requireNonNull(jdbc.queryForObject(
+                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES"
+                        + " (?,'scm.repository',?,?) RETURNING id",
+                Long.class,
+                workspace.getId(),
+                repository,
+                Timestamp.from(AT)));
+        jdbc.update("UPDATE item SET parent_id=? WHERE workspace_id=? AND id=?", parent, workspace.getId(), itemId);
+        var copy = summary(piece(FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, AT), FeedbackCopyState.POSTED);
+        var kind = new ItemKind("scm.pull_request");
+        assertThat(delivered
+                        .findForRepository(workspace.getId(), repository, kind)
+                        .get(42L))
+                .singleElement()
+                .satisfies(receipt -> assertThat(receipt.externalRef()).isEqualTo(copy.getExternalRef()));
+        assertThat(delivered.findForRepository(workspace.getId() + 1, repository, kind))
+                .isEmpty();
+        assertThat(delivered.findForRepository(workspace.getId(), repository + 1, kind))
+                .isEmpty();
+        assertThat(delivered.findForRepository(workspace.getId(), repository, new ItemKind("scm.issue")))
+                .isEmpty();
     }
 
     private void currentResultOnNewWork(Result template, Instant recordedAt, int sourceOffset) {

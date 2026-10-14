@@ -165,9 +165,14 @@ public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
             @Param("summaryKind") String summaryKind,
             @Param("states") List<String> states);
 
-    @Query(
-            value = ISSUE_RECEIPTS + " AND i.workspace_id=:workspaceId AND parent.source_id=:repositoryId",
-            nativeQuery = true)
+    @Query(value = ISSUE_RECEIPTS + """
+        AND parent.source_id=:repositoryId
+        AND EXISTS (
+          SELECT 1 FROM item permitted
+          WHERE permitted.workspace_id=:workspaceId AND permitted.kind=parent.kind
+            AND permitted.source_id=parent.source_id
+        )
+        """, nativeQuery = true)
     List<IssueReceipt> repositoryReceipts(
             @Param("workspaceId") long workspaceId,
             @Param("repositoryId") long repositoryId,

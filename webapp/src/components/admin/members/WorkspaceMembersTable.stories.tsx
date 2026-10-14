@@ -14,7 +14,7 @@ import {
 import { workspaceMemberRows } from "./workspace-members";
 import { WorkspaceMembersTable } from "./WorkspaceMembersTable";
 
-const members = workspaceMemberRows(mockMemberships, mockTeams);
+const members = workspaceMemberRows(mockMemberships);
 
 type Scope = StoryContext["canvas"];
 
@@ -34,6 +34,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		members,
+		rowCount: members.length,
 		teams: mockTeams,
 		onToggleHidden: fn(),
 		onRoleChange: fn(),
@@ -61,7 +62,7 @@ export const Default: Story = {
 };
 
 export const MultiProviderAccount: Story = {
-	args: { members: workspaceMemberRows([multiProviderMember], mockTeams) },
+	args: { members: workspaceMemberRows([multiProviderMember]), rowCount: 1 },
 	play: async ({ canvas }) => {
 		const row = within(rowOf(canvas, "Alice Johnson"));
 		await expect(row.getByText("alice")).toBeVisible();
@@ -72,7 +73,7 @@ export const MultiProviderAccount: Story = {
 };
 
 export const UnclaimedAccount: Story = {
-	args: { members: workspaceMemberRows([unclaimedMember], mockTeams) },
+	args: { members: workspaceMemberRows([unclaimedMember]), rowCount: 1 },
 	play: async ({ canvas }) => {
 		const row = within(rowOf(canvas, "Bob Smith"));
 		await expect(row.getByText("Unclaimed")).toBeVisible();
@@ -82,18 +83,16 @@ export const UnclaimedAccount: Story = {
 
 export const MemberWhoLeft: Story = {
 	args: {
-		members: workspaceMemberRows(
-			[
-				membership(
-					memberAccount("21", {
-						displayName: "Erin Former",
-						identities: [{ provider: "GITHUB", login: "erin", displayName: null, avatarUrl: null }],
-					}),
-					{ leftAt: new Date("2026-06-30T12:00:00Z") },
-				),
-			],
-			[],
-		),
+		rowCount: 1,
+		members: workspaceMemberRows([
+			membership(
+				memberAccount("21", {
+					displayName: "Erin Former",
+					identities: [{ provider: "GITHUB", login: "erin", displayName: null, avatarUrl: null }],
+				}),
+				{ leftAt: new Date("2026-06-30T12:00:00Z") },
+			),
+		]),
 	},
 	play: async ({ canvas }) => {
 		await expect(within(rowOf(canvas, "Erin Former")).getByText(/^Left /u)).toBeVisible();
@@ -110,6 +109,8 @@ export const RoleChangePending: Story = {
 
 export const FilteredByTeam: Story = {
 	args: {
+		members: workspaceMemberRows([multiProviderMember]),
+		rowCount: 1,
 		view: { q: "", team: "3", sort: "name", desc: false, page: 0, size: 10 },
 	},
 	play: async ({ canvas }) => {
@@ -127,16 +128,30 @@ export const Loading: Story = {
 	args: {
 		isLoading: true,
 		members: [],
+		rowCount: 0,
 	},
 };
 
 export const Empty: Story = {
 	args: {
 		members: [],
+		rowCount: 0,
 		isLoading: false,
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("This workspace has no members yet.")).toBeVisible();
+	},
+};
+
+export const EmptyPage: Story = {
+	args: {
+		members: [],
+		rowCount: 2,
+		view: { q: "", team: "all", sort: "name", desc: false, page: 9, size: 10 },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("No members on this page")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Go to first page" })).toBeVisible();
 	},
 };
 
@@ -150,18 +165,18 @@ export const ReadOnly: Story = {
 
 export const ManyMembers: Story = {
 	args: {
+		rowCount: 50,
 		members: workspaceMemberRows(
-			Array.from({ length: 50 }, (_, i) =>
+			Array.from({ length: 10 }, (_, i) =>
 				membership(
 					memberAccount(String(i + 100), {
-						displayName: `User ${i + 1}`,
+						displayName: `User ${String(i + 1).padStart(2, "0")}`,
 						identities: [
 							{ provider: "GITHUB", login: `user${i + 1}`, displayName: null, avatarUrl: null },
 						],
 					}),
 				),
 			),
-			mockTeams,
 		),
 	},
 };

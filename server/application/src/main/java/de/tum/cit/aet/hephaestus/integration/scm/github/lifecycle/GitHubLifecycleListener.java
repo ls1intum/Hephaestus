@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.lifecycle;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
@@ -658,7 +659,12 @@ public class GitHubLifecycleListener implements IntegrationLifecycleListener {
         }
 
         String prefix = oldLogin + "/";
-        var repositories = repositoryRepository.findByNameWithOwnerStartingWithIgnoreCase(prefix);
+        Long providerId = Objects.requireNonNull(gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider for GitHub not found"))
+                .getId());
+        var repositories =
+                repositoryRepository.findByNameWithOwnerStartingWithIgnoreCaseAndProviderId(prefix, providerId);
         if (repositories.isEmpty()) {
             return;
         }

@@ -102,7 +102,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
               AND (:person = 0 OR e.actor_id = :person)
               AND e.repository_id IN (:#{#scope.repositoryIds()})
               AND (:#{#scope.teamIds().isEmpty()} = true OR (
-                  EXISTS (SELECT 1 FROM team_membership tm WHERE tm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '') AND tm.team_id IN (:#{#scope.teamIds()}))
+                  EXISTS (SELECT 1 FROM team_membership tm WHERE tm.user_id = u.id AND tm.team_id IN (:#{#scope.teamIds()}))
                   AND EXISTS (SELECT 1 FROM team_repository_permission p
                       WHERE p.repository_id = e.repository_id AND p.team_id IN (:#{#scope.teamIds()}))
                   AND NOT EXISTS (SELECT 1 FROM workspace_team_repository_settings s
@@ -437,7 +437,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             AND NOT EXISTS (SELECT 1 FROM activity_automation a
                 WHERE a.workspace_id = :#{#scope.workspaceId()} AND a.user_id = u.id)
             AND (:#{#scope.teamIds().isEmpty()} = true OR EXISTS (SELECT 1 FROM team_membership tm
-                WHERE tm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '') AND tm.team_id IN (:#{#scope.teamIds()})))
+                WHERE tm.user_id = u.id AND tm.team_id IN (:#{#scope.teamIds()})))
             AND EXISTS (SELECT 1 FROM activity_event e JOIN repository r ON r.id = e.repository_id
                 WHERE e.workspace_id = :#{#scope.workspaceId()} AND e.actor_id = u.id
                     AND e.repository_id IN (:#{#scope.repositoryIds()}) AND r.provider_id = u.provider_id)

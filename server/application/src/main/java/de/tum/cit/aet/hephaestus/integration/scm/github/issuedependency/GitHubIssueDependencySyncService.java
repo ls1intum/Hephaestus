@@ -9,6 +9,9 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.adaptPageSize;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider.SyncMetadata;
@@ -90,6 +93,7 @@ public class GitHubIssueDependencySyncService {
 
     private final IssueRepository issueRepository;
     private final RepositoryRepository repositoryRepository;
+    private final IdentityProviderRepository identityProviderRepository;
     private final SyncTargetProvider syncTargetProvider;
     private final GitHubGraphQlClientProvider graphQlClientProvider;
     private final GitHubSyncProperties syncProperties;
@@ -103,6 +107,7 @@ public class GitHubIssueDependencySyncService {
     public GitHubIssueDependencySyncService(
             IssueRepository issueRepository,
             RepositoryRepository repositoryRepository,
+            IdentityProviderRepository identityProviderRepository,
             SyncTargetProvider syncTargetProvider,
             GitHubGraphQlClientProvider graphQlClientProvider,
             GitHubSyncProperties syncProperties,
@@ -113,6 +118,7 @@ public class GitHubIssueDependencySyncService {
             GitHubGraphQlSyncCoordinator graphQlSyncHelper) {
         this.issueRepository = issueRepository;
         this.repositoryRepository = repositoryRepository;
+        this.identityProviderRepository = identityProviderRepository;
         this.syncTargetProvider = syncTargetProvider;
         this.graphQlClientProvider = graphQlClientProvider;
         this.syncProperties = syncProperties;
@@ -201,6 +207,11 @@ public class GitHubIssueDependencySyncService {
             return 0;
         }
 
+        var provider = identityProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL)
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for type=GITHUB, serverUrl="
+                        + PersonSourceNamespace.GITHUB_DEFAULT_URL));
+        Long providerId = Objects.requireNonNull(provider.getId());
         HttpGraphQlClient client = graphQlClientProvider.forScope(scopeId);
         int totalSynced = 0;
         int failedRepoCount = 0;
@@ -213,7 +224,8 @@ public class GitHubIssueDependencySyncService {
                 }
             }
 
-            Optional<Repository> repoOpt = repositoryRepository.findByNameWithOwnerWithOrganization(repoNameWithOwner);
+            Optional<Repository> repoOpt =
+                    repositoryRepository.findByNameWithOwnerAndProviderId(repoNameWithOwner, providerId);
             if (repoOpt.isEmpty()) {
                 log.debug(
                         "Skipped dependency sync: reason=repositoryNotFound, repoName={}",
@@ -222,7 +234,7 @@ public class GitHubIssueDependencySyncService {
             }
 
             try {
-                int synced = syncRepositoryDependencies(client, repoOpt.get(), scopeId);
+                int synced = syncRepositoryDependencies(client, repoOpt.get(), scopeId, providerId);
                 totalSynced += synced;
             } catch (InstallationNotFoundException e) {
                 log.warn("Installation not found for scope {}, skipping issue dependency sync", scopeId);
@@ -266,7 +278,7 @@ public class GitHubIssueDependencySyncService {
      * Sync dependencies for a single repository.
      * Uses type-safe generated DTOs for GraphQL response handling.
      */
-    private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo, Long scopeId) {
+    private int syncRepositoryDependencies(HttpGraphQlClient client, Repository repo, Long scopeId, Long providerId) {
         String safeNameWithOwner = Objects.requireNonNullElse(sanitizeForLog(repo.getNameWithOwner()), "<unknown>");
         Optional<RepositoryOwnerAndName> parsedName = GitHubRepositoryNameParser.parse(repo.getNameWithOwner());
         if (parsedName.isEmpty()) {
@@ -377,8 +389,8 @@ public class GitHubIssueDependencySyncService {
 
             retryAttempt = 0;
 
-            totalSynced +=
-                    transactionTemplate.execute(status -> processIssueDependencies(issueConnection, repo, scopeId));
+            totalSynced += transactionTemplate.execute(
+                    status -> processIssueDependencies(issueConnection, repo, scopeId, providerId));
         }
 
         // Raw issue nodes received (not dependency relationships synced) vs issues.totalCount.
@@ -396,14 +408,15 @@ public class GitHubIssueDependencySyncService {
      * Using REQUIRES_NEW ensures each page is committed independently,
      * providing better resilience if a single page fails.
      */
-    private int processIssueDependencies(GHIssueConnection issueConnection, Repository repo, Long scopeId) {
+    private int processIssueDependencies(
+            GHIssueConnection issueConnection, Repository repo, Long scopeId, Long providerId) {
         if (issueConnection.getNodes() == null) {
             return 0;
         }
 
         int synced = 0;
         for (var graphQlIssue : issueConnection.getNodes()) {
-            synced += processIssueDependencies(graphQlIssue, repo, scopeId);
+            synced += processIssueDependencies(graphQlIssue, repo, scopeId, providerId);
         }
         return synced;
     }
@@ -415,7 +428,7 @@ public class GitHubIssueDependencySyncService {
      * we create it from the GraphQL data. This ensures relationships are
      * preserved even before backfill completes.
      */
-    private int processIssueDependencies(GHIssue graphQlIssue, Repository repo, Long scopeId) {
+    private int processIssueDependencies(GHIssue graphQlIssue, Repository repo, Long scopeId, Long providerId) {
         if (graphQlIssue.getFullDatabaseId() == null) {
             return 0;
         }
@@ -453,7 +466,7 @@ public class GitHubIssueDependencySyncService {
                 blockedBy.getTotalCount(),
                 "Issue #" + graphQlIssue.getNumber());
 
-        return syncBlockedByRelationships(issue, blockedBy.getNodes(), scopeId);
+        return syncBlockedByRelationships(issue, blockedBy.getNodes(), scopeId, providerId);
     }
 
     /**
@@ -501,7 +514,7 @@ public class GitHubIssueDependencySyncService {
      * doesn't exist locally, we create a stub issue from the GraphQL data.
      * This ensures relationships are preserved even before backfill completes.
      */
-    private int syncBlockedByRelationships(Issue issue, List<GHIssue> blockerNodes, Long scopeId) {
+    private int syncBlockedByRelationships(Issue issue, List<GHIssue> blockerNodes, Long scopeId, Long providerId) {
         if (blockerNodes.isEmpty()) {
             // Remove all existing relationships
             int removed = issue.getBlockedBy().size();
@@ -539,7 +552,7 @@ public class GitHubIssueDependencySyncService {
         List<Issue> createdBlockers = new ArrayList<>();
         for (Long missingId : missingBlockerIds) {
             GHIssue blockerGraphQl = blockerGraphQlData.get(missingId);
-            Issue createdBlocker = createBlockerIssue(blockerGraphQl, scopeId);
+            Issue createdBlocker = createBlockerIssue(blockerGraphQl, scopeId, providerId);
             if (createdBlocker != null) {
                 createdBlockers.add(createdBlocker);
                 log.debug(
@@ -589,13 +602,13 @@ public class GitHubIssueDependencySyncService {
      * triggering domain events. These stubs will be hydrated with full data when
      * the regular issue sync runs.
      */
-    private @Nullable Issue createBlockerIssue(@Nullable GHIssue blockerGraphQl, Long scopeId) {
+    private @Nullable Issue createBlockerIssue(@Nullable GHIssue blockerGraphQl, Long scopeId, Long providerId) {
         if (blockerGraphQl == null || blockerGraphQl.getFullDatabaseId() == null) {
             return null;
         }
 
         // The blocker may be in a different repository
-        Repository blockerRepo = resolveBlockerRepository(blockerGraphQl);
+        Repository blockerRepo = resolveBlockerRepository(blockerGraphQl, providerId);
         if (blockerRepo == null) {
             log.debug(
                     "Skipped creating blocker: reason=repositoryNotFound, blockerId={}, blockerNumber={}",
@@ -622,7 +635,7 @@ public class GitHubIssueDependencySyncService {
      * we just skip blockers in unknown repositories.
      */
     @Nullable
-    private Repository resolveBlockerRepository(GHIssue blockerGraphQl) {
+    private Repository resolveBlockerRepository(GHIssue blockerGraphQl, Long providerId) {
         if (blockerGraphQl.getRepository() == null) {
             return null;
         }
@@ -633,7 +646,7 @@ public class GitHubIssueDependencySyncService {
         }
 
         return repositoryRepository
-                .findByNameWithOwnerWithOrganization(nameWithOwner)
+                .findByNameWithOwnerAndProviderId(nameWithOwner, providerId)
                 .orElse(null);
     }
 

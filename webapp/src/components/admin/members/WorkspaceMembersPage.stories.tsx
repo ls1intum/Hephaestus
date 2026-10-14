@@ -8,7 +8,7 @@ import { mockMemberships, mockTeams } from "./fixtures";
 import { workspaceMemberRows } from "./workspace-members";
 import { WorkspaceMembersPage } from "./WorkspaceMembersPage";
 
-const members = workspaceMemberRows(mockMemberships, mockTeams);
+const members = workspaceMemberRows(mockMemberships);
 
 const meta = {
 	component: WorkspaceMembersPage,
@@ -19,6 +19,7 @@ const meta = {
 	tags: ["autodocs"],
 	args: {
 		members,
+		rowCount: members.length,
 		teams: mockTeams,
 		isLoading: false,
 		onToggleHidden: fn(),
@@ -37,6 +38,7 @@ export const Default: Story = {};
 export const Loading: Story = {
 	args: {
 		members: [],
+		rowCount: 0,
 		teams: [],
 		isLoading: true,
 	},
@@ -52,6 +54,7 @@ export const Loading: Story = {
 export const Empty: Story = {
 	args: {
 		members: [],
+		rowCount: 0,
 		isLoading: false,
 	},
 	play: async ({ canvas }) => {
@@ -93,6 +96,7 @@ export const TeamsRefused: Story = {
 export const Error: Story = {
 	args: {
 		members: [],
+		rowCount: 0,
 		error: { status: 503, detail: "Service unavailable" },
 		onRetry: fn(),
 	},
@@ -105,7 +109,7 @@ export const Error: Story = {
 
 export const NoTeams: Story = {
 	args: {
-		members: workspaceMemberRows(mockMemberships, []),
+		members: workspaceMemberRows(mockMemberships),
 		teams: [],
 	},
 };

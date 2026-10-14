@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.handler.AgentHandlerTestDoubles;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -25,14 +24,8 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
-import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
-import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
-import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles;
-import de.tum.cit.aet.hephaestus.testconfig.StubInstallationRepositoryEnumerator;
-import de.tum.cit.aet.hephaestus.testconfig.TestAsyncConfiguration;
-import de.tum.cit.aet.hephaestus.testconfig.TestSecurityConfig;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceEchoControllers;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.time.Instant;
@@ -40,47 +33,15 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.annotation.Import;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@AutoConfigureWebTestClient(timeout = "30s")
-@Import({
-    TestSecurityConfig.class,
-    TestAsyncConfiguration.class,
-    RecordingScmEventListener.class,
-    StubInstallationRepositoryEnumerator.class,
-    SharedTestDoubles.class,
-    AgentHandlerTestDoubles.class,
-    WorkspaceEchoControllers.ScopedEchoController.class,
-    WorkspaceEchoControllers.WorkspaceContextEchoController.class
-})
-@TestPropertySource(
-        properties = {"hephaestus.features.flags.gitlab-workspace-creation=true", "hephaestus.llm.display-currency="})
-@Tag("database")
-class ReviewMethodPersistenceDatabaseTest {
-    @DynamicPropertySource
-    static void database(DynamicPropertyRegistry properties) {
-        var postgres = PostgreSQLTestContainer.getInstance();
-        properties.add("spring.datasource.url", postgres::getJdbcUrl);
-        properties.add("spring.datasource.username", postgres::getUsername);
-        properties.add("spring.datasource.password", postgres::getPassword);
-    }
-
+class ReviewMethodPersistenceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 

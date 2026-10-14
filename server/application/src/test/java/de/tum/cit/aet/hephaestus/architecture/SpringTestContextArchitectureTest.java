@@ -73,7 +73,6 @@ class SpringTestContextArchitectureTest extends HephaestusArchitectureTest {
             assignment("practices.result.PracticeGroupStandingIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultAdmissionIntegrationTest", "review-resultadmission"),
             assignment("practices.result.ResultControllerIntegrationTest", "review-fixture"),
-            assignment("practices.result.ResultCurrentOrderIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultHistoryIntegrationTest", "review-resulthistory"),
             assignment("practices.result.ResultMarkServiceIntegrationTest", "review-fixture"),
             assignment("practices.result.ResultRepositoryIntegrationTest", "review-fixture"),

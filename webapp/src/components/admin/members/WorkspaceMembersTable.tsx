@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-table";
 import { ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- TanStack Table keys its caches on identity, which the compiler memoises as an optimisation rather than promises; each `useMemo` below says what breaks without it.
-import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactElement, useMemo, useState } from "react";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -63,6 +63,7 @@ const SKELETON_WIDTHS: Record<string, string> = {
 
 interface WorkspaceMembersTableProps {
 	members: WorkspaceMemberRow[];
+	rowCount: number;
 	teams: TeamInfo[];
 	isLoading?: boolean;
 	onToggleHidden?: (accountId: string, hidden: boolean) => void;
@@ -102,6 +103,7 @@ function AccountStatus({ row }: { row: WorkspaceMemberRow }) {
 
 export function WorkspaceMembersTable({
 	members,
+	rowCount,
 	teams,
 	isLoading = false,
 	onToggleHidden,
@@ -242,19 +244,6 @@ export function WorkspaceMembersTable({
 		[onToggleHidden, onRoleChange, pendingRoleAccountId],
 	);
 
-	// The table's `data`, keyed the same way `columns` is: the core row model is cached against this
-	// array's identity.
-	const filteredData = useMemo(
-		() =>
-			members.filter((member) => {
-				if (view.team === "all") {
-					return true;
-				}
-				return member.teams.some((team) => team.id.toString() === view.team);
-			}),
-		[members, view.team],
-	);
-
 	const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
 
 	const teamFilterItems = [
@@ -272,7 +261,11 @@ export function WorkspaceMembersTable({
 	// render overwrites it.
 	const table = useTable({
 		features: dataTableFeatures,
-		data: filteredData,
+		data: members,
+		rowCount,
+		manualFiltering: true,
+		manualSorting: true,
+		manualPagination: true,
 		columns,
 		autoResetPageIndex: false,
 		onSortingChange: (updater) => {
@@ -284,12 +277,6 @@ export function WorkspaceMembersTable({
 			});
 		},
 		onColumnVisibilityChange: setColumnVisibility,
-		onGlobalFilterChange: (updater) => {
-			// The library types `globalFilter` as `any`, so the value is narrowed on the way back out
-			// rather than trusted into a typed search param.
-			const next: unknown = functionalUpdate(updater, view.q.trim());
-			onViewChange({ q: typeof next === "string" ? next : "", page: 0 });
-		},
 		onPaginationChange: (updater) => {
 			const next = functionalUpdate(updater, { pageIndex: view.page, pageSize: view.size });
 			if (next.pageIndex !== view.page || next.pageSize !== view.size) {
@@ -299,17 +286,15 @@ export function WorkspaceMembersTable({
 		state: {
 			sorting,
 			columnVisibility,
-			globalFilter: view.q.trim(),
 			pagination: { pageIndex: view.page, pageSize: view.size },
 		},
 	});
-	const lastPage = Math.max(0, table.getPageCount() - 1);
 
-	useEffect(() => {
-		if (!isLoading && view.page > lastPage) {
-			onViewChange({ page: lastPage });
-		}
-	}, [isLoading, lastPage, onViewChange, view.page]);
+	const noMatchesMessage =
+		hasText(view.q) || view.team !== "all"
+			? "Try a different search or team."
+			: "This workspace has no members yet.";
+	const emptyMessage = rowCount > 0 ? "Choose another page." : noMatchesMessage;
 
 	let body: ReactElement | ReactElement[];
 	if (table.getRowModel().rows.length > 0) {
@@ -328,12 +313,15 @@ export function WorkspaceMembersTable({
 				<TableCell colSpan={table.getVisibleLeafColumns().length} className="h-32 text-center">
 					<div className="flex flex-col items-center justify-center space-y-2">
 						<Users className="h-8 w-8 text-muted-foreground" />
-						<p className="text-sm font-medium">No members found</p>
-						<p className="text-xs text-muted-foreground">
-							{view.q || view.team !== "all"
-								? "Try a different search or team."
-								: "This workspace has no members yet."}
+						<p className="text-sm font-medium">
+							{rowCount > 0 ? "No members on this page" : "No members found"}
 						</p>
+						<p className="text-xs text-muted-foreground">{emptyMessage}</p>
+						{rowCount > 0 && view.page > 0 && (
+							<Button variant="outline" size="sm" onClick={() => onViewChange({ page: 0 })}>
+								Go to first page
+							</Button>
+						)}
 					</div>
 				</TableCell>
 			</TableRow>

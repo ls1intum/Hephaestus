@@ -14,6 +14,7 @@ import type { WorkspaceRole } from "@/lib/workspace-roles";
 
 interface WorkspaceMembersPageProps {
 	members: WorkspaceMemberRow[];
+	rowCount: number;
 	teams: TeamInfo[];
 	isLoading: boolean;
 	error?: unknown;
@@ -31,6 +32,7 @@ interface WorkspaceMembersPageProps {
 
 export function WorkspaceMembersPage({
 	members,
+	rowCount,
 	teams,
 	isLoading,
 	error,
@@ -64,6 +66,7 @@ export function WorkspaceMembersPage({
 					)}
 					<WorkspaceMembersTable
 						members={members}
+						rowCount={rowCount}
 						teams={teams}
 						isLoading={isLoading}
 						onToggleHidden={onToggleHidden}

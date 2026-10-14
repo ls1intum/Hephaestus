@@ -1,6 +1,5 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -9,8 +8,8 @@ import {
 	getAllTeamsOptions,
 	getOwnMembershipQueryKey,
 	getUsersWithTeamsQueryKey,
-	listMembershipsInfiniteOptions,
-	listMembershipsInfiniteQueryKey,
+	listMembershipsOptions,
+	listMembershipsQueryKey,
 	setMemberHiddenMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { WorkspaceMembership } from "@/api/types.gen";
@@ -26,11 +25,7 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
-import { springPageParams } from "@/runtime/tanstack-query/spring-page";
 import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
-
-/** The server's largest page: the table filters and sorts every member, so it reads them all. */
-const MEMBER_PAGE_SIZE = 100;
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/members")({
 	head: workspaceAdminHead("Members"),
@@ -61,22 +56,29 @@ function AdminMembersContainer() {
 		error: workspaceError,
 	} = useActiveWorkspaceSlug();
 
-	const membersQueryOptions = listMembershipsInfiniteOptions({
+	const view: WorkspaceMembersTableView = {
+		q: search.q ?? "",
+		team: search.team ?? "all",
+		sort: search.sort ?? "name",
+		desc: search.desc ?? false,
+		page: search.page ?? 0,
+		size: search.size ?? 10,
+	};
+	const membersQueryOptions = listMembershipsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
-		query: { size: MEMBER_PAGE_SIZE },
+		query: {
+			q: hasText(view.q.trim()) ? view.q.trim() : undefined,
+			team: view.team === "all" ? undefined : view.team,
+			page: view.page,
+			size: view.size,
+			sort: [`${view.sort},${view.desc ? "desc" : "asc"}`],
+		},
 	});
-	const membersQuery = useInfiniteQuery({
+	const membersQuery = useQuery({
 		...membersQueryOptions,
-		...springPageParams,
-		enabled: Boolean(workspaceSlug),
+		enabled: hasText(workspaceSlug),
 	});
 	useQueryReadRefusal(membersQueryOptions.queryKey, membersQuery.isError, membersQuery.error);
-	const { hasNextPage, isFetchingNextPage, isError: membersFailed, fetchNextPage } = membersQuery;
-	useEffect(() => {
-		if (hasNextPage && !isFetchingNextPage && !membersFailed) {
-			void fetchNextPage();
-		}
-	}, [hasNextPage, isFetchingNextPage, membersFailed, fetchNextPage]);
 
 	const teamsQueryOptions = getAllTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
@@ -88,9 +90,8 @@ function AdminMembersContainer() {
 	useQueryReadRefusal(teamsQueryOptions.queryKey, teamsQuery.isError, teamsQuery.error);
 
 	const queryClient = useQueryClient();
-	const membersKey = listMembershipsInfiniteQueryKey({
+	const membersKey = listMembershipsQueryKey({
 		path: { workspaceSlug: workspaceSlug ?? "" },
-		query: { size: MEMBER_PAGE_SIZE },
 	});
 	const toggleHidden = useMutation({
 		...setMemberHiddenMutation(),
@@ -141,33 +142,9 @@ function AdminMembersContainer() {
 		changeRole({ path: { workspaceSlug }, body: { accountId, role } });
 	};
 
-	const teams = teamsQuery.isError
-		? []
-		: [...(teamsQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-	const members = workspaceMemberRows(
-		membersQuery.data?.pages.flatMap((page) => page.content) ?? [],
-		teams,
-	);
-	const teamListed = hasText(search.team) && teams.some((t) => t.id.toString() === search.team);
-	const teamPending = hasText(search.team) && !teamListed && teamsQuery.isFetching;
-	const isLoading = isWorkspaceLoading || membersQuery.isPending || hasNextPage || teamPending;
-	const teamUnknown =
-		hasText(search.team) && teamsQuery.isSuccess && !teamsQuery.isFetching && !teamListed;
-	const selectedTeam = hasText(search.team) && teamListed ? search.team : "all";
-	const view: WorkspaceMembersTableView = {
-		q: search.q ?? "",
-		team: selectedTeam,
-		sort: search.sort ?? "name",
-		desc: search.desc ?? false,
-		page: search.page ?? 0,
-		size: search.size ?? 10,
-	};
-
-	useEffect(() => {
-		if (teamUnknown) {
-			void navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
-		}
-	}, [navigate, teamUnknown]);
+	const teams = teamsQuery.isError ? [] : (teamsQuery.data ?? []);
+	const members = workspaceMemberRows(membersQuery.data?.content ?? []);
+	const isLoading = isWorkspaceLoading || membersQuery.isPending;
 
 	if (!hasText(workspaceSlug) && !isWorkspaceLoading) {
 		return <NoWorkspace />;
@@ -176,6 +153,7 @@ function AdminMembersContainer() {
 	return (
 		<WorkspaceMembersPage
 			members={members}
+			rowCount={membersQuery.data?.totalElements ?? 0}
 			teams={teams}
 			isLoading={isLoading || !hasText(workspaceSlug)}
 			error={workspaceError ?? membersQuery.error}

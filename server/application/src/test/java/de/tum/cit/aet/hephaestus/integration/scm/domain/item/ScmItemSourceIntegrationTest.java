@@ -523,7 +523,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         item.itemId()))
                 .containsExactly("true");
         pull.setHeadRefOid("a".repeat(40));
-        pull = pulls.saveAndFlush(pull);
+        pulls.saveAndFlush(pull);
         var captured = sources.pin(item, null).version();
         var event = Objects.requireNonNull(transactions.execute(status -> {
             var current = pulls.findById(pullId).orElseThrow();
