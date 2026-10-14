@@ -121,7 +121,7 @@ a note was posted, or say that every practice was checked.
 
 `basedOn` names exactly the NOT_MET results and problems a text speaks about: a result's `resultId`, or
 a problem's `problemId` when the text speaks about that located problem. A note's `basedOn` names its
-anchor's problem or that problem's result. If any of them may not go out — the developer disputed it, a
+anchor's problem or that problem's result. If any of them may not go out — the developer contested it, a
 reviewer must approve it first, or it may not appear on the work — the whole text stays unsaid.
 
 ## How to say it on the work

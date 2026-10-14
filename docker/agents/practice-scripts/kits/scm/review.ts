@@ -30,7 +30,7 @@ export interface LinkedWorkItem {
 	closedAt?: string;
 	subIssuesTotal?: number;
 	subIssuesCompleted?: number;
-	/** What the counts are of; absent in a capture from before the source was recorded. */
+	/** What the counts are of; absent when the item carries no sub-issue counts. */
 	subIssuesSource?: SubIssueSource;
 }
 

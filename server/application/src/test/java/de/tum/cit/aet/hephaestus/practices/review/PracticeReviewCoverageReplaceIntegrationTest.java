@@ -5,15 +5,21 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Import(ReviewIntegrationData.class)
 class PracticeReviewCoverageReplaceIntegrationTest extends BaseIntegrationTest {
@@ -47,6 +53,15 @@ class PracticeReviewCoverageReplaceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     JdbcClient jdbc;
+
+    @Autowired
+    MembershipRepository memberships;
+
+    @Autowired
+    WorkspaceRepository workspaces;
+
+    @Autowired
+    PlatformTransactionManager transactions;
 
     @Test
     void selectedEmptyIsDifferentFromAll() {
@@ -109,5 +124,27 @@ class PracticeReviewCoverageReplaceIntegrationTest extends BaseIntegrationTest {
                 .param("id", scenario.account().getId())
                 .update();
         assertThat(coverage.eligibleAccountIds(scenario.workspace().getId())).isEmpty();
+    }
+
+    @Test
+    void shouldKeepLoadedMembershipsCoherentWhenSelectionIsReplacedAndReset() {
+        long workspaceId = scenario.workspace().getId();
+        long accountId = Objects.requireNonNull(scenario.account().getId());
+        new TransactionTemplate(transactions).executeWithoutResult(ignored -> {
+            var workspace = workspaces.findById(workspaceId).orElseThrow();
+            var member = memberships
+                    .findById(new Membership.Id(workspaceId, accountId))
+                    .orElseThrow();
+            assertThat(member.isReviewSelected()).isFalse();
+            coverage.replace(
+                    workspace,
+                    new WorkspaceReviewScope(
+                            ReviewScopeMode.ALL, ReviewScopeMode.SELECTED, List.of(), List.of(accountId)));
+            assertThat(member.isReviewSelected()).isTrue();
+            assertThat(coverage.scope(workspace).accountIds()).containsExactly(accountId);
+            coverage.replace(workspace, WorkspaceReviewScope.ALL);
+            assertThat(member.isReviewSelected()).isFalse();
+        });
+        assertThat(coverage.scope(scenario.workspace()).accountIds()).isEmpty();
     }
 }

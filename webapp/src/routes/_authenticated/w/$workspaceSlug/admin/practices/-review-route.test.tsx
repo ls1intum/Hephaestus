@@ -36,7 +36,6 @@ const fixture = buildFeedbackModeFixture({
 });
 
 const membership = (overrides: Partial<WorkspaceMembership>): WorkspaceMembership => ({
-	accountId: adaAccount.id,
 	account: adaAccount,
 	role: "ADMIN",
 	joinedAt: new Date("2026-01-01T00:00:00Z"),
@@ -49,7 +48,6 @@ const membership = (overrides: Partial<WorkspaceMembership>): WorkspaceMembershi
 
 /** An account nobody has signed in to yet, known only by its GitLab identity. */
 const unclaimed = membership({
-	accountId: "9",
 	role: "MEMBER",
 	account: {
 		id: "9",

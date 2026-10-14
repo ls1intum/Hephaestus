@@ -3,6 +3,9 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import {
 	getLlmUsageReportOptions,
@@ -49,7 +52,7 @@ import {
 	type ProviderTestResult,
 	WorkspaceLlmProviderPanel,
 } from "@/components/admin/workspace-llm/WorkspaceLlmProviderPanel";
-import { combinePanelStates, panelState, queryLoadState } from "@/components/common/panel-state";
+import { type LoadState, panelState } from "@/components/common/panel-state";
 import {
 	AGENT_PURPOSE_DEFS,
 	AGENT_PURPOSES,
@@ -123,14 +126,36 @@ function ModelsContainer() {
 	const saveKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug, "save"];
 	const clearKey = [...AGENT_WRITE_MUTATION_KEY, workspaceSlug, "clear"];
 
-	const bindingsQuery = useQuery(listAgentsOptions({ path: { workspaceSlug } }));
-	const workspaceQuery = useQuery(getWorkspaceOptions({ path: { workspaceSlug } }));
-	const llmSettingsQuery = useQuery(workspaceGetLlmSettingsOptions({ path: { workspaceSlug } }));
-	const availableModelsQuery = useQuery(
-		workspaceListAvailableLlmModelsOptions({ path: { workspaceSlug } }),
+	const bindingsOptions = listAgentsOptions({ path: { workspaceSlug } });
+	const workspaceOptions = getWorkspaceOptions({ path: { workspaceSlug } });
+	const llmSettingsOptions = workspaceGetLlmSettingsOptions({ path: { workspaceSlug } });
+	const availableModelsOptions = workspaceListAvailableLlmModelsOptions({
+		path: { workspaceSlug },
+	});
+	const onboardingSettingsOptions = getMemberOnboardingSettingsOptions({
+		path: { workspaceSlug },
+	});
+	const bindingsQuery = useQuery(bindingsOptions);
+	const workspaceQuery = useQuery(workspaceOptions);
+	const llmSettingsQuery = useQuery(llmSettingsOptions);
+	const availableModelsQuery = useQuery(availableModelsOptions);
+	const onboardingSettingsQuery = useQuery(onboardingSettingsOptions);
+	useQueryReadRefusal(bindingsOptions.queryKey, bindingsQuery.isError, bindingsQuery.error);
+	useQueryReadRefusal(workspaceOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
+	useQueryReadRefusal(
+		llmSettingsOptions.queryKey,
+		llmSettingsQuery.isError,
+		llmSettingsQuery.error,
 	);
-	const onboardingSettingsQuery = useQuery(
-		getMemberOnboardingSettingsOptions({ path: { workspaceSlug } }),
+	useQueryReadRefusal(
+		availableModelsOptions.queryKey,
+		availableModelsQuery.isError,
+		availableModelsQuery.error,
+	);
+	useQueryReadRefusal(
+		onboardingSettingsOptions.queryKey,
+		onboardingSettingsQuery.isError,
+		onboardingSettingsQuery.error,
 	);
 	const practiceScriptNeedsQuery = useQuery(
 		listPracticeScriptNeedsOptions({ path: { workspaceSlug } }),
@@ -149,6 +174,18 @@ function ModelsContainer() {
 		availableModelsQuery,
 		onboardingSettingsQuery,
 	];
+	const failedQueries = pageQueries.filter((query) => query.isError);
+	const loaded = pageQueries.every((query) => query.data !== undefined);
+	// A refusal hides the page even over cached data. Any other failure leaves loaded rows, and the
+	// drafts in them, on screen beside the retry; a failure before anything loaded still blocks.
+	const blockingFailure =
+		failedQueries.find((query) => !queryErrorIsRetryable(query.error)) ??
+		(loaded ? undefined : failedQueries[0]);
+	const retryFailed = () => {
+		for (const query of failedQueries) {
+			void query.refetch();
+		}
+	};
 
 	// Readiness per AI choice lives on the member setup, which decides whether Heph is in the
 	// navigation. Which members a practice's required model misses follows the bindings too.
@@ -240,10 +277,24 @@ function ModelsContainer() {
 		...[...savingTargets].map((key) => [key, "SAVE"] as const),
 	]);
 
+	const pageState: LoadState = blockingFailure
+		? { status: "error", error: blockingFailure.error, onRetry: retryFailed }
+		: loaded
+			? { status: "ready" }
+			: { status: "loading" };
+	const refreshFailure: RefreshFailure | undefined =
+		!blockingFailure && failedQueries.length > 0
+			? {
+					error: failedQueries[0]?.error,
+					pending: failedQueries.some((q) => q.isFetching),
+					onRetry: retryFailed,
+				}
+			: undefined;
 	return (
 		<AgentBindingsPage
 			workspaceSlug={workspaceSlug}
-			state={combinePanelStates(pageQueries.map(queryLoadState))}
+			state={pageState}
+			refreshFailure={refreshFailure}
 			bindings={bindingsQuery.data ?? []}
 			availableModels={availableModelsQuery.data ?? []}
 			practicesEnabled={workspaceQuery.data?.practicesEnabled ?? false}
@@ -318,12 +369,45 @@ function WorkspaceProviders({
 	const [registrationRefused, setRegistrationRefused] = useState(false);
 	const [testResults, setTestResults] = useState(() => new Map<number, ProviderTestResult>());
 
-	const connectionsQuery = useQuery(workspaceListLlmConnectionsOptions({ path }));
+	const connectionsOptions = workspaceListLlmConnectionsOptions({ path });
+	const connectionsQuery = useQuery(connectionsOptions);
+	useQueryReadRefusal(
+		connectionsOptions.queryKey,
+		connectionsQuery.isError,
+		connectionsQuery.error,
+	);
 	const connections = connectionsQuery.data ?? [];
-	const modelsQuery = useQuery({
-		...workspaceListLlmModelsOptions({ path }),
-		enabled: connections.length > 0,
-	});
+	const modelsOptions = workspaceListLlmModelsOptions({ path });
+	const modelsQuery = useQuery({ ...modelsOptions, enabled: connections.length > 0 });
+	useQueryReadRefusal(modelsOptions.queryKey, modelsQuery.isError, modelsQuery.error);
+	const requiredReads =
+		connections.length > 0 ? [connectionsQuery, modelsQuery] : [connectionsQuery];
+	const failedReads = requiredReads.filter((read) => read.isError);
+	const loaded =
+		connectionsQuery.data !== undefined &&
+		(connections.length === 0 || modelsQuery.data !== undefined);
+	const blockingFailure =
+		failedReads.find((read) => !queryErrorIsRetryable(read.error)) ??
+		(loaded ? undefined : failedReads[0]);
+	const retryPending = failedReads.some((read) => read.isFetching);
+	const retryFailedReads = () => {
+		for (const read of failedReads) void read.refetch();
+	};
+	if (
+		blockingFailure !== undefined &&
+		!queryErrorIsRetryable(blockingFailure.error) &&
+		(connectionDialogOpen ||
+			modelDialogOpen ||
+			editingConnection !== null ||
+			editingModel !== null ||
+			modelConnectionId !== null)
+	) {
+		setConnectionDialogOpen(false);
+		setModelDialogOpen(false);
+		setEditingConnection(null);
+		setEditingModel(null);
+		setModelConnectionId(null);
+	}
 
 	const invalidateProviders = async () =>
 		Promise.all([
@@ -429,16 +513,31 @@ function WorkspaceProviders({
 	const writingConnectionIds = usePendingMutationIds(connectionWriteKey, idOf);
 	const writingModelIds = usePendingMutationIds(modelWriteKey, idOf);
 
-	// The models are asked for only once a connection exists, so with none there is nothing to wait for.
-	const providersState: ProviderPanelState = panelState(connectionsQuery, (loaded) =>
-		loaded.length === 0
-			? { status: "ready" as const, connections: loaded, models: [] }
-			: panelState(modelsQuery, (models) => ({
-					status: "ready" as const,
-					connections: loaded,
-					models,
-				})),
-	);
+	const refreshFailure: RefreshFailure | undefined =
+		blockingFailure === undefined && failedReads.length > 0
+			? { error: failedReads[0]?.error, pending: retryPending, onRetry: retryFailedReads }
+			: undefined;
+	const formOpen = connectionDialogOpen || modelDialogOpen;
+	const refreshNotice =
+		refreshFailure === undefined ? undefined : (
+			<QueryErrorAlert
+				error={refreshFailure.error}
+				title="We could not refresh your AI providers"
+				pending={refreshFailure.pending}
+				onRetry={refreshFailure.onRetry}
+			/>
+		);
+	const providersState: ProviderPanelState =
+		blockingFailure !== undefined
+			? { status: "error", error: blockingFailure.error, onRetry: retryFailedReads }
+			: !loaded
+				? { status: "loading" }
+				: {
+						status: "ready",
+						connections,
+						models: modelsQuery.data ?? [],
+						refreshFailure: formOpen ? undefined : refreshFailure,
+					};
 
 	return (
 		<>
@@ -478,6 +577,7 @@ function WorkspaceProviders({
 			/>
 			<WorkspaceLlmConnectionFormDialog
 				open={connectionDialogOpen}
+				notice={refreshNotice}
 				onOpenChange={setConnectionDialogOpen}
 				editing={editingConnection}
 				isSubmitting={createConnection.isPending || updateConnection.isPending}
@@ -486,6 +586,7 @@ function WorkspaceProviders({
 			/>
 			<WorkspaceLlmModelFormDialog
 				open={modelDialogOpen}
+				notice={refreshNotice}
 				onOpenChange={setModelDialogOpen}
 				editing={editingModel}
 				isSubmitting={createModel.isPending || updateModel.isPending}

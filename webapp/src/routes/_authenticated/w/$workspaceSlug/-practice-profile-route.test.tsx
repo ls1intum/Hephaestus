@@ -88,7 +88,6 @@ const groupReview: ProfileReview = {
 
 /** The reader's account in this workspace, a plain MEMBER: the profile is their own page. */
 const membership: WorkspaceMembership = {
-	accountId: "1",
 	account: {
 		id: "1",
 		displayName: "Ada",

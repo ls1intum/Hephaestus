@@ -30,6 +30,7 @@ import type { ProviderType } from "@/lib/provider/provider-terms";
 import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
 import { keepSameSubject } from "@/runtime/tanstack-query/keep-same-subject";
 import { loadedPages } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 /** What activity counts: the period, and — on Workspace activity — a team and repositories. */
 export interface ActivityScope {
@@ -199,27 +200,31 @@ export function useActivityWork({
 	const { workspaceSlug, team, repo, period } = scope;
 	const queryClient = useQueryClient();
 	const filter = { ...scopeQuery(scope), kinds: kinds && [...kinds] };
+	const workspaceOptions = getActivityWorkInfiniteOptions({
+		path: { workspaceSlug },
+		query: { ...filter, size: WORK_PAGE_SIZE },
+	});
 	const workspaceQuery = useInfiniteQuery({
-		...getActivityWorkInfiniteOptions({
-			path: { workspaceSlug },
-			query: { ...filter, size: WORK_PAGE_SIZE },
-		}),
+		...workspaceOptions,
 		initialPageParam: { path: { workspaceSlug }, query: { cursor: undefined } },
 		getNextPageParam: (last) => last.nextCursor ?? undefined,
 		placeholderData: keepSameSubject({ workspaceSlug, team, repo, kinds }),
 		enabled: enabled && userId === undefined,
 	});
+	useQueryReadRefusal(workspaceOptions.queryKey, workspaceQuery.isError, workspaceQuery.error);
 	const personPath = { workspaceSlug, userId: userId ?? 0 };
+	const personOptions = getActivityPersonWorkInfiniteOptions({
+		path: personPath,
+		query: { ...filter, size: WORK_PAGE_SIZE },
+	});
 	const personQuery = useInfiniteQuery({
-		...getActivityPersonWorkInfiniteOptions({
-			path: personPath,
-			query: { ...filter, size: WORK_PAGE_SIZE },
-		}),
+		...personOptions,
 		initialPageParam: { path: personPath, query: { cursor: undefined } },
 		getNextPageParam: (last) => last.nextCursor ?? undefined,
 		placeholderData: keepSameSubject({ workspaceSlug, userId, team, repo, kinds }),
 		enabled: enabled && userId !== undefined,
 	});
+	useQueryReadRefusal(personOptions.queryKey, personQuery.isError, personQuery.error);
 	const query = userId === undefined ? workspaceQuery : personQuery;
 
 	const everything = async (): Promise<ActivityWork[]> => {

@@ -1028,7 +1028,6 @@ jobs:
     timeout-minutes: 10
     runs-on: ubuntu-slim
     permissions:
-      actions: read
       statuses: write
     needs:
       [
@@ -1052,50 +1051,6 @@ jobs:
       ]
     if: always()
     steps:
-      - name: Generate workflow timeline
-        uses: Kesin11/actions-timeline@57fc93f20c6da7fbc14063c6d24a2a5627c799ad # v3.2.0
-        with:
-          show-waiting-runner: true
-
-      - name: Summarize workflow performance
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const run = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-            const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-              per_page: 100,
-              filter: 'latest',
-            });
-            const finished = jobs.filter((job) => job.started_at && job.completed_at);
-            const seconds = (start, end) => (Date.parse(end) - Date.parse(start)) / 1000;
-            const elapsed = seconds(run.data.created_at, new Date().toISOString());
-            const runnerSeconds = finished.reduce(
-              (total, job) => total + seconds(job.started_at, job.completed_at),
-              0,
-            );
-            const startDelays = finished.map((job) => seconds(job.created_at, job.started_at));
-            const format = (value) => `${Math.floor(value / 60)}m ${Math.round(value % 60)}s`;
-
-            await core.summary
-              .addHeading('Workflow performance', 3)
-              .addTable([
-                [{ data: 'Metric', header: true }, { data: 'Value', header: true }],
-                ['Workflow-to-gate sample', format(elapsed)],
-                ['Completed runner time', format(runnerSeconds)],
-                ['Longest job creation-to-start delay', format(Math.max(0, ...startDelays))],
-              ])
-              .addRaw(
-                'The creation-to-start delay includes dependency waiting; use the timeline above to distinguish dependency time from runner waiting. Cache hits and misses remain visible in each native cache action log.',
-              )
-              .write();
-
       - name: Evaluate CI results
         id: evaluate
         env:
@@ -1117,6 +1072,16 @@ jobs:
           echo "Host smoke:     ${{ needs.Supported-host-smoke.result }}"
           echo "Preflight:      ${{ needs.Release-preflight.result }}"
           echo "Release candidate: ${{ needs.detect-changes.outputs.release-candidate == 'true' }}"
+
+          # Reporting uses only native results. A local summary write cannot change their verdict.
+          if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+            {
+              echo '## Required CI results'
+              echo '| Job | Result |'
+              echo '| --- | --- |'
+              jq -r 'to_entries[] | "| " + .key + " | " + (.value.result // "Unavailable" | tostring) + " |"' <<< "$NEEDS"
+            } >> "$GITHUB_STEP_SUMMARY" || echo '::warning::CI summary unavailable'
+          fi
 
           if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
             echo "status=failure" >> $GITHUB_OUTPUT
@@ -1144,56 +1109,11 @@ jobs:
 
           echo "status=success" >> $GITHUB_OUTPUT
 
-      # Keep this checkout-free: the job writes commit statuses and must not execute PR source.
-      - name: Generate CI Summary
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-          VERDICT: ${{ steps.evaluate.outputs.status }}
-        with:
-          script: |
-            const needs = JSON.parse(process.env.NEEDS);
-            if (!needs || typeof needs !== 'object' || Array.isArray(needs)) {
-              throw new Error('Expected CI job results');
-            }
-            const statuses = new Set(['success', 'failure', 'skipped', 'cancelled']);
-            const jobs = Object.entries(needs);
-            for (const [name, job] of jobs) {
-              if (!job || typeof job !== 'object' || !statuses.has(job.result)) {
-                throw new Error(`Invalid CI result for ${name}`);
-              }
-            }
-            const verdict = process.env.VERDICT;
-            core.summary.addHeading('CI Pipeline Summary', 2)
-              .addRaw(verdict === 'success' ? '✅ All required checks passed.\n\n'
-                : verdict === 'failure' ? '❌ CI failed. Review the job results and logs.\n\n'
-                : verdict === 'cancelled' ? '🚫 CI was cancelled before it finished.\n\n'
-                : '⚠️ CI did not produce a verdict.\n\n')
-              .addHeading('Job results', 3)
-              .addTable([
-                [{data: 'Job', header: true}, {data: 'Result', header: true}],
-                ...jobs.map(([name, job]) => [name, job.result]),
-              ]);
-            const skipped = jobs.filter(([, job]) => job.result === 'skipped').length;
-            core.summary.addRaw(`${skipped} of ${jobs.length} jobs skipped. Job conditions determine why; a skip alone does not prove a path-filter saving.\n\n`);
-            const selection = needs['detect-changes']?.outputs;
-            const flags = selection && typeof selection === 'object' && !Array.isArray(selection)
-              ? Object.entries(selection).filter(([, value]) => value === 'true' || value === 'false') : [];
-            if (flags.length > 0) {
-              core.summary.addHeading('Selection flags', 3).addTable([
-                [{data: 'Flag', header: true}, {data: 'Value', header: true}],
-                ...flags,
-              ]);
-            }
-            core.summary.addLink('Local verification and troubleshooting',
-              `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/blob/main/docs/contributor/local-verification.mdx`);
-            await core.summary.write();
-
+      # This checkout-free job publishes only the required verdict. Diagnostics run separately.
       - name: Create commit status
         if: ${{ !cancelled() && !contains(needs.*.result, 'cancelled') }}
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        # The job's own status, not the evaluation's: a step after it that failed fails the gate too.
+        # Evaluation or status publication failures must fail the required gate.
         env:
           JOB_STATUS: ${{ job.status }}
         with:

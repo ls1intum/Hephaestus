@@ -44,6 +44,7 @@ import {
 import type { AppState, InstanceSummary } from "~/shared/rpc";
 import { ask, RpcClientError } from "~/ui/rpc-client";
 import { useGeneration } from "~/ui/worker-state";
+import { EXTENSION_QUERY_KEYS } from "~/views/query-keys";
 
 const HOSTED_HOST = new URL(HOSTED_INSTANCE_ORIGIN).host;
 
@@ -136,7 +137,7 @@ function Setup({ developmentBuild }: { developmentBuild: boolean }) {
 
 function SignIn({ instance }: { instance: InstanceSummary }) {
 	const options = useQuery({
-		queryKey: ["sign-in-options"],
+		queryKey: EXTENSION_QUERY_KEYS.signInOptions,
 		queryFn: async () => ask({ type: "list-sign-in-options" }),
 	});
 	const signIn = useMutation({
@@ -191,10 +192,11 @@ function useSiteAccess() {
 	const queryClient = useQueryClient();
 	const [activity, setActivity] = useState<SiteActivity>();
 	const sites = useQuery({
-		queryKey: ["site-access"],
+		queryKey: EXTENSION_QUERY_KEYS.siteAccess,
 		queryFn: async () => ask({ type: "list-site-access" }),
 	});
-	const refresh = async () => queryClient.invalidateQueries({ queryKey: ["site-access"] });
+	const refresh = async () =>
+		queryClient.invalidateQueries({ queryKey: EXTENSION_QUERY_KEYS.siteAccess });
 	let state: SiteAccessState = { status: "loading" };
 	if (sites.isError) {
 		state = {
@@ -328,7 +330,7 @@ function Connected({ state, instance }: { state: AppState; instance: InstanceSum
 						onCheckAgain={() => {
 							setChecking(true);
 							const check = async () => {
-								await queryClient.refetchQueries({ queryKey: ["state"] });
+								await queryClient.refetchQueries({ queryKey: EXTENSION_QUERY_KEYS.state });
 								setChecking(false);
 							};
 							void check();
@@ -381,7 +383,10 @@ function manifestVersion(): string | undefined {
 /** Setup, sign-in, site access and sign-out: everything that changes what the extension may do. */
 export function OptionsView() {
 	const generation = useGeneration();
-	const state = useQuery({ queryKey: ["state"], queryFn: async () => ask({ type: "get-state" }) });
+	const state = useQuery({
+		queryKey: EXTENSION_QUERY_KEYS.state,
+		queryFn: async () => ask({ type: "get-state" }),
+	});
 	let body: ReactNode = (
 		<div className="flex flex-col gap-3" aria-hidden>
 			<Skeleton className="h-40 w-full rounded-xl" />

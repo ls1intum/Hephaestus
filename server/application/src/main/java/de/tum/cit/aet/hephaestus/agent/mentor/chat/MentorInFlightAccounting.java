@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
@@ -62,13 +63,10 @@ public class MentorInFlightAccounting {
                 Math.max(1, observed.totalCalls()),
                 price,
                 observed.hasBillableUsage() ? UsageProvenance.PROXY : UsageProvenance.NONE,
+                observed.hasBillableUsage() ? MeasurementVerification.VERIFIED : MeasurementVerification.UNVERIFIABLE,
                 Instant.now());
-        if (observed.hasBillableUsage()) {
-            usageRecorder.record(workspaceId, sample);
-            return true;
-        }
-        usageRecorder.recordUnverifiable(workspaceId, sample);
-        return false;
+        usageRecorder.record(workspaceId, sample);
+        return observed.hasBillableUsage();
     }
 
     private static ObjectNode withAbandonedError(@Nullable JsonNode existingMetadata) {

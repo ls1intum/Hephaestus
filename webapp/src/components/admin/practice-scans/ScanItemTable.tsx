@@ -1,11 +1,11 @@
 import { FileSearchIcon } from "lucide-react";
 import type { ScanReportItem } from "@/api/types.gen";
 
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { OUTCOME_DEFS, problemCount } from "@/components/practice-vocabulary/outcome-defs";
 import {
 	REMOVED_FILE_DEF,

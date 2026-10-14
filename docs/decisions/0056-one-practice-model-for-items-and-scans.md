@@ -20,9 +20,9 @@ Provider-specific records and duplicated definitions cannot express those facts 
 
 ## Considered options
 
-1. Keep provider-specific verdict and execution records. This couples history to runtime and repeats provider meaning in core.
-2. Add a parallel scan model. This duplicates definitions, outcomes and report logic.
-3. Build a generic graph for future domains. Current review and delivery needs do not require it.
+1. **Keep provider-specific verdict and execution records.** Rejected. Job retention then deletes product history, and core repeats the meaning of each provider in its own enum.
+2. **Add a parallel scan model.** Rejected. It costs two definition stores, two outcome enums and two report readers that must agree.
+3. **Build a generic graph for future domains.** Rejected. It costs a node and edge schema that every query must join, and no shipped domain needs an edge that an item, review and result cannot hold.
 4. Use one item, review and result model with domain meaning at the boundary.
 
 ## Decision
@@ -57,7 +57,6 @@ Preparation persists physical copies before provider writes.
 Unknown visibility stays Unconfirmed and never permits an automatic repeat POST.
 A confirmed sibling retains its appearance time.
 Practice-page delivery uses the feedback record's first authenticated developer read.
-No separate practice-card copy kind exists.
 
 GitHub and GitLab scans pin monitored default-branch inventory.
 Only one scan per workspace and one execution job per review can be active.
@@ -84,7 +83,7 @@ The [migration procedure](../contributor/database-migration.mdx#prove-the-releas
 Rollback restores a verified backup with the previous release.
 
 This ADR supersedes model details in ADRs 0019, 0020, 0021, 0022, 0029 and 0050.
-[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the script contract.
+[ADR 0055](0055-practice-scripts-use-one-result-contract.md) owns the script contract.
 Their surviving identity, evidence and runtime constraints remain in their owning records.
 
 ## Revisit trigger

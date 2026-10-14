@@ -1,9 +1,9 @@
 import { Link } from "@tanstack/react-router";
 
 import type { ScanSummary } from "@/api/types.gen";
-import type { TableSkeletonColumn } from "@/components/admin/integrations/TableRowsSkeleton";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
+import type { TableSkeletonColumn } from "@/components/common/TableRowsSkeleton";
 import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
 import { TableBody, TableCell, TableHead, TableRow } from "@/components/ui/table";
 

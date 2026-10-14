@@ -361,7 +361,7 @@ public class CatalogService {
 
     public static void require(@Nullable EntityTagPrecondition precondition, String tag) {
         if (precondition == null) throw new CatalogPreconditionRequiredException();
-        if (!precondition.matchesExact(tag)) throw new StaleCatalogEntryException(tag);
+        if (!precondition.matchesExact(tag)) throw new StaleCatalogEntryException();
     }
 
     public CatalogDTO view() {

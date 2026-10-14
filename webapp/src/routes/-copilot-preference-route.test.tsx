@@ -244,11 +244,11 @@ it("stops the old response before starting a new panel conversation", async () =
 		http.post<PathParams, { id: string }>(
 			"*/workspaces/acme/mentor/chat",
 			async ({ request }) => {
-				const { id } = await request.json();
-				requests.push(id);
 				request.signal.addEventListener("abort", () => {
 					aborted = true;
 				});
+				const { id } = await request.json();
+				requests.push(id);
 				return new HttpResponse(
 					new ReadableStream({
 						start(controller) {
@@ -278,6 +278,7 @@ it("stops the old response before starting a new panel conversation", async () =
 	);
 	await user.type(await screen.findByRole("textbox", { name: "Message" }), "Keep answering{Enter}");
 	await screen.findByRole("button", { name: "Stop generating" });
+	await waitFor(() => expect(requests).toHaveLength(1));
 	await user.click(screen.getByRole("button", { name: "Start new chat" }));
 	await waitFor(() => expect(aborted).toBe(true));
 	await waitFor(() => expect(screen.queryByText("Keep answering")).toBeNull());

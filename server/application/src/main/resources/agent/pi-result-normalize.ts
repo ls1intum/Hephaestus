@@ -138,11 +138,7 @@ export function describeVocabulary<T extends string>(
 /** The summary heads the developer's practice page. It is a phrase, not the explanation. */
 export const MAX_SUMMARY_CHARS: number = CANDIDATE_LIMITS.summaryChars;
 
-export function trimmedSlug(value: unknown): string {
-	return trimmedText(value);
-}
-
-function trimmedText(value: unknown): string {
+export function trimmedText(value: unknown): string {
 	return typeof value === "string" ? value.trim() : "";
 }
 
@@ -337,8 +333,8 @@ function completedFromManifest(
 }
 
 /**
- * One citation, checked and completed from the manifest. An empty quote stays "": it is a citation by
- * coordinates alone, and {@link resolveQuote} fills it from the sourceFile later.
+ * One citation, checked and completed from the manifest. The quote is required: admission verifies it
+ * verbatim against the sourceFile, so coordinates alone prove nothing.
  * @param which prefixes each note and error, e.g. "problem 2 citation 1: ", so that the session knows
  *   which citation it is about.
  */
@@ -418,6 +414,11 @@ export function normalizeCitation(
 	if (!Number.isSafeInteger(endLine) || endLine < startLine || endLine > 2_147_483_647) {
 		throw new Error(
 			`${which}evidence citation endLine must be an integer >= startLine, received ${JSON.stringify(fields.endLine)} with startLine ${startLine}`,
+		);
+	}
+	if (quote.trim() === "") {
+		throw new Error(
+			`${which}evidence citation quote is required: the cited text, verbatim as the sourceFile writes it`,
 		);
 	}
 	if (quote.length > CANDIDATE_LIMITS.quoteChars) {
@@ -671,7 +672,7 @@ function normalizeProblem(
 	checkedKeys(value, PROBLEM_FIELDS, at, problems);
 	let key: string | undefined;
 	if (!nullish(value.key) && value.key !== "") {
-		key = trimmedSlug(value.key).toLowerCase().replaceAll("_", "-");
+		key = trimmedText(value.key);
 		if (!PRACTICE_SLUG.test(key)) {
 			problems.push(
 				`${at}: key must be a short slug of lowercase letters, digits and hyphens, received ${JSON.stringify(value.key)}`,
@@ -1174,7 +1175,12 @@ function reviewedTurnLines(
 	} catch {
 		return [];
 	}
-	const messages = isRecord(parsed) && Array.isArray(parsed.messages) ? parsed.messages : [];
+	const messages: unknown = isRecord(parsed) ? parsed.messages : undefined;
+	// The pass below counts the objects of `messages`; only when every element is one does its count
+	// index the array.
+	if (!Array.isArray(messages) || !messages.every(isRecord)) {
+		return [];
+	}
 	// JSON.parse keeps no positions, so one pass finds each turn's lines, in the same order.
 	const spans: { first: number; last: number; index: number }[] = [];
 	let line = 1;
@@ -1225,22 +1231,14 @@ function reviewedTurnLines(
 			depth -= 1;
 		}
 	}
-	return spans.filter((_, index) => {
-		const message: unknown = messages[index];
-		return isRecord(message) && message.accountId === developerId;
-	});
+	return spans.filter((span) => messages[span.index]?.accountId === developerId);
 }
 
 /** How much of a diff line a refusal quotes back; enough to see the difference, not the whole line. */
 const MISMATCH_EXCERPT_CHARS = 160;
 
-/** The most a citation by coordinates alone may record; beyond it, the model names a fragment. */
-const COORDINATE_QUOTE_MAX_CHARS = 2000;
-
-/** Whether a citation is really in the sourceFile it names. */
-export function citationMatchesSourceFile(citation: Citation, content: string): boolean {
-	return describeCitationMismatch(citation, content) === null;
-}
+/** Why a citation without a quote is refused: coordinates alone verify nothing. */
+const NO_QUOTE = "the citation has no quote; quote the cited text verbatim";
 
 /** Why a citation does not match, in one phrase, or null when it does. */
 export function describeCitationMismatch(citation: Citation, content: string): string | null {
@@ -1250,12 +1248,15 @@ export function describeCitationMismatch(citation: Citation, content: string): s
 
 /**
  * Resolve a citation to the sourceFile's exact text for admission. Accepted formatting differences
- * are replaced with source text; an omitted quote is filled from the supplied coordinates.
+ * are replaced with source text. A citation without a quote is refused: only a quote can be verified.
  */
 export function resolveQuote(
 	citation: Citation,
 	content: string,
 ): ResolvedQuote | { mismatch: string } {
+	if (citation.quote.trim() === "") {
+		return { mismatch: NO_QUOTE };
+	}
 	const resolved = resolveQuoteText(citation, content);
 	// Admission refuses a blank quote, so a citation of blank lines is refused here, with the reason.
 	if ("quote" in resolved && resolved.quote.trim() === "") {
@@ -1281,12 +1282,8 @@ export function resolveCapturedText(
 		.join("")
 		.replace(/\n$/u, "");
 	const where = `[L${citation.startLine}]${citation.endLine === citation.startLine ? "" : `-[L${citation.endLine}]`}`;
-	if (quote === "") {
-		return citedText.length > COORDINATE_QUOTE_MAX_CHARS
-			? {
-					mismatch: `${where} is ${citedText.length} characters; cite fewer lines or quote a fragment of them`,
-				}
-			: { quote: citedText };
+	if (quote.trim() === "") {
+		return { mismatch: NO_QUOTE };
 	}
 	const found = findAsWritten(citedText, quote);
 	if (found !== null) {
@@ -1324,20 +1321,20 @@ function resolveQuoteText(
 		return { mismatch: lines };
 	}
 	if (citation.path === DIFF_VIEW) {
-		return placedInDiff(lines, citation, quote);
+		return placedInDiff(lines, quote);
 	}
 	const citedLines = lines.get(diffKey(citation.path, citation.side));
 	if (citedLines === undefined || citedLines.size === 0) {
 		return { mismatch: noLinesToCite(lines, citation.path, citation.side ?? "NEW") };
 	}
 	const citedLineCount = citation.endLine - citation.startLine + 1;
-	const quoteLines = quote === "" ? null : quote.split(/\r\n|\r|\n/u);
-	const spanMatches = quoteLines === null || quoteLines.length === citedLineCount;
-	const atCited = spanMatches
-		? diffLinesMatch(citedLines, citation.startLine, citedLineCount, quoteLines)
-		: {
-				mismatch: `the quote is ${quoteLines.length} line(s) and the citation covers ${citedLineCount}`,
-			};
+	const quoteLines = quote.split(/\r\n|\r|\n/u);
+	const atCited =
+		quoteLines.length === citedLineCount
+			? diffLinesMatch(citedLines, citation.startLine, citedLineCount, quoteLines)
+			: {
+					mismatch: `the quote is ${quoteLines.length} line(s) and the citation covers ${citedLineCount}`,
+				};
 	if (!("text" in atCited)) {
 		const atView = readAtViewLines(lines, citedLines, citation, quoteLines);
 		if (atView !== null) {
@@ -1345,32 +1342,26 @@ function resolveQuoteText(
 		}
 	}
 	if ("text" in atCited) {
-		return quoteLines === null && atCited.text.length > COORDINATE_QUOTE_MAX_CHARS
-			? {
-					mismatch: `[L${citation.startLine}]-[L${citation.endLine}] is ${atCited.text.length} characters; cite fewer lines or quote a fragment of them`,
-				}
-			: { quote: atCited.text };
+		return { quote: atCited.text };
 	}
 	// The text may be real with the coordinates guessed, or the span miscounted: when the quoted
 	// block occurs exactly once on that side of that path, it is recorded there.
-	if (quoteLines !== null) {
-		const found = [...citedLines.keys()].flatMap((start) => {
-			const match = diffLinesMatch(citedLines, start, quoteLines.length, quoteLines);
-			return "text" in match ? [{ start, text: match.text }] : [];
-		});
-		const only = found[0];
-		if (found.length === 1 && only !== undefined) {
-			return {
-				quote: only.text,
-				startLine: only.start,
-				endLine: only.start + quoteLines.length - 1,
-			};
-		}
-		if (found.length > 1) {
-			return {
-				mismatch: `[L${citation.startLine}] does not hold that text on the ${citation.side ?? "NEW"} side of ${citation.path}; it occurs at ${found.map((hit) => `[L${hit.start}]`).join(", ")} — cite the one you mean`,
-			};
-		}
+	const found = [...citedLines.keys()].flatMap((start) => {
+		const match = diffLinesMatch(citedLines, start, quoteLines.length, quoteLines);
+		return "text" in match ? [{ start, text: match.text }] : [];
+	});
+	const only = found[0];
+	if (found.length === 1 && only !== undefined) {
+		return {
+			quote: only.text,
+			startLine: only.start,
+			endLine: only.start + quoteLines.length - 1,
+		};
+	}
+	if (found.length > 1) {
+		return {
+			mismatch: `[L${citation.startLine}] does not hold that text on the ${citation.side ?? "NEW"} side of ${citation.path}; it occurs at ${found.map((hit) => `[L${hit.start}]`).join(", ")} — cite the one you mean`,
+		};
 	}
 	return atCited;
 }
@@ -1413,13 +1404,13 @@ const DIFF_VIEW = "work/change/diff.patch";
 
 /**
  * The diff's lines from `start` matched against the quote's lines, one each: the content they carry
- * when every line matches, or why not. With no quote, the lines are simply read.
+ * when every line matches, or why not.
  */
 function diffLinesMatch(
 	citedLines: ReadonlyMap<number, string>,
 	start: number,
 	count: number,
-	quoteLines: readonly string[] | null,
+	quoteLines: readonly string[],
 ): { text: string } | { mismatch: string } {
 	const recorded: string[] = [];
 	for (let index = 0; index < count; index += 1) {
@@ -1428,7 +1419,7 @@ function diffLinesMatch(
 		if (diffLine === undefined) {
 			return { mismatch: `the diff has no [L${lineNumber}] on that side of that path` };
 		}
-		const quoteLine = quoteLines?.[index];
+		const quoteLine = quoteLines[index];
 		if (
 			quoteLine !== undefined &&
 			!quotesDiffLine(diffLine, withoutOwnCoordinate(quoteLine, lineNumber))
@@ -1487,7 +1478,7 @@ function diffKey(path: string | null, side: DiffSide | undefined): string {
  */
 const viewLines = new WeakMap<
 	ReadonlyMap<string, ReadonlyMap<number, string>>,
-	{ lineCount: number; at: ReadonlyMap<number, { key: string; line: number }> }
+	ReadonlyMap<number, { key: string; line: number }>
 >();
 
 /**
@@ -1500,7 +1491,7 @@ function annotatedDiff(content: string): Map<string, Map<number, string>> | stri
 	const byFile = new Map<string, Map<number, string>>();
 	const atViewLine = new Map<number, { key: string; line: number }>();
 	const viewed = content.split("\n");
-	viewLines.set(byFile, { lineCount: viewed.length, at: atViewLine });
+	viewLines.set(byFile, atViewLine);
 	// A file the diff names without a hunk — binary, renamed without edits, mode only — is known with no
 	// lines, so a citation of it is told why rather than that the change does not touch it.
 	const known = (side: DiffSide, filePath: string) => {
@@ -1560,92 +1551,28 @@ function annotatedDiff(content: string): Map<string, Map<number, string>> | stri
 }
 
 /**
- * The coordinates may be lines of diff.patch itself, as a numbered view prints them. With a quote, the view's
- * line names the cited file's line that must hold it. With coordinates alone, the range is a stretch of the view,
- * the file's header and hunks included, and the cited file's lines among its lines, from the first to the last,
- * are what it cites: the view's lines are not the file's, since headers and the other side's lines interleave.
- * Null when the view names no line of the cited file there, or the lines do not hold what was cited.
+ * The coordinates may be lines of diff.patch itself, as a numbered view prints them: the view's line names the
+ * cited file's line that must hold the quote. Null when the view names no line of the cited file there, or the
+ * lines do not hold the quote.
  */
 function readAtViewLines(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
 	citedLines: ReadonlyMap<number, string>,
 	citation: Citation,
-	quoteLines: readonly string[] | null,
+	quoteLines: readonly string[],
 ): ResolvedQuote | null {
 	const view = viewLines.get(lines);
 	if (view === undefined) {
 		return null;
 	}
-	const key = diffKey(citation.path, citation.side);
-	if (quoteLines !== null) {
-		const viewed = view.at.get(citation.startLine);
-		if (viewed?.key !== key) {
-			return null;
-		}
-		const atView = diffLinesMatch(citedLines, viewed.line, quoteLines.length, quoteLines);
-		return "text" in atView
-			? { quote: atView.text, startLine: viewed.line, endLine: viewed.line + quoteLines.length - 1 }
-			: null;
-	}
-	// A range past the view's last line names no line of it, however far it reaches.
-	if (citation.endLine > view.lineCount) {
+	const viewed = view.get(citation.startLine);
+	if (viewed?.key !== diffKey(citation.path, citation.side)) {
 		return null;
 	}
-	const inRange: number[] = [];
-	for (let at = citation.startLine; at <= citation.endLine; at += 1) {
-		const viewed = view.at.get(at);
-		if (viewed?.key === key) {
-			inRange.push(viewed.line);
-		}
-	}
-	const [first] = inRange;
-	const last = inRange.at(-1);
-	if (first === undefined || last === undefined) {
-		return null;
-	}
-	const atView = diffLinesMatch(citedLines, first, last - first + 1, null);
-	return "text" in atView && atView.text.length <= COORDINATE_QUOTE_MAX_CHARS
-		? { quote: atView.text, startLine: first, endLine: last }
+	const atView = diffLinesMatch(citedLines, viewed.line, quoteLines.length, quoteLines);
+	return "text" in atView
+		? { quote: atView.text, startLine: viewed.line, endLine: viewed.line + quoteLines.length - 1 }
 		: null;
-}
-
-/**
- * A range of the diff view by coordinates alone, when the view's lines in it are lines of one changed file:
- * what it cites is that file's lines, its NEW side when the range adds a line and its OLD side when it only
- * removes. Unchanged lines are read on the NEW side, so they do not decide. A range across files names no
- * one file.
- */
-function viewRangeOfOneFile(
-	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
-	citation: Citation,
-): ResolvedQuote | null {
-	const view = viewLines.get(lines);
-	// A range past the view's last line names no line of it, however far it reaches.
-	if (view === undefined || citation.endLine > view.lineCount) {
-		return null;
-	}
-	const keys = new Set<string>();
-	let adds = false;
-	for (let at = citation.startLine; at <= citation.endLine; at += 1) {
-		const viewed = view.at.get(at);
-		if (viewed !== undefined) {
-			keys.add(viewed.key);
-			adds ||= lines.get(viewed.key)?.get(viewed.line)?.startsWith("+") === true;
-		}
-	}
-	const paths = new Set([...keys].map((key) => key.slice(key.indexOf(" ") + 1)));
-	const [path] = paths;
-	if (paths.size !== 1 || path === undefined) {
-		return null;
-	}
-	const side = adds || !keys.has(diffKey(path, "OLD")) ? "NEW" : "OLD";
-	const fileLines = lines.get(diffKey(path, side));
-	if (fileLines === undefined) {
-		return null;
-	}
-	const asFile = { ...citation, path, side } as const;
-	const read = readAtViewLines(lines, fileLines, asFile, null);
-	return read === null ? null : { ...read, path: asFile.path, side: asFile.side };
 }
 
 /**
@@ -1655,15 +1582,11 @@ function viewRangeOfOneFile(
  */
 function placedInDiff(
 	lines: ReadonlyMap<string, ReadonlyMap<number, string>>,
-	citation: Citation,
 	quote: string,
 ): ResolvedQuote | { mismatch: string } {
 	const how =
 		`${DIFF_VIEW} is the view of the change, not a file in it: cite the changed file's path (the ` +
 		"`+++ b/<path>` above its hunk) and the [L<n>] that prefixes the line";
-	if (quote === "") {
-		return viewRangeOfOneFile(lines, citation) ?? { mismatch: `${how}, with the quoted text` };
-	}
 	const quoteLines = quote.split(/\r\n|\r|\n/u);
 	const found = [...lines].flatMap(([key, fileLines]) =>
 		[...fileLines.keys()].flatMap((start) => {

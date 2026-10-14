@@ -20,7 +20,7 @@ export function useReviewPeople(workspaceSlug: string): ReviewPeople {
 	const membersQuery = useQuery({
 		...listMembershipsOptions({ path: { workspaceSlug }, query: { size: MEMBER_PAGE_SIZE } }),
 	});
-	const options: PersonOption[] = (membersQuery.data ?? []).map(({ account }) => {
+	const options: PersonOption[] = (membersQuery.data?.content ?? []).map(({ account }) => {
 		const login = account.identities.find((identity) => hasText(identity.login))?.login;
 		return {
 			accountId: account.id,
@@ -31,9 +31,7 @@ export function useReviewPeople(workspaceSlug: string): ReviewPeople {
 
 	return {
 		options,
-		// A full page is the only signal the endpoint gives that there may be more; it returns a bare
-		// array, so there is no total to compare against.
-		capped: (membersQuery.data?.length ?? 0) >= MEMBER_PAGE_SIZE,
+		capped: (membersQuery.data?.totalElements ?? 0) > options.length,
 		isLoading: membersQuery.isLoading,
 		isError: membersQuery.isError,
 	};

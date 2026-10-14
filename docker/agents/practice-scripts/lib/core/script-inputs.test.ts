@@ -7,7 +7,7 @@ import { stagePracticeScripts } from "../../stage.ts";
 import { practiceInputsSchema } from "./contract.ts";
 import { InputReader, parseInputs } from "./script-inputs.ts";
 
-void test("the host stages and reads one v3 input record for each assigned practice", async () => {
+void test("the host stages and reads one input record for each assigned practice", async () => {
 	const stage = await stagePracticeScripts({ fixture: null });
 	try {
 		assert.deepEqual(await readdir(stage.practices), ["fixture.inputs.json"]);

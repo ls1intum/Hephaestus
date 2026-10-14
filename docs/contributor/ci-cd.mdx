@@ -123,7 +123,7 @@ A merge group is a diff, so it selects its jobs from the paths it touches —
 `any-code` is the union of source filters and reaches `docs/**` through the tooling filter.
 Thus, a documentation-only group starts `Quality`, `Security`, `Build`, and `Docker`, even when their internal jobs skip.
 
-To see why a leg did not run, read the `CI Status Gate` summary.
+Read the `CI Status Gate` summary for each prerequisite's result.
 It lists every leg, including skipped legs.
 Read the `Detect changes` log for filters matched by the diff.
 
@@ -576,6 +576,7 @@ Why the label is the authority, and which alternatives were priced and declined,
 | `semgrep.yml`                         | Pull request, push to main, merge group                                       | Tests and scans the repository's own TLS rule pack                                                                                                                                                                               |
 | `rescan-main-images.yml`              | Weekly, manual                                                                | Rescans main's published images against the release vulnerability policy and keeps one tracking issue in step with the findings                                                                                                  |
 | `rescan-release-images.yml`           | Weekly, manual                                                                | Rescans the latest published release's images and reports drift on the vulnerability response issue                                                                                                                              |
+| `ci-diagnostics.yml`                 | Completed CI/CD runs                                                          | Reports exact-attempt job and step timings without changing the required CI verdict |
 | `ci-profile.yml`                      | Weekly, manual                                                                | Reports advisory performance budgets and profiles server test tiers                                                                                                                                                              |
 | `ci-server-clean-reference.yml`       | Weekly, manual                                                                | Records cold server phases and compares generated JARs                                                                                                                                                                           |
 | `scorecard-ratchet.yml`               | Push to main, branch-protection change, weekly, manual                        | Fails when a Scorecard check drops below the committed baseline. A push fails only for the checks its own commit decides                                                                                                         |
@@ -890,13 +891,20 @@ Thus, this check needs network access. Nothing it reads is stored in the reposit
 ## Monitoring CI
 
 Use GitHub's organization-level [Actions metrics](https://docs.github.com/en/actions/concepts/metrics)
-for workflow and job run time, queue time, failure rate, and runner usage. Each `CI Status Gate` job
-also includes the current run's dependency-aware timeline, every direct prerequisite's result and
-the boolean selection flags from `Detect changes`. Selection is not a claim that a component's files
-changed: an unfiltered run or a preview can select unchanged inputs. The summary counts all skipped
-prerequisites without guessing their cause and links to the [local verification guide](./local-verification.mdx)
-for troubleshooting. It stays checkout-free because the same job writes commit statuses. JUnit
-results appear as `Test Results - …` check runs.
+for workflow and job run time, queue time, failure rate, and runner usage.
+`CI Status Gate` evaluates every direct prerequisite and the required release evidence preflight.
+It publishes the required commit status without checking out source.
+Its logs and local summary retain each prerequisite result.
+A local summary write failure does not change the verdict.
+
+After CI finishes, `CI diagnostics` reads that run's exact attempt with read-only Actions permissions.
+It reports the completed verdict, job times, and step times in a separate workflow summary.
+
+Attempt-to-gate time starts when that attempt starts, so it excludes earlier attempts.
+Creation-to-start time includes dependency waiting.
+Missing timestamps remain unavailable.
+A reporting failure cannot change CI, Version PR maintenance, or release eligibility.
+JUnit results appear as `Test Results - …` check runs.
 
 ### Pull-request latency
 

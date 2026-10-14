@@ -118,3 +118,18 @@ export const LoadFailed: Story = {
 		await expect(await canvas.findByText("We could not load problems")).toBeVisible();
 	},
 };
+
+const retryRefresh = fn();
+export const RefreshFailed: Story = {
+	args: {
+		problems: loadedList(reviewProblems, {
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: retryRefresh },
+		}),
+	},
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByText("These problems may be out of date");
+		await expect(canvas.getByRole("table").querySelectorAll("tbody tr").length).toBeGreaterThan(0);
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(retryRefresh).toHaveBeenCalledOnce();
+	},
+};

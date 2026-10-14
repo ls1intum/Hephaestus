@@ -20,20 +20,17 @@ export interface GrepOptions {
 
 const GLOB_GREP_BATCH_SIZE = 256;
 
+/** One `grep -Z -n` line: the file name, a NUL, then `<line>:<content>`. */
 function parseGrepLine(line: string, dir: string): GrepMatch | null {
-	// Path and line number are required groups; the trailing content group matches empty for a blank
-	// matched line, so it defaults instead of rejecting the whole match.
-	const {
-		file,
-		lineNumber,
-		content = "",
-	} = /^(?<file>.+?):(?<lineNumber>\d+):(?<content>.*)$/u.exec(line)?.groups ?? {};
-	if (file === undefined || lineNumber === undefined) {
+	const separator = line.indexOf("\0");
+	const { lineNumber, content } =
+		/^(?<lineNumber>\d+):(?<content>.*)$/su.exec(line.slice(separator + 1))?.groups ?? {};
+	if (separator === -1 || lineNumber === undefined || content === undefined) {
 		return null;
 	}
 
 	return {
-		file: path.relative(dir, file),
+		file: path.relative(dir, line.slice(0, separator)),
 		line: Number.parseInt(lineNumber, 10),
 		content: content.trim(),
 	};
@@ -166,7 +163,9 @@ export async function grep(
 		return [];
 	}
 
-	const grepArgs = fixedString ? ["grep", "-H", "-n", "-F"] : ["grep", "-H", "-n", "-E"];
+	// -Z ends the file name with a NUL, so a name holding `:<n>:` still splits; -I skips binary files,
+	// whose only output would be a "Binary file … matches" line with no line to cite.
+	const grepArgs = ["grep", "-H", "-n", "-Z", "-I", fixedString ? "-F" : "-E"];
 
 	if ((glob !== undefined && glob !== "") || opts.paths !== undefined) {
 		// A basename-only glob matches only the root dir; prepend "**/" for recursion.

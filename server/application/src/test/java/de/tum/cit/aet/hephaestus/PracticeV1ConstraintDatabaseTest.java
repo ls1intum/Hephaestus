@@ -141,8 +141,8 @@ class PracticeV1ConstraintDatabaseTest {
 
     static String insert(String outcome, String coverage) {
         return "INSERT INTO"
-            + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,coverage,recorded_at)"
-            + " SELECT '"
+                + " result(id,workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,coverage,recorded_at)"
+                + " SELECT '"
                 + RESULT + "',workspace_id,id,992121,992131,item_id,item_version,992106,'" + outcome
                 + "','Review summary'," + coverage + ",now() FROM review WHERE id='" + REVIEW + "'";
     }

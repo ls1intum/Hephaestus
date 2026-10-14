@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-28
 **Authors:** Felix T.J. Dietrich
-**Builds on:** [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md) (destination audiences),
+**Builds on:** [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md) (channel audiences),
 [ADR 0017](0017-replace-keycloak-with-spring-native-auth.md) (read-only user views, updates of 2026-09-11
 and 2026-09-24)
 
@@ -21,8 +21,8 @@ A workspace-admin audience would break what the product tells developers today:
   this access."
 - [Practice feedback language](../contributor/practice-feedback-language.md): feedback about a way of
   working is "prepared for one developer about what recurs across their work, readable by nobody
-  else — the `PRACTICE_PAGE` destination".
-- [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md): the audience of `PRACTICE_PAGE` is the
+  else — the `IN_APP` channel".
+- [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md): the audience of `IN_APP` is the
   "Recipient's private practice pages".
 - `docs/admin/practice-review.mdx`, under **Review before sending**: "the developer's own practice pages
   and the mentor are written regardless, because nobody but the developer reads them and only on
@@ -49,7 +49,7 @@ conclusion — is already served by the admin practice-review pages.
    admins, without the feedback text. Rejected: it reverses the four promises above. Standings, trends
    and the summary are a claim about a person across their work, so leaving out the feedback text does
    not make the view any less personal. It would need the disclosure records of [#1421] for every read,
-   an amendment to ADR 0029's `PRACTICE_PAGE` audience, a privacy notice change that tells every member, and a
+   an amendment to ADR 0029's `IN_APP` audience, a privacy notice change that tells every member, and a
    new answer to why in-app feedback skips approval.
 2. **A member opt-in to show their profile to workspace admins.** Rejected: nobody has asked for it,
    and it adds a consent surface with its own reverse state, its own record and its own wording in each
@@ -63,8 +63,8 @@ The Practice profile is the developer's alone. Each of its endpoints serves the 
 user to read on behalf of.
 
 - **Workspace admins** read what reviews concluded about a member in the admin practice-review pages:
-  **Practices → Practice reviews → Results**, filtered to that member, and the review and delivery
-  pages beside it. They can mark an result incorrect there. They see that in-app and conversation
+  **Practices → Practice reviews → Observations**, filtered to that member, and the review and delivery
+  pages beside it. They can mark an observation incorrect there. They see that in-app and conversation
   feedback exists and where its delivery stands, but not its text (`bodyVisibleToOperator` in
   `ReviewFeedbackQueryService`).
 - **Instance administrators** can read a member's Practice profile through **View as user**
@@ -93,17 +93,17 @@ profile with their admins.
 [#1421]: https://github.com/hephaestus-build/Hephaestus/issues/1421
 [#2260]: https://github.com/hephaestus-build/Hephaestus/pull/2260
 
-## Update — 2026-09-28: a disagreement is written to the admins
+## Update — 2026-09-28: a dispute is written to the admins
 
-A developer who disagreements feedback, including a Practice profile card they rate **Not accurate**, writes the
+A developer who disputes feedback, including a Practice profile card they rate **Not accurate**, writes the
 explanation to the workspace admins, and the form says so before they send it. Admins read it on the
-results the feedback was written from and on the feedback's record under Practice reviews, so they can
-mark an result incorrect or withdraw the card. Only the explanation crosses: the card's text stays
+observations the feedback was written from and on the feedback's record under Practice reviews, so they can
+mark an observation incorrect or withdraw the card. Only the explanation crosses: the card's text stays
 withheld from them, and every other response a developer writes — a rating's note, an *Addressed* or *Not
 applicable* note — stays theirs alone.
 
-## Update — 2026-10-05: a disagreement has one path
+## Update — 2026-10-05: a dispute has one path
 
-A developer disagreements a Practice profile card with **Disagree** only. The **Not accurate** reason in the
-update above is gone, because a rating answers whether the feedback helped and a disagreement answers whether it is
-wrong. The decision is unchanged: the explanation of a disagreement is written to the workspace admins.
+A developer disputes a Practice profile card with **Disagree** only. The **Not accurate** reason in the
+update above is gone, because a rating answers whether the feedback helped and a dispute answers whether it is
+wrong. The decision is unchanged: the explanation of a dispute is written to the workspace admins.

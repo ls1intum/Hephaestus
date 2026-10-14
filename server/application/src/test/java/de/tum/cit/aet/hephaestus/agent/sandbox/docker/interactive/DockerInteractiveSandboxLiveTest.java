@@ -393,8 +393,14 @@ class DockerInteractiveSandboxLiveTest {
                     "second turn"));
 
             assertThat(reused).isSameAs(first);
-            assertThat(proxyCredentialRegistry.authenticate(captured(firstToken)).flatMap(proxyCredentialRegistry::resolve)).isPresent();
-            assertThat(proxyCredentialRegistry.authenticate(captured(unusedToken)).flatMap(proxyCredentialRegistry::resolve)).isEmpty();
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(firstToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
+                    .isPresent();
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(unusedToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
+                    .isEmpty();
             first.close(Duration.ofSeconds(2));
         }
 
@@ -410,8 +416,13 @@ class DockerInteractiveSandboxLiveTest {
 
             assertThat(replacement).isNotSameAs(oldSandbox);
             assertThat(((DockerAttachedSandboxAdapter) oldSandbox).state()).isEqualTo(AttachedSandboxState.CLOSED);
-            assertThat(proxyCredentialRegistry.authenticate(captured(oldToken)).flatMap(proxyCredentialRegistry::resolve)).isEmpty();
-            assertThat(proxyCredentialRegistry.authenticate(captured(newToken)).flatMap(proxyCredentialRegistry::resolve))
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(oldToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
+                    .isEmpty();
+            assertThat(proxyCredentialRegistry
+                            .authenticate(captured(newToken))
+                            .flatMap(proxyCredentialRegistry::resolve))
                     .get()
                     .extracting(route -> route.baseUrl())
                     .isEqualTo("https://new.example/v1");

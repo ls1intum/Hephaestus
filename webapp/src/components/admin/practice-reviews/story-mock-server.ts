@@ -390,7 +390,9 @@ export function reviewHandlers({
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
 			HttpResponse.json(ownMembership(role)),
 		),
-		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(workspaceMembers)),
+		http.get("*/workspaces/:workspaceSlug/members", ({ request }) =>
+			HttpResponse.json(springPage(workspaceMembers, new URL(request.url))),
+		),
 	];
 }
 

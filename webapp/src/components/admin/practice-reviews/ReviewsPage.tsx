@@ -1,5 +1,6 @@
 import { WorkflowIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { ReviewListRefresh } from "./ReviewListRefresh";
 
 import type { ItemRef, ReviewSummary } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
@@ -142,6 +143,7 @@ export function ReviewsPage({
 	} else {
 		results = (
 			<>
+				<ReviewListRefresh failure={reviews.refreshFailure} noun="reviews" />
 				<ReviewDayTable
 					aria-label={LIST_LABEL}
 					timeLabel={TIME_LABEL}

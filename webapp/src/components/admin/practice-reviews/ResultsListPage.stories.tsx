@@ -408,3 +408,15 @@ export const NoResultsYet: Story = {
 		).toBeVisible();
 	},
 };
+
+export const RefreshFailed: Story = {
+	args: {
+		results: loadedList(reviewResults, {
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		}),
+	},
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("These results may be out of date")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};

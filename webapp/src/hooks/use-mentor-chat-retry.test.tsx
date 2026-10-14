@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { server } from "@/mocks/server";
 
-import { useMentorChat } from "./use-mentor-chat";
+import { useMentorChat, useMentorChatSession } from "./use-mentor-chat";
 
 vi.mock("@/hooks/use-active-workspace", () => ({
 	useActiveWorkspaceSlug: () => ({ workspaceSlug: "test-workspace", isLoading: false }),
@@ -66,7 +66,10 @@ describe("useMentorChat retry", () => {
 				},
 			),
 		);
-		const { result } = renderHook(() => useMentorChat({}), { wrapper });
+		const { result } = renderHook(
+			() => useMentorChat(useMentorChatSession({ workspaceSlug: "test-workspace" })),
+			{ wrapper },
+		);
 		const retryAfterFailure = async (posts: number) => {
 			await waitFor(() => expect(result.current.turn.kind).toBe("error"));
 			act(() => result.current.retry());

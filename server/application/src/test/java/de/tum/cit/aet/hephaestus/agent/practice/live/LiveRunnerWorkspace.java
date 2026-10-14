@@ -299,8 +299,7 @@ final class LiveRunnerWorkspace {
                     ReviewOrigin.REQUEST,
                     1,
                     List.of(pinned));
-            var inputs =
-                    new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null);
+            var inputs = new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null);
             for (var file : inputs.entrySet()) {
                 Path path = workspace.resolve(file.getKey());
                 Files.createDirectories(path.getParent());

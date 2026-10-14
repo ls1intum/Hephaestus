@@ -7,14 +7,17 @@ import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
 import de.tum.cit.aet.hephaestus.practices.PracticeReleaseChoice;
 import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -30,6 +33,64 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     CatalogService catalog;
+
+    @Test
+    @WithAdminUser
+    void shouldMoveACatalogPracticeThroughTheGroupRoute() {
+        persistUser("admin");
+        String suffix = UUID.randomUUID().toString();
+        String groupSlug = "move-group-" + suffix;
+        String practiceSlug = "move-practice-" + suffix;
+        catalog.createGroup(new CatalogGroupInputDTO(groupSlug, "Move group", null, null, null, null));
+        var created = catalog.createPractice(new CatalogPracticeInputDTO(
+                practiceSlug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
+
+        var response = client.patch()
+                .uri("/admin/practice-catalog/practices/{slug}/group", practiceSlug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .header("If-Match", EntityTagPrecondition.format(created.etag()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new MovePracticeRequestDTO(groupSlug, 0))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(CatalogDTO.class)
+                .returnResult();
+
+        var moved = Objects.requireNonNull(response.getResponseBody()).practices().stream()
+                .filter(practice -> practice.slug().equals(practiceSlug))
+                .findFirst()
+                .orElseThrow();
+        assertThat(moved.groupSlug()).isEqualTo(groupSlug);
+        assertThat(moved.position()).isZero();
+        assertThat(catalog.practice(practiceSlug).effective().groupSlug()).isEqualTo(groupSlug);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRejectAStaleWriteWithoutDisclosingTheCurrentETag() {
+        persistUser("admin");
+        String slug = "stale-" + UUID.randomUUID();
+        var created = catalog.createPractice(
+                new CatalogPracticeInputDTO(slug, "scm.pull_request", null, DefinitionTestFixtures.definition(), null));
+
+        client.patch()
+                .uri("/admin/practice-catalog/practices/{slug}/status", slug)
+                .headers(TestAuthUtils.withCurrentUser())
+                .header("If-Match", EntityTagPrecondition.format("stale"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("excluded", true))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.detail")
+                .isEqualTo("This entry changed after you loaded it. Reload and try again.");
+
+        var unchanged = catalog.practice(slug);
+        assertThat(unchanged.excluded()).isFalse();
+        assertThat(unchanged.etag()).isEqualTo(created.etag());
+    }
 
     @Test
     @WithAdminUser

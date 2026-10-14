@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -33,6 +34,36 @@ class PracticeRepositoryIntegrationTest extends AbstractWorkspaceIntegrationTest
                 null,
                 0,
                 null));
+    }
+
+    @Test
+    void shouldReadOnlyTheOwnedVersionAtTheRequestedTime() {
+        var own = create("as-of-own");
+        var foreign = create("as-of-foreign");
+        var first = own.getCurrentVersion();
+        var latest = versions.append(
+                own,
+                DefinitionTestFixtures.withCriteria(DefinitionTestFixtures.definition(), "Updated criteria."),
+                null);
+        long workspaceId = own.getWorkspace().getId();
+        var practiceIds = List.of(Objects.requireNonNull(own.getId()), Objects.requireNonNull(foreign.getId()));
+        long firstVersionId = Objects.requireNonNull(first.getId());
+        long latestVersionId = Objects.requireNonNull(latest.getId());
+        long foreignVersionId = Objects.requireNonNull(foreign.getCurrentVersion().getId());
+        var versionIds = List.of(firstVersionId, latestVersionId, foreignVersionId);
+
+        assertThat(versionRows.findByWorkspaceIdAndIdIn(workspaceId, versionIds))
+                .extracting(PracticeVersion::getId)
+                .containsExactlyInAnyOrder(firstVersionId, latestVersionId);
+        assertThat(versionRows.findAt(workspaceId, practiceIds, first.getCreatedAt()))
+                .extracting(PracticeVersion::getId)
+                .containsExactly(firstVersionId);
+        assertThat(versionRows.findAt(workspaceId, practiceIds, latest.getCreatedAt()))
+                .extracting(PracticeVersion::getId)
+                .containsExactly(latestVersionId);
+        assertThat(versionRows.findAt(
+                        workspaceId, practiceIds, first.getCreatedAt().minusMillis(1)))
+                .isEmpty();
     }
 
     @Test

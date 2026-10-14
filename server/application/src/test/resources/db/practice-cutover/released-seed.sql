@@ -100,3 +100,57 @@ INSERT INTO review_sweep_schedule(id,workspace_id,artifact_kind,cadence,lookback
 VALUES('00000000-0000-0000-0000-000000992272',992101,'scm.pull_request','DAILY',2,true,'2026-01-02T00:00:00Z',992106,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
 INSERT INTO review_backfill_run(id,workspace_id,artifact_kind,from_at,to_at,status,estimated_artifacts,requested_by_account_id,created_at,updated_at)
 VALUES('00000000-0000-0000-0000-000000992273',992101,'scm.pull_request','2026-01-01T00:00:00Z','2026-01-02T00:00:00Z','AWAITING_CONFIRMATION',1,992106,'2026-01-01T00:00:00Z','2026-01-01T00:00:00Z');
+
+INSERT INTO practice(id,workspace_id,slug,name,criteria,applies_to,subject,signals,evidence_requirements,
+    review_when,automated_review_policy,delivery_behavior,created_at)
+SELECT n,workspace_id,'send-practice-'||n,name,criteria,applies_to,subject,signals,evidence_requirements,
+    review_when,automated_review_policy,delivery_behavior,created_at
+FROM practice CROSS JOIN generate_series(992401,992406) n WHERE id=992121;
+INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,signals,
+    evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,created_at)
+SELECT id+10,id,1,slug,name,applies_to,subject,signals,evidence_requirements,review_when,criteria,
+    automated_review_policy,delivery_behavior,created_at FROM practice WHERE id BETWEEN 992401 AND 992406;
+UPDATE practice SET current_revision_id=id+10 WHERE id BETWEEN 992401 AND 992406;
+
+-- Separate unmarked results keep pending sends eligible without borrowing marked history.
+INSERT INTO observation(id,occurrence_key,agent_job_id,workspace_id,practice_id,practice_revision_id,
+    artifact_kind,artifact_id,about_user_id,summary,outcome,severity,evidence,evidence_rationale,observed_at)
+SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,'send-case-'||n,
+    '00000000-0000-0000-0000-000000992111',992101,n+100,n+110,'scm.pull_request',992109,992103,
+    'Explain this change.','NOT_MET','INFO','{"citations":[]}','The purpose is missing.','2026-01-01T00:00:30Z'
+FROM generate_series(992301,992306) n;
+INSERT INTO feedback(id,workspace_id,agent_job_id,recipient_user_id,about_user_id,channel,position,
+    delivery_state,source,body,created_at,delivered_at,suppression_reason)
+SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,992101,'00000000-0000-0000-0000-000000992111',
+    992103,992103,'IN_CONTEXT',n-992100,state,'AGENT','Explain this change.',
+    '2026-01-01T00:01:00Z',CASE WHEN state='DELIVERED' THEN '2026-01-01T00:01:30Z'::timestamptz END,
+    CASE WHEN state='SUPPRESSED' THEN 'OUTSIDE_CURRENT_COVERAGE' END
+FROM (VALUES (992311,'PREPARED'),(992312,'UNCONFIRMED'),(992313,'PREPARED'),
+    (992314,'DELIVERED'),(992315,'DELIVERED'),(992316,'SUPPRESSED')) f(n,state);
+INSERT INTO feedback_observation(feedback_id,observation_id,role,ordinal)
+SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,
+    ('00000000-0000-0000-0000-000000'||(n-10))::uuid,'PRIMARY',0
+FROM generate_series(992311,992316) n;
+INSERT INTO feedback_placement(id,feedback_id,placement_type,posted_comment_ref,created_at)
+SELECT ('00000000-0000-0000-0000-000000'||(n+20))::uuid,
+    ('00000000-0000-0000-0000-000000'||n)::uuid,'SUMMARY',external,
+    '2026-01-01T00:01:30Z'
+FROM (VALUES (992312,NULL::text),(992314,'provider:updated'),(992315,'provider:correction')) c(n,external);
+INSERT INTO feedback_dispatch(id,destination_key,workspace_id,agent_job_id,feedback_id,destination,state,body,
+    practice_slugs,package_content,delivered_placements,write_started,inline_write_started,
+    delivered_external_ref,next_attempt_at,attempt_count,created_at,updated_at)
+SELECT ('00000000-0000-0000-0000-000000'||(n+40))::uuid,'send-case-'||n,
+    992101,'00000000-0000-0000-0000-000000992111',('00000000-0000-0000-0000-000000'||n)::uuid,
+    'APPROVED_REVIEW_PACKAGE',state,'Explain this change.','["explains-why"]',
+    jsonb_build_object('mrNote','Explain this change.','summaryContributors',jsonb_build_array('send-case-'||(n-10)),
+        'inlineMarker','<!-- hephaestus-approved-package:00000000-0000-0000-0000-000000'||n||' -->'),
+    '[]',n IN(992312,992314,992315),false,external,'2026-01-01T00:01:30Z',1,'2026-01-01T00:01:00Z','2026-01-01T00:01:30Z'
+FROM (VALUES (992311,'PENDING',NULL::text),(992312,'PENDING',NULL::text),
+    (992313,'UNCERTAIN',NULL::text),(992314,'SENT','provider:updated'),
+    (992315,'SENT','provider:correction'),(992316,'PENDING',NULL::text)) d(n,state,external);
+INSERT INTO observation_invalidation(id,workspace_id,observation_id,reason,invalidated_at,
+    invalidated_by_account_id,provider_copy,provider_copy_retry_at)
+SELECT ('00000000-0000-0000-0000-000000'||(n+60))::uuid,992101,
+    ('00000000-0000-0000-0000-000000'||(n-10))::uuid,'Wrong evidence.',
+    '2026-01-01T00:02:00Z',992106,correction,'2026-01-01T00:03:00Z'
+FROM (VALUES (992314,'UPDATED'),(992315,'PENDING')) m(n,correction);

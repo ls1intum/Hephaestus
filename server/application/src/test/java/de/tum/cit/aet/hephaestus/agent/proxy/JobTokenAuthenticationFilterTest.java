@@ -1,7 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
@@ -49,8 +55,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         filter.doFilter(
                 request,
                 response,
-                (incoming, outgoing) ->
-                        principal.set(SecurityContextHolder.getContext().getAuthentication()));
+                (incoming, outgoing) -> principal.set(Objects.requireNonNull(
+                        SecurityContextHolder.getContext().getAuthentication())));
         assertThat(response.getStatus()).isEqualTo(200);
         assertThat(principal.get()).isInstanceOf(JobTokenAuthentication.class);
         assertThat(((JobTokenAuthentication) principal.get()).getPrincipal().job())
@@ -77,8 +83,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         authFilter.doFilter(
                 request("/internal/llm/responses", "Bearer " + token),
                 response,
-                (incoming, outgoing) ->
-                        principal.set(SecurityContextHolder.getContext().getAuthentication()));
+                (incoming, outgoing) -> principal.set(Objects.requireNonNull(
+                        SecurityContextHolder.getContext().getAuthentication())));
         assertThat(response.getStatus()).isEqualTo(200);
         var sessionIdentity = Objects.requireNonNull(
                 ((JobTokenAuthentication) principal.get()).getPrincipal().mentor());

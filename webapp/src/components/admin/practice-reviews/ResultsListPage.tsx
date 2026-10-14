@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ReviewListRefresh } from "./ReviewListRefresh";
 
 import type { ReviewResult } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
@@ -91,6 +92,7 @@ export function ResultsListPage({
 			{results.status === "loading" && <ResultRows state={{ status: "loading" }} />}
 			{results.status === "ready" && (
 				<>
+					<ReviewListRefresh failure={results.refreshFailure} noun="results" />
 					<ResultRows state={resultsState(rows, hasFilter ? reset : undefined)} byDay={byDay} />
 					{rows.length > 0 && <ReviewListEnd {...results} noun="results" />}
 				</>

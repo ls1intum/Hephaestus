@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDraft;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import java.time.Clock;
 import java.time.Instant;
@@ -112,18 +113,18 @@ public class FeedbackPreparationService {
             } else {
                 var selection = pageSupport.select(
                         draft.workspaceId(), draft.developerId(), primary.getPracticeId(), clock.instant());
-                var authorizedIds =
+                var selectedIds =
                         selection.evidence().stream().map(Result::getId).toList();
                 if (support.stream()
                         .anyMatch(row ->
-                                !row.getReviewId().equals(draft.reviewId()) && !authorizedIds.contains(row.getId())))
-                    throw conflict("Historical support must come from the authorized practice-page read.");
+                                !row.getReviewId().equals(draft.reviewId()) && !selectedIds.contains(row.getId())))
+                    throw conflict("Historical support must come from the selected practice-page window.");
                 support = selection.evidence();
                 var prior = selection.previous();
                 var decision = composition.pageDecision(primary, support, selection, clock.instant());
                 reason = switch (decision.decision()) {
                     case ADMIT ->
-                        ids.stream().anyMatch(id -> !authorizedIds.contains(id))
+                        ids.stream().anyMatch(id -> !selectedIds.contains(id))
                                 ? FeedbackStopReason.EVIDENCE_NOT_PERMITTED
                                 : reason;
                     case FEEDBACK_OFF -> FeedbackStopReason.FEEDBACK_OFF;
@@ -147,15 +148,19 @@ public class FeedbackPreparationService {
         }
         if (draft.destination() == FeedbackDestination.CONVERSATION && existing.isEmpty()) {
             for (var result : support) {
+                if (result.getOutcome() != ResultOutcome.NOT_MET)
+                    throw conflict("Conversation feedback requires NOT_MET results.");
                 var decision = composition.conversationDecision(snapshot, result);
-                if (decision != ConversationDecision.ADMIT) {
-                    reason = switch (decision) {
+                if (decision.decision() != ConversationDecision.ADMIT) {
+                    reason = switch (decision.decision()) {
                         case FEEDBACK_OFF -> FeedbackStopReason.FEEDBACK_OFF;
                         case BACKFILL_QUIET -> FeedbackStopReason.BACKFILL_QUIET;
                         case PRACTICE_REQUIRES_APPROVAL -> FeedbackStopReason.PRACTICE_REQUIRES_APPROVAL;
                         case HAS_INLINE_ANCHOR, ALREADY_DELIVERED_ON_WORK -> FeedbackStopReason.NOTHING_NEW;
                         case REVIEWER_DEFERRED -> FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
-                        case MENTOR_UNAVAILABLE, NOT_DELIVERABLE -> FeedbackStopReason.RECIPIENT_UNAVAILABLE;
+                        case MENTOR_UNAVAILABLE -> FeedbackStopReason.RECIPIENT_UNAVAILABLE;
+                        case UNATTRIBUTABLE_SUBJECT -> FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE;
+                        case GATE_REFUSED -> Objects.requireNonNull(decision.stopReason());
                         case ADMIT -> throw new IllegalStateException("An admitted result has no refusal.");
                     };
                     break;

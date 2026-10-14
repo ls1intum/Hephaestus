@@ -287,9 +287,7 @@ public class ResultStoreService implements ResultStore {
 
     @Override
     public UUID mark(long workspaceId, UUID resultId, ResultMarkKind kind, long actorId, String reason) {
-        return marking
-                .create(workspaceId, resultId, kind, actorId, reason)
-                .getId();
+        return marking.create(workspaceId, resultId, kind, actorId, reason).getId();
     }
 
     @Override

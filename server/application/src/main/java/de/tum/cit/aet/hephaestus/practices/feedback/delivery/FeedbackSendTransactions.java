@@ -71,12 +71,15 @@ public class FeedbackSendTransactions {
         var row = store.lock(workspaceId, feedbackId);
         if (!owns(workspaceId, feedbackId, owner)) return false;
         record(workspaceId, feedbackId, completed);
+        if (visibility.withdrawn(workspaceId, feedbackId)) {
+            settle(workspaceId, feedbackId, owner, false);
+            return false;
+        }
         var check = store.check(row, true);
         if (!check.allowed()) {
             store.withhold(row, Objects.requireNonNull(check.reason()));
             return false;
         }
-        if (visibility.withdrawn(workspaceId, feedbackId)) return false;
         for (UUID id : attempting) {
             if (copies.beginWrite(workspaceId, feedbackId, id, clock.instant()) != 1)
                 throw new IllegalStateException("A copy is no longer eligible for a write.");
@@ -167,6 +170,10 @@ public class FeedbackSendTransactions {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void finish(long workspaceId, UUID feedbackId, String owner, boolean exhausted) {
+        settle(workspaceId, feedbackId, owner, exhausted);
+    }
+
+    private void settle(long workspaceId, UUID feedbackId, String owner, boolean exhausted) {
         var row = store.lock(workspaceId, feedbackId);
         if (!owns(workspaceId, feedbackId, owner)) return;
         var active = sends.lockByFeedbackId(workspaceId, feedbackId).orElseThrow();

@@ -196,6 +196,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private IdentityProvider savedProvider;
     private Workspace savedWorkspace;
 
+    @Autowired
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();

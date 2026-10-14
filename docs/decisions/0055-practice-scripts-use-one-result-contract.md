@@ -10,8 +10,22 @@ Some practices can decide from exact captured records.
 Others need model judgment within the same evidence boundary.
 Both must reach one admission path before they can support feedback.
 
+## Decision drivers
+
+- A script failure never becomes a claim about the work.
+- A script that a workspace admin wrote holds no credential.
+- Every candidate passes the same admission as the built-in review.
+
+## Considered options
+
+1. **A positional function that returns leads only.** Rejected. The server then has to turn leads into results, so a second outcome path and a second admission path appear.
+2. **Fall back to the built-in script when a custom script is invalid.** Rejected. The admin who wrote the script never sees the failure, and the result claims a method that did not run.
+3. **Give the child process its own model credential.** Rejected. A script could read and send the credential, which breaks the third control of ADR 0036.
+4. **One exported definition, one candidate result, and models only through the host.** Chosen.
+
 ## Decision
 
+Use option 4.
 Each assigned practice runs one custom script or the built-in script.
 A custom script exports definePracticeScript with meta and run(ctx).
 The script returns one candidate result for its assigned item.
@@ -31,10 +45,8 @@ The [runner guide](../contributor/practice-script-runner.mdx) owns the strict ve
 
 ## Consequences
 
-No earlier script form, output decoder or grace runner remains.
-Operators upgrade roles, runtime images and clients together.
-The migration retains old history and cancels incompatible queued work without replay.
 A script failure creates no claim about the work.
+[ADR 0056](0056-one-practice-model-for-items-and-scans.md) § Consequences owns the upgrade.
 
 ## Revisit trigger
 

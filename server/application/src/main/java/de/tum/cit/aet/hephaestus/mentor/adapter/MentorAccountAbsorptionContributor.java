@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.mentor.adapter;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAbsorptionContributor;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.core.annotation.Order;
 
 @Order(30)
 @Component

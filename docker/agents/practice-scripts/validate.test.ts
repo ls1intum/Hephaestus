@@ -9,7 +9,7 @@ import { requested, REVIEWED } from "./run-bundled.ts";
 
 const cli = path.join(import.meta.dirname, "validate.ts");
 async function workspace(t: TestContext, source: string) {
-	const root = await mkdtemp(path.join(tmpdir(), "practice-validate-v3-"));
+	const root = await mkdtemp(path.join(tmpdir(), "practice-validate-"));
 	t.after(async () => rm(root, { recursive: true, force: true }));
 	await mkdir(path.join(root, "repo"));
 	await mkdir(path.join(root, "out"));
@@ -46,7 +46,7 @@ async function report(root: string) {
 		.parse(value);
 }
 
-void test("the author tool returns an authored v3 candidate without model access", async (t) => {
+void test("the author tool returns an authored candidate without model access", async (t) => {
 	const { root, args } = await workspace(
 		t,
 		`export default {meta:{},run:async()=>(${JSON.stringify({ ...REVIEWED, coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true } })})};`,
@@ -67,7 +67,7 @@ void test("review without a supplied result remains unavailable rather than maki
 	const result = await report(root);
 	assert.equal(result.stopReason, "unavailable");
 });
-void test("the author tool passes the supplied review result through the v3 host", async (t) => {
+void test("the author tool passes the supplied review result through the host", async (t) => {
 	const { root, args } = await workspace(
 		t,
 		'export default {meta:{},run:async ctx=>ctx.review({directions:["Read the complete standard."]})};',

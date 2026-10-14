@@ -98,7 +98,10 @@ class MentorPiAdapterTest extends BaseUnitTest {
     private ProxyRouting routingFor(PiPlanSpec spec) {
         String jobToken = spec.jobToken();
         assertThat(jobToken).isNotNull();
-        return proxyRegistry.authenticate(jobToken).flatMap(proxyRegistry::resolve).orElseThrow();
+        return proxyRegistry
+                .authenticate(jobToken)
+                .flatMap(proxyRegistry::resolve)
+                .orElseThrow();
     }
 
     @Test
@@ -162,7 +165,8 @@ class MentorPiAdapterTest extends BaseUnitTest {
         String jobToken = spec.jobToken();
         assertThat(jobToken).isNotNull();
         assertThat(jobToken).isNotBlank();
-        assertThat(proxyRegistry.authenticate(jobToken).flatMap(proxyRegistry::resolve)).isPresent();
+        assertThat(proxyRegistry.authenticate(jobToken).flatMap(proxyRegistry::resolve))
+                .isPresent();
     }
 
     @Test

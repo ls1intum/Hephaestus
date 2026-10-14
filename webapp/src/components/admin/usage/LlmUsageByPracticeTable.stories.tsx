@@ -66,7 +66,7 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * The purse names group their columns, so only the leaf columns sort and carry `aria-sort`. With
- * every call priced, there is no *No price set* column. The two purses' Spend buttons are
+ * every call priced, there is no *Unavailable cost* column. The two purses' Spend buttons are
  * told apart by name.
  */
 export const Priced: Story = {
@@ -93,7 +93,7 @@ export const Priced: Story = {
 				(name) => table.getByRole("columnheader", { name }).ariaSort,
 			),
 		).toStrictEqual(["descending", "none"]);
-		await expect(table.queryByRole("columnheader", { name: "No price set" })).toBeNull();
+		await expect(table.queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 
 		const row = await rowNamed(canvas, /^Comments explain why/u);
 		// Nothing spent on the own provider still averages: $0.000, not a dash. Each average column
@@ -201,7 +201,7 @@ export const OwnProviderAbsent: Story = {
 };
 
 /**
- * A reranker that reports no tokens: the reviews that called it are counted under *No price set*,
+ * A reranker that reports no tokens: the reviews that called it are counted under *Unavailable cost*,
  * and the row has no average: its $0.00 is not a known cost.
  * The column is there only while some row has such a review. Its header wraps onto two lines, so at
  * the width of a 1280 px screen the table still shows every column without scrolling.
@@ -230,7 +230,7 @@ export const UnpricedReviews: Story = {
 	},
 	play: async ({ canvas }) => {
 		const table = within(await tableIn(canvas));
-		const header = table.getByRole("columnheader", { name: "No price set" });
+		const header = table.getByRole("columnheader", { name: "Unavailable cost" });
 		await expect(header).toHaveAttribute("rowspan", "2");
 		const scroller = horizontalScrollParentOf(await tableIn(canvas));
 		await expect(scroller.scrollWidth).toBeLessThanOrEqual(scroller.clientWidth + 1);

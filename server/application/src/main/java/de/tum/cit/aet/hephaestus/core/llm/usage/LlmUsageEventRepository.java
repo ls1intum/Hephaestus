@@ -85,7 +85,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             total_calls, cost_usd, occurred_at, pricing_state, funding_source, applied_price_id,
             applied_workspace_model_id, applied_per_1m_input_usd, applied_per_1m_output_usd,
             applied_per_1m_cache_read_usd, applied_per_1m_cache_write_usd, usage_provenance, search_units,
-            unreported_calls
+            unreported_calls, measurement_verification
         ) VALUES (
             :#{#event.id()}, :#{#event.workspaceId()}, :#{#event.reviewId()}, :#{#event.jobType()}, :#{#event.sourceType()},
             :#{#event.sourceId()}, :#{#event.sourceAttempt()}, :#{#event.model()},
@@ -96,7 +96,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             :#{#event.appliedWorkspaceModelId()}, :#{#event.appliedPer1mInputUsd()},
             :#{#event.appliedPer1mOutputUsd()}, :#{#event.appliedPer1mCacheReadUsd()},
             :#{#event.appliedPer1mCacheWriteUsd()}, :#{#event.usageProvenance()}, :#{#event.searchUnits()},
-            :#{#event.unreportedCalls()}
+            :#{#event.unreportedCalls()}, :#{#event.measurementVerification()}
         ) ON CONFLICT (source_type, source_id, source_attempt) DO NOTHING
         """, nativeQuery = true)
     int insertIfAbsent(@Param("event") LlmUsageInsert event);
@@ -170,9 +170,10 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @Query("SELECT new de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow(e.id,"
             + " e.workspace.id, e.model, e.fundingSource, e.inputTokens, e.outputTokens,"
             + " e.cacheReadTokens, e.cacheWriteTokens, e.searchUnits, e.appliedPriceId,"
-            + " e.appliedWorkspaceModelId) FROM LlmUsageEvent e WHERE e.occurredAt >= :from AND"
+            + " e.appliedWorkspaceModelId, e.measurementVerification) FROM LlmUsageEvent e WHERE e.occurredAt >= :from AND"
             + " e.occurredAt < :to AND e.pricingState ="
             + " de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState.UNPRICED AND"
+            + " e.measurementVerification = de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification.VERIFIED AND"
             + " e.unreportedCalls = 0 AND (e.inputTokens > 0 OR e.outputTokens > 0 OR"
             + " e.cacheReadTokens > 0 OR e.cacheWriteTokens > 0) ORDER BY e.occurredAt")
     List<UnpricedLedgerRow> findUnpricedInWindow(
@@ -220,7 +221,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
                     + " :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
                     + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd ="
                     + " :#{#price.per1mCacheWriteUsd()} WHERE id = :id AND pricing_state ="
-                    + " 'UNPRICED' AND unreported_calls = 0 AND (input_tokens > 0 OR"
+                    + " 'UNPRICED' AND measurement_verification = 'VERIFIED' AND unreported_calls = 0 AND (input_tokens > 0 OR"
                     + " output_tokens > 0 OR cache_read_tokens > 0 OR cache_write_tokens > 0)",
             nativeQuery = true)
     int applyResolvedPrice(

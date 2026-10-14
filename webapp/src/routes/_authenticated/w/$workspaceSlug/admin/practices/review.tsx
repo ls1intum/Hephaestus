@@ -361,10 +361,10 @@ function AutomatedReviewSection({ workspaceSlug }: { workspaceSlug: string }) {
 	} else {
 		peopleOptions = {
 			status: "ready",
-			options: membersQuery.data
+			options: membersQuery.data.content
 				.filter((member) => member.eligibleForPracticeReview)
 				.map((member) => ({
-					value: member.accountId,
+					value: member.account.id,
 					label: accountLabel(member.account),
 					description: accountDescription(member.account),
 				})),

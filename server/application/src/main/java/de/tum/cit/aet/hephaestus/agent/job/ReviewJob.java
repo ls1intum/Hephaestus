@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import jakarta.persistence.Column;
@@ -91,11 +90,6 @@ public class ReviewJob {
 
     @Column(name = "trace_id", nullable = false, length = 32)
     private String traceId;
-
-    @JsonIgnore
-    @ToString.Exclude
-    @Column(name = "job_token_hash", length = 64)
-    private @Nullable String jobTokenHash;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "input", nullable = false, columnDefinition = "jsonb")

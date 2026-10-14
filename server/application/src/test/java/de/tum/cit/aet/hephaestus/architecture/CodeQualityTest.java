@@ -628,8 +628,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                                     javaClass,
                                                     String.format(
                                                             "LSP: %s.%s throws UnsupportedOperationException -"
-                                                                + " indicates contract violation, consider interface"
-                                                                + " redesign",
+                                                                    + " indicates contract violation, consider interface"
+                                                                    + " redesign",
                                                             javaClass.getSimpleName(), method.getName())));
                                         }
                                     });

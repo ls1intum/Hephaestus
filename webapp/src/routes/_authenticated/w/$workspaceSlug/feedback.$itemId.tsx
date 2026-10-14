@@ -1,5 +1,6 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { createFileRoute, notFound } from "@tanstack/react-router";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import { listOwnItemReviewsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
 import { ItemFeedbackPage } from "@/components/profile/ItemFeedbackPage";
@@ -35,13 +36,15 @@ function ItemFeedbackRoute() {
 	const readOnly = useAuth().userView !== undefined;
 	const { workspaceSlug } = Route.useParams();
 	const { itemId } = Route.useLoaderData();
+	const listOptions = listOwnItemReviewsInfiniteOptions({
+		path: { workspaceSlug, itemId },
+		query: { size: REVIEW_PAGE_SIZE },
+	});
 	const reviews = useInfiniteQuery({
-		...listOwnItemReviewsInfiniteOptions({
-			path: { workspaceSlug, itemId },
-			query: { size: REVIEW_PAGE_SIZE },
-		}),
+		...listOptions,
 		...pagedModelParams,
 	});
+	useQueryReadRefusal(listOptions.queryKey, reviews.isError, reviews.error);
 	const responses = useFeedbackResponseWrite(workspaceSlug);
 	return (
 		<ItemFeedbackPage

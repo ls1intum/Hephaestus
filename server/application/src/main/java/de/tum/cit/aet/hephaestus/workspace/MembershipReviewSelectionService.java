@@ -1,0 +1,26 @@
+package de.tum.cit.aet.hephaestus.workspace;
+
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
+import java.util.Collection;
+import java.util.Set;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+@ConditionalOnCaptureRole
+@RequiredArgsConstructor
+public class MembershipReviewSelectionService implements MembershipReviewSelection {
+    private final MembershipRepository memberships;
+
+    @Override
+    @Transactional
+    public void replaceSelection(long workspaceId, Collection<Long> accountIds) {
+        var selected = Set.copyOf(accountIds);
+        memberships
+                .findReviewSelectionMembers(workspaceId, selected)
+                .forEach(member -> member.setReviewSelected(selected.contains(member.getAccountId())));
+        memberships.flush();
+    }
+}

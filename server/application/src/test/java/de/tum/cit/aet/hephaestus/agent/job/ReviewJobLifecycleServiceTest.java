@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -17,6 +18,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -124,6 +126,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
                         BigDecimal.ONE,
                         BigDecimal.ONE));
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
+        job.prePersist();
         return job;
     }
 
@@ -255,10 +258,37 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
+            verify(usageRecorder).record(eq(1L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceId()).isEqualTo(cancelledJob.getId());
             assertThat(sample.getValue().sourceAttempt()).isEqualTo(cancelledJob.getAttempt());
             assertThat(sample.getValue().inputTokens()).isZero();
+        }
+
+        @Test
+        void cancellationReadsCommittedProxyCountersInsteadOfTheEarlierEntity() {
+            ReviewJob running = createJobWithStatus(ReviewJobStatus.RUNNING);
+            running.setExecutionStartedAt(Instant.now());
+            UUID id = running.getId();
+            ReviewJob cancelled = createJobWithStatus(ReviewJobStatus.CANCELLED);
+            cancelled.setId(id);
+            cancelled.setExecutionStartedAt(running.getExecutionStartedAt());
+            when(agentJobRepository.findByIdAndWorkspaceId(id, 1L))
+                    .thenReturn(Optional.of(running))
+                    .thenReturn(Optional.of(cancelled));
+            when(agentJobRepository.transitionToCancelled(eq(id), any(), any(), any(), any()))
+                    .thenReturn(1);
+            when(agentJobRepository.findLlmUsageById(id))
+                    .thenReturn(Optional.of(new ReviewJobLlmUsage(4, 900, 600, 30, 100, 0)));
+
+            service.cancel(1L, id);
+
+            var captured = ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
+            verify(usageRecorder).record(eq(1L), captured.capture());
+            assertThat(captured.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
+            assertThat(captured.getValue().inputTokens()).isEqualTo(900);
+            assertThat(captured.getValue().outputTokens()).isEqualTo(600);
+            assertThat(captured.getValue().totalCalls()).isEqualTo(4);
         }
 
         @Test
@@ -288,7 +318,8 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
             assertThat(result.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(usageRecorder).recordUnverifiable(eq(1L), sample.capture());
+            verify(usageRecorder).record(eq(1L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().price().fundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
             assertThat(sample.getValue().price().pricingState()).isEqualTo(UsagePricingState.UNPRICED);
         }
@@ -309,7 +340,8 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -330,7 +362,8 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         }
 
         @Test
@@ -343,7 +376,8 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
             service.cancel(1L, jobId);
 
-            verify(usageRecorder, never()).recordUnverifiable(any(), any());
+            verify(usageRecorder, never())
+                    .record(any(), argThat(r -> r.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
             verify(agentJobRepository, never()).transitionToCancelled(any(), any(), any(), any(), any());
         }
     }

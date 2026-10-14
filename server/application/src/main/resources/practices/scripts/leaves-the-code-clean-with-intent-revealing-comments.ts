@@ -56,7 +56,7 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 	rust: [["println!/dbg!/eprintln!", /\b(?:println|eprintln|dbg|print|eprint)\s*!/u]],
 };
 
-// A TODO/FIXME/XXX/HACK marker selected in the diff — a residue signal across all languages.
+// A TODO/FIXME/XXX/HACK marker selected in the diff — residue in any language.
 const TODO_MARKER = /\b(?:TODO|FIXME|XXX|HACK)\b/u;
 
 // A comment that narrates the editing session rather than the code, on any language's comment line.

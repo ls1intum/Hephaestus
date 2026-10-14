@@ -671,7 +671,8 @@ class MentorChatServiceTest extends BaseUnitTest {
         preparer.prepare(WORKSPACE_ID, USER_ID);
 
         verify(interactiveSandboxService, never()).attach(any());
-        assertThat(proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve)).isEmpty();
+        assertThat(proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve))
+                .isEmpty();
     }
 
     @Test
@@ -1611,7 +1612,7 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         assertThat(emitter.recordedTypes()).contains("error");
         assertThat(String.join("\n", emitter.rawData))
-                .contains("Some usage has no price, so the server cannot check it against the budget")
+                .contains("Some usage has no confirmed cost, so the server cannot check it against the budget")
                 .doesNotContain("has reached its monthly");
         verify(persistence, never()).persistInFlight(any(), any(), any(), any(), any());
         try {
@@ -1864,14 +1865,20 @@ class MentorChatServiceTest extends BaseUnitTest {
         Consumer<JsonNode> scripted = sandbox.onSend;
         sandbox.onSend = frame -> {
             if ("prompt".equals(frame.path("method").asString(""))) {
-                ProxyRouting.BilledAttempt attempt =
-                        proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt();
+                ProxyRouting.BilledAttempt attempt = proxyCredentialRegistry
+                        .authenticate(token)
+                        .flatMap(proxyCredentialRegistry::resolve)
+                        .orElseThrow()
+                        .attempt();
                 if (attempt != null) {
 
                     proxyCredentialRegistry.accumulate(attempt.sourceId(), new ProxyTokenUsage(100_000, 0, 0, 0, 0));
                 }
-                seen.set(Objects.requireNonNull(
-                        proxyCredentialRegistry.authenticate(token).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt()));
+                seen.set(Objects.requireNonNull(proxyCredentialRegistry
+                        .authenticate(token)
+                        .flatMap(proxyCredentialRegistry::resolve)
+                        .orElseThrow()
+                        .attempt()));
             }
             scripted.accept(frame);
         };
@@ -1907,7 +1914,11 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(duringPrompt.get()).isNotNull();
         assertThat(duringPrompt.get().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
         assertThat(duringPrompt.get().spentUsd()).isEqualByComparingTo("1.00");
-        assertThat(proxyCredentialRegistry.authenticate(sessionToken).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt())
+        assertThat(proxyCredentialRegistry
+                        .authenticate(sessionToken)
+                        .flatMap(proxyCredentialRegistry::resolve)
+                        .orElseThrow()
+                        .attempt())
                 .isNull();
     }
 
@@ -1922,7 +1933,11 @@ class MentorChatServiceTest extends BaseUnitTest {
 
         verify(persistence).interrupt(any(), any(), any(Throwable.class));
         assertThat(duringPrompt.get()).isNotNull();
-        assertThat(proxyCredentialRegistry.authenticate(sessionToken).flatMap(proxyCredentialRegistry::resolve).orElseThrow().attempt())
+        assertThat(proxyCredentialRegistry
+                        .authenticate(sessionToken)
+                        .flatMap(proxyCredentialRegistry::resolve)
+                        .orElseThrow()
+                        .attempt())
                 .isNull();
     }
 

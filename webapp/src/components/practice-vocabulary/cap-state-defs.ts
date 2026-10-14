@@ -23,10 +23,11 @@ function capStateDefs(limit: "budget" | "cap"): StatusDefs<CapState> {
 			description: `Most of this month’s ${limit} is used.`,
 		},
 		UNPRICED: {
-			label: "No price set",
+			label: "Unavailable cost",
 			icon: CircleAlertIcon,
 			badgeVariant: "warning",
-			description: "Some calls have no price, so real spend may be higher than shown.",
+			description:
+				"A rate is missing or a measurement is unverified, so real spend may be higher than shown.",
 		},
 	};
 }

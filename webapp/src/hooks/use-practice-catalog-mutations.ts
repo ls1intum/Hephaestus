@@ -17,7 +17,7 @@ import {
 	listPracticesOptions,
 	listPracticesQueryKey,
 	listPracticeVersionsQueryKey,
-	placePracticeMutation,
+	movePracticeMutation,
 	previewGroupAdoptionQueryKey,
 	reorderPracticeGroupsMutation,
 	resetPracticeToCatalogMutation,
@@ -301,7 +301,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	});
 
 	const place = useMutation({
-		...filedUnder(practiceMutationKey, placePracticeMutation()),
+		...filedUnder(practiceMutationKey, movePracticeMutation()),
 		scope: structuralScope,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: practicesQueryKey });

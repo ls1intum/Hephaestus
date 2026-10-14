@@ -57,6 +57,9 @@ export const WITHHOLDING_FAMILY_DEFS: StatusDefs<WithholdingFamily> = {
 };
 
 const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
+	EVIDENCE_NOT_PERMITTED: "POLICY",
+	NO_EVIDENCE: "HOUSEKEEPING",
+	UNCORROBORATED: "HOUSEKEEPING",
 	ITEM_GONE: "WORK_MOVED_ON",
 	ITEM_CLOSED: "WORK_MOVED_ON",
 	ITEM_MERGED: "WORK_MOVED_ON",
@@ -96,6 +99,9 @@ const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
  * anyone with access can open these screens and the work is usually somebody else's.
  */
 export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
+	EVIDENCE_NOT_PERMITTED: "The evidence cannot be used for this feedback.",
+	NO_EVIDENCE: "The feedback has no evidence that supports it.",
+	UNCORROBORATED: "The feedback could not be confirmed against its evidence.",
 	ITEM_GONE: "The work no longer exists.",
 	ITEM_CLOSED: "The work was closed before the feedback could be posted.",
 	ITEM_MERGED: "The work was already merged, so a note on it would arrive too late.",

@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -12,6 +13,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
@@ -124,7 +126,11 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
-        verify(usageRecorder, never()).recordUnverifiable(any(), any());
+        verify(usageRecorder, never())
+                .record(
+                        any(),
+                        argThat(recorded ->
+                                recorded.measurementVerification() == MeasurementVerification.UNVERIFIABLE));
         assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
         assertThat(sample.getValue().sourceId()).isEqualTo(assistantId);
         assertThat(sample.getValue().inputTokens()).isEqualTo(6_000);
@@ -135,8 +141,9 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a turn that reported its own usage is billed from that report, not from the proxy meter")
-    void theRunnerReportWinsWhenThereIsOne() {
+    @DisplayName("a turn with no billable proxy usage is billed from its runner report")
+    void shouldBillTheRunnerReportWhenTheProxyHasNoBillableUsage() {
+        proxyRecorded(MentorTurnLlmUsage.NONE);
         TranslatorState state = startedTurnWithNoRunnerReport();
         ObjectNode reported = NODES.objectNode();
         reported.put("input", 11).put("output", 22);
@@ -149,8 +156,8 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
         verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
         assertThat(sample.getValue().inputTokens()).isEqualTo(11);
         assertThat(sample.getValue().outputTokens()).isEqualTo(22);
-        // Not even consulted: summing the two views of the same calls would double-bill them.
-        verify(chatMessageRepository, never()).findLlmUsageById(any());
+        assertThat(sample.getValue().totalCalls()).isEqualTo(1);
+        assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
     }
 
     static Stream<Arguments> nothingToBillFrom() {
@@ -178,8 +185,12 @@ class MentorTurnCrashBillingTest extends BaseUnitTest {
 
         ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                 ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-        verify(usageRecorder).recordUnverifiable(eq(WORKSPACE_ID), sample.capture());
-        verify(usageRecorder, never()).record(any(), any());
+        verify(usageRecorder).record(eq(WORKSPACE_ID), sample.capture());
+        assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
+        verify(usageRecorder, never())
+                .record(
+                        any(),
+                        argThat(recorded -> recorded.measurementVerification() == MeasurementVerification.VERIFIED));
         assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.MENTOR_TURN);
         assertThat(sample.getValue().sourceId()).isEqualTo(assistantId);
         assertThat(sample.getValue().model()).isEqualTo("gpt-x");

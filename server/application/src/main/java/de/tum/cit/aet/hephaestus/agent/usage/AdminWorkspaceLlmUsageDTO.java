@@ -53,7 +53,7 @@ public record AdminWorkspaceLlmUsageDTO(
         @NonNull
         @Schema(
                 description = "Whether shared-model spend is within the instance cap, has reached it, or cannot be "
-                        + "confirmed because some shared-model usage has no price set.")
+                        + "confirmed because shared-model rates are missing or usage measurements are unverified.")
         LlmBudgetVerdict instanceBudgetVerdict,
 
         @NonNull @Schema(description = "The same verdict for the workspace's own-provider spend against its own cap.")

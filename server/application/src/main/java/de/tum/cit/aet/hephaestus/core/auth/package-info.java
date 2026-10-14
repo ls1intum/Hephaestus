@@ -23,8 +23,7 @@
  *   <li><b>{@link de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent AuthEvent}</b> — append-only
  *       authentication and privileged-access event. Monthly RANGE-partitioned on {@code
  *       occurred_at}, managed by pg_partman (run_maintenance_proc via
- *       AuthEventPartitionMaintenance) (create-ahead + 12-month retention) on stock Postgres — no
- *       {@code pg_partman}.
+ *       AuthEventPartitionMaintenance) with create-ahead and 12-month retention.
  * </ul>
  *
  * <h2>JWT format</h2>

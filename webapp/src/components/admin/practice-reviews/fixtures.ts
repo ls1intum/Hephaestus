@@ -645,7 +645,7 @@ const diff = (
 	quote,
 	verification: {
 		status: "VERIFIED",
-		artifactSha256: "8f14e45fceea167a5a36dedd4bea2543",
+		itemSha256: "8f14e45fceea167a5a36dedd4bea2543",
 		quoteSha256: "c9f0f895fb98ab9159f51fd0297e236d",
 	},
 });
@@ -2068,6 +2068,7 @@ function copiesOf(review: ReviewSpec, spec: FeedbackSpec): FeedbackCopy[] {
 					: null,
 			stopReason: copy.state === "WITHHELD" ? (spec.stopReason ?? null) : null,
 			lastError: copy.lastError ?? null,
+			readback: null,
 		};
 	});
 }
@@ -2794,7 +2795,7 @@ export const reviewDetailProcessingFailed: ReviewDetail = standaloneReview(
 /** Stopped before it started, because the AI budget was used up. */
 export const reviewDetailCancelledOnBudget: ReviewDetail = standaloneReview(
 	"0a0a0a0a-1111-4111-8111-000000000005",
-	{ status: "CANCELLED", stopReason: "BUDGET_EXHAUSTED" },
+	{ status: "CANCELLED", stopReason: "BUDGET" },
 	(summary) => jobsOf(summary, 1).map((job) => ({ ...job, startedAt: null, exitCode: null })),
 );
 
@@ -2907,10 +2908,9 @@ export function manyMembers(count: number): WorkspaceMembership[] {
 		if (cycle === 0) {
 			return source;
 		}
-		const accountId = String(Number(source.accountId) + cycle * 100);
+		const accountId = String(Number(source.account.id) + cycle * 100);
 		return {
 			...source,
-			accountId,
 			account: {
 				...source.account,
 				id: accountId,

@@ -8,6 +8,7 @@ import {
 import { actionIntentSchema } from "~/shared/review-actions";
 import { ask, RpcClientError } from "~/ui/rpc-client";
 import { useGeneration } from "~/ui/worker-state";
+import { EXTENSION_QUERY_KEYS } from "~/views/query-keys";
 
 /**
  * The intent this window was sent to, from its address. The worker opens the window blank, binds the
@@ -35,7 +36,7 @@ function definite(error: unknown): string | undefined {
 
 function ActionContent({ intent, generation }: { intent: string | undefined; generation: number }) {
 	const preview = useQuery({
-		queryKey: ["action", generation, intent],
+		queryKey: EXTENSION_QUERY_KEYS.action(generation, intent),
 		queryFn: async () => ask({ type: "get-action", intent: intent ?? "" }),
 		enabled: intent !== undefined,
 		retry: false,

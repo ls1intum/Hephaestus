@@ -507,7 +507,6 @@ export type Example = z.infer<typeof exampleShape>;
 export type ClaimBasis = z.infer<typeof basisShape>;
 export type Problem = z.infer<typeof problemShape>;
 export const OMISSION_REASONS = ["selection", "truncated", ...REASONS, "cancelled"] as const;
-export type OmissionReason = (typeof OMISSION_REASONS)[number];
 /** What a program or a review did not cover, and why. */
 export type Omission = z.infer<typeof omissionShape>;
 export type Completeness =

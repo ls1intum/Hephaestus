@@ -279,9 +279,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(personData.get(preview.request().getId()).request().getState())
                 .isEqualTo(PersonDataRequest.State.COMPLETE);
         assertThat(suppression.isReviewJobSuppressed(fixture.jobId())).isFalse();
-        assertThat(jdbc.queryForObject(
-                        "SELECT job_token_hash FROM review_job WHERE id=?", String.class, fixture.jobId()))
-                .isNull();
+        assertThat(agentJobRepository.findById(fixture.jobId())).isEmpty();
     }
 
     private void keepCompositionInputs(DerivedConversation derived) {
@@ -647,7 +645,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(jdbc.queryForObject(
                         "SELECT count(*) FROM config_audit_event WHERE"
                                 + " entity_type='WORKSPACE_ROLE' AND entity_id='ERASED' AND"
-                                + " old_value->>'role'='MEMBER' AND new_value->>'role'='ADMIN'"
+                                + " (old_value::jsonb)->>'role'='MEMBER' AND (new_value::jsonb)->>'role'='ADMIN'"
                                 + " AND actor_account_id=?",
                         Long.class,
                         administrator.getId()))

@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,12 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     final MonitoredRepositoryQuery indexed = mock(MonitoredRepositoryQuery.class);
     final JdbcClient jdbc = mock(JdbcClient.class, RETURNS_DEEP_STUBS);
     final PracticeReviewCoverageService service = new PracticeReviewCoverageService(
-            monitors, targets, mock(PersonProcessingSuppression.class), jdbc, indexed);
+            monitors,
+            targets,
+            mock(PersonProcessingSuppression.class),
+            jdbc,
+            indexed,
+            mock(MembershipReviewSelection.class));
     Workspace workspace;
 
     @BeforeEach

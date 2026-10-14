@@ -112,7 +112,7 @@ class PracticeV1CutoverMigrationTest {
         assertThat(column(
                         database,
                         "SELECT status || '|' || processing_status || '|' || cancellation_reason || '|' ||"
-                                + " (worker_id IS NULL AND job_token_hash IS NULL) FROM review_job WHERE"
+                                + " (worker_id IS NULL) FROM review_job WHERE"
                                 + " id='00000000-0000-0000-0000-000000992112'"))
                 .containsExactly("CANCELLED|DONE|CONTRACT_CHANGED|true");
         assertThat(column(
@@ -157,7 +157,9 @@ class PracticeV1CutoverMigrationTest {
                 .containsExactly("0");
         assertThatThrownBy(() ->
                         execute(database, "DELETE FROM membership WHERE workspace_id=992101 AND account_id=992106"))
-                .isInstanceOf(SQLException.class);
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        error -> assertThat(error.getSQLState()).isEqualTo("23001"));
         assertThatThrownBy(() -> execute(
                         database,
                         "INSERT INTO"
@@ -174,7 +176,9 @@ class PracticeV1CutoverMigrationTest {
                                 + " problem(id,workspace_id,result_id,position,severity,summary,explanation,citations)"
                                 + " VALUES(gen_random_uuid(),992201,'"
                                 + RESULT + "',1,'MINOR','Other','Other','[]')"))
-                .isInstanceOf(SQLException.class);
+                .isInstanceOfSatisfying(
+                        SQLException.class,
+                        error -> assertThat(error.getSQLState()).isEqualTo("23503"));
         execute(
                 database,
                 "INSERT INTO result_mark(id,workspace_id,result_id,kind,reason) VALUES(gen_random_uuid(),992101,'"
@@ -238,9 +242,37 @@ class PracticeV1CutoverMigrationTest {
                         "00000000-0000-0000-0000-000000992232|POST|DONE|4");
         assertThat(column(
                         database,
+                        "SELECT feedback_id::text || '|' || action || '|' || state FROM feedback_send"
+                                + " WHERE feedback_id BETWEEN '00000000-0000-0000-0000-000000992311'::uuid"
+                                + " AND '00000000-0000-0000-0000-000000992316'::uuid ORDER BY feedback_id"))
+                .containsExactly(
+                        "00000000-0000-0000-0000-000000992311|POST|PENDING",
+                        "00000000-0000-0000-0000-000000992312|POST|UNCERTAIN",
+                        "00000000-0000-0000-0000-000000992313|POST|UNCERTAIN",
+                        "00000000-0000-0000-0000-000000992314|POST|DONE",
+                        "00000000-0000-0000-0000-000000992315|RETRACT|PENDING",
+                        "00000000-0000-0000-0000-000000992316|POST|DONE");
+        assertThat(column(
+                        database,
+                        "SELECT id::text || '|' || state || '|' || external_ref FROM feedback_copy"
+                                + " WHERE id='00000000-0000-0000-0000-000000992334'"))
+                .containsExactly("00000000-0000-0000-0000-000000992334|RETRACTED|provider:updated");
+        assertThat(column(database, "SELECT state FROM feedback_copy WHERE id='00000000-0000-0000-0000-000000992332'"))
+                .containsExactly("WRITE_STARTED");
+        assertThat(column(
+                        database,
                         "SELECT review_scope_repositories || '|' || review_scope_people FROM workspace WHERE"
                                 + " id=992101"))
                 .containsExactly("ALL|ALL");
+        assertThat(column(
+                        database,
+                        "SELECT definition->'reviewOn'->'state'->'state' FROM practice_version WHERE id=992131"))
+                .containsExactly("[\"OPEN\"]");
+        assertThat(column(
+                        database,
+                        "SELECT count(*)::text FROM information_schema.columns WHERE table_schema='public'"
+                                + " AND table_name='workspace' AND column_name='practice_skip_drafts'"))
+                .containsExactly("0");
         assertThat(column(
                         database,
                         "SELECT account_id || '|' || purpose || '|' || granted || '|' || mechanism || '|' ||"
@@ -309,20 +341,6 @@ class PracticeV1CutoverMigrationTest {
         try (var liquibase = liquibase(database, "db/master.xml")) {
             liquibase.update(new Contexts(context), new LabelExpression());
         }
-    }
-
-    static void release(TestDatabase database, String context) throws Exception {
-        PostgreSQLTestContainer.migrateReleasedDatabase(database, context);
-        assertThat(column(
-                        database,
-                        "SELECT count(*)::text FROM databasechangelog WHERE id='1791941746633-2' AND"
-                                + " filename='db/changelog/1791941746633_changelog.xml'"))
-                .containsExactly("1");
-        assertThat(column(
-                        database,
-                        "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND"
-                                + " table_name='auth_event' AND column_name='details'"))
-                .containsExactly("text");
     }
 
     private static Liquibase liquibase(TestDatabase database, String changelog) throws Exception {

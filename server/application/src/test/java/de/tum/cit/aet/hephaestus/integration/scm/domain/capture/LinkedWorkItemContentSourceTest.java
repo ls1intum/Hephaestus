@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -33,6 +34,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -698,21 +700,24 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         }
 
         @Test
-        void reportsCollectionErrorWhenRepositoryQueryFails() {
+        void shouldPropagateProgrammingFailuresWithoutRecordingCaptureRefusals() {
             pullRequestWithBody("Closes #42");
-            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42)).thenThrow(new RuntimeException("DB down"));
+            var failure = new NullPointerException("Invalid issue mapping");
+            when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 42)).thenThrow(failure);
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            assertThatExceptionOfType(ItemCaptureException.class)
+            assertThatExceptionOfType(NullPointerException.class)
                     .isThrownBy(() -> files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
-                            .files()));
+                            .files()))
+                    .isSameAs(failure);
             assertThat(files).isEmpty();
         }
 
         @Test
         void shouldReportCommitScanFailureInsteadOfEmptyEvidence() {
             when(gitRepositoryManager.isEnabled()).thenReturn(true);
-            doThrow(new IllegalStateException("JGit failed"))
+            doThrow(new GitRepositoryManager.GitOperationException(
+                            "JGit failed", new IOException("Unreadable repository")))
                     .when(gitRepositoryManager)
                     .forEachCommitMessage(eq(KEY), eq(BASE), eq(HEAD), any());
 
@@ -739,7 +744,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
 
         @Test
         void shouldRejectUnauthorizedDatabaseCaptureWhenGitIsDisabled() {
-            when(repositoryPreparer.authorize(any())).thenThrow(new IllegalStateException("Unauthorized repository"));
+            var failure = new ItemCaptureException(ItemCaptureCode.ITEM_NOT_VISIBLE, "Unauthorized repository");
+            when(repositoryPreparer.authorize(any())).thenThrow(failure);
 
             assertThatExceptionOfType(ItemCaptureException.class)
                     .isThrownBy(() -> provider.capture(request(sampleMetadata()), provider.sourceKinds()));

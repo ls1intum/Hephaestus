@@ -387,14 +387,13 @@ export const WITHHELD_ENTRY: ScanReportItem = {
 	...entryBase("webapp/src/main.tsx", "error-handling", "903"),
 	status: "WITHHELD",
 	reason: "MODEL_UNAVAILABLE",
-	reasonDescription: "MODEL_UNAVAILABLE",
 };
 
 export const NOT_REVIEWED_ENTRY: ScanReportItem = {
 	...entryBase("webapp/src/main.tsx", "comment-quality", "903"),
 	status: "NOT_REVIEWED",
 	reason: null,
-	reasonDescription: null,
+
 	lastResult: {
 		id: "r-0",
 		reviewId: "0b0b0b0b-1111-4222-8333-444455556666",
@@ -417,7 +416,7 @@ export const LISTED_ENTRY: ScanReportItem = {
 	...entryBase("server/src/ScanReport.java", "comment-quality", "904"),
 	status: "LISTED",
 	reason: null,
-	reasonDescription: null,
+
 	lastResult: null,
 };
 

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
@@ -33,6 +34,11 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     }
 
     private static LlmUsageRecorder.LlmUsageSample sample(LlmPriceSnapshot price, int attempt) {
+        return sample(price, attempt, MeasurementVerification.VERIFIED);
+    }
+
+    private static LlmUsageRecorder.LlmUsageSample sample(
+            LlmPriceSnapshot price, int attempt, MeasurementVerification verification) {
         return new LlmUsageRecorder.LlmUsageSample(
                 null,
                 "PRACTICE_REVIEW",
@@ -49,6 +55,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 1,
                 price,
                 UsageProvenance.RUNNER,
+                verification,
                 Instant.now());
     }
 
@@ -78,7 +85,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
         recorder.record(7L, sample(priced(), 3));
 
-        assertThat(captured(event).sourceType()).isEqualTo("AGENT_JOB");
+        assertThat(captured(event).sourceType()).isEqualTo("REVIEW_JOB");
         assertThat(captured(event).sourceAttempt()).isEqualTo(3);
         assertThat(captured(event).model()).isEqualTo("authoritative-model");
         // 1*1 + 2*2 + .5*3 + .25*4 = 7.5. reasoning is output telemetry, not a second charge.
@@ -105,10 +112,10 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             return Answers.RETURNS_DEFAULTS.answer(invocation);
         });
         LlmUsageRecorder recorder = new LlmUsageRecorder(repository, mock(LlmBudgetService.class), registry);
-        LlmUsageRecorder.LlmUsageSample redelivered = sample(priced(), 2);
+        LlmUsageRecorder.LlmUsageSample redelivered = sample(priced(), 2, MeasurementVerification.UNVERIFIABLE);
 
-        recorder.recordUnverifiable(7L, redelivered);
-        recorder.recordUnverifiable(7L, redelivered);
+        recorder.record(7L, redelivered);
+        recorder.record(7L, redelivered);
 
         assertThat(inserts.get())
                 .as("both attempts reach the ledger's conflict guard")
@@ -144,12 +151,13 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             return Answers.RETURNS_DEFAULTS.answer(invocation);
         });
 
-        recorder(repository).recordUnverifiable(7L, sample(priced(), 4));
+        recorder(repository).record(7L, sample(priced(), 4, MeasurementVerification.UNVERIFIABLE));
 
         assertThat(captured(event).sourceAttempt()).isEqualTo(4);
         assertThat(captured(event).costUsd()).isNull();
         assertThat(captured(event).pricingState()).isEqualTo("UNPRICED");
         assertThat(captured(event).appliedWorkspaceModelId()).isEqualTo(42L);
+        assertThat(captured(event).measurementVerification()).isEqualTo("UNVERIFIABLE");
     }
 
     /**
@@ -177,7 +185,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         assertThat(captured(event).pricingState()).isEqualTo("UNPRICED");
         assertThat(captured(event).costUsd()).isNull();
         assertThat(captured(event).appliedPer1mInputUsd()).isEqualByComparingTo("1");
+        assertThat(captured(event).measurementVerification()).isEqualTo("VERIFIED");
         assertThat(registry.counter("llm.usage.uncosted").count()).isEqualTo(1.0);
+        assertThat(registry.counter("llm.usage.unverifiable").count()).isZero();
     }
 
     @Test
@@ -238,6 +248,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 0,
                 priced(),
                 UsageProvenance.RUNNER,
+                MeasurementVerification.VERIFIED,
                 Instant.now());
 
         recorderWith(new SimpleMeterRegistry(), capturing(event)).record(7L, negative);
@@ -332,7 +343,33 @@ class LlmUsageRecorderTest extends BaseUnitTest {
                 1,
                 price,
                 UsageProvenance.RUNNER,
+                MeasurementVerification.VERIFIED,
                 Instant.now());
+    }
+
+    @Test
+    void shouldRejectUnknownVerificationWhenAppendingNewUsage() {
+        AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
+
+        assertThatThrownBy(() ->
+                        recorder(capturing(event)).record(7L, sample(priced(), 1, MeasurementVerification.UNKNOWN)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("measurement verification decision");
+        assertThat(event.get()).isNull();
+    }
+
+    @Test
+    void shouldKeepUnverifiablePositiveUsageUnpricedEvenWhenTheModelIsFree() {
+        AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
+        var free = new LlmPriceSnapshot(
+                UsageFundingSource.WORKSPACE, UsagePricingState.NO_CHARGE, null, 42L, null, null, null, null);
+
+        recorder(capturing(event)).record(7L, sample(free, 1, MeasurementVerification.UNVERIFIABLE));
+
+        assertThat(captured(event).inputTokens()).isEqualTo(1_000_000L);
+        assertThat(captured(event).costUsd()).isNull();
+        assertThat(captured(event).pricingState()).isEqualTo("UNPRICED");
+        assertThat(captured(event).measurementVerification()).isEqualTo("UNVERIFIABLE");
     }
 
     private static LlmUsageEventRepository capturing(AtomicReference<LlmUsageInsert> event) {

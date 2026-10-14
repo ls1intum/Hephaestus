@@ -91,7 +91,7 @@ removed Keycloak, so nothing in § Decision beyond the Stage A deletions is what
 - The Hephaestus principal is `core.auth.domain.Account`; ADR 0017 § Update 2026-09-17 names the
   join key. Stage B is not what shipped.
 - The SCM `User` (`integration.scm.domain.user.User`) is the attribution row and what
-  `membership` references — ADR 0017 § Update 2026-09-17;
+  `workspace_membership` references — ADR 0017 § Update 2026-09-17;
   [ADR 0019](0019-workspace-membership-keyed-on-account.md) (Proposed) owns the re-key.
 - `webapp/src/integrations/auth/keycloak.ts` does not exist; `1780313973588_changelog.xml` is
   archived ([ADR 0014](0014-per-row-aes-gcm-aad-binding.md) § Update 2026-09-17).

@@ -33,8 +33,18 @@ final class NoDocumentationMirror implements DocumentProjection {
     }
 
     @Override
+    public List<DocumentAccess> documentAccessByReference(long workspaceId, Collection<String> documentRefs) {
+        return List.of();
+    }
+
+    @Override
     public Optional<ProjectedDocument> documentById(long workspaceId, long documentId) {
         return Optional.empty();
+    }
+
+    @Override
+    public List<DocumentAccess> documentAccessById(long workspaceId, Collection<Long> documentIds) {
+        return List.of();
     }
 
     @Override

@@ -29,14 +29,16 @@ import {
 	reviewsSearchSchema,
 } from "@/components/admin/practice-reviews/review-search";
 import { ReviewsPage } from "@/components/admin/practice-reviews/ReviewsPage";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { RefusalFixLink } from "@/components/practice-trace/RefusalFixLink";
 import { TraceRefusalAlert } from "@/components/practice-trace/TraceRefusalAlert";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { useReviewScopeSources } from "@/hooks/use-review-scope-sources";
 import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
-import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
+import { type RefreshFailure, pagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { loadedPages, springPageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/runs",
@@ -54,14 +56,31 @@ function ReviewsRoute() {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
+	const listOptions = listReviewsInfiniteOptions({
+		path: { workspaceSlug },
+		query: reviewsQuery(search, REVIEW_PAGE_SIZE),
+	});
 	const reviewsResult = useInfiniteQuery({
-		...listReviewsInfiniteOptions({
-			path: { workspaceSlug },
-			query: reviewsQuery(search, REVIEW_PAGE_SIZE),
-		}),
+		...listOptions,
 		...springPageParams,
 	});
-	useActiveReviewPoll(workspaceSlug, search, reviewsResult.data);
+	useQueryReadRefusal(listOptions.queryKey, reviewsResult.isError, reviewsResult.error);
+	const pollingFailure = useActiveReviewPoll(workspaceSlug, search, reviewsResult.data);
+	let reviews = pagedListState(reviewsResult, (row) => row.id);
+	if (pollingFailure !== undefined && !queryErrorIsRetryable(pollingFailure.error)) {
+		reviews = { status: "error", error: pollingFailure.error, onRetry: pollingFailure.onRetry };
+	}
+	if (reviews.status === "ready" && pollingFailure !== undefined) {
+		const pageFailure = reviews.refreshFailure;
+		reviews.refreshFailure = {
+			...pollingFailure,
+			pending: pollingFailure.pending || pageFailure?.pending === true,
+			onRetry: () => {
+				pollingFailure.onRetry();
+				pageFailure?.onRetry();
+			},
+		};
+	}
 
 	// Every row asks for a review of its work. A refusal is said once above the list, and the hook
 	// refreshes the list when a review starts.
@@ -73,7 +92,7 @@ function ReviewsRoute() {
 		<ReviewsPage
 			search={search}
 			onSearchChange={updateSearch}
-			reviews={pagedListState(reviewsResult, (row) => row.id)}
+			reviews={reviews}
 			requestReview={{
 				canRequest: (item) => REVIEWABLE_ON_DEMAND.has(item.kind),
 				onRequest: (itemId) => review.ask(itemId),
@@ -124,7 +143,7 @@ function useActiveReviewPoll(
 	const statuses = ACTIVE_REVIEW_STATUSES.filter(
 		(status) => listQuery.status === undefined || listQuery.status.includes(status),
 	);
-	useLoadedRowsPoll(listKey, {
+	const activePoll = useLoadedRowsPoll(listKey, {
 		polling: statuses.length > 0 && loaded.some(isActiveReview),
 		request: {
 			path: { workspaceSlug },
@@ -132,6 +151,16 @@ function useActiveReviewPoll(
 		},
 		follows: isActiveReview,
 	});
+	useQueryReadRefusal(listKey, activePoll.isError, activePoll.error);
+	return activePoll.isError
+		? ({
+				error: activePoll.error,
+				pending: activePoll.isFetching,
+				onRetry: () => {
+					void activePoll.refetch();
+				},
+			} satisfies RefreshFailure)
+		: undefined;
 }
 
 /**
@@ -151,7 +180,7 @@ function useLoadedRowsPoll(
 	},
 ) {
 	const queryClient = useQueryClient();
-	useQuery({
+	return useQuery({
 		...listReviewsOptions(request),
 		queryFn: async ({ signal }) => {
 			const { data: polled } = await listReviews({
@@ -160,10 +189,17 @@ function useLoadedRowsPoll(
 				throwOnError: true,
 			});
 			const rows = polled.content;
+			const loadedData =
+				queryClient.getQueryData<InfiniteData<PageResponseDtoReviewSummary>>(listKey);
+			if (loadedData === undefined) {
+				void queryClient.invalidateQueries(
+					{ queryKey: listKey, exact: true },
+					{ cancelRefetch: false },
+				);
+				return polled;
+			}
 			const { updated, refetch } = reconcileActiveRows(
-				queryClient
-					.getQueryData<InfiniteData<PageResponseDtoReviewSummary>>(listKey)
-					?.pages.flatMap((page) => page.content) ?? [],
+				loadedData.pages.flatMap((page) => page.content),
 				rows,
 				polled.totalElements <= rows.length,
 				follows,

@@ -371,7 +371,6 @@ describe("the report's calls", () => {
 				identities: [],
 				status: "ACTIVE",
 			},
-			accountId: "acc",
 			eligibleForPracticeReview: true,
 			hidden: false,
 			joinedAt: "2026-01-01T00:00:00Z",

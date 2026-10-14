@@ -10,7 +10,7 @@ import {
 	listAdoptablePracticesQueryKey,
 	listPracticeGroupsQueryKey,
 	listPracticesQueryKey,
-	placePracticeMutation,
+	movePracticeMutation,
 	previewGroupAdoptionQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type * as ReactQueryGen from "@/api/@tanstack/react-query.gen";
@@ -30,7 +30,7 @@ vi.mock("@/api/@tanstack/react-query.gen", async (importOriginal) => {
 		...actual,
 		deletePracticeGroupMutation: vi.fn(),
 		deletePracticeMutation: vi.fn(),
-		placePracticeMutation: vi.fn(),
+		movePracticeMutation: vi.fn(),
 	};
 });
 
@@ -82,7 +82,7 @@ describe("usePracticeCatalogMutations", () => {
 		});
 		client.setQueryData(detailKey, moving);
 		const request = deferred<Practice[]>();
-		vi.mocked(placePracticeMutation).mockReturnValue({
+		vi.mocked(movePracticeMutation).mockReturnValue({
 			mutationFn: async () => request.promise,
 		});
 		const { result } = renderHook(() => usePracticeCatalogMutations(WORKSPACE), {
@@ -130,7 +130,7 @@ describe("usePracticeCatalogMutations", () => {
 		const practices = [practice("moving", "quality", 0), practice("remaining", "quality", 1)];
 		client.setQueryData(queryKey, practices);
 		const request = deferred<Practice[]>();
-		vi.mocked(placePracticeMutation).mockReturnValue({
+		vi.mocked(movePracticeMutation).mockReturnValue({
 			mutationFn: async () => request.promise,
 		});
 		const { result } = renderHook(() => usePracticeCatalogMutations(WORKSPACE), {
@@ -171,7 +171,7 @@ describe("usePracticeCatalogMutations", () => {
 		]);
 		const first = deferred<Practice[]>();
 		const mutation = vi.fn(async () => first.promise);
-		vi.mocked(placePracticeMutation).mockReturnValue({ mutationFn: mutation });
+		vi.mocked(movePracticeMutation).mockReturnValue({ mutationFn: mutation });
 		const { result } = renderHook(() => usePracticeCatalogMutations(WORKSPACE), {
 			wrapper: wrapper(client),
 		});

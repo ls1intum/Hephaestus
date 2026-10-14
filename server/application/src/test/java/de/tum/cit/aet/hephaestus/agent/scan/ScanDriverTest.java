@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -32,17 +32,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 class ScanDriverTest extends BaseUnitTest {
@@ -192,7 +192,9 @@ class ScanDriverTest extends BaseUnitTest {
         driver.advance(state);
         assertCompletion(ReviewStatus.PARTIAL, ReviewStopReason.MODEL_CHANGED);
         verifyNoInteractions(queue);
-    }    @Test
+    }
+
+    @Test
     void shouldStopAnUnavailableModelWithItsOwnReason() {
         var state = state(1, 0, 0, 0, false);
         when(budget.permits(state, List.of(assignment))).thenThrow(new ScanModelUnavailableException("Unavailable"));
@@ -208,6 +210,7 @@ class ScanDriverTest extends BaseUnitTest {
         assertThatThrownBy(() -> driver.advance(state)).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(reviews, queue);
     }
+
     @Test
     void shouldEnumerateOutsideTheLockedTransactionAndRecordAfterRelocking() {
         var inside = new AtomicBoolean();
@@ -216,10 +219,26 @@ class ScanDriverTest extends BaseUnitTest {
             inside.set(true);
             return new SimpleTransactionStatus();
         });
-        doAnswer(call -> { inside.set(false); return null; }).when(manager).commit(any());
+        doAnswer(call -> {
+                    inside.set(false);
+                    return null;
+                })
+                .when(manager)
+                .commit(any());
         var recorded = state(1, 0, 0, 0, false);
-        var initial = new ScanExecutionSnapshot(review, ReviewStatus.QUEUED, BigDecimal.TEN,
-                recorded.createdAt(), false, false, false, Set.of(), 0, 0, 0, 0);
+        var initial = new ScanExecutionSnapshot(
+                review,
+                ReviewStatus.QUEUED,
+                BigDecimal.TEN,
+                recorded.createdAt(),
+                false,
+                false,
+                false,
+                Set.of(),
+                0,
+                0,
+                0,
+                0);
         when(scans.active(anyInt())).thenReturn(List.of(initial));
         when(scans.lock(1, review.id())).thenReturn(initial, initial, recorded);
         when(reviews.start(1, review.id())).thenReturn(true);
@@ -228,11 +247,25 @@ class ScanDriverTest extends BaseUnitTest {
             assertThat(inside).isFalse();
             return prepared;
         });
-        doAnswer(call -> { assertThat(inside).isTrue(); return null; }).when(inventory).record(review, prepared);
-        new ScanDriver(scans, reviews, inventory, budget, queue, jobs, lifecycle, new TransactionTemplate(manager),
-                new ScanProperties(100, 10000, Duration.ofMinutes(1), Duration.ofHours(1)), Clock.fixed(NOW, ZoneOffset.UTC)).tick();
+        doAnswer(call -> {
+                    assertThat(inside).isTrue();
+                    return null;
+                })
+                .when(inventory)
+                .record(review, prepared);
+        new ScanDriver(
+                        scans,
+                        reviews,
+                        inventory,
+                        budget,
+                        queue,
+                        jobs,
+                        lifecycle,
+                        new TransactionTemplate(manager),
+                        new ScanProperties(100, 10000, Duration.ofMinutes(1), Duration.ofHours(1)),
+                        Clock.fixed(NOW, ZoneOffset.UTC))
+                .tick();
         verify(inventory).record(review, prepared);
         assertThat(inside).isFalse();
     }
-
 }

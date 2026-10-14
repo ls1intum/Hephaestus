@@ -159,4 +159,29 @@ void describe("grep", () => {
 
 		assert.deepEqual(globFilesSync("*.ts", dir), ["file.ts"]);
 	});
+
+	void it("splits a file name that holds :<n>: and skips binary files", async () => {
+		const dir = await createTempDir();
+		await writeFile(path.join(dir, "a:12:b.ts"), "first\nneedle: here\n");
+		await writeFile(path.join(dir, "image.bin"), Buffer.from("needle\0\u0001\u0002"));
+
+		for (const options of [{}, { glob: "*" }]) {
+			assert.deepEqual(await grep("needle", dir, options), [
+				{ file: "a:12:b.ts", line: 2, content: "needle: here" },
+			]);
+		}
+	});
+
+	void it("never reads the checkout's .git folder through a glob", async () => {
+		const dir = await createTempDir();
+		await mkdir(path.join(dir, ".git"));
+		await writeFile(path.join(dir, ".git", "config"), "url = https://token@example.org/x\n");
+		await writeFile(path.join(dir, "notes.md"), "token@ here\n");
+
+		for (const glob of ["**", "**/*", ".git/*", "**/config"]) {
+			const matches = await grep("token@", dir, { glob, fixedString: true });
+			assert.ok(!matches.some((match) => match.file.startsWith(".git")), glob);
+		}
+		assert.deepEqual(globFilesSync("**", dir), ["notes.md"]);
+	});
 });

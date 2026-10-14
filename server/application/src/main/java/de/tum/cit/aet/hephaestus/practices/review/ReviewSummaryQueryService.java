@@ -35,7 +35,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScriptQuery;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -302,7 +301,7 @@ public class ReviewSummaryQueryService {
                                     Math.toIntExact(rs.getLong("reviewed")),
                                     Math.toIntExact(rs.getLong("reused")),
                                     Math.toIntExact(rs.getLong("withheld")),
-                                    terminal(review.getStatus()) ? Math.toIntExact(rs.getLong("pending")) : 0))
+                                    review.getStatus().isTerminal() ? Math.toIntExact(rs.getLong("pending")) : 0))
                             .single();
                     return new ReviewPracticeDTO(
                             p.getSlug(),
@@ -402,10 +401,6 @@ public class ReviewSummaryQueryService {
                 c.getOrDefault(FeedbackState.REJECTED, 0),
                 c.getOrDefault(FeedbackState.REPLACED, 0),
                 c.getOrDefault(FeedbackState.FAILED, 0));
-    }
-
-    public static boolean terminal(ReviewStatus status) {
-        return status != ReviewStatus.QUEUED && status != ReviewStatus.RUNNING;
     }
 
     private static @Nullable Instant instant(@Nullable OffsetDateTime value) {

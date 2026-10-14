@@ -5,7 +5,7 @@ import java.io.Serial;
 
 /**
  * Thrown at an LLM enforcement point when a cap is set but this month's spend against it cannot be
- * verified — at least one event funded from that purse has no resolvable price, so the ledger cannot
+ * verified — at least one record funded from that purse has no confirmed cost, so the ledger cannot
  * rule out the cap already being exceeded.
  *
  * <p>User-facing message, and not an HTTP exception, for the reasons on {@link LlmBudgetExhaustedException}.

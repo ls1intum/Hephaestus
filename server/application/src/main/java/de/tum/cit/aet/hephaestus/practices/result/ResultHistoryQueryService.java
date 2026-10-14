@@ -124,8 +124,7 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
 
     private Optional<ResultHistoryEntry> entry(Result result, SourceUsePurpose purpose) {
         if (result.getPracticeVersionId() == null || result.getItemVersion() == null) return Optional.empty();
-        var version = versions.findById(result.getPracticeVersionId())
-                .filter(v -> v.getWorkspaceId() == result.getWorkspaceId());
+        var version = versions.findByIdAndWorkspaceId(result.getPracticeVersionId(), result.getWorkspaceId());
         var item = items.find(result.getWorkspaceId(), result.getItemId());
         var review = reviews.findByIdAndWorkspaceId(result.getReviewId(), result.getWorkspaceId());
         if (version.isEmpty() || item.isEmpty() || review.isEmpty()) return Optional.empty();

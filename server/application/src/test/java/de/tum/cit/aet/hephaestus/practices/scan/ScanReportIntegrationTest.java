@@ -240,9 +240,9 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
     private UUID invocation(long workspaceId, UUID reviewId, ReviewJobStatus status) {
         var id = UUID.randomUUID();
         jdbc.sql("INSERT INTO"
-            + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at,completed_at)"
-            + " VALUES(:id,:review,:ws,:status,0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,CASE WHEN"
-            + " :status='QUEUED' THEN NULL ELSE :at END,CASE WHEN :status='FAILED' THEN :at ELSE NULL END)")
+                        + " review_job(id,review_id,workspace_id,status,attempt,processing_status,trace_id,input,config_snapshot,submitted_at,available_at,started_at,completed_at)"
+                        + " VALUES(:id,:review,:ws,:status,0,'PENDING',:trace,CAST(:input AS jsonb),'{}'::jsonb,:at,:at,CASE WHEN"
+                        + " :status='QUEUED' THEN NULL ELSE :at END,CASE WHEN :status='FAILED' THEN :at ELSE NULL END)")
                 .param("id", id)
                 .param("review", reviewId)
                 .param("ws", workspaceId)

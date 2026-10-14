@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Clock;
 import java.util.List;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -40,8 +41,10 @@ public class ReviewBatchDriver {
     @Scheduled(fixedDelay = 120000, initialDelay = 120000)
     @SchedulerLock(name = "review-batch-driver", lockAtMostFor = "PT10M", lockAtLeastFor = "PT30S")
     public void tick() {
-        for (var batch :
-                batches.findByStatusOrderByUpdatedAtAscIdAsc(ReviewBatchStatus.RUNNING, PageRequest.ofSize(5))) {
+        var running = batches.findByStatusOrderByUpdatedAtAscIdAsc(ReviewBatchStatus.RUNNING, PageRequest.ofSize(5));
+        var budgetPaused = batches.findByStatusAndPauseReasonOrderByUpdatedAtAscIdAsc(
+                ReviewBatchStatus.PAUSED, ReviewBatchPauseReason.BUDGET_EXHAUSTED, PageRequest.ofSize(5));
+        for (var batch : Stream.concat(running.stream(), budgetPaused.stream()).toList()) {
             try {
                 advance(batch);
             } catch (RuntimeException failure) {
@@ -55,15 +58,20 @@ public class ReviewBatchDriver {
     }
 
     void advance(ReviewBatch batch) {
-        if (batch.getStatus() != ReviewBatchStatus.RUNNING) return;
+        boolean budgetPaused = batch.getStatus() == ReviewBatchStatus.PAUSED
+                && batch.getPauseReason() == ReviewBatchPauseReason.BUDGET_EXHAUSTED;
+        if (batch.getStatus() != ReviewBatchStatus.RUNNING && !budgetPaused) return;
         var workspace = workspaces.findById(batch.getWorkspaceId()).orElse(null);
         boolean scan = batch.getKind().equals("scm.repository");
         if (scan
                 && workspace != null
                 && workspace.getStatus() == Workspace.WorkspaceStatus.ACTIVE
                 && reviews.existsByWorkspaceIdAndKindAndStatusIn(
-                        batch.getWorkspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
+                        batch.getWorkspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING))) {
+            batch.setUpdatedAt(clock.instant());
+            batches.save(batch);
             return;
+        }
         var remaining = spend.remaining(batch);
         ReviewBatchPauseReason reason = workspace == null || workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE
                 ? ReviewBatchPauseReason.WORKSPACE_UNAVAILABLE
@@ -72,18 +80,19 @@ public class ReviewBatchDriver {
                         : remaining.exhausted()
                                         || !budget.canRequest(
                                                 batch.getWorkspaceId(),
-                                                batch.getKind().equals("scm.repository")
-                                                        ? ReviewKind.SCAN
-                                                        : ReviewKind.ITEM,
+                                                scan ? ReviewKind.SCAN : ReviewKind.ITEM,
                                                 remaining.remainingUsd())
                                 ? ReviewBatchPauseReason.BUDGET_EXHAUSTED
                                 : null;
         if (reason != null) {
             batch.setStatus(ReviewBatchStatus.PAUSED);
             batch.setPauseReason(reason);
+            batch.setUpdatedAt(clock.instant());
             batches.save(batch);
             return;
         }
+        batch.setStatus(ReviewBatchStatus.RUNNING);
+        batch.setPauseReason(null);
         var ids = scope.next(
                 batch.getWorkspaceId(), batch.getId(), batch.getCursorItemId(), scan ? 1 : properties.batchSize());
         if (ids.isEmpty()) {
@@ -99,6 +108,11 @@ public class ReviewBatchDriver {
                         batch.setSubmittedCount(batch.getSubmittedCount() + 1);
                     case ReviewBatchSubmitter.SubmissionOutcome.Skipped ignored ->
                         batch.setSkippedCount(batch.getSkippedCount() + 1);
+                    case ReviewBatchSubmitter.SubmissionOutcome.Deferred ignored -> {
+                        batch.setUpdatedAt(clock.instant());
+                        batches.save(batch);
+                        return;
+                    }
                     case ReviewBatchSubmitter.SubmissionOutcome.Paused paused -> {
                         batch.setStatus(ReviewBatchStatus.PAUSED);
                         batch.setPauseReason(paused.reason());

@@ -435,7 +435,7 @@ export const WithdrawFeedbackFails: Story = {
 };
 
 /**
- * A conversation linked it before 1.0 recorded appearances, so whether the developer saw it is
+ * A conversation linked it, and no appearance is recorded, so whether the developer saw it is
  * unknown: never counted as delivered, and never as withheld.
  */
 export const DeliveryUnconfirmed: Story = {

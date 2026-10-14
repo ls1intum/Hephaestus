@@ -9,9 +9,11 @@ import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDige
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackDecisionService;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDecisionAction;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackSendState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import java.util.List;
@@ -119,6 +121,55 @@ class FeedbackDecisionErasureIntegrationTest extends AbstractFeedbackDeliveryInt
                 null);
         assertThat(response.resolution()).isEqualTo(FeedbackResolution.ADDRESSED);
         assertThat(current().getState()).isEqualTo(FeedbackState.UNCONFIRMED);
+    }
+
+    @Test
+    void shouldSettleWithdrawalAtTheFenceWithoutInventingAnApprovalRefusal() {
+        prepare(false);
+        String owner = "withdrawal-fence-test";
+        assertThat(transactions.claim(workspace.getId(), feedbackId, owner)).isNotNull();
+        var withdrawal = decisionService.decide(
+                workspace.getId(),
+                feedbackId,
+                developerId,
+                FeedbackDecisionAction.WITHDRAW,
+                null,
+                "The context needs review.",
+                null);
+        assertThat(transactions.fence(
+                        workspace.getId(),
+                        feedbackId,
+                        owner,
+                        List.of(children().getFirst().getId()),
+                        List.of()))
+                .isFalse();
+        var send = sends.findById(feedbackId).orElseThrow();
+        assertThat(send.getState()).isEqualTo(FeedbackSendState.DONE);
+        assertThat(send.getLeaseOwner()).isNull();
+        assertThat(children()).allSatisfy(copy -> {
+            assertThat(copy.getState()).isEqualTo(FeedbackCopyState.PLANNED);
+            assertThat(copy.getWriteStartedAt()).isNull();
+            assertThat(copy.getExternalRef()).isNull();
+        });
+        assertThat(decisions
+                        .findLatestVisibility(workspace.getId(), feedbackId)
+                        .orElseThrow()
+                        .getId())
+                .isEqualTo(withdrawal.getId());
+        assertThat(current().getStopReason()).isNull();
+        assertThat(provider.physical).isEmpty();
+        decisionService.decide(
+                workspace.getId(),
+                feedbackId,
+                developerId,
+                FeedbackDecisionAction.RESTORE,
+                null,
+                "The context is confirmed.",
+                null);
+        assertThat(sends.findById(feedbackId).orElseThrow().getState()).isEqualTo(FeedbackSendState.PENDING);
+        sender.send(workspace.getId(), feedbackId);
+        assertThat(current().getState()).isEqualTo(FeedbackState.DELIVERED);
+        assertThat(provider.summaryCreates).isEqualTo(1);
     }
 
     @Test

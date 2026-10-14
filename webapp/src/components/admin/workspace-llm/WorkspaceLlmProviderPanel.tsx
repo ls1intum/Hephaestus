@@ -1,5 +1,6 @@
 import { CircleAlert, Plug, Plus } from "lucide-react";
 import { useId, useState } from "react";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import type {
 	WorkspaceLlmConnection,
@@ -36,6 +37,7 @@ export type ProviderTestResult =
 export type ProviderPanelState = PanelState<{
 	connections: WorkspaceLlmConnection[];
 	models: WorkspaceLlmModel[];
+	refreshFailure?: RefreshFailure;
 }>;
 
 export interface WorkspaceLlmProviderPanelProps {
@@ -128,6 +130,7 @@ export function WorkspaceLlmProviderPanel({
 	onDeleteModel,
 }: WorkspaceLlmProviderPanelProps) {
 	const [disconnecting, setDisconnecting] = useState<WorkspaceLlmConnection | null>(null);
+	if (state.status === "error" && disconnecting !== null) setDisconnecting(null);
 	const connections = state.status === "ready" ? state.connections : [];
 
 	return (
@@ -154,6 +157,14 @@ export function WorkspaceLlmProviderPanel({
 			{state.status === "loading" && <ProviderPanelSkeleton />}
 			{state.status === "ready" && (
 				<div className="space-y-8">
+					{state.refreshFailure !== undefined && (
+						<QueryErrorAlert
+							error={state.refreshFailure.error}
+							title="We could not refresh your AI providers"
+							pending={state.refreshFailure.pending}
+							onRetry={state.refreshFailure.onRetry}
+						/>
+					)}
 					{!registrationAllowed && (
 						<Alert>
 							<CircleAlert aria-hidden />

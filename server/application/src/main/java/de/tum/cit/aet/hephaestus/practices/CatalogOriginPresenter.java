@@ -89,7 +89,7 @@ public class CatalogOriginPresenter {
                 group.getPosition(),
                 group.isShownToDevelopers(),
                 new FeedbackModeAssignmentDTO(group.getFeedbackMode(), effective.mode(), effective.source()),
-                new CatalogOriginDTO(source, state, List.of(), offer == null ? null : catalog.definitionDigest(offer)),
+                new CatalogOriginDTO(source, state, List.of(), null),
                 group.getCreatedAt(),
                 group.getUpdatedAt());
     }

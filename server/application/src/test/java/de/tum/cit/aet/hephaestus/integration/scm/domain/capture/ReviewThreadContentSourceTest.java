@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -494,14 +493,16 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_reportsCollectionError_onRepositoryFailure() {
+    void shouldPropagateProgrammingFailuresWithoutRecordingCaptureRefusals() {
+        var failure = new NullPointerException("Invalid review mapping");
         when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
-                .thenThrow(new RuntimeException("db down"));
+                .thenThrow(failure);
 
         Map<String, byte[]> files = new HashMap<>();
-        assertThatExceptionOfType(ItemCaptureException.class)
+        assertThatExceptionOfType(NullPointerException.class)
                 .isThrownBy(() -> files.putAll(provider.capture(request(metadataWithPr()), provider.sourceKinds())
-                        .files()));
+                        .files()))
+                .isSameAs(failure);
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
 

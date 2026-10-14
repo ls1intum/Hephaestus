@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 
 import { DetailDrawerStack } from "@/components/layout/detail-drawer/DetailDrawerStack";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
@@ -203,4 +204,26 @@ export const HephaestusUpdateAvailable: Story = {
 
 export const Submitting: Story = {
 	args: { mode: "edit", practice, isPending: true },
+};
+
+export const RefreshFailed: Story = {
+	args: {
+		mode: "edit",
+		practice,
+		refreshAlert: (
+			<QueryErrorAlert
+				error={{ status: 503 }}
+				title="We could not refresh the practice editor"
+				onRetry={fn()}
+			/>
+		),
+	},
+	play: async () => {
+		await expectPanelContentInset(await settledDrawerPanel());
+		await expect(screen.getByText("We could not refresh the practice editor")).toBeVisible();
+		await expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue(
+			practice.definition?.name,
+		);
+	},
 };

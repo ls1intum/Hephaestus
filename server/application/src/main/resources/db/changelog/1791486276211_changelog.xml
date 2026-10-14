@@ -1025,7 +1025,6 @@ CREATE TABLE review_job (
   worker_id varchar(255),
   idempotency_key varchar(255),
   trace_id varchar(32) NOT NULL,
-  job_token_hash varchar(64),
   input jsonb NOT NULL,
   config_snapshot jsonb NOT NULL,
   capture jsonb,
@@ -2074,13 +2073,13 @@ FROM _cutover_old_agent_job j JOIN _job_transition t ON t.id=j.id
 LEFT JOIN _cutover_old_public_review_completion p ON p.job_id=j.id AND p.workspace_id=j.workspace_id CROSS JOIN _cutover_clock c;
 
 INSERT INTO review_job(id,review_id,workspace_id,submitted_at,status,attempt,processing_status,available_at,hold_reason,worker_id,
- idempotency_key,trace_id,job_token_hash,input,config_snapshot,capture,output,exit_code,error_message,cancellation_reason,
+ idempotency_key,trace_id,input,config_snapshot,capture,output,exit_code,error_message,cancellation_reason,
  conversation_prepared_at,practice_page_prepared_at,public_review_digest,admission_attempt,admission_digest,
  llm_calls,llm_input_tokens,llm_output_tokens,llm_reasoning_tokens,llm_cache_read_tokens,llm_cache_write_tokens,
  started_at,execution_started_at,completed_at)
 SELECT j.id,j.id,j.workspace_id,j.created_at,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'CANCELLED' ELSE j.status END,j.retry_count,
  CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'DONE' ELSE CASE j.delivery_status WHEN 'PENDING' THEN 'FAILED' WHEN 'DELIVERED' THEN 'DONE' WHEN 'FAILED' THEN 'FAILED' ELSE 'NONE' END END,
- j.available_at,j.hold_reason,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN NULL ELSE j.worker_id END,j.idempotency_key,j.trace_id,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN NULL ELSE j.job_token_hash END,jsonb_build_object('reviewId',j.id,'itemId',r.item_id::text),j.config_snapshot,
+ j.available_at,j.hold_reason,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN NULL ELSE j.worker_id END,j.idempotency_key,j.trace_id,jsonb_build_object('reviewId',j.id,'itemId',r.item_id::text),j.config_snapshot,
  j.evidence_snapshot-'reviewedWork'-'practices'-'answeredPractices',j.output,j.exit_code,j.error_message,CASE WHEN j.status IN ('QUEUED','RUNNING') THEN 'CONTRACT_CHANGED' ELSE CASE WHEN j.cancellation_reason IN('DRAIN_GRACEFUL','DRAIN_IMMEDIATE','BUDGET_EXHAUSTED','MODEL_UNAVAILABLE','MEMBER_AI_DECLINED','PERSON_DATA_ERASED','CANCELLED_BY_ADMIN','CANCELLED_BY_REQUESTER','CONTRACT_CHANGED') THEN j.cancellation_reason END END,
  j.in_chat_prepared_at,j.in_app_prepared_at,p.review_digest,
  COALESCE(p.admission_attempt,NULLIF(j.metadata->>'observation_admission_attempt','')::integer),
@@ -2709,7 +2708,7 @@ BEGIN
  AND (to_jsonb(NEW)-'account_id'-'acting_account_id'-'viewed_account_id'-'viewed_actor_id'-'identity_id'-'provider_id'-'workspace_id'-'ip_inet'-'user_agent'-'details')
  IS NOT DISTINCT FROM (to_jsonb(OLD)-'account_id'-'acting_account_id'-'viewed_account_id'-'viewed_actor_id'-'identity_id'-'provider_id'-'workspace_id'-'ip_inet'-'user_agent'-'details') THEN
   RETURN NEW; END IF;
- RAISE EXCEPTION 'auth_event permits only nulling private attribution and content';
+ RAISE EXCEPTION 'auth_event is append-only: permits only nulling private attribution and content';
 END $$;$auth_definition$;
  END IF;
 END $auth_function$;
@@ -3390,7 +3389,7 @@ DO $$ DECLARE checked_row record; BEGIN
  IF EXISTS(SELECT 1 FROM feedback_send s JOIN _cutover_send_parent sp ON sp.feedback_id=s.feedback_id JOIN _cutover_old_feedback_dispatch d ON d.id=sp.dispatch_id WHERE d.state IN('SENT','SUPPRESSED','FAILED') AND s.action='POST' AND s.state='PENDING') THEN RAISE EXCEPTION 'terminal delivery was re-enqueued'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_feedback f WHERE f.delivery_state IN('PARTIALLY_DELIVERED','PARTIALLY_FAILED') AND NOT EXISTS(SELECT 1 FROM feedback_copy c WHERE c.feedback_id=f.id AND c.state='POSTED')) THEN RAISE EXCEPTION 'partial delivery has no confirmed appearance'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o LEFT JOIN review_job j ON j.id=o.id WHERE NOT EXISTS(SELECT 1 FROM _discarded_job_ids d WHERE d.id=o.id) AND(j.id IS NULL OR j.review_id<>o.id)) THEN RAISE EXCEPTION 'routed job identity changed'; END IF;
- IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o JOIN review_job j ON j.id=o.id WHERE o.status IN('QUEUED','RUNNING') AND(j.status<>'CANCELLED' OR j.processing_status<>'DONE' OR j.cancellation_reason<>'CONTRACT_CHANGED' OR j.worker_id IS NOT NULL OR j.job_token_hash IS NOT NULL)) THEN RAISE EXCEPTION 'old runtime authority survived cutover'; END IF;
+ IF EXISTS(SELECT 1 FROM _cutover_old_agent_job o JOIN review_job j ON j.id=o.id WHERE o.status IN('QUEUED','RUNNING') AND(j.status<>'CANCELLED' OR j.processing_status<>'DONE' OR j.cancellation_reason<>'CONTRACT_CHANGED' OR j.worker_id IS NOT NULL)) THEN RAISE EXCEPTION 'old runtime authority survived cutover'; END IF;
  IF EXISTS(SELECT 1 FROM _cutover_old_observation o WHERE o.evidence->'inapplicability' ? 'subject' AND o.evidence->'inapplicability' ? 'prerequisite' AND o.evidence->'inapplicability'->'subject' IS DISTINCT FROM o.evidence->'inapplicability'->'prerequisite') THEN RAISE EXCEPTION 'historical inapplicability keys conflict'; END IF;
  FOR checked_row IN SELECT id FROM result ORDER BY id::text LOOP PERFORM check_result_children(checked_row.id); END LOOP;
  FOR checked_row IN SELECT review_id,practice_id,item_id FROM review_item ORDER BY review_id::text,practice_id,item_id LOOP PERFORM check_review_item_scope(checked_row.review_id,checked_row.practice_id,checked_row.item_id); END LOOP;

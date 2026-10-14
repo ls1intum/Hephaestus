@@ -118,13 +118,13 @@ export const ChangeRole: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Role of Bob Smith" }));
 		await userEvent.click(await screen.findByRole("option", { name: "Admin" }));
-		await expect(args.onRoleChange).toHaveBeenCalledWith(unclaimedMember.accountId, "ADMIN");
+		await expect(args.onRoleChange).toHaveBeenCalledWith(unclaimedMember.account.id, "ADMIN");
 	},
 };
 
 /** Only the member whose role change is in flight waits. */
 export const RoleChangePending: Story = {
-	args: { pendingRoleAccountId: unclaimedMember.accountId },
+	args: { pendingRoleAccountId: unclaimedMember.account.id },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("combobox", { name: "Role of Bob Smith" })).toBeDisabled();
 		await expect(canvas.getByRole("combobox", { name: "Role of Alice Johnson" })).toBeEnabled();

@@ -51,6 +51,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -351,9 +352,7 @@ public class ScmItemService implements ItemSource {
                     && !ScmVersion.reviewedHead(pinned.version())
                             .equals(record.path("commit_sha").asString())) throw versionUnavailable();
             return record;
-        } catch (ItemCaptureException refusal) {
-            throw refusal;
-        } catch (RuntimeException malformed) {
+        } catch (JacksonException malformed) {
             throw new ItemCaptureException(
                     ItemCaptureCode.CAPTURE_FAILED, "Captured SCM item record is invalid", malformed);
         }

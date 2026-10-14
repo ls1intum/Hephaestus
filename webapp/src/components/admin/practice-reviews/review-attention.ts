@@ -36,6 +36,9 @@ export function percentText(share: number): string {
 export type WithheldClass = "TIMING" | "HELD_BY_REVIEW" | "DEVELOPER_CHOICE" | "OTHER";
 
 const REASON_CLASS: Record<WithholdingReason, WithheldClass> = {
+	EVIDENCE_NOT_PERMITTED: "OTHER",
+	NO_EVIDENCE: "OTHER",
+	UNCORROBORATED: "OTHER",
 	ITEM_MERGED: "TIMING",
 	ITEM_CLOSED: "TIMING",
 	STALE_ROLLOUT_REVISION: "TIMING",

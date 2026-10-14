@@ -38,9 +38,13 @@ export function WorkspaceScmTokenSettings({
 	tokenMetadataError,
 }: WorkspaceScmTokenSettingsProps) {
 	const id = useId();
+	const isGitLab = providerLabel === "GitLab";
 	const expiresAt = asDate(tokenExpiresAt);
-	let expiryDescription = "The token expiry is not available yet.";
-	if (tokenExpiryCheckedAt && tokenExpiresAt == null) {
+	// Only GitLab records a checked expiry, so a missing date proves "no expiry" for GitLab alone.
+	let expiryDescription = isGitLab
+		? "The token expiry is not available yet."
+		: `The token expiry is not available for this connection. Check the token in ${providerLabel} and replace it below if it has expired or been revoked.`;
+	if (isGitLab && tokenExpiryCheckedAt && tokenExpiresAt == null) {
 		expiryDescription = "The token has no expiry.";
 	}
 	if (expiresAt) {
@@ -70,32 +74,30 @@ export function WorkspaceScmTokenSettings({
 				</CardDescription>
 			</CardHeader>
 			<CardContent className="space-y-4">
-				{providerLabel === "GitLab" && (
-					<div className="space-y-3">
-						{isLoadingTokenMetadata ? (
-							<Skeleton className="h-4 w-52" />
-						) : (
-							<p className="text-sm text-muted-foreground">{expiryDescription}</p>
-						)}
-						{attentionProblem === "CREDENTIAL_REVOKED" && (
-							<Alert variant="destructive">
-								<AlertTitle>GitLab no longer accepts this token</AlertTitle>
-								<AlertDescription>
-									Replace the token below to restore sync. Existing repositories and synced work are
-									kept.
-								</AlertDescription>
-							</Alert>
-						)}
-						{attentionProblem === "CREDENTIAL_EXPIRING" && (
-							<Alert>
-								<AlertTitle>The GitLab token is about to expire</AlertTitle>
-								<AlertDescription>
-									Hephaestus could not rotate it. Replace it below to keep sync working.
-								</AlertDescription>
-							</Alert>
-						)}
-					</div>
-				)}
+				<div className="space-y-3">
+					{isLoadingTokenMetadata ? (
+						<Skeleton className="h-4 w-52" />
+					) : (
+						<p className="text-sm text-muted-foreground">{expiryDescription}</p>
+					)}
+					{isGitLab && attentionProblem === "CREDENTIAL_REVOKED" && (
+						<Alert variant="destructive">
+							<AlertTitle>GitLab no longer accepts this token</AlertTitle>
+							<AlertDescription>
+								Replace the token below to restore sync. Existing repositories and synced work are
+								kept.
+							</AlertDescription>
+						</Alert>
+					)}
+					{isGitLab && attentionProblem === "CREDENTIAL_EXPIRING" && (
+						<Alert>
+							<AlertTitle>The GitLab token is about to expire</AlertTitle>
+							<AlertDescription>
+								Hephaestus could not rotate it. Replace it below to keep sync working.
+							</AlertDescription>
+						</Alert>
+					)}
+				</div>
 				<form
 					className="space-y-4"
 					onSubmit={(event) => {

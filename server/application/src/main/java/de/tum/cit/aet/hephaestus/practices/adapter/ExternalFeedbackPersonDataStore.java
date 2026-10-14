@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyCleanupCustody;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyReadback;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -40,7 +41,7 @@ final class ExternalFeedbackPersonDataStore extends JdbcPersonDataStore {
 
     private List<JsonNode> inspectionRows(PersonDataSelection selection) {
         return querySelected(
-                "jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,'state',t.state,'lastError',t.last_error,'feedbackId',t.feedback_id,'writeStartedAt',t.write_started_at,'writeMarker',t.write_marker,'externalRef',t.external_ref,'externalUrl',t.external_url,'postedAt',t.posted_at)::text",
+                "jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,'state',t.state,'readback',t.readback,'lastError',t.last_error,'feedbackId',t.feedback_id,'writeStartedAt',t.write_started_at,'writeMarker',t.write_marker,'externalRef',t.external_ref,'externalUrl',t.external_url,'postedAt',t.posted_at)::text",
                 "feedback_copy t",
                 selection);
     }
@@ -61,8 +62,9 @@ final class ExternalFeedbackPersonDataStore extends JdbcPersonDataStore {
     public List<ExternalDelivery> externalDeliveries(PersonDataSelection selection) {
         var deliveries = new ArrayList<ExternalDelivery>();
         for (var row : inspectionRows(selection)) {
-            boolean absent = row.path("state").asString().equals("FAILED")
-                    && row.path("lastError").asString().startsWith("ABSENT:");
+            boolean absent = FeedbackCopyReadback.ABSENT
+                    .name()
+                    .equals(row.path("readback").asString());
             boolean uncertain = !absent
                     && !row.path("writeStartedAt").isNull()
                     && row.path("postedAt").isNull();

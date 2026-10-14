@@ -91,21 +91,20 @@ export function isImageIndex(raw: unknown): boolean {
 }
 
 /** The digest of the manifest `reference` names, which for an index is the index itself. */
-async function manifestDigest(reference: string): Promise<string> {
-	const inspected = await output("docker", [
-		"buildx",
-		"imagetools",
-		"inspect",
-		"--format",
-		"{{.Manifest.Digest}}",
-		reference,
-	]);
+async function manifestDigest(reference: string, signal: AbortSignal): Promise<string> {
+	const inspected = await output(
+		"docker",
+		["buildx", "imagetools", "inspect", "--format", "{{.Manifest.Digest}}", reference],
+		{ signal },
+	);
 	return inspected.trim();
 }
 
 export async function resolvePlatformDigest(reference: string, platform: string): Promise<string> {
+	// Both registry reads share one deadline, including the single-manifest fallback.
+	const signal = AbortSignal.timeout(120_000);
 	const raw: unknown = JSON.parse(
-		await output("docker", ["buildx", "imagetools", "inspect", reference, "--raw"]),
+		await output("docker", ["buildx", "imagetools", "inspect", reference, "--raw"], { signal }),
 	);
 	const selected = selectPlatformDigest(raw, platform);
 	// An index that publishes no manifest for this platform must fail, never fall through. The
@@ -116,7 +115,7 @@ export async function resolvePlatformDigest(reference: string, platform: string)
 	if (selected === undefined && isImageIndex(raw)) {
 		throw new Error(`${reference} publishes no ${platform} manifest`);
 	}
-	const digest = selected ?? (await manifestDigest(reference));
+	const digest = selected ?? (await manifestDigest(reference, signal));
 	if (!DIGEST.test(digest)) {
 		throw new Error(`no ${platform} digest for ${reference} (got: ${digest || "<empty>"})`);
 	}

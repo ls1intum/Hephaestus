@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -24,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ResultViewQuery {
 
     private final PracticeRepository practices;
-    private final ResultPracticeVersionRepository versions;
+    private final PracticeVersionRepository versions;
     private final ReviewRepository reviews;
     private final ProductReferenceQuery references;
 

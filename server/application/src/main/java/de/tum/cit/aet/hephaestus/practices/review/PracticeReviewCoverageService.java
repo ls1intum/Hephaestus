@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ public class PracticeReviewCoverageService {
     private final PersonProcessingSuppression suppression;
     private final JdbcClient jdbc;
     private final MonitoredRepositoryQuery monitored;
+    private final MembershipReviewSelection selections;
 
     public Map<String, List<String>> generatedPaths(Workspace workspace) {
         var indexed = monitored.repositories(workspace.getId()).values().stream()
@@ -241,15 +243,9 @@ public class PracticeReviewCoverageService {
         }
         desired.forEach((id, branches) ->
                 repositoryTargetRepository.save(new ReviewScopeRepository(workspace.getId(), id, branches)));
-        jdbc.sql("UPDATE membership SET review_selected=false WHERE workspace_id=:ws")
-                .param("ws", workspace.getId())
-                .update();
-        if (requested.personMode() == ReviewScopeMode.SELECTED
-                && !requested.accountIds().isEmpty())
-            jdbc.sql("UPDATE membership SET review_selected=true WHERE workspace_id=:ws AND account_id IN (:ids)")
-                    .param("ws", workspace.getId())
-                    .param("ids", requested.accountIds())
-                    .update();
+        selections.replaceSelection(
+                workspace.getId(),
+                requested.personMode() == ReviewScopeMode.SELECTED ? requested.accountIds() : List.of());
         workspace.getReviewSettings().applyRollout(requested.repositoryMode(), requested.personMode(), null);
     }
 }

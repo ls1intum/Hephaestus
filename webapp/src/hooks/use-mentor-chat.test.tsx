@@ -12,10 +12,21 @@ import type { ChatMessage } from "@/lib/types";
 import { server } from "@/mocks/server";
 import { deferred } from "@/test/async";
 
-import { useMentorChat } from "./use-mentor-chat";
+import { useMentorChat, useMentorChatSession } from "./use-mentor-chat";
+
+/** What each `Chat` the hook built was configured with, read back by the fake `useChat`. */
+const configured = vi.hoisted(() => new WeakMap<object, ChatInit<ChatMessage>>());
 
 vi.mock("@ai-sdk/react", () => ({
 	useChat: vi.fn(),
+	Chat: class {
+		readonly id: string;
+		constructor(init: ChatInit<ChatMessage>) {
+			this.id = init.id ?? "";
+			configured.set(this, init);
+		}
+		stop = vi.fn();
+	},
 }));
 
 vi.mock("@/hooks/use-active-workspace", () => ({
@@ -97,9 +108,10 @@ function installFakeChat(initialStatus: ChatStatus = "ready"): FakeChat {
 		finishTurn: notRenderedYet,
 	};
 
-	mockUseChat.mockImplementation((options) => {
-		if (!options || "chat" in options) {
-			throw new Error("useMentorChat is expected to configure its own chat, not adopt one");
+	mockUseChat.mockImplementation((adopted) => {
+		const options = adopted && "chat" in adopted ? configured.get(adopted.chat) : undefined;
+		if (!options) {
+			throw new Error("useMentorChat is expected to adopt the session's chat");
 		}
 		lastOptions = options;
 		const [messages, setMessages] = useState<ChatMessage[]>(options.messages ?? []);
@@ -169,6 +181,22 @@ function createQueryClient() {
 	});
 }
 
+/** The hook as a view owns it: over a conversation of its own, in the active workspace. */
+function useLocalMentorChat({
+	threadId,
+	initialMessages,
+}: {
+	threadId?: string;
+	initialMessages?: ChatMessage[];
+}) {
+	const session = useMentorChatSession({
+		workspaceSlug: useActiveWorkspaceSlug().workspaceSlug ?? "",
+		threadId,
+		initialMessages,
+	});
+	return useMentorChat(session, { threadId });
+}
+
 function createWrapper(queryClient: QueryClient) {
 	return function Wrapper({ children }: { children: ReactNode }) {
 		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
@@ -207,7 +235,7 @@ describe("useMentorChat", () => {
 
 	describe("initialization", () => {
 		it("should initialize with default values when no threadId provided", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -218,7 +246,7 @@ describe("useMentorChat", () => {
 		});
 
 		it("should use provided threadId when available", () => {
-			const { result } = renderHook(() => useMentorChat({ threadId: "existing-thread-123" }), {
+			const { result } = renderHook(() => useLocalMentorChat({ threadId: "existing-thread-123" }), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -231,7 +259,7 @@ describe("useMentorChat", () => {
 				createMockMessage("assistant", "Hi there!"),
 			];
 
-			const { result } = renderHook(() => useMentorChat({ initialMessages }), {
+			const { result } = renderHook(() => useLocalMentorChat({ initialMessages }), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -243,7 +271,7 @@ describe("useMentorChat", () => {
 				activeWorkspace({ workspaceSlug: undefined, isLoading: true }),
 			);
 
-			const { result } = renderHook(() => useMentorChat({ threadId: "thread-123" }), {
+			const { result } = renderHook(() => useLocalMentorChat({ threadId: "thread-123" }), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -253,7 +281,7 @@ describe("useMentorChat", () => {
 
 	describe("message sending", () => {
 		it("puts what the user typed into the transcript", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -273,7 +301,7 @@ describe("useMentorChat", () => {
 			["an empty message", ""],
 			["a message that is only whitespace", "   "],
 		])("leaves the transcript untouched for %s", (_name, text) => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -288,7 +316,7 @@ describe("useMentorChat", () => {
 		it("sends nothing while no workspace is active, because there is no endpoint to send to", () => {
 			mockUseActiveWorkspaceSlug.mockReturnValue(activeWorkspace({ workspaceSlug: undefined }));
 
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -303,7 +331,7 @@ describe("useMentorChat", () => {
 
 	describe("error handling", () => {
 		it("reports a failed stream as a failure", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 			act(() => {
@@ -314,7 +342,7 @@ describe("useMentorChat", () => {
 		});
 
 		it("reports Heph as busy when the server said so before the stream failed", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -333,7 +361,7 @@ describe("useMentorChat", () => {
 		});
 
 		it("does not read busy from the error text when no status part said so", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -353,7 +381,7 @@ describe("useMentorChat", () => {
 				createMockMessage("user", "Second question", "second"),
 				createMockMessage("assistant", "Second answer"),
 			];
-			const { result } = renderHook(() => useMentorChat({ initialMessages }), {
+			const { result } = renderHook(() => useLocalMentorChat({ initialMessages }), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -376,7 +404,7 @@ describe("useMentorChat", () => {
 		} as const;
 
 		it("says Heph is warming up from the server's status until the turn finishes", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 			act(() => {
@@ -394,7 +422,7 @@ describe("useMentorChat", () => {
 		});
 
 		it("stops saying so when the turn fails", () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -414,7 +442,7 @@ describe("useMentorChat", () => {
 
 	describe("vote functionality", () => {
 		it("records an upvote optimistically, before the server has answered", async () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -435,7 +463,7 @@ describe("useMentorChat", () => {
 		});
 
 		it("records a downvote the same way", async () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -456,7 +484,7 @@ describe("useMentorChat", () => {
 		});
 
 		it("keeps one entry per voted message", async () => {
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -479,7 +507,7 @@ describe("useMentorChat", () => {
 					async () => response.promise,
 				),
 			);
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 			act(() => result.current.voteMessage("msg-rejected", true));
@@ -495,7 +523,7 @@ describe("useMentorChat", () => {
 		it("should not vote when workspace is not available", () => {
 			mockUseActiveWorkspaceSlug.mockReturnValue(activeWorkspace({ workspaceSlug: undefined }));
 
-			const { result } = renderHook(() => useMentorChat({}), {
+			const { result } = renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 
@@ -516,7 +544,7 @@ describe("useMentorChat", () => {
 			queryClient.setQueryData(threadsKey, []);
 			queryClient.setQueryData(threadKey, { id: SELF_GENERATED_THREAD_ID, messages: [] });
 
-			renderHook(() => useMentorChat({}), { wrapper: createWrapper(queryClient) });
+			renderHook(() => useLocalMentorChat({}), { wrapper: createWrapper(queryClient) });
 			expect(queryClient.getQueryState(threadsKey)?.isInvalidated).toBe(false);
 
 			act(() => {
@@ -530,7 +558,7 @@ describe("useMentorChat", () => {
 
 	describe("transport configuration", () => {
 		it("posts the latest message to the active workspace's mentor endpoint, cookie + CSRF", async () => {
-			renderHook(() => useMentorChat({}), {
+			renderHook(() => useLocalMentorChat({}), {
 				wrapper: createWrapper(queryClient),
 			});
 

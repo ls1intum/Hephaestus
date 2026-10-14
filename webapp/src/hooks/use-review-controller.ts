@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import {
@@ -18,6 +17,8 @@ import { isActiveReview } from "@/components/practice-vocabulary/review-status-d
 import { problemDetailOf } from "@/lib/problem-detail";
 import { invalidateWorkspaceReads } from "@/runtime/tanstack-query/invalidate-workspace-reads";
 import { retryUnlessNotFound } from "@/runtime/tanstack-query/query-defaults";
+
+import { useInvalidateOnSettle } from "./use-invalidate-on-settle";
 
 /**
  * Everything the review's sheet needs, already resolved: the review, the feedback checks it ran,
@@ -58,19 +59,11 @@ export function useReviewController(workspaceSlug: string, reviewId: string): Re
 	// The checks are written when the results are processed, and the review's row (its counts, which
 	// the lists read) with its results: the review settling is what asks both once more.
 	const settled = reviewQuery.data !== undefined && !isMoving(reviewQuery.data);
-	// Undefined until the review is first read, so arriving at a settled review asks nothing again.
-	const wasSettled = useRef<boolean | undefined>(undefined);
-	useEffect(() => {
-		const before = wasSettled.current;
-		wasSettled.current = reviewQuery.data === undefined ? undefined : settled;
-		if (before === false && settled) {
-			void queryClient.invalidateQueries({ queryKey: checksOptions.queryKey });
-			// Any read of the review's row, whatever its page size.
-			void queryClient.invalidateQueries({
-				queryKey: listReviewsQueryKey({ path: { workspaceSlug }, query: { reviewId } }),
-			});
-		}
-	});
+	useInvalidateOnSettle(reviewId, reviewQuery.data !== undefined && !settled, [
+		checksOptions.queryKey,
+		// Any read of the review's row, whatever its page size.
+		listReviewsQueryKey({ path: { workspaceSlug }, query: { reviewId } }),
+	]);
 
 	// Cancelling answers the review's summary, not its detail: every read it can move is asked again.
 	const cancelReview = useMutation({

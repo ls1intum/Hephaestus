@@ -37,4 +37,5 @@ public record LlmUsageInsert(
         @Nullable BigDecimal appliedPer1mCacheWriteUsd,
         String usageProvenance,
         long searchUnits,
-        int unreportedCalls) {}
+        int unreportedCalls,
+        String measurementVerification) {}

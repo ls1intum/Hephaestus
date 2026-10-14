@@ -107,7 +107,7 @@ The notice to the people on the page:
 
 ### Practices stay out
 
-Standings, practices, results and feedback never sort people.
+Standings, practices, observations and feedback never sort people.
 They never appear on a public page.
 [ADR 0051](0051-practices-across-the-workspace-counts-developers.md) records the same limit for **Practices across the workspace**.
 
@@ -126,7 +126,7 @@ The page shows only this data:
 - Pull or merge requests, reviews and issues, as counts, positions and links to the work.
 - Humans only. Members and outside contributors to those repositories.
 
-It never shows practices, feedback, results, Slack, Outline, or AI review content.
+It never shows practices, feedback, observations, Slack, Outline, or AI review content.
 It never shows a hidden person or an erased person.
 
 A hidden person leaves the page and every total on it.

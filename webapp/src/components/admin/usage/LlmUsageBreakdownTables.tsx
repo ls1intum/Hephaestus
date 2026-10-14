@@ -20,10 +20,7 @@ import {
 	formatCostUsd,
 } from "@/lib/money";
 
-import {
-	type TableSkeletonColumn,
-	TableRowsSkeleton,
-} from "@/components/admin/integrations/TableRowsSkeleton";
+import { type TableSkeletonColumn, TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { MoneyCell } from "./MoneyCell";
 import { PurseHeading } from "./PurseHeading";
 import {

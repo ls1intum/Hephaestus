@@ -15,6 +15,8 @@ import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -49,6 +51,39 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PracticeReviewCoverageService coverage;
+
+    @Autowired
+    private MembershipReviewSelection selections;
+
+    @Autowired
+    private EntityManager entityManager;
+
+    @Test
+    void shouldKeepLoadedSelectionCurrentWhenReviewScopeIsReplaced() {
+        var account = accounts.saveAndFlush(new Account("Selection cache"));
+        var member = membership(account, "selection-cache");
+        var foreign = membership(account, "selection-cache-foreign");
+        foreign.setReviewSelected(true);
+        memberships.flush();
+        long accountId = Objects.requireNonNull(account.getId());
+        selections.replaceSelection(member.getWorkspace().getId(), List.of(accountId));
+        assertThat(member.isReviewSelected()).isTrue();
+        assertThat(foreign.isReviewSelected()).isTrue();
+        assertThat(coverage.scope(member.getWorkspace()).accountIds()).containsExactly(accountId);
+        selections.replaceSelection(member.getWorkspace().getId(), List.of());
+        assertThat(member.isReviewSelected()).isFalse();
+        var memberId = member.getId();
+        var foreignId = foreign.getId();
+        entityManager.clear();
+        assertThat(memberships.findById(memberId))
+                .get()
+                .extracting(Membership::isReviewSelected)
+                .isEqualTo(false);
+        assertThat(memberships.findById(foreignId))
+                .get()
+                .extracting(Membership::isReviewSelected)
+                .isEqualTo(true);
+    }
 
     @Test
     void shouldReturnOneMembershipWhenAnAccountHasTwoProviderIdentities() {
@@ -138,7 +173,9 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         unclaimed.setStatus(Account.Status.UNCLAIMED);
         accounts.saveAndFlush(unclaimed);
         addMember(member.getWorkspace(), unclaimed, Membership.WorkspaceRole.MEMBER, null);
-        var ids = List.of(Objects.requireNonNull(human.getId()), Objects.requireNonNull(unclaimed.getId()));
+        long humanId = Objects.requireNonNull(human.getId());
+        long unclaimedId = Objects.requireNonNull(unclaimed.getId());
+        var ids = List.of(humanId, unclaimedId);
         assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, provider.getId()))
                 .containsExactly(human.getId());
         assertThat(memberships.findEligibleAccountIds(member.getWorkspace().getId(), ids, null))
@@ -159,10 +196,12 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
                 workspace,
                 new WorkspaceReviewScope(ReviewScopeMode.ALL, ReviewScopeMode.SELECTED, List.of(), List.of(accountId)));
         assertThat(coverage.scope(workspace).accountIds()).containsExactly(accountId);
+        assertThat(member.isReviewSelected()).isTrue();
         coverage.replace(
                 workspace,
                 new WorkspaceReviewScope(ReviewScopeMode.ALL, ReviewScopeMode.SELECTED, List.of(), List.of()));
         assertThat(coverage.scope(workspace).accountIds()).isEmpty();
+        assertThat(member.isReviewSelected()).isFalse();
     }
 
     private void addMember(

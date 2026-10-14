@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
@@ -65,7 +66,8 @@ class MentorTurnPersistenceCostTest extends BaseUnitTest {
                 new MentorTurnPersistence.UsageBreakdown("authoritative-model", input, output, cacheRead, cacheWrite),
                 1,
                 0,
-                UsageProvenance.RUNNER);
+                UsageProvenance.RUNNER,
+                MeasurementVerification.VERIFIED);
     }
 
     @Test

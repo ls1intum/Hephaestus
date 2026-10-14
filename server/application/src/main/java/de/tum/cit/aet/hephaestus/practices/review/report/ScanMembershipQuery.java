@@ -109,9 +109,9 @@ public class ScanMembershipQuery {
         if (filter.openOnly())
             where.append(
                     " AND COALESCE(x.baseline_state,'')<>'ABSENT' AND r.outcome='NOT_MET' AND r.ended_at IS NULL AND"
-                        + " pinned.review_digest=current.review_digest AND NOT EXISTS(SELECT 1 FROM result_mark mark"
-                        + " WHERE mark.workspace_id=r.workspace_id AND mark.result_id=r.id AND mark.removed_at IS"
-                        + " NULL)");
+                            + " pinned.review_digest=current.review_digest AND NOT EXISTS(SELECT 1 FROM result_mark mark"
+                            + " WHERE mark.workspace_id=r.workspace_id AND mark.result_id=r.id AND mark.removed_at IS"
+                            + " NULL)");
         if (after != null) {
             where.append(
                     " AND (x.path,x.practice_id,x.item_id,x.position,x.problem_id::text)>(:lastPath,:lastPractice,:lastItem,:lastPosition,:lastProblem)");
@@ -157,8 +157,8 @@ public class ScanMembershipQuery {
         if (openOnly)
             where.append(
                     " AND r.outcome='NOT_MET' AND r.ended_at IS NULL AND pinned.review_digest=current.review_digest"
-                        + " AND NOT EXISTS(SELECT 1 FROM result_mark mark WHERE mark.workspace_id=r.workspace_id AND"
-                        + " mark.result_id=r.id AND mark.removed_at IS NULL)");
+                            + " AND NOT EXISTS(SELECT 1 FROM result_mark mark WHERE mark.workspace_id=r.workspace_id AND"
+                            + " mark.result_id=r.id AND mark.removed_at IS NULL)");
         return jdbc.sql("SELECT DISTINCT r.id,r.id::text AS ordering FROM review_item m JOIN result r ON"
                         + " r.id=m.result_id AND r.workspace_id=m.workspace_id JOIN practice p ON"
                         + " p.id=r.practice_id AND p.workspace_id=r.workspace_id LEFT JOIN practice_version pinned"

@@ -163,12 +163,12 @@ public final class TestMentorWorker implements AutoCloseable {
                     result(id, mapper.createObjectNode());
                 }
                 case "prompt" -> {
-                    if (credentials
-                                    .validate(Objects.requireNonNull(Objects.requireNonNull(spec.networkPolicy())
-                                            .llmProxyToken()))
-                                    .orElseThrow()
-                                    .attempt()
-                            == null) throw new IllegalStateException("Prompt has no worker billing binding");
+                    var authenticated = credentials
+                            .authenticate(Objects.requireNonNull(
+                                    Objects.requireNonNull(spec.networkPolicy()).llmProxyToken()))
+                            .orElseThrow();
+                    if (credentials.resolve(authenticated).orElseThrow().attempt() == null)
+                        throw new IllegalStateException("Prompt has no worker billing binding");
                     promptId = id;
                     promptReceived = true;
                     if (holdPrompt) return;

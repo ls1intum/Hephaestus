@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -34,7 +35,7 @@ class ResultVisibilityPolicyTest {
     private final EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
     private final ResultMarkRepository marks = mock(ResultMarkRepository.class);
     private final PracticeRepository practices = mock(PracticeRepository.class);
-    private final ResultPracticeVersionRepository versions = mock(ResultPracticeVersionRepository.class);
+    private final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
     private final ResultVisibilityPolicy policy = new ResultVisibilityPolicy(authorization, marks, practices, versions);
     private final Practice practice = ReviewTestData.practice(1, 1, "test-practice");
 
@@ -161,6 +162,25 @@ class ResultVisibilityPolicyTest {
                         List.of(missingSummary),
                         SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY,
                         missingSummary.getRecordedAt().plusSeconds(1)))
+                .isEmpty();
+    }
+
+    @Test
+    void shouldRetainProofThatWasCurrentBeforeItEndedAndTheStandardChanged() {
+        var r = result();
+        var edge = r.getRecordedAt().plusSeconds(1);
+        r.end(ResultEndReason.REPLACED, edge.plusSeconds(1));
+        var oldVersion = practice.getCurrentVersion();
+        when(versions.findAt(1L, List.of(1L), edge)).thenReturn(List.of(oldVersion));
+        var changed = new PracticeVersion(
+                practice, 2, new JsonMapper().valueToTree(DefinitionTestFixtures.definition()), null);
+        ReflectionTestUtils.setField(changed, "reviewDigest", "v6:" + "b".repeat(64));
+        practice.setCurrentVersion(changed);
+        when(authorization.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of(r.getId()));
+        assertThat(policy.permitsAt(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, edge))
+                .containsExactly(r.getId());
+        assertThat(policy.permitsAt(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY, edge.plusSeconds(1)))
                 .isEmpty();
     }
 }

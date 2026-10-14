@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>There are two purses, each judged against its own cap and never summed: the host's shared models
  * and the workspace's own provider. A capped purse whose month is UNVERIFIABLE — some event funded from
- * it has no resolvable price — is blocked exactly like an exhausted one, because a cap you cannot
+ * it has no confirmed cost — is blocked exactly like an exhausted one, because a cap you cannot
  * verify is not a cap.
  *
  * <p>The ledger only gains a row when an agent job or mentor turn ENDS, so {@link #decide} is blind to
@@ -80,7 +80,9 @@ public class LlmBudgetService {
     }
 
     private static String reasonLabel(LlmBudgetBlockReason reason) {
-        return reason == LlmBudgetBlockReason.EXHAUSTED ? "exhausted" : "unverifiable (some spend has no price)";
+        return reason == LlmBudgetBlockReason.EXHAUSTED
+                ? "exhausted"
+                : "unverifiable (some spend has no confirmed cost)";
     }
 
     @Transactional(readOnly = true)

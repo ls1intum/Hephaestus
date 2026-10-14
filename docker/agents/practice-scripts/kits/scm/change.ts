@@ -1,6 +1,7 @@
 /** Read the captured commit metadata. */
 
-import { isJsonObject, text } from "../../lib/core/json.ts";
+import { z } from "zod";
+
 import type { Evidence } from "../../lib/core/practice-script.ts";
 
 export interface ChangeCommit {
@@ -28,29 +29,38 @@ export interface ChangedFile {
 	deletions?: number;
 }
 
-function parseJson(source: string | null): unknown {
-	if (source === null) {
-		return null;
-	}
+const changedFileSchema = z.object({
+	status: z.string().min(1),
+	path: z.string().min(1),
+	oldPath: z.string().optional(),
+	additions: z.number().optional(),
+	deletions: z.number().optional(),
+});
+
+const optionalText = z.string().default("");
+const commitId = z.string().trim().min(1);
+
+const commitsRecordSchema = z.object({
+	commits: z.array(
+		z.object({
+			sha: commitId,
+			message: z.string(),
+			author: optionalText,
+			authoredAt: optionalText,
+			committer: optionalText,
+			committedAt: optionalText,
+			parents: z.array(commitId),
+			files: z.array(changedFileSchema),
+		}),
+	),
+});
+
+function parseJson(source: string): unknown {
 	try {
 		return JSON.parse(source);
 	} catch {
 		return null;
 	}
-}
-
-function changedFiles(value: unknown): ChangedFile[] {
-	if (!Array.isArray(value)) {
-		return [];
-	}
-	return value.filter(isJsonObject).map((file) => ({
-		status: text(file.status),
-		path: text(file.path),
-		...(typeof file.oldPath === "string" ? { oldPath: file.oldPath } : {}),
-		...(typeof file.additions === "number" && typeof file.deletions === "number"
-			? { additions: file.additions, deletions: file.deletions }
-			: {}),
-	}));
 }
 
 /**
@@ -62,54 +72,30 @@ export async function readCapturedCommits(
 	evidence: Pick<Evidence, "record">,
 ): Promise<ChangeCommit[] | null> {
 	const record = await evidence.record("commits.json");
-	const source = record.status === "FOUND" ? record.text : null;
-	const parsed = parseJson(source);
-	if (
-		!isJsonObject(parsed) ||
-		!Array.isArray(parsed.commits) ||
-		!parsed.commits.every(isJsonObject)
-	) {
+	if (record.status !== "FOUND") {
 		return null;
 	}
-	if (
-		!parsed.commits.every(
-			(commit) =>
-				typeof commit.sha === "string" &&
-				commit.sha.trim() !== "" &&
-				typeof commit.message === "string" &&
-				Array.isArray(commit.parents) &&
-				commit.parents.every((parent) => typeof parent === "string" && parent !== "") &&
-				Array.isArray(commit.files) &&
-				commit.files.every(
-					(file) =>
-						isJsonObject(file) &&
-						typeof file.path === "string" &&
-						file.path !== "" &&
-						typeof file.status === "string" &&
-						file.status !== "",
-				),
-		)
-	) {
+	const parsed = commitsRecordSchema.safeParse(parseJson(record.text));
+	if (!parsed.success) {
 		return null;
 	}
-	const lines = (source ?? "").split("\n");
-	return parsed.commits.map((commit) => {
-		const sha = text(commit.sha);
-		return {
-			sha,
-			message: text(commit.message),
-			author: text(commit.author),
-			authoredAt: text(commit.authoredAt),
-			committer: text(commit.committer),
-			committedAt: text(commit.committedAt),
-			parents: Array.isArray(commit.parents)
-				? commit.parents.filter((p) => typeof p === "string")
-				: [],
-			files: changedFiles(commit.files),
-			line:
-				sha === ""
-					? 0
-					: lines.findIndex((line) => new RegExp(`"sha"\\s*:\\s*"${sha}"`, "u").test(line)) + 1,
-		};
-	});
+	const lines = record.text.split("\n");
+	return parsed.data.commits.map((commit) => ({
+		sha: commit.sha,
+		message: commit.message,
+		author: commit.author,
+		authoredAt: commit.authoredAt,
+		committer: commit.committer,
+		committedAt: commit.committedAt,
+		parents: commit.parents,
+		files: commit.files.map((file) => ({
+			status: file.status,
+			path: file.path,
+			...(file.oldPath === undefined ? {} : { oldPath: file.oldPath }),
+			...(file.additions !== undefined && file.deletions !== undefined
+				? { additions: file.additions, deletions: file.deletions }
+				: {}),
+		})),
+		line: lines.findIndex((line) => line.includes(commit.sha)) + 1,
+	}));
 }

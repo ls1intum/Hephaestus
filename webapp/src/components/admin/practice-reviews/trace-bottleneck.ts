@@ -345,7 +345,7 @@ function reviewBottleneck(
 	const tries = attempts > 1 ? ` It was tried ${countOf(attempts, "time", "times")}.` : "";
 	switch (review.status) {
 		case "FAILED": {
-			const timedOut = stopReason === "TIMED_OUT" || stopReason === "DEADLINE_EXCEEDED";
+			const timedOut = stopReason === "TIMED_OUT" || stopReason === "DEADLINE";
 			return {
 				kind: "failed",
 				stage: "review",

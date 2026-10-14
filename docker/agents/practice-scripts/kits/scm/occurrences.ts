@@ -93,14 +93,13 @@ function consumingExtent(source: string, start: number, end: number): number {
 export function occurrences(
 	file: SourceFile,
 	patterns: readonly OccurrencePattern[],
-	options: { includeComments?: boolean; firstPatternPerLine?: boolean } = {},
+	options: { includeComments?: boolean } = {},
 ): readonly Occurrence[] {
 	const { text } = file;
 	const executable =
 		options.includeComments === true ? undefined : maskSource(file.language, file.text);
 	const found: Occurrence[] = [];
 	const lineAt = (offset: number) => text.slice(0, offset).split("\n").length;
-	const occupied = new Set<number>();
 	for (const [pattern, { label, test }] of patterns.entries()) {
 		const expression = new RegExp(
 			test.source,
@@ -116,10 +115,6 @@ export function occurrences(
 				continue;
 			}
 			const startLine = lineAt(match.index + Math.max(0, first));
-			if (options.firstPatternPerLine === true && occupied.has(startLine)) {
-				continue;
-			}
-			occupied.add(startLine);
 			const row: Occurrence = {
 				path: file.path,
 				startLine,

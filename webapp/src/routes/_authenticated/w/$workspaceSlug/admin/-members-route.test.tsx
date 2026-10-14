@@ -30,7 +30,6 @@ function member(
 	overrides: Partial<Wire<WorkspaceMembership>> = {},
 ): Wire<WorkspaceMembership> {
 	return {
-		accountId,
 		account: {
 			id: accountId,
 			status: "ACTIVE",
@@ -64,6 +63,24 @@ const SAM = member("8", {
 	identities: [{ provider: "GITHUB", login: "sam", displayName: "Sam Unclaimed", avatarUrl: null }],
 });
 
+function membershipPage(
+	content: Wire<WorkspaceMembership>[],
+	number = 0,
+	totalElements = content.length,
+) {
+	return {
+		content,
+		number,
+		size: 100,
+		totalElements,
+		totalPages: Math.ceil(totalElements / 100),
+		first: number === 0,
+		last: (number + 1) * 100 >= totalElements,
+		numberOfElements: content.length,
+		empty: content.length === 0,
+	};
+}
+
 function mockMembersRoute(members: Wire<WorkspaceMembership>[] = [ADA, SAM]) {
 	server.use(
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
@@ -72,7 +89,9 @@ function mockMembersRoute(members: Wire<WorkspaceMembership>[] = [ADA, SAM]) {
 		http.get("*/workspaces", () => HttpResponse.json([WORKSPACE])),
 		http.get("*/workspaces/:workspaceSlug", () => HttpResponse.json(WORKSPACE)),
 		http.get("*/workspaces/:workspaceSlug/connections/catalog", () => HttpResponse.json([])),
-		http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(members)),
+		http.get("*/workspaces/:workspaceSlug/members", () =>
+			HttpResponse.json(membershipPage(members)),
+		),
 		http.get("*/workspaces/:workspaceSlug/teams", () => HttpResponse.json([])),
 	);
 }
@@ -123,7 +142,9 @@ describe("workspace members route", () => {
 			http.get("*/workspaces/:workspaceSlug/members", ({ request }) => {
 				const page = new URL(request.url).searchParams.get("page");
 				pages.push(page);
-				return HttpResponse.json(pageContents[String(page)]);
+				return HttpResponse.json(
+					membershipPage(pageContents[String(page)] ?? [], Number(page), 101),
+				);
 			}),
 		);
 		renderRouteAt("/w/acme/admin/members");
@@ -165,7 +186,7 @@ describe("workspace members route", () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members", () => {
 				reads += 1;
-				return HttpResponse.json(members);
+				return HttpResponse.json(membershipPage(members));
 			}),
 			http.post<never, AssignRoleRequest>(
 				"*/workspaces/:workspaceSlug/members/assign",

@@ -1,6 +1,6 @@
 # ADR 0049: The browser extension shows its report in the page and confirms changes in its own window
 
-**Status:** Accepted (amended 2026-10-12 — a not met result names its problems, see the update below)
+**Status:** Accepted (amended 2026-10-12 — a not met result names its problems)
 **Date:** 2026-09-27
 **Authors:** Felix T.J. Dietrich
 
@@ -10,7 +10,7 @@ The Chrome extension ([ADR 0048](0048-installed-clients-sign-in-with-a-pkce-hand
 sign-in) first showed one identical **Hephaestus** button in the provider's header, opening a popover
 with practice outcomes and links to the web app. It said nothing until clicked, covered the work it
 described, and showed process data — a matrix of practice outcomes — instead of what a developer or an
-admin can act on: the results, the next step, the evidence, and what became of the feedback.
+admin can act on: the observations, the next step, the evidence, and what became of the feedback.
 
 Two constraints stand. Anything in the provider's DOM is readable by the provider's scripts, so
 private review data must stay in an extension-origin frame. And the provider page can position, size
@@ -22,7 +22,7 @@ and cover that frame to misdirect a real click, so the frame cannot be trusted t
   details open in the page's flow, not over it.
 - **Feedback first, for everyone.** What a reader acts on is the feedback posted for them. The
   provider's comments are where it is read and answered, so the report points to them rather than
-  repeating them; results and the review's operation are one deliberate step away.
+  repeating them; observations and the review's operation are one deliberate step away.
 - **Nothing private in the provider DOM**, including through geometry: the collapsed report is the same
   height in every state.
 - **No clickjackable mutation.** A change is confirmed where the page cannot reach.
@@ -43,7 +43,7 @@ and cover that frame to misdirect a real click, so the frame cannot be trusted t
 Within the chosen section, and on lists:
 
 - **Every surface the same report**, with the admin's delivery ledger, runs and every developer's
-  results as nested disclosures inside it. Rejected: a list row then holds a detail page that
+  observations as nested disclosures inside it. Rejected: a list row then holds a detail page that
   needs a second click, the work page becomes a small dashboard, and it duplicates the web app's
   reviewed-work output page. Only the report's line opens; its content is flat.
 - **A hovercard on list rows.** Rejected for the same overlay reasons as option 1, and hover would look
@@ -64,12 +64,12 @@ Within the chosen section, and on lists:
   The collapsed line says what a review is doing now, how many such comments there are, and when a
   review last recorded a result.
 - Opened, the report is flat, as a merge request report's second level: the reader's comments, each
-  one link to that comment on the provider; then the reader's own results on that exact work (a
-  exact `itemId` filter), loaded when the report opens, each its practice, outcome
+  one link to that comment on the provider; then the reader's own observations on that exact work (a
+  paired `artifactKind`/`artifactId` filter), loaded when the report opens, each its practice, outcome
   and one sentence; then the precise review time and commit, and links into the web app. Nothing
   inside opens further. The worker checks each returned record is about that work.
 - The page shows every reader only their own records, admins included, and no feedback text at all.
-  Every developer's results, the feedback's delivery, the review runs — with cancelling and
+  Every developer's observations, the feedback's delivery, the review runs — with cancelling and
   retrying — and the review's history are the web app's: **Open in Hephaestus** leads to the reader's feedback page, and an admin's **Review details** opens the work in Practice reviews. The only change
   the page can start is a review request.
 - On a repository's list of pull requests, merge requests or issues, each row recognised by the
@@ -111,7 +111,7 @@ evidence that navigation from the report cannot give.
 ## Update — 2026-10-12 (#2656): a not met result names its problems
 
 The report lists the reader's own **results**.
-Under a `NOT_MET` result, it shows the one-line summary of each problem (result), in the review's order.
+Under a `NOT_MET` result, it shows the one-line summary of each problem, in the review's order.
 The list endpoint carries these summaries only where the result detail would show its evidence.
 The report still shows no feedback text, no explanation, and no place in the work.
 Nothing inside opens further.

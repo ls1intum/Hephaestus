@@ -380,8 +380,8 @@ paths:
             - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_GROUP
-            - CURATED_PRACTICE
-            - CURATED_PRACTICE_GROUP
+            - CATALOG_PRACTICE
+            - CATALOG_GROUP
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -1314,6 +1314,35 @@ paths:
           description: OK
       tags:
       - catalog-admin
+  /admin/practice-catalog/practices/{slug}/group:
+    patch:
+      operationId: moveCatalogPractice
+      parameters:
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MovePracticeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Catalog"
+          description: OK
+      tags:
+      - catalog-admin
   /admin/practice-catalog/practices/{slug}/override:
     delete:
       operationId: resetCatalogPractice
@@ -1357,35 +1386,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/CatalogPractice"
-          description: OK
-      tags:
-      - catalog-admin
-  /admin/practice-catalog/practices/{slug}/placement:
-    patch:
-      operationId: placeCatalogPractice
-      parameters:
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      - in: header
-        name: If-Match
-        required: false
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PlacePracticeRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Catalog"
           description: OK
       tags:
       - catalog-admin
@@ -4007,8 +4007,8 @@ paths:
             - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_GROUP
-            - CURATED_PRACTICE
-            - CURATED_PRACTICE_GROUP
+            - CATALOG_PRACTICE
+            - CATALOG_GROUP
             - WORKSPACE_INSTANCE_LLM_BUDGET
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
@@ -4991,32 +4991,39 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - description: Zero-based page index
+      - description: Zero-based page index (0..N)
         in: query
         name: page
         required: false
         schema:
           type: integer
-          format: int32
           default: 0
           minimum: 0
-      - description: "Results per page, capped at 100"
+      - description: The size of the page to be returned
         in: query
         name: size
         required: false
         schema:
           type: integer
-          format: int32
           default: 50
           minimum: 1
+      - description: "Sorting criteria in the format: property,(asc|desc). Default\
+          \ sort order is ascending. Multiple sort criteria are supported."
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: array
+          default:
+          - "joinedAt,ASC"
+          items:
+            type: string
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/WorkspaceMembership"
+                $ref: "#/components/schemas/PageResponseDTOWorkspaceMembership"
           description: OK
       summary: List workspace memberships
       tags:
@@ -6443,10 +6450,10 @@ paths:
       description: "Read-only metadata for up to 50 in-context pieces of feedback\
         \ addressed to the caller with recorded provider comments, newest delivery\
         \ first. Uses the exact connected-provider work lookup. Only recorded successful\
-        \ placements are included, even when the remaining delivery failed. Incomplete\
-        \ units omit draft practice metadata. No bodies, private channels or replaced\
-        \ feedback; admin status does not broaden the recipient. Permalinks are recorded\
-        \ provider links, not live existence checks."
+        \ deliveries are included, even when the remaining delivery failed. Incomplete\
+        \ reviews omit draft practice metadata. No bodies, private conversations or\
+        \ replaced feedback; admin status does not broaden the recipient. Permalinks\
+        \ are recorded provider links, not live existence checks."
       operationId: getOwnDeliveredWorkFeedback
       parameters:
       - description: Workspace slug
@@ -7147,32 +7154,6 @@ paths:
                 $ref: "#/components/schemas/PageResponseDTOResultList"
           description: Paginated results returned
       summary: List results for current developer
-      tags:
-      - Practice Results
-  /workspaces/{workspaceSlug}/practices/results/summary:
-    get:
-      description: Aggregated result counts per practice for dashboard cards
-      operationId: getOwnResultSummary
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/DeveloperPracticeSummary"
-          description: Practice summaries returned
-      summary: Per-practice summary for current developer
       tags:
       - Practice Results
   /workspaces/{workspaceSlug}/practices/results/{resultId}:
@@ -7958,6 +7939,9 @@ paths:
             - RESULT_MARKED_INCORRECT
             - REVIEWED_VERSION_CHANGED
             - REVIEW_CANCELLED
+            - EVIDENCE_NOT_PERMITTED
+            - NO_EVIDENCE
+            - UNCORROBORATED
       - in: query
         name: withdrawn
         required: false
@@ -8142,6 +8126,9 @@ paths:
             - RESULT_MARKED_INCORRECT
             - REVIEWED_VERSION_CHANGED
             - REVIEW_CANCELLED
+            - EVIDENCE_NOT_PERMITTED
+            - NO_EVIDENCE
+            - UNCORROBORATED
       - in: query
         name: withdrawn
         required: false
@@ -8311,6 +8298,9 @@ paths:
             - RESULT_MARKED_INCORRECT
             - REVIEWED_VERSION_CHANGED
             - REVIEW_CANCELLED
+            - EVIDENCE_NOT_PERMITTED
+            - NO_EVIDENCE
+            - UNCORROBORATED
       - in: query
         name: withdrawn
         required: false
@@ -9893,6 +9883,40 @@ paths:
       tags:
       - practice-catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/group:
+    patch:
+      operationId: movePractice
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          maxLength: 51
+          minLength: 3
+          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MovePracticeRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Practice"
+          description: OK
+      tags:
+      - practice-catalog
     put:
       operationId: bindPracticeGroup
       parameters:
@@ -9957,41 +9981,6 @@ paths:
           description: Practice guidance
         "304":
           description: Guidance is unchanged
-      tags:
-      - practice-catalog
-  /workspaces/{workspaceSlug}/practices/{practiceSlug}/placement:
-    put:
-      operationId: placePractice
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - in: path
-        name: practiceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PlacePracticeRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Practice"
-          description: OK
       tags:
       - practice-catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/versions:
@@ -11619,8 +11608,8 @@ components:
         instanceBudgetVerdict:
           type: string
           description: "Whether shared-model spend is within the instance cap, has\
-            \ reached it, or cannot be confirmed because some shared-model usage has\
-            \ no price set."
+            \ reached it, or cannot be confirmed because shared-model rates are missing\
+            \ or usage measurements are unverified."
           enum:
           - WITHIN
           - EXHAUSTED
@@ -12253,23 +12242,35 @@ components:
           type:
           - string
           - "null"
+          maxLength: 32
+          minLength: 0
         description:
           type:
           - string
           - "null"
+          maxLength: 2000
+          minLength: 0
         icon:
           type:
           - string
           - "null"
+          maxLength: 64
+          minLength: 0
         name:
           type: string
+          maxLength: 128
+          minLength: 0
         position:
           type:
           - "null"
           - integer
           format: int32
+          minimum: 0
         slug:
           type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[a-z0-9]+(?:-[a-z0-9]+)*"
       required:
       - color
       - description
@@ -12396,13 +12397,18 @@ components:
           - "null"
         kind:
           type: string
+          pattern: "[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*"
         position:
           type:
           - "null"
           - integer
           format: int32
+          minimum: 0
         slug:
           type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[a-z0-9]+(?:-[a-z0-9]+)*"
       required:
       - definition
       - groupSlug
@@ -12508,7 +12514,7 @@ components:
         parts:
           type: array
           items:
-            description: AI SDK UIMessage part (text / data-observation).
+            description: AI SDK UIMessage part (text / data-result).
         role:
           type: string
     ChatMessageVote:
@@ -12610,7 +12616,7 @@ components:
     CitationProof:
       type: object
       properties:
-        artifactSha256:
+        itemSha256:
           type: string
         quoteSha256:
           type: string
@@ -12619,7 +12625,7 @@ components:
           enum:
           - VERIFIED
       required:
-      - artifactSha256
+      - itemSha256
       - quoteSha256
       - status
     ClaimBasis:
@@ -12785,8 +12791,8 @@ components:
           - PRACTICE_USAGE
           - PRACTICE_DEFINITION
           - PRACTICE_GROUP
-          - CURATED_PRACTICE
-          - CURATED_PRACTICE_GROUP
+          - CATALOG_PRACTICE
+          - CATALOG_GROUP
           - WORKSPACE_INSTANCE_LLM_BUDGET
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
@@ -13216,7 +13222,7 @@ components:
           - MISSING_CONTEXT
           - UNHELPFUL
           - DUPLICATE
-          - INAPPROPRIATE_PLACEMENT
+          - INAPPROPRIATE_LOCATION
           - OTHER
       required:
       - action
@@ -13405,25 +13411,37 @@ components:
           type:
           - string
           - "null"
+          maxLength: 32
+          minLength: 0
         description:
           type:
           - string
           - "null"
+          maxLength: 2000
+          minLength: 0
         icon:
           type:
           - string
           - "null"
+          maxLength: 64
+          minLength: 0
         name:
           type: string
+          maxLength: 128
+          minLength: 0
         position:
           type:
           - "null"
           - integer
           format: int32
+          minimum: 0
         shownToDevelopers:
           type: boolean
         slug:
           type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[a-z0-9]+(?:-[a-z0-9]+)*"
       required:
       - color
       - description
@@ -13443,13 +13461,18 @@ components:
           - "null"
         kind:
           type: string
+          pattern: "[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*"
         position:
           type:
           - "null"
           - integer
           format: int32
+          minimum: 0
         slug:
           type: string
+          maxLength: 64
+          minLength: 0
+          pattern: "[a-z0-9]+(?:-[a-z0-9]+)*"
       required:
       - definition
       - groupSlug
@@ -13922,42 +13945,6 @@ components:
       - deliveredAt
       - id
       - practices
-    DeveloperPracticeSummary:
-      type: object
-      properties:
-        couldNotDetermine:
-          type: integer
-          format: int32
-        doesNotApply:
-          type: integer
-          format: int32
-        lastRecordedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        met:
-          type: integer
-          format: int32
-        notMet:
-          type: integer
-          format: int32
-        practiceName:
-          type: string
-        practiceSlug:
-          type: string
-        totalResults:
-          type: integer
-          format: int32
-      required:
-      - couldNotDetermine
-      - doesNotApply
-      - lastRecordedAt
-      - met
-      - notMet
-      - practiceName
-      - practiceSlug
-      - totalResults
     DutyBasis:
       allOf:
       - $ref: "#/components/schemas/ClaimBasis"
@@ -14203,6 +14190,9 @@ components:
           - RESULT_MARKED_INCORRECT
           - REVIEWED_VERSION_CHANGED
           - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
           - null
         stage:
           type: string
@@ -14302,6 +14292,15 @@ components:
           - string
           - "null"
           format: date-time
+        readback:
+          type:
+          - string
+          - "null"
+          enum:
+          - ABSENT
+          - TRANSIENT
+          - UNKNOWN
+          - null
         side:
           type:
           - string
@@ -14361,6 +14360,9 @@ components:
           - RESULT_MARKED_INCORRECT
           - REVIEWED_VERSION_CHANGED
           - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
           - null
         writeStartedAt:
           type:
@@ -14379,6 +14381,7 @@ components:
       - path
       - position
       - postedAt
+      - readback
       - side
       - startLine
       - state
@@ -14452,7 +14455,7 @@ components:
           - MISSING_CONTEXT
           - UNHELPFUL
           - DUPLICATE
-          - INAPPROPRIATE_PLACEMENT
+          - INAPPROPRIATE_LOCATION
           - OTHER
           - null
       required:
@@ -15770,10 +15773,6 @@ components:
             type:
             - string
             - "null"
-          reasonDescription:
-            type:
-            - string
-            - "null"
           status:
             type: string
             enum:
@@ -15785,7 +15784,6 @@ components:
       - practiceName
       - practiceSlug
       - reason
-      - reasonDescription
       - status
     LlmConnection:
       type: object
@@ -16095,9 +16093,10 @@ components:
         unpricedEventCount:
           type: integer
           format: int64
-          description: Runs this day with at least one ledger row whose price is not
-            yet known. A practice script row counts toward the run of its review.
-            Those rows are excluded from both totals above.
+          description: Runs this day with at least one ledger row whose cost is unavailable
+            because a rate is missing or the measurement is unverified. A practice
+            script row counts toward the run of its review. Those rows are excluded
+            from both totals above.
       required:
       - day
       - events
@@ -16146,9 +16145,10 @@ components:
         unpricedEventCount:
           type: integer
           format: int64
-          description: Runs of this job type with at least one ledger row whose price
-            is not yet known. A practice script row counts toward the run of its review.
-            Those rows are excluded from both totals above.
+          description: Runs of this job type with at least one ledger row whose cost
+            is unavailable because a rate is missing or the measurement is unverified.
+            A practice script row counts toward the run of its review. Those rows
+            are excluded from both totals above.
       required:
       - cacheReadTokens
       - cacheWriteTokens
@@ -16304,6 +16304,20 @@ components:
       - scopes
       - type
       - updatedAt
+    MovePracticeRequest:
+      type: object
+      properties:
+        groupSlug:
+          type:
+          - string
+          - "null"
+        position:
+          type: integer
+          format: int32
+          minimum: 0
+      required:
+      - groupSlug
+      - position
     NotReviewedScanReportItem:
       allOf:
       - type: object
@@ -16324,10 +16338,6 @@ components:
             type:
             - string
             - "null"
-          reasonDescription:
-            type:
-            - string
-            - "null"
           status:
             type: string
             enum:
@@ -16339,7 +16349,6 @@ components:
       - practiceName
       - practiceSlug
       - reason
-      - reasonDescription
       - status
     NotificationPreferences:
       type: object
@@ -17401,6 +17410,54 @@ components:
       - sort
       - totalElements
       - totalPages
+    PageResponseDTOWorkspaceMembership:
+      type: object
+      description: |-
+        Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+         is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+         response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkspaceMembership"
+        empty:
+          type: boolean
+        first:
+          type: boolean
+        last:
+          type: boolean
+        number:
+          type: integer
+          format: int32
+        numberOfElements:
+          type: integer
+          format: int32
+        pageable:
+          $ref: "#/components/schemas/Pageable"
+        size:
+          type: integer
+          format: int32
+        sort:
+          $ref: "#/components/schemas/Sort"
+        totalElements:
+          type: integer
+          format: int64
+        totalPages:
+          type: integer
+          format: int32
+      required:
+      - content
+      - empty
+      - first
+      - last
+      - number
+      - numberOfElements
+      - pageable
+      - size
+      - sort
+      - totalElements
+      - totalPages
     Pageable:
       type: object
       properties:
@@ -17539,19 +17596,6 @@ components:
             $ref: "#/components/schemas/Identity"
       required:
       - identities
-    PlacePracticeRequest:
-      type: object
-      properties:
-        groupSlug:
-          type:
-          - string
-          - "null"
-        position:
-          type: integer
-          format: int32
-      required:
-      - groupSlug
-      - position
     Practice:
       type: object
       properties:
@@ -20324,14 +20368,10 @@ components:
           - CANCELLED_BY_ADMIN
           - REPLACED
           - LEGACY_FAILURE
-          - BUDGET_EXHAUSTED
-          - DEADLINE_EXCEEDED
-          - CANCELLED_BY_REQUESTER
           - EXECUTION_INCOMPLETE
           - RESULT_WITHHELD
           - READINESS_REFUSED
           - SUSPECT_LISTING
-          - INVENTORY_INCOMPLETE
           - BUDGET
           - DEADLINE
           - CANCELLED
@@ -20340,7 +20380,6 @@ components:
           - NO_SCAN_PRACTICES
           - MODEL_CHANGED
           - MODEL_UNAVAILABLE
-          - SOURCE_UNAVAILABLE
           - ERROR
           - LEGACY_SCOPE_UNKNOWN
           - CONTRACT_CHANGED
@@ -20419,6 +20458,7 @@ components:
           - BUDGET_EXHAUSTED
           - REVIEW_MODEL_UNBOUND
           - WORKSPACE_UNAVAILABLE
+          - PAUSED_BY_ADMIN
           - null
         requestedBy:
           anyOf:
@@ -20729,14 +20769,10 @@ components:
           - CANCELLED_BY_ADMIN
           - REPLACED
           - LEGACY_FAILURE
-          - BUDGET_EXHAUSTED
-          - DEADLINE_EXCEEDED
-          - CANCELLED_BY_REQUESTER
           - EXECUTION_INCOMPLETE
           - RESULT_WITHHELD
           - READINESS_REFUSED
           - SUSPECT_LISTING
-          - INVENTORY_INCOMPLETE
           - BUDGET
           - DEADLINE
           - CANCELLED
@@ -20745,7 +20781,6 @@ components:
           - NO_SCAN_PRACTICES
           - MODEL_CHANGED
           - MODEL_UNAVAILABLE
-          - SOURCE_UNAVAILABLE
           - ERROR
           - LEGACY_SCOPE_UNKNOWN
           - CONTRACT_CHANGED
@@ -20928,6 +20963,9 @@ components:
           - RESULT_MARKED_INCORRECT
           - REVIEWED_VERSION_CHANGED
           - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
           - null
         withdrawn:
           type: boolean
@@ -21125,6 +21163,9 @@ components:
           - RESULT_MARKED_INCORRECT
           - REVIEWED_VERSION_CHANGED
           - REVIEW_CANCELLED
+          - EVIDENCE_NOT_PERMITTED
+          - NO_EVIDENCE
+          - UNCORROBORATED
           - null
         withdrawn:
           type: boolean
@@ -22403,14 +22444,10 @@ components:
           - CANCELLED_BY_ADMIN
           - REPLACED
           - LEGACY_FAILURE
-          - BUDGET_EXHAUSTED
-          - DEADLINE_EXCEEDED
-          - CANCELLED_BY_REQUESTER
           - EXECUTION_INCOMPLETE
           - RESULT_WITHHELD
           - READINESS_REFUSED
           - SUSPECT_LISTING
-          - INVENTORY_INCOMPLETE
           - BUDGET
           - DEADLINE
           - CANCELLED
@@ -22419,7 +22456,6 @@ components:
           - NO_SCAN_PRACTICES
           - MODEL_CHANGED
           - MODEL_UNAVAILABLE
-          - SOURCE_UNAVAILABLE
           - ERROR
           - LEGACY_SCOPE_UNKNOWN
           - CONTRACT_CHANGED
@@ -22929,14 +22965,10 @@ components:
           - CANCELLED_BY_ADMIN
           - REPLACED
           - LEGACY_FAILURE
-          - BUDGET_EXHAUSTED
-          - DEADLINE_EXCEEDED
-          - CANCELLED_BY_REQUESTER
           - EXECUTION_INCOMPLETE
           - RESULT_WITHHELD
           - READINESS_REFUSED
           - SUSPECT_LISTING
-          - INVENTORY_INCOMPLETE
           - BUDGET
           - DEADLINE
           - CANCELLED
@@ -22945,7 +22977,6 @@ components:
           - NO_SCAN_PRACTICES
           - MODEL_CHANGED
           - MODEL_UNAVAILABLE
-          - SOURCE_UNAVAILABLE
           - ERROR
           - LEGACY_SCOPE_UNKNOWN
           - CONTRACT_CHANGED
@@ -23304,14 +23335,10 @@ components:
           - CANCELLED_BY_ADMIN
           - REPLACED
           - LEGACY_FAILURE
-          - BUDGET_EXHAUSTED
-          - DEADLINE_EXCEEDED
-          - CANCELLED_BY_REQUESTER
           - EXECUTION_INCOMPLETE
           - RESULT_WITHHELD
           - READINESS_REFUSED
           - SUSPECT_LISTING
-          - INVENTORY_INCOMPLETE
           - BUDGET
           - DEADLINE
           - CANCELLED
@@ -23320,7 +23347,6 @@ components:
           - NO_SCAN_PRACTICES
           - MODEL_CHANGED
           - MODEL_UNAVAILABLE
-          - SOURCE_UNAVAILABLE
           - ERROR
           - LEGACY_SCOPE_UNKNOWN
           - CONTRACT_CHANGED
@@ -23603,23 +23629,32 @@ components:
       properties:
         budgetUsd:
           type: string
+          pattern: "(?:0|[1-9][0-9]*)(?:\\.[0-9]{1,4})?"
         expectedVersion:
           type:
           - string
           - "null"
+          maxLength: 1024
+          minLength: 1
         practiceSlugs:
           type:
           - "null"
           - array
           items:
             type: string
+            maxLength: 128
+            minLength: 0
+          maxItems: 1000
+          minItems: 1
         ref:
           type:
           - string
           - "null"
+          maxLength: 1024
+          minLength: 1
         repositoryItemId:
           type: string
-          pattern: "^[1-9][0-9]*$"
+          pattern: "[1-9][0-9]*"
         reuse:
           type:
           - boolean
@@ -23905,7 +23940,7 @@ components:
           - MANUAL
           - LIFECYCLE
           - SYSTEM
-        triggeredByUserId:
+        triggeredByAccountId:
           type: integer
           format: int64
           description: "Account id of the admin who triggered this job, if MANUAL"
@@ -24504,16 +24539,24 @@ components:
           type:
           - string
           - "null"
+          maxLength: 32
+          minLength: 0
         description:
           type:
           - string
           - "null"
+          maxLength: 2000
+          minLength: 0
         icon:
           type:
           - string
           - "null"
+          maxLength: 64
+          minLength: 0
         name:
           type: string
+          maxLength: 128
+          minLength: 0
         shownToDevelopers:
           type: boolean
       required:
@@ -24529,7 +24572,7 @@ components:
           $ref: "#/components/schemas/PracticeDefinition"
         expectedVersionId:
           type: string
-          pattern: "^[1-9][0-9]*$"
+          pattern: "[1-9][0-9]*"
       required:
       - definition
       - expectedVersionId
@@ -24955,8 +24998,6 @@ components:
             type: string
           reason:
             type: string
-          reasonDescription:
-            type: string
           status:
             type: string
             enum:
@@ -24967,7 +25008,6 @@ components:
       - practiceName
       - practiceSlug
       - reason
-      - reasonDescription
       - status
     WorkItem:
       type: object
@@ -25586,8 +25626,8 @@ components:
         instanceBudgetVerdict:
           type: string
           description: "Whether host-funded (shared-model) spend is within its cap,\
-            \ has reached it, or cannot be confirmed because some shared-model usage\
-            \ has no price set."
+            \ has reached it, or cannot be confirmed because shared-model rates are\
+            \ missing or usage measurements are unverified."
           enum:
           - WITHIN
           - EXHAUSTED
@@ -25654,10 +25694,11 @@ components:
           type: integer
           format: int64
           description: "Runs this month (job attempts and mentor turns, either purse)\
-            \ with at least one ledger row whose price is not yet known, each counted\
-            \ once. A practice script row counts toward the run of its review. Those\
-            \ rows are excluded from both totals above, so a non-zero value means\
-            \ the real spend may be higher than shown."
+            \ with at least one ledger row whose cost is unavailable because a rate\
+            \ is missing or the measurement is unverified, each counted once. A practice\
+            \ script row counts toward the run of its review. Those rows are excluded\
+            \ from both totals above, so a non-zero value means the real spend may\
+            \ be higher than shown."
       required:
       - byDay
       - byJobType
@@ -25677,9 +25718,6 @@ components:
       properties:
         account:
           $ref: "#/components/schemas/AccountRef"
-        accountId:
-          type: string
-          pattern: "^[1-9][0-9]*$"
         eligibleForPracticeReview:
           type: boolean
         hidden:
@@ -25702,7 +25740,6 @@ components:
           - MEMBER
       required:
       - account
-      - accountId
       - eligibleForPracticeReview
       - hidden
       - joinedAt

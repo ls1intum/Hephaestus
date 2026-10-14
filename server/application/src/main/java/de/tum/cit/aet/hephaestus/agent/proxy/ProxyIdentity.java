@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
+import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry.AuthenticatedSession;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -8,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 record ProxyIdentity(
         @Nullable JobJwt job,
         @Nullable String workerId,
-        MentorProxyCredentialRegistry.@Nullable AuthenticatedSession mentor) {
+        @Nullable AuthenticatedSession mentor) {
     ProxyIdentity {
         if ((job == null) == (mentor == null))
             throw new IllegalArgumentException("Exactly one proxy identity is required");

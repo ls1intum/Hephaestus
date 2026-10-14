@@ -142,7 +142,11 @@ public class FeedbackCompositionContextService {
                     practice.getSlug(), decision.decision(), decision.stopReason(), occurrences));
         }
         var routes = negatives.stream()
-                .map(row -> new ConversationEligibility.ResultDecision(row.getId(), conversationDecision(review, row)))
+                .map(row -> {
+                    var admission = conversationDecision(review, row);
+                    return new ConversationEligibility.ResultDecision(
+                            row.getId(), admission.decision(), admission.stopReason());
+                })
                 .toList();
         if (pageUnavailable)
             return new FeedbackCompositionContext(
@@ -166,7 +170,7 @@ public class FeedbackCompositionContextService {
                 && support.stream()
                         .allMatch(row -> reviews.find(row.getWorkspaceId(), row.getReviewId())
                                 .map(r -> r.origin() == ReviewOrigin.BACKFILL)
-                                .orElse(true)))
+                                .orElseThrow()))
             return new PageAdmission(PracticePageDecision.BACKFILL_HELD, FeedbackStopReason.BACKFILL_QUIET);
         var review = reviews.find(about.getWorkspaceId(), about.getReviewId()).orElseThrow();
         var check = gate.evaluateComposition(
@@ -188,20 +192,35 @@ public class FeedbackCompositionContextService {
         return new PageAdmission(PracticePageDecision.ADMIT, null);
     }
 
-    public ConversationDecision conversationDecision(ReviewSnapshot review, Result result) {
-        if (review.origin() == ReviewOrigin.BACKFILL) return ConversationDecision.BACKFILL_QUIET;
-        if (gate.mode(result) == FeedbackMode.OFF) return ConversationDecision.FEEDBACK_OFF;
-        if (!"AUTHOR".equals(role(result))) return ConversationDecision.REVIEWER_DEFERRED;
+    public record ConversationAdmission(
+            ConversationDecision decision, @Nullable FeedbackStopReason stopReason) {}
+
+    public ConversationAdmission conversationDecision(ReviewSnapshot review, Result result) {
+        if (result.getOutcome() != ResultOutcome.NOT_MET)
+            throw new IllegalArgumentException("Conversation feedback requires a NOT_MET result.");
         Long developer = result.getDeveloperId();
-        if (developer == null
-                || result.getOutcome() != ResultOutcome.NOT_MET
-                || !gate.evaluateComposition(review, developer, List.of(result), FeedbackDestination.CONVERSATION)
-                        .allowed()) return ConversationDecision.NOT_DELIVERABLE;
-        if (!mentor.isReady(review.workspaceId())) return ConversationDecision.MENTOR_UNAVAILABLE;
-        if (hasInlineAnchor(review, result)) return ConversationDecision.HAS_INLINE_ANCHOR;
+        if (developer == null)
+            return new ConversationAdmission(
+                    ConversationDecision.UNATTRIBUTABLE_SUBJECT, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE);
+        if (review.origin() == ReviewOrigin.BACKFILL)
+            return new ConversationAdmission(ConversationDecision.BACKFILL_QUIET, FeedbackStopReason.BACKFILL_QUIET);
+        if (gate.mode(result) == FeedbackMode.OFF)
+            return new ConversationAdmission(ConversationDecision.FEEDBACK_OFF, FeedbackStopReason.FEEDBACK_OFF);
+        if (!"AUTHOR".equals(role(result)))
+            return new ConversationAdmission(
+                    ConversationDecision.REVIEWER_DEFERRED, FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE);
+        var check = gate.evaluateComposition(review, developer, List.of(result), FeedbackDestination.CONVERSATION);
+        if (!check.allowed())
+            return new ConversationAdmission(ConversationDecision.GATE_REFUSED, Objects.requireNonNull(check.reason()));
+        if (!mentor.isReady(review.workspaceId()))
+            return new ConversationAdmission(
+                    ConversationDecision.MENTOR_UNAVAILABLE, FeedbackStopReason.RECIPIENT_UNAVAILABLE);
+        if (hasInlineAnchor(review, result))
+            return new ConversationAdmission(ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW);
         if (basis.hasConfirmedOnWork(review.workspaceId(), developer, result.getId()))
-            return ConversationDecision.ALREADY_DELIVERED_ON_WORK;
-        return ConversationDecision.ADMIT;
+            return new ConversationAdmission(
+                    ConversationDecision.ALREADY_DELIVERED_ON_WORK, FeedbackStopReason.NOTHING_NEW);
+        return new ConversationAdmission(ConversationDecision.ADMIT, null);
     }
 
     private @Nullable String role(Result result) {

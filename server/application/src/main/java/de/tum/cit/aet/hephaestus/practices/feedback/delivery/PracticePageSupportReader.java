@@ -44,7 +44,7 @@ public class PracticePageSupportReader {
         var since = prior.map(card -> card.nextEvidenceSince(window)).orElse(window);
         return new Selection(
                 prior,
-                permittedResults(workspaceId, developerId).stream()
+                candidateResults(workspaceId, developerId).stream()
                         .filter(row -> row.getPracticeId() == practiceId
                                 && row.getRecordedAt().isAfter(since))
                         .toList());
@@ -52,12 +52,14 @@ public class PracticePageSupportReader {
 
     @Transactional(readOnly = true)
     public List<Result> read(long workspaceId, long developerId) {
-        return permittedResults(workspaceId, developerId);
+        var rows = candidateResults(workspaceId, developerId);
+        var permitted = evidence.permitsForNewDelivery(workspaceId, rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        return rows.stream().filter(row -> permitted.contains(row.getId())).toList();
     }
 
-    private List<Result> permittedResults(long workspaceId, long developerId) {
+    private List<Result> candidateResults(long workspaceId, long developerId) {
         var since = clock.instant().minus(LOOKBACK);
-        var rows = results
+        return results
                 .findCurrentForDeveloper(workspaceId, developerId, ResultMarkKind.INCORRECT, PageRequest.of(0, 100))
                 .getContent()
                 .stream()
@@ -65,7 +67,5 @@ public class PracticePageSupportReader {
                         && row.getEvidenceVersion() == 1
                         && !row.getRecordedAt().isBefore(since))
                 .toList();
-        var permitted = evidence.permitsForNewDelivery(workspaceId, rows, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        return rows.stream().filter(row -> permitted.contains(row.getId())).toList();
     }
 }

@@ -115,7 +115,7 @@ void test("the catalog advertises exactly the 13 approved scan practices", async
 				numbers.push(number);
 				assert.match(practice.definition.criteria, /## On a change/u);
 				assert.match(practice.definition.criteria, /## In a scan/u);
-				assert.doesNotMatch(practice.definition.criteria, /## Occasion|single most consequential/u);
+				assert.doesNotMatch(practice.definition.criteria, /single most consequential/u);
 			}
 		}
 	}

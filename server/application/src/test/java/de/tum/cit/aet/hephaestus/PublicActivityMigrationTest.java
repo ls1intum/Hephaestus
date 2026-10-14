@@ -57,7 +57,7 @@ class PublicActivityMigrationTest {
                     var rows = statement.executeQuery("""
                         SELECT w.public_activity_enabled,w.public_activity_search_engines,a.public_activity_visible,
                             o.public_activity_seen,o.seen_revision,
-                            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='workspace' AND column_name='is_publicly_viewable')
+                            EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace' AND column_name='is_publicly_viewable')
                         FROM workspace w JOIN workspace_member_onboarding o ON o.workspace_id=w.id
                         JOIN account a ON a.id=o.account_id WHERE w.id=993001
                         """)) {

@@ -15,6 +15,7 @@ import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
 import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/observations",
@@ -32,13 +33,15 @@ function ProblemsListRoute() {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 
+	const listOptions = listReviewProblemsInfiniteOptions({
+		path: { workspaceSlug },
+		query: problemsQuery(search, REVIEW_PAGE_SIZE),
+	});
 	const problemsQueryResult = useInfiniteQuery({
-		...listReviewProblemsInfiniteOptions({
-			path: { workspaceSlug },
-			query: problemsQuery(search, REVIEW_PAGE_SIZE),
-		}),
+		...listOptions,
 		...pagedModelParams,
 	});
+	useQueryReadRefusal(listOptions.queryKey, problemsQueryResult.isError, problemsQueryResult.error);
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
 	const record = useScopeRecordFilter(workspaceSlug, search);
 

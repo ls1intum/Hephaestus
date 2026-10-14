@@ -211,7 +211,7 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
                 + ")**\n\n"
                 + postedBody(note);
         return new SummaryContent(
-                note.copyId(), body, note.writeKey(), "<!-- hephaestus-diff-note-ck=" + note.writeKey() + " -->");
+                note.copyId(), body, note.writeKey(), ScmFeedbackFormatter.deliveryTag(note.writeKey()));
     }
 
     private CopyWriteResult postMixed(

@@ -6,8 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import nodePath from "node:path";
 
 export const AUTHENTICATION_CRITERION = "Added authentication calls use checked(), not insecure().";
-export const AUTHENTICATION_PRACTICE =
-	"# Uses secure authentication\n\n## Standard\n" + AUTHENTICATION_CRITERION + "\n";
+export const AUTHENTICATION_PRACTICE = `# Uses secure authentication\n\n## Standard\n${AUTHENTICATION_CRITERION}\n`;
 
 /** Labels for the prepared review input. */
 export const LEAD_LABELS = {
@@ -129,8 +128,7 @@ export function stageGoldenWorkspace(
 	mkdirSync(nodePath.join(cwd, "repos/primary/.git"), { recursive: true });
 	write(
 		"catalog/practices/test-practice.md",
-		AUTHENTICATION_PRACTICE +
-			"\n## applicability\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.\n",
+		`${AUTHENTICATION_PRACTICE}\n## applicability\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.\n`,
 	);
 	write(
 		"catalog/practices/index.json",

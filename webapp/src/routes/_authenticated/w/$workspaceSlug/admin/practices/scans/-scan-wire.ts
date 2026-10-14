@@ -197,13 +197,12 @@ export const ITEMS_PAGE: WireItemsPage = {
 			...entry("903", "webapp/src/main.tsx", "error-handling"),
 			status: "WITHHELD",
 			reason: "MODEL_UNAVAILABLE",
-			reasonDescription: "MODEL_UNAVAILABLE",
 		},
 		{
 			...entry("903", "webapp/src/main.tsx", "comment-quality"),
 			status: "NOT_REVIEWED",
 			reason: "SOMETHING_THE_PAGE_DOES_NOT_KNOW",
-			reasonDescription: "SOMETHING_THE_PAGE_DOES_NOT_KNOW",
+
 			lastResult: {
 				id: "r-0",
 				reviewId: "0b0b0b0b-1111-4222-8333-444455556666",

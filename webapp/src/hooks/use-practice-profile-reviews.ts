@@ -1,5 +1,6 @@
-import { skipToken, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { skipToken, useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 import {
 	getOwnReviewOptions,
@@ -21,6 +22,7 @@ import {
 	type ReviewFeedState,
 	reviewFeedState,
 } from "@/components/profile/reviews";
+import { useInvalidateOnSettle } from "@/hooks/use-invalidate-on-settle";
 import { PRACTICE_PROFILE_POLL_MS } from "@/hooks/use-practice-profile-overview";
 import { useRequestPracticeReview } from "@/hooks/use-request-practice-review";
 import { problemStatusOf } from "@/lib/problem-detail";
@@ -58,20 +60,22 @@ export function usePracticeProfileReviews({
 	since,
 }: ProfileReviewsRequest) {
 	const now = useNow();
+	const listOptions = listOwnReviewsInfiniteOptions({
+		path: { workspaceSlug },
+		query: {
+			size: PROFILE_REVIEWS_PAGE_SIZE,
+			itemKind,
+			since: since === undefined ? undefined : reviewRangeStart(now, since),
+		},
+	});
 	const reviewsQuery = useInfiniteQuery({
-		...listOwnReviewsInfiniteOptions({
-			path: { workspaceSlug },
-			query: {
-				size: PROFILE_REVIEWS_PAGE_SIZE,
-				itemKind,
-				since: since === undefined ? undefined : reviewRangeStart(now, since),
-			},
-		}),
+		...listOptions,
 		...pagedModelParams,
 		enabled: listOpen,
 		// A review is listed once it records something about the reader, which no ask here announces.
 		refetchInterval: PRACTICE_PROFILE_POLL_MS,
 	});
+	useQueryReadRefusal(listOptions.queryKey, reviewsQuery.isError, reviewsQuery.error);
 	const reviewOptions = getOwnReviewOptions({
 		path: { workspaceSlug, reviewId: reviewId ?? "" },
 	});
@@ -89,17 +93,9 @@ export function usePracticeProfileReviews({
 	const list: ReviewFeedState = listOpen ? reviewFeedState(reviewsQuery) : EMPTY_REVIEW_FEED;
 	// The list polls only every minute, so it can predate the open review's final results; the
 	// review stopping is what asks it once more.
-	const queryClient = useQueryClient();
-	const lastSeen = useRef({ reviewId, active });
-	useEffect(() => {
-		const before = lastSeen.current;
-		lastSeen.current = { reviewId, active };
-		if (before.reviewId === reviewId && before.active && !active) {
-			void queryClient.invalidateQueries({
-				queryKey: listOwnReviewsInfiniteQueryKey({ path: { workspaceSlug } }),
-			});
-		}
-	}, [queryClient, workspaceSlug, reviewId, active]);
+	useInvalidateOnSettle(reviewId, active, [
+		listOwnReviewsInfiniteQueryKey({ path: { workspaceSlug } }),
+	]);
 
 	// The open review's head explains a refusal about its own item; a row anywhere else gets a toast.
 	const openItemId = reviewQuery.data?.review.item.id;

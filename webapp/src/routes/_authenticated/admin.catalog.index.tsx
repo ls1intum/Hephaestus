@@ -9,7 +9,7 @@ import {
 	getCatalogPracticeQueryKey,
 	getInstanceCatalogOptions,
 	getInstanceCatalogQueryKey,
-	placeCatalogPracticeMutation,
+	moveCatalogPracticeMutation,
 	reorderCatalogGroupsMutation,
 	resetCatalogOrderMutation,
 	setCatalogGroupStatusMutation,
@@ -174,7 +174,7 @@ function AdminCatalogPage() {
 		onSettled: invalidateCatalog,
 	});
 	const placePractice = useMutation({
-		...placeCatalogPracticeMutation(),
+		...moveCatalogPracticeMutation(),
 		scope: STRUCTURE_SCOPE,
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: getInstanceCatalogQueryKey() });

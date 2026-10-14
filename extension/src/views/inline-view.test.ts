@@ -14,6 +14,7 @@ import { VISIBLE_REFRESH_MS } from "~/shared/review-context";
 import type { RpcRequest, RpcResult } from "~/shared/rpc";
 import { createQueryClient } from "~/ui/worker-state";
 import { InlineView } from "~/views/InlineView";
+import { EXTENSION_QUERY_KEYS } from "~/views/query-keys";
 
 /** What the worker answers each command with; a test swaps one to make a refresh fail. */
 const answers = new Map<RpcRequest["type"], () => RpcResult<unknown>>();
@@ -159,7 +160,7 @@ it("says a list row's preview is not current when its refresh fails, and keeps t
 		generation: 3,
 	}));
 	await act(async () => {
-		await client.refetchQueries({ queryKey: ["context"] });
+		await client.refetchQueries({ queryKey: EXTENSION_QUERY_KEYS.anyContext });
 	});
 	await vi.waitFor(() => expect(container.textContent).toContain("Not refreshed"));
 	// What it knew stays, marked, and the one way on is on the line.

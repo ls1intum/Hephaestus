@@ -56,7 +56,8 @@ public class ReviewSnapshotQueryService implements ReviewSnapshotQuery {
                         || assignment.getMethod() == null
                         || assignment.getStatus() == ReviewPracticeStatus.WITHHELD
                         || assignment.getStatus() == ReviewPracticeStatus.FAILED) continue;
-                var version = versions.findById(assignment.getPracticeVersionId())
+                var version = versions.findByIdAndWorkspaceId(
+                                assignment.getPracticeVersionId(), assignment.getWorkspaceId())
                         .filter(v -> v.getWorkspaceId() == workspaceId
                                 && v.getPractice().getId().equals(assignment.getPracticeId()));
                 if (version.isPresent()) {

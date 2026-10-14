@@ -9,6 +9,8 @@ import {
 import { ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
 // oxlint-disable-next-line no-restricted-imports -- TanStack Table keys its caches on identity, which the compiler memoises as an optimisation rather than promises; each `useMemo` below says what breaks without it.
 import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
+import { Spinner } from "@/components/ui/spinner";
 
 import type { TeamInfo } from "@/api/types.gen";
 import { ACCOUNT_STATUS_LABELS } from "@/components/admin/users/account-labels";
@@ -33,7 +35,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider/provider-labels";
@@ -48,6 +49,17 @@ const ROLE_ITEMS = (["OWNER", "ADMIN", "MEMBER"] satisfies WorkspaceRole[]).map(
 	value: role,
 	label: WORKSPACE_ROLE_LABELS[role],
 }));
+
+/** The width each column's placeholder promises, by column id; a column the reader hid has none. */
+const SKELETON_WIDTHS: Record<string, string> = {
+	name: "w-32",
+	username: "w-24",
+	account: "w-16",
+	role: "w-20",
+	joined: "w-20",
+	"review scope": "w-16",
+	visibility: "w-6",
+};
 
 interface WorkspaceMembersTableProps {
 	members: WorkspaceMemberRow[];
@@ -144,7 +156,8 @@ export function WorkspaceMembersTable({
 					id: "role",
 					header: () => "Role",
 					cell: ({ row }) => {
-						const { accountId, role } = row.original.membership;
+						const { account, role } = row.original.membership;
+						const accountId = account.id;
 						if (!onRoleChange) {
 							return WORKSPACE_ROLE_LABELS[role];
 						}
@@ -205,7 +218,7 @@ export function WorkspaceMembersTable({
 										size="icon-xs"
 										onClick={() =>
 											onToggleHidden(
-												row.original.membership.accountId,
+												row.original.membership.account.id,
 												!row.original.membership.hidden,
 											)
 										}
@@ -299,18 +312,7 @@ export function WorkspaceMembersTable({
 	}, [isLoading, lastPage, onViewChange, view.page]);
 
 	let body: ReactElement | ReactElement[];
-	if (isLoading) {
-		body = (
-			<TableRow>
-				<TableCell colSpan={table.getVisibleLeafColumns().length} className="h-32 text-center">
-					<div className="flex flex-col items-center justify-center space-y-2">
-						<Spinner />
-						<p className="text-sm text-muted-foreground">Loading members…</p>
-					</div>
-				</TableCell>
-			</TableRow>
-		);
-	} else if (table.getRowModel().rows.length > 0) {
+	if (table.getRowModel().rows.length > 0) {
 		body = table.getRowModel().rows.map((row) => (
 			<TableRow key={row.id}>
 				{row.getVisibleCells().map((cell) => (
@@ -425,19 +427,32 @@ export function WorkspaceMembersTable({
 				</div>
 			</div>
 
-			<Table bordered>
+			<Table bordered aria-label="Workspace members" aria-busy={isLoading || undefined}>
 				<DataTableHeader table={table} />
-				<TableBody>{body}</TableBody>
+				{isLoading ? (
+					// A page of placeholder rows under the real header, one cell per visible column.
+					<TableRowsSkeleton
+						columns={table
+							.getVisibleLeafColumns()
+							.map((column) => SKELETON_WIDTHS[column.id] ?? null)}
+						rows={view.size}
+					/>
+				) : (
+					<TableBody>{body}</TableBody>
+				)}
 			</Table>
 
 			<div className="flex flex-col items-center justify-between space-y-4 py-4 sm:flex-row sm:space-y-0 sm:space-x-2">
 				<div className="order-2 flex-1 text-sm text-muted-foreground sm:order-1">
-					<div className="flex flex-col gap-1 sm:flex-row sm:gap-4">
-						<span>
-							Showing {table.getRowModel().rows.length} of {table.getRowCount()}{" "}
-							{table.getRowCount() === 1 ? "member" : "members"}
-						</span>
-					</div>
+					{/* No count until the members are in: "0 of 0" while loading would read as a result. */}
+					{!isLoading && (
+						<div className="flex flex-col gap-1 sm:flex-row sm:gap-4">
+							<span>
+								Showing {table.getRowModel().rows.length} of {table.getRowCount()}{" "}
+								{table.getRowCount() === 1 ? "member" : "members"}
+							</span>
+						</div>
+					)}
 				</div>
 				<div className="order-1 flex flex-col items-center space-y-4 sm:order-2 sm:flex-row sm:space-y-0 sm:space-x-6 lg:space-x-8">
 					<div className="flex items-center space-x-2">

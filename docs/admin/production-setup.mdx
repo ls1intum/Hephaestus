@@ -497,22 +497,24 @@ Plan for support contact, not only a dashboard change.
 
 Some started attempts may return no trustworthy usage counters.
 Migrated legacy attempts may lack an admission price snapshot.
-These events are recorded without a price and **excluded from monthly totals**.
-An attempt on a model declared **No metered API cost** is the exception: it always records a confirmed $0.
-The reported total is then a lower bound, not confirmed spend.
-The UI shows the confirmed total and, under **No price set**, the count of runs that have usage without a price.
+These usage records have no confirmed cost and are **excluded from monthly totals**.
+Missing rates and unverified measurements are separate reasons for an unavailable cost.
+The reported total is then a lower bound on spend.
+The UI shows the confirmed total and a separate count of runs with unavailable cost across both purses.
 
 The purse reads **UNVERIFIABLE** instead of **WITHIN**.
 **EXHAUSTED** still takes priority.
 A non-zero unpriced count indicates real spend may exceed the display.
 New models require a price or **No metered API cost** before activation.
-The latter counts as confirmed $0 spend, not unpriced.
+The latter counts as confirmed $0 spend only when the usage measurement is accepted.
 
 There is **no setting** for UNVERIFIABLE-month behavior.
 An **uncapped** purse never pauses for unpriced usage because it has no cap to breach.
 A **capped** UNVERIFIABLE purse pauses exactly like an exhausted one because its cap cannot be verified.
-The pause clears after usage reconciliation or at the next UTC month.
-The model activation requirement prevents a correctly administered instance from reaching this state.
+Adding missing rates cannot resolve an unknown or unverified measurement.
+Existing unpriced usage continues to block a capped purse for the current UTC month.
+[AI providers](./ai-providers#missing-prices-and-unverified-measurements) explains measurement verification,
+historical records, and the stopped-writer upgrade requirement.
 
 **Alerting hook:** there is no built-in push notification for a crossed workspace cap.
 Use the private endpoint and example rules in [Scrape metrics](./observability.mdx#scrape-metrics) for these Micrometer counters:
@@ -744,6 +746,8 @@ Each resolves images from the verified release lock.
 `docker/.env` defines no `HEPHAESTUS_IMAGE_*` variable.
 A project without the lock refuses startup.
 
+For an upgrade, read the [database migration instructions](./compatibility-policy#database-migrations) before starting any target runtime role.
+
 1. Make sure PostgreSQL, NATS, and storage volumes are ready.
    The self-host stack supplies its own.
    This stack does not.
@@ -767,8 +771,8 @@ A project without the lock refuses startup.
 `depends_on` cannot cross project boundaries.
 You must maintain the order.
 The broker starts first to preserve existing application-server JetStream connections during redeployment.
-The application stack owns PostgreSQL and runs Liquibase migrations at startup.
-The core stack's webhook runtime reads migration results.
+The application stack owns PostgreSQL.
+Start the core stack's webhook runtime only after the required database migrations complete.
 The proxy starts last, never routing to a stack that is still starting.
 
 Kubernetes manifests need the same order.

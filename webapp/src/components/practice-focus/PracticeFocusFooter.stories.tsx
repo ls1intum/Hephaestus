@@ -86,10 +86,7 @@ export const ProfileGroupLevel: Story = {
 export const WorkspaceGroupLevelWithMarkedPractice: Story = {
 	args: {
 		...FOCUS_FOOTER_COPY.workspaceGroup,
-		accessibleLabel: focusSwitchName(
-			FOCUS_FOOTER_COPY.workspaceGroup.label,
-			PACKAGING_GROUP.name,
-		),
+		accessibleLabel: focusSwitchName(FOCUS_FOOTER_COPY.workspaceGroup.label, PACKAGING_GROUP.name),
 	},
 	render: (args) => (
 		<DetailDrawerStack

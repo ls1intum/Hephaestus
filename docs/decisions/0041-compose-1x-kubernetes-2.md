@@ -177,7 +177,7 @@ proposal in [#1108](https://github.com/hephaestus-build/Hephaestus/issues/1108) 
 Protocol v3 provides attempt-scoped credentials, byte-budget discovery, one logical workspace download,
 result-archive upload, and interactive frames. The upload carries an
 [RFC 9530 `Content-Digest`](https://www.rfc-editor.org/rfc/rfc9530#section-2) with SHA-256 over the
-complete tar. A successful upload acknowledges transport, not result admission. Both success
+complete tar. A successful upload acknowledges transport, not observation admission. Both success
 and duplicate `409` return the admitted archive's strong
 [RFC 9110 `ETag`](https://www.rfc-editor.org/rfc/rfc9110#section-8.8.3). The runner treats either as
 convergence only when that tag matches the bytes it sent. A different result or a conflict from a
@@ -186,13 +186,13 @@ non-owning worker is not success. An overlapping upload returns retryable `503`.
 
 ### Evidence admission and deletion
 
-Result admission is a separate authenticated operation. It verifies citations against captured
+Observation admission is a separate authenticated operation. It verifies citations against captured
 artifacts or Git objects and persists verdicts and digests in PostgreSQL under the job's ownership
 fence. Result upload does not bypass this check. Delivery reads persisted verdicts, never worker
 storage.
 
 The guarantee is **byte-exact citation verification against captured evidence**. **No replay is
-offered.** The worker deletes its evidence folder after result admission commits; feedback
+offered.** The worker deletes its evidence folder after observation admission commits; feedback
 composition uses the sandbox's already downloaded read-only workspace and the persisted verdicts.
 A sweep retries missed cleanup. Other ended attempts become eligible for deletion one hour after
 the worker first records that they have ended. On restart, the worker deletes folders for unknown
@@ -205,8 +205,8 @@ reclaims only leftovers of a previous process.
 ### Bash and the sandbox boundary
 
 Practice sessions expose native shell and file tools; feedback composition uses read-only evidence
-tools and report tools. The [workspace ABI](../contributor/agent/workspace-abi.mdx#folder-layout)
-owns the tool sets. A tool allowlist is not a security boundary: practice scripts also executes child
+tools and report tools. The [workspace ABI](../contributor/agent/workspace-abi.mdx#practice-review-tools)
+owns the tool sets. A tool allowlist is not a security boundary: precompute also executes child
 processes inside the sandbox.
 
 The sandbox is the boundary: non-root user, read-only root filesystem, no host mounts or Docker
@@ -340,8 +340,8 @@ It adds no replayable workspace snapshot, no database table, no API and no listi
 - **Custody.** The transcripts sit beside the attempt folder, under the same job lease and the same `person_evidence_copy` receipt.
   Erasure of the job removes them with the job folder before it acknowledges.
   The sweep deletes them after 24 hours, also after a restart and whatever the job's status.
-- **Ownership proof.** A transcript can repeat any row that the review copied from another review's results or feedback.
-  This includes the history staged at capture and the reads during the run (PRACTICE_PAGE support and public history).
+- **Ownership proof.** A transcript can repeat any row that the review copied from another review's observations or feedback.
+  This includes the history staged at capture and the reads during the run (IN_APP support and public history).
   Those rows can quote people whom only the source review's receipt names.
   A receipt therefore records the jobs whose rows it copied and unions their receipts.
   It is `dependencies: COMPLETE` only when each such receipt is `READY` and itself `COMPLETE`.
@@ -356,7 +356,7 @@ It adds no replayable workspace snapshot, no database table, no API and no listi
   New dependent receipts do not reconstruct missing legacy ownership.
 - **Unavailable.** A parent SIGKILL, a Docker stop timeout before the upload, or a failed upload leaves no transcript.
 
-The [workspace ABI](../contributor/agent/workspace-abi.mdx#output-and-custody) owns the bounds and file formats.
+The [workspace ABI](../contributor/agent/workspace-abi.mdx#session-transcripts) owns the bounds and file formats.
 
 ## Sources
 

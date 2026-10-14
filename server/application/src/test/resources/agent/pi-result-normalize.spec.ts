@@ -11,12 +11,10 @@ import {
 import { folderCitationIndex } from "../../../main/resources/agent/pi-folder-index.ts";
 import {
 	CONVERSATION_THREAD,
-	citationMatchesSourceFile,
 	citesReviewedTurn,
 	describeCitationMismatch,
 	MAX_SUMMARY_CHARS,
 	normalizeCitation,
-	trimmedSlug,
 	normalizeSubmission,
 	resolveQuote,
 	resolveCapturedText,
@@ -243,7 +241,7 @@ void test("each problem names its severity, summary, explanation, citations and 
 	const problem = onlyCitation(
 		normalizeSubmission(
 			baseSubmission({
-				problems: [problemFixture({ key: "Insecure_Call", nextStep: "  Remove the call.  " })],
+				problems: [problemFixture({ key: " insecure-call ", nextStep: "  Remove the call.  " })],
 			}),
 		).problems ?? [],
 	);
@@ -329,12 +327,16 @@ void test("two problems do not share a key", () => {
 		refusal(
 			baseSubmission({
 				problems: [
-					problemFixture({ key: "missing_test" }),
-					problemFixture({ key: "Missing-Test" }),
+					problemFixture({ key: "missing-test" }),
+					problemFixture({ key: "missing-test" }),
 				],
 			}),
 		),
 		/^problems 1 and 2 share the key 'missing-test': each key names one problem$/u,
+	);
+	assert.match(
+		refusal(baseSubmission({ problems: [problemFixture({ key: "Missing_Test" })] })),
+		/^problem 1: key must be a short slug .* received "Missing_Test"$/u,
 	);
 });
 
@@ -463,12 +465,12 @@ void test("explicit null warrants and citation fields record the same evidence a
 		const sent = isEvidence(raw.evidence) ? raw.evidence : {};
 		const normalized = normalizeSubmission({
 			...raw,
-			citations: [citationFixture({ side: null, revision: null, endLine: null, quote: null })],
+			citations: [citationFixture({ side: null, revision: null, endLine: null })],
 			example: null,
 			evidence: { search: null, inapplicability: null, openQuestions: null, ...sent },
 		});
 		const { side: _side, ...plain } = DIFF_CITATION;
-		assert.deepEqual(normalized.citations, [{ ...plain, endLine: plain.startLine, quote: "" }]);
+		assert.deepEqual(normalized.citations, [{ ...plain, endLine: plain.startLine }]);
 		assert.equal("example" in normalized, false);
 		assert.deepEqual(Object.keys(normalized.evidence).toSorted(), Object.keys(sent).toSorted());
 	}
@@ -583,11 +585,6 @@ void test("the wire contract rejects outcome aliases and text coerced from numbe
 	assert.match(refusal(baseSubmission({ summary: 1234 })), /summary is required/u);
 });
 
-void test("a slug is read as sent, apart from surrounding space: a near miss names no other practice", () => {
-	assert.equal(trimmedSlug(" writes-focused-pull-requests "), "writes-focused-pull-requests");
-	assert.equal(trimmedSlug("writes_focused_pull_requests"), "writes_focused_pull_requests");
-});
-
 void test("a correction to severity or explanation is not an exact retry", () => {
 	const initial = normalizeSubmission(baseSubmission());
 	assert.notDeepEqual(
@@ -687,8 +684,13 @@ void test("citation requires an exact sourceFile path and quote", () => {
 		refusal(citing(citationFixture({ sourcePath: undefined }))),
 		/sourcePath is required/u,
 	);
-	// No quote is a citation by coordinates alone; the runner fills it from the sourceFile.
-	assert.equal(normalizedCitation(citationFixture({ quote: undefined })).quote, "");
+	// Coordinates alone verify nothing: an invented range would read as evidence.
+	for (const quote of [undefined, null, "", "  "]) {
+		assert.match(
+			refusal(citing(citationFixture({ quote }))),
+			/^citation 1: evidence citation quote is required/u,
+		);
+	}
 	assert.match(
 		refusal(citing(citationFixture({ quote: "x".repeat(4001) }))),
 		/^citation 1: quote must be at most 4000 characters/u,
@@ -1108,9 +1110,12 @@ void test("diff citations bind the quote to the claimed file and side; a wrong l
 	const citation = normalizedCitation();
 	const diff =
 		"diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
-	assert.equal(citationMatchesSourceFile(citation, diff), true);
-	assert.equal(citationMatchesSourceFile({ ...citation, path: "src/Other.java" }, diff), false);
-	assert.equal(citationMatchesSourceFile({ ...citation, side: "OLD" }, diff), false);
+	assert.equal(describeCitationMismatch(citation, diff) === null, true);
+	assert.equal(
+		describeCitationMismatch({ ...citation, path: "src/Other.java" }, diff) === null,
+		false,
+	);
+	assert.equal(describeCitationMismatch({ ...citation, side: "OLD" }, diff) === null, false);
 	assert.deepEqual(resolveQuote({ ...citation, startLine: 11, endLine: 12 }, diff), {
 		quote: " insecure();",
 		startLine: 10,
@@ -1178,10 +1183,12 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 	assert.deepEqual(resolveQuote({ ...cited, quote: "    -flag --now\n  next" }, diff), {
 		quote: "    -flag --now\n  next",
 	});
-	// Coordinates alone record the lines.
-	assert.deepEqual(resolveQuote({ ...cited, quote: "" }, diff), {
-		quote: "    -flag --now\n  next",
-	});
+	// Coordinates alone verify nothing, so a citation without a quote is refused.
+	assert.match(mismatch(resolveQuote({ ...cited, quote: "" }, diff)), /has no quote/u);
+	assert.match(
+		mismatch(resolveQuote({ ...cited, path: "work/change/diff.patch", quote: "" }, diff)),
+		/has no quote/u,
+	);
 	// A marker the quote carries that is not the line's own: a blank context line read as an added one.
 	const blankContext =
 		"diff --git a/a.md b/a.md\n+++ b/a.md\n@@ -9,2 +10,2 @@\n[L10] +text\n[L11]  \n";
@@ -1197,13 +1204,16 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 	assert.match(
 		mismatch(
 			resolveQuote(
-				{ ...citation, path: "a.md", startLine: 10, endLine: 11, quote: "\n" },
+				{ ...citation, path: "a.md", startLine: 10, endLine: 11, quote: "+\n+" },
 				blankDiff,
 			),
 		),
 		/cited lines are blank/u,
 	);
-	assert.match(mismatch(resolveQuote({ ...cited, quote: "", endLine: 12 }, diff)), /no \[L12\]/u);
+	assert.match(
+		mismatch(resolveQuote({ ...cited, quote: "+    -flag --now\n+  next\n+x", endLine: 12 }, diff)),
+		/no \[L12\]/u,
+	);
 	// What does not match is refused with what the line reads.
 	assert.match(
 		mismatch(resolveQuote({ ...cited, quote: "+    -flag\n+  next" }, diff)),
@@ -1246,14 +1256,9 @@ void test("a quote is recorded as the sourceFile spells it: JSON escapes and non
 		),
 		{ quote: "## Testing\n\n1. Launch app and open\u00A0**Coupons**\u00A0tab.\n2. Verify." },
 	);
-	// Coordinates alone record the line, up to a bound.
-	assert.deepEqual(resolveQuote({ ...first, quote: "" }, nbsp), {
-		quote: "* Launch app and open\u00A0`Venues`.",
-	});
-	assert.match(
-		mismatch(resolveQuote({ ...first, quote: "" }, `${"x".repeat(2001)}\n`)),
-		/cite fewer lines or quote a fragment/u,
-	);
+	// Coordinates alone verify nothing, so a citation without a quote is refused.
+	assert.match(mismatch(resolveQuote({ ...first, quote: "" }, nbsp)), /has no quote/u);
+	assert.match(mismatch(resolveCapturedText({ ...first, quote: " " }, nbsp)), /has no quote/u);
 	// A quote across the body's line breaks is a reading of the escaped form and resolves to it.
 	assert.deepEqual(resolveQuote({ ...citation, quote: "## Criteria\n- [x] stored" }, serialized), {
 		quote: "## Criteria\\n- [x] stored",
@@ -1373,23 +1378,6 @@ void test("a quote of many indented lines resolves promptly, and so does a near 
 	);
 });
 
-void test("a range of the diff view past its last line names no line of it", () => {
-	const citation = normalizedCitation();
-	const diff =
-		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n" +
-		"@@ -10,2 +10,3 @@\n[L10]  keep();\n[L11] -old();\n[L11] +insecure();\n[L12] +audit();\n";
-	for (const path of [citation.path, "work/change/diff.patch"]) {
-		assert.notEqual(
-			describeCitationMismatch(
-				{ ...citation, path, startLine: 5, endLine: 2_147_483_647, quote: "" },
-				diff,
-			),
-			null,
-			`${path} has no line ${String(2_147_483_647)}`,
-		);
-	}
-});
-
 void test("a quote from the other side of the change is refused, however it is written", () => {
 	const citation: Citation = {
 		...normalizedCitation(),
@@ -1487,68 +1475,6 @@ void test("a citation of the diff view itself is placed at the changed line its 
 	);
 });
 
-void test("a range copied from a numbered view of diff.patch is read through both of its ends", () => {
-	const citation = normalizedCitation();
-	// View lines 5-8 hold NEW [L10]-[L12] with an OLD line among them: the view's count is not the file's.
-	const diff =
-		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n" +
-		"@@ -10,2 +10,3 @@\n[L10]  keep();\n[L11] -old();\n[L11] +insecure();\n[L12] +audit();\n";
-	const expected = { quote: "keep();\ninsecure();\naudit();", startLine: 10, endLine: 12 };
-	assert.deepEqual(
-		resolveQuote({ ...citation, startLine: 5, endLine: 8, quote: "" }, diff),
-		expected,
-	);
-	// A range that starts on the file's own header, as a read of the view file by file prints it.
-	assert.deepEqual(
-		resolveQuote({ ...citation, startLine: 1, endLine: 8, quote: "" }, diff),
-		expected,
-	);
-	// A range of diff.patch itself that holds one file's lines is read as that file's lines.
-	assert.deepEqual(
-		resolveQuote(
-			{ ...citation, path: "work/change/diff.patch", startLine: 1, endLine: 8, quote: "" },
-			diff,
-		),
-		{ ...expected, path: "src/Auth.java", side: "NEW" },
-	);
-});
-
-void test("a range of diff.patch itself over a hunk that only removes is read on the OLD side", () => {
-	const citation = normalizedCitation();
-	// View lines 5-8: an unchanged line, two removed lines, an unchanged line. The evidence is what was removed.
-	const diff =
-		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n" +
-		"@@ -9,4 +9,2 @@\n[L9]  begin();\n[L10] -checkToken();\n[L11] -checkRole();\n[L10]  end();\n";
-	assert.deepEqual(
-		resolveQuote(
-			{ ...citation, path: "work/change/diff.patch", startLine: 1, endLine: 8, quote: "" },
-			diff,
-		),
-		{
-			quote: "checkToken();\ncheckRole();",
-			startLine: 10,
-			endLine: 11,
-			path: "src/Auth.java",
-			side: "OLD",
-		},
-	);
-});
-
-void test("a range of diff.patch itself across two files names no one file", () => {
-	const citation = normalizedCitation();
-	const diff =
-		"diff --git a/src/Auth.java b/src/Auth.java\n--- a/src/Auth.java\n+++ b/src/Auth.java\n" +
-		"@@ -10,0 +10,1 @@\n[L10] + insecure();\n" +
-		"diff --git a/src/Log.java b/src/Log.java\n--- a/src/Log.java\n+++ b/src/Log.java\n@@ -3,0 +3 @@\n[L3] + log();\n";
-	assert.match(
-		describeCitationMismatch(
-			{ ...citation, path: "work/change/diff.patch", startLine: 1, endLine: 10, quote: "" },
-			diff,
-		) ?? "",
-		/work\/change\/diff\.patch is the view of the change, not a file in it/u,
-	);
-});
-
 void test("a coordinate copied from a numbered view of diff.patch is read as the line it names", () => {
 	const citation = normalizedCitation();
 	// The text occurs twice in the file; the session cites line 7 of diff.patch, as sed -n prints it.
@@ -1601,8 +1527,8 @@ void test("removed-line citations use old-side coordinates", () => {
 	};
 	const diff =
 		"--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -8 +8 @@\n[L8] - requireAdmin();\n[L8] + allowAll();\n";
-	assert.equal(citationMatchesSourceFile(citation, diff), true);
-	assert.equal(citationMatchesSourceFile({ ...citation, side: "NEW" }, diff), false);
+	assert.equal(describeCitationMismatch(citation, diff) === null, true);
+	assert.equal(describeCitationMismatch({ ...citation, side: "NEW" }, diff) === null, false);
 });
 
 void test("a claim about an earlier review is bound to the staged history like any other citation", () => {
@@ -1627,9 +1553,9 @@ void test("a claim about an earlier review is bound to the staged history like a
 	assert.doesNotThrow(() => validateEvidenceSources(submission, staged, sourceFiles));
 	const cited = onlyCitation(submission.citations);
 	const bytes = '{"problems":[{"recurrenceKey": "rec-1","title":"Caught and ignored"}]}';
-	assert.equal(citationMatchesSourceFile(cited, bytes), true);
+	assert.equal(describeCitationMismatch(cited, bytes) === null, true);
 	const invented = { ...cited, quote: '"recurrenceKey": "invented"' };
-	assert.equal(citationMatchesSourceFile(invented, bytes), false);
+	assert.equal(describeCitationMismatch(invented, bytes) === null, false);
 	// The refusal shows what the cited lines hold: a body serialized into one JSON line is one line.
 	assert.equal(
 		describeCitationMismatch(invented, bytes),
@@ -1660,24 +1586,24 @@ void test("a claim about an earlier review is bound to the staged history like a
 void test("a citation rejects typographic substitutions not present in the sourceFile", () => {
 	const content = 'Resolve "Connect data between screens" — see the plan';
 	assert.equal(
-		citationMatchesSourceFile(cite('Resolve "Connect data between screens"'), content),
+		describeCitationMismatch(cite('Resolve "Connect data between screens"'), content) === null,
 		true,
 	);
 	assert.equal(
-		citationMatchesSourceFile(cite("Resolve “Connect data between screens”"), content),
+		describeCitationMismatch(cite("Resolve “Connect data between screens”"), content) === null,
 		false,
 	);
-	assert.equal(citationMatchesSourceFile(cite("see the plan"), content), true);
+	assert.equal(describeCitationMismatch(cite("see the plan"), content) === null, true);
 });
 
 void test("a citation rejects invented sourceFile text", () => {
 	const content = 'Resolve "Connect data between screens"';
 	assert.equal(
-		citationMatchesSourceFile(cite("Resolve “Disconnect data between screens”"), content),
+		describeCitationMismatch(cite("Resolve “Disconnect data between screens”"), content) === null,
 		false,
 	);
 	assert.equal(
-		citationMatchesSourceFile(cite("a rationale the author never wrote"), content),
+		describeCitationMismatch(cite("a rationale the author never wrote"), content) === null,
 		false,
 	);
 });
@@ -1721,12 +1647,15 @@ void test("a serialized-source quote at the wrong lines is recorded where it occ
 		describeCitationMismatch(citation, `${content}  "changed_files" : 1\n`) ?? "",
 		/it occurs at \[L2\], \[L4\] — cite the one you mean/u,
 	);
-	assert.equal(citationMatchesSourceFile({ ...citation, startLine: 2, endLine: 2 }, content), true);
 	assert.equal(
-		citationMatchesSourceFile(
+		describeCitationMismatch({ ...citation, startLine: 2, endLine: 2 }, content) === null,
+		true,
+	);
+	assert.equal(
+		describeCitationMismatch(
 			{ ...citation, startLine: 2, endLine: 2, quote: '  "changed_files" : 1\n' },
 			content,
-		),
+		) === null,
 		true,
 	);
 });
@@ -1878,6 +1807,22 @@ void test("logical message text citations use the frozen native account rather t
 	assert.equal(citesReviewedTurn([quote(1)], THREAD, "42"), false);
 	assert.equal(citesReviewedTurn([quote(0)], THREAD, "42"), true);
 	assert.equal(citesReviewedTurn([quote(1)], THREAD, "7"), false);
+});
+
+void test("a thread whose messages are not all objects is refused, never read with shifted turns", () => {
+	// Counted by objects alone, the third message's lines would be read as the second message's turn.
+	const thread = `{
+  "messages" : [ "joined", {
+    "accountId" : "42"
+  }, {
+    "accountId" : "7"
+  } ]
+}
+`;
+	assert.equal(citesReviewedTurn([threadCitation(5)], thread, "42"), false);
+	assert.equal(citesReviewedTurn([threadCitation(3)], thread, "42"), false);
+	const text = { ...threadCitation(1), path: `${CONVERSATION_THREAD}#/messages/1/text` };
+	assert.equal(citesReviewedTurn([text], thread, "42"), false);
 });
 
 void test("a registered logical text resolves plaintext independently of source naming", () => {

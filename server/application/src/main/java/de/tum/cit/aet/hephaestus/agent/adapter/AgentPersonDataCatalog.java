@@ -7,58 +7,43 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonEvidenceErasure;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Component;
-import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
 @ConditionalOnServerRole
 @RequiredArgsConstructor
-@PersonDataStores({
-    "review_job",
-    "review_job_evidence_copy",
-    "review_composition_basis",
-    "public_review_completion",
-    "llm_usage_event",
-    "instance_llm_settings",
-    "review_backfill_run",
-    "review_sweep_schedule"
-})
+@PersonDataStores({"review_job", "review_composition_basis", "llm_usage_event", "instance_llm_settings"})
 public class AgentPersonDataCatalog implements PersonDataCatalog {
     private static final String SUBJECT_JOBS = """
-        SELECT j.id FROM review_job j
-        WHERE j.metadata->>'author_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-        OR j.metadata->>'actor_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-        OR j.metadata->>'about_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-        OR j.id IN (SELECT review_job_id FROM practice_result WHERE about_user_id = ANY(:users))
-        OR j.id IN (SELECT review_job_id FROM feedback
-            WHERE about_user_id = ANY(:users) OR recipient_user_id = ANY(:users))
+        SELECT j.id FROM review_job j JOIN review r ON (r.id,r.workspace_id)=(j.review_id,j.workspace_id)
+        WHERE r.requested_by_id=:account
+          OR EXISTS(SELECT 1 FROM result x WHERE (x.review_id,x.workspace_id)=(r.id,r.workspace_id)
+            AND x.developer_id=:account)
+          OR EXISTS(SELECT 1 FROM feedback f WHERE (f.review_id,f.workspace_id)=(r.id,r.workspace_id)
+            AND f.developer_id=:account)
         """;
-    private static final String REVIEWED_WORK = """
-        (artifact_kind IN ('scm.issue','scm.pull_request') AND artifact_id = ANY(:artifacts))
-        OR (artifact_kind='chat.conversation_thread' AND artifact_id = ANY(:conversations))
-        OR (artifact_kind='docs.document' AND artifact_id = ANY(:documents))
+    private static final String COPYING_JOBS = """
+        SELECT j.id FROM review_job j JOIN review r ON (r.id,r.workspace_id)=(j.review_id,j.workspace_id)
+        WHERE j.id=ANY(:derivedJobs)
+          OR EXISTS(SELECT 1 FROM item i WHERE i.workspace_id=j.workspace_id
+            AND (i.id=r.item_id OR EXISTS(SELECT 1 FROM item reviewed
+              WHERE reviewed.workspace_id=r.workspace_id AND reviewed.id=r.item_id AND reviewed.parent_id=i.id)
+              OR EXISTS(SELECT 1 FROM review_item a
+              WHERE (a.review_id,a.workspace_id)=(r.id,r.workspace_id) AND a.item_id=i.id))
+            AND ((i.kind IN ('scm.issue','scm.pull_request') AND i.source_id=ANY(:artifacts))
+              OR (i.kind='chat.thread' AND i.source_id=ANY(:conversations))
+              OR (i.kind='docs.document' AND i.source_id=ANY(:documents))))
         """;
-    // Another developer's review whose inputs held the person's work or evidence.
-    private static final String COPYING_JOBS =
-            """
-                    SELECT j.id FROM review_job j WHERE j.id = ANY(:derivedJobs)
-                    OR j.metadata->>'slack_thread_id' IN (SELECT unnest(CAST(:conversations AS bigint[]))::text)
-                    OR j.metadata->>'docs_document_id' IN (SELECT unnest(CAST(:documents AS bigint[]))::text)
-                    OR j.metadata->>'pull_request_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
-                    OR j.metadata->>'issue_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
-                    """ + " OR j.id IN (SELECT review_job_id FROM practice_result WHERE " + REVIEWED_WORK + ")"
-                    + " OR j.id IN (SELECT review_job_id FROM feedback WHERE " + REVIEWED_WORK + ")";
+    private static final String SELECTED_JOBS = SUBJECT_JOBS + " UNION " + COPYING_JOBS;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -68,142 +53,56 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
     @Override
     public List<PersonDataContributor> contributors() {
         return List.of(
-                // Original writer inputs copy the same people as their job: removed outright, before the job is
-                // redacted, so no later writer can read them. Only their coordinates are exported.
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
                         "review_composition_basis",
                         "review_composition_basis",
-                        "t.job_id IN (" + SUBJECT_JOBS + ") OR t.job_id IN (" + COPYING_JOBS + ")",
-                        "job_id,workspace_id,admission_attempt,created_at,expires_at,byte_size",
-                        "job_id",
+                        "t.job_id IN (" + SELECTED_JOBS + ")",
+                        "job_id,workspace_id,admission_attempt,admission_digest,basis_digest,basis_version,copy_id,expires_at",
+                        "job_id,workspace_id",
                         "",
                         -82),
-                // An accepted review on the work speaks about the same people as its job: removed outright, before
-                // the job is redacted. What it put on the work is erased through the feedback ledger's own store.
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "public_review_completion",
-                        "public_review_completion",
-                        "t.job_id IN (" + SUBJECT_JOBS + ") OR t.job_id IN (" + COPYING_JOBS + ")",
-                        "job_id,workspace_id,admission_attempt,accepted_attempt,accepted_at",
-                        "job_id",
-                        "",
-                        -81),
-                new AgentJobStore(
-                        "review_job",
-                        "t.id IN (" + SUBJECT_JOBS + ")",
-                        "metadata='{}'::jsonb,output=NULL,capture=NULL,container_logs=NULL,config_snapshot='{}'::jsonb,job_token=gen_random_uuid()::text,job_token_hash=NULL,error_message=NULL,delivery_comment_id=NULL,review_readiness=NULL",
-                        -80),
-                // The colleague keeps the delivery reference of their own review; nothing here is exported.
-                new AgentJobStore(
-                        "review_job_evidence_copy",
-                        "t.id IN (" + COPYING_JOBS + ") AND t.id NOT IN (" + SUBJECT_JOBS + ")",
-                        "metadata='{}'::jsonb,output=NULL,capture=NULL,container_logs=NULL,config_snapshot='{}'::jsonb,job_token=gen_random_uuid()::text,job_token_hash=NULL,error_message=NULL,review_readiness=NULL",
-                        -81),
+                new AgentJobStore(),
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
                         "llm_usage_event",
                         "llm_usage_event",
-                        "t.source_id IN (" + SUBJECT_JOBS
-                                + ") OR t.source_id IN (SELECT id FROM chat_message WHERE thread_id IN (SELECT id FROM"
-                                + " chat_thread WHERE user_id = ANY(:users)))",
-                        "id,workspace_id,job_type,source_type,source_id,source_attempt,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,total_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
-                        "id",
-                        "source_id=gen_random_uuid()",
+                        "t.source_id IN (" + SELECTED_JOBS
+                                + ") OR t.review_id IN (SELECT review_id FROM review_job WHERE id IN ("
+                                + SELECTED_JOBS
+                                + ")) OR (t.source_type='MENTOR_TURN' AND t.source_id IN (SELECT m.id FROM"
+                                + " chat_message m JOIN chat_thread c ON c.id=m.thread_id WHERE"
+                                + " c.account_id=:account))",
+                        "id,workspace_id,job_type,source_type,source_id,source_attempt,review_id,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,total_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
+                        "id,workspace_id",
+                        "source_id=gen_random_uuid(),review_id=NULL",
                         -85),
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
                         "instance_llm_settings",
                         "instance_llm_settings",
-                        "t.updated_by_account_id = :account",
+                        "t.updated_by_account_id=:account",
                         "id,allowed_egress_hosts,allow_workspace_connections,updated_at,updated_by_account_id",
                         "id",
                         "updated_by_account_id=NULL",
-                        400),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "review_backfill_run",
-                        "review_backfill_run",
-                        "t.requested_by_account_id = :account OR t.confirmed_by_account_id = :account",
-                        "id,workspace_id,artifact_kind,from_at,to_at,status,pause_reason,estimated_artifacts,estimated_cost_usd,cursor_artifact_id,submitted_count,passed_count,requested_by_account_id,confirmed_by_account_id,created_at,started_at,finished_at,updated_at,version,failed_count,discovered_via,sweep_schedule_id",
-                        "id",
-                        "",
-                        -75),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "review_sweep_schedule",
-                        "review_sweep_schedule",
-                        "t.created_by_account_id = :account",
-                        "id,version,workspace_id,artifact_kind,cadence,lookback_days,enabled,next_run_at,last_run_at,created_by_account_id,created_at,updated_at",
-                        "id",
-                        "",
-                        -70));
+                        400));
     }
 
-    /** Exports and lists legacy provider writes only for the person's own reviews. */
     private final class AgentJobStore extends JdbcPersonDataStore {
-        private final boolean subject;
-
-        AgentJobStore(String store, String predicate, String redaction, int order) {
+        AgentJobStore() {
             super(
                     jdbc,
                     mapper,
-                    store,
                     "review_job",
-                    predicate,
-                    "id,workspace_id,purpose,job_type,status,capture,created_at,completed_at,processing_status,delivery_comment_id",
-                    "id",
-                    redaction,
-                    order);
-            this.subject = store.equals("review_job");
-        }
-
-        @Override
-        public PersonDataSelection select(PersonScope scope) {
-            var selected = super.select(scope);
-            return subject ? selected.withExternalDeliveryFacts(legacyProviderWrites(selected)) : selected;
-        }
-
-        @Override
-        public List<JsonNode> export(PersonDataSelection selection) {
-            return subject ? super.export(selection) : List.of();
-        }
-
-        private List<JsonNode> legacyProviderWrites(PersonDataSelection selection) {
-            return querySelected("""
-                jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,
-                  'commentRef',t.delivery_comment_id,'state',t.processing_status,
-                  'locator',COALESCE(NULLIF(t.metadata->>'pr_url',''),
-                    NULLIF(t.metadata->>'issue_url','')))::text
-                """, "review_job t", selection).stream()
-                    .filter(row -> row.path("commentRef").isString()
-                            && !row.path("commentRef").asString().isBlank())
-                    .toList();
-        }
-
-        @Override
-        public List<ExternalDelivery> externalDeliveries(PersonDataSelection selection) {
-            if (!subject) return List.of();
-            return legacyProviderWrites(selection).stream()
-                    .map(row -> {
-                        var locator = row.path("locator");
-                        if (!locator.isString() || locator.asString().isBlank())
-                            throw new ResponseStatusException(
-                                    HttpStatus.CONFLICT,
-                                    "Legacy provider feedback job "
-                                            + row.path("id").asString()
-                                            + " has no exact locator for the reviewed-work inspection");
-                        return new ExternalDelivery(row.path("workspaceId").asLong(), locator.asString());
-                    })
-                    .distinct()
-                    .toList();
+                    "review_job",
+                    "t.id IN (" + SELECTED_JOBS + ")",
+                    "id,workspace_id,review_id,status,attempt,submitted_at,started_at,completed_at,processing_status",
+                    "id,workspace_id",
+                    "",
+                    -80);
         }
 
         private List<JsonNode> jobs(PersonDataSelection selection) {

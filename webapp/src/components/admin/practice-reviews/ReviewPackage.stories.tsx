@@ -15,6 +15,7 @@ const copy = (fields: Partial<FeedbackCopy> & Pick<FeedbackCopy, "id" | "kind" |
 		externalRef: null,
 		externalUrl: null,
 		lastError: null,
+		readback: null,
 		path: null,
 		postedAt: null,
 		side: null,

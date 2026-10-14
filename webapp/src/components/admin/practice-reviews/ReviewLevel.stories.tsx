@@ -344,3 +344,15 @@ export const Reflow: Story = {
 		await expectNoPanelOverflow(await settledDrawerPanel());
 	},
 };
+
+export const NoPracticeResultsRecordedYet: Story = {
+	args: {
+		...Running.args,
+		review: ready({ ...reviewDetailRunning, practices: [] }),
+	},
+	play: async () => {
+		const panel = within(await settledDrawerPanel());
+		panel.getByText("Practices appear here as the review reaches them.");
+		await expect(panel.queryByRole("list", { name: "Every practice in this review" })).toBeNull();
+	},
+};

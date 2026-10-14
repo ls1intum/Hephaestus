@@ -5,7 +5,7 @@ title: Source governance
 description: Approval, minimization, retention, and erasure gate for AI-readable sources.
 ---
 
-# Artifact-source governance
+# Source governance
 
 An artifact source is a registered logical input that can supply project or personal data. Files, mounts, caches, database projections, and tool results are materializations or derived copies. Each must map to a registered source and remain in the governance inventory. Code, configuration, documentation, and schema registration do not
 authorize collection. Approve each source use for its exact purpose before enabling it.

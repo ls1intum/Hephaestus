@@ -407,9 +407,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                         javaClass,
                                         String.format(
                                                 "SCHEDULED JOB CONTEXT: %s has @Scheduled methods but no workspace"
-                                                    + " iteration dependencies. Add SyncTargetProvider or"
-                                                    + " WorkspaceRepository to iterate workspaces and set context, or"
-                                                    + " add to WORKSPACE_AGNOSTIC_SCHEDULERS if truly system-wide.",
+                                                        + " iteration dependencies. Add SyncTargetProvider or"
+                                                        + " WorkspaceRepository to iterate workspaces and set context, or"
+                                                        + " add to WORKSPACE_AGNOSTIC_SCHEDULERS if truly system-wide.",
                                                 javaClass.getSimpleName())));
                             }
                         }
@@ -714,8 +714,8 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                             method,
                                             String.format(
                                                     "SERVICE WORKSPACE RISK: %s.%s returns a list but has no obvious"
-                                                        + " workspace parameter. Add workspace parameter or document"
-                                                        + " that scoping is applied internally.",
+                                                            + " workspace parameter. Add workspace parameter or document"
+                                                            + " that scoping is applied internally.",
                                                     ownerName, methodName)));
                                 }
                             }

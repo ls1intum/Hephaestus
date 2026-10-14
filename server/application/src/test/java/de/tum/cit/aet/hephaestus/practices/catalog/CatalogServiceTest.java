@@ -176,7 +176,8 @@ class CatalogServiceTest extends BaseUnitTest {
         assertThatThrownBy(() -> service.setExcluded(CatalogEntryType.PRACTICE, "description", true, null))
                 .isInstanceOf(CatalogPreconditionRequiredException.class);
         assertThatThrownBy(() -> service.setExcluded(CatalogEntryType.PRACTICE, "description", true, tag("stale")))
-                .isInstanceOf(StaleCatalogEntryException.class);
+                .isInstanceOf(StaleCatalogEntryException.class)
+                .hasMessage("This entry changed after you loaded it. Reload and try again.");
         assertThat(rows).isEmpty();
         verifyNoInteractions(audit);
     }

@@ -22,6 +22,13 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
     List<Membership> findByWorkspace_Id(Long workspaceId);
 
     @Query("""
+        SELECT m FROM Membership m WHERE m.workspace.id = :workspaceId
+          AND (m.reviewSelected = true OR m.id.accountId IN :accountIds)
+        """)
+    List<Membership> findReviewSelectionMembers(
+            @Param("workspaceId") long workspaceId, @Param("accountIds") Collection<Long> accountIds);
+
+    @Query("""
         SELECT m.id.accountId FROM Membership m JOIN Account a ON a.id = m.id.accountId
         WHERE m.workspace.id = :workspaceId AND m.leftAt IS NULL
           AND a.status IN (de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.ACTIVE,

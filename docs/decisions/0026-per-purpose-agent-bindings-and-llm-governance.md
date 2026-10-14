@@ -1,6 +1,6 @@
 # ADR 0026: Per-purpose agent bindings and governed OpenAI-compatible LLM catalog
 
-**Status:** Accepted, amended 2026-07-26 (named-agent-config model deleted), 2026-09-22 (member AI choice is per account, and the tiers collapse to in-house and cloud from one declared fact) and 2026-10-09 (purposes for practice scripts and model protocols)
+**Status:** Accepted, amended 2026-07-26 (named-agent-config model deleted), 2026-09-22 (member AI choice is per account, and the tiers collapse to in-house and cloud from one declared fact), 2026-10-09 (purposes for practice scripts and model protocols) and 2026-10-14 (job names)
 **Date:** 2026-07-24
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0006](0006-llm-proxy-on-coordinator-trust-model.md) (in-app LLM proxy as the sole credential path), [ADR 0025](0025-agent-job-queue-on-postgresql.md) (PostgreSQL agent job queue)
@@ -12,9 +12,9 @@
 > present is retained as the record of the decision, not as a description of the current code.
 >
 > **Amendment (2026-09-22):** a developer's AI choice — the data-handling ceiling over the tiers
-> the bindings are assigned by, or No AI — is stored once per account (`account`,
+> the bindings are assigned by, or No AI — is stored once per account (`account_ai_choice`,
 > registered GLOBAL in the tenancy layer) and holds in every workspace the account is a member of
-> on the instance; `membership` keeps only the settings revision at which the
+> on the instance; `workspace_member_onboarding` keeps only the settings revision at which the
 > member finished or skipped a workspace's setup page. The tiers follow from who operates a
 > model, which does not vary by workspace, and comparable products keep
 > the person's data-use choice with the signed-in identity while organisations only tighten. The
@@ -181,9 +181,6 @@ gate never kills a call already streaming; it acts only pre-forward.
   can together reach N times the cap before any of them stops. For jobs N is the workspace's
   sum of the per-location `maxConcurrentJobs` limits — operator-set numbers, not an open end; for mentor
   turns it is the number of developers chatting at once.
-- **Calls in flight together.** The term counts only calls that have returned. The practice program host
-  sends up to 4 direct model calls at a time, so the direct calls of an attempt can overshoot by those calls,
-  not by one.
 - **Calls the provider reports no usage for.** A streamed call whose provider rejects
   `stream_options.include_usage` (retried without it, counted as
   `llm.proxy.stream.usage.unsupported`), or any served response with no usage block (counted as
@@ -223,7 +220,7 @@ the connection row and into its own negotiation.
 ## Update — 2026-10-09: purposes for practice scripts and model protocols
 
 Supersedes the purpose list of § Decision (`PRACTICE_REVIEW` | `MENTOR`) and the last clause of
-§ Revisit trigger. [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the reasons.
+§ Revisit trigger. [ADR 0055](0055-practice-scripts-use-one-result-contract.md) owns the reasons.
 
 The revisit trigger "provider contracts beyond the OpenAI Chat Completions and Responses shapes become
 load-bearing" fired. The protocol stays a string on the connection row, and the API carries it as an
@@ -240,3 +237,12 @@ bindings page offers only those models. Through the API, a binding of another ki
 `allowInternet` is refused for every purpose except `MENTOR`. The three purposes for practice scripts do not
 use the execution limits. The binding table, its unique key `(workspace, purpose, tier)` and the tier
 routing do not change: as § Decision says, a new need is a new purpose value.
+
+A practice script host sends up to 4 direct model calls at a time. The term counts only calls that have
+returned, so the direct calls of one attempt can overshoot the cap by those calls, not by one.
+
+## Update — 2026-10-14 (#2656): the job table and classes are renamed
+
+`agent_job` is `review_job`. `AgentJobExecutor`, `AgentJobService`, `AgentJobZombieSweeper` and
+`AgentJobRetentionService` are `ReviewJobExecutor`, `ReviewJobService`, `ReviewJobZombieSweeper` and
+`ReviewJobRetentionService`. The decision above is unchanged.

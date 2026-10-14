@@ -154,9 +154,12 @@ public class ReviewServiceImpl implements ReviewService {
                     .toList();
         } else {
             var decision = gate.evaluate(workspace, pinned, request.origin(), event, request.practiceIds());
-            if (!(decision instanceof GateDecision.Run run))
+            if (decision instanceof GateDecision.Skip skip)
                 throw new ReviewRequestRejected(
-                        ReviewRequestRejected.Reason.ITEM_INELIGIBLE, "No practice can review this item.");
+                        ReviewRequestRejected.Reason.ITEM_INELIGIBLE,
+                        "No practice can review this item.",
+                        skip.eventReason());
+            var run = (GateDecision.Run) decision;
             selected = run.matchedPractices();
         }
         if (selected.isEmpty()
@@ -185,7 +188,9 @@ public class ReviewServiceImpl implements ReviewService {
                         .sorted()
                         .toList()
                         .equals(List.of("chat", "decision", "embedding", "reranking", "review")))
-            throw new IllegalStateException("The review method must contain the five frozen slots.");
+            throw new ReviewRequestRejected(
+                    ReviewRequestRejected.Reason.MODEL_UNAVAILABLE,
+                    "The review method must contain the five frozen slots.");
         if (!developers.isEmpty()
                 && models.stream()
                                 .filter(slot -> slot.slot().equals("review"))
@@ -435,7 +440,9 @@ public class ReviewServiceImpl implements ReviewService {
                 || ((r.origin() == ReviewOrigin.SCHEDULE || r.origin() == ReviewOrigin.BACKFILL)
                         && r.batchId() == null))
             throw new IllegalArgumentException("The review origin requires its recorded link.");
-        if (r.kind() == ReviewKind.SCAN && (r.requestKey() == null || r.requestDigest() == null))
+        if (r.kind() == ReviewKind.SCAN
+                && r.origin() == ReviewOrigin.REQUEST
+                && (r.requestKey() == null || r.requestDigest() == null))
             throw new IllegalArgumentException("A scan requires its request key and digest.");
     }
 

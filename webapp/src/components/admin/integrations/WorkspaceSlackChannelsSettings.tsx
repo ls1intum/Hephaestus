@@ -6,6 +6,7 @@ import type {
 	SlackMonitoredChannel,
 } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import {
@@ -26,7 +27,6 @@ import type { SlackConsentState } from "./slack-channels/consent-terms";
 import { RemoveChannelAlertDialog } from "./slack-channels/RemoveChannelAlertDialog";
 import { SlackChannelRow } from "./slack-channels/SlackChannelRow";
 import { swallow } from "./swallow";
-import { TableRowsSkeleton } from "./TableRowsSkeleton";
 
 export type { SlackConsentState } from "./slack-channels/consent-terms";
 

@@ -228,7 +228,7 @@ export type AdminWorkspaceLlmUsage = {
      */
     events: number;
     /**
-     * Whether shared-model spend is within the instance cap, has reached it, or cannot be confirmed because some shared-model usage has no price set.
+     * Whether shared-model spend is within the instance cap, has reached it, or cannot be confirmed because shared-model rates are missing or usage measurements are unverified.
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
@@ -675,7 +675,7 @@ export type CitationCapabilities = {
 };
 
 export type CitationProof = {
-    artifactSha256: string;
+    itemSha256: string;
     quoteSha256: string;
     status: 'VERIFIED';
 };
@@ -757,7 +757,7 @@ export type ConfigAuditEntryView = {
      */
     elevatedViaInstanceAdmin: boolean;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CATALOG_PRACTICE' | 'CATALOG_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -971,7 +971,7 @@ export type CreateFeedbackDecisionRequest = {
     action: 'APPROVE' | 'REJECT' | 'WITHDRAW' | 'RESTORE';
     contentDigest?: string;
     note?: string;
-    reasonCode?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
+    reasonCode?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_LOCATION' | 'OTHER';
 };
 
 /**
@@ -1328,17 +1328,6 @@ export type DeliveredWorkFeedbackItem = {
     practices: Array<DeliveredFeedbackPractice>;
 };
 
-export type DeveloperPracticeSummary = {
-    couldNotDetermine: number;
-    doesNotApply: number;
-    lastRecordedAt: Date | null;
-    met: number;
-    notMet: number;
-    practiceName: string;
-    practiceSlug: string;
-    totalResults: number;
-};
-
 export type DutyBasis = Omit<ClaimBasis, 'type'> & {
     criterionQuote?: string;
     event?: number;
@@ -1446,7 +1435,7 @@ export type FeedbackCheck = {
     allowed: boolean;
     checkedAt: Date;
     facts: FeedbackCheckFacts;
-    reason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | null;
+    reason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
     stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
 };
 
@@ -1475,10 +1464,11 @@ export type FeedbackCopy = {
     path: string | null;
     position: number;
     postedAt: Date | null;
+    readback: 'ABSENT' | 'TRANSIENT' | 'UNKNOWN' | null;
     side: 'OLD' | 'NEW' | null;
     startLine: null | number;
     state: 'PLANNED' | 'WRITE_STARTED' | 'POSTED' | 'FAILED' | 'WITHHELD' | 'RETRACTED';
-    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | null;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
     writeStartedAt: Date | null;
 };
 
@@ -1499,7 +1489,7 @@ export type FeedbackDecision = {
     feedbackId: string;
     id: string;
     note: string | null;
-    reasonCode: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER' | null;
+    reasonCode: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_LOCATION' | 'OTHER' | null;
 };
 
 export type FeedbackDisagreement = {
@@ -2084,7 +2074,6 @@ export type ListedScanReportItem = {
     practiceName: string;
     practiceSlug: string;
     reason: string | null;
-    reasonDescription: string | null;
     status: 'LISTED';
 };
 
@@ -2314,7 +2303,7 @@ export type LlmUsageByDay = {
      */
     ownProviderTotalCostUsd: number;
     /**
-     * Runs this day with at least one ledger row whose price is not yet known. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
+     * Runs this day with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2345,7 +2334,7 @@ export type LlmUsageByJobType = {
      */
     totalCalls: number;
     /**
-     * Runs of this job type with at least one ledger row whose price is not yet known. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
+     * Runs of this job type with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified. A practice script row counts toward the run of its review. Those rows are excluded from both totals above.
      */
     unpricedEventCount: number;
 };
@@ -2431,6 +2420,11 @@ export type LoginProviderView = {
     updatedAt: Date;
 };
 
+export type MovePracticeRequest = {
+    groupSlug: string | null;
+    position: number;
+};
+
 export type NotReviewedScanReportItem = {
     item: ItemRef;
     itemVersion: string;
@@ -2438,7 +2432,6 @@ export type NotReviewedScanReportItem = {
     practiceName: string;
     practiceSlug: string;
     reason: string | null;
-    reasonDescription: string | null;
     status: 'NOT_REVIEWED';
 };
 
@@ -2931,6 +2924,25 @@ export type PageResponseDtoUserViewAccount = {
     totalPages: number;
 };
 
+/**
+ * Stable wire representation for the APIs that expose flat page metadata. Spring Data's PageImpl
+ * is an implementation detail, not a JSON contract; these fields preserve the existing clients'
+ * response shape without relying on its bean properties. New APIs use Spring Data's PagedModel.
+ */
+export type PageResponseDtoWorkspaceMembership = {
+    content: Array<WorkspaceMembership>;
+    empty: boolean;
+    first: boolean;
+    last: boolean;
+    number: number;
+    numberOfElements: number;
+    pageable: Pageable;
+    size: number;
+    sort: Sort;
+    totalElements: number;
+    totalPages: number;
+};
+
 export type Pageable = {
     offset: number;
     pageNumber: number;
@@ -2988,11 +3000,6 @@ export type PersonDataRequest = {
 export type PersonDataScope = {
     accountId?: number;
     identities: Array<Identity>;
-};
-
-export type PlacePracticeRequest = {
-    groupSlug: string | null;
-    position: number;
 };
 
 export type Practice = {
@@ -3999,7 +4006,7 @@ export type Review = {
     results: ReviewResultCounts;
     startedBy: ItemEvent | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
-    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
 };
 
 export type ReviewBatch = {
@@ -4015,7 +4022,7 @@ export type ReviewBatch = {
     id: string;
     itemKind: string;
     origin: 'BACKFILL' | 'SCHEDULE';
-    pauseReason: 'BUDGET_EXHAUSTED' | 'REVIEW_MODEL_UNBOUND' | 'WORKSPACE_UNAVAILABLE' | null;
+    pauseReason: 'BUDGET_EXHAUSTED' | 'REVIEW_MODEL_UNBOUND' | 'WORKSPACE_UNAVAILABLE' | 'PAUSED_BY_ADMIN' | null;
     requestedBy: AccountRef | null;
     reviewIds: Array<string>;
     scheduleId: string | null;
@@ -4087,7 +4094,7 @@ export type ReviewDetail = {
     stageTiming: Array<ReviewStageTiming>;
     startedBy: ItemEvent | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
-    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
     usage: ReviewUsage;
 };
 
@@ -4122,7 +4129,7 @@ export type ReviewFeedback = {
     resultCount: number;
     reviewId: string;
     state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
-    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | null;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
     withdrawn: boolean;
 };
 
@@ -4161,7 +4168,7 @@ export type ReviewFeedbackDetail = {
     reviewId: string;
     sends: Array<FeedbackSend>;
     state: 'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED';
-    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | null;
+    stopReason: 'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED' | null;
     withdrawn: boolean;
 };
 
@@ -4476,7 +4483,7 @@ export type ReviewSummary = {
     results: ReviewResultCounts;
     startedBy: ItemEvent | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
-    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
 };
 
 export type ReviewTimeShares = {
@@ -4647,7 +4654,7 @@ export type ScanDetail = {
     requestedBy: AccountRef | null;
     startedAt: Date | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
-    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
 };
 
 export type ScanPracticeRef = {
@@ -4738,7 +4745,7 @@ export type ScanSummary = {
     requestedBy: AccountRef | null;
     startedAt: Date | null;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETE' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
-    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'BUDGET_EXHAUSTED' | 'DEADLINE_EXCEEDED' | 'CANCELLED_BY_REQUESTER' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'INVENTORY_INCOMPLETE' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'SOURCE_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
+    stopReason: 'TIMED_OUT' | 'EXECUTION_FAILED' | 'PREPARATION_FAILED' | 'PROCESSING_FAILED' | 'PERSON_DATA_ERASED' | 'STALE_ROLLOUT_REVISION' | 'CANCELLED_BY_ADMIN' | 'REPLACED' | 'LEGACY_FAILURE' | 'EXECUTION_INCOMPLETE' | 'RESULT_WITHHELD' | 'READINESS_REFUSED' | 'SUSPECT_LISTING' | 'BUDGET' | 'DEADLINE' | 'CANCELLED' | 'ENUMERATION_FAILED' | 'ENUMERATION_LIMIT' | 'NO_SCAN_PRACTICES' | 'MODEL_CHANGED' | 'MODEL_UNAVAILABLE' | 'ERROR' | 'LEGACY_SCOPE_UNKNOWN' | 'CONTRACT_CHANGED' | null;
 };
 
 export type SearchWarrant = {
@@ -5053,7 +5060,7 @@ export type SyncJob = {
     /**
      * Account id of the admin who triggered this job, if MANUAL
      */
-    triggeredByUserId?: number;
+    triggeredByAccountId?: number;
     /**
      * What kind of pass this is
      */
@@ -5780,7 +5787,6 @@ export type WithheldScanReportItem = {
     practiceName: string;
     practiceSlug: string;
     reason: string;
-    reasonDescription: string;
     status: 'WITHHELD';
 };
 
@@ -6220,7 +6226,7 @@ export type WorkspaceLlmUsageReport = {
      */
     fx?: FxRateInfo;
     /**
-     * Whether host-funded (shared-model) spend is within its cap, has reached it, or cannot be confirmed because some shared-model usage has no price set.
+     * Whether host-funded (shared-model) spend is within its cap, has reached it, or cannot be confirmed because shared-model rates are missing or usage measurements are unverified.
      */
     instanceBudgetVerdict: 'WITHIN' | 'EXHAUSTED' | 'UNVERIFIABLE';
     /**
@@ -6264,14 +6270,13 @@ export type WorkspaceLlmUsageReport = {
      */
     practiceScriptTotal: LlmUsagePracticeScriptTotal;
     /**
-     * Runs this month (job attempts and mentor turns, either purse) with at least one ledger row whose price is not yet known, each counted once. A practice script row counts toward the run of its review. Those rows are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
+     * Runs this month (job attempts and mentor turns, either purse) with at least one ledger row whose cost is unavailable because a rate is missing or the measurement is unverified, each counted once. A practice script row counts toward the run of its review. Those rows are excluded from both totals above, so a non-zero value means the real spend may be higher than shown.
      */
     unpricedEventCount: number;
 };
 
 export type WorkspaceMembership = {
     account: AccountRef;
-    accountId: string;
     eligibleForPracticeReview: boolean;
     hidden: boolean;
     joinedAt: Date;
@@ -6462,7 +6467,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CATALOG_PRACTICE' | 'CATALOG_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -7317,6 +7322,27 @@ export type UpdateCatalogPracticeResponses = {
 
 export type UpdateCatalogPracticeResponse = UpdateCatalogPracticeResponses[keyof UpdateCatalogPracticeResponses];
 
+export type MoveCatalogPracticeData = {
+    body: MovePracticeRequest;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        slug: string;
+    };
+    query?: never;
+    url: '/admin/practice-catalog/practices/{slug}/group';
+};
+
+export type MoveCatalogPracticeResponses = {
+    /**
+     * OK
+     */
+    200: Catalog;
+};
+
+export type MoveCatalogPracticeResponse = MoveCatalogPracticeResponses[keyof MoveCatalogPracticeResponses];
+
 export type ResetCatalogPracticeData = {
     body?: never;
     headers?: {
@@ -7358,27 +7384,6 @@ export type AcknowledgeCatalogPracticeResponses = {
 };
 
 export type AcknowledgeCatalogPracticeResponse = AcknowledgeCatalogPracticeResponses[keyof AcknowledgeCatalogPracticeResponses];
-
-export type PlaceCatalogPracticeData = {
-    body: PlacePracticeRequest;
-    headers?: {
-        'If-Match'?: string;
-    };
-    path: {
-        slug: string;
-    };
-    query?: never;
-    url: '/admin/practice-catalog/practices/{slug}/placement';
-};
-
-export type PlaceCatalogPracticeResponses = {
-    /**
-     * OK
-     */
-    200: Catalog;
-};
-
-export type PlaceCatalogPracticeResponse = PlaceCatalogPracticeResponses[keyof PlaceCatalogPracticeResponses];
 
 export type DeclineCatalogPracticeReleaseData = {
     body?: never;
@@ -9438,7 +9443,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'ACTIVITY_AUTOMATION' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_GROUP' | 'CATALOG_PRACTICE' | 'CATALOG_GROUP' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BATCH' | 'REVIEW_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -10199,13 +10204,17 @@ export type ListMembershipsData = {
     };
     query?: {
         /**
-         * Zero-based page index
+         * Zero-based page index (0..N)
          */
         page?: number;
         /**
-         * Results per page, capped at 100
+         * The size of the page to be returned
          */
         size?: number;
+        /**
+         * Sorting criteria in the format: property,(asc|desc). Default sort order is ascending. Multiple sort criteria are supported.
+         */
+        sort?: Array<string>;
     };
     url: '/workspaces/{workspaceSlug}/members';
 };
@@ -10214,7 +10223,7 @@ export type ListMembershipsResponses = {
     /**
      * OK
      */
-    200: Array<WorkspaceMembership>;
+    200: PageResponseDtoWorkspaceMembership;
 };
 
 export type ListMembershipsResponse = ListMembershipsResponses[keyof ListMembershipsResponses];
@@ -11855,27 +11864,6 @@ export type ListOwnResultsResponses = {
 
 export type ListOwnResultsResponse = ListOwnResultsResponses[keyof ListOwnResultsResponses];
 
-export type GetOwnResultSummaryData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/results/summary';
-};
-
-export type GetOwnResultSummaryResponses = {
-    /**
-     * Practice summaries returned
-     */
-    200: Array<DeveloperPracticeSummary>;
-};
-
-export type GetOwnResultSummaryResponse = GetOwnResultSummaryResponses[keyof GetOwnResultSummaryResponses];
-
 export type GetOwnResultData = {
     body?: never;
     path: {
@@ -12346,7 +12334,7 @@ export type ListReviewFeedbackData = {
         destination?: Array<'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION'>;
         state?: Array<'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED'>;
         location?: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
-        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED'>;
+        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED'>;
         withdrawn?: boolean;
         disagreed?: boolean;
         sort?: 'NEWEST' | 'OLDEST';
@@ -12385,7 +12373,7 @@ export type CountReviewFeedbackByLocationData = {
         destination?: Array<'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION'>;
         state?: Array<'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED'>;
         location?: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
-        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED'>;
+        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED'>;
         withdrawn?: boolean;
         disagreed?: boolean;
         sort?: 'NEWEST' | 'OLDEST';
@@ -12422,7 +12410,7 @@ export type CountReviewFeedbackByReasonData = {
         destination?: Array<'ON_WORK' | 'PRACTICE_PAGE' | 'CONVERSATION'>;
         state?: Array<'AWAITING_APPROVAL' | 'READY' | 'DELIVERED' | 'UNCONFIRMED' | 'WITHHELD' | 'REJECTED' | 'REPLACED' | 'FAILED'>;
         location?: 'GITHUB' | 'GITLAB' | 'OTHER_WORK' | 'HEPH' | 'SLACK' | 'NEXT_CONVERSATION' | 'PRACTICE_PAGES';
-        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED'>;
+        stopReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_WITHHELD' | 'NOTHING_NEW' | 'REPEATS_DELIVERED_NOTE' | 'REACTED_DISAGREE' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'DELIVERY_UNCONFIRMED' | 'ITEM_GONE' | 'ITEM_CLOSED' | 'ITEM_MERGED' | 'ITEM_STATE_INELIGIBLE' | 'ISSUE_SNAPSHOT_CHANGED' | 'PUBLIC_SUBJECT_INELIGIBLE' | 'NO_AI' | 'DELIVERY_OFF' | 'PERSON_SUPPRESSED' | 'RECIPIENT_UNAVAILABLE' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'FEEDBACK_OFF' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_SCOPE' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET' | 'RESULT_MARKED_INCORRECT' | 'REVIEWED_VERSION_CHANGED' | 'REVIEW_CANCELLED' | 'EVIDENCE_NOT_PERMITTED' | 'NO_EVIDENCE' | 'UNCORROBORATED'>;
         withdrawn?: boolean;
         disagreed?: boolean;
         sort?: 'NEWEST' | 'OLDEST';
@@ -13351,6 +13339,28 @@ export type SetPracticeFeedbackModeResponses = {
 
 export type SetPracticeFeedbackModeResponse = SetPracticeFeedbackModeResponses[keyof SetPracticeFeedbackModeResponses];
 
+export type MovePracticeData = {
+    body: MovePracticeRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/group';
+};
+
+export type MovePracticeResponses = {
+    /**
+     * OK
+     */
+    200: Array<Practice>;
+};
+
+export type MovePracticeResponse = MovePracticeResponses[keyof MovePracticeResponses];
+
 export type BindPracticeGroupData = {
     body: BindPracticeGroupRequest;
     path: {
@@ -13397,28 +13407,6 @@ export type GetPracticeGuidanceResponses = {
 };
 
 export type GetPracticeGuidanceResponse = GetPracticeGuidanceResponses[keyof GetPracticeGuidanceResponses];
-
-export type PlacePracticeData = {
-    body: PlacePracticeRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        practiceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/placement';
-};
-
-export type PlacePracticeResponses = {
-    /**
-     * OK
-     */
-    200: Array<Practice>;
-};
-
-export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
 
 export type ListPracticeVersionsData = {
     body?: never;

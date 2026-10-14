@@ -8,9 +8,9 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultMarkRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultPracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
 import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
@@ -41,7 +41,7 @@ class ReviewRuntimeRoleContextTest extends BaseUnitTest {
             .withBean(JdbcClient.class, () -> mock(JdbcClient.class))
             .withBean(ReviewRepository.class, () -> mock(ReviewRepository.class))
             .withBean(ReviewPracticeRepository.class, () -> mock(ReviewPracticeRepository.class))
-            .withBean(ResultPracticeVersionRepository.class, () -> mock(ResultPracticeVersionRepository.class))
+            .withBean(PracticeVersionRepository.class, () -> mock(PracticeVersionRepository.class))
             .withBean(ProductItemQuery.class, () -> mock(ProductItemQuery.class))
             .withBean(JsonMapper.class, () -> JsonMapper.builder().build());
 

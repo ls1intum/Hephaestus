@@ -89,17 +89,31 @@ export function ActivityWorkLog({ state, providerType, subject }: ActivityWorkLo
 			</div>
 		);
 	}
+	// The work already read stays, but a reader must know it may be out of date.
+	const refreshAlert =
+		state.refreshFailure === undefined ? undefined : (
+			<QueryErrorAlert
+				error={state.refreshFailure.error}
+				title="We could not refresh activity"
+				pending={state.refreshFailure.pending}
+				onRetry={state.refreshFailure.onRetry}
+			/>
+		);
 	if (state.items.length === 0) {
 		return (
-			<ActivityEmpty
-				icon={<HistoryMark providerType={providerType} />}
-				title="No activity in this range"
-			/>
+			<div className="space-y-6">
+				{refreshAlert}
+				<ActivityEmpty
+					icon={<HistoryMark providerType={providerType} />}
+					title="No activity in this range"
+				/>
+			</div>
 		);
 	}
 	const today = new Date(nowMs);
 	return (
 		<div aria-busy={state.stale || undefined} className={cn("space-y-6", state.stale && STALE)}>
+			{refreshAlert}
 			{groupByDay(state.items).map(({ day, items }) => (
 				<DayGroup key={day.getTime()} label={dayLabel(day, today)}>
 					{items.map((item) => (

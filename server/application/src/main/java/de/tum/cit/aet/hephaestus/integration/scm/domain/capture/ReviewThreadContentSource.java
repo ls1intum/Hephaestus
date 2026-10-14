@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -151,7 +152,7 @@ public class ReviewThreadContentSource {
                     threadArray.size(),
                     decisionArray.size());
             return root;
-        } catch (Exception e) {
+        } catch (JacksonException e) {
             throw new ItemCaptureException(ItemCaptureCode.CAPTURE_FAILED, "Review-thread collection failed", e);
         }
     }

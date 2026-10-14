@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.review.schedule;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.review.ProductItemQuery;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
-import de.tum.cit.aet.hephaestus.practices.review.report.ProblemComparison;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchPauseReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
@@ -11,7 +10,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import java.util.List;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -25,6 +23,8 @@ public class ReviewBatchSubmitter {
         record Submitted() implements SubmissionOutcome {}
 
         record Skipped() implements SubmissionOutcome {}
+
+        record Deferred() implements SubmissionOutcome {}
 
         record Paused(ReviewBatchPauseReason reason) implements SubmissionOutcome {}
     }
@@ -44,12 +44,7 @@ public class ReviewBatchSubmitter {
         if (ledger.existsByWorkspaceIdAndBatchIdAndItemIdAndStatusNot(
                 batch.getWorkspaceId(), batch.getId(), itemId, ReviewStatus.CANCELLED))
             return new SubmissionOutcome.Submitted();
-        var requestKey = kind == ReviewKind.SCAN ? UUID.randomUUID() : null;
-        var requestDigest = kind == ReviewKind.SCAN
-                ? ProblemComparison.sha256(batch.getId() + "/" + itemId + "/" + batch.getBudgetUsd())
-                : null;
         var remaining = spend.remaining(batch);
-        if (remaining.exhausted()) return new SubmissionOutcome.Paused(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
         try {
             reviews.request(new ReviewRequest(
                     batch.getWorkspaceId(),
@@ -61,8 +56,8 @@ public class ReviewBatchSubmitter {
                     null,
                     batch.getId(),
                     remaining.remainingUsd(),
-                    requestKey,
-                    requestDigest,
+                    null,
+                    null,
                     List.of(),
                     true));
         } catch (ReviewRequestRejected refusal) {
@@ -70,9 +65,8 @@ public class ReviewBatchSubmitter {
                 case BUDGET_UNAVAILABLE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
                 case WORKSPACE_INACTIVE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.WORKSPACE_UNAVAILABLE);
                 case MODEL_UNAVAILABLE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.REVIEW_MODEL_UNBOUND);
-                case SCAN_ACTIVE -> new SubmissionOutcome.Paused(ReviewBatchPauseReason.SCAN_ALREADY_ACTIVE);
-                case ITEM_INELIGIBLE, SOURCE_UNAVAILABLE -> new SubmissionOutcome.Skipped();
-                case REQUEST_CONFLICT -> throw refusal;
+                case SCAN_ACTIVE, SOURCE_UNAVAILABLE -> new SubmissionOutcome.Deferred();
+                case ITEM_INELIGIBLE, REQUEST_CONFLICT -> new SubmissionOutcome.Skipped();
             };
         }
         return new SubmissionOutcome.Submitted();

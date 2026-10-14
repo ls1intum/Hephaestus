@@ -140,8 +140,8 @@ class ReviewTimingFactsIntegrationTest extends BaseIntegrationTest {
 
     private void withheld(UUID reviewId, Instant at) {
         jdbc.sql("INSERT INTO"
-            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,created_at)"
-            + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','WITHHELD','ITEM_MERGED',:at)")
+                        + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,stop_reason,created_at)"
+                        + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','WITHHELD','ITEM_MERGED',:at)")
                 .param("id", UUID.randomUUID())
                 .param("ws", scenario.workspace().getId())
                 .param("review", reviewId)

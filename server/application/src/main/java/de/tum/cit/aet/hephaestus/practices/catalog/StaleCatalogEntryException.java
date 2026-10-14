@@ -7,7 +7,7 @@ public class StaleCatalogEntryException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public StaleCatalogEntryException(String subject) {
-        super(subject + " changed after you loaded it. Reload and try again.");
+    public StaleCatalogEntryException() {
+        super("This entry changed after you loaded it. Reload and try again.");
     }
 }

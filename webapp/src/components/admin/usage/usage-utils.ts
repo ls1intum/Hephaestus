@@ -264,7 +264,7 @@ export const TOTAL_CELL = "bg-muted";
  * word per line, and the two lines are balanced.
  */
 export const UNPRICED_RUNS = {
-	label: "No price set",
+	label: "Unavailable cost",
 	className: "min-w-24 whitespace-normal text-balance",
 };
 

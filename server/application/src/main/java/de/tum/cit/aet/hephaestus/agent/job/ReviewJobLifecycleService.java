@@ -144,6 +144,9 @@ public class ReviewJobLifecycleService {
         LlmPriceSnapshot price = snap.model().priceSnapshot() != null
                 ? snap.model().priceSnapshot()
                 : LlmPriceSnapshot.unpricedInstance();
+        // The terminal update holds the row lock and prevents further proxy accumulations.
+        // Read its committed counters directly; the entity can predate a proxy response.
+        // No token evidence stays unknown.
         boolean billed = TerminalUsage.fromProxy(
                         agentJobRepository.findLlmUsageById(job.getId()).orElse(null))
                 .appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);

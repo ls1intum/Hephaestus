@@ -1,11 +1,11 @@
 import { BarChart3, ClipboardList } from "lucide-react";
 
 import type { Survey } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TablePagination } from "@/components/common/TablePagination";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { DetailStackLink } from "@/components/layout/detail-drawer/DetailStackLink";
 import {
 	SURVEY_AVAILABILITY_DEFS,

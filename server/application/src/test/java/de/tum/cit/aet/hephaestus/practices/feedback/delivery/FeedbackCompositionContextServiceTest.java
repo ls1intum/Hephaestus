@@ -252,11 +252,12 @@ class FeedbackCompositionContextServiceTest {
         var descriptor = mock(ItemDescriptor.class);
         when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.LINE_NOTE));
         when(catalog.descriptorFor(item.kind())).thenReturn(Optional.of(descriptor));
-        current.setEvidence(new JsonMapper().readTree("""
+        var anchored =
+                current.toBuilder().evidence(new JsonMapper().readTree("""
             {"citations":[{"path":"src/Work.java","startLine":3,"side":"NEW",
               "verification":{"status":"VERIFIED"}}]}
-            """));
-        assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.HAS_INLINE_ANCHOR);
+            """)).build();
+        assertThat(service.conversationDecision(snapshot, anchored)).isEqualTo(ConversationDecision.HAS_INLINE_ANCHOR);
     }
 
     @Test

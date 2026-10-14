@@ -81,8 +81,8 @@ class FeedbackResponseControllerIntegrationTest extends AbstractFeedbackIntegrat
         long other = Objects.requireNonNull(persistAccount("Other developer").getId());
         jdbc.update(
                 "INSERT INTO"
-                    + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
-                    + " VALUES (?,?,'MEMBER',now(),false,false,false)",
+                        + " membership(workspace_id,account_id,role,joined_at,review_selected,hidden,public_activity_seen)"
+                        + " VALUES (?,?,'MEMBER',now(),false,false,false)",
                 workspace.getId(),
                 other);
         jdbc.update("UPDATE feedback SET developer_id=? WHERE id=?", other, shown.getId());

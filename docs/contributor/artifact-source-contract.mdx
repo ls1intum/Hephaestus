@@ -118,9 +118,7 @@ A source allowed in an internal mirror is not thereby allowed in an external mod
 The machine-readable [catalog](https://github.com/hephaestus-build/Hephaestus/blob/main/server/application/src/main/resources/contracts/source-use/1.3.0/catalog.json), its adjacent JSON Schemas, and the checks in [`gate:contracts`](https://github.com/hephaestus-build/Hephaestus/blob/main/scripts/validate-source-use-contracts.ts) jointly define conformance.
 Schema validation alone is insufficient.
 Standard JSON Schema `uniqueItems` compares whole values, not a selected identity property.
-The script also rejects duplicate source kinds.
-It holds each schema's pinned `catalogDigest` to the catalog's actual hash.
-The cross-resource rules that bind a source to its governance decisions run when the server reads the catalog, not in the script.
+The [validation checks](#validation) separate resource validation and digest checks from the server's catalog and governance checks.
 
 Prose does not maintain a second field-by-field catalog.
 Authoring tools resolve source kinds through the catalog and reject unknown kinds.
@@ -327,7 +325,7 @@ Currentness is derived:
 
 - source resources are immutable within a published contract version. Any semantic change creates a new
   version.
-- moving a practice to that version changes what its evidence requirements may name and stales that practice's earlier claims.
+- an [explicit practice upgrade](#cut-a-contract-version) controls when a practice moves to another source-contract version.
 - changing a practice's review configuration or automated-review policy stales that practice's claims.
 - adding a source cannot silently alter existing requirements because each practice names its sources explicitly.
 - governance withdrawal disables its exact future use without rewriting historical semantics.
@@ -363,15 +361,63 @@ They never establish that a title is unchanged.
 Complete the [source governance decision](../admin/dsms/artifact-source-governance) before enabling a new or expanded source use.
 Accuracy or product benefit alone does not authorize collection.
 
+### Cut a contract version
+
+The source-contract version is separate from the application release version.
+Use this procedure when source semantics change, after the governance decision above.
+Run commands from the repository root.
+
+1. Copy the current directory under `server/application/src/main/resources/contracts/source-use/` to an unused version directory.
+   Keep its catalog, source-use decisions, and all four schemas together.
+   Leave every published version unchanged.
+2. Set the new `catalog.json` version and `source-use-decisions.json` contract version.
+   Update every schema version constant and each schema's `$id` to the new version.
+   Use the identifier prefix `https://hephaestus.aet.cit.tum.de/contracts/item-source/`.
+   Update version-specific references to other schemas if the change introduces them.
+3. Apply the intended source and governance changes only in the new directory.
+   Finalize `catalog.json`, including formatting, before calculating its SHA-256 digest.
+   Replace `NEXT_VERSION` below with the new version:
+
+   ```bash
+   node --input-type=module -e '
+   import { createHash } from "node:crypto";
+   import { readFileSync } from "node:fs";
+   console.log(createHash("sha256").update(readFileSync(process.argv[1])).digest("hex"));
+   ' server/application/src/main/resources/contracts/source-use/NEXT_VERSION/catalog.json
+   ```
+
+   Set `automated-review-readiness-report.schema.json` → `properties.catalogDigest.const` to that digest.
+   Hash the exact file bytes, not parsed or normalized JSON.
+   Recalculate the digest after any subsequent catalog edit.
+4. Set `ClasspathSourceCatalogRegistry.CURRENT_VERSION_VALUE` to the new version.
+   The registry derives current resource paths and the runtime digest from this value.
+   It accepts only the current contract; keep published resources unchanged for verification.
+5. Update current-version documentation and fixtures without changing historical contract resources.
+   Cover the new catalog, its pinned digest, and rejection of unsupported versions in the registry tests.
+   Cover an explicit practice upgrade in the practice-version and review-digest tests.
+6. Run `vp run gate:contracts` and `vp run test:server:unit`.
+   Check both the resource-validation results and the runtime validation below.
+   Follow the [local verification procedure](./local-verification.mdx) for the remaining checks.
+
+A practice definition pins its source contract in `reads.version`.
+A version cut does not change existing practice versions.
+An explicit definition update creates a practice version with a new review digest.
+The [currentness rules](#change-and-staleness) apply after the update.
+The [catalog update path](./practice-catalogue.md#workspace-adoption-lifecycle) owns workspace proposal and acceptance behavior.
+
+### Validation
+
 The rules are enforced mechanically, in two places:
 
 - `gate:contracts` validates every contract resource and the bundled practice catalog against their schemas.
-  It rejects duplicate source kinds.
-  It holds each schema's pinned catalog digest to the catalog's actual hash.
+  It holds the readiness schema's pinned catalog digest to the catalog's actual hash.
   It exercises the policy schema against deliberately broken fixtures.
   These include a retired evidence profile and evidence requirements written onto a policy instead of the definition.
   A guard whose failure path never runs is indistinguishable from one that cannot fail.
-- When it reads the catalog at startup, the server rejects a mirror that pins an identity.
+  The gate also checks published-resource immutability against the branch's merge base and tests that guard.
+  Changed or deleted published files fail that check.
+- When it reads the catalog at startup, the server rejects duplicate source kinds.
+  It rejects a mirror that pins an identity.
   It rejects a lossy derivation that claims completeness.
   It rejects required capture quality that the source can never report.
   It rejects a source whose use decisions do not cover every product purpose.

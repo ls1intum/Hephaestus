@@ -181,41 +181,38 @@ public class WorkspaceRepositoryMonitorService {
             return;
         }
 
-        if (workspace.getRepositoriesToMonitor().stream()
-                .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
-            log.debug(
-                    "Skipped repository monitor addition: reason=alreadyMonitored,"
-                            + " nameWithOwner={}, workspaceId={}",
-                    LoggingUtils.sanitizeForLog(nameWithOwner),
-                    workspace.getId());
-            throw new RepositoryAlreadyMonitoredException(nameWithOwner);
-        }
-
-        ConnectionConfig config = connectionRepository
-                .findActive(workspace.getId(), kind)
-                .map(connection -> connection.getConfig())
-                .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
-        IdentityProvider provider =
-                sourceProvider(kind, config).orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
-        Optional<Repository> repository = repositoryRepository.findByNameWithOwnerAndProviderId(
-                nameWithOwner, Objects.requireNonNull(provider.getId()));
-        if (repository.isEmpty()) {
-            log.debug(
-                    "Skipped repository monitor addition: reason=repositoryNotFound," + " nameWithOwner={}",
-                    LoggingUtils.sanitizeForLog(nameWithOwner));
-            throw new EntityNotFoundException("Repository", nameWithOwner);
-        }
-
+        Long workspaceId = workspace.getId();
+        RepositoryToMonitor monitor = transactionTemplate.execute(status -> {
+            // Disconnect and credential changes take this same lock; decide from the configuration they committed.
+            ConnectionConfig config = connectionRepository
+                    .lockActiveConfig(workspaceId, IntegrationKind.GITHUB)
+                    .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+            if (!(config instanceof ConnectionConfig.GitHubPatConfig)) {
+                throw new RepositoryManagementNotAllowedException(slug);
+            }
+            if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspaceId, nameWithOwner)) {
+                throw new RepositoryAlreadyMonitoredException(nameWithOwner);
+            }
+            IdentityProvider provider = sourceProvider(IntegrationKind.GITHUB, config)
+                    .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+            Repository repository = repositoryRepository
+                    .findByNameWithOwnerAndProviderId(nameWithOwner, Objects.requireNonNull(provider.getId()))
+                    .orElseThrow(() -> new EntityNotFoundException("Repository", nameWithOwner));
+            Workspace owner = workspaceRepository
+                    .findById(workspaceId)
+                    .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
+            RepositoryToMonitor created = new RepositoryToMonitor();
+            created.setNameWithOwner(nameWithOwner);
+            created.setNativeId(repository.getNativeId());
+            created.setWorkspace(owner);
+            owner.getRepositoriesToMonitor().add(created);
+            return repositoryToMonitorRepository.saveAndFlush(created);
+        });
         log.info(
                 "Added repository to monitor: nameWithOwner={}, workspaceId={}",
                 LoggingUtils.sanitizeForLog(nameWithOwner),
-                workspace.getId());
-
-        RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
-        repositoryToMonitor.setNameWithOwner(nameWithOwner);
-        repositoryToMonitor.setNativeId(repository.orElseThrow().getNativeId());
-        repositoryToMonitor.setWorkspace(workspace);
-        persistRepositoryMonitor(workspace, repositoryToMonitor, false);
+                workspaceId);
+        announceRepositoryMonitor(workspace, Objects.requireNonNull(monitor), false);
     }
 
     /**

@@ -62,7 +62,7 @@ import {
 	SEVERITY_DESCRIPTIONS,
 	citesReviewedTurn,
 	describeVocabulary,
-	trimmedSlug,
+	trimmedText,
 	normalizeSubmission,
 	resolveQuote,
 	resolveCapturedText,
@@ -385,6 +385,8 @@ const PRACTICE_TOOLS = [...EVIDENCE_TOOLS, "bash", "codemode"] as const;
 const CWD = process.env.PI_RUNNER_CWD ?? WORKSPACE_ROOT;
 const ENVELOPE_MISMATCH_EXIT = 42;
 const TASK_PATH = `${CWD}/task.json`;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 const taskEnvelope = readTaskEnvelope();
 const INPUT_PATHS = resolveTaskPaths(CWD, taskEnvelope.paths);
 /**
@@ -577,6 +579,7 @@ const usageTotals: UsageTotals = {
 	totalCalls: 0,
 };
 interface TurnTrace {
+	phase: SessionPhase;
 	modelError: boolean;
 	/** Failed or aborted model calls of this turn, by the adapter's own closed kind; no provider text is kept. */
 	modelFailures: Partial<Record<ModelFailureKind, number>>;
@@ -1474,7 +1477,7 @@ const RECORDING_TOOLS: ReadonlySet<string> = new Set([
 	"report_review",
 ]);
 
-/** The tool the composition turn under way records with: the review on the work, or the private lanes. */
+/** The tool the composition turn under way records with: the review on the work, or the private destinations. */
 let composerTool: "report_review" | "report_feedback" = "report_feedback";
 
 /** The text of a tool result as the model reads it; empty when the result carries none. */
@@ -1664,9 +1667,8 @@ const IDENTICAL_REFUSAL_ABORT = 2;
 const READ_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "find", "ls"]);
 /** The most feedback an omission names; the count says how many there are. */
 const OMISSION_ITEMS = CANDIDATE_LIMITS.omissionItems;
-/** A tool error that says the source could not be read, not that the session asked for something absent. */
-const READ_FAILURE =
-	/EACCES|EPERM|EIO|ETIMEDOUT|permission denied|operation not permitted|timed out/iu;
+/** A tool error that proves the session asked for a path that does not exist; every other error is a failed read. */
+const ABSENT_PATH = /\bENOENT\b|^Path not found: /u;
 
 /**
  * What one review session's evidence reads reached, from the host's own receipts of its tools: every read,
@@ -1705,7 +1707,7 @@ function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
 	const named = target ?? event.toolName;
 	const result: unknown = event.result;
 	if (event.isError) {
-		if (READ_FAILURE.test(toolResultText(result))) {
+		if (!ABSENT_PATH.test(toolResultText(result))) {
 			reads.failed.push(named);
 		}
 		return;
@@ -1717,11 +1719,11 @@ function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
 		details.resultLimitReached !== undefined ||
 		details.entryLimitReached !== undefined;
 	if (event.toolName === "read" && target !== undefined) {
-		// A read that reaches the end of its file without a cut, or a read with no offset, is the file's last word.
-		const continued = isRecord(args) && args.offset !== undefined;
-		if (cut) {
+		// The tool cuts at its own limit with a truncation detail, and at the session's `limit` with only a
+		// "more lines in file" notice. Only a read that reaches the end of the file clears an earlier cut.
+		if (cut || /more lines in file/u.test(toolResultText(result))) {
 			reads.cutFiles.add(target);
-		} else if (continued && !/more lines in file/u.test(toolResultText(result))) {
+		} else {
 			reads.cutFiles.delete(target);
 		}
 		return;
@@ -2320,12 +2322,8 @@ function readTaskEnvelope(): TaskEnvelope {
 	if (
 		typeof envelope.reviewId !== "string" ||
 		typeof envelope.jobId !== "string" ||
-		!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-			envelope.reviewId,
-		) ||
-		!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
-			envelope.jobId,
-		) ||
+		!UUID.test(envelope.reviewId) ||
+		!UUID.test(envelope.jobId) ||
 		typeof envelope.attempt !== "number" ||
 		!Number.isSafeInteger(envelope.attempt) ||
 		envelope.attempt < 0 ||
@@ -2382,10 +2380,10 @@ const PRACTICE_PAGE_SUPPORT_PATH = `${CWD}/work/composition/in-app-support.json`
 let practicePageSupport: PracticePageSupport | null = null;
 let conversationEligibility: ConversationEligibility | null = null;
 
-/** The open private lanes each NOT_MET practice is routed to; null until admission routed them. */
-let routedLanes: ReadonlyMap<string, readonly PrivateDestination[]> | null = null;
+/** The open private destinations each NOT_MET practice is routed to; null until admission routed them. */
+let routedDestinations: ReadonlyMap<string, readonly PrivateDestination[]> | null = null;
 
-/** Whether the server's read after admission routes the practice's NOT_MET result to the lane. */
+/** Whether the server's read after admission routes the practice's NOT_MET result to the destination. */
 function routedTo(destination: PrivateDestination, practiceSlug: string): boolean {
 	if (destination === "PRACTICE_PAGE") {
 		return (
@@ -2411,8 +2409,8 @@ function routedTo(destination: PrivateDestination, practiceSlug: string): boolea
 	);
 }
 
-/** Why the server routes none of the practice's NOT_MET results to the lane, in its own words. */
-function laneRefusal(destination: PrivateDestination, practiceSlug: string): string {
+/** Why the server routes none of the practice's NOT_MET results to the destination, in its own words. */
+function destinationRefusal(destination: PrivateDestination, practiceSlug: string): string {
 	if (destination === "PRACTICE_PAGE") {
 		const decision =
 			practicePageSupport?.state === "COMPLETE"
@@ -2465,7 +2463,7 @@ interface ConversationNotes {
 }
 
 /**
- * A private-lane piece; per-piece validation in readFeedbackPiece/validateFeedback. As read, basedOn holds the ids the
+ * A private-destination piece; per-piece validation in readFeedbackPiece/validateFeedback. As read, basedOn holds the ids the
  * composer named; as stored, the references they resolve to.
  */
 interface FeedbackPieceOf<Basis> extends ComposedFeedbackPiece {
@@ -2683,7 +2681,7 @@ function stagedDeliveredPractices(): Set<string> {
 				}
 				return jsonArray(entry.basedOn).flatMap((support) =>
 					isRecord(support) && support.outcome === "NOT_MET"
-						? [`${destination}:${trimmedSlug(support.practiceSlug)}`]
+						? [`${destination}:${trimmedText(support.practiceSlug)}`]
 						: [],
 				);
 			}),
@@ -2747,7 +2745,7 @@ function persistComposedFeedback(): void {
 }
 
 // The composer references admitted results and problems; it cannot author verdicts, citations, or locations.
-/** What report_feedback reports back: a refusal stores nothing and names no lane. */
+/** What report_feedback reports back: a refusal stores nothing and names no destination. */
 interface ReportFeedbackDetails {
 	stored: number;
 	destination?: Destination;
@@ -2780,8 +2778,7 @@ function buildFeedbackTool(
 
 	/** One piece stored, or the reason it was not. */
 	const store = (value: unknown): { stored: boolean; text: string } => {
-		const repairs: string[] = [];
-		const read = readFeedbackPiece(withholdBasis(value, results, repairs), practiceSlugs);
+		const read = readFeedbackPiece(value, practiceSlugs, results);
 		if (typeof read === "string") {
 			return { stored: false, text: read };
 		}
@@ -2810,11 +2807,11 @@ function buildFeedbackTool(
 		if (rejection !== null) {
 			return skipped(rejection);
 		}
-		// The server's routing decides the lanes a practice may reach; a withholding elsewhere decides nothing.
-		if (!(routedLanes?.get(piece.practiceSlug) ?? []).includes(piece.destination)) {
+		// The server's routing decides the destinations a practice may reach; a withholding elsewhere decides nothing.
+		if (!(routedDestinations?.get(piece.practiceSlug) ?? []).includes(piece.destination)) {
 			return skipped(
 				`${piece.destination} cannot carry feedback about ${piece.practiceSlug} this run ` +
-					`(${laneRefusal(piece.destination, piece.practiceSlug)}); write no piece for it there, not even a WITHHOLD. Skipped.`,
+					`(${destinationRefusal(piece.destination, piece.practiceSlug)}); write no piece for it there, not even a WITHHOLD. Skipped.`,
 			);
 		}
 		// PRACTICE_PAGE pattern feedback requires NOT_MET results on distinct pieces of work.
@@ -2838,7 +2835,7 @@ function buildFeedbackTool(
 		});
 		return {
 			stored: true,
-			text: `stored a ${piece.destination} piece for ${piece.practiceSlug} (${piece.action}); ${usedPerDestination[piece.destination]}/${bounds.maxPieces} used on that destination.${repairs.map((repair) => ` ${repair}.`).join("")}`,
+			text: `stored a ${piece.destination} piece for ${piece.practiceSlug} (${piece.action}); ${usedPerDestination[piece.destination]}/${bounds.maxPieces} used on that destination.`,
 		};
 	};
 
@@ -3215,7 +3212,7 @@ function vocabularyWord<T extends string>(
 	return match ?? `${field} must be one of ${vocabulary.join(", ")} (received '${value}')`;
 }
 
-/** Enforce text length here; validateFeedback handles lane-specific required fields. */
+/** Enforce text length here; validateFeedback handles destination-specific required fields. */
 function boundedText(
 	value: unknown,
 	field: keyof typeof FEEDBACK_TEXT_BOUNDS,
@@ -3239,36 +3236,10 @@ function boundedText(
 	return { text };
 }
 
-/**
- * A WITHHOLD sent with no basedOn rests on its practice's NOT_MET result, the only one it can withhold: it is filled
- * in, and said so.
- */
-function withholdBasis(
-	value: unknown,
-	results: readonly AdmittedResult[],
-	repairs: string[],
-): unknown {
-	if (
-		!isRecord(value) ||
-		String(value.action).toUpperCase() !== "WITHHOLD" ||
-		listOrSingle(value.basedOn).length > 0
-	) {
-		return value;
-	}
-	const slug = trimmedSlug(value.practiceSlug);
-	const ids = results
-		.filter((result) => result.practiceSlug === slug && result.outcome === "NOT_MET")
-		.map((result) => result.resultId);
-	if (ids.length === 0) {
-		return value;
-	}
-	repairs.push(`basedOn filled in with ${slug}'s NOT_MET result ${ids.join(", ")}`);
-	return { ...value, basedOn: ids };
-}
-
 function readFeedbackPiece(
 	value: unknown,
 	practiceSlugs: readonly string[],
+	results: readonly AdmittedResult[],
 ): ReadFeedbackPiece | string {
 	if (!isRecord(value)) {
 		return `each item of feedback is one piece object with destination, practiceSlug, basedOn and action (received ${typeof value}); skipped.`;
@@ -3290,10 +3261,7 @@ function readFeedbackPiece(
 	if (!isFeedbackAction(action)) {
 		return `${action}; skipped.`;
 	}
-	const practiceSlug =
-		typeof value.practiceSlug === "string"
-			? value.practiceSlug.trim().toLowerCase().replaceAll("_", "-")
-			: "";
+	const practiceSlug = typeof value.practiceSlug === "string" ? value.practiceSlug.trim() : "";
 	if (!practiceSlug) {
 		return "practiceSlug is required; skipped.";
 	}
@@ -3326,7 +3294,10 @@ function readFeedbackPiece(
 		(reference): reference is string => typeof reference === "string" && reference.trim() !== "",
 	);
 	if (basedOn.length === 0) {
-		return "basedOn is required: the admitted result or problem id(s) this piece rests on; skipped.";
+		const ids = results
+			.filter((result) => result.practiceSlug === practiceSlug)
+			.map((result) => result.resultId);
+		return `basedOn is required: the admitted result or problem id(s) this piece rests on (${practiceSlug}'s results: ${ids.join(", ")}); skipped.`;
 	}
 	let withholdReason: string | undefined;
 	if (value.withholdReason !== undefined && value.withholdReason !== null) {
@@ -3419,7 +3390,7 @@ function negativePiecesOfWork(practiceSlug: string): number {
 	).size;
 }
 
-/** The CONVERSATION lane: notes to the mentor, and nothing that would be read out. */
+/** The CONVERSATION destination: notes to the mentor, and nothing that would be read out. */
 function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
 	if (hasText(piece.body) || hasText(piece.nextStep)) {
 		return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing for this destination is read out; skipped.";
@@ -3439,7 +3410,7 @@ function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
 }
 
 /**
- * The PRACTICE_PAGE lane: a body about a pattern across work, never a quote of this work. Every quote of a result the piece
+ * The PRACTICE_PAGE destination: a body about a pattern across work, never a quote of this work. Every quote of a result the piece
  * rests on counts, its own and its problems', whichever of its ids the piece names.
  */
 function validatePracticePagePiece(
@@ -3695,7 +3666,7 @@ function buildCompositionTurn(
 	results: readonly AdmittedResult[],
 	notReached: readonly string[] = [],
 ): string {
-	const lanes = PRIVATE_DESTINATIONS.filter(
+	const openDestinations = PRIVATE_DESTINATIONS.filter(
 		(destination) => request.destinations[destination].enabled,
 	)
 		.map((destination) => `${destination} (at most ${request.destinations[destination].maxPieces})`)
@@ -3712,7 +3683,7 @@ function buildCompositionTurn(
 		.map(
 			(destination) =>
 				`${destination}: ${privatelyComposable()
-					.filter((slug) => routedLanes?.get(slug)?.includes(destination) === true)
+					.filter((slug) => routedDestinations?.get(slug)?.includes(destination) === true)
 					.join(", ")}`,
 		)
 		.join("; ");
@@ -3750,11 +3721,11 @@ ${admitted}
 
 ${context}
 ${onTheWork}
-Lanes open this turn: ${lanes}.${closedNote}
-The practices each open lane may carry: ${routing}. Write no piece, not even a WITHHOLD, for a practice on a lane that does not list it.
+Destinations open this turn: ${openDestinations}.${closedNote}
+The practices each open destination may carry: ${routing}. Write no piece, not even a WITHHOLD, for a practice on a destination that does not list it.
 A pattern claim needs at least ${request.minDistinctItems} distinct pieces of work.
 
-${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a lane is a correct and common outcome; say in one line why, and stop.`;
+${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a destination is a correct and common outcome; say in one line why, and stop.`;
 }
 
 /** A transport failure or a server that is not answering yet; a refusal is a decision, not a blip. */
@@ -3774,16 +3745,13 @@ const ADMISSION_ATTEMPTS = 4;
 // one attempt may take minutes; the cap only bounds a server that went silent without closing.
 const ADMISSION_ATTEMPT_TIMEOUT_MS = 10 * 60_000;
 
-/** Preserve an HTTP refusal even when its body is unreadable. */
+/** The problem `detail` of an HTTP refusal; the raw body never reaches an error message. */
 async function answerText(response: Response): Promise<string> {
-	try {
-		const body = await response.text();
-		const problem: unknown = body.trim().startsWith("{") ? JSON.parse(body) : null;
-		const detail = isRecord(problem) ? problem.detail : null;
-		return typeof detail === "string" && detail.length > 0 ? detail : body.slice(0, 500);
-	} catch {
-		return "the server gave no readable reason";
-	}
+	const problem: unknown = await response.json().catch(() => null);
+	const detail = isRecord(problem) ? problem.detail : null;
+	return typeof detail === "string" && detail.length > 0
+		? detail
+		: "the server gave no problem detail";
 }
 
 /** One admission attempt: the answer it returns is the parsed body, unvalidated. */
@@ -3963,11 +3931,11 @@ function acceptAdmission(admitted: unknown): Record<string, unknown> {
 }
 
 /**
- * A private lane composes only what the server's read after admission routes to it. Without a complete read the lane
- * closes for this run: a refusal is the policy's answer, anything else is feedback that could not be composed. A lane
- * no NOT_MET practice is routed to closes as decided. Other lanes go on, and preparation still routes what is written.
+ * A private destination composes only what the server's read after admission routes to it. Without a complete read the destination
+ * closes for this run: a refusal is the policy's answer, anything else is feedback that could not be composed. A destination
+ * no NOT_MET practice is routed to closes as decided. Other destinations go on, and preparation still routes what is written.
  */
-function closeUnroutedPrivateLanes(request: CompositionRequest): void {
+function closeUnroutedPrivateDestinations(request: CompositionRequest): void {
 	const notMet = notMetPractices(admittedResults);
 	for (const destination of PRIVATE_DESTINATIONS) {
 		if (!request.destinations[destination].enabled || notMet.length === 0) {
@@ -3987,7 +3955,7 @@ function closeUnroutedPrivateLanes(request: CompositionRequest): void {
 			console.error(`[pi-runner] ${destination} closed for this run: no practice is routed to it`);
 		}
 	}
-	routedLanes = new Map(
+	routedDestinations = new Map(
 		notMet.map((slug) => [
 			slug,
 			PRIVATE_DESTINATIONS.filter(
@@ -3997,11 +3965,11 @@ function closeUnroutedPrivateLanes(request: CompositionRequest): void {
 	);
 }
 
-/** The NOT_MET practices private composition owes a decision on: those routed to an open lane, once routed. */
+/** The NOT_MET practices private composition owes a decision on: those routed to an open destination, once routed. */
 function privatelyComposable(): string[] {
 	const notMet = notMetPractices(admittedResults);
-	const lanes = routedLanes;
-	return lanes === null ? notMet : notMet.filter((slug) => (lanes.get(slug) ?? []).length > 0);
+	const routed = routedDestinations;
+	return routed === null ? notMet : notMet.filter((slug) => (routed.get(slug) ?? []).length > 0);
 }
 
 /** One read of the delivered public history; any refusal or bad answer is final, never an older or empty history. */
@@ -4182,10 +4150,16 @@ function resetSessionGuards(): void {
 	sessionGuards = { cutOff: 0, recordingCalls: 0, stored: 0 };
 }
 
-function openTurnTrace(label: string, budget: Work, demand: TurnDemand): TurnTrace {
+function openTurnTrace(
+	phase: SessionPhase,
+	label: string,
+	budget: Work,
+	demand: TurnDemand,
+): TurnTrace {
 	resetSessionGuards();
 	lastEventAt = Date.now();
 	currentTurn = {
+		phase,
 		modelError: false,
 		modelFailures: {},
 		lastModelFailureAt: null,
@@ -4493,7 +4467,7 @@ function notMetPractices(results: readonly { practiceSlug: string; outcome: Outc
 
 /**
  * Composition's budget: a piece per NOT_MET practice, but never more than a full turn's worth — the
- * lanes cap what it can write, so work beyond that is a loop, not more feedback.
+ * destinations cap what it can write, so work beyond that is a loop, not more feedback.
  */
 function compositionBudget(notMet: number): Work {
 	return turnBudget(Math.min(Math.max(1, notMet), PRACTICES_PER_TURN), PER_PRACTICE_WORK);
@@ -4542,6 +4516,7 @@ function incompleteCompositionReason(
 /** Retry undecided composition once, under its own work budget and the run's safety line. */
 async function askComposerOnceMore(
 	session: AgentSession,
+	phase: SessionPhase,
 	notMet: readonly string[],
 	undecided: () => readonly string[],
 	request: CompositionRequest,
@@ -4551,7 +4526,7 @@ async function askComposerOnceMore(
 	console.error(
 		`[pi-runner] composition left ${notMet.length} NOT_MET practice(s) undecided — asking once more`,
 	);
-	const trace = openTurnTrace("composition once more", compositionBudget(notMet.length), {
+	const trace = openTurnTrace(phase, "composition once more", compositionBudget(notMet.length), {
 		owed: () => undecided().length,
 		nudge: COMPOSITION_NUDGE,
 		endsWhenPaid: true,
@@ -4599,7 +4574,7 @@ ${finishCompositionText(notMet, request)}`,
 }
 
 function finishCompositionText(notMet: readonly string[], request: CompositionRequest): string {
-	// The lanes as they stand: a retry that does not know a lane is full writes feedback that are skipped.
+	// The destinations as they stand: a retry that does not know a destination is full writes feedback that is skipped.
 	const room = PRIVATE_DESTINATIONS.filter(
 		(destination) => request.destinations[destination].enabled,
 	)
@@ -4615,7 +4590,7 @@ function finishCompositionText(notMet: readonly string[], request: CompositionRe
 		`## Undecided\nThe turn ended with no piece and no WITHHOLD for these practices, each with a ` +
 		`NOT_MET result: ${notMet.join(", ")}. For each, persist the piece you decided on, or a ` +
 		`WITHHOLD with its reason (NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR), in one report_feedback ` +
-		`call. Room left for new items: ${room}; a lane with none left takes only a WITHHOLD. The ` +
+		`call. Room left for new items: ${room}; a destination with none left takes only a WITHHOLD. The ` +
 		`admitted results and their problems are in \`work/composition/results.json\`. Use tools only from this ` +
 		`point onward; no prose.`
 	);
@@ -4885,7 +4860,7 @@ async function main() {
 		openingInContext = false;
 		lastEventAt = Date.now();
 		activeSession = fresh;
-		return { session: fresh, unsubscribe: subscribeSession(fresh) };
+		return { session: fresh, phase, unsubscribe: subscribeSession(fresh) };
 	}
 
 	/** Keep settlement events subscribed until the native session stops before another scope starts. */
@@ -4961,7 +4936,8 @@ async function main() {
 		console.error(
 			`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerProblem} tokens per result so far)`,
 		);
-		const trace = openTurnTrace(label, budget, {
+		const phase: SessionPhase = "practice";
+		const trace = openTurnTrace(phase, label, budget, {
 			owed: () => owedPractices(slugs).length,
 			nudge: RECORD_NUDGE,
 		});
@@ -5391,7 +5367,7 @@ async function main() {
 	rmSync(`${CWD}/${REVIEW_INPUT_ROOT}`, { recursive: true, force: true });
 	await admitResults();
 	if (compositionRequest) {
-		closeUnroutedPrivateLanes(compositionRequest);
+		closeUnroutedPrivateDestinations(compositionRequest);
 	}
 	persistComposedFeedback();
 	maybeWriteResultFile();
@@ -5600,6 +5576,7 @@ async function main() {
 			state.reviewContext = "RESTORING";
 			return text;
 		};
+		const phase: SessionPhase = "public-review";
 		const { session: reviewSession } = await createAgentSession({
 			cwd: CWD,
 			agentDir: AGENT_DIR,
@@ -5613,7 +5590,7 @@ async function main() {
 					restore,
 				),
 			],
-			sessionManager: nativeSessionManager("public-review", null),
+			sessionManager: nativeSessionManager(phase, null),
 			settingsManager,
 			resourceLoader: reviewLoader,
 			modelRuntime,
@@ -5680,7 +5657,7 @@ async function main() {
 		const budget = compositionBudget(owed());
 		let started = false;
 		const wasStarted = () => started;
-		const trace = openTurnTrace("review composition", budget, { owed, nudge: REVIEW_NUDGE });
+		const trace = openTurnTrace(phase, "review composition", budget, { owed, nudge: REVIEW_NUDGE });
 		let finalTrace = trace;
 		try {
 			try {
@@ -5732,7 +5709,7 @@ async function main() {
 						? `[pi-runner] the review left ${left.length} NOT_MET result(s) undecided — asking once more`
 						: "[pi-runner] the review is not final — asking once more",
 				);
-				const retry = openTurnTrace("review composition once more", budget, {
+				const retry = openTurnTrace(phase, "review composition once more", budget, {
 					owed,
 					nudge: REVIEW_NUDGE,
 					endsWhenPaid: true,
@@ -5794,7 +5771,7 @@ async function main() {
 	}
 
 	/**
-	 * The private lanes, in a fresh session opened after measurement ended: it receives the task, the brief, the
+	 * The private destinations, in a fresh session opened after measurement ended: it receives the task, the brief, the
 	 * admitted results with their problems and the person's authorized history, reads with the evidence tools, and records only
 	 * with report_feedback. No measuring transcript is in its context.
 	 */
@@ -5823,7 +5800,7 @@ async function main() {
 		});
 		await privateLoader.reload();
 		composerTool = "report_feedback";
-		// A lane closed after admission (closeUnroutedPrivateLanes) leaves only the lanes still open.
+		// A destination closed after admission (closeUnroutedPrivateDestinations) leaves only the destinations still open.
 		{
 			currentTurnSlugs = [];
 			const opened = await openSession(
@@ -5835,7 +5812,7 @@ async function main() {
 			const { session } = opened;
 			let finalTrace: TurnTrace;
 			try {
-				finalTrace = await composeInto(session);
+				finalTrace = await composeInto(session, opened.phase);
 			} finally {
 				await closeSession(opened);
 			}
@@ -5847,14 +5824,19 @@ async function main() {
 			}
 		}
 
-		async function composeInto(session: AgentSession): Promise<TurnTrace> {
+		async function composeInto(session: AgentSession, phase: SessionPhase): Promise<TurnTrace> {
 			const undecided = undecidedPrivatePractices;
 			let started = false;
 			const wasStarted = () => started;
-			const trace = openTurnTrace("composition", compositionBudget(privatelyComposable().length), {
-				owed: () => undecided().length,
-				nudge: COMPOSITION_NUDGE,
-			});
+			const trace = openTurnTrace(
+				phase,
+				"composition",
+				compositionBudget(privatelyComposable().length),
+				{
+					owed: () => undecided().length,
+					nudge: COMPOSITION_NUDGE,
+				},
+			);
 			let finalTrace = trace;
 			try {
 				if (safety.expired()) {
@@ -5907,6 +5889,7 @@ async function main() {
 			) {
 				finalTrace = await askComposerOnceMore(
 					session,
+					phase,
 					left,
 					undecided,
 					request,

@@ -14,6 +14,7 @@ import { FeedbackResults, type FeedbackResultsState } from "./FeedbackResults";
 import { clearedScope } from "./review-scope";
 import type { FeedbackSearch } from "./review-search";
 import { ReviewListEnd } from "./ReviewListEnd";
+import { ReviewListRefresh } from "./ReviewListRefresh";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ScopeRecordFilter } from "./ReviewScopeFilters";
 import { ReviewTabIntro } from "./ReviewTabIntro";
@@ -102,6 +103,7 @@ export function FeedbackListPage({
 			{feedback.status === "loading" && <FeedbackResults state={{ status: "loading" }} />}
 			{feedback.status === "ready" && (
 				<>
+					<ReviewListRefresh failure={feedback.refreshFailure} noun="pieces of feedback" />
 					<FeedbackResults state={resultsState(rows, hasFilter ? reset : undefined)} />
 					{rows.length > 0 && <ReviewListEnd {...feedback} noun="feedback" />}
 				</>

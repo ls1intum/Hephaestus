@@ -301,7 +301,8 @@ public class ScanReportService {
         var practiceReports = new ArrayList<ScanPracticeReportDTO>();
         var comparisons = new HashMap<Long, Comparison>();
         for (var assignment : assigned) {
-            var version = versions.findById(Objects.requireNonNull(assignment.getPracticeVersionId()))
+            var version = versions.findByIdAndWorkspaceId(
+                            Objects.requireNonNull(assignment.getPracticeVersionId()), review.getWorkspaceId())
                     .filter(v -> v.getWorkspaceId() == review.getWorkspaceId())
                     .orElseThrow();
             var definition = json.convertValue(version.getDefinition(), PracticeDefinition.class);
@@ -486,7 +487,8 @@ public class ScanReportService {
     private ProblemComparison.@Nullable Standard standard(@Nullable ReviewPractice assignment) {
         if (assignment == null || assignment.getPracticeVersionId() == null || assignment.getMethod() == null)
             return null;
-        var version = versions.findById(assignment.getPracticeVersionId()).orElseThrow();
+        var version = versions.findByIdAndWorkspaceId(assignment.getPracticeVersionId(), assignment.getWorkspaceId())
+                .orElseThrow();
         var definition = json.convertValue(version.getDefinition(), PracticeDefinition.class);
         return new ProblemComparison.Standard(
                 ProblemComparison.sha256(

@@ -5,10 +5,14 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogOffer;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
+import de.tum.cit.aet.hephaestus.practices.catalog.EffectiveCatalog;
+import de.tum.cit.aet.hephaestus.practices.curated.CatalogChangeKind;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackModeSource;
@@ -19,6 +23,44 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class CatalogOriginPresentationTest extends BaseUnitTest {
+    @Test
+    void shouldLeaveReviewDigestAbsentForAGroupWithoutAJudgmentDefinition() {
+        var definition = new GroupDefinition("Review", "Review practices", null, null);
+        var offer = new CatalogOffer<>(
+                "review",
+                null,
+                definition,
+                definition,
+                definition,
+                0,
+                false,
+                CatalogEntryState.FROM_HEPHAESTUS,
+                CatalogChangeKind.NONE,
+                "group-etag",
+                true);
+        var catalog = mock(CatalogService.class);
+        when(catalog.effectiveCatalog()).thenReturn(new EffectiveCatalog(List.of(offer), List.of(), "catalog-etag"));
+        var group = new PracticeGroup();
+        group.setId(42L);
+        group.setSlug("review");
+        group.setName(definition.name());
+        group.setDescription(definition.description());
+        group.setCatalogSlug("review");
+        group.setCatalogBase(definition);
+        group.setCreatedAt(Instant.EPOCH);
+
+        var dto = new CatalogOriginPresenter(
+                        catalog,
+                        mock(PracticeReviewDigest.class),
+                        mock(PracticeVersionService.class),
+                        mock(WorkspaceReviewDefaultsProvider.class))
+                .present(10L, group);
+
+        assertThat(dto.catalogOrigin().state()).isEqualTo(CatalogEntryState.FROM_HEPHAESTUS);
+        assertThat(dto.catalogOrigin().catalogSlug()).isEqualTo("review");
+        assertThat(dto.catalogOrigin().offeredDigest()).isNull();
+    }
+
     @Test
     void shouldPresentAnUnlinkedPracticeAsLocalWithInstanceInheritance() {
         var versions = mock(PracticeVersionService.class);

@@ -37,8 +37,8 @@ public class ResultRetentionService {
         var cutoff = clock.instant().minus(Duration.ofDays(400));
         var workspaces = jdbc.sql(
                         "SELECT DISTINCT workspace_id FROM review WHERE kind='SCAN' AND completed_at<=:cutoff AND"
-                            + " COALESCE((report->>'expired')::boolean,false)=false UNION SELECT DISTINCT workspace_id"
-                            + " FROM result WHERE ended_at<=:cutoff ORDER BY workspace_id")
+                                + " COALESCE((report->>'expired')::boolean,false)=false UNION SELECT DISTINCT workspace_id"
+                                + " FROM result WHERE ended_at<=:cutoff ORDER BY workspace_id")
                 .param("cutoff", Timestamp.from(cutoff))
                 .query((rs, n) -> rs.getLong(1))
                 .list();

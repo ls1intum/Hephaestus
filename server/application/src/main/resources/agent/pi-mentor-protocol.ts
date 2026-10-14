@@ -351,12 +351,6 @@ export interface ShowFeedbackRequest {
 	params: { threadId: string; feedbackId: string };
 }
 
-export interface LinkSuccessResponse {
-	jsonrpc: typeof JSONRPC_VERSION;
-	id: JsonRpcId;
-	result: { resultId: string } | { problemId: string } | { feedbackId: string };
-}
-
 /** Java's answer when it refuses or fails a callback. */
 export interface ServerCallbackErrorResponse {
 	jsonrpc: typeof JSONRPC_VERSION;

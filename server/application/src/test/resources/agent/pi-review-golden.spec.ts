@@ -526,7 +526,9 @@ if (scenario !== undefined && scenario !== "") {
 			assert.ok(captured !== undefined);
 			if (UPDATE_GOLDEN) {
 				for (const file of readdirSync(nodePath.join(GOLDEN, name))) {
-					if (!captured.has(file)) unlinkSync(nodePath.join(GOLDEN, name, file));
+					if (!captured.has(file)) {
+						unlinkSync(nodePath.join(GOLDEN, name, file));
+					}
 				}
 				for (const [file, text] of captured) {
 					const shared = SHARED_GOLDENS.some((entry) => entry === file);
@@ -536,7 +538,10 @@ if (scenario !== undefined && scenario !== "") {
 				}
 			}
 			const scenarioFiles = readdirSync(nodePath.join(GOLDEN, name));
-			assert.deepEqual([...captured.keys()].sort(), [...SHARED_GOLDENS, ...scenarioFiles].sort());
+			assert.deepEqual(
+				[...captured.keys()].toSorted(),
+				[...SHARED_GOLDENS, ...scenarioFiles].toSorted(),
+			);
 			for (const file of captured.keys()) {
 				const actual = captured.get(file);
 				assert.ok(actual !== undefined);

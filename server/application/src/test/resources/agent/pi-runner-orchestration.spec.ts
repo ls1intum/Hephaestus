@@ -1099,24 +1099,30 @@ if (scenario !== undefined && scenario !== "") {
 				cwd,
 				manager,
 				(options) => {
-					assert.ok(cwd !== undefined && cwd !== "");
+					assert.ok(cwd !== "");
 					const first = !existsSync(nodePath.join(cwd, "system-prompt.md"));
 					const privateComposition = options.systemPrompt.includes(
 						"Compose from admitted problems.",
 					);
-					const promptFile = first
-						? "system-prompt.md"
-						: privateComposition
-							? "private-system-prompt.md"
-							: "review-system-prompt.md";
-					writeFileSync(nodePath.join(cwd, promptFile), options.systemPrompt);
-					if (!first)
+					if (first) {
+						writeFileSync(nodePath.join(cwd, "system-prompt.md"), options.systemPrompt);
+					} else {
+						writeFileSync(
+							nodePath.join(
+								cwd,
+								privateComposition ? "private-system-prompt.md" : "review-system-prompt.md",
+							),
+							options.systemPrompt,
+						);
 						record(`review-loader extensions=${String(options.extensionFactories?.length)}`);
+					}
 					assert.ok(options.agentsFilesOverride);
 					assert.deepEqual(options.agentsFilesOverride(), { agentsFiles: [] });
 				},
 				() => {
-					if (scenario === "setup") now += PAST_SAFETY_MS;
+					if (scenario === "setup") {
+						now += PAST_SAFETY_MS;
+					}
 				},
 			),
 			async createAgentSession(options: {
@@ -1950,13 +1956,20 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								// The composer's finishing prompt: the runner asks once more for the practices
 								// with a NOT_MET result, and a WITHHOLD is a recorded decision.
-								// Sent without basedOn: a WITHHOLD rests on its practice's NOT_MET result,
-								// found under its exact slug.
+								// A WITHHOLD sent without basedOn is refused with the practice's result ids;
+								// the second piece names one.
 								const withheld = await tool("report_feedback").execute("f-9", {
 									feedback: [
 										{
 											destination: "PRACTICE_PAGE",
 											practiceSlug: "test-practice",
+											action: "WITHHOLD",
+											withholdReason: "below_bar",
+										},
+										{
+											destination: "PRACTICE_PAGE",
+											practiceSlug: "test-practice",
+											basedOn: ["result-1"],
 											action: "WITHHOLD",
 											withholdReason: "below_bar",
 										},
@@ -2602,23 +2615,9 @@ if (scenario !== undefined && scenario !== "") {
 								);
 								await assert.rejects(atRevision("b".repeat(40), 2), /no such file at revision/u);
 								record("citation:history-refused");
-								// Coordinates alone: the runner records the line and echoes what it recorded.
-								const echoed: unknown = await cite("src/Auth.java", "", "Cited by line alone");
-								const firstContent: unknown =
-									typeof echoed === "object" &&
-									echoed !== null &&
-									"content" in echoed &&
-									Array.isArray(echoed.content)
-										? echoed.content[0]
-										: undefined;
-								const echoedText =
-									typeof firstContent === "object" &&
-									firstContent !== null &&
-									"text" in firstContent &&
-									typeof firstContent.text === "string"
-										? firstContent.text
-										: "";
-								record(`citation:echo:${echoedText.split("\n")[1] ?? ""}`);
+								// Coordinates alone verify nothing: the quote is the claim the runner checks.
+								await assert.rejects(cite("src/Auth.java", "", "Cited by line alone"), /quote/u);
+								record("citation:no-quote-refused");
 								writeFileSync(nodePath.join(cwd, "out", "stray.txt"), "left by a session");
 								return;
 							}
@@ -3597,6 +3596,37 @@ if (scenario !== undefined && scenario !== "") {
 						},
 					);
 					assert.equal(child.error, undefined);
+					// Read production output from the native orchestration fixtures, including both retry helpers.
+					const expectedPhases = new Map([
+						["scope-native-completion", ["practice"]],
+						["compose", ["practice", "public-review", "private-feedback"]],
+						["compose-recover", ["practice", "public-review", "public-review", "private-feedback"]],
+						[
+							"compose-no-decision",
+							["practice", "public-review", "private-feedback", "private-feedback"],
+						],
+						["compose-recovered-error", ["practice", "public-review", "private-feedback"]],
+						["compose-private-error", ["practice", "public-review", "private-feedback"]],
+					]).get(fixture);
+					if (expectedPhases !== undefined) {
+						const debug: unknown = JSON.parse(
+							readFileSync(nodePath.join(cwd, "out/runner-debug.json"), "utf8"),
+						);
+						assert.ok(isRecord(debug) && Array.isArray(debug.turns));
+						assert.deepEqual(
+							debug.turns.map((turn: unknown) => {
+								assert.ok(isRecord(turn));
+								assert.ok(
+									typeof turn.durationMs === "number" &&
+										Number.isSafeInteger(turn.durationMs) &&
+										turn.durationMs >= 0,
+								);
+								return turn.phase;
+							}),
+							expectedPhases,
+						);
+					}
+
 					const events = readFileSync(nodePath.join(cwd, "events"), "utf8")
 						.trim()
 						.split("\n")
@@ -3851,7 +3881,7 @@ if (scenario !== undefined && scenario !== "") {
 								// The last call failed with a stated native status, before any response.
 								"compose-public-error": [
 									[
-										"review composition",
+										"public-review",
 										{
 											kind: "HTTP_ERROR",
 											source: "ADAPTER",
@@ -3868,7 +3898,7 @@ if (scenario !== undefined && scenario !== "") {
 								// Responses diagnostics are read like chat-completions ones.
 								"compose-recovered-error": [
 									[
-										"review composition",
+										"public-review",
 										null,
 										0,
 										timing(
@@ -3884,7 +3914,7 @@ if (scenario !== undefined && scenario !== "") {
 								// event marks it. A call without a span is not timed, not timed as zero.
 								"compose-private-error": [
 									[
-										"composition",
+										"private-feedback",
 										{
 											kind: "UNKNOWN",
 											source: "INVALID",
@@ -3902,14 +3932,14 @@ if (scenario !== undefined && scenario !== "") {
 							assert.ok(!debugText.includes("sk-orchestration-secret"));
 							const debug: unknown = JSON.parse(debugText);
 							assert.ok(isRecord(debug) && Array.isArray(debug.turns));
-							for (const [label, final, unattributed, callTiming] of failures[stage] ?? []) {
+							for (const [phase, final, unattributed, callTiming] of failures[stage] ?? []) {
 								const turn: unknown = debug.turns.find(
-									(entry: unknown) => isRecord(entry) && entry.label === label,
+									(entry: unknown) => isRecord(entry) && entry.phase === phase,
 								);
-								assert.ok(isRecord(turn), label);
-								assert.deepEqual(turn.finalModelFailure, final, `${stage} ${label}`);
-								assert.equal(turn.unattributedModelFailures, unattributed, `${stage} ${label}`);
-								assert.deepEqual(turn.modelCallTiming, callTiming, `${stage} ${label}`);
+								assert.ok(isRecord(turn), phase);
+								assert.deepEqual(turn.finalModelFailure, final, `${stage} ${phase}`);
+								assert.equal(turn.unattributedModelFailures, unattributed, `${stage} ${phase}`);
+								assert.deepEqual(turn.modelCallTiming, callTiming, `${stage} ${phase}`);
 								assert.ok(isRecord(turn.modelFailures));
 								assert.equal(
 									Object.values(turn.modelFailures).reduce(
@@ -4813,7 +4843,7 @@ for (const item of nullableCases) {
 									"citation:stored",
 									"citation:history:1",
 									"citation:history-refused",
-									'citation:echo:   src/Auth.java:2-2 recorded "  insecure();"',
+									"citation:no-quote-refused",
 								],
 								child.stderr,
 							);
@@ -4826,9 +4856,10 @@ for (const item of nullableCases) {
 									sourceKind: "scm.repository.tree",
 									sourcePath: "repos/primary/.git/HEAD",
 									path: "src/Auth.java",
+									revision: readFileSync(nodePath.join(cwd, "history-sha"), "utf8"),
 									startLine: 2,
 									endLine: 2,
-									quote: "  insecure();",
+									quote: "insecure();",
 								},
 							]);
 							reached({ "test-practice": "EVALUATED" });
@@ -5387,11 +5418,11 @@ for (const item of nullableCases) {
 							assert.equal(events.filter((event) => event === "steer").length, 1);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-finish:")) ?? "",
-								/#1: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\)/u,
+								/#1: basedOn is required: [^;]*\(test-practice's results: result-1\); skipped\./u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-finish:")) ?? "",
-								/basedOn filled in with test-practice's NOT_MET result result-1\./u,
+								/#2: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\)/u,
 							);
 							// The retry exists only to decide what was left undecided: once nothing is, it ends.
 							assert.match(
@@ -5941,7 +5972,7 @@ for (const item of nullableCases) {
 								(turn: unknown) =>
 									typeof turn === "object" &&
 									turn !== null &&
-									Reflect.get(turn, "label") === "review composition",
+									Reflect.get(turn, "phase") === "public-review",
 							);
 							assert.ok(typeof composition === "object" && composition !== null);
 							assert.equal(Reflect.get(composition, "toolErrors"), 24);

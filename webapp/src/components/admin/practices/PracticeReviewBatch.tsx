@@ -70,6 +70,8 @@ const WINDOWS = [
 
 /** Each one names what stopped it and the single thing that restarts it — never just the cause. */
 const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBatch["pauseReason"]>, string> = {
+	PAUSED_BY_ADMIN:
+		"A workspace admin paused this review. Resume it to continue from where it stopped.",
 	BUDGET_EXHAUSTED:
 		"The monthly AI budget funding these reviews is used up. Nothing has been skipped. The review continues from where it stopped once the budget resets or the cap is raised.",
 	REVIEW_MODEL_UNBOUND:

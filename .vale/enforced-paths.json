@@ -173,7 +173,7 @@
 	"docs/decisions/0052-activity-sorts-by-contributions-and-can-be-public.md",
 	"docs/decisions/0053-workspace-addresses-are-a-presentation-origin.md",
 	"docs/decisions/0054-practice-visuals-and-guides.md",
-	"docs/decisions/0055-practice-scripts-call-models-through-the-runner.md",
+	"docs/decisions/0055-practice-scripts-use-one-result-contract.md",
 	"docs/user/accessibility.mdx",
 	"docs/user/activity.mdx",
 	"docs/user/ai-code-review.mdx",

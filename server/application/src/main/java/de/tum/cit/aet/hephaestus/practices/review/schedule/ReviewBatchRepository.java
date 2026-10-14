@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review.schedule;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchPauseReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchStatus;
 import java.util.Collection;
 import java.util.List;
@@ -18,6 +19,10 @@ public interface ReviewBatchRepository extends JpaRepository<ReviewBatch, UUID> 
     List<ReviewBatch> findByWorkspaceIdOrderByCreatedAtDesc(long workspaceId, Pageable pageable);
 
     boolean existsByWorkspaceIdAndStatusIn(long workspaceId, Collection<ReviewBatchStatus> statuses);
+
+    @WorkspaceAgnostic("The driver rechecks budget pauses across workspaces")
+    List<ReviewBatch> findByStatusAndPauseReasonOrderByUpdatedAtAscIdAsc(
+            ReviewBatchStatus status, ReviewBatchPauseReason reason, Pageable pageable);
 
     @WorkspaceAgnostic("The driver reads active batches across workspaces")
     List<ReviewBatch> findByStatusOrderByUpdatedAtAscIdAsc(ReviewBatchStatus status, Pageable pageable);

@@ -51,7 +51,7 @@ public record WorkspaceLlmUsageReportDTO(
         @NonNull
         @Schema(
                 description = "Runs this month (job attempts and mentor turns, either purse) with at least one "
-                        + "ledger row whose price is not yet known, each counted once. A practice script row counts "
+                        + "ledger row whose cost is unavailable because a rate is missing or the measurement is unverified, each counted once. A practice script row counts "
                         + "toward the run of its review. Those rows are excluded from both totals above, so a "
                         + "non-zero value means the real spend may be higher than shown.")
         Long unpricedEventCount,
@@ -59,7 +59,7 @@ public record WorkspaceLlmUsageReportDTO(
         @NonNull
         @Schema(
                 description = "Whether host-funded (shared-model) spend is within its cap, has reached it, or cannot "
-                        + "be confirmed because some shared-model usage has no price set.")
+                        + "be confirmed because shared-model rates are missing or usage measurements are unverified.")
         LlmBudgetVerdict instanceBudgetVerdict,
 
         @NonNull
@@ -69,8 +69,8 @@ public record WorkspaceLlmUsageReportDTO(
         @NonNull
         @Schema(
                 description = "Whether work on SHARED models is currently paused for this workspace. Authoritative —"
-                    + " it mirrors the live gate rather than being derivable from the verdict alone. Always false for"
-                    + " a past month, which cannot pause anything.")
+                        + " it mirrors the live gate rather than being derivable from the verdict alone. Always false for"
+                        + " a past month, which cannot pause anything.")
         Boolean instancePaused,
 
         @NonNull @Schema(description = "Whether work on this workspace's OWN provider is currently paused.")

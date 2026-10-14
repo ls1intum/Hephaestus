@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -120,7 +121,7 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
                         + " ('SLACK','https://slack.com',CURRENT_TIMESTAMP) ON CONFLICT(type,server_url) DO UPDATE SET"
                         + " server_url=EXCLUDED.server_url RETURNING id",
                 Long.class);
-        databaseTestUtils.erase(providerId, "UPRIVACYTARGET", "");
+        databaseTestUtils.erase(Objects.requireNonNull(providerId), "UPRIVACYTARGET", "");
         var captured = new ArrayList<ObjectNode>();
         projector.forEachWorkspaceMessage(workspace, captured::add);
         assertThat(captured)

@@ -38,7 +38,7 @@ Historical unknown visibility stays Unconfirmed. A confirmed sibling copy keeps 
 Old positive measurements do not establish the complete current standard merely because their names changed.
 
 **Practice settings.**
-Practice definitions are now stored on practice versions.
+Practice definitions are stored on practice versions.
 The new definition has reviewOn, appliesWhen, about, reads, reviewedBy, criteria, script, scan, lineNotes and guidance.
 The source contract stays in reads.contract.
 Human review explanations and limits stay in reviewedBy.
@@ -51,10 +51,10 @@ Review every practice left Off if the previous setting was intended to stop AI r
 Instance silent mode and workspace delivery pause control delivery, not review execution.
 
 **People.**
-Membership and reviewed developers now use native accounts rather than SCM user IDs.
+Membership and reviewed developers use native accounts rather than SCM user IDs.
 Roster sync can create an UNCLAIMED account before sign-in.
 
-Sign-in claims that record instead of making another person.
+Sign-in claims the roster account instead of creating a second account.
 AI choice and the preference for external comments and reminders apply across the account's workspaces.
 Review conflicting imported preferences in the account settings.
 A former member keeps membership history but has no active workspace access.
@@ -88,7 +88,7 @@ Direct script model calls default to 200,000 tokens and 1,000 search units per a
 Set PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT to change the token limit.
 Set PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT to change the search-unit limit.
 A spent limit returns HTTP 402. Calls already in flight can finish above the limit.
-A practice-review timeout below 61 seconds runs at 61 seconds.
+See [Practice review operations](https://docs.hephaestus.build/admin/practice-review-operations) for the minimum practice-review timeout.
 
 **Custom API clients.**
 Workspace paths below begin with /workspaces/{workspaceSlug}.

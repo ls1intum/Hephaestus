@@ -19,6 +19,7 @@ import { useScopeRecordFilter } from "@/hooks/use-scope-record-filter";
 import { useSearchState } from "@/lib/search-params";
 import { pagedListState } from "@/runtime/tanstack-query/infinite-list";
 import { pagedModelParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/feedback",
@@ -36,13 +37,15 @@ function FeedbackListRoute() {
 		void setSearch((previous) => ({ ...previous, ...patch }), { replace: true });
 	};
 
+	const listOptions = listReviewFeedbackInfiniteOptions({
+		path: { workspaceSlug },
+		query: feedbackQuery(search, REVIEW_PAGE_SIZE),
+	});
 	const feedbackQueryResult = useInfiniteQuery({
-		...listReviewFeedbackInfiniteOptions({
-			path: { workspaceSlug },
-			query: feedbackQuery(search, REVIEW_PAGE_SIZE),
-		}),
+		...listOptions,
 		...pagedModelParams,
 	});
+	useQueryReadRefusal(listOptions.queryKey, feedbackQueryResult.isError, feedbackQueryResult.error);
 	const { groups, practices, people } = useReviewScopeSources(workspaceSlug);
 	// Everything addressed to the developer filtered to, whatever else is filtered: the summary is
 	// about the person, and its counts open the list narrowed to them alone.

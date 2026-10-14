@@ -22,6 +22,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
@@ -66,7 +67,8 @@ public class MembershipController {
     @GetMapping
     @Operation(operationId = "listMemberships", summary = "List workspace memberships")
     public ResponseEntity<PageResponseDTO<WorkspaceMembershipDTO>> listMembers(
-            WorkspaceContext context, @PageableDefault(size = 50, sort = "joinedAt") Pageable pageable) {
+            WorkspaceContext context,
+            @ParameterObject @PageableDefault(size = 50, sort = "joinedAt") Pageable pageable) {
         var page = workspaceMembershipService.listMembers(context.id(), pageable);
         var accountIds = page.getContent().stream()
                 .map(member -> Objects.requireNonNull(member.getAccountId()))

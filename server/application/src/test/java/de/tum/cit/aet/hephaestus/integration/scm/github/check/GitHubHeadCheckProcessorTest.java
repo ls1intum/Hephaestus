@@ -61,7 +61,7 @@ class GitHubHeadCheckProcessorTest extends BaseUnitTest {
         PullRequest alreadyFailed = new PullRequest();
         alreadyFailed.setHeadRefOid(HEAD);
         alreadyFailed.observeHeadChecks(HEAD, CheckState.FAILURE, false);
-        when(pullRequestRepository.findAllByRepository_IdAndHeadRefOid(5L, HEAD))
+        when(pullRequestRepository.findAllForUpdateByRepositoryIdAndHeadRefOid(5L, HEAD))
                 .thenReturn(List.of(open, alreadyFailed));
 
         new GitHubHeadCheckProcessor(pullRequestRepository)

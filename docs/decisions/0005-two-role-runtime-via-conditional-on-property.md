@@ -95,7 +95,7 @@ property.
 
 The "agent NATS pull consumer" named in the Context section, and `hephaestus.agent.nats.enabled`
 in the 2026-07-20 update above, no longer exist. The agent job queue moved off NATS JetStream onto
-PostgreSQL — each worker replica polls `review_job` and claims a batch with
+PostgreSQL — each worker replica polls `agent_job` and claims a batch with
 `FOR UPDATE SKIP LOCKED` instead of pulling ids off a stream — see **ADR 0025**. The job-execution
 capability expression `AgentJobExecutor` and the LLM proxy key off is now
 `hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled`: same shape, the left-hand
@@ -189,3 +189,9 @@ needs. The shipped Compose stacks now set it there: `application-worker` is the 
 the worker role and the only one given the Docker socket, and the `gate:env` check fails a container
 that mounts the socket without that role. That is the server-only deployment the 2026-07-22 update
 called unbuilt; it needed no new role.
+
+## Update — 2026-10-14 (#2656): the job table and classes are renamed
+
+`agent_job` is `review_job`. `AgentJobExecutor`, `AgentJobService`, `AgentJobZombieSweeper` and
+`AgentJobRetentionService` are `ReviewJobExecutor`, `ReviewJobService`, `ReviewJobZombieSweeper` and
+`ReviewJobRetentionService`. The decision above is unchanged.

@@ -121,7 +121,6 @@ function membership(role: WorkspaceMembership["role"]): WorkspaceMembership {
 			identities: [],
 			status: "ACTIVE",
 		},
-		accountId: "1002",
 		eligibleForPracticeReview: true,
 		hidden: false,
 		joinedAt: "2026-01-01T00:00:00Z",

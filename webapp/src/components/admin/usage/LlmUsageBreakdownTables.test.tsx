@@ -164,7 +164,7 @@ describe("usage breakdown columns", () => {
 			within(table)
 				.getAllByRole("columnheader")
 				.map((header) => header.textContent),
-		).toStrictEqual(["Day", "Shared models", "Own provider", "Runs", "No price set"]);
+		).toStrictEqual(["Day", "Shared models", "Own provider", "Runs", "Unavailable cost"]);
 		expect(cellTexts(totalsRowOf("AI spend by day"))).toStrictEqual(["$4.25", "$1.75", "30", "2"]);
 	});
 
@@ -184,7 +184,7 @@ describe("usage breakdown columns", () => {
 		render(<LlmUsageByJobTypeTable report={priced} purses={BOTH} />);
 
 		const table = screen.getByRole("table", { name: "AI spend by run type" });
-		expect(within(table).queryByRole("columnheader", { name: "No price set" })).toBeNull();
+		expect(within(table).queryByRole("columnheader", { name: "Unavailable cost" })).toBeNull();
 	});
 
 	it("prints nothing spent as $0.00 and averages it to $0.00, not a dash", () => {

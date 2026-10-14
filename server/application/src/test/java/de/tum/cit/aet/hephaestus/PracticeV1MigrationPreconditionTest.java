@@ -17,8 +17,8 @@ class PracticeV1MigrationPreconditionTest {
         var cases = new Corruption[] {
             new Corruption(
                     "UPDATE feedback_dispatch SET"
-                        + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
-                        + " WHERE id='00000000-0000-0000-0000-000000992241'",
+                            + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
+                            + " WHERE id='00000000-0000-0000-0000-000000992241'",
                     "SQL Precondition failed",
                     "UPDATE feedback_dispatch SET state='PENDING',lease_owner=NULL,lease_expires_at=NULL WHERE"
                             + " id='00000000-0000-0000-0000-000000992241'"),

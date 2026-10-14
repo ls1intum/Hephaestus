@@ -267,9 +267,10 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         AuthenticationResult result = authenticate("POST", path, tokenFor(job));
 
         assertThat(result.status()).isEqualTo(200);
-        assertThat(((ProxyIdentity) result.authentication().getPrincipal()).description())
+        var authentication = Objects.requireNonNull(result.authentication());
+        assertThat(((ProxyIdentity) Objects.requireNonNull(authentication.getPrincipal())).description())
                 .isEqualTo("job:" + job.getId());
-        assertThat(result.authentication().getAuthorities())
+        assertThat(authentication.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
                 .containsExactly("SCOPE_" + WorkerJwtIssuer.LLM_PROXY_SCOPE);
     }
@@ -760,7 +761,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         request.setRemoteAddr("127.0.0.1");
         request.addHeader("Authorization", "Bearer " + token);
         MockHttpServletResponse response = new MockHttpServletResponse();
-        AtomicReference<Authentication> authentication = new AtomicReference<>();
+        AtomicReference<@Nullable Authentication> authentication = new AtomicReference<>();
         filter.doFilter(
                 request,
                 response,
@@ -769,7 +770,8 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return new AuthenticationResult(response.getStatus(), authentication.get());
     }
 
-    private record AuthenticationResult(int status, Authentication authentication) {}
+    private record AuthenticationResult(
+            int status, @Nullable Authentication authentication) {}
 
     private String tokenFor(ReviewJob job) {
         return jwtIssuer.issueForJob(job.getId(), workspace.getId(), job.getAttempt(), Duration.ofMinutes(5));
@@ -779,7 +781,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Authentication authentication = Objects.requireNonNull(result.authentication(), "token did not authenticate");
         return new ProxyRoutingService(jobRepository, objectMapper, new MentorProxyCredentialRegistry())
                 .resolve(
-                        (ProxyIdentity) authentication.getPrincipal(),
+                        (ProxyIdentity) Objects.requireNonNull(authentication.getPrincipal()),
                         new MockHttpServletRequest("POST", "/internal/llm/chat/completions"));
     }
 

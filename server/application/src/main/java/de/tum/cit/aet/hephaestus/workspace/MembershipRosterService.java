@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.MembershipPageQuery;
 import de.tum.cit.aet.hephaestus.workspace.spi.MembershipRoster;
@@ -37,11 +38,13 @@ public class MembershipRosterService implements MembershipRoster, MembershipPage
     @Override
     @Transactional
     public boolean ensureMember(long workspaceId, long accountId) {
-        var workspace = workspaces.findByIdForUpdate(workspaceId).orElseThrow();
+        var workspace = workspaces
+                .findByIdForUpdate(workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) return false;
         var existing = memberships.findByWorkspace_IdAndAccount_Id(workspaceId, accountId);
         if (existing.isPresent()) return existing.get().getLeftAt() == null;
-        var account = accounts.find(accountId).orElseThrow();
+        var account = accounts.find(accountId).orElseThrow(() -> new EntityNotFoundException("Account", accountId));
         if (account.status() != Account.Status.UNCLAIMED && account.status() != Account.Status.ACTIVE) return false;
         memberships.insertIfAbsent(workspaceId, accountId, Membership.WorkspaceRole.MEMBER.name(), false);
         return memberships

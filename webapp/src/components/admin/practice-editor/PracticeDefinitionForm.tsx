@@ -1,6 +1,7 @@
 import deepEqual from "fast-deep-equal";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { type ReactElement, type ReactNode, useRef, useState } from "react";
+import { UnsavedPracticeDraft } from "./unsaved-practice-draft";
 
 import type {
 	PracticeDefinition,
@@ -176,8 +177,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		kindDraftsRef.current = new Map([[draft.kind, kindDraftOf(draft)]]);
 	}
 	const kindDrafts = kindDraftsRef.current;
+	const isDirty = !deepEqual(draft, initialDraft(definitionOptions, initialData));
 	const unsavedChanges = useUnsavedChanges({
-		isDirty: !deepEqual(draft, initialDraft(definitionOptions, initialData)),
+		isDirty,
 		disabled: formDisabled,
 	});
 	const update = (patch: Partial<PracticeDefinitionDraft>) =>
@@ -247,7 +249,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
 			{unsavedChanges.dialog}
 			<DrawerBody className="flex flex-col gap-8">
-				{beforeFields}
+				<UnsavedPracticeDraft value={isDirty}>{beforeFields}</UnsavedPracticeDraft>
 				<FormErrorSummary key={refusals} errors={shown?.summary ?? []} />
 				<fieldset disabled={formDisabled} className="contents">
 					{/* The panel is the measure. Capping the controls narrower than the panel they sit in

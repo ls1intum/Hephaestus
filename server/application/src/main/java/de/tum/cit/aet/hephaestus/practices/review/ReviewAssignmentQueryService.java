@@ -65,12 +65,10 @@ public class ReviewAssignmentQueryService implements ReviewAssignmentQuery {
         var parent = review.orElseThrow();
         if (pinned.getPracticeVersionId() == null || pinned.getMethod() == null || member.getItemVersion() == null)
             return Optional.empty();
-        var version = versions.findById(pinned.getPracticeVersionId())
+        var version = versions.findByIdAndWorkspaceId(pinned.getPracticeVersionId(), workspaceId)
                 .filter(v -> v.getWorkspaceId() == workspaceId
                         && v.getPractice().getId().equals(id.practiceId()));
-        var practice = practices
-                .findById(id.practiceId())
-                .filter(p -> p.getWorkspace().getId().equals(workspaceId));
+        var practice = practices.findByIdAndWorkspaceId(id.practiceId(), workspaceId);
         var ref = itemQuery.find(workspaceId, id.itemId());
         if (version.isEmpty() || practice.isEmpty() || ref.isEmpty()) return Optional.empty();
         if (!version.orElseThrow().getDefinition().has("about")) return Optional.empty();

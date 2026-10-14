@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewAdmissionData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
@@ -53,6 +54,9 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     PracticeVersionService versions;
+
+    @Autowired
+    PracticeVersionRepository historicalVersions;
 
     @MockitoBean
     ResultSourceAuthorization authorization;
@@ -250,5 +254,36 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
                 .isEmpty();
         assertThat(history.forItem(foreign.workspace().getId(), result.getItemId(), result.getPracticeId(), 20))
                 .isEmpty();
+    }
+
+    @Test
+    void shouldReadTheWorkspaceStandardThatExistedAtTheHistoricalEdge() {
+        long workspace = scenario.workspace().getId();
+        long practiceId = scenario.practice().getId();
+        long originalId =
+                Objects.requireNonNull(scenario.practice().getCurrentVersion().getId());
+        var edge = Instant.now();
+        var definition = DefinitionTestFixtures.definition();
+        var changed = new PracticeDefinition(
+                definition.name(),
+                definition.reviewOn(),
+                definition.appliesWhen(),
+                definition.about(),
+                definition.reads(),
+                definition.reviewedBy(),
+                "A different review standard.",
+                definition.script(),
+                definition.scan(),
+                definition.lineNotes(),
+                definition.guidance());
+        var appended = versions.append(scenario.practice(), changed, scenarioAccountId);
+        var foreign = data.scenario();
+        var ids = List.of(practiceId, foreign.practice().getId());
+        assertThat(historicalVersions.findAt(workspace, ids, edge))
+                .extracting(v -> v.getId())
+                .containsExactly(originalId);
+        assertThat(historicalVersions.findAt(workspace, ids, Instant.now()))
+                .extracting(v -> v.getId())
+                .containsExactly(appended.getId());
     }
 }

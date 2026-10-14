@@ -6,7 +6,7 @@ import {
 	type PracticeScriptContext,
 } from "../../lib/core/practice-script.ts";
 import { evidenceTools } from "./evidence-tools.ts";
-import type { GrepMatch } from "./grep.ts";
+import type { GrepMatch, GrepOptions } from "./grep.ts";
 import {
 	repositoryRecordSchema,
 	fileRecordSchema,
@@ -25,12 +25,8 @@ export {
 	type ScmFileRecord,
 } from "./records.ts";
 export type { DiffFile } from "./types.ts";
+export type { GrepOptions } from "./grep.ts";
 export { addedComments, commentKinds, type AddedComment } from "./comment-kinds.ts";
-export interface GrepOptions {
-	glob?: string;
-	maxResults?: number;
-	fixedString?: boolean;
-}
 export interface FileTree {
 	readonly revision: string;
 	read: (

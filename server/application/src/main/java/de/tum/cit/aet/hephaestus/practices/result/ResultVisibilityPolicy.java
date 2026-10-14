@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.result;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
@@ -30,7 +31,7 @@ public class ResultVisibilityPolicy {
     private final EvidenceAuthorization evidenceAuthorization;
     private final ResultMarkRepository marks;
     private final PracticeRepository practices;
-    private final ResultPracticeVersionRepository versions;
+    private final PracticeVersionRepository versions;
 
     public Set<UUID> permitsAll(long workspaceId, Collection<Result> results, SourceUsePurpose purpose) {
         return permitted(workspaceId, results, purpose, false);
@@ -65,15 +66,18 @@ public class ResultVisibilityPolicy {
         if (result.getEndedAt() != null) {
             return Currentness.STALE;
         }
-        if (pinned == null
-                || result.getEvidenceVersion() == 0
-                || result.getSummary() == null
-                || result.getExplanation() == null
-                || result.getEvidence() == null
-                || result.getCoverage() == null) {
-            return Currentness.UNVERIFIABLE;
-        }
+        if (!verifiable(result, pinned)) return Currentness.UNVERIFIABLE;
+        Objects.requireNonNull(pinned);
         return pinned.getReviewDigest().equals(current.getReviewDigest()) ? Currentness.CURRENT : Currentness.STALE;
+    }
+
+    private static boolean verifiable(Result result, @Nullable PracticeVersion pinned) {
+        return pinned != null
+                && result.getEvidenceVersion() != 0
+                && result.getSummary() != null
+                && result.getExplanation() != null
+                && result.getEvidence() != null
+                && result.getCoverage() != null;
     }
 
     public Set<UUID> permitsAt(long workspaceId, Collection<Result> rows, SourceUsePurpose purpose, Instant at) {
@@ -83,12 +87,18 @@ public class ResultVisibilityPolicy {
                         && (r.getEndedAt() == null || r.getEndedAt().isAfter(at)))
                 .toList();
         var pinned = pinnedVersions(workspaceId, owned);
-        var current = practices
-                .findByWorkspaceIdAndIdIn(
-                        workspaceId,
-                        owned.stream().map(Result::getPracticeId).distinct().toList())
-                .stream()
-                .collect(Collectors.toMap(Practice::getId, Function.identity()));
+        var current =
+                versions
+                        .findAt(
+                                workspaceId,
+                                owned.stream()
+                                        .map(Result::getPracticeId)
+                                        .distinct()
+                                        .toList(),
+                                at)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                v -> Objects.requireNonNull(v.getPractice().getId()), Function.identity()));
         var incorrect =
                 marks
                         .findByWorkspaceIdAndResultIdIn(
@@ -104,11 +114,10 @@ public class ResultVisibilityPolicy {
                 owned.stream()
                         .filter(r -> !incorrect.contains(r.getId())
                                 && current.containsKey(r.getPracticeId())
-                                && currentness(
-                                                r,
-                                                pinned.get(r.getPracticeVersionId()),
-                                                current.get(r.getPracticeId()).getCurrentVersion())
-                                        == Currentness.CURRENT)
+                                && verifiable(r, pinned.get(r.getPracticeVersionId()))
+                                && Objects.requireNonNull(pinned.get(r.getPracticeVersionId()))
+                                        .getReviewDigest()
+                                        .equals(current.get(r.getPracticeId()).getReviewDigest()))
                         .toList(),
                 purpose);
     }

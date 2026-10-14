@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventLedgerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRecorded;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
 import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventService;
@@ -95,6 +96,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 
 @Import({ReviewIntegrationData.class, ReviewAdmissionData.class})
 class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    ItemEventLedgerProperties eventProperties;
+
     @Autowired
     ItemEventService itemEvents;
 
@@ -670,11 +674,16 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
     void shouldRecordBudgetWaitingAndStartTheSameEventAfterBudgetBecomesAvailable() {
         var input = eventInput();
         when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(false);
+        var offeredAt = Instant.now();
         var id = itemEvents.record(input);
         var waiting = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
         assertThat(waiting.getState()).isEqualTo(ItemEventState.WAITING);
         assertThat(waiting.getReason()).isEqualTo("BUDGET_EXHAUSTED");
         assertThat(waiting.getRetryAt()).isNotNull();
+        assertThat(Objects.requireNonNull(waiting.getRetryAt()))
+                .isBetween(
+                        offeredAt.plus(eventProperties.pendingRetryAfter()).minusSeconds(1),
+                        Instant.now().plus(eventProperties.pendingRetryAfter()).plusSeconds(1));
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
         when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(true);
         new TransactionTemplate(transactions)
@@ -689,5 +698,40 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                         .orElseThrow()
                         .getOrigin())
                 .isEqualTo(ReviewOrigin.EVENT);
+    }
+
+    @Test
+    void shouldRecordTheGateRefusalInsteadOfCallingDisabledPracticesMissing() {
+        var input = eventInput();
+        jdbc.sql("UPDATE workspace SET practices_enabled=false WHERE id=:id")
+                .param("id", input.workspaceId())
+                .update();
+        var id = itemEvents.record(input);
+        var decision = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
+        assertThat(decision.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(decision.getReason()).isEqualTo("PRACTICES_DISABLED");
+        assertThat(decision.getRetryAt()).isNull();
+        assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
+    }
+
+    @Test
+    void shouldSettleAPermanentEventVersionConflictWithoutCreatingAReview() {
+        var input = eventInput();
+        var ref = productItems.require(input.workspaceId(), input.itemId());
+        var wanted = new ItemVersion(input.itemVersion(), null);
+        var mismatch = new ItemSnapshot(
+                ref,
+                new ItemVersion("different-version", null),
+                new IntegrationRef(IntegrationKind.GITHUB, input.workspaceId(), "https://github.com", null),
+                Map.of(),
+                List.of(),
+                new ItemLabel(ref.itemId(), "Event work", "pull request", 1, null, null, IntegrationKind.GITHUB));
+        doReturn(mismatch).when(productItems).pin(eq(ref), eq(wanted));
+        var id = itemEvents.record(input);
+        var decision = eventRows.findByIdAndWorkspaceId(id, input.workspaceId()).orElseThrow();
+        assertThat(decision.getState()).isEqualTo(ItemEventState.WITHHELD);
+        assertThat(decision.getReason()).isEqualTo("ITEM_NOT_VISIBLE");
+        assertThat(decision.getRetryAt()).isNull();
+        assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
     }
 }

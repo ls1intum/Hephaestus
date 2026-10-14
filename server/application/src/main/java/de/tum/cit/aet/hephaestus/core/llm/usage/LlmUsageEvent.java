@@ -191,4 +191,10 @@ public class LlmUsageEvent {
     @ColumnDefault("0")
     @Column(name = "unreported_calls", nullable = false, updatable = false)
     private int unreportedCalls;
+
+    @NonNull
+    @ColumnDefault("'UNKNOWN'")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "measurement_verification", nullable = false, length = 16, updatable = false)
+    private MeasurementVerification measurementVerification = MeasurementVerification.UNKNOWN;
 }

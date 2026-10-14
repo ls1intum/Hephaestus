@@ -135,16 +135,6 @@ if history never changes underneath an instance that already ran part of it.
    Release *N+1* drops it. A single
    release must stay bootable against the schema left behind by the previous one.
 
-Before 1.0, a maintainer can approve one exception to rule 3 for one change: a single-release contraction.
-Then one release migrates the data, moves every reader and writer, and drops the old objects.
-Rules 1 and 2 still apply, so the contraction appends new changesets and edits no released changeset.
-The release cannot run against the schema of the previous release, and the previous release cannot run against the new schema.
-Thus, the operator stops every runtime role and active attempt, makes a verified backup, and upgrades all components together.
-Rollback after the contraction is a restore of that backup with the previous release, never an old binary on the new schema.
-
-The release ships a `.migration` fragment that gives these steps to the operator.
-[Practice model cutover](#practice-model-cutover) is the approved instance.
-
 CI enforces 1 and 2 mechanically (see below). 3 is a review responsibility. The sole archival
 transition is the verified v0.77.4 baseline: archived files remain byte-identical and test-only.
 The baseline and subsequent migrations follow the same immutability policy. Existing installations
@@ -225,16 +215,21 @@ The baseline integration suite proves these properties in both `dev` and `prod`:
 - Announce the cut-point and synchronization requirement before merging. Developer reset:
   `vp run dev:reset`, then `vp run dev`. This destroys local database data.
 
-## Resources
-
-- [Liquibase documentation](https://docs.liquibase.com/) for change set syntax.
-
 ## Practice model cutover
 
-Release 1.0 applies one approved single-release contraction for the practice model.
-One changelog transforms the complete released schema directly to the final model.
+Release 1.0 is a maintainer-approved exception to rule 3 of the [immutability policy](#changelog-immutability-policy).
+One changelog transforms the complete released schema directly to the final practice model.
+Rules 1 and 2 still apply: the changelog appends and edits no released changeset.
+Neither release can run against the schema of the other, so all components upgrade together and rollback restores a verified backup.
 [ADR 0056](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0056-one-practice-model-for-items-and-scans.md) owns the decision.
 The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns what the upgrade preserves.
+
+### Removed settings and redundant data
+
+| Released data | Release 1.0 behavior |
+|---|---|
+| `workspace.practice_skip_drafts` | The workspace flag is removed. It does not change a pinned practice version. Each practice's `reviewOn` declaration owns the automatic review filter. A draft can be reviewed when that declaration permits it. |
+| `consent_decision.notice_sha256` | The duplicate hash is removed. Each decision keeps its immutable `notice_version`. The referenced `consent_notice` keeps the exact notice text and hash. |
 
 ## Prove the released-state upgrade
 
@@ -251,3 +246,33 @@ The generated ERD must come from the final migrated schema.
 ## Upgrade and recovery
 
 The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the release procedure and rollback.
+
+## Native Hibernate JSON cutover
+
+Five semantic String columns use TEXT: `auth_event.details`, `config_audit_event.old_value`,
+`config_audit_event.new_value`, `project_field.options`, and `connection_audit.detail`.
+Typed JSONB fields use Hibernate 7.4.5.Final's native `Jackson3JsonFormatMapper` with Spring's configured `JsonMapper`.
+
+The forward migration converts each old JSONB value once.
+SQL null and JSON null become SQL null.
+A JSONB String becomes its decoded text, including whitespace, Unicode, and backslashes.
+The JSONB String `"null"` stays the literal text `null`.
+Other JSON values become canonical JSON text.
+
+The conversion does not decode serialized JSON inside a String again.
+It preserves row metadata and embedded payload hashes.
+Checksums over the old storage representation can change.
+
+The parent authentication table alteration includes existing and default partitions.
+The migration resolves the pg_partman template from its native configuration and alters that template too.
+Unexpected source types or partition/template states stop the migration.
+The migration does not issue row updates or disable append-only guards.
+Populated PostgreSQL tests cover conversion, guards, retention, future partitions, export shape, and reruns.
+
+Authentication and configuration HTTP and CSV fields remain Strings.
+Direct person-data exports of previously structured values now contain JSON-text Strings.
+The [operator procedure](../admin/native-hibernate-json-cutover) owns shutdown, backup, upgrade, export checks, and recovery.
+
+## Resources
+
+- [Liquibase documentation](https://docs.liquibase.com/) for change set syntax.

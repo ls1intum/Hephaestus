@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
@@ -17,6 +19,7 @@ import org.jspecify.annotations.Nullable;
  * Retains one observed token vector for an ending attempt. Prompt and output totals select the source,
  * with the proxy winning ties. Incomparable totals remain unverifiable instead of combining buckets.
  * Aggregate totals do not establish that either source observed every call.
+ * Measurement verification follows source selection, independently of the frozen price.
  */
 record TerminalUsage(
         long inputTokens,
@@ -136,8 +139,10 @@ record TerminalUsage(
                         totalCalls,
                         price,
                         provenance,
-                        occurredAt),
-                verifiable && chatUsageReported(practiceScript));
+                        verifiable && chatUsageReported(practiceScript)
+                                ? MeasurementVerification.VERIFIED
+                                : MeasurementVerification.UNVERIFIABLE,
+                        occurredAt));
         for (PracticeScriptKindTotal total : practiceScript) {
             if (total.modelKind() == ModelKind.CHAT) {
                 continue;
@@ -163,30 +168,19 @@ record TerminalUsage(
                             (int) Math.min(Integer.MAX_VALUE, total.calls()),
                             frozen != null ? frozen : LlmPriceSnapshot.unpricedInstance(),
                             UsageProvenance.PROXY,
-                            occurredAt),
-                    total.hasCompleteUsage());
+                            total.hasCompleteUsage()
+                                    ? MeasurementVerification.VERIFIED
+                                    : MeasurementVerification.UNVERIFIABLE,
+                            occurredAt));
         }
         return billed;
     }
 
-    /**
-     * The one billing rule. A declared zero is confirmed without tokens. A rate is charged only on
-     * observed tokens. Anything else is appended UNPRICED.
-     */
-    private static boolean append(
-            LlmUsageRecorder recorder, Long workspaceId, LlmUsageRecorder.LlmUsageSample sample, boolean observed) {
-        boolean billable =
-                switch (sample.price().pricingState()) {
-                    case NO_CHARGE -> true;
-                    case PRICED -> observed;
-                    case UNPRICED -> false;
-                };
-        if (billable) {
-            recorder.record(workspaceId, sample);
-        } else {
-            recorder.recordUnverifiable(workspaceId, sample);
-        }
-        return billable;
+    /** The frozen rate applies only to a verified measurement. */
+    private static boolean append(LlmUsageRecorder recorder, Long workspaceId, LlmUsageRecorder.LlmUsageSample sample) {
+        recorder.record(workspaceId, sample);
+        return sample.measurementVerification() == MeasurementVerification.VERIFIED
+                && sample.price().pricingState() != UsagePricingState.UNPRICED;
     }
 
     /** A report is evidence only if it claims a call AND a non-zero token bucket; calls alone cannot be priced. */

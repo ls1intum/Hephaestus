@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchPauseReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
@@ -157,8 +158,7 @@ class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
         assertThat(batches.findByIdAndWorkspaceId(
                                 batch.getId(), scenario.workspace().getId())
                         .orElseThrow()
-                        .getPauseReason()
-                        .name())
-                .isEqualTo("PAUSED_BY_ADMIN");
+                        .getPauseReason())
+                .isEqualTo(ReviewBatchPauseReason.PAUSED_BY_ADMIN);
     }
 }

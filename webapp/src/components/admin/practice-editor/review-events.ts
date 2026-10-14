@@ -49,7 +49,7 @@ export interface EventDef {
 
 /**
  * Event names are an open vocabulary — the client receives a bare `string` — so a domain may
- * declare an event this build has never met. Hence the fallback rather than a total map.
+ * declare an event this build has never met; `eventDef` answers one with its fallback.
  */
 const EVENTS: Record<string, EventDef> = {
 	"scm.pull_request.opened": { icon: GitPullRequestArrowIcon, phase: "start", repeats: false },

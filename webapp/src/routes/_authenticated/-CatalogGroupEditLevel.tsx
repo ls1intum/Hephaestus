@@ -14,11 +14,12 @@ import type { CatalogGroup } from "@/api/types.gen";
 import { CatalogFormLevel } from "@/components/admin/catalog/CatalogFormLevel";
 import { CatalogGroupForm } from "@/components/admin/catalog/CatalogGroupForm";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { QueryErrorAlert, queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { LevelCancel } from "@/components/layout/detail-drawer/LevelCancel";
 import { DrawerBody } from "@/components/ui/drawer";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 export interface CatalogGroupEditLevelProps {
 	groupSlug: string;
@@ -34,14 +35,36 @@ export function CatalogGroupEditLevel({
 	path,
 	onDone,
 }: CatalogGroupEditLevelProps) {
-	const groupQuery = useQuery({ ...getCatalogGroupOptions({ path: { slug: groupSlug } }) });
+	const groupOptions = getCatalogGroupOptions({ path: { slug: groupSlug } });
+	const groupQuery = useQuery(groupOptions);
+	useQueryReadRefusal(groupOptions.queryKey, groupQuery.isError, groupQuery.error);
+	const retry = () => {
+		void groupQuery.refetch();
+	};
 
 	let body: ReactNode;
-	if (groupQuery.isPending) {
+	// A refusal hides the editor even over cached data. Any other failure leaves a loaded draft open.
+	if (
+		groupQuery.data !== undefined &&
+		(!groupQuery.isError || queryErrorIsRetryable(groupQuery.error))
+	) {
 		body = (
-			<DrawerBody>
-				<PracticeDefinitionSkeleton />
-			</DrawerBody>
+			<LoadedCatalogGroupEditor
+				key={groupSlug}
+				groupSlug={groupSlug}
+				initialGroup={groupQuery.data}
+				refreshAlert={
+					groupQuery.isError ? (
+						<QueryErrorAlert
+							error={groupQuery.error}
+							title="We could not refresh the group"
+							pending={groupQuery.isFetching}
+							onRetry={retry}
+						/>
+					) : undefined
+				}
+				onDone={onDone}
+			/>
 		);
 	} else if (groupQuery.isError) {
 		body = (
@@ -49,20 +72,15 @@ export function CatalogGroupEditLevel({
 				<QueryErrorAlert
 					error={groupQuery.error}
 					title="We could not load the group"
-					onRetry={() => {
-						void groupQuery.refetch();
-					}}
+					onRetry={retry}
 				/>
 			</DrawerBody>
 		);
 	} else {
 		body = (
-			<LoadedCatalogGroupEditor
-				key={groupSlug}
-				groupSlug={groupSlug}
-				initialGroup={groupQuery.data}
-				onDone={onDone}
-			/>
+			<DrawerBody>
+				<PracticeDefinitionSkeleton />
+			</DrawerBody>
 		);
 	}
 
@@ -76,12 +94,14 @@ export function CatalogGroupEditLevel({
 interface LoadedCatalogGroupEditorProps {
 	groupSlug: string;
 	initialGroup: CatalogGroup;
+	refreshAlert: ReactNode;
 	onDone: () => void;
 }
 
 function LoadedCatalogGroupEditor({
 	groupSlug,
 	initialGroup,
+	refreshAlert,
 	onDone,
 }: LoadedCatalogGroupEditorProps) {
 	const queryClient = useQueryClient();
@@ -191,6 +211,7 @@ function LoadedCatalogGroupEditor({
 			isPending={updateGroup.isPending}
 			isResetPending={resetGroup.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
+			refreshAlert={refreshAlert}
 			conflict={conflict}
 			onContinueWithDraft={() => {
 				void continueWithDraft();

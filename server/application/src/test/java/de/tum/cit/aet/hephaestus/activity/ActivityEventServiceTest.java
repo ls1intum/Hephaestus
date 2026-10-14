@@ -41,9 +41,7 @@ class ActivityEventServiceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        Mockito.lenient()
-                .when(admission.holdActor(ArgumentMatchers.anyLong()))
-                .thenReturn(true);
+        Mockito.lenient().when(admission.holdActor(ArgumentMatchers.anyLong())).thenReturn(true);
         service = new ActivityEventService(eventRepository, workspaceRepository, meterRegistry, admission);
     }
 

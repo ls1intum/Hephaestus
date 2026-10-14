@@ -148,11 +148,21 @@ public class FeedbackDecisionService {
                 .build());
         if ((action == FeedbackDecisionAction.WITHDRAW || action == FeedbackDecisionAction.RESTORE)
                 && feedback.getDestination() == FeedbackDestination.ON_WORK
-                && lockedCopies.stream()
-                        .anyMatch(copy -> copy.getState() == FeedbackCopyState.POSTED
-                                || copy.getState() == FeedbackCopyState.RETRACTED)
                 && send.map(row -> row.getState() == FeedbackSendState.DONE).orElse(true)) {
-            sendQueue.queue(feedback, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
+            if (lockedCopies.stream()
+                    .anyMatch(copy -> copy.getState() == FeedbackCopyState.POSTED
+                            || copy.getState() == FeedbackCopyState.RETRACTED)) {
+                sendQueue.queue(feedback, FeedbackSendAction.RETRACT, FeedbackSendState.PENDING);
+            } else if (action == FeedbackDecisionAction.RESTORE
+                    && feedback.getState() == FeedbackState.READY
+                    && !lockedCopies.isEmpty()
+                    && lockedCopies.stream()
+                            .allMatch(copy -> copy.getState() == FeedbackCopyState.PLANNED
+                                    && copy.getWriteStartedAt() == null
+                                    && copy.getPostedAt() == null
+                                    && copy.getExternalRef() == null)) {
+                sendQueue.queue(feedback, FeedbackSendAction.POST, FeedbackSendState.PENDING);
+            }
         }
         if (action == FeedbackDecisionAction.APPROVE) {
             events.publishEvent(new ApprovedFeedbackReadyEvent(workspaceId, feedbackId));

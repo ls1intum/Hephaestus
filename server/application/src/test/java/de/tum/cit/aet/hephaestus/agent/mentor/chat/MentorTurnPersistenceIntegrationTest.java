@@ -14,28 +14,28 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.TurnAlreadyInFlight
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.PiEventToUiChunkTranslator;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
-import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageDTO;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadService;
+import de.tum.cit.aet.hephaestus.mentor.MentorTurnAccount;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -47,7 +47,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -62,13 +61,13 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.dao.OptimisticLockingFailureException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
@@ -91,10 +90,10 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    private AccountRepository accountRepository;
 
     @Autowired
-    private IdentityProviderRepository gitProviderRepository;
+    private MembershipRepository memberships;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -123,11 +122,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PersonDataRegistry personDataRegistry;
 
-    @Autowired
-    private JdbcTemplate jdbc;
-
     private Workspace workspace;
-    private User user;
+    private long accountId;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -148,22 +144,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         workspace.setAccountType(AccountType.ORG);
         workspace = workspaceRepository.save(workspace);
 
-        IdentityProvider gitProvider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.com")
-                .orElseGet(() -> gitProviderRepository.save(
-                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com")));
-
-        user = new User();
-        user.setNativeId(7_001L);
-        user.setLogin("mentor-tester");
-        user.setName("Mentor Tester");
-        user.setAvatarUrl("https://example.com/m.png");
-        user.setHtmlUrl("https://gitlab.com/mentor-tester");
-        user.setType(User.Type.USER);
-        user.setCreatedAt(Instant.now());
-        user.setUpdatedAt(Instant.now());
-        user.setProvider(gitProvider);
-        user = userRepository.save(user);
+        accountId = Objects.requireNonNull(
+                accountRepository.save(new Account("Mentor Tester")).getId());
     }
 
     @AfterEach
@@ -178,9 +160,9 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     void ensureThread_createsWhenAbsent() {
         UUID threadId = UUID.randomUUID();
-        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user.getId(), "Hello mentor");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, accountId, "Hello mentor");
         assertThat(thread.getId()).isEqualTo(threadId);
-        assertThat(thread.getAccountId()).isEqualTo(user.getId());
+        assertThat(thread.getAccountId()).isEqualTo(accountId);
         assertThat(thread.getWorkspace().getId()).isEqualTo(workspace.getId());
         assertThat(thread.getTitle()).isEqualTo("Hello mentor");
         assertThat(chatThreadRepository.findById(threadId)).isPresent();
@@ -189,8 +171,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     void ensureThread_returnsExisting() {
         UUID threadId = UUID.randomUUID();
-        ChatThread first = persistence.ensureThread(workspace.getId(), threadId, user.getId(), "first prompt");
-        ChatThread second = persistence.ensureThread(workspace.getId(), threadId, user.getId(), "second prompt");
+        ChatThread first = persistence.ensureThread(workspace.getId(), threadId, accountId, "first prompt");
+        ChatThread second = persistence.ensureThread(workspace.getId(), threadId, accountId, "second prompt");
         assertThat(second.getId()).isEqualTo(first.getId());
         // Title is fixed on first write — a second call with a different prompt must NOT
         // overwrite, otherwise the thread sidebar flickers between titles.
@@ -200,54 +182,18 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     void ensureThread_foreignOwnerThrows() {
         UUID threadId = UUID.randomUUID();
-        persistence.ensureThread(workspace.getId(), threadId, user.getId(), "hello");
+        persistence.ensureThread(workspace.getId(), threadId, accountId, "hello");
 
-        User other = new User();
-        other.setNativeId(7_002L);
-        other.setLogin("other");
-        other.setName("Other");
-        other.setAvatarUrl("https://example.com/o.png");
-        other.setHtmlUrl("https://gitlab.com/other");
-        other.setType(User.Type.USER);
-        other.setCreatedAt(Instant.now());
-        other.setUpdatedAt(Instant.now());
-        other.setProvider(user.getProvider());
-        other = userRepository.save(other);
-
-        final User otherUser = other;
-        assertThatThrownBy(() -> persistence.ensureThread(workspace.getId(), threadId, otherUser.getId(), "intruder"))
+        long otherId = Objects.requireNonNull(
+                accountRepository.save(new Account("Other")).getId());
+        assertThatThrownBy(() -> persistence.ensureThread(workspace.getId(), threadId, otherId, "intruder"))
                 .isInstanceOf(EntityNotFoundException.class);
-    }
-
-    @Test
-    void ensureThread_movesTheAccountsThreadToTheActorContinuingIt() {
-        UUID threadId = UUID.randomUUID();
-        persistence.ensureThread(workspace.getId(), threadId, user.getId(), "hello");
-
-        User sameAccount = new User();
-        sameAccount.setNativeId(7_003L);
-        sameAccount.setLogin("same-account");
-        sameAccount.setName("Same account");
-        sameAccount.setAvatarUrl("https://example.com/s.png");
-        sameAccount.setHtmlUrl("https://gitlab.com/same-account");
-        sameAccount.setType(User.Type.USER);
-        sameAccount.setCreatedAt(Instant.now());
-        sameAccount.setUpdatedAt(Instant.now());
-        sameAccount.setProvider(user.getProvider());
-        sameAccount = userRepository.save(sameAccount);
-
-        persistence.ensureThread(workspace.getId(), threadId, sameAccount.getId(), "again");
-
-        assertThat(chatThreadRepository.findById(threadId))
-                .get()
-                .extracting(thread -> thread.getAccountId())
-                .isEqualTo(sameAccount.getId());
     }
 
     @Test
     @ExtendWith(OutputCaptureExtension.class)
     void persistInFlight_happyPath(CapturedOutput output) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello mentor", assistantId, null, admittedMentorConfig());
@@ -267,7 +213,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void persistInFlight_honorsClientUserMessageId() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID clientUserId = UUID.randomUUID();
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
@@ -278,7 +224,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void persistInFlight_secondCallThrows() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         persistence.persistInFlight(thread, "first", UUID.randomUUID(), null, admittedMentorConfig());
         assertThatThrownBy(() ->
                         persistence.persistInFlight(thread, "second", UUID.randomUUID(), null, admittedMentorConfig()))
@@ -287,7 +233,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldRollBackTheNewParentWhenAnotherTurnAlreadyExists() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "first");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "first");
         persistence.persistInFlight(thread, "first", UUID.randomUUID(), null, admittedMentorConfig());
         UUID rejectedUserId = UUID.randomUUID();
         UUID rejectedAssistantId = UUID.randomUUID();
@@ -302,7 +248,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void persistInFlight_concurrentRace_theDbUniqueIndexAloneLetsExactlyOneWriterWin() throws Exception {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
 
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch ready = new CountDownLatch(2);
@@ -615,7 +561,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                         .cookie(),
                 "Here is a plan.");
 
-        CurrentScmIdentityHolder.set(user.getId(), user.getLogin(), Set.of(user.getId()));
+        MentorTurnAccount.set(accountId);
         try {
             assertThat(chatThreadService
                             .loadOwnedThreadDetail(
@@ -624,7 +570,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                     .extracting(ChatMessageDTO::id)
                     .containsExactly(failed.prompt(), retryId);
         } finally {
-            CurrentScmIdentityHolder.clear();
+            MentorTurnAccount.clear();
         }
     }
 
@@ -632,7 +578,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     /** A prompt whose only reply the watchdog interrupted before it wrote anything. */
     private FailedTurn failedTurn(String prompt) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), prompt);
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, prompt);
         UUID promptId = UUID.randomUUID();
         UUID replyId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
@@ -662,7 +608,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void complete_writesCompletedRow() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -705,7 +651,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // A provider-reported totalTokens that includes cache tokens legitimately exceeds input+output. The
         // persisted block must round-trip the WIRE total unchanged (single source of truth), NOT re-derive
         // it as input+output — otherwise a rehydrated thread renders a different token count than the stream.
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hi");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hi");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hi", assistantId, null, admittedMentorConfig());
@@ -736,7 +682,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     void complete_storesSessionJsonlByteIdentically() {
         UUID threadId = UUID.randomUUID();
-        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -762,7 +708,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         // detoast on read — the path that would surface an encoding/transport regression in JDBC
         // stream handling.
         UUID threadId = UUID.randomUUID();
-        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -788,7 +734,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @Test
     void complete_withoutSessionJsonl_preservesPriorTurn() {
         UUID threadId = UUID.randomUUID();
-        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), threadId, accountId, "hello");
 
         byte[] priorBytes = "{\"prior\":\"turn\"}\n".getBytes(StandardCharsets.UTF_8);
         chatThreadRepository.updateSessionJsonl(threadId, priorBytes, sessionVersion(threadId));
@@ -806,7 +752,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldNotStoreARunningTurnsSessionOverAJournalThatPersonErasureCleared() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID threadId = thread.getId();
         chatThreadRepository.updateSessionJsonl(
                 threadId, "{\"type\":\"earlier\"}\n".getBytes(StandardCharsets.UTF_8), sessionVersion(threadId));
@@ -814,27 +760,17 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         MentorTurnPersistence.TurnPersistenceCookie running =
                 persistence.persistInFlight(thread, "hello", runningId, null, admittedMentorConfig());
 
-        User colleague = new User();
-        colleague.setNativeId(7_002L);
-        colleague.setLogin("erased-colleague");
-        colleague.setName("Erased Colleague");
-        colleague.setAvatarUrl("https://example.com/c.png");
-        colleague.setHtmlUrl("https://gitlab.com/erased-colleague");
-        colleague.setType(User.Type.USER);
-        colleague.setCreatedAt(Instant.now());
-        colleague.setUpdatedAt(Instant.now());
-        colleague.setProvider(user.getProvider());
-        colleague = userRepository.save(colleague);
-        jdbc.update(
-                "INSERT INTO workspace_membership(created_at,role,user_id,workspace_id,hidden) VALUES"
-                        + " (CURRENT_TIMESTAMP,'MEMBER',?,?,FALSE)",
-                colleague.getId(),
-                workspace.getId());
+        long colleagueId = Objects.requireNonNull(
+                accountRepository.save(new Account("Erased Colleague")).getId());
+        var membership = new Membership();
+        membership.setId(new Membership.Id(workspace.getId(), colleagueId));
+        membership.setWorkspace(workspace);
+        memberships.saveAndFlush(membership);
         var journals = personDataRegistry.stores().stream()
                 .filter(store -> store.store().equals("chat_thread_runtime_journal"))
                 .findFirst()
                 .orElseThrow();
-        var selection = journals.select(new PersonScope(null, List.of(), List.of(colleague.getId())));
+        var selection = journals.select(new PersonScope(colleagueId, List.of(), List.of()));
         assertThat(selection.rows()).isNotEmpty();
         journals.erase(selection);
 
@@ -861,7 +797,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void interrupt_writesInterruptedRow() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -875,7 +811,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void interrupt_afterLlmCallStarted_writesUnverifiableLedgerEventWhenUsageIsMissing() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -894,7 +830,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void complete_cacheOnlyUsage_writesPricedLedgerEvent() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         LlmPriceSnapshot price = new LlmPriceSnapshot(
                 UsageFundingSource.INSTANCE,
@@ -942,7 +878,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @ValueSource(ints = {2, 1})
     @DisplayName("a turn the watchdog ends after compacting keeps its checkpoint and bills every call the proxy saw")
     void shouldKeepTheCheckpointAndBillTheProxysCallsWhenACompactedTurnIsInterrupted(int summaryCalls) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID threadId = thread.getId();
         chatThreadRepository.updateSessionJsonl(
                 threadId, "{\"type\":\"before\"}\n".getBytes(StandardCharsets.UTF_8), sessionVersion(threadId));
@@ -982,7 +918,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @ValueSource(ints = {2, 1})
     @DisplayName("a compacted turn's live Finish reports the usage and cost its row and ledger record")
     void shouldReportTheRecordedUsageOnTheFinishWhenACompactedTurnCompletes(int summaryCalls) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         LlmPriceSnapshot price = new LlmPriceSnapshot(
                 UsageFundingSource.INSTANCE,
@@ -1042,7 +978,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void shouldAccountForEarlierCallsWhenTheNativeRetrySettles(boolean recovered) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         LlmPriceSnapshot price = new LlmPriceSnapshot(
                 UsageFundingSource.INSTANCE,
@@ -1104,7 +1040,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void shouldLeaveRetryUsageUnverifiableWhenItsProxyAccountIsMissing(boolean recovered) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         LlmPriceSnapshot price = new LlmPriceSnapshot(
                 UsageFundingSource.INSTANCE,
@@ -1167,10 +1103,151 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 600);
     }
 
+    @ParameterizedTest(name = "{0}: {1}")
+    @CsvSource(
+            value = {
+                "completed, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED, 0.010290",
+                "interrupted, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED, 0.010290",
+                "completed, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "interrupted, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "completed, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "interrupted, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "completed, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, UNVERIFIABLE, unpriced",
+                "interrupted, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, UNVERIFIABLE, unpriced",
+                "completed, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, UNVERIFIABLE, unpriced",
+                "interrupted, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, UNVERIFIABLE, unpriced"
+            },
+            nullValues = "unpriced")
+    void shouldSelectTheWholeProxyVectorOnlyWhenNormalizedPromptAndOutputDominateOnAnOrdinaryTurn(
+            String terminal,
+            String scenario,
+            int runnerInput,
+            int runnerOutput,
+            int proxyInput,
+            int proxyOutput,
+            int proxyCacheRead,
+            int proxyCacheWrite,
+            UsageProvenance expectedProvenance,
+            MeasurementVerification expectedVerification,
+            @Nullable String expectedCost) {
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
+        UUID assistantId = UUID.randomUUID();
+        LlmPriceSnapshot price = new LlmPriceSnapshot(
+                UsageFundingSource.INSTANCE,
+                UsagePricingState.PRICED,
+                12L,
+                null,
+                new BigDecimal("10"),
+                new BigDecimal("20"),
+                new BigDecimal("2"),
+                new BigDecimal("3"));
+        var cookie = persistence.persistInFlight(thread, "hello", assistantId, null, pricedMentorConfig(price));
+        TranslatorState state = new TranslatorState(assistantId);
+        state.bindAdmission("test-model", price);
+        state.markLlmCallStarted();
+        state.completeUsage(NODES.objectNode()
+                .put("input", runnerInput)
+                .put("output", runnerOutput)
+                .put("cacheRead", 0)
+                .put("cacheWrite", 0));
+        int proxyReasoning = proxyOutput > 0 ? 7 : 0;
+        accumulateProxyCall(assistantId, proxyInput, proxyOutput, proxyReasoning, proxyCacheRead, proxyCacheWrite);
+
+        boolean proxySelected = expectedProvenance == UsageProvenance.PROXY;
+        int input = proxySelected ? proxyInput : runnerInput;
+        int output = proxySelected ? proxyOutput : runnerOutput;
+        int cacheRead = proxySelected ? proxyCacheRead : 0;
+        int cacheWrite = proxySelected ? proxyCacheWrite : 0;
+        int total = input + output + cacheRead + cacheWrite;
+        var selected = new UIMessageChunk.MessageMetadata.Usage(input, output, cacheRead, cacheWrite, total);
+        if (terminal.equals("completed")) {
+            var runnerUsage = runnerInput == 0 && runnerOutput == 0
+                    ? null
+                    : new UIMessageChunk.MessageMetadata.Usage(
+                            runnerInput, runnerOutput, 0, 0, runnerInput + runnerOutput);
+            var streamed = new UIMessageChunk.Finish(
+                    UIMessageChunk.FinishReason.STOP,
+                    new UIMessageChunk.MessageMetadata("test-model", runnerUsage, null));
+            var sent = persistence.complete(cookie, state, streamed).orElseThrow();
+            var metadata = Objects.requireNonNull(sent.messageMetadata());
+            assertThat(sent.finishReason()).isEqualTo(UIMessageChunk.FinishReason.STOP);
+            assertThat(metadata.model()).isEqualTo("test-model");
+            if (expectedProvenance == UsageProvenance.NONE) {
+                assertThat(metadata.usage()).isNull();
+            } else {
+                assertThat(metadata.usage()).isEqualTo(selected);
+            }
+            if (expectedCost == null) {
+                assertThat(metadata.costUsd()).isNull();
+            } else {
+                assertThat(BigDecimal.valueOf(Objects.requireNonNull(metadata.costUsd())))
+                        .isEqualByComparingTo(expectedCost);
+            }
+        } else {
+            persistence.interrupt(cookie, state, new IllegalStateException("upstream disconnected"));
+        }
+
+        var assistant = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.valueOf(terminal));
+        JsonNode metadata = assistant.getMetadata();
+        assertThat(metadata.at("/llmAdmission/model").asString()).isEqualTo("test-model");
+        assertThat(metadata.at("/llmAdmission/price/appliedPriceId").asString()).isEqualTo("12");
+        if (terminal.equals("completed") && expectedProvenance != UsageProvenance.NONE) {
+            assertThat(metadata.path("usage"))
+                    .isEqualTo(NODES.objectNode()
+                            .put("input", input)
+                            .put("output", output)
+                            .put("cacheRead", cacheRead)
+                            .put("cacheWrite", cacheWrite)
+                            .put("totalTokens", total));
+            if (expectedCost == null) {
+                assertThat(metadata.has("costUsd")).isFalse();
+            } else {
+                assertThat(BigDecimal.valueOf(metadata.path("costUsd").asDouble()))
+                        .isEqualByComparingTo(expectedCost);
+            }
+        } else {
+            assertThat(metadata.has("usage")).isFalse();
+            assertThat(metadata.has("costUsd")).isFalse();
+        }
+        if (terminal.equals("interrupted")) {
+            assertThat(metadata.path("error").asString()).isEqualTo("upstream disconnected");
+        }
+        assertThat(usageEventRepository.findAll())
+                .filteredOn(event -> event.getSourceId().equals(assistantId))
+                .as("%s ledger entry", scenario)
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getWorkspace().getId()).isEqualTo(workspace.getId());
+                    assertThat(event.getModel()).isEqualTo("test-model");
+                    assertThat(event.getInputTokens()).isEqualTo(input);
+                    assertThat(event.getOutputTokens()).isEqualTo(output);
+                    assertThat(event.getCacheReadTokens()).isEqualTo(cacheRead);
+                    assertThat(event.getCacheWriteTokens()).isEqualTo(cacheWrite);
+                    assertThat(event.getReasoningTokens()).isEqualTo(proxySelected ? proxyReasoning : 0);
+                    assertThat(event.getTotalCalls()).isEqualTo(1);
+                    assertThat(event.getUsageProvenance()).isEqualTo(expectedProvenance);
+                    assertThat(event.getMeasurementVerification()).isEqualTo(expectedVerification);
+                    assertThat(event.getFundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
+                    assertThat(event.getAppliedPriceId()).isEqualTo(12L);
+                    assertThat(event.getAppliedPer1mInputUsd()).isEqualByComparingTo("10");
+                    assertThat(event.getAppliedPer1mOutputUsd()).isEqualByComparingTo("20");
+                    assertThat(event.getAppliedPer1mCacheReadUsd()).isEqualByComparingTo("2");
+                    assertThat(event.getAppliedPer1mCacheWriteUsd()).isEqualByComparingTo("3");
+                    if (expectedCost == null) {
+                        assertThat(event.getPricingState()).isEqualTo(UsagePricingState.UNPRICED);
+                        assertThat(event.getCostUsd()).isNull();
+                    } else {
+                        assertThat(event.getPricingState()).isEqualTo(UsagePricingState.PRICED);
+                        assertThat(event.getCostUsd()).isEqualByComparingTo(expectedCost);
+                    }
+                });
+    }
+
     @Test
     @DisplayName("a turn that never compacted bills the runner's own report, not the proxy's as well")
     void shouldBillTheRunnersReportWhenTheTurnDidNotCompact() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -1192,7 +1269,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldBillEarlierUsageWhenTheFinalRetryReportsNoTokens() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -1225,7 +1302,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void interrupt_beforeLlmCallStarted_doesNotInventAUsageEvent() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -1265,7 +1342,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void complete_leavesATurnTheReaperAlreadyInterruptedAsItWas() throws Exception {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -1288,7 +1365,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void interrupt_neverDowngradesACompletedTurn() {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "hello");
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "hello");
         UUID assistantId = UUID.randomUUID();
         MentorTurnPersistence.TurnPersistenceCookie cookie =
                 persistence.persistInFlight(thread, "hello", assistantId, null, admittedMentorConfig());
@@ -1382,7 +1459,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID persistInFlightTurn(String prompt) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), prompt);
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, prompt);
         UUID assistantId = UUID.randomUUID();
         persistence.persistInFlight(thread, prompt, assistantId, null, admittedMentorConfig());
         return assistantId;
@@ -1420,7 +1497,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("chk_chat_message_status rejects values outside (in_flight,completed,interrupted)")
     void statusColumnCheckConstraintFires() throws Exception {
         ChatThread thread =
-                persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), "constraint test");
+                persistence.ensureThread(workspace.getId(), UUID.randomUUID(), accountId, "constraint test");
         assertThatThrownBy(() -> {
                     try (var conn = dataSource.getConnection();
                             var stmt = conn.prepareStatement(

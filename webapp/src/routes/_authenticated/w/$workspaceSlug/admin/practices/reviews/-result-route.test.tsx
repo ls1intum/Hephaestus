@@ -4,7 +4,7 @@ import { HttpResponse, http } from "msw";
 import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-	getOwnResultSummaryQueryKey,
+	getOwnResultQueryKey,
 	getOwnReviewQueryKey,
 	getReviewOverviewQueryKey,
 	listOwnResultsQueryKey,
@@ -43,7 +43,7 @@ function stub(...handlers: Parameters<typeof server.use>) {
 function countingReads(workspaceSlug: string) {
 	return [
 		listOwnResultsQueryKey({ path: { workspaceSlug } }),
-		getOwnResultSummaryQueryKey({ path: { workspaceSlug } }),
+		getOwnResultQueryKey({ path: { workspaceSlug, resultId: reviewResultDetail.id } }),
 		getOwnReviewQueryKey({ path: { workspaceSlug, reviewId: reviewResultDetail.reviewId } }),
 		getReviewOverviewQueryKey({
 			path: { workspaceSlug },

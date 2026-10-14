@@ -77,14 +77,14 @@ final class CapturedPersonDataContributor implements PersonDataContributor {
         var jobs = new LinkedHashSet<>(person.derivedJobIds());
         jobs.addAll(jdbc.query(
                 "SELECT DISTINCT captured.job_id FROM review_item member CROSS JOIN LATERAL (SELECT member.job_id"
-                    + " UNION ALL SELECT source.value::uuid FROM"
-                    + " jsonb_array_elements_text(COALESCE(member.detail->'custody'->'sourceJobIds','[]'::jsonb))"
-                    + " source(value)) captured WHERE captured.job_id IS NOT NULL AND EXISTS(SELECT 1 FROM"
-                    + " jsonb_array_elements(COALESCE(member.detail->'custody'->'copiedIdentities','[]'::jsonb)) copy,"
-                    + " jsonb_array_elements(CAST(:copies AS jsonb)) person WHERE"
-                    + " copy->>'providerType'=person->>'providerType' AND"
-                    + " copy->>'providerOrigin'=person->>'providerOrigin' AND copy->>'subject'=person->>'subject' AND"
-                    + " copy->>'teamId' IS NOT DISTINCT FROM person->>'teamId')",
+                        + " UNION ALL SELECT source.value::uuid FROM"
+                        + " jsonb_array_elements_text(COALESCE(member.detail->'custody'->'sourceJobIds','[]'::jsonb))"
+                        + " source(value)) captured WHERE captured.job_id IS NOT NULL AND EXISTS(SELECT 1 FROM"
+                        + " jsonb_array_elements(COALESCE(member.detail->'custody'->'copiedIdentities','[]'::jsonb)) copy,"
+                        + " jsonb_array_elements(CAST(:copies AS jsonb)) person WHERE"
+                        + " copy->>'providerType'=person->>'providerType' AND"
+                        + " copy->>'providerOrigin'=person->>'providerOrigin' AND copy->>'subject'=person->>'subject' AND"
+                        + " copy->>'teamId' IS NOT DISTINCT FROM person->>'teamId')",
                 Map.of("copies", mapper.writeValueAsString(copied)),
                 (rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class))));
         return store.select(new PersonScope(

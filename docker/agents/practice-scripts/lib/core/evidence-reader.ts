@@ -79,11 +79,8 @@ async function inside(root: string, relative: string): Promise<string> {
 	if (full !== base && !full.startsWith(`${base}${path.sep}`)) {
 		throw new UnratedError("refused", `${relative} is outside the captured source`);
 	}
-	// The checkout's Git folder is not a file of the work: it reads as absent.
 	if (inGitFolder(path.relative(base, full))) {
-		throw Object.assign(new Error(`${relative} is in the checkout's Git folder, not the work`), {
-			code: "ENOENT",
-		});
+		throw new UnratedError("refused", `${relative} is in the checkout's Git folder, not the work`);
 	}
 	return full;
 }
@@ -400,9 +397,7 @@ export class EvidenceReader {
 				const repo = this.#repo();
 				const all = globFilesSync(request.glob ?? "**", repo).filter(
 					(file) =>
-						file !== ".git" &&
-						!file.startsWith(".git/") &&
-						(this.#sources.permittedPaths === undefined || this.#sources.permittedPaths.has(file)),
+						this.#sources.permittedPaths === undefined || this.#sources.permittedPaths.has(file),
 				);
 				return {
 					paths: all.slice(0, MAX_LIST_PATHS),

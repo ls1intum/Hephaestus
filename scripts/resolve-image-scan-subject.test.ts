@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { setTimeout } from "node:timers/promises";
 
 import { isMap, isSeq, parseDocument } from "yaml";
 
@@ -231,6 +232,124 @@ process.stdout.write(args.includes('--raw') ? process.env.RAW : process.env.SING
 			assert.equal(calls, expectedCalls.map((args) => `${JSON.stringify(args)}\n`).join(""));
 		}
 	});
+}
+
+for (const stalledLookup of ["raw", "fallback"] as const) {
+	void test(
+		`aborts a stalled ${stalledLookup} lookup without publishing a subject`,
+		{ skip: process.platform === "win32" },
+		async (t) => {
+			const directory = mkdtempSync(path.join(tmpdir(), "image-scan-deadline-"));
+			const pidFile = path.join(directory, "pid");
+			const terminated = path.join(directory, "terminated");
+			t.after(() => {
+				try {
+					process.kill(Number(readFileSync(pidFile, "utf8")), "SIGKILL");
+				} catch {
+					// The fixture usually exits on the resolver's SIGTERM; clean up a baseline failure too.
+				}
+				rmSync(directory, { recursive: true, force: true });
+			});
+			const docker = path.join(directory, "docker");
+			const calls = path.join(directory, "calls");
+			const deadlineCalls = path.join(directory, "deadlines");
+			const outputFile = path.join(directory, "output");
+			const preload = path.join(directory, "deadline.mjs");
+			writeFileSync(outputFile, "");
+			writeFileSync(
+				docker,
+				String.raw`#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.CALL_LOG, JSON.stringify(args) + '\n');
+if (process.env.STALLED_LOOKUP === 'fallback' && args.includes('--raw')) {
+ process.stdout.write(JSON.stringify({ config: {}, layers: [] }));
+ process.exit(0);
+}
+fs.writeFileSync(process.env.PID_FILE, String(process.pid));
+process.on('SIGTERM', () => {
+ fs.writeFileSync(process.env.TERMINATED, 'SIGTERM');
+ process.exit(0);
+});
+setInterval(() => {}, 1000);
+`,
+			);
+			chmodSync(docker, 0o755);
+			writeFileSync(
+				preload,
+				String.raw`import assert from 'node:assert/strict';
+import { appendFileSync } from 'node:fs';
+import { mock } from 'node:test';
+const nativeTimeout = AbortSignal.timeout.bind(AbortSignal);
+mock.method(AbortSignal, 'timeout', (milliseconds) => {
+ assert.equal(milliseconds, 120000);
+ appendFileSync(process.env.DEADLINE_LOG, 'deadline\n');
+ return nativeTimeout(500);
+});
+`,
+			);
+			const result = spawnSync(process.execPath, ["--import", preload, checker], {
+				encoding: "utf8",
+				timeout: 3000,
+				killSignal: "SIGKILL",
+				env: {
+					...process.env,
+					PATH: `${directory}${path.delimiter}${process.env.PATH ?? ""}`,
+					IMAGE_REF: reference,
+					DIGEST_DIRECTORY: "",
+					SCAN_PLATFORM: "linux/amd64",
+					INPUT_IMAGE_NAME: "example/webapp",
+					GITHUB_OUTPUT: outputFile,
+					CALL_LOG: calls,
+					DEADLINE_LOG: deadlineCalls,
+					STALLED_LOOKUP: stalledLookup,
+					PID_FILE: pidFile,
+					TERMINATED: terminated,
+				},
+			});
+			assert.equal(
+				result.error,
+				undefined,
+				"the resolver must abort before the outer test deadline",
+			);
+			assert.equal(result.status, 1, result.stderr);
+			assert.match(result.stderr, /AbortError/u);
+			assert.equal(readFileSync(outputFile, "utf8"), "");
+			assert.equal(
+				readFileSync(deadlineCalls, "utf8"),
+				"deadline\n",
+				"both lookups share one deadline",
+			);
+			const pid = Number(readFileSync(pidFile, "utf8"));
+			let childExited = false;
+			for (let attempt = 0; attempt < 20; attempt += 1) {
+				try {
+					process.kill(pid, 0);
+				} catch {
+					childExited = true;
+					break;
+				}
+				await setTimeout(25);
+			}
+			assert.equal(childExited, true, "the actual Docker fixture must terminate");
+			assert.equal(readFileSync(terminated, "utf8"), "SIGTERM");
+			const expectedCalls = [["buildx", "imagetools", "inspect", reference, "--raw"]];
+			if (stalledLookup === "fallback") {
+				expectedCalls.push([
+					"buildx",
+					"imagetools",
+					"inspect",
+					"--format",
+					"{{.Manifest.Digest}}",
+					reference,
+				]);
+			}
+			assert.equal(
+				readFileSync(calls, "utf8"),
+				expectedCalls.map((args) => `${JSON.stringify(args)}\n`).join(""),
+			);
+		},
+	);
 }
 
 void test("the image workflow shares the resolver and retains its immutable subject and platform", () => {

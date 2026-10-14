@@ -7,8 +7,8 @@ import type { ReviewPeople } from "./ReviewPersonFacet";
 /** The options of the shared scope's facets, loaded, for the stories of every review list. */
 export const STORY_PEOPLE: ReviewPeople = {
 	options: workspaceMembers.map((member) => ({
-		accountId: member.accountId,
-		label: member.account.displayName ?? `#${member.accountId}`,
+		accountId: member.account.id,
+		label: member.account.displayName ?? `#${member.account.id}`,
 		secondary: member.account.identities[0]?.login ?? undefined,
 	})),
 	capped: false,

@@ -124,7 +124,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 new MockHttpServletResponse(),
                 new HttpHeaders(),
                 jsonBody());
-        assertThat(result.getStatusCode().value()).isEqualTo(403);
+        assertThat(Objects.requireNonNull(result).getStatusCode().value()).isEqualTo(403);
         verifyNoInteractions(resolver, budgetGate);
     }
 
@@ -216,7 +216,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     jsonBody());
 
             assertThat(result).isNotNull();
-            assertThat(result.getStatusCode().value()).isEqualTo(403);
+            assertThat(Objects.requireNonNull(result).getStatusCode().value()).isEqualTo(403);
             verifyNoInteractions(resolver);
             verifyNoInteractions(mentorTurnUsageAccumulator);
             verifyNoInteractions(usageAccumulator);

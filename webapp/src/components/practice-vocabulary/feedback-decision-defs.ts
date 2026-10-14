@@ -50,7 +50,7 @@ const FEEDBACK_DECISION_REASON_LABELS: Record<FeedbackDecisionReason, string> = 
 	MISSING_CONTEXT: "Missing important context",
 	UNHELPFUL: "Not useful to the developer",
 	DUPLICATE: "Already covered elsewhere",
-	INAPPROPRIATE_PLACEMENT: "Wrong place for this feedback",
+	INAPPROPRIATE_LOCATION: "Wrong place for this feedback",
 	OTHER: "Something else",
 };
 
@@ -61,7 +61,7 @@ export const FEEDBACK_DECISION_REASONS = (
 		"MISSING_CONTEXT",
 		"UNHELPFUL",
 		"DUPLICATE",
-		"INAPPROPRIATE_PLACEMENT",
+		"INAPPROPRIATE_LOCATION",
 		"OTHER",
 	] as const satisfies readonly FeedbackDecisionReason[]
 ).map((value) => ({ value, label: FEEDBACK_DECISION_REASON_LABELS[value] }));

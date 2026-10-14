@@ -26,6 +26,8 @@ import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 import { hasText } from "@/lib/text";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 /** The server's largest page: the table filters and sorts every member, so it reads them all. */
 const MEMBER_PAGE_SIZE = 100;
@@ -65,11 +67,10 @@ function AdminMembersContainer() {
 	});
 	const membersQuery = useInfiniteQuery({
 		...membersQueryOptions,
-		initialPageParam: 0,
-		getNextPageParam: (lastPage: WorkspaceMembership[], allPages: WorkspaceMembership[][]) =>
-			lastPage.length < MEMBER_PAGE_SIZE ? undefined : allPages.length,
+		...springPageParams,
 		enabled: Boolean(workspaceSlug),
 	});
+	useQueryReadRefusal(membersQueryOptions.queryKey, membersQuery.isError, membersQuery.error);
 	const { hasNextPage, isFetchingNextPage, isError: membersFailed, fetchNextPage } = membersQuery;
 	useEffect(() => {
 		if (hasNextPage && !isFetchingNextPage && !membersFailed) {
@@ -80,15 +81,11 @@ function AdminMembersContainer() {
 	const teamsQueryOptions = getAllTeamsOptions({
 		path: { workspaceSlug: workspaceSlug ?? "" },
 	});
-	const {
-		data: teamsData,
-		isLoading: teamsLoading,
-		error: teamsError,
-		refetch: refetchTeams,
-	} = useQuery({
+	const teamsQuery = useQuery({
 		...teamsQueryOptions,
 		enabled: Boolean(workspaceSlug) && (teamsQueryOptions.enabled ?? true),
 	});
+	useQueryReadRefusal(teamsQueryOptions.queryKey, teamsQuery.isError, teamsQuery.error);
 
 	const queryClient = useQueryClient();
 	const membersKey = listMembershipsInfiniteQueryKey({
@@ -97,11 +94,13 @@ function AdminMembersContainer() {
 	});
 	const toggleHidden = useMutation({
 		...setMemberHiddenMutation(),
-		onSuccess: () => {
+		onSuccess: (_data, variables) => {
 			void queryClient.invalidateQueries({ queryKey: membersKey });
 			// Workspace activity lists the same people and leaves hidden ones out.
 			void queryClient.invalidateQueries({
-				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
+				queryKey: getUsersWithTeamsQueryKey({
+					path: { workspaceSlug: variables.path.workspaceSlug },
+				}),
 			});
 		},
 		onError: (error) => {
@@ -141,14 +140,19 @@ function AdminMembersContainer() {
 		assignRole.mutate({ path: { workspaceSlug }, body: { accountId, role } });
 	};
 
-	const teams = [...(teamsData ?? [])].sort((a, b) => a.name.localeCompare(b.name));
-	const members = workspaceMemberRows(membersQuery.data?.pages.flat() ?? [], teams);
-	// Until every page is in, a count or an empty filter result would be a claim about part of the list.
-	const isLoading = isWorkspaceLoading || membersQuery.isPending || hasNextPage || teamsLoading;
-	const selectedTeam =
-		hasText(search.team) && teams.some((team) => team.id.toString() === search.team)
-			? search.team
-			: "all";
+	const teams = teamsQuery.isError
+		? []
+		: [...(teamsQuery.data ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+	const members = workspaceMemberRows(
+		membersQuery.data?.pages.flatMap((page) => page.content) ?? [],
+		teams,
+	);
+	const teamListed = hasText(search.team) && teams.some((t) => t.id.toString() === search.team);
+	const teamPending = hasText(search.team) && !teamListed && teamsQuery.isFetching;
+	const isLoading = isWorkspaceLoading || membersQuery.isPending || hasNextPage || teamPending;
+	const teamUnknown =
+		hasText(search.team) && teamsQuery.isSuccess && !teamsQuery.isFetching && !teamListed;
+	const selectedTeam = hasText(search.team) && teamListed ? search.team : "all";
 	const view: WorkspaceMembersTableView = {
 		q: search.q ?? "",
 		team: selectedTeam,
@@ -159,10 +163,10 @@ function AdminMembersContainer() {
 	};
 
 	useEffect(() => {
-		if (teamsData && !teamsError && hasText(search.team) && selectedTeam === "all") {
+		if (teamUnknown) {
 			void navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
 		}
-	}, [navigate, search.team, selectedTeam, teamsData, teamsError]);
+	}, [navigate, teamUnknown]);
 
 	if (!hasText(workspaceSlug) && !isWorkspaceLoading) {
 		return <NoWorkspace />;
@@ -173,10 +177,15 @@ function AdminMembersContainer() {
 			members={members}
 			teams={teams}
 			isLoading={isLoading || !hasText(workspaceSlug)}
-			error={workspaceError ?? membersQuery.error ?? teamsError}
+			error={workspaceError ?? membersQuery.error}
 			onRetry={() => {
 				void membersQuery.refetch();
-				void refetchTeams();
+				void teamsQuery.refetch();
+			}}
+			teamsError={teamsQuery.error}
+			teamsRetrying={teamsQuery.isFetching}
+			onRetryTeams={() => {
+				void teamsQuery.refetch();
 			}}
 			onToggleHidden={handleToggleHidden}
 			onRoleChange={handleRoleChange}

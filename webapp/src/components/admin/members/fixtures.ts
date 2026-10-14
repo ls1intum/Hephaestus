@@ -33,10 +33,9 @@ export function memberAccount(id: string, overrides: Partial<AccountRef> = {}): 
 
 export function membership(
 	account: AccountRef,
-	overrides: Partial<Omit<WorkspaceMembership, "account" | "accountId">> = {},
+	overrides: Partial<Omit<WorkspaceMembership, "account">> = {},
 ): WorkspaceMembership {
 	return {
-		accountId: account.id,
 		account,
 		role: "MEMBER",
 		joinedAt: new Date("2026-03-02T09:00:00Z"),

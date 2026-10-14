@@ -1,6 +1,4 @@
-import { useEffect } from "react";
-
-import { useInfiniteQuery, useQuery, useQueryClient, type QueryKey } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import {
 	getPublicActivityPersonOptions,
@@ -14,6 +12,7 @@ import { panelState } from "@/components/common/panel-state";
 import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
 import { loadedPages } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 interface PublicPersonScope {
 	workspaceSlug: string;
@@ -21,20 +20,6 @@ interface PublicPersonScope {
 	period: ActivityPeriod;
 	repo: readonly string[];
 	enabled: boolean;
-}
-
-/** Active resetQueries refetches. Native data clearing keeps the refusal without issuing another read. */
-function usePublicReadRefusal(queryKey: QueryKey, isError: boolean, error: unknown) {
-	const queryClient = useQueryClient();
-	useEffect(() => {
-		if (!isError || queryErrorIsRetryable(error)) {
-			return;
-		}
-		const cached = queryClient.getQueryCache().find({ queryKey, exact: true });
-		if (cached !== undefined && cached.state.error === error && cached.state.data !== undefined) {
-			cached.setState({ data: undefined, dataUpdatedAt: 0 });
-		}
-	}, [queryClient, queryKey, isError, error]);
 }
 
 /** Published person data never uses a member read or a previous person's cached response. */
@@ -45,7 +30,7 @@ export function usePublicPersonActivity(scope: PublicPersonScope): PublicPersonA
 		query: { ...periodQuery(period), repo: repo.length > 0 ? [...repo] : undefined },
 	});
 	const query = useQuery({ ...options, enabled: enabled && login !== undefined, gcTime: 0 });
-	usePublicReadRefusal(options.queryKey, query.isError, query.error);
+	useQueryReadRefusal(options.queryKey, query.isError, query.error);
 	if (!enabled || login === undefined) {
 		return { status: "loading", seedAllowed: false };
 	}
@@ -78,7 +63,7 @@ export function usePublicPersonWork({
 		enabled: enabled && login !== undefined,
 		gcTime: 0,
 	});
-	usePublicReadRefusal(options.queryKey, query.isError, query.error);
+	useQueryReadRefusal(options.queryKey, query.isError, query.error);
 	if (!enabled || login === undefined) {
 		return { status: "loading" };
 	}

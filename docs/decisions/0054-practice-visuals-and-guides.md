@@ -51,8 +51,8 @@ Where the long explanation lives:
 
 Where the panel shows the guide:
 
-1. **A "Read more" disclosure under the introduction.** Rejected. An open guide moves the results down the panel.
-2. **A Guide tab beside the Results and Feedback tabs.** Chosen. The guide is one step away and does not move the results.
+1. **A "Read more" disclosure under the introduction.** Rejected. An open guide moves the observations down the panel.
+2. **A Guide tab beside the Observations and Feedback tabs.** Chosen. The guide is one step away and does not move the observations.
 
 How visuals are made:
 
@@ -72,13 +72,13 @@ A **practice guide** is Markdown with SVG figures.
 
 The practice panel starts with an introduction.
 **Why it matters** is the lead sentence, the visual follows it, and **What good looks like** is the caption of the visual.
-The tabs **Results**, **Feedback**, and **Guide** follow the introduction.
+The tabs **Observations**, **Feedback**, and **Guide** follow the introduction.
 The **Guide** tab shows the guide, and it appears only for a practice that has a guide.
 The introduction has no control that hides it.
 
 The fields follow the rules of other developer guidance:
 
-- Each change creates a practice version. A release proposal offers each field separately.
+- Each change creates a revision. A release proposal offers each field separately.
 - The definition digest includes both fields. The review-rule fingerprint excludes them, so a change keeps the recurrence chain.
 - The review model never receives them. Heph receives the descriptions and the guide text.
 
@@ -93,7 +93,7 @@ The webapp sanitizes the markup again with DOMPurify [9] and draws it inline.
 ## Consequences
 
 - One file follows both themes.
-- Practice versions, release proposals, and the reset to the Hephaestus default work as they do for text fields.
+- Revisions, release proposals, and the reset to the Hephaestus default work as they do for text fields.
 - The allowlist refuses SVG files from most drawing tools until a person removes ids, styles, and gradients.
 - Without ids, a picture cannot use markers, gradients, masks, filters, or clip paths. An arrow is two paths.
 - The server and DOMPurify each hold a copy of the rules, and the copies can drift. The server is the gate. DOMPurify is the second layer.

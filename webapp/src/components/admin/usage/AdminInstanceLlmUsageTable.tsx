@@ -11,13 +11,13 @@ import { type ReactNode, useMemo } from "react";
 
 import { cn } from "cn";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
-import { TableRowsSkeleton } from "@/components/admin/integrations/TableRowsSkeleton";
 import { type DataTableFeatures, dataTableFeatures } from "@/components/common/data-table";
 import { DataTableHeader } from "@/components/common/DataTableHeader";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { TablePagination } from "@/components/common/TablePagination";
+import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Section } from "@/components/layout/Section";
 import { CAP_STATE_DEFS, type CapState } from "@/components/practice-vocabulary/cap-state-defs";
 import type { Purse } from "@/components/practice-vocabulary/purse-defs";

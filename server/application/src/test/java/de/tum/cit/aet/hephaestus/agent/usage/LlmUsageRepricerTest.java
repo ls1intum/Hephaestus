@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
@@ -30,6 +31,8 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
@@ -81,7 +84,8 @@ class LlmUsageRepricerTest extends BaseUnitTest {
                 0L,
                 0L,
                 appliedPriceId,
-                appliedWorkspaceModelId);
+                appliedWorkspaceModelId,
+                MeasurementVerification.VERIFIED);
     }
 
     private static LlmModelPrice price(PricingMode mode, @Nullable BigDecimal input) {
@@ -129,7 +133,18 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     @DisplayName("a row with only search units stays unpriced, because it holds no token to price")
     void aRowWithOnlySearchUnitsStaysUnpriced() {
         LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(new UnpricedLedgerRow(
-                EVENT_ID, WORKSPACE_ID, "rerank-v3.5", UsageFundingSource.INSTANCE, 0L, 0L, 0L, 0L, 3L, 11L, null));
+                EVENT_ID,
+                WORKSPACE_ID,
+                "rerank-v3.5",
+                UsageFundingSource.INSTANCE,
+                0L,
+                0L,
+                0L,
+                0L,
+                3L,
+                11L,
+                null,
+                MeasurementVerification.VERIFIED));
 
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.NO_TOKEN_EVIDENCE);
         verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
@@ -142,7 +157,18 @@ class LlmUsageRepricerTest extends BaseUnitTest {
         when(priceRepository.findById(11L)).thenReturn(Optional.of(price(PricingMode.PRICED, new BigDecimal("3.00"))));
 
         LlmUsageRepricer.ResultOutcome outcome = repricer.reprice(new UnpricedLedgerRow(
-                EVENT_ID, WORKSPACE_ID, "rerank-v3.5", UsageFundingSource.INSTANCE, 120L, 0L, 0L, 0L, 3L, 11L, null));
+                EVENT_ID,
+                WORKSPACE_ID,
+                "rerank-v3.5",
+                UsageFundingSource.INSTANCE,
+                120L,
+                0L,
+                0L,
+                0L,
+                3L,
+                11L,
+                null,
+                MeasurementVerification.VERIFIED));
 
         assertThat(outcome).isEqualTo(LlmUsageRepricer.ResultOutcome.STILL_UNPRICEABLE);
         verify(usageRepository, never()).applyResolvedPrice(any(), any(), any());
@@ -225,9 +251,43 @@ class LlmUsageRepricerTest extends BaseUnitTest {
     @DisplayName("a row with no measured token stays unknown even when its model is free")
     void aRowWithNoTokenEvidenceIsNeverPriced() {
         var unmeasured = new UnpricedLedgerRow(
-                EVENT_ID, WORKSPACE_ID, "gpt-5", UsageFundingSource.INSTANCE, 0L, 0L, 0L, 0L, 0L, 11L, null);
+                EVENT_ID,
+                WORKSPACE_ID,
+                "gpt-5",
+                UsageFundingSource.INSTANCE,
+                0L,
+                0L,
+                0L,
+                0L,
+                0L,
+                11L,
+                null,
+                MeasurementVerification.VERIFIED);
 
         assertThat(repricer.reprice(unmeasured)).isEqualTo(LlmUsageRepricer.ResultOutcome.NO_TOKEN_EVIDENCE);
+        verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
+    }
+
+    @ParameterizedTest
+    @EnumSource(
+            value = MeasurementVerification.class,
+            names = {"UNKNOWN", "UNVERIFIABLE"})
+    void shouldRefusePositiveMeasurementsWhenVerificationWasNotAccepted(MeasurementVerification verification) {
+        var row = new UnpricedLedgerRow(
+                EVENT_ID,
+                WORKSPACE_ID,
+                "gpt-5",
+                UsageFundingSource.INSTANCE,
+                1_000_000L,
+                0L,
+                0L,
+                0L,
+                0L,
+                11L,
+                null,
+                verification);
+
+        assertThat(repricer.reprice(row)).isEqualTo(LlmUsageRepricer.ResultOutcome.UNVERIFIED_MEASUREMENT);
         verifyNoInteractions(usageRepository, priceRepository, modelRepository, workspaceModelRepository);
     }
 

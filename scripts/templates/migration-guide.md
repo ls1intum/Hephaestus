@@ -53,7 +53,7 @@ Before upgrading to any new `0.x.0` version:
 
 1. ✅ Read the [release notes](https://github.com/hephaestus-build/Hephaestus/releases)
 2. ✅ Check this migration guide for breaking changes
-3. ✅ Verify in staging first (auto-deployed on every release)
+3. ✅ Verify the upgrade in staging first
 4. ✅ Approve production deployment after staging verification
 
 ---
@@ -67,16 +67,17 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ## Automatic vs Manual Migrations
 
-### Automatic (No Action Needed)
+### Normal Startup Migrations
 
 | Component | Tool | Notes |
 |-----------|------|-------|
-| Database schema | Liquibase | Changesets apply automatically, in order, on server startup |
+| Database schema | Liquibase | Follow the [database migration instructions](https://docs.hephaestus.build/admin/compatibility-policy#database-migrations) |
 
 ### Manual (Action Required)
 
 | Component | How | Notes |
 |-----------|-----|-------|
+| Database cutover | Follow the target release's migration entry | Complete any required procedure before starting the new runtime roles |
 | Environment variables | Check release notes | New config may be required |
 | Docker compose | Check `docker/` files | Image versions may change |
 
@@ -108,38 +109,35 @@ and review the release notes for endpoint changes.
 
 ### Database Schema Changed
 
-Liquibase applies changelogs automatically, in order, on server startup. A failure is not silent: the
-application context fails to start, so the container exits and your orchestrator restarts it — a
-crash-loop whose first useful line is in the *first* startup attempt's log, not the latest. Capture
-that before doing anything else:
+First follow the [database migration instructions](https://docs.hephaestus.build/admin/compatibility-policy#database-migrations).
+For a migration run at startup, a failure prevents the application context from starting.
+The container exits, and the orchestrator may restart it.
+Capture the first failed startup log before retrying:
 
 ```bash
 docker compose logs application-server | grep -i -m5 liquibase
 ```
 
-Liquibase runs each changeset in its own transaction, so a failure leaves earlier changesets applied
-and the failing one rolled back. The database is therefore consistent but *partially migrated*, and
-the old application version may no longer match it — do not assume rolling back the image is safe.
+Liquibase normally runs each changeset in a transaction. A changeset with `runInTransaction="false"`
+can fail after applying some statements. Earlier completed changesets also remain applied.
+Do not assume that a failed upgrade rolled back or that the previous application can read its schema.
 
 | Symptom in the log | What it means | What to do |
 | --- | --- | --- |
-| `Could not acquire change log lock` | A previous run was killed (OOM, `docker kill`, node eviction) mid-migration and left its row in `DATABASECHANGELOGLOCK`. | Confirm no server is actually running, then clear it: `UPDATE databasechangeloglock SET locked = FALSE, lockgranted = NULL, lockedby = NULL WHERE id = 1;` and restart. Never clear it while another replica may still be migrating. |
+| `Could not acquire change log lock` | A migration is active, or an interrupted process left its lock. | Follow [stale lock recovery](https://docs.hephaestus.build/admin/liquibase-baseline-runbook#stale-lock-recovery) with the target release image. Never clear an active migration process's lock. |
 | `Validation Failed: … checksums do not match` | A changelog file that already ran was edited. Released changelogs are immutable for exactly this reason. | Restore the file to its released content and fix forward with a *new* changelog. Do not `clearCheckSums` on production to make the error go away — it tells Liquibase to trust a file whose applied effect you no longer know. |
-| A constraint or `NOT NULL` addition fails | Existing rows violate the new rule. CI replays migrations against an empty database, so a data-incompatible migration passes CI and fails only on real data. | Do not hand-edit the schema. Report it with the failing changeset id; the fix ships as a new changelog that cleans the data first. |
-| `permission denied` / `must be owner of` | The database user lacks DDL rights on an existing object. | Grant ownership or `ALTER` on the named object and restart. |
+| A constraint or `NOT NULL` addition fails | Existing rows violate the new constraint. Migration tests do not cover every installed dataset. | Report the failing changeset and follow the release's recovery instructions. Do not bypass the constraint or mark a failed changeset as applied. |
+| `permission denied` / `must be owner of` | The migration user lacks the required rights on an existing object. | Have the database owner restore the required ownership or permissions before retrying. |
 
-**Fix forward, do not roll back.** Changelogs carry `<rollback>` blocks, but they are never exercised
-in CI and are not a supported recovery path. The supported recoveries, in order of preference:
+**Follow the target release's recovery procedure.** A `<rollback>` block does not establish a supported
+downgrade. Keep writers stopped if the release requires it. Choose one of these recovery paths:
 
-1. **Wait for a patch release** that fixes the changeset forward. A partially migrated database keeps
-   serving on the previous image only if no applied changeset broke it — check the log for which
-   changesets succeeded before deciding.
-2. **Restore from backup** if the instance must come back now and forward-fixing will take longer than
-   the outage budget. Follow
-   [Backup & restore](https://docs.hephaestus.build/admin/backup-restore); restore the
-   database dump *and* the `.env` holding `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, or every encrypted
-   credential in the restored database is unreadable. Then pin `IMAGE_TAG` to the version the dump
-   was taken under so it is not immediately re-migrated by the release that failed.
+1. **Apply a forward fix** qualified for the observed migration state. Do not restart an older image
+   against a partially migrated database without an explicit supported procedure.
+2. **Restore a verified backup** with its matching signed release lock and configuration. Follow
+   [Backup & restore](https://docs.hephaestus.build/admin/backup-restore), including its key, broker,
+   privacy and restart checks. The matching lock prevents a failed target release from immediately
+   migrating the restored database again.
 
 Take a database dump before every upgrade that ships a migration. The release notes flag which ones
 do.

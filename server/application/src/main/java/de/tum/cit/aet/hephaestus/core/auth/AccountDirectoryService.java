@@ -17,6 +17,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/** Account choices serve both HTTP requests and capture-role permission and consent checks. */
 @Service
 @WorkspaceAgnostic("Account status and choices span all workspaces")
 @RequiredArgsConstructor

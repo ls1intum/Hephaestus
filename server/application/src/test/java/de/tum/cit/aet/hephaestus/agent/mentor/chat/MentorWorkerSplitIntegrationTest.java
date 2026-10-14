@@ -7,7 +7,6 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
@@ -140,12 +139,6 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
                                 null)));
         when(contextBuilder.build(any()))
                 .thenReturn(Map.of("inputs/context/results_history.json", "[]".getBytes(StandardCharsets.UTF_8)));
-        doAnswer(invocation -> {
-                    service.start(invocation.getArgument(0), invocation.getArgument(1));
-                    return null;
-                })
-                .when(starter)
-                .start(any(), any());
         when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
                 .thenReturn("stream-ts");
         doNothing().when(slack).stopStream(anyLong(), anyString(), anyString(), any());

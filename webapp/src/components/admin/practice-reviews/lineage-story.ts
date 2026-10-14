@@ -100,17 +100,6 @@ export interface RailStage {
 	items: RailItem[];
 }
 
-/**
- * When this review's story starts: the event that started it, or the review itself where no event
- * did.
- */
-export function traceStart(
-	review: ReviewRef | undefined,
-	startedBy: ItemEvent | null | undefined,
-): Date | undefined {
-	return startedBy?.occurredAt ?? review?.createdAt;
-}
-
 /** The siblings the simple story folds into one line. */
 export interface StorySiblings {
 	results: number;

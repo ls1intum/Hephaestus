@@ -73,8 +73,10 @@ class ReviewBatchDriverTest extends BaseUnitTest {
 
     @Test
     void exhaustedBudgetPausesWithoutAdvancingCursor() {
+        batch.setUpdatedAt(now.minusSeconds(3600));
         when(budget.canRequest(1, ReviewKind.ITEM, null)).thenReturn(false);
         driver.advance(batch);
+        assertThat(batch.getUpdatedAt()).isEqualTo(now);
         assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.PAUSED);
         assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
         assertThat(batch.getCursorItemId()).isNull();
@@ -83,8 +85,8 @@ class ReviewBatchDriverTest extends BaseUnitTest {
 
     @Test
     void resumedBudgetContinuesFromTheStoredCursor() {
-        batch.setStatus(ReviewBatchStatus.RUNNING);
-        batch.setPauseReason(null);
+        batch.setStatus(ReviewBatchStatus.PAUSED);
+        batch.setPauseReason(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
         batch.setCursorItemId(5L);
         when(scope.next(1, batch.getId(), 5L, 2)).thenReturn(List.of(6L));
         when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Submitted());
@@ -145,15 +147,13 @@ class ReviewBatchDriverTest extends BaseUnitTest {
                         ArgumentMatchers.anyCollection()))
                 .thenReturn(false);
         when(scope.next(1, batch.getId(), null, 1)).thenReturn(List.of(6L));
-        when(submitter.offer(batch, 6))
-                .thenReturn(
-                        new ReviewBatchSubmitter.SubmissionOutcome.Paused(ReviewBatchPauseReason.SCAN_ALREADY_ACTIVE));
+        when(submitter.offer(batch, 6)).thenReturn(new ReviewBatchSubmitter.SubmissionOutcome.Deferred());
         driver.advance(batch);
         assertThat(batch.getCursorItemId()).isNull();
         assertThat(batch.getFailedCount()).isZero();
         assertThat(batch.getSubmittedCount()).isZero();
-        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.PAUSED);
-        assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.SCAN_ALREADY_ACTIVE);
+        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.RUNNING);
+        assertThat(batch.getPauseReason()).isNull();
     }
 
     @Test
@@ -168,5 +168,31 @@ class ReviewBatchDriverTest extends BaseUnitTest {
         assertThat(batch.getFailedCount()).isZero();
         assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.PAUSED);
         assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.BUDGET_EXHAUSTED);
+    }
+
+    @Test
+    void shouldMoveAWaitingScanBehindOtherRunningBatches() {
+        batch.setKind("scm.repository");
+        batch.setUpdatedAt(now.minusSeconds(3600));
+        when(reviews.existsByWorkspaceIdAndKindAndStatusIn(
+                        ArgumentMatchers.eq(1L),
+                        ArgumentMatchers.eq(ReviewKind.SCAN),
+                        ArgumentMatchers.anyCollection()))
+                .thenReturn(true);
+        driver.advance(batch);
+        assertThat(batch.getUpdatedAt()).isEqualTo(now);
+        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.RUNNING);
+        assertThat(batch.getCursorItemId()).isNull();
+        verifyNoInteractions(submitter, scope);
+    }
+
+    @Test
+    void shouldKeepAnAdministrativePauseWhenBudgetReturns() {
+        batch.setStatus(ReviewBatchStatus.PAUSED);
+        batch.setPauseReason(ReviewBatchPauseReason.PAUSED_BY_ADMIN);
+        driver.advance(batch);
+        assertThat(batch.getStatus()).isEqualTo(ReviewBatchStatus.PAUSED);
+        assertThat(batch.getPauseReason()).isEqualTo(ReviewBatchPauseReason.PAUSED_BY_ADMIN);
+        verifyNoInteractions(submitter, scope);
     }
 }

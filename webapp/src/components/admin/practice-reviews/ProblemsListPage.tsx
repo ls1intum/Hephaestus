@@ -1,6 +1,7 @@
 import type { ReviewProblem } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import type { PagedListState } from "@/runtime/tanstack-query/infinite-list";
+import { ReviewListRefresh } from "./ReviewListRefresh";
 
 import {
 	clearedProblemFacets,
@@ -79,6 +80,7 @@ export function ProblemsListPage({
 			{problems.status === "loading" && <ProblemRows state={{ status: "loading" }} />}
 			{problems.status === "ready" && (
 				<>
+					<ReviewListRefresh failure={problems.refreshFailure} noun="problems" />
 					<ProblemRows state={problemsState(rows, hasProblemFilter(search) ? reset : undefined)} />
 					{rows.length > 0 && <ReviewListEnd {...problems} noun="problems" />}
 				</>

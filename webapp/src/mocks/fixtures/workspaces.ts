@@ -34,7 +34,6 @@ export function ownMembership(
 	overrides: Partial<Wire<WorkspaceMembership>> = {},
 ): Wire<WorkspaceMembership> {
 	return {
-		accountId: "42",
 		account: {
 			id: "42",
 			status: "ACTIVE",

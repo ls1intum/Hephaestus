@@ -180,10 +180,10 @@ export const SelectOverlay = reflowStory(
 				]}
 				defaultValue="propose"
 			>
-				<SelectTrigger aria-label="Autonomy" className="w-full">
+				<SelectTrigger aria-label="Feedback mode" className="w-full">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent aria-label="Autonomy">
+				<SelectContent aria-label="Feedback mode">
 					<SelectItem value="propose">Propose feedback for a reviewer</SelectItem>
 					<SelectItem value="deliver">{optionLabel}</SelectItem>
 				</SelectContent>
@@ -191,7 +191,7 @@ export const SelectOverlay = reflowStory(
 		</Page>
 	),
 	async () => {
-		await userEvent.click(screen.getByRole("combobox", { name: "Autonomy" }));
+		await userEvent.click(screen.getByRole("combobox", { name: "Feedback mode" }));
 		return screen.findByRole("option", { name: optionLabel });
 	},
 );
@@ -200,12 +200,12 @@ export const ComboboxOverlay = reflowStory(
 	() => (
 		<Page>
 			<Combobox items={["Propose feedback for a reviewer", optionLabel]}>
-				<ComboboxTrigger aria-label="Autonomy">
+				<ComboboxTrigger aria-label="Feedback mode">
 					<ComboboxValue />
 				</ComboboxTrigger>
 				{/* `min-w-72` is the widest the app asks for. */}
-				<ComboboxContent align="start" className="min-w-72" aria-label="Autonomy modes">
-					<ComboboxList aria-label="Autonomy modes">
+				<ComboboxContent align="start" className="min-w-72" aria-label="Feedback modes">
+					<ComboboxList aria-label="Feedback modes">
 						{(item: string) => (
 							<ComboboxItem key={item} value={item}>
 								{item}
@@ -217,7 +217,7 @@ export const ComboboxOverlay = reflowStory(
 		</Page>
 	),
 	async () => {
-		await userEvent.click(screen.getByRole("combobox", { name: "Autonomy" }));
+		await userEvent.click(screen.getByRole("combobox", { name: "Feedback mode" }));
 		return screen.findByRole("option", { name: optionLabel });
 	},
 );

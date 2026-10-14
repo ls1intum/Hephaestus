@@ -310,7 +310,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(failed.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
         assertThat(failed.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         assertThat(failed.getAttempt()).isZero();
-        assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
         assertThat(failed.getInput()).isEqualTo(before.getInput());
         assertThat(failed.getCapture()).isEqualTo(before.getCapture());
         Result kept = practiceResultRepository.findById(observed.getId()).orElseThrow();
@@ -378,7 +377,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         ReviewJob continuing = jobRepository.findById(jobId).orElseThrow();
         assertThat(continuing.getStatus()).isEqualTo(ReviewJobStatus.QUEUED);
         assertThat(continuing.getAttempt()).isEqualTo(1);
-        assertThat(continuing.getJobTokenHash()).isNotEqualTo(before.getJobTokenHash());
         // The admission and the evidence it was verified against are the original attempt's, untouched.
         assertThat(continuing.getInput()).isEqualTo(before.getInput());
         assertThat(continuing.getCapture()).isEqualTo(before.getCapture());
@@ -443,7 +441,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         }
         spentBeforeItWasLost(jobId, 2);
         registerStaleWorker("dead-replica-10");
-        ReviewJob before = jobRepository.findById(jobId).orElseThrow();
 
         sweeper.recoverOrphanedJobs();
 
@@ -451,7 +448,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(failed.getStatus()).isEqualTo(ReviewJobStatus.FAILED);
         assertThat(failed.getErrorMessage()).isEqualTo(ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION);
         assertThat(failed.getAttempt()).isZero();
-        assertThat(failed.getJobTokenHash()).isEqualTo(before.getJobTokenHash());
         assertThat(jdbc.queryForList(
                         "SELECT total_calls FROM llm_usage_event WHERE source_id::text = ? AND source_attempt = 0",
                         Integer.class,
@@ -501,7 +497,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         assertThat(after.getErrorMessage()).isNull();
     }
 
-    /**
+    /*
      * Holds the job's row lock as the admission does, changes it, and lets the sweep run against it: the
      * sweep blocks on the lock, then decides on what this transaction committed or rolled back.
      */
@@ -542,7 +538,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         });
     }
 
-    /**
+    /*
      * An admission as it is persisted: a result of a practice revision, citing this job's capture,
      * and the digest on the job's metadata.
      */
@@ -578,7 +574,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
         }));
     }
 
-    /**
+    /*
      * What an admission keeps for a later writer, as persisted: the inputs under its digest and attempt, and the
      * capture receipt that vouches for whose rows they copied.
      */
@@ -619,12 +615,12 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
                 "{\"files\":{}}");
     }
 
-    /** The attempt ran and the proxy counted its calls before its worker was lost. */
+    /* The attempt ran and the proxy counted its calls before its worker was lost. */
     private void spentBeforeItWasLost(UUID jobId, int calls) {
         jdbc.update("UPDATE review_job SET execution_started_at = now(), llm_calls = ? WHERE id = ?", calls, jobId);
     }
 
-    /** The practice's definition moves on after the admission, as a later edit would. */
+    /* The practice's definition moves on after the admission, as a later edit would. */
     private void changePracticeDefinition() {
         var kind = practice.getKind();
         runtimePracticeVersions.append(

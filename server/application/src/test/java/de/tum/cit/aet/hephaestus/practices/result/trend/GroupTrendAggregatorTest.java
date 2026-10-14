@@ -21,9 +21,8 @@ class GroupTrendAggregatorTest {
 
     @Test
     void shouldPreventThinEvidenceFromDominatingWellEvidencedPractice() {
-        PracticeTrend wellEvidenced =
-                trend("well", BetaPosterior.from(24, 21).differenceFrom(BetaPosterior.from(24, 3)));
-        PracticeTrend thin = trend("thin", BetaPosterior.from(3, 0).differenceFrom(BetaPosterior.from(3, 3)));
+        PracticeTrend wellEvidenced = trend(BetaPosterior.from(24, 21).differenceFrom(BetaPosterior.from(24, 3)));
+        PracticeTrend thin = trend(BetaPosterior.from(3, 0).differenceFrom(BetaPosterior.from(3, 3)));
 
         PracticeTrend group =
                 GroupTrendAggregator.aggregate(List.of("well", "thin"), List.of(wellEvidenced, thin), properties);
@@ -181,7 +180,7 @@ class GroupTrendAggregatorTest {
         assertThat(group.support().reviewedWork()).isEqualTo(9);
     }
 
-    private PracticeTrend trend(String slug, BetaPosterior.Difference difference) {
+    private PracticeTrend trend(BetaPosterior.Difference difference) {
         TrendSupport support = new TrendSupport(
                 4,
                 4,

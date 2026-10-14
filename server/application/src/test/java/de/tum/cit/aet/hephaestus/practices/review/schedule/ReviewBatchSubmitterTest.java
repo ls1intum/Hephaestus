@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequestRejected;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
@@ -91,6 +92,8 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
         assertThat(request.origin()).isEqualTo(expected);
         assertThat(request.eventId()).isNull();
         assertThat(request.batchId()).isEqualTo(batch.getId());
+        assertThat(request.requestKey()).isNull();
+        assertThat(request.requestDigest()).isNull();
         if (reserved == null) assertThat(request.budgetUsd()).isNull();
         else assertThat(request.budgetUsd()).isEqualByComparingTo(reserved);
     }
@@ -102,5 +105,34 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
                 .kind("scm.pull_request")
                 .origin(ReviewBatchOrigin.BACKFILL)
                 .build();
+    }
+
+    @Test
+    void shouldDeferAnUnavailableSourceWithoutConsumingTheTarget() {
+        assertThat(refusal(ReviewRequestRejected.Reason.SOURCE_UNAVAILABLE))
+                .isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Deferred());
+    }
+
+    @Test
+    void shouldSkipAPermanentRequestConflictWithoutReportingACaptureFailure() {
+        assertThat(refusal(ReviewRequestRejected.Reason.REQUEST_CONFLICT))
+                .isEqualTo(new ReviewBatchSubmitter.SubmissionOutcome.Skipped());
+    }
+
+    private ReviewBatchSubmitter.SubmissionOutcome refusal(ReviewRequestRejected.Reason reason) {
+        var batch = batch();
+        var ref = new ItemRef(1, 7, new ItemKind("scm.pull_request"), 7L, null, null);
+        when(items.find(1, 7)).thenReturn(Optional.of(ref));
+        when(items.current(ref))
+                .thenReturn(Optional.of(new ItemSnapshot(
+                        ref,
+                        new ItemVersion("v1", null),
+                        new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null),
+                        Map.of(),
+                        List.of(),
+                        new ItemLabel(7, "Item", "Item", 1, "Container", null, IntegrationKind.GITHUB))));
+        when(spend.remaining(batch)).thenReturn(new ReviewBatchSpend.Snapshot(null, true));
+        when(reviews.request(ArgumentMatchers.any())).thenThrow(new ReviewRequestRejected(reason, "Unavailable"));
+        return submitter.offer(batch, 7);
     }
 }
