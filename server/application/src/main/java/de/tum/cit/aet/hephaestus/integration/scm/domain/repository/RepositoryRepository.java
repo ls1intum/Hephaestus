@@ -34,6 +34,7 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
      */
     Optional<Repository> findByNameWithOwner(String nameWithOwner);
 
+    @EntityGraph(attributePaths = {"organization", "provider"})
     Optional<Repository> findByNativeIdAndProviderId(Long nativeId, Long providerId);
 
     @EntityGraph(attributePaths = {"organization", "provider"})
