@@ -280,6 +280,7 @@ try {
 			},
 			webapp: { ports: [], depends_on: {}, environment: { SENTRY_DSN: "" } },
 			"application-server": {
+				ports: [],
 				entrypoint: ["nginx", "-g", "daemon off;"],
 				healthcheck: { disable: true },
 				volumes: [`${directory}/api.conf:/etc/nginx/conf.d/default.conf:ro`],
@@ -289,7 +290,7 @@ try {
 		networks: { "shared-network": { name: project } },
 	});
 
-	for (const service of ["reverse-proxy", "webapp"]) {
+	for (const service of ["reverse-proxy", "webapp", "application-server"]) {
 		const ports = overrideDocument.getIn(["services", service, "ports"], true);
 		assert.ok(isSeq(ports));
 		ports.tag = "!override";
