@@ -180,6 +180,46 @@ export const LoadMoreFailed: Story = {
 	},
 };
 
+/** A refresh failed: the work already read stays, under a warning that it may be out of date. */
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			status: "ready",
+			stale: false,
+			items: WORK_LOG,
+			hasMore: false,
+			isLoadingMore: false,
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+			onLoadMore,
+			onCopy,
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("alert")).toHaveTextContent("We could not refresh activity");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		const [today] = canvas.getAllByRole("list");
+		await expect(today).toHaveAccessibleName("Today");
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: {
+		state: {
+			status: "ready",
+			stale: false,
+			items: WORK_LOG,
+			hasMore: false,
+			isLoadingMore: false,
+			refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+			onLoadMore,
+			onCopy,
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+	},
+};
+
 export const Empty: Story = {
 	args: {
 		state: {
