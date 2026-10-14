@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ScrollTextIcon } from "lucide-react";
 
 import { adminListWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { instanceAdminHead } from "@/lib/page-title";
+import { useSearchState } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/admin/audit")({
 	head: instanceAdminHead("Audit log"),
@@ -19,10 +20,10 @@ export const Route = createFileRoute("/_authenticated/admin/audit")({
 
 function AdminAuditPage() {
 	const search = Route.useSearch();
-	const navigate = useNavigate({ from: Route.fullPath });
+	const setSearch = useSearchState();
 
 	const patchSearch = (patch: Partial<AuditSearch>) => {
-		void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+		void setSearch((prev) => ({ ...prev, ...patch }), { replace: true });
 	};
 
 	const workspacesQuery = useQuery(adminListWorkspacesOptions());
@@ -43,16 +44,14 @@ function AdminAuditPage() {
 				className="gap-4"
 				value={search.tab}
 				onValueChange={(value) => {
-					void navigate({
-						search: (prev) => ({
-							// The tab component hands back an untyped value; the schema's `.catch` decides what
-							// a stray one becomes.
-							tab: auditSearchSchema.shape.tab.parse(value),
-							actorId: prev.actorId,
-							from: prev.from,
-							to: prev.to,
-						}),
-					});
+					void setSearch((prev) => ({
+						// The tab component hands back an untyped value; the schema's `.catch` decides what
+						// a stray one becomes.
+						tab: auditSearchSchema.shape.tab.parse(value),
+						actorId: prev.actorId,
+						from: prev.from,
+						to: prev.to,
+					}));
 				}}
 			>
 				<TabsList className="h-10 w-full p-1 sm:w-fit">
