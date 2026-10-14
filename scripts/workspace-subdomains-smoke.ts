@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { once } from "node:events";
 import { mkdtemp, readFile, mkdir, writeFile, cp, rm } from "node:fs/promises";
 import { request } from "node:https";
-import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout } from "node:timers/promises";
@@ -92,6 +90,15 @@ function selectRelease(release: string) {
 		assert.ok(index !== -1);
 		args[index] = path.join(directory, release, path.basename(file));
 	}
+}
+
+async function publishedPort(target: number) {
+	const published = await output("docker", [...args, "port", "reverse-proxy", String(target)], {
+		env,
+	});
+	const port = Number(published.trim().split(":").at(-1));
+	assert.ok(port > 0);
+	return port;
 }
 
 async function get(port: number, host: string, url: string, method = "GET") {
@@ -264,7 +271,7 @@ try {
 	const overrideDocument = new Document({
 		services: {
 			"reverse-proxy": {
-				ports: [],
+				ports: [80, 443, 8080].map((target) => ({ target, host_ip: "127.0.0.1" })),
 				command,
 				volumes: [
 					`${directory}/tls.pem:/smoke/tls.pem:ro`,
@@ -273,6 +280,7 @@ try {
 			},
 			webapp: { ports: [], depends_on: {}, environment: { SENTRY_DSN: "" } },
 			"application-server": {
+				ports: [],
 				entrypoint: ["nginx", "-g", "daemon off;"],
 				healthcheck: { disable: true },
 				volumes: [`${directory}/api.conf:/etc/nginx/conf.d/default.conf:ro`],
@@ -282,7 +290,7 @@ try {
 		networks: { "shared-network": { name: project } },
 	});
 
-	for (const service of ["reverse-proxy", "webapp"]) {
+	for (const service of ["reverse-proxy", "webapp", "application-server"]) {
 		const ports = overrideDocument.getIn(["services", service, "ports"], true);
 		assert.ok(isSeq(ports));
 		ports.tag = "!override";
@@ -383,37 +391,6 @@ try {
 		assert.ok(content.includes("{{ $base :="));
 		assert.ok(content.includes(`https://\${1}.`));
 		assert.ok(!JSON.stringify(selfHost).includes(credential));
-		// Docker's random port allocator does not exclude other host listeners.
-		const probes = [80, 443, 8080].map((target) => ({
-			target,
-			probe: createServer().listen(0, "127.0.0.1"),
-		}));
-		try {
-			await Promise.all(probes.map(async ({ probe }) => once(probe, "listening")));
-			const ports = probes.map(({ probe, target }) => {
-				const address = probe.address();
-				assert.ok(address !== null && typeof address !== "string");
-				return `127.0.0.1:${address.port}:${target}`;
-			});
-			const portNode = overrideDocument.createNode(ports);
-			portNode.tag = "!override";
-			overrideDocument.setIn(["services", "reverse-proxy", "ports"], portNode);
-			await writeFile(override, overrideDocument.toString());
-		} finally {
-			await Promise.all(
-				probes.map(async ({ probe }) => {
-					const closed = Promise.withResolvers<undefined>();
-					probe.close((error) => {
-						if (error === undefined) {
-							closed.resolve(undefined);
-						} else {
-							closed.reject(error);
-						}
-					});
-					await closed.promise;
-				}),
-			);
-		}
 		await run(
 			"docker",
 			[
@@ -429,9 +406,7 @@ try {
 			],
 			{ env },
 		);
-		const published = await output("docker", [...args, "port", "reverse-proxy", "443"], { env });
-		const port = Number(published.trim().split(":").at(-1));
-		assert.ok(port > 0);
+		let port = await publishedPort(443);
 		await waitForBody(port, base, "/", "tenant-spa");
 		await assert.rejects(
 			get(port, "untrusted.example.invalid", "/"),
@@ -441,10 +416,7 @@ try {
 				(error.code === "ERR_TLS_CERT_ALTNAME_INVALID" ||
 					error.code === "DEPTH_ZERO_SELF_SIGNED_CERT"),
 		);
-		const apiPublished = await output("docker", [...args, "port", "reverse-proxy", "8080"], {
-			env,
-		});
-		const apiPort = Number(apiPublished.trim().split(":").at(-1));
+		const apiPort = await publishedPort(8080);
 		const routerResponse = await fetch(
 			`http://127.0.0.1:${apiPort}/api/http/routers/https-tenant@file`,
 		);
@@ -543,6 +515,7 @@ try {
 			);
 			await run("docker", ["stop", retainedListing.trim()]);
 			await run("docker", ["start", retainedListing.trim()]);
+			port = await publishedPort(443);
 			await waitForBody(port, base, "/", "tenant-spa");
 		}
 		const post = await get(port, base, "/w/acme", "POST");
