@@ -4,7 +4,7 @@ import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { expectSettledVisible } from "@/stories/overlay";
 
-import { ConfigAuditTable } from "./ConfigAuditTable";
+import { ConfigAuditTable, type ConfigAuditTableProps } from "./ConfigAuditTable";
 
 const impersonatedUpdate: ConfigAuditEntryView = {
 	id: 3,
@@ -88,19 +88,25 @@ const entries: ConfigAuditEntryView[] = [
 	systemCreate,
 ];
 
+/** A read that stands, with no page left to ask for. */
+function loaded(rows: ConfigAuditEntryView[]) {
+	return {
+		status: "ready",
+		rows,
+		total: rows.length,
+		hasMore: false,
+		isLoadingMore: false,
+		onLoadMore: fn(),
+	} satisfies ConfigAuditTableProps["state"];
+}
+
 const meta = {
 	component: ConfigAuditTable,
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	args: {
-		entries,
-		isLoading: false,
-		isError: false,
+		state: loaded(entries),
 		hasFilter: false,
-		hasNextPage: false,
-		isFetchingNextPage: false,
-		onLoadMore: fn(),
-		onRetry: fn(),
 		onFilterActor: fn(),
 	},
 } satisfies Meta<typeof ConfigAuditTable>;
@@ -116,7 +122,7 @@ export const Default: Story = {
 };
 
 export const Impersonation: Story = {
-	args: { entries: [impersonatedUpdate] },
+	args: { state: loaded([impersonatedUpdate]) },
 	play: async ({ canvas }) => {
 		canvas.getByText(/acting as Ada Lovelace/u);
 		canvas.getByText(/not set → ••••••/u);
@@ -124,7 +130,7 @@ export const Impersonation: Story = {
 };
 
 export const SystemActor: Story = {
-	args: { entries: [systemCreate] },
+	args: { state: loaded([systemCreate]) },
 	play: async ({ canvas }) => {
 		canvas.getByText("System");
 	},
@@ -155,35 +161,82 @@ export const RowDetail: Story = {
 };
 
 export const EmptyWithFilter: Story = {
-	args: { entries: [], hasFilter: true },
+	args: { state: loaded([]), hasFilter: true },
 	play: async ({ canvas }) => {
 		canvas.getByText("No changes match your filters");
 	},
 };
 
 export const EmptyInitial: Story = {
-	args: { entries: [] },
+	args: { state: loaded([]) },
 	play: async ({ canvas }) => {
 		canvas.getByText("No settings changes yet");
 	},
 };
 
+/** The first read is on its way: the real columns, with no empty state. */
+export const Loading: Story = {
+	args: { state: { status: "loading" }, showWorkspace: true },
+	play: async ({ canvas }) => {
+		canvas.getByRole("columnheader", { name: "Workspace" });
+		await expect(canvas.queryByText("No settings changes yet")).toBeNull();
+	},
+};
+
+/** The first read failed; nothing was read to show, so nothing claims there are no changes. */
 export const ErrorState: Story = {
-	args: { entries: [], isError: true },
+	args: { state: { status: "error", error: { status: 503 }, onRetry: fn() } },
 	play: async ({ canvas }) => {
 		canvas.getByText(/We could not load the audit log/iu);
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByText("No settings changes yet")).toBeNull();
+	},
+};
+
+/** A refused read says why and offers no retry that would be refused again. */
+export const Refused: Story = {
+	args: { state: { status: "error", error: { status: 403 }, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		canvas.getByText("You do not have access to the audit log");
+		await expect(canvas.queryByRole("button", { name: "Retry" })).toBeNull();
+		await expect(canvas.queryByRole("table")).toBeNull();
+	},
+};
+
+/** A refresh failed: the changes already read stay, marked as possibly out of date. */
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			...loaded(entries),
+			refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("We could not refresh the audit log");
+		await expect(canvas.getByRole("button", { name: /Retrying/u })).toBeDisabled();
+		canvas.getByText(/cooldownMinutes: 30 → 10/u);
 	},
 };
 
 export const LoadMore: Story = {
-	args: { hasNextPage: true, isFetchingNextPage: true },
+	args: { state: { ...loaded(entries), hasMore: true, isLoadingMore: true } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /Load more/iu })).toBeDisabled();
 	},
 };
 
+/** The next page failed: the first stays readable, and Load more asks again. */
+export const LoadMoreFailed: Story = {
+	args: { state: { ...loaded(entries), hasMore: true, loadMoreError: { status: 503 } } },
+	play: async ({ canvas }) => {
+		canvas.getByText("We could not load more changes.");
+		await expect(canvas.getByRole("button", { name: "Load more" })).toBeEnabled();
+		canvas.getByText(/cooldownMinutes: 30 → 10/u);
+	},
+};
+
 export const ElevatedAccess: Story = {
-	args: { entries: [elevatedUpdate] },
+	args: { state: loaded([elevatedUpdate]) },
 	play: async ({ canvas }) => {
 		canvas.getByText("Grace Hopper");
 		await expect(canvas.getByText("Elevated")).toBeVisible();
@@ -191,7 +244,7 @@ export const ElevatedAccess: Story = {
 };
 
 export const MemberChangeIsNotBadged: Story = {
-	args: { entries: [{ ...elevatedUpdate, elevatedViaInstanceAdmin: false }] },
+	args: { state: loaded([{ ...elevatedUpdate, elevatedViaInstanceAdmin: false }]) },
 	play: async ({ canvas }) => {
 		canvas.getByText("Grace Hopper");
 		await expect(canvas.queryByText("Elevated")).toBeNull();
@@ -199,7 +252,7 @@ export const MemberChangeIsNotBadged: Story = {
 };
 
 export const ElevatedRowDetail: Story = {
-	args: { entries: [elevatedUpdate] },
+	args: { state: loaded([elevatedUpdate]) },
 	play: async ({ canvas }) => {
 		const [details] = canvas.getAllByRole("button", { name: /^View details for/iu });
 		if (!details) {

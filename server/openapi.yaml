@@ -9778,8 +9778,8 @@ paths:
             application/sarif+json:
               schema:
                 type: string
-                format: byte
-          description: OK
+                format: binary
+          description: SARIF report
       summary: Export a scan report as SARIF
       tags:
       - scan
@@ -12735,7 +12735,7 @@ components:
     CitationCapabilities:
       type: object
       properties:
-        revision:
+        commit:
           type: string
           enum:
           - REQUIRED
@@ -14137,6 +14137,10 @@ components:
     EvidenceCitation:
       type: object
       properties:
+        commit:
+          type:
+          - string
+          - "null"
         endLine:
           type:
           - "null"
@@ -14147,10 +14151,6 @@ components:
           - string
           - "null"
         quote:
-          type:
-          - string
-          - "null"
-        revision:
           type:
           - string
           - "null"
@@ -14178,10 +14178,10 @@ components:
           - $ref: "#/components/schemas/CitationProof"
           - type: "null"
       required:
+      - commit
       - endLine
       - path
       - quote
-      - revision
       - side
       - sourceKind
       - sourcePath
@@ -20827,6 +20827,8 @@ components:
     ReviewContext:
       type: object
       properties:
+        canInspectReviewDetails:
+          type: boolean
         item:
           anyOf:
           - $ref: "#/components/schemas/ItemRef"
@@ -20843,6 +20845,7 @@ components:
         workspaceSlug:
           type: string
       required:
+      - canInspectReviewDetails
       - item
       - reasonDescription
       - requestAllowed

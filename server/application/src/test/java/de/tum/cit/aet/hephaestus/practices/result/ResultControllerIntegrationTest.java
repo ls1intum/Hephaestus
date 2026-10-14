@@ -87,9 +87,10 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
         var copy = FeedbackIds.copy(feedback, FeedbackCopyKind.SUMMARY, 0);
         long ws = scenario.workspace().getId();
         var url = "https://github.com/example/project/pull/1#issuecomment-1";
-        jdbc.sql("INSERT INTO"
-            + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,created_at,delivered_at)"
-            + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','DELIVERED','Review this change.',:at,:at)")
+        jdbc.sql(
+                        "INSERT INTO"
+                                + " feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body,created_at,delivered_at)"
+                                + " VALUES(:id,:ws,:review,:item,:developer,'ON_WORK','DELIVERED','Review this change.',:at,:at)")
                 .param("id", feedback)
                 .param("ws", ws)
                 .param("review", result.getReviewId())

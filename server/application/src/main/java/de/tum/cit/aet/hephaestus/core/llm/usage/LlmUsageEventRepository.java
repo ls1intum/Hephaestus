@@ -179,13 +179,13 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
             value = "UPDATE llm_usage_event SET cost_usd = :costUsd, pricing_state = :#{#price.pricingState().name()},"
-                + " applied_price_id = :#{#price.appliedPriceId()}, applied_workspace_model_id ="
-                + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd = :#{#price.per1mInputUsd()},"
-                + " applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
-                + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
-                + " WHERE id = :id AND pricing_state = 'UNPRICED' AND measurement_verification = 'VERIFIED' AND"
-                + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
-                + " cache_write_tokens > 0)",
+                    + " applied_price_id = :#{#price.appliedPriceId()}, applied_workspace_model_id ="
+                    + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd = :#{#price.per1mInputUsd()},"
+                    + " applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
+                    + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
+                    + " WHERE id = :id AND pricing_state = 'UNPRICED' AND measurement_verification = 'VERIFIED' AND"
+                    + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
+                    + " cache_write_tokens > 0)",
             nativeQuery = true)
     int applyResolvedPrice(
             @Param("id") UUID id, @Param("costUsd") BigDecimal costUsd, @Param("price") LlmPriceSnapshot price);

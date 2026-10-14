@@ -11,20 +11,18 @@ This document helps you upgrade between versions of Hephaestus. For what a versi
 | Symbol | Meaning |
 |--------|---------|
 | 🔴 | **Breaking**: Action required before upgrade |
-| 🟡 | **Deprecated**: Works now; removed in a later release — the release notes say which |
+| 🟡 | **Deprecated**: Works now. Removed in a later release — the release notes say which |
 | 🟢 | **New**: No action needed |
 
 ## Check Your Version
 
-Run these from the directory you deploy from — for a self-hosted install that is
-`/opt/hephaestus/docker/self-host`, the same directory as your `.env`. Running them from the
-repository root points at a different Compose project and reports nothing.
+For the running version, follow the
+[runtime identity handoff](https://docs.hephaestus.build/admin/release-image-lock#runtime-identity-handoff).
+It explains how to check each runtime role against the signed release lock.
+The administration overview shows the server's identity.
 
 ```bash
-# Deployed version (the image tag your containers run; APP_VERSION is derived from it)
-docker compose images application-server
-
-# Latest release
+# Latest published release
 curl -fsSL https://api.github.com/repos/hephaestus-build/Hephaestus/releases/latest \
   | grep -m1 '"tag_name"'
 ```
@@ -45,7 +43,7 @@ During pre-1.0, we follow [Semantic Versioning 0.x conventions](https://semver.o
 | Version Bump | May Contain |
 |--------------|-------------|
 | `0.x.0` → `0.y.0` | Breaking changes |
-| `0.x.y` → `0.x.z` | Bug fixes, minor features |
+| `0.x.y` → `0.x.z` | Bug and security fixes |
 
 ### Upgrade Checklist
 
@@ -87,10 +85,9 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### v1.0.0 (Future)
 
-At v1.0.0 the [Compatibility Policy](https://docs.hephaestus.build/admin/compatibility-policy)
-takes effect — the public contract, the "any 1.x → any later 1.y" upgrade guarantee,
-deprecation-ahead-of-removal, and latest-release-only support. Until then, expect rapid iteration and
-occasional breaking changes in minor releases.
+The [Compatibility Policy](https://docs.hephaestus.build/admin/compatibility-policy) applies now,
+including its pre-1.0 exception. Its stable compatibility and upgrade guarantees begin at v1.0.0.
+Before then, minor releases can contain breaking changes.
 
 ---
 
@@ -98,7 +95,7 @@ occasional breaking changes in minor releases.
 
 ### You build against our REST API
 
-The API surface is published as `server/openapi.yaml` in each release; regenerate your client from it
+The API surface is published as `server/openapi.yaml` in each release. Regenerate your client from it
 and review the release notes for endpoint changes.
 
 ### New Required Environment Variable

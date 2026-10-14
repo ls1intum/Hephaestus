@@ -283,7 +283,7 @@ export type Origin = (typeof ORIGINS)[number];
 export type AboutRole = (typeof ABOUT_ROLES)[number];
 export const decimalIdSchema = z.string().regex(/^[1-9][0-9]*$/u);
 const version = z.string().min(1).max(CANDIDATE_LIMITS.versionChars);
-/** A full commit id: the only commit a file location names, so it can never read as a git option. */
+/** File locations use full commit ids so Git cannot interpret them as options. */
 export const commitIdSchema = z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u);
 export const kindSchema = z
 	.string()

@@ -125,7 +125,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                         .as("%s must bind workspaceId", method.getName())
                         .anyMatch(parameter -> {
                             Param param = parameter.getAnnotation(Param.class);
-                            return param != null && param.value().equals("workspaceId");
+                            return param != null
+                                    ? param.value().equals("workspaceId")
+                                    : parameter.isNamePresent()
+                                            && parameter.getName().equals("workspaceId");
                         });
             }
         }

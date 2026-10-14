@@ -7,6 +7,6 @@ import java.util.Set;
 public interface CitationVerifier {
     Set<ItemKind> kinds();
 
-    /** Checks captured side, revision and change-basis references. Empty means verified. */
+    /** Checks captured side, commit and change-basis references. Empty means verified. */
     List<CitationRefusal> verify(CitationCheck check);
 }

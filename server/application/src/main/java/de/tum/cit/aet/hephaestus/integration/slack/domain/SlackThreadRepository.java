@@ -255,10 +255,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
             @Param("audienceAccountId") long audienceAccountId,
             @Param("limit") int limit);
 
-    /**
-     * Agent-owned {@code ConversationCandidateSource} SPI: advance the thread's {@code last_reviewed_ts} watermark
-     * to {@code lastTs}, workspace-pinned.
-     */
+    /** Advances the completed-review watermark without allowing late reviews to rewind it. */
     @Modifying
     @Transactional
     @Query(

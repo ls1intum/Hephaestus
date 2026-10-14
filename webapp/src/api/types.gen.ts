@@ -665,7 +665,7 @@ export type ChatThreadSummary = {
 };
 
 export type CitationCapabilities = {
-    revision?: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN';
+    commit?: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN';
     side?: 'REQUIRED' | 'OPTIONAL' | 'FORBIDDEN';
 };
 
@@ -1354,10 +1354,10 @@ export type ErasureRequest = {
 };
 
 export type EvidenceCitation = {
+    commit: string | null;
     endLine: null | number;
     path: string | null;
     quote: string | null;
-    revision: string | null;
     side: 'OLD' | 'NEW' | null;
     sourceKind: string;
     sourcePath: string | null;
@@ -4067,6 +4067,7 @@ export type ReviewBucket = {
 };
 
 export type ReviewContext = {
+    canInspectReviewDetails: boolean;
     item: ItemRef | null;
     reasonDescription: string | null;
     requestAllowed: boolean;
@@ -13227,9 +13228,9 @@ export type ExportScanSarifData = {
 
 export type ExportScanSarifResponses = {
     /**
-     * OK
+     * SARIF report
      */
-    200: string;
+    200: Blob | File;
 };
 
 export type ExportScanSarifResponse = ExportScanSarifResponses[keyof ExportScanSarifResponses];

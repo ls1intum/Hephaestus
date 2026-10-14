@@ -1,5 +1,6 @@
 import { LogOut, MoreHorizontal, UserCog, Users } from "lucide-react";
 import type { AdminAccountView } from "@/api/types.gen";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { TableRowsSkeleton } from "@/components/common/TableRowsSkeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,10 +22,11 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import type { MorePages } from "@/runtime/tanstack-query/infinite-list";
 
 import { ACCOUNT_STATUS_LABELS, APP_ROLE_LABELS, type AppRole } from "./account-labels";
 
-export interface AdminUsersTableProps {
+export interface AdminUsersTableProps extends Pick<MorePages, "loadMoreError" | "refreshFailure"> {
 	users: AdminAccountView[];
 	isLoading: boolean;
 	isError: boolean;
@@ -64,10 +66,30 @@ function changeRoleLabel(isSelfAdmin: boolean, appRole: AppRole) {
 	return appRole === "APP_ADMIN" ? "Revoke instance admin" : "Grant instance admin";
 }
 
+// Shown once loading has stopped, so a search with pages left unread has not searched them all.
+function emptyTitle(hasSearch: boolean, hasNextPage: boolean) {
+	if (!hasSearch) {
+		return "No users yet";
+	}
+	return hasNextPage ? "No matches among the loaded users" : "No users found";
+}
+
 export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsersTableProps) {
-	const { users, isLoading, hasSearch, hasNextPage, isFetchingNextPage } = rows;
+	const {
+		users,
+		isLoading,
+		isError,
+		hasSearch,
+		hasNextPage,
+		isFetchingNextPage,
+		loadMoreError,
+		refreshFailure,
+	} = rows;
 	return (
 		<div className="space-y-4">
+			{refreshFailure !== undefined && (
+				<QueryErrorAlert title="These users may be out of date" {...refreshFailure} />
+			)}
 			<Table bordered aria-label="Application users" aria-busy={isLoading || undefined}>
 				<TableHeader>
 					<TableRow>
@@ -93,7 +115,7 @@ export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsers
 			<div className="flex flex-col items-center justify-between gap-2 sm:flex-row">
 				<p className="text-sm text-muted-foreground" aria-live="polite">
 					{/* No count until the first page is in: "0 users" while loading would read as a result. */}
-					{!isLoading && (
+					{!isLoading && !isError && (
 						<>
 							Showing {users.length}
 							{hasSearch ? ` of ${totalLoaded} loaded` : ""}{" "}
@@ -101,13 +123,20 @@ export function AdminUsersTable({ totalLoaded, onLoadMore, ...rows }: AdminUsers
 						</>
 					)}
 				</p>
-				{hasNextPage && (
+				{hasNextPage && loadMoreError === undefined && (
 					<Button variant="outline" size="sm" onClick={onLoadMore} disabled={isFetchingNextPage}>
 						{isFetchingNextPage ? <Spinner className="size-4" /> : null}
 						Load more
 					</Button>
 				)}
 			</div>
+			{loadMoreError !== undefined && (
+				<QueryErrorAlert
+					title={hasSearch ? "Search results may be incomplete" : "We could not load more users"}
+					error={loadMoreError}
+					onRetry={onLoadMore}
+				/>
+			)}
 		</div>
 	);
 }
@@ -119,6 +148,8 @@ function UserRows({
 	currentUserId,
 	hasNextPage,
 	isFetchingNextPage,
+	loadMoreError,
+	refreshFailure,
 	onChangeRole,
 	onForceSignOut,
 }: Omit<AdminUsersTableProps, "totalLoaded" | "onLoadMore" | "isLoading">) {
@@ -134,10 +165,12 @@ function UserRows({
 		);
 	}
 	if (users.length === 0) {
+		// A failed read stops the search from loading more, so it must not keep promising results.
+		const stopped = loadMoreError !== undefined || refreshFailure !== undefined;
 		return (
 			<TableRow>
 				<TableCell colSpan={COLUMN_COUNT} className="h-32 text-center">
-					{hasSearch && (hasNextPage || isFetchingNextPage) ? (
+					{hasSearch && (isFetchingNextPage || (hasNextPage && !stopped)) ? (
 						// Search filters loaded rows client-side, and the page is still loading more —
 						// don't claim "no users" before every page is in (avoids a false negative).
 						<div className="flex flex-col items-center justify-center gap-2">
@@ -147,9 +180,13 @@ function UserRows({
 					) : (
 						<div className="flex flex-col items-center justify-center gap-2">
 							<Users className="size-8 text-muted-foreground" aria-hidden />
-							<p className="text-sm font-medium">{hasSearch ? "No users found" : "No users yet"}</p>
+							<p className="text-sm font-medium">{emptyTitle(hasSearch, hasNextPage)}</p>
 							{hasSearch ? (
-								<p className="text-xs text-muted-foreground">Try a different search.</p>
+								<p className="text-xs text-muted-foreground">
+									{hasNextPage
+										? "Some users did not load, so the search did not include them."
+										: "Try a different search."}
+								</p>
 							) : null}
 						</div>
 					)}

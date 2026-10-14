@@ -115,8 +115,8 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         calls(review, "CHAT", COMMENTS, 70, 20, 1);
         assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(transaction -> jdbc.update(
                         "INSERT INTO review_job_script_usage (job_id, attempt, model_kind, practice_id, workspace_id,"
-                            + " calls, input_tokens, output_tokens) VALUES (?, 0, 'DECISION', (SELECT id FROM practice"
-                            + " WHERE workspace_id=? AND slug=?), ?, 1, 1000000, 0)",
+                                + " calls, input_tokens, output_tokens) VALUES (?, 0, 'DECISION', (SELECT id FROM practice"
+                                + " WHERE workspace_id=? AND slug=?), ?, 1, 1000000, 0)",
                         review.getId(),
                         other.getId(),
                         COMMENTS,

@@ -1,12 +1,12 @@
-import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
+import { hashKey, useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { DownloadIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.gen";
 import { adminExportAuthEvents } from "@/api/sdk.gen";
-import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
 import { EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
+import { auditRows } from "@/components/admin/audit/audit-list";
 import {
 	type AuditSearch,
 	dayAfterInstant,
@@ -22,10 +22,11 @@ import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { ResultCount } from "@/components/common/ResultCount";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { dedupeById } from "@/lib/dedupe-by-id";
 import { saveTextFile } from "@/lib/download";
 import { narrowToEnum, nonEmpty } from "@/lib/search-params";
-import { loadedPages, springPageParams } from "@/runtime/tanstack-query/spring-page";
+import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
+import { springPageParams } from "@/runtime/tanstack-query/spring-page";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 const PAGE_SIZE = 50;
 
@@ -59,14 +60,15 @@ export function AuthAuditPanel({
 		to: dateRange?.to ? dayAfterInstant(dateRange.to) : undefined,
 	} as const;
 
-	const listQuery = useInfiniteQuery({
-		...adminListAuthEventsInfiniteOptions({ query: { size: PAGE_SIZE, ...filters } }),
-		...springPageParams,
+	const listOptions = adminListAuthEventsInfiniteOptions({
+		query: { size: PAGE_SIZE, ...filters },
 	});
-
-	const pages = loadedPages(listQuery.data);
-	const events: AuthEventView[] = dedupeById(pages.flatMap((p) => p.content));
-	const total = pages[0]?.totalElements;
+	const listQuery = useInfiniteQuery({ ...listOptions, ...springPageParams });
+	useQueryReadRefusal(listOptions.queryKey, listQuery.isError, listQuery.error);
+	const list = infiniteListState(listQuery, auditRows);
+	// Names, the count and the export come only from a read that stands, never from one refused.
+	const events = list.status === "ready" ? list.rows : [];
+	const total = list.status === "ready" ? list.total : undefined;
 	const hasAppliedFilter =
 		(filters.eventType?.length ?? 0) > 0 ||
 		(filters.result?.length ?? 0) > 0 ||
@@ -152,19 +154,12 @@ export function AuthAuditPanel({
 			<ResultCount total={total} noun={["event", "events"]} hasFilter={hasAppliedFilter} />
 
 			<AdminAuditTable
-				events={events}
-				isLoading={listQuery.isLoading}
-				isError={listQuery.isError}
+				// One table per read: another filter's read starts with nothing selected, while the same
+				// read failing to refresh keeps what is open.
+				key={hashKey(listOptions.queryKey)}
+				state={list}
 				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
-				hasNextPage={listQuery.hasNextPage}
-				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => {
-					void listQuery.fetchNextPage();
-				}}
-				onRetry={() => {
-					void listQuery.refetch();
-				}}
 				onFilterAccount={(accountId) => onSearchChange({ accountId })}
 				onFilterActor={(actorId) => onSearchChange({ actorId })}
 				resolveWorkspaceName={resolveWorkspaceName}

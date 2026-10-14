@@ -21,6 +21,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAbsorptionContributor;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountErasureContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
 import java.util.Map;
@@ -527,6 +528,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                         || javaClass.isAssignableTo(
                                 JavaClass.Predicates.resideInAPackage(BASE_PACKAGE + ".core.privacy.spi.."))
                         || javaClass.isAssignableTo(AccountErasureContributor.class)
+                        || javaClass.isAssignableTo(AccountAbsorptionContributor.class)
                         || javaClass.getDirectDependenciesFromSelf().stream()
                                 .anyMatch(dependency ->
                                         dependency.getTargetClass().isEquivalentTo(PersonDataCopyFence.Lease.class)));

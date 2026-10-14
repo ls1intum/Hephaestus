@@ -45,14 +45,14 @@ public class ResultQueriesImpl implements ResultQueries {
                     + " m.kind='ACCEPTED' AND m.removed_at IS NULL)";
     private static final String DISAGREED =
             "EXISTS(SELECT 1 FROM feedback_basis b JOIN feedback_response s ON s.feedback_id=b.feedback_id AND"
-                + " s.workspace_id=b.workspace_id WHERE b.workspace_id=r.workspace_id AND b.result_id=r.id AND"
-                + " s.resolution='DISAGREE' AND s.id=(SELECT latest.id FROM feedback_response latest WHERE"
-                + " latest.workspace_id=s.workspace_id AND latest.feedback_id=s.feedback_id ORDER BY latest.created_at"
-                + " DESC,latest.id::text DESC LIMIT 1))";
+                    + " s.workspace_id=b.workspace_id WHERE b.workspace_id=r.workspace_id AND b.result_id=r.id AND"
+                    + " s.resolution='DISAGREE' AND s.id=(SELECT latest.id FROM feedback_response latest WHERE"
+                    + " latest.workspace_id=s.workspace_id AND latest.feedback_id=s.feedback_id ORDER BY latest.created_at"
+                    + " DESC,latest.id::text DESC LIMIT 1))";
     private static final String CURRENTNESS =
             "CASE WHEN r.ended_at IS NOT NULL THEN 'STALE' WHEN r.evidence_version=0 OR v.id IS NULL OR r.summary IS"
-                + " NULL OR r.explanation IS NULL OR r.evidence IS NULL OR r.coverage IS NULL THEN 'UNVERIFIABLE' WHEN"
-                + " v.review_digest=cv.review_digest THEN 'CURRENT' ELSE 'STALE' END";
+                    + " NULL OR r.explanation IS NULL OR r.evidence IS NULL OR r.coverage IS NULL THEN 'UNVERIFIABLE' WHEN"
+                    + " v.review_digest=cv.review_digest THEN 'CURRENT' ELSE 'STALE' END";
 
     @Override
     public Page<Result> list(

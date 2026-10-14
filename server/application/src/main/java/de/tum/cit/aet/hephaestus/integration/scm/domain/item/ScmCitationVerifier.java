@@ -106,8 +106,8 @@ public class ScmCitationVerifier implements CitationVerifier {
                         "The basis does not identify its captured citations"));
             } else if (!change
                     || !Set.of("introduced", "worsened").contains(basis.type())
-                    || (code(newest) && !basisRevision(newest, CitationSide.NEW, head))
-                    || (oldest != null && code(oldest) && !basisRevision(oldest, CitationSide.OLD, base))) {
+                    || (code(newest) && !basisCommit(newest, CitationSide.NEW, head))
+                    || (oldest != null && code(oldest) && !basisCommit(oldest, CitationSide.OLD, base))) {
                 refused.add(refusal(
                         basis.headCitation(),
                         "The problem basis cites another repository commit than the reviewed change"));
@@ -132,7 +132,7 @@ public class ScmCitationVerifier implements CitationVerifier {
         }
     }
 
-    private static boolean basisRevision(CitationToCheck citation, CitationSide expectedSide, @Nullable String commit) {
+    private static boolean basisCommit(CitationToCheck citation, CitationSide expectedSide, @Nullable String commit) {
         if (commit == null) return false;
         if (citation.source().equals(PullRequestContentSource.DIFF.value()))
             return citation.side() == expectedSide && (citation.commit() == null || commit.equals(citation.commit()));

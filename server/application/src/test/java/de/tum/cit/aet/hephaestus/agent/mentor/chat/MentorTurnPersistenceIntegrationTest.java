@@ -1505,8 +1505,8 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                     try (var conn = dataSource.getConnection();
                             var stmt = conn.prepareStatement(
                                     "INSERT INTO chat_message (id, thread_id, workspace_id, role, parts, status,"
-                                        + " created_at, version) VALUES (?, ?, ?, 'ASSISTANT', '[]'::jsonb, ?, now(),"
-                                        + " 0)")) {
+                                            + " created_at, version) VALUES (?, ?, ?, 'ASSISTANT', '[]'::jsonb, ?, now(),"
+                                            + " 0)")) {
                         stmt.setObject(1, UUID.randomUUID());
                         stmt.setObject(2, thread.getId());
                         // Must fit VARCHAR(16) so we exercise the CHECK constraint, not the

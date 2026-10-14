@@ -54,12 +54,12 @@ public class ScanMembershipQueriesImpl implements ScanMembershipQueries {
         return session()
                 .createNativeQuery(
                         "SELECT COALESCE(i.path,'') AS path,m.practice_id,m.item_id,m.result_id, (SELECT count(*) FROM"
-                            + " problem child WHERE child.workspace_id=m.workspace_id AND child.result_id=m.result_id)"
-                            + " AS problem_count FROM review_item m JOIN review v ON v.id=m.review_id AND"
-                            + " v.workspace_id=m.workspace_id JOIN item i ON i.id=m.item_id AND"
-                            + " i.workspace_id=m.workspace_id JOIN practice p ON p.id=m.practice_id AND"
-                            + " p.workspace_id=m.workspace_id LEFT JOIN result r ON r.id=m.result_id AND"
-                            + " r.workspace_id=m.workspace_id"
+                                + " problem child WHERE child.workspace_id=m.workspace_id AND child.result_id=m.result_id)"
+                                + " AS problem_count FROM review_item m JOIN review v ON v.id=m.review_id AND"
+                                + " v.workspace_id=m.workspace_id JOIN item i ON i.id=m.item_id AND"
+                                + " i.workspace_id=m.workspace_id JOIN practice p ON p.id=m.practice_id AND"
+                                + " p.workspace_id=m.workspace_id LEFT JOIN result r ON r.id=m.result_id AND"
+                                + " r.workspace_id=m.workspace_id"
                                 + where + " ORDER BY COALESCE(i.path,''),m.practice_id,m.item_id LIMIT :limit",
                         Tuple.class)
                 .setProperties(params)
@@ -118,9 +118,9 @@ public class ScanMembershipQueriesImpl implements ScanMembershipQueries {
         if (filter.openOnly())
             where.append(
                     " AND COALESCE(x.baseline_state,'')<>'ABSENT' AND r.outcome='NOT_MET' AND r.ended_at IS NULL AND"
-                        + " pinned.review_digest=current.review_digest AND NOT EXISTS(SELECT 1 FROM result_mark mark"
-                        + " WHERE mark.workspace_id=r.workspace_id AND mark.result_id=r.id AND mark.removed_at IS"
-                        + " NULL)");
+                            + " pinned.review_digest=current.review_digest AND NOT EXISTS(SELECT 1 FROM result_mark mark"
+                            + " WHERE mark.workspace_id=r.workspace_id AND mark.result_id=r.id AND mark.removed_at IS"
+                            + " NULL)");
         if (after != null) {
             where.append(
                     " AND (x.path,x.practice_id,x.item_id,x.position,x.problem_id::text)>(:lastPath,:lastPractice,:lastItem,:lastPosition,:lastProblem)");
@@ -184,16 +184,16 @@ public class ScanMembershipQueriesImpl implements ScanMembershipQueries {
         if (openOnly)
             where.append(
                     " AND r.outcome='NOT_MET' AND r.ended_at IS NULL AND pinned.review_digest=current.review_digest"
-                        + " AND NOT EXISTS(SELECT 1 FROM result_mark mark WHERE mark.workspace_id=r.workspace_id AND"
-                        + " mark.result_id=r.id AND mark.removed_at IS NULL)");
+                            + " AND NOT EXISTS(SELECT 1 FROM result_mark mark WHERE mark.workspace_id=r.workspace_id AND"
+                            + " mark.result_id=r.id AND mark.removed_at IS NULL)");
         return session()
                 .createNativeQuery(
                         "SELECT DISTINCT r.id,r.id::text AS ordering FROM review_item m JOIN result r ON"
-                            + " r.id=m.result_id AND r.workspace_id=m.workspace_id JOIN practice p ON"
-                            + " p.id=r.practice_id AND p.workspace_id=r.workspace_id LEFT JOIN practice_version pinned"
-                            + " ON pinned.id=r.practice_version_id AND pinned.workspace_id=r.workspace_id JOIN"
-                            + " practice_version current ON current.id=p.current_version_id AND"
-                            + " current.workspace_id=p.workspace_id"
+                                + " r.id=m.result_id AND r.workspace_id=m.workspace_id JOIN practice p ON"
+                                + " p.id=r.practice_id AND p.workspace_id=r.workspace_id LEFT JOIN practice_version pinned"
+                                + " ON pinned.id=r.practice_version_id AND pinned.workspace_id=r.workspace_id JOIN"
+                                + " practice_version current ON current.id=p.current_version_id AND"
+                                + " current.workspace_id=p.workspace_id"
                                 + where + " ORDER BY ordering LIMIT :limit",
                         Tuple.class)
                 .setProperties(params)
