@@ -1,32 +1,19 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Anchor for inline feedback. Sealed so new variants force every consumer to handle
- * them at compile time. Today only SCM diff coordinates are produced.
- */
-public sealed interface FeedbackAnchor permits FeedbackAnchor.DiffAnchor {
-    /** SCM diff coordinates. {@code side} disambiguates multi-line inline shapes (Bitbucket). */
-    record DiffAnchor(
-            String filePath, int newLineNumber, @Nullable Integer startLine, DiffSide side) implements FeedbackAnchor {
-        public DiffAnchor(String filePath, int newLineNumber, @Nullable Integer startLine) {
-            this(filePath, newLineNumber, startLine, DiffSide.RIGHT);
-        }
+public record FeedbackAnchor(
+        String path,
+        @Nullable Integer startLine,
+        @Nullable Integer endLine,
+        @Nullable CitationSide side) {
+    public FeedbackAnchor {
 
-        public static DiffAnchor singleLine(String filePath, int line) {
-            return new DiffAnchor(filePath, line, null);
-        }
-
-        public static DiffAnchor range(String filePath, int startLine, int endLine) {
-            if (endLine < startLine) throw new IllegalArgumentException("endLine must not precede startLine");
-            return new DiffAnchor(filePath, endLine, startLine);
-        }
-    }
-
-    enum DiffSide {
-        LEFT,
-        RIGHT,
-        BOTH,
+        if (path.isBlank()
+                || (startLine != null && startLine <= 0)
+                || (endLine != null && endLine <= 0)
+                || (startLine != null && endLine != null && startLine > endLine))
+            throw new IllegalArgumentException("Invalid feedback anchor");
     }
 }

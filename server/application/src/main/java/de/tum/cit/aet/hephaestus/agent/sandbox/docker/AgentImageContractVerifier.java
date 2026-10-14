@@ -36,7 +36,7 @@ public class AgentImageContractVerifier {
 
     private static final String PI_VERSION_LABEL = "hephaestus.agent.pi-version";
 
-    public enum Outcome {
+    public enum ResultOutcome {
         /** The image declares the contract this server stages for. */
         VERIFIED,
         /** The image declares a different contract — server and image cannot agree. */
@@ -55,8 +55,8 @@ public class AgentImageContractVerifier {
         this.meterRegistry = meterRegistry;
     }
 
-    public Outcome verify(String image) {
-        Outcome outcome = evaluate(image);
+    public ResultOutcome verify(String image) {
+        ResultOutcome outcome = evaluate(image);
         meterRegistry
                 .counter(
                         AgentMetrics.AGENT_IMAGE_CONTRACT,
@@ -66,35 +66,36 @@ public class AgentImageContractVerifier {
         return outcome;
     }
 
-    private Outcome evaluate(String image) {
+    private ResultOutcome evaluate(String image) {
         Optional<Map<String, String>> labels = imageOps.imageLabels(image);
         if (labels.isEmpty()) {
             log.warn("Could not inspect agent image {}; its runtime contract is unverified.", image);
-            return Outcome.UNKNOWN;
+            return ResultOutcome.UNKNOWN;
         }
         String declared = labels.get().get(SandboxLayout.RUNTIME_CONTRACT_LABEL);
         int expected = SandboxLayout.RUNTIME_CONTRACT_VERSION;
         if (declared == null) {
             log.error(
-                    "Agent image {} declares no {} label, so it predates the runtime contract this server stages "
-                            + "for (v{}). It cannot be a build matching this server. See docs/admin/release-image-lock.md.",
+                    "Agent image {} declares no {} label, so it predates the runtime contract this server stages for"
+                        + " (v{}). It cannot be a build matching this server. See docs/admin/release-image-lock.md.",
                     image,
                     SandboxLayout.RUNTIME_CONTRACT_LABEL,
                     expected);
-            return Outcome.UNLABELLED;
+            return ResultOutcome.UNLABELLED;
         }
         if (!declared.equals(Integer.toString(expected))) {
             log.error(
-                    "Agent image {} implements runtime contract v{} but this server stages for v{} (image node={}, pi={}). "
-                            + "Practice reviews and mentor sessions in this image will fail. See docs/admin/release-image-lock.md.",
+                    "Agent image {} implements runtime contract v{} but this server stages for v{} (image node={},"
+                            + " pi={}). Practice reviews and mentor sessions in this image will fail. See"
+                            + " docs/admin/release-image-lock.md.",
                     image,
                     declared,
                     expected,
                     labels.get().getOrDefault(NODE_VERSION_LABEL, "unknown"),
                     labels.get().getOrDefault(PI_VERSION_LABEL, "unknown"));
-            return Outcome.MISMATCH;
+            return ResultOutcome.MISMATCH;
         }
         log.info("Agent image {} implements runtime contract v{}.", image, expected);
-        return Outcome.VERIFIED;
+        return ResultOutcome.VERIFIED;
     }
 }

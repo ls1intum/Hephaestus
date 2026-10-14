@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.lang.reflect.Field;
@@ -61,7 +62,10 @@ class CandidateContractSyncTest extends BaseUnitTest {
 
         assertThat(runner)
                 .containsExactlyElementsOf(Arrays.stream(CandidateRefusal.values())
-                        .map(CandidateRefusal::code)
+                        .filter(value -> value != CandidateRefusal.BASIS_STATE_UNSUPPORTED
+                                && value != CandidateRefusal.BASIS_REVISION_UNSUPPORTED
+                                && value != CandidateRefusal.QUOTE_UNVERIFIED)
+                        .map(CandidateRefusal::wireValue)
                         .toList());
     }
 
@@ -84,17 +88,6 @@ class CandidateContractSyncTest extends BaseUnitTest {
         assertThat(runner).containsExactlyElementsOf(CandidateParser.OMISSION_REASONS);
     }
 
-    /** The citation shape names the same code sources on the host and server. */
-    @Test
-    void shouldNameCodeCitationSourcesAlikeWhenTheHostAndAdmissionCheckAShape() throws IOException {
-        String contract = contract();
-
-        assertThat(contract)
-                .contains(
-                        "export const DIFF_SOURCE = \"" + CandidateParser.DIFF_SOURCE + "\";",
-                        "export const TREE_SOURCE = \"" + CandidateParser.TREE_SOURCE + "\";");
-    }
-
     private static List<String> quoted(String text) {
         return QUOTED_ANY.matcher(text).results().map(code -> code.group(1)).toList();
     }
@@ -112,7 +105,7 @@ class CandidateContractSyncTest extends BaseUnitTest {
     }
 
     private static String contract() throws IOException {
-        return Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
+        return Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/core/contract.ts"));
     }
 
     private static Path resolveRepoFile(String relativePath) {

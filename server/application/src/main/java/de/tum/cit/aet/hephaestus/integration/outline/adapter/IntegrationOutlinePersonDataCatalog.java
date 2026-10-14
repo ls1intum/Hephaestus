@@ -34,7 +34,12 @@ public class IntegrationOutlinePersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "outline_document",
                         "outline_document",
-                        "EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\" JOIN connection c ON c.config->>'serverUrl'=p.server_url WHERE p.type='OUTLINE' AND c.id=t.connection_id AND i.subject=t.created_by_subject)",
+                        "EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\""
+                            + " bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\""
+                            + " JOIN connection c ON c.config->>'serverUrl'=p.server_url WHERE p.type='OUTLINE' AND"
+                            + " c.id=t.connection_id AND c.workspace_id=t.workspace_id AND"
+                            + " COALESCE(i.\"teamId\",'')=COALESCE(c.instance_key,'') AND"
+                            + " i.subject=t.created_by_subject)",
                         "id,workspace_id,connection_id,document_id,collection_id,collection_slug,parent_document_id,title,slug,body_markdown,content_hash,outline_updated_at,deleted_at,last_materialized_at,created_at,updated_at,created_by_subject,created_by_name,outline_created_at,body_evicted_at,archived_at,version",
                         "id",
                         "created_by_subject=NULL,created_by_name=NULL,title=NULL,slug=NULL,body_markdown=NULL,content_hash=NULL",
@@ -44,7 +49,11 @@ public class IntegrationOutlinePersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "outline_document_event",
                         "outline_document_event",
-                        "EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\" JOIN connection c ON c.config->>'serverUrl'=p.server_url WHERE p.type='OUTLINE' AND c.id=t.connection_id AND i.subject=t.actor_subject)",
+                        "EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\""
+                            + " bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\""
+                            + " JOIN connection c ON c.config->>'serverUrl'=p.server_url WHERE p.type='OUTLINE' AND"
+                            + " c.id=t.connection_id AND c.workspace_id=t.workspace_id AND"
+                            + " COALESCE(i.\"teamId\",'')=COALESCE(c.instance_key,'') AND i.subject=t.actor_subject)",
                         "id,workspace_id,connection_id,document_id,event_name,actor_subject,occurred_at,created_at",
                         "id",
                         "",
@@ -64,7 +73,12 @@ public class IntegrationOutlinePersonDataCatalog implements PersonDataCatalog {
                         mapper,
                         "outline_document_editor",
                         "outline_document",
-                        "EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\" bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\" JOIN connection c ON c.config->>'serverUrl'=p.server_url WHERE p.type='OUTLINE' AND c.id=t.connection_id AND i.subject=t.updated_by_subject)",
+                        "EXISTS (SELECT 1 FROM jsonb_to_recordset(CAST(:identities AS jsonb)) AS i(\"providerId\""
+                            + " bigint,subject text,\"teamId\" text) JOIN identity_provider p ON p.id=i.\"providerId\""
+                            + " JOIN connection c ON c.config->>'serverUrl'=p.server_url WHERE p.type='OUTLINE' AND"
+                            + " c.id=t.connection_id AND c.workspace_id=t.workspace_id AND"
+                            + " COALESCE(i.\"teamId\",'')=COALESCE(c.instance_key,'') AND"
+                            + " i.subject=t.updated_by_subject)",
                         "id,workspace_id,connection_id,document_id,updated_by_subject,updated_by_name,outline_updated_at",
                         "id",
                         "updated_by_subject=NULL,updated_by_name=NULL",

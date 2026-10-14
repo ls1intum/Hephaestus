@@ -209,7 +209,7 @@ Corrects names and paths in § Decision and § Consequences; the layout and the 
   `integration/outline/` is the fourth adapter ([ADR 0023](0023-outline-documentation-integration.md));
   `integration/identity/connect/` holds `RegistrationToGitProviderResolver`.
 - `integration/core/feedback/` and `FeedbackPost` do not exist; cross-vendor feedback identity is
-  `practices/feedback/Feedback` and `FeedbackPlacement.posted_comment_ref`
+  `practices/feedback/Feedback` and `FeedbackCopy.posted_comment_ref`
   ([ADR 0021](0021-observations-feedback-synthesis-seam.md),
   [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md)), so the `feedback_post`
   table in the third Revisit-trigger bullet does not exist.

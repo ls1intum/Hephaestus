@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.adapter;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobLifecycleService;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCatalog;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
@@ -25,8 +25,8 @@ import tools.jackson.databind.ObjectMapper;
 @ConditionalOnServerRole
 @RequiredArgsConstructor
 @PersonDataStores({
-    "agent_job",
-    "agent_job_evidence_copy",
+    "review_job",
+    "review_job_evidence_copy",
     "review_composition_basis",
     "public_review_completion",
     "llm_usage_event",
@@ -36,34 +36,34 @@ import tools.jackson.databind.ObjectMapper;
 })
 public class AgentPersonDataCatalog implements PersonDataCatalog {
     private static final String SUBJECT_JOBS = """
-            SELECT j.id FROM agent_job j
-            WHERE j.metadata->>'author_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            OR j.metadata->>'actor_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            OR j.metadata->>'about_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
-            OR j.id IN (SELECT agent_job_id FROM practice_result WHERE about_user_id = ANY(:users))
-            OR j.id IN (SELECT agent_job_id FROM feedback
-                WHERE about_user_id = ANY(:users) OR recipient_user_id = ANY(:users))
-            """;
+        SELECT j.id FROM review_job j
+        WHERE j.metadata->>'author_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
+        OR j.metadata->>'actor_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
+        OR j.metadata->>'about_user_id' IN (SELECT unnest(CAST(:users AS bigint[]))::text)
+        OR j.id IN (SELECT review_job_id FROM practice_result WHERE about_user_id = ANY(:users))
+        OR j.id IN (SELECT review_job_id FROM feedback
+            WHERE about_user_id = ANY(:users) OR recipient_user_id = ANY(:users))
+        """;
     private static final String REVIEWED_WORK = """
-            (artifact_kind IN ('scm.issue','scm.pull_request') AND artifact_id = ANY(:artifacts))
-            OR (artifact_kind='chat.conversation_thread' AND artifact_id = ANY(:conversations))
-            OR (artifact_kind='docs.document' AND artifact_id = ANY(:documents))
-            """;
+        (artifact_kind IN ('scm.issue','scm.pull_request') AND artifact_id = ANY(:artifacts))
+        OR (artifact_kind='chat.conversation_thread' AND artifact_id = ANY(:conversations))
+        OR (artifact_kind='docs.document' AND artifact_id = ANY(:documents))
+        """;
     // Another developer's review whose inputs held the person's work or evidence.
     private static final String COPYING_JOBS =
             """
-            SELECT j.id FROM agent_job j WHERE j.id = ANY(:derivedJobs)
-            OR j.metadata->>'slack_thread_id' IN (SELECT unnest(CAST(:conversations AS bigint[]))::text)
-            OR j.metadata->>'docs_document_id' IN (SELECT unnest(CAST(:documents AS bigint[]))::text)
-            OR j.metadata->>'pull_request_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
-            OR j.metadata->>'issue_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
-            """ + " OR j.id IN (SELECT agent_job_id FROM practice_result WHERE " + REVIEWED_WORK + ")"
-                    + " OR j.id IN (SELECT agent_job_id FROM feedback WHERE " + REVIEWED_WORK + ")";
+                    SELECT j.id FROM review_job j WHERE j.id = ANY(:derivedJobs)
+                    OR j.metadata->>'slack_thread_id' IN (SELECT unnest(CAST(:conversations AS bigint[]))::text)
+                    OR j.metadata->>'docs_document_id' IN (SELECT unnest(CAST(:documents AS bigint[]))::text)
+                    OR j.metadata->>'pull_request_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
+                    OR j.metadata->>'issue_id' IN (SELECT unnest(CAST(:artifacts AS bigint[]))::text)
+                    """ + " OR j.id IN (SELECT review_job_id FROM practice_result WHERE " + REVIEWED_WORK + ")"
+                    + " OR j.id IN (SELECT review_job_id FROM feedback WHERE " + REVIEWED_WORK + ")";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final List<PersonEvidenceErasure> evidenceCopies;
-    private final AgentJobLifecycleService lifecycle;
+    private final ReviewJobLifecycleService lifecycle;
 
     @Override
     public List<PersonDataContributor> contributors() {
@@ -93,15 +93,15 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                         "",
                         -81),
                 new AgentJobStore(
-                        "agent_job",
+                        "review_job",
                         "t.id IN (" + SUBJECT_JOBS + ")",
-                        "metadata='{}'::jsonb,output=NULL,evidence_snapshot=NULL,container_logs=NULL,config_snapshot='{}'::jsonb,job_token=gen_random_uuid()::text,job_token_hash=NULL,error_message=NULL,delivery_comment_id=NULL,review_readiness=NULL",
+                        "metadata='{}'::jsonb,output=NULL,capture=NULL,container_logs=NULL,config_snapshot='{}'::jsonb,job_token=gen_random_uuid()::text,job_token_hash=NULL,error_message=NULL,delivery_comment_id=NULL,review_readiness=NULL",
                         -80),
                 // The colleague keeps the delivery reference of their own review; nothing here is exported.
                 new AgentJobStore(
-                        "agent_job_evidence_copy",
+                        "review_job_evidence_copy",
                         "t.id IN (" + COPYING_JOBS + ") AND t.id NOT IN (" + SUBJECT_JOBS + ")",
-                        "metadata='{}'::jsonb,output=NULL,evidence_snapshot=NULL,container_logs=NULL,config_snapshot='{}'::jsonb,job_token=gen_random_uuid()::text,job_token_hash=NULL,error_message=NULL,review_readiness=NULL",
+                        "metadata='{}'::jsonb,output=NULL,capture=NULL,container_logs=NULL,config_snapshot='{}'::jsonb,job_token=gen_random_uuid()::text,job_token_hash=NULL,error_message=NULL,review_readiness=NULL",
                         -81),
                 new JdbcPersonDataStore(
                         jdbc,
@@ -109,7 +109,8 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                         "llm_usage_event",
                         "llm_usage_event",
                         "t.source_id IN (" + SUBJECT_JOBS
-                                + ") OR t.source_id IN (SELECT id FROM chat_message WHERE thread_id IN (SELECT id FROM chat_thread WHERE user_id = ANY(:users)))",
+                                + ") OR t.source_id IN (SELECT id FROM chat_message WHERE thread_id IN (SELECT id FROM"
+                                + " chat_thread WHERE user_id = ANY(:users)))",
                         "id,workspace_id,job_type,source_type,source_id,source_attempt,model,input_tokens,output_tokens,cache_read_tokens,cache_write_tokens,reasoning_tokens,total_calls,cost_usd,pricing_state,funding_source,applied_price_id,applied_workspace_model_id,applied_per_1m_input_usd,applied_per_1m_output_usd,applied_per_1m_cache_read_usd,applied_per_1m_cache_write_usd,occurred_at,usage_provenance",
                         "id",
                         "source_id=gen_random_uuid()",
@@ -155,13 +156,13 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
                     jdbc,
                     mapper,
                     store,
-                    "agent_job",
+                    "review_job",
                     predicate,
-                    "id,workspace_id,purpose,job_type,status,evidence_snapshot,created_at,completed_at,delivery_status,delivery_comment_id",
+                    "id,workspace_id,purpose,job_type,status,capture,created_at,completed_at,processing_status,delivery_comment_id",
                     "id",
                     redaction,
                     order);
-            this.subject = store.equals("agent_job");
+            this.subject = store.equals("review_job");
         }
 
         @Override
@@ -177,11 +178,11 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
 
         private List<JsonNode> legacyProviderWrites(PersonDataSelection selection) {
             return querySelected("""
-                    jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,
-                      'commentRef',t.delivery_comment_id,'state',t.delivery_status,
-                      'locator',COALESCE(NULLIF(t.metadata->>'pr_url',''),
-                        NULLIF(t.metadata->>'issue_url','')))::text
-                    """, "agent_job t", selection).stream()
+                jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,
+                  'commentRef',t.delivery_comment_id,'state',t.processing_status,
+                  'locator',COALESCE(NULLIF(t.metadata->>'pr_url',''),
+                    NULLIF(t.metadata->>'issue_url','')))::text
+                """, "review_job t", selection).stream()
                     .filter(row -> row.path("commentRef").isString()
                             && !row.path("commentRef").asString().isBlank())
                     .toList();
@@ -208,8 +209,8 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
         private List<JsonNode> jobs(PersonDataSelection selection) {
             return querySelected(
                     "jsonb_build_object('id',t.id,'workspaceId',t.workspace_id,'status',t.status,"
-                            + "'evidence',t.evidence_snapshot IS NOT NULL)::text",
-                    "agent_job t",
+                            + "'evidence',t.capture IS NOT NULL)::text",
+                    "review_job t",
                     selection);
         }
 

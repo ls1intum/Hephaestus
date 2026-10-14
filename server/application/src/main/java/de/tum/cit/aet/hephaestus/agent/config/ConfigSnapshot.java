@@ -1,14 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.EnumMap;
 import java.util.Map;
@@ -20,7 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Immutable projection of a workspace's {@link WorkspaceAgentBinding} frozen at job submission time.
  *
- * <p>Stored as JSONB on {@link de.tum.cit.aet.hephaestus.agent.job.AgentJob#getConfigSnapshot()}.
+ * <p>Stored as JSONB on {@link de.tum.cit.aet.hephaestus.agent.job.ReviewJob#getConfigSnapshot()}.
  * The executor reads this snapshot instead of the live binding so that in-flight jobs are not
  * affected by binding changes.
  *
@@ -32,18 +31,15 @@ import tools.jackson.databind.ObjectMapper;
  * no longer points at. {@link #baseUrl} is frozen only for non-proxy consumers that need a host
  * before any credential exists.
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
 public record ConfigSnapshot(
         int schemaVersion,
         String apiProtocol,
         String baseUrl,
         String upstreamModelId,
-        // Read-only carry-over from pre-catalog snapshots; from() writes null.
-        @Nullable String modelVersion,
         @Nullable Integer contextWindow,
         @Nullable Integer maxOutputTokens,
         @Nullable ReasoningEffort reasoningEffort,
-        @Nullable FundingSource connectionScope,
+        @Nullable UsageFundingSource connectionScope,
         @Nullable Long connectionId,
         @Nullable Long modelId,
         @Nullable Long workspaceId,
@@ -58,19 +54,7 @@ public record ConfigSnapshot(
      * Bump only for a reshape (field removal, type change, semantic reinterpretation). Adding a
      * nullable field is compatible both ways and needs no bump.
      */
-    public static final int SCHEMA_VERSION = 6;
-
-    /**
-     * Oldest persisted version that already uses this record's shape: at or above it a payload
-     * deserializes straight through, below it {@link #fromLegacyJson} must translate.
-     */
-    private static final int CATALOG_SHAPE_MIN_VERSION = 4;
-
-    /**
-     * Snapshots before version 6 used {@code supportsReasoning}. Preserve their Pi default
-     * ({@code medium}) when that flag was true.
-     */
-    private static final int REASONING_EFFORT_MIN_VERSION = 6;
+    public static final int SCHEMA_VERSION = 7;
 
     public ConfigSnapshot {
         Objects.requireNonNull(apiProtocol, "apiProtocol must not be null");
@@ -94,7 +78,6 @@ public record ConfigSnapshot(
                 resolved.apiProtocol(),
                 resolved.baseUrl(),
                 resolved.upstreamModelId(),
-                null,
                 resolved.contextWindow(),
                 resolved.maxOutputTokens(),
                 resolved.reasoningEffort(),
@@ -115,7 +98,6 @@ public record ConfigSnapshot(
                 apiProtocol,
                 baseUrl,
                 upstreamModelId,
-                modelVersion,
                 contextWindow,
                 maxOutputTokens,
                 reasoningEffort,
@@ -130,14 +112,13 @@ public record ConfigSnapshot(
                 practiceScript);
     }
 
-    /** The chat kind is never a key: the practice script chat model is {@link #model()}. */
+    /** The exact direct-model slots frozen by the review, including explicit chat availability. */
     public ConfigSnapshot withPracticeScript(@Nullable Map<ModelKind, FrozenModel> slots) {
         return new ConfigSnapshot(
                 schemaVersion,
                 apiProtocol,
                 baseUrl,
                 upstreamModelId,
-                modelVersion,
                 contextWindow,
                 maxOutputTokens,
                 reasoningEffort,
@@ -152,7 +133,7 @@ public record ConfigSnapshot(
                 slots);
     }
 
-    /** The review's own model, which is also the chat model of its practice scripts. */
+    /** The review's own model. */
     public FrozenModel model() {
         return new FrozenModel(
                 apiProtocol,
@@ -167,10 +148,9 @@ public record ConfigSnapshot(
                 priceSnapshot);
     }
 
-    /** Every model that the practice scripts may call, by kind; the chat model is {@link #model()}. */
+    /** Every direct model that the frozen method permits scripts to call. */
     public Map<ModelKind, FrozenModel> practiceScriptModels() {
         Map<ModelKind, FrozenModel> models = new EnumMap<>(ModelKind.class);
-        models.put(ModelKind.CHAT, model());
         if (practiceScript != null) {
             models.putAll(practiceScript);
         }
@@ -191,90 +171,11 @@ public record ConfigSnapshot(
      * misread a row an upgraded node wrote.
      */
     public static ConfigSnapshot fromJson(JsonNode node, ObjectMapper objectMapper) {
-        Objects.requireNonNull(node, "node must not be null");
-        int version = node.path("schemaVersion").asInt(0);
-        if (version > SCHEMA_VERSION) {
-            throw new IllegalStateException(
-                    "ConfigSnapshot schema version %d is newer than supported version %d. Upgrade the application server."
-                            .formatted(version, SCHEMA_VERSION));
+        Objects.requireNonNull(node, "node");
+        int version = node.path("schemaVersion").asInt(-1);
+        if (version != SCHEMA_VERSION) {
+            throw new IllegalStateException("Unsupported runtime config snapshot version: " + version);
         }
-        if (version < CATALOG_SHAPE_MIN_VERSION) {
-            return fromLegacyJson(node);
-        }
-        ConfigSnapshot snapshot = objectMapper.convertValue(node, ConfigSnapshot.class);
-        if (version < REASONING_EFFORT_MIN_VERSION
-                && node.path("supportsReasoning").asBoolean(false)) {
-            return snapshot.withReasoningEffort(ReasoningEffort.MEDIUM);
-        }
-        return snapshot;
-    }
-
-    private ConfigSnapshot withReasoningEffort(ReasoningEffort effort) {
-        return new ConfigSnapshot(
-                schemaVersion,
-                apiProtocol,
-                baseUrl,
-                upstreamModelId,
-                modelVersion,
-                contextWindow,
-                maxOutputTokens,
-                effort,
-                connectionScope,
-                connectionId,
-                modelId,
-                workspaceId,
-                timeoutSeconds,
-                allowInternet,
-                priceSnapshot,
-                dataHandlingTier,
-                practiceScript);
-    }
-
-    /**
-     * Translates a pre-catalog snapshot into the current shape so historical rows stay readable.
-     * {@code connectionScope}/{@code connectionId} stay null, so the proxy fails such a job closed.
-     */
-    private static ConfigSnapshot fromLegacyJson(JsonNode node) {
-        String provider = node.path("llmProvider").asString("OPENAI");
-        String apiProtocol;
-        String defaultBaseUrl;
-        switch (provider) {
-            case "ANTHROPIC" -> {
-                apiProtocol = "anthropic-messages";
-                defaultBaseUrl = "https://api.anthropic.com";
-            }
-            case "AZURE_OPENAI" -> {
-                apiProtocol = "azure-openai-responses";
-                defaultBaseUrl = "";
-            }
-            default -> {
-                apiProtocol = "openai-completions";
-                defaultBaseUrl = "https://api.openai.com";
-            }
-        }
-        String legacyBaseUrl = node.path("llmBaseUrl").asString(null);
-        String baseUrl = legacyBaseUrl != null && !legacyBaseUrl.isBlank() ? legacyBaseUrl : defaultBaseUrl;
-        String modelName = node.path("modelName").asString(null);
-        String modelVersion = node.path("modelVersion").asString(null);
-        int timeoutSeconds = node.path("timeoutSeconds").asInt(600);
-        boolean allowInternet = node.path("allowInternet").asBoolean(false);
-        return new ConfigSnapshot(
-                node.path("schemaVersion").asInt(0),
-                apiProtocol,
-                baseUrl,
-                modelName != null ? modelName : "",
-                modelVersion,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null,
-                timeoutSeconds,
-                allowInternet,
-                null,
-                DataHandlingTier.UNDECLARED,
-                null);
+        return objectMapper.convertValue(node, ConfigSnapshot.class);
     }
 }

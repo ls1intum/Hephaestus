@@ -2,10 +2,11 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
 import de.tum.cit.aet.hephaestus.practices.PracticeService;
 import de.tum.cit.aet.hephaestus.practices.PracticeSlugConflictException;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogLock;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogLock;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -18,10 +19,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
+@ConditionalOnServerRole
 public class CatalogAdoptionService {
 
     private final CatalogAdoptionPlanAssembler plans;
-    private final CuratedCatalogLock catalogLock;
+    private final CatalogLock catalogLock;
     private final WorkspaceRepository workspaceRepository;
     private final PracticeGroupService groupService;
     private final PracticeService practiceService;
@@ -62,9 +64,9 @@ public class CatalogAdoptionService {
                     context,
                     Objects.requireNonNull(plan.groupSlug()),
                     Objects.requireNonNull(plan.groupDefinition()),
-                    plan.groupDisplayOrder());
+                    plan.groupPosition());
         }
-        return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition(), plan.initialAutonomy());
+        return practiceService.adoptPracticeFromCatalog(context, slug, plan.document(), plan.initialFeedbackMode());
     }
 
     @Transactional
@@ -80,12 +82,12 @@ public class CatalogAdoptionService {
         }
         requireCurrentPlan(ifMatch, plan.etag());
         if (plan.disposition() == CatalogGroupDisposition.CREATE_CATALOG_GROUP) {
-            groupService.adoptGroupFromCatalog(context, slug, plan.definition(), plan.displayOrder());
+            groupService.adoptGroupFromCatalog(context, slug, plan.definition(), plan.position());
         }
         List<Practice> added = plan.practices().stream()
                 .filter(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE)
                 .map(practice -> practiceService.adoptPracticeFromCatalog(
-                        context, practice.slug(), practice.definition(), practice.initialAutonomy()))
+                        context, practice.slug(), practice.document(), practice.initialFeedbackMode()))
                 .toList();
         List<Practice> moved = new ArrayList<>();
         int position = 0;
@@ -116,7 +118,7 @@ public class CatalogAdoptionService {
         } catch (IllegalArgumentException exception) {
             throw new StaleCatalogAdoptionPlanException(exception);
         }
-        if (!precondition.matches(currentEtag)) {
+        if (!precondition.matchesExact(currentEtag)) {
             throw new StaleCatalogAdoptionPlanException();
         }
     }

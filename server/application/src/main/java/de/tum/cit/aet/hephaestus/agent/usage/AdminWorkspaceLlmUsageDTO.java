@@ -46,8 +46,8 @@ public record AdminWorkspaceLlmUsageDTO(
         @NonNull
         @Schema(
                 description =
-                        "Runs this month, either purse: job attempts and mentor turns. Rows of models for practice scripts "
-                                + "are not runs.")
+                        "Runs this month, either purse: job attempts and mentor turns. Rows of models for practice"
+                                + " scripts are not runs.")
         Long events,
 
         @NonNull

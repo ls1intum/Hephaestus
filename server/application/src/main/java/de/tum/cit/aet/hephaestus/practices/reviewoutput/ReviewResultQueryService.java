@@ -1,172 +1,229 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery.AccountSummary;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ResultFeedbackCounts;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
-import de.tum.cit.aet.hephaestus.practices.result.ObservationQueryFilter;
-import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository.OperatorObservationRow;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.OperatorResultRow;
+import de.tum.cit.aet.hephaestus.practices.dto.GroupRefDTO;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ProblemQueryFilter;
+import de.tum.cit.aet.hephaestus.practices.result.ProblemRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
+import de.tum.cit.aet.hephaestus.practices.result.ResultPresentation;
 import de.tum.cit.aet.hephaestus.practices.result.ResultQueryFilter;
-import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.FeedbackDisputeDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.PracticeResultInvalidationDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.PracticeReviewObservationRowDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundFeedbackDTO;
+import de.tum.cit.aet.hephaestus.practices.result.ResultReadQuery;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
+import de.tum.cit.aet.hephaestus.practices.result.ResultViewQuery;
+import de.tum.cit.aet.hephaestus.practices.review.ProductReferenceQuery;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDeveloperDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundResultDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewProblemDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewProblemDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewResultDetailDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultSort;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@ConditionalOnServerRole
 @RequiredArgsConstructor
-class ReviewResultQueryService {
+@Transactional(readOnly = true)
+public class ReviewResultQueryService {
+    private final ResultRepository results;
+    private final ProblemRepository problems;
+    private final ResultReadQuery read;
+    private final ResultViewQuery views;
+    private final ResultPresentation presentation;
+    private final ProductReferenceQuery references;
+    private final EvidenceAuthorization authorization;
+    private final ResultMarkService marks;
 
-    private final PracticeResultRepository practiceResultRepository;
-    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
-    private final FeedbackRepository feedbackRepository;
-    private final ReviewSubjectResolver subjectResolver;
-    private final ReviewRunLookup reviewRunLookup;
-    private final EvidenceAuthorization evidenceAuthorization;
-    private final ReviewResultWords resultWords;
-    private final PracticeResultInvalidationRepository invalidationRepository;
-    private final AccountSummaryQuery accountSummaryQuery;
-    private final ReactionRepository reactionRepository;
-    private final ObservationRepository observationRepository;
-
-    @Transactional(readOnly = true)
-    public Page<ReviewResultDTO> list(
-            Long workspaceId, ResultQueryFilter filter, ReviewResultSort sort, Pageable pageable) {
-        Page<OperatorResultRow> rows = practiceResultRepository.findForWorkspace(
-                workspaceId, filter, sort == ReviewResultSort.ACTIONABILITY, pageable);
-        Map<Long, ReviewSubjectDTO> subjects = subjectResolver.resolve(rows.getContent().stream()
-                .map(OperatorResultRow::getAboutUserId)
-                .toList());
-        Map<UUID, ResultFeedbackCounts> feedbackCounts = rows.isEmpty()
-                ? Map.of()
-                : feedbackRepository
-                        .summarizeFeedbackByResult(
-                                workspaceId,
-                                rows.getContent().stream()
-                                        .map(OperatorResultRow::getId)
-                                        .toList())
-                        .stream()
-                        .collect(Collectors.toMap(ResultFeedbackCounts::getPracticeResultId, Function.identity()));
-        Map<UUID, Target> targets = reviewRunLookup.findTargets(
-                workspaceId,
-                rows.getContent().stream().map(OperatorResultRow::getAgentJobId).toList());
-        Set<UUID> permittedWords = resultWords.permitted(
-                workspaceId,
-                rows.getContent().stream().map(OperatorResultRow::getId).toList());
-        return rows.map(row -> ReviewResultDTO.from(
-                row,
-                feedbackCounts.get(row.getId()),
-                ReviewedWorkLabels.ref(
-                        ArtifactKind.of(row.getArtifactKind()), row.getArtifactId(), targets.get(row.getAgentJobId())),
-                subjects,
-                permittedWords.contains(row.getId())));
+    public Page<ReviewResultDTO> list(long ws, ResultQueryFilter filter, ResultSort sort, Pageable page) {
+        var rows = read.list(ws, filter, sort, false, page);
+        var permitted = authorization.permitsAll(ws, rows.getContent(), SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
+        return new PageImpl<>(
+                views.views(ws, rows.getContent()).stream()
+                        .map(v -> list(v, permitted.contains(v.result().getId())))
+                        .toList(),
+                page,
+                rows.getTotalElements());
     }
 
-    /**
-     * One page of the workspace's observations. Each row carries its summary and place only where its result's
-     * detail would show them ({@link EvidenceAuthorization} for operator review); elsewhere it is flagged instead.
-     */
-    @Transactional(readOnly = true)
-    public Page<PracticeReviewObservationRowDTO> listObservations(
-            Long workspaceId, ResultQueryFilter resultFilter, ObservationQueryFilter filter, Pageable pageable) {
-        Page<OperatorObservationRow> rows =
-                observationRepository.findForWorkspace(workspaceId, resultFilter, filter, pageable);
-        Set<UUID> resultIds = rows.getContent().stream()
-                .map(OperatorObservationRow::getPracticeResultId)
-                .collect(Collectors.toSet());
-        Set<UUID> shown = resultIds.isEmpty()
-                ? Set.of()
-                : evidenceAuthorization.permitsAll(
-                        workspaceId,
-                        practiceResultRepository.findForEvidenceAuthorization(resultIds, workspaceId),
-                        SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
-        Map<Long, ReviewSubjectDTO> subjects = subjectResolver.resolve(rows.getContent().stream()
-                .map(OperatorObservationRow::getAboutUserId)
-                .toList());
-        Map<UUID, Target> targets = reviewRunLookup.findTargets(
-                workspaceId,
-                rows.getContent().stream()
-                        .map(OperatorObservationRow::getAgentJobId)
-                        .toList());
-        return rows.map(row -> PracticeReviewObservationRowDTO.from(
-                row,
-                shown.contains(row.getPracticeResultId()),
-                ReviewedWorkLabels.ref(
-                        ArtifactKind.of(row.getArtifactKind()), row.getArtifactId(), targets.get(row.getAgentJobId())),
-                subjects));
+    private ReviewResultDTO list(ResultView v, boolean permitted) {
+        var r = v.result();
+        return new ReviewResultDTO(
+                r.getId(),
+                r.getReviewId(),
+                v.item(),
+                v.practice().getSlug(),
+                presentation.name(v),
+                r.getOutcome(),
+                r.getSeverity(),
+                permitted ? r.getSummary() : null,
+                v.review().getOrigin(),
+                r.getRecordedAt(),
+                presentation.currentness(v),
+                presentation.markedAt(r, ResultMarkKind.INCORRECT),
+                presentation.markedAt(r, ResultMarkKind.ACCEPTED),
+                presentation.summaries(r, permitted),
+                developer(v),
+                presentation.problems(r).size(),
+                presentation.feedbackCounts(r));
     }
 
-    @Transactional(readOnly = true)
-    public ReviewResultDetailDTO get(Long workspaceId, UUID practiceResultId) {
-        PracticeResult practiceResult = practiceResultRepository
-                .findByIdAndWorkspaceId(practiceResultId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("PracticeResult", practiceResultId.toString()));
-        List<ReviewBoundFeedbackDTO> feedback =
-                feedbackEvidenceRepository.findBoundFeedbackUnits(workspaceId, practiceResultId).stream()
-                        .map(ReviewBoundFeedbackDTO::from)
-                        .toList();
-        ReviewSubjectDTO subject = subjectResolver
-                .resolve(List.of(practiceResult.getAboutUserId()))
-                .get(practiceResult.getAboutUserId());
-        ReviewedWorkRefDTO reviewedWork = ReviewedWorkLabels.ref(
-                practiceResult.getArtifactKind(),
-                practiceResult.getArtifactId(),
-                reviewRunLookup
-                        .findTargets(workspaceId, List.of(practiceResult.getAgentJobId()))
-                        .get(practiceResult.getAgentJobId()));
-        boolean includeEvidence = resultWords.permits(workspaceId, practiceResult);
-        List<PracticeResultInvalidation> history = invalidationRepository.findHistory(workspaceId, practiceResultId);
-        Map<Long, AccountSummary> accounts = accountSummaryQuery.findAllByIds(history.stream()
-                .flatMap(invalidation ->
-                        Stream.of(invalidation.getInvalidatedByAccountId(), invalidation.getRestoredByAccountId()))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet()));
-        List<PracticeResultInvalidationDTO> invalidations = history.stream()
-                .map(invalidation -> PracticeResultInvalidationDTO.from(invalidation, accounts))
-                .toList();
-        List<FeedbackDisputeDTO> disputes =
-                reactionRepository.findStandingDisputesOfResult(workspaceId, practiceResultId).stream()
-                        .map(FeedbackDisputeDTO::from)
-                        .toList();
-        return ReviewResultDetailDTO.from(
-                practiceResult,
-                reviewedWork,
-                subject,
-                feedback,
-                invalidations,
-                disputes,
-                includeEvidence,
-                observationRepository.findByPracticeResultIds(workspaceId, List.of(practiceResultId)));
+    public ReviewResultDetailDTO get(long ws, UUID id) {
+        var r = require(ws, id);
+        var v = views.views(ws, List.of(r)).getFirst();
+        boolean permitted = authorization.permits(ws, r, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
+        return new ReviewResultDetailDTO(
+                r.getId(),
+                r.getReviewId(),
+                v.item(),
+                v.practice().getSlug(),
+                presentation.name(v),
+                r.getOutcome(),
+                r.getSeverity(),
+                permitted ? r.getSummary() : null,
+                v.review().getOrigin(),
+                r.getRecordedAt(),
+                presentation.currentness(v),
+                presentation.markedAt(r, ResultMarkKind.INCORRECT),
+                presentation.markedAt(r, ResultMarkKind.ACCEPTED),
+                r.getPracticeVersionId() == null
+                        ? null
+                        : r.getPracticeVersionId().toString(),
+                v.version() == null ? null : v.version().getNumber(),
+                r.getItemVersion(),
+                permitted ? r.getExplanation() : null,
+                presentation.evidence(r, permitted),
+                presentation.problems(r).stream()
+                        .map(p -> presentation.problem(p, permitted))
+                        .toList(),
+                presentation.example(r, permitted),
+                presentation.coverage(r, permitted),
+                r.getEndedAt(),
+                r.getEndReason(),
+                developer(v),
+                r.getEvidenceVersion(),
+                !permitted,
+                marks.list(ws, id).stream().map(m -> presentation.mark(ws, m)).toList(),
+                presentation.disagreements(r),
+                presentation.boundFeedback(r));
+    }
+
+    public Page<ReviewProblemDTO> listProblems(
+            long ws, ResultQueryFilter filter, ProblemQueryFilter child, Pageable page) {
+        var rows = read.problems(ws, filter, child, page);
+        return rows.map(p -> problemRow(ws, p));
+    }
+
+    public ReviewProblemDetailDTO problem(long ws, UUID id) {
+        var p = problems.findByIdAndWorkspaceId(id, ws)
+                .orElseThrow(() -> new EntityNotFoundException("Problem", id.toString()));
+        var row = problemRow(ws, p);
+        var r = require(ws, p.getResultId());
+        var v = views.views(ws, List.of(r)).getFirst();
+        return new ReviewProblemDetailDTO(
+                row.id(),
+                row.resultId(),
+                row.reviewId(),
+                row.item(),
+                row.practiceSlug(),
+                row.practiceName(),
+                row.group(),
+                row.developer(),
+                row.severity(),
+                row.summary(),
+                row.path(),
+                row.startLine(),
+                row.endLine(),
+                row.side(),
+                row.sourceKind(),
+                row.evidenceHidden(),
+                row.currentness(),
+                row.markedIncorrectAt(),
+                row.acceptedAt(),
+                row.disagreedAt(),
+                row.recordedAt(),
+                presentation.problem(p, !row.evidenceHidden()),
+                bound(v, !row.evidenceHidden()));
+    }
+
+    public ReviewBoundResultDTO bound(ResultView v, boolean permitted) {
+        var r = v.result();
+        return new ReviewBoundResultDTO(
+                r.getId(),
+                r.getReviewId(),
+                v.practice().getSlug(),
+                presentation.name(v),
+                r.getOutcome(),
+                r.getSeverity(),
+                permitted ? r.getSummary() : null,
+                v.item(),
+                developer(v),
+                r.getRecordedAt(),
+                presentation.currentness(v));
+    }
+
+    private ReviewProblemDTO problemRow(long ws, Problem p) {
+        var r = require(ws, p.getResultId());
+        var v = views.views(ws, List.of(r)).getFirst();
+        boolean permitted = authorization.permits(ws, r, SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW);
+        var dto = presentation.problem(p, permitted);
+        var primary = dto.citations().isEmpty() ? null : dto.citations().getFirst();
+        var group = v.practice().getGroup();
+        return new ReviewProblemDTO(
+                p.getId(),
+                r.getId(),
+                r.getReviewId(),
+                v.item(),
+                v.practice().getSlug(),
+                presentation.name(v),
+                group == null
+                        ? null
+                        : new GroupRefDTO(group.getSlug(), group.getName(), group.getIcon(), group.getColor()),
+                developer(v),
+                p.getSeverity(),
+                dto.summary(),
+                primary == null ? null : primary.path(),
+                primary == null ? null : primary.startLine(),
+                primary == null ? null : primary.endLine(),
+                primary == null ? null : primary.side(),
+                primary == null ? null : primary.sourceKind(),
+                !permitted,
+                presentation.currentness(v),
+                presentation.markedAt(r, ResultMarkKind.INCORRECT),
+                presentation.markedAt(r, ResultMarkKind.ACCEPTED),
+                presentation.disagreements(r).stream()
+                        .map(d -> d.respondedAt())
+                        .max(Instant::compareTo)
+                        .orElse(null),
+                r.getRecordedAt());
+    }
+
+    private Result require(long ws, UUID id) {
+        return results.findByIdAndWorkspaceId(id, ws)
+                .orElseThrow(() -> new EntityNotFoundException("Result", id.toString()));
+    }
+
+    private @Nullable ReviewDeveloperDTO developer(ResultView v) {
+        var r = v.result();
+        return r.getDeveloperId() == null
+                ? null
+                : references
+                        .developers(r.getWorkspaceId(), List.of(r.getDeveloperId()))
+                        .get(r.getDeveloperId());
     }
 }

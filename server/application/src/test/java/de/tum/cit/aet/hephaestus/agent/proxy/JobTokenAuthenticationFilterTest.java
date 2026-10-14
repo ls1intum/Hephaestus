@@ -9,20 +9,21 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.servlet.FilterChain;
@@ -59,7 +60,7 @@ import tools.jackson.databind.ObjectMapper;
 class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
     @Mock
-    private AgentJobRepository agentJobRepository;
+    private ReviewJobRepository agentJobRepository;
 
     @Mock
     private FilterChain filterChain;
@@ -190,7 +191,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldExtractFromBearerAuth() throws Exception {
             var job = createRunningJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
@@ -246,9 +247,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldReturn401WhenJobDoesNotExist() throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.empty());
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.empty());
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -262,7 +263,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldReturn401WhenAttemptDoesNotMatch() throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             JobJwt current = jobJwt(job, Set.of("llm_proxy"));
             JobJwt stale = new JobJwt(
                     current.jobId(),
@@ -273,7 +274,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
                     current.issuedAt(),
                     current.expiresAt());
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(stale);
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             assertThat(authenticate(JOB_JWT).getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
         }
@@ -281,10 +282,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @ParameterizedTest
         @ValueSource(strings = {"worker-2", ""})
         void shouldRejectJobWhenGatewayDoesNotOwnIt(String owner) throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             job.setWorkerId(owner.isEmpty() ? null : owner);
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             assertThat(authenticate(JOB_JWT).getStatus()).isEqualTo(HttpServletResponse.SC_UNAUTHORIZED);
             verify(filterChain, never()).doFilter(any(), any());
@@ -292,10 +293,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldReturn409ForResultUploadOnAnotherWorker() throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             job.setWorkerId("worker-2");
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             var request = new MockHttpServletRequest("POST", "/internal/llm/runtime/" + job.getId() + "/result");
             request.setRemoteAddr("10.0.0.2");
@@ -310,11 +311,11 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldRejectCancelledResultUploadWithoutRevealingOwnership() throws Exception {
-            AgentJob job = createRunningJob();
-            job.setStatus(AgentJobStatus.CANCELLED);
+            ReviewJob job = createRunningJob();
+            job.setStatus(ReviewJobStatus.CANCELLED);
             job.setWorkerId("worker-2");
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             var request = new MockHttpServletRequest("POST", "/internal/llm/runtime/" + job.getId() + "/result");
             request.setRemoteAddr("10.0.0.2");
@@ -328,7 +329,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldRejectResultUploadForAnotherJob() throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
 
             var request = new MockHttpServletRequest("POST", "/internal/llm/runtime/" + UUID.randomUUID() + "/result");
@@ -352,15 +353,15 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldReturn401WhenJobHasNoConfigSnapshot() throws Exception {
-            var job = new AgentJob();
+            var job = new ReviewJob();
             job.setId(UUID.randomUUID());
             Workspace workspace = new Workspace();
             workspace.setId(7L);
-            job.setWorkspace(workspace);
-            job.setStatus(AgentJobStatus.RUNNING);
+            RuntimeJobTestData.initialize(job, (workspace).getId());
+            job.setStatus(ReviewJobStatus.RUNNING);
             job.setWorkerId("worker-1");
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             var request = new MockHttpServletRequest();
             request.setRemoteAddr("10.0.0.2");
@@ -406,7 +407,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertAuthenticatedAsJob(installed, job);
         }
 
-        private void assertAuthenticatedAsJob(Authentication installed, AgentJob job) {
+        private void assertAuthenticatedAsJob(Authentication installed, ReviewJob job) {
             assertThat(installed).isInstanceOf(JobTokenAuthentication.class);
             ProxyRouting routing = ((JobTokenAuthentication) installed).getPrincipal();
             assertThat(routing.principalDescription()).isEqualTo("job:" + job.getId());
@@ -415,9 +416,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
 
         private Authentication authenticateAndCaptureAuthentication(
-                AgentJob job, String authorizationHeader, @Nullable String providerKeyHeader) throws Exception {
+                ReviewJob job, String authorizationHeader, @Nullable String providerKeyHeader) throws Exception {
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
                         authCapture.set(Objects.requireNonNull(
@@ -444,7 +445,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         void shouldClearContextOnFilterChainException() throws Exception {
             var job = createRunningJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
             doAnswer(invocation -> {
                         throw new ServletException("Simulated failure");
                     })
@@ -535,7 +536,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void theRoutingCarriesTheAttemptNumber() throws Exception {
             var job = createRunningJob();
-            job.setRetryCount(3);
+            job.setAttempt(3);
 
             ProxyRouting routing = authenticateAndCaptureRouting(job);
 
@@ -547,16 +548,16 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void theRoutingPricesWhatTheAttemptHasAlreadySpent() throws Exception {
             var job = createRunningJob(new LlmPriceSnapshot(
-                    FundingSource.INSTANCE,
-                    PricingState.PRICED,
+                    UsageFundingSource.INSTANCE,
+                    UsagePricingState.PRICED,
                     1L,
                     null,
                     new BigDecimal("10"),
                     new BigDecimal("30"),
                     new BigDecimal("1"),
                     new BigDecimal("2")));
-            job.setLlmTotalInputTokens(1_000_000);
-            job.setLlmTotalOutputTokens(100_000);
+            job.setLlmInputTokens(1_000_000);
+            job.setLlmOutputTokens(100_000);
 
             ProxyRouting routing = authenticateAndCaptureRouting(job);
 
@@ -566,16 +567,16 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @Test
         void aSnapshotWithoutAPriceContributesNothing() throws Exception {
             var job = createRunningJob();
-            job.setLlmTotalInputTokens(1_000_000);
+            job.setLlmInputTokens(1_000_000);
 
             ProxyRouting routing = authenticateAndCaptureRouting(job);
 
             assertThat(routing.inFlightSpendUsd()).isEqualByComparingTo("0");
         }
 
-        private ProxyRouting authenticateAndCaptureRouting(AgentJob job) throws Exception {
+        private ProxyRouting authenticateAndCaptureRouting(ReviewJob job) throws Exception {
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
                         authCapture.set(Objects.requireNonNull(
@@ -602,8 +603,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     class PracticeScriptRouting {
 
         private static final LlmPriceSnapshot DECISION_PRICE = new LlmPriceSnapshot(
-                FundingSource.WORKSPACE,
-                PricingState.PRICED,
+                UsageFundingSource.WORKSPACE,
+                UsagePricingState.PRICED,
                 null,
                 4L,
                 new BigDecimal("2"),
@@ -613,7 +614,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldRouteTheChatSlotToTheReviewModelWhenTheJobTokenCallsIt() throws Exception {
-            AgentJob job = createPracticeScriptJob();
+            ReviewJob job = createPracticeScriptJob();
 
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/chat/chat/completions");
 
@@ -621,7 +622,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(routing.apiProtocol()).isEqualTo("openai-completions");
             assertThat(routing.baseUrl()).isEqualTo("https://api.openai.com/v1");
             assertThat(routing.practiceScriptSlot()).isEqualTo(ModelKind.CHAT);
-            assertThat(Objects.requireNonNull(routing.attempt()).sourceType()).isEqualTo(LlmUsageSourceType.AGENT_JOB);
+            assertThat(Objects.requireNonNull(routing.attempt()).sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
         }
 
         @ParameterizedTest
@@ -631,14 +632,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             "reranking,rerank,RERANKING,cohere-rerank,PRACTICE_SCRIPT_RERANKING,33"
         })
         void shouldRouteASlotToItsFrozenModelWhenTheJobTokenCallsIt(
-                String slot,
-                String op,
-                ModelKind kind,
-                String protocol,
-                LlmUsageSourceType sourceType,
-                long connectionId)
+                String slot, String op, ModelKind kind, String protocol, UsageSourceType sourceType, long connectionId)
                 throws Exception {
-            AgentJob job = createPracticeScriptJob();
+            ReviewJob job = createPracticeScriptJob();
 
             ProxyRouting routing = routeAs(job, "/internal/llm/practice-script/" + slot + "/" + op);
 
@@ -646,7 +642,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             assertThat(routing.practiceScriptSlot()).isEqualTo(kind);
             assertThat(routing.apiProtocol()).isEqualTo(protocol);
             assertThat(routing.baseUrl()).isEqualTo("https://models.example.com/" + slot);
-            assertThat(routing.connectionScope()).isEqualTo(FundingSource.WORKSPACE);
+            assertThat(routing.connectionScope()).isEqualTo(UsageFundingSource.WORKSPACE);
             assertThat(routing.connectionId()).isEqualTo(connectionId);
             ProxyRouting.BilledAttempt attempt = Objects.requireNonNull(routing.attempt());
             assertThat(attempt.sourceType()).isEqualTo(sourceType);
@@ -655,9 +651,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldRefuseASlotWhenNoModelOfItsKindIsBound() throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             var response = call("POST", "/internal/llm/practice-script/decision/decisions");
 
@@ -668,10 +664,10 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldRefuseTheJobTokenOnAPracticeScriptPathWhenItsJobHasEnded() throws Exception {
-            AgentJob job = createPracticeScriptJob();
-            job.setStatus(AgentJobStatus.COMPLETED);
+            ReviewJob job = createPracticeScriptJob();
+            job.setStatus(ReviewJobStatus.COMPLETED);
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             var response = call("POST", "/internal/llm/practice-script/decision/decisions");
 
@@ -682,9 +678,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         @ParameterizedTest
         @ValueSource(strings = {"/internal/llm/practice-script/speech/speak", "/internal/llm/practice-script/decision"})
         void shouldRefuseAPracticeScriptPathWhenItNamesNoKnownSlot(String path) throws Exception {
-            AgentJob job = createPracticeScriptJob();
+            ReviewJob job = createPracticeScriptJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
 
             assertThat(call("POST", path).getStatus()).isEqualTo(HttpServletResponse.SC_NOT_FOUND);
             verify(filterChain, never()).doFilter(any(), any());
@@ -692,7 +688,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldCountTheCachedPromptAndTheSearchUnitsForTheAttemptLimitsWhenRoutingASlot() throws Exception {
-            AgentJob job = createPracticeScriptJob();
+            ReviewJob job = createPracticeScriptJob();
             when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
                     .thenReturn(List.of(
                             new PracticeScriptKindTotal(ModelKind.DECISION, 2, 1_000, 100, 4_000, 500, 0, 2),
@@ -709,7 +705,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void shouldPriceTheAttemptsPracticeScriptUsageFromTheSamePurseWhenRoutingASlot() throws Exception {
-            AgentJob job = createPracticeScriptJob();
+            ReviewJob job = createPracticeScriptJob();
             when(agentJobRepository.sumPracticeScriptUsageByKind(7L, job.getId(), 0))
                     .thenReturn(List.of(
                             new PracticeScriptKindTotal(ModelKind.DECISION, 4, 1_000_000, 100_000, 0, 0, 0, 4)));
@@ -723,9 +719,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
                     .isEqualTo(1_100_000);
         }
 
-        private ProxyRouting routeAs(AgentJob job, String path) throws Exception {
+        private ProxyRouting routeAs(ReviewJob job, String path) throws Exception {
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
             var authCapture = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
                         authCapture.set(Objects.requireNonNull(
@@ -750,8 +746,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             return response;
         }
 
-        private AgentJob createPracticeScriptJob() {
-            AgentJob job = createRunningJob();
+        private ReviewJob createPracticeScriptJob() {
+            ReviewJob job = createRunningJob();
             Map<ModelKind, FrozenModel> slots = new EnumMap<>(ModelKind.class);
             slots.put(ModelKind.DECISION, slot(ModelKind.DECISION, "openai-decisions", 31L, DECISION_PRICE));
             slots.put(ModelKind.EMBEDDING, slot(ModelKind.EMBEDDING, "openai-embeddings", 32L, null));
@@ -768,7 +764,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
                     protocol,
                     "https://models.example.com/" + kind.name().toLowerCase(Locale.ROOT),
                     kind.name().toLowerCase(Locale.ROOT) + "-model",
-                    FundingSource.WORKSPACE,
+                    UsageFundingSource.WORKSPACE,
                     connectionId,
                     connectionId + 10,
                     7L,
@@ -778,18 +774,17 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
     }
 
-    private AgentJob createRunningJob() {
+    private ReviewJob createRunningJob() {
         return createRunningJob(null);
     }
 
-    private AgentJob createRunningJob(@Nullable LlmPriceSnapshot price) {
-        var job = new AgentJob();
+    private ReviewJob createRunningJob(@Nullable LlmPriceSnapshot price) {
+        var job = new ReviewJob();
         ConfigSnapshot snapshot = new ConfigSnapshot(
                 ConfigSnapshot.SCHEMA_VERSION,
                 "openai-completions",
                 "https://api.openai.com/v1",
                 "gpt-5-mini",
-                null,
                 null,
                 null,
                 null,
@@ -806,8 +801,8 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         job.setId(UUID.randomUUID());
         Workspace workspace = new Workspace();
         workspace.setId(7L);
-        job.setWorkspace(workspace);
-        job.setStatus(AgentJobStatus.RUNNING);
+        RuntimeJobTestData.initialize(job, (workspace).getId());
+        job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-1");
         return job;
     }
@@ -844,9 +839,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
         @Test
         void theSameTokenInTheHeaderDoesAuthenticate() throws Exception {
-            AgentJob job = createRunningJob();
+            ReviewJob job = createRunningJob();
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
-            when(agentJobRepository.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+            when(agentJobRepository.findById(job.getId())).thenReturn(Optional.of(job));
             var authInsideChain = new AtomicReference<Authentication>();
             doAnswer(invocation -> {
                         authInsideChain.set(Objects.requireNonNull(
@@ -865,12 +860,12 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         }
     }
 
-    private static JobJwt jobJwt(AgentJob job, Set<String> scopes) {
+    private static JobJwt jobJwt(ReviewJob job, Set<String> scopes) {
         Instant now = Instant.now();
         return new JobJwt(
                 job.getId(),
-                job.getWorkspace().getId(),
-                job.getRetryCount(),
+                job.getWorkspaceId(),
+                job.getAttempt(),
                 scopes,
                 UUID.randomUUID().toString(),
                 now,

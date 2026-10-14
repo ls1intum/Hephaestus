@@ -1,14 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.label;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
 import java.time.Instant;
 import java.util.Objects;
@@ -23,22 +23,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitHub labels.
- * <p>
- * This service handles the conversion of GitHubLabelDTO to Label entities,
- * persists them, and publishes appropriate domain events.
- * <p>
- * <b>Design Principles:</b>
+ *
+ * <p>This service handles the conversion of GitHubLabelDTO to Label entities, persists them, and
+ * publishes appropriate domain events.
+ *
+ * <p><b>Design Principles:</b>
+ *
  * <ul>
- * <li>Single processing path for all data sources (sync and webhooks)</li>
- * <li>Idempotent operations via upsert pattern</li>
- * <li>Domain events published for reactive feature development</li>
- * <li>Works exclusively with DTOs for complete field coverage</li>
+ *   <li>Single processing path for all data sources (sync and webhooks)
+ *   <li>Idempotent operations via upsert pattern
+ *   <li>Domain events published for reactive feature development
+ *   <li>Works exclusively with DTOs for complete field coverage
  * </ul>
- * <p>
- * <b>Note on Label IDs:</b>
- * GitHub's GraphQL API does not expose databaseId for labels, only node_id.
- * This processor supports both ID-based lookup (for webhook events which provide databaseId)
- * and name-based lookup (for GraphQL sync where only name is reliably available).
+ *
+ * <p><b>Note on Label IDs:</b> GitHub's GraphQL API does not expose databaseId for labels, only
+ * node_id. This processor supports both ID-based lookup (for webhook events which provide
+ * databaseId) and name-based lookup (for GraphQL sync where only name is reliably available).
  */
 @Service
 public class GitHubLabelProcessor {
@@ -59,12 +59,12 @@ public class GitHubLabelProcessor {
     }
 
     /**
-     * Process a GitHub label DTO and persist it as a Label entity.
-     * Uses ID-based lookup when id is available (webhooks), otherwise falls back to name-based lookup.
-     * Publishes appropriate domain events based on what changed.
-     * <p>
-     * For new labels from GraphQL (which doesn't provide databaseId), a deterministic ID is generated
-     * from the repository ID and label name to ensure consistency.
+     * Process a GitHub label DTO and persist it as a Label entity. Uses ID-based lookup when id is
+     * available (webhooks), otherwise falls back to name-based lookup. Publishes appropriate domain
+     * events based on what changed.
+     *
+     * <p>For new labels from GraphQL (which doesn't provide databaseId), a deterministic ID is
+     * generated from the repository ID and label name to ensure consistency.
      *
      * @param dto the GitHub label DTO
      * @param repository the repository this label belongs to
@@ -80,7 +80,8 @@ public class GitHubLabelProcessor {
             return null;
         }
 
-        // Always check by unique key (repository_id + name) FIRST - this is the constraint we enforce.
+        // Always check by unique key (repository_id + name) FIRST - this is the constraint we
+        // enforce.
         // This handles the case where GraphQL sync created a label with a deterministic nativeId,
         // then NATS replay sends a webhook with the actual GitHub databaseId.
         Optional<Label> existingOpt = labelRepository.findByRepositoryIdAndName(repository.getId(), dto.name());
@@ -96,7 +97,8 @@ public class GitHubLabelProcessor {
 
         // Set or update fields
         // For labels, all fields including description are always updated (null values are allowed)
-        // CRITICAL: NEVER change the nativeId/provider of an existing (managed) entity - Hibernate will throw
+        // CRITICAL: NEVER change the nativeId/provider of an existing (managed) entity - Hibernate
+        // will throw
         // "identifier of an instance was altered" exception. Only set these for NEW entities.
         if (isNew) {
             long nativeId = dto.id() != null ? dto.id() : generateDeterministicId(repository.getId(), dto.name());
@@ -146,10 +148,10 @@ public class GitHubLabelProcessor {
 
     /**
      * Delete a label by its database ID.
-     * <p>
-     * IMPORTANT: For bidirectional @ManyToMany relationships,
-     * we must sync both sides of the relationship before deleting to avoid
-     * constraint violations or stale references in the persistence context.
+     *
+     * <p>IMPORTANT: For bidirectional @ManyToMany relationships, we must sync both sides of the
+     * relationship before deleting to avoid constraint violations or stale references in the
+     * persistence context.
      *
      * @param labelId the label database ID (synthetic PK)
      * @param context processing context with scope information
@@ -164,8 +166,8 @@ public class GitHubLabelProcessor {
     }
 
     /**
-     * Delete a label by its native ID (provider-assigned ID).
-     * Used by webhook handlers where only the native ID is available.
+     * Delete a label by its native ID (provider-assigned ID). Used by webhook handlers where only
+     * the native ID is available.
      *
      * @param nativeId the label's native ID from the provider
      * @param context processing context with scope information

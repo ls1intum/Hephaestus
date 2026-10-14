@@ -5,9 +5,9 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.judg
 import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.noVerdict;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,8 +28,8 @@ class PracticeTrendCalculatorTest {
                 "testing",
                 List.of(
                         noVerdict(7L, "2026-03-01T09:00:00Z"),
-                        judged(40L, "2026-05-01T09:00:00Z", Outcome.NOT_MET),
-                        judged(55L, "2026-06-01T09:00:00Z", Outcome.MET)),
+                        judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(55L, "2026-06-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
@@ -47,7 +47,7 @@ class PracticeTrendCalculatorTest {
         // optional arguments.
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
                 "testing",
-                List.of(judged(40L, "2026-05-01T09:00:00Z", Outcome.MET)),
+                List.of(judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
@@ -59,9 +59,9 @@ class PracticeTrendCalculatorTest {
     void shouldCountEveryJudgedPieceOfWorkPastTheChartsCap() {
         // Sixteen judged pull requests and one with nothing to judge. The chart keeps twelve; the reader is told
         // about all sixteen, and that the standing reads the newest four of them.
-        List<PracticeResult> observations = new ArrayList<>();
+        List<ResultView> observations = new ArrayList<>();
         for (int day = 1; day <= 16; day++) {
-            observations.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), Outcome.MET));
+            observations.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), ResultOutcome.MET));
         }
         observations.add(noVerdict(99L, "2026-05-20T09:00:00Z"));
 
@@ -70,7 +70,7 @@ class PracticeTrendCalculatorTest {
 
         assertThat(trend.support().reviewedWork()).isEqualTo(16);
         assertThat(trend.support().standingWork()).isEqualTo(4);
-        assertThat(trend.support().reviewedWorkKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
+        assertThat(trend.support().reviewedWorkKind()).isEqualTo(new ItemKind("scm.pull_request"));
         assertThat(trend.opportunities().stream().filter(EvidenceOpportunity::decided))
                 .hasSize(12);
     }
@@ -80,9 +80,9 @@ class PracticeTrendCalculatorTest {
         PracticeTrend trend = PracticeTrendCalculator.calculatePractice(
                 "testing",
                 List.of(
-                        judged(40L, "2026-05-01T09:00:00Z", Outcome.NOT_MET),
-                        judged(40L, "2026-05-02T09:00:00Z", Outcome.MET),
-                        clean(40L, "2026-05-03T09:00:00Z", ArtifactKinds.ISSUE)),
+                        judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(40L, "2026-05-02T09:00:00Z", ResultOutcome.MET),
+                        clean(40L, "2026-05-03T09:00:00Z", new ItemKind("scm.issue"))),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 

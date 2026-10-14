@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context;
 import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -52,7 +52,7 @@ public final class PreparedJobInputsFixtures {
         }
     }
 
-    public static PreparedJobInputs prepare(JobEvidenceFiles files, AgentJob job, PreparedJobInputs inputs) {
+    public static PreparedJobInputs prepare(JobEvidenceFiles files, ReviewJob job, PreparedJobInputs inputs) {
         files.beginPersonCapture(job);
         try {
             return files.prepare(

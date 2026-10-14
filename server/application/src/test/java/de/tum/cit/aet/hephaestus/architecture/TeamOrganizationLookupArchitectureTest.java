@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * guard. Workspace read/authorization paths must scope by {@code (organization, provider_id)} via the
  * {@code *AndProviderId} finders, or better, via {@code WorkspaceTeamScope}.
  *
- * @see de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScope
+ * @see de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceTeamScope
  * @see AccountLoginLookupArchitectureTest the same bug class, one level up (workspace by account login)
  */
 class TeamOrganizationLookupArchitectureTest extends HephaestusArchitectureTest {

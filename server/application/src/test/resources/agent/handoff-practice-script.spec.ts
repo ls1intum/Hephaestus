@@ -23,7 +23,7 @@ const metadata = {
 
 void test("a testing checklist does not turn a traceable handoff into a test-absence claim", async () => {
 	const result = await runBundled("ready-and-traceable-handoff", {
-		work: metadata,
+		item: metadata,
 		context: commitsRecord([]),
 	});
 	assert.equal(result.facts?.issueMentionSyntaxCandidateCount, 1);
@@ -40,7 +40,7 @@ void test("a testing checklist does not turn a traceable handoff into a test-abs
 
 void test("a reference in a commit message of the change counts, read from the staged commit record", async () => {
 	const result = await runBundled("ready-and-traceable-handoff", {
-		work: { ...metadata, body: "No mention here.", source_branch: "quiz-flow" },
+		item: { ...metadata, body: "No mention here.", source_branch: "quiz-flow" },
 		context: commitsRecord([{ sha: "a".repeat(40), message: "Fix quiz flow\n\nRefs #7" }]),
 	});
 	assert.equal(result.facts?.issueMentionSyntaxCandidateCount, 1);

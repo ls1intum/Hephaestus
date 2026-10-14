@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,7 +28,7 @@ public class MentorSandboxController {
             description = "Accepted; the sandbox starts unless it is already warm or Heph could not answer anyway")
     @PreAuthorize("@workspaceSecure.isMemberWithoutElevation()")
     public ResponseEntity<Void> prepareMentorSandbox(WorkspaceContext workspaceContext) {
-        CurrentScmIdentityHolder.getUserId()
+        SecurityUtils.getCurrentAccountId()
                 .ifPresent(developerId -> mentorSandboxPreparer.prepare(workspaceContext.id(), developerId));
         return ResponseEntity.accepted().build();
     }

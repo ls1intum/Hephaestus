@@ -44,7 +44,7 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
     private static final String EXTENSION_ID = "ijkajblcbajjpjbknfgdiiiljipafiko";
 
     private LoginProviderService loginProviderService;
-    private IdentityLinkAuthentication identityLinkAuthentication;
+    private IdentityAuthentication identityLinkAuthentication;
     private AuthIntentCookie authIntentCookie;
     private AuthBeginController controller;
 
@@ -54,7 +54,7 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
         lenient()
                 .when(loginProviderService.findEnabled(any()))
                 .thenReturn(Optional.of(providerRow("github", LoginProvider.ProviderType.GITHUB)));
-        identityLinkAuthentication = mock(IdentityLinkAuthentication.class);
+        identityLinkAuthentication = mock(IdentityAuthentication.class);
         byte[] key = new byte[32];
         new SecureRandom().nextBytes(key);
         authIntentCookie = new AuthIntentCookie(key);
@@ -162,8 +162,8 @@ class AuthBeginControllerLinkTest extends BaseUnitTest {
     }
 
     /**
-     * Link-only is classified by the login_provider row's TYPE: a self-hosted Outline's authorization URL is
-     * indistinguishable from a GitLab's by shape.
+     * Link-only is classified by the login_provider row's TYPE: a self-hosted Outline's
+     * authorization URL is indistinguishable from a GitLab's by shape.
      */
     @ParameterizedTest
     @EnumSource(

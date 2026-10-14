@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,7 +27,7 @@ final class TrendSupportFactory {
             int currentOpportunities,
             int previousOpportunities,
             int opportunitiesUntilComparable,
-            Set<ReviewedWorkKey> reviewedWork,
+            Map<Long, ItemKind> reviewedWork,
             List<EvidenceOpportunity> trail) {
         // One practice's bundles are disjoint, so no piece of reviewed work is in both.
         return build(
@@ -57,7 +56,7 @@ final class TrendSupportFactory {
             int opportunities,
             int opportunitiesUntilComparable,
             int standingWork,
-            Set<ReviewedWorkKey> reviewedWork,
+            Map<Long, ItemKind> reviewedWork,
             int comparablePractices,
             int eligiblePractices,
             List<EvidenceOpportunity> trail) {
@@ -81,7 +80,7 @@ final class TrendSupportFactory {
             int opportunities,
             int opportunitiesUntilComparable,
             int standingWork,
-            Set<ReviewedWorkKey> reviewedWork,
+            Map<Long, ItemKind> reviewedWork,
             @Nullable Integer comparablePractices,
             @Nullable Integer eligiblePractices,
             List<EvidenceOpportunity> trail) {
@@ -117,9 +116,8 @@ final class TrendSupportFactory {
     }
 
     /** The kind every piece of work shares, so a reader can be told "pull requests"; none when mixed or empty. */
-    private static @Nullable ArtifactKind sharedKind(Set<ReviewedWorkKey> work) {
-        List<ArtifactKind> kinds =
-                work.stream().map(ReviewedWorkKey::kind).distinct().toList();
+    private static @Nullable ItemKind sharedKind(Map<Long, ItemKind> work) {
+        List<ItemKind> kinds = work.values().stream().distinct().toList();
         return kinds.size() == 1 ? kinds.getFirst() : null;
     }
 }

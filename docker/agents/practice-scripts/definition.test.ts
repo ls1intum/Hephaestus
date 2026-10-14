@@ -4,7 +4,8 @@ import path from "node:path";
 import { after, describe, test } from "node:test";
 
 import { LABELS } from "./fixtures/every-slot.ts";
-import { MODEL_CONCURRENCY } from "./lib/concurrency.ts";
+import { parseDiff } from "./kits/scm/diff-parser.ts";
+import { MODEL_CONCURRENCY } from "./lib/core/concurrency.ts";
 import {
 	legacyContractError,
 	MODEL_SLOT_CAPS,
@@ -13,14 +14,13 @@ import {
 	type Candidate,
 	type EvidenceLocation,
 	type ReviewOptions,
-} from "./lib/contract.ts";
-import { parseDiff } from "./lib/diff-parser.ts";
-import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/evidence-reader.ts";
-import { resolveLeads, type QuotedLead } from "./lib/leads.ts";
-import { hostModels, MAX_OUTPUT_TOKENS, ModelBudget } from "./lib/models-host.ts";
-import { UnratedError } from "./lib/practice-script.ts";
-import { runPracticeProgram, type ProgramOutcome } from "./lib/program-host.ts";
-import { InputReader } from "./lib/script-inputs.ts";
+} from "./lib/core/contract.ts";
+import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/core/evidence-reader.ts";
+import { resolveLeads, type QuotedLead } from "./lib/core/leads.ts";
+import { hostModels, MAX_OUTPUT_TOKENS, ModelBudget } from "./lib/core/models-host.ts";
+import { UnratedError } from "./lib/core/practice-script.ts";
+import { runPracticeProgram, type ProgramOutcome } from "./lib/core/program-host.ts";
+import { InputReader } from "./lib/core/script-inputs.ts";
 import { stagePracticeScripts } from "./stage.ts";
 import {
 	chatMessage,
@@ -60,13 +60,13 @@ const CHANGE = parseDiff(
 
 /** What the fake review returns for every review. */
 const REVIEWED: Candidate = {
-	outcome: "UNDETERMINED",
+	outcome: "COULD_NOT_DETERMINE",
 	summary: "The review leaves the practice open",
 	explanation: "The fake review answers every review with this result.",
 	citations: [
 		{
 			sourceKind: "scm.pull-request.core",
-			artifactPath: "context/metadata.json",
+			sourcePath: "context/metadata.json",
 			path: "context/metadata.json",
 			startLine: 1,
 			endLine: 1,
@@ -74,11 +74,18 @@ const REVIEWED: Candidate = {
 		},
 	],
 	evidence: {
-		undecidability: [
+		openQuestions: [
 			{ openQuestion: "What would the review decide?", wouldSettleIt: "A review session." },
 		],
 	},
-	coverage: { source: "host", reads: 0, truncatedReads: 0, failedReads: 0, complete: true },
+	coverage: {
+		source: "host",
+		reads: 0,
+		truncatedReads: 0,
+		failedReads: 0,
+		receipts: [],
+		complete: true,
+	},
 };
 
 /** One review a program asked for: its input, and its leads as the host quotes them. */
@@ -121,7 +128,7 @@ async function stage(slugs: Record<string, string>) {
 	const sources: EvidenceSources = {
 		repo,
 		headRevision: HEAD,
-		treeArtifact: "repos/reviewed/.git/HEAD",
+		treeSourceFile: "repos/reviewed/.git/HEAD",
 		contextDir: context,
 		contextReference: "context",
 		change: { base: BASE, head: HEAD, files: CHANGE },
@@ -132,9 +139,6 @@ async function stage(slugs: Record<string, string>) {
 		sources,
 		inputs: new InputReader({
 			practicesDir: practices,
-			contextDir: context,
-			repo,
-			log: () => undefined,
 		}),
 	};
 }
@@ -211,7 +215,8 @@ async function run(
 /** The one review the run asked for: the program passed, and returned that review's result. */
 function reviewed({ outcome, reviews }: Run): Review {
 	assert.equal(outcome.status, "ok", outcome.error);
-	assert.deepEqual(outcome.candidate, REVIEWED);
+	const { coverage: _coverage, ...result } = REVIEWED;
+	assert.partialDeepStrictEqual(outcome.candidate, result);
 	const [review, ...more] = reviews;
 	assert.ok(review !== undefined && more.length === 0, `${reviews.length} reviews`);
 	return review;
@@ -306,10 +311,10 @@ void describe("practice programs and their direct models at the host", () => {
 	void test("run without any model: code's leads, and each unrated item named with its reason", async () => {
 		const result = await run("every-slot", {});
 		assert.deepEqual(result.outcome.models, [
-			{ slot: "chat", need: "optional", bound: false, notRated: {} },
-			{ slot: "decision", need: "optional", bound: false, notRated: {} },
-			{ slot: "embedding", need: "optional", bound: false, notRated: {} },
-			{ slot: "reranking", need: "optional", bound: false, notRated: {} },
+			{ slot: "chat", need: "optional", bound: false, failures: {} },
+			{ slot: "decision", need: "optional", bound: false, failures: {} },
+			{ slot: "embedding", need: "optional", bound: false, failures: {} },
+			{ slot: "reranking", need: "optional", bound: false, failures: {} },
 		]);
 		assert.ok(typeof result.outcome.durationMs === "number" && result.outcome.durationMs >= 0);
 		const review = reviewed(result);
@@ -323,10 +328,10 @@ void describe("practice programs and their direct models at the host", () => {
 
 	void test("a program whose required model is not bound does not run, and its report names the model", async () => {
 		const { outcome, reviews } = await run("requires-decision", {});
-		assert.equal(outcome.status, "skipped");
+		assert.equal(outcome.status, "withheld");
 		assert.equal(outcome.stopReason, "unavailable");
 		assert.deepEqual(outcome.models, [
-			{ slot: "decision", need: "required", bound: false, notRated: {} },
+			{ slot: "decision", need: "required", bound: false, failures: {} },
 		]);
 		assert.deepEqual(reviews, []);
 	});
@@ -348,7 +353,7 @@ void describe("practice programs and their direct models at the host", () => {
 				assertAttributed(standIn, "every-slot");
 				assert.deepEqual(
 					result.outcome.models.find((model) => model.slot === "decision"),
-					{ slot: "decision", need: "optional", bound: true, notRated: {} },
+					{ slot: "decision", need: "optional", bound: true, failures: {} },
 				);
 				assert.equal(result.outcome.calls.decision, 1);
 				const review = reviewed(result);
@@ -549,7 +554,7 @@ void describe("the attempt's direct model budget", () => {
 				);
 				assert.deepEqual(reviewed(result).options.facts, { reason: "budget", fast: true });
 				assert.deepEqual(result.outcome.models, [
-					{ slot: "embedding", need: "required", bound: true, notRated: { budget: 1 } },
+					{ slot: "embedding", need: "required", bound: true, failures: { budget: 1 } },
 				]);
 				assert.equal(standIn.requests.length, 0);
 			},
@@ -579,7 +584,7 @@ void describe("the attempt's direct model budget", () => {
 			assert.equal(outcome.stopReason, "deadline");
 			assert.equal(outcome.candidate, undefined);
 			assert.deepEqual(outcome.models, [
-				{ slot: "embedding", need: "required", bound: true, notRated: { deadline: 1 } },
+				{ slot: "embedding", need: "required", bound: true, failures: { deadline: 1 } },
 			]);
 		});
 	});
@@ -595,7 +600,7 @@ void describe("the attempt's direct model budget", () => {
 				async () => ({ ...chatMessage("ok"), usage }),
 				async (standIn) => {
 					const budget = new ModelBudget(5000, MODEL_CONCURRENCY);
-					const source = `import { definePracticeScript, generateText } from "../lib/practice-script.ts";
+					const source = `import {definePracticeScript,generateText} from "../lib/core/practice-script.ts";
 export default definePracticeScript({ meta: { models: { chat: "required" } }, async run(ctx) {
 await generateText({ model: ctx.models.chat, prompt: "Say yes.", maxOutputTokens: 1000 });
 return ctx.review();
@@ -630,7 +635,7 @@ return ctx.review();
 					);
 					assert.deepEqual(reviewed(result).options.facts, { reason, fast: true });
 					assert.deepEqual(result.outcome.models, [
-						{ slot: "embedding", need: "required", bound: true, notRated: { [reason]: 1 } },
+						{ slot: "embedding", need: "required", bound: true, failures: { [reason]: 1 } },
 					]);
 				},
 			);
@@ -670,11 +675,11 @@ return ctx.review();
 					embedMany: "rated",
 				});
 				assert.deepEqual(
-					result.outcome.models.map(({ slot, notRated }) => ({ slot, notRated })),
+					result.outcome.models.map(({ slot, failures }) => ({ slot, failures })),
 					[
-						{ slot: "decision", notRated: { "too-large": 1 } },
-						{ slot: "embedding", notRated: { "too-large": 1 } },
-						{ slot: "reranking", notRated: { "too-large": 1 } },
+						{ slot: "decision", failures: { "too-large": 1 } },
+						{ slot: "embedding", failures: { "too-large": 1 } },
+						{ slot: "reranking", failures: { "too-large": 1 } },
 					],
 				);
 				// Only the rerank at the cap and the two calls that `embedMany` split its values into.
@@ -834,7 +839,7 @@ void describe("a program the host refuses", () => {
 		}
 		// The review that the lead was for fails, and with it the program.
 		const runs = await runSource(
-			`import { definePracticeScript } from "../lib/practice-script.ts";
+			`import {definePracticeScript,generateText} from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: {},
 	run: async (ctx) => ctx.review({ leads: [{ at: { change: "src/cart.ts", line: 400 }, label: "A lead." }] }),
@@ -861,7 +866,7 @@ export default definePracticeScript({
 	for (const key of ["version", "kinds", "tokens"] as const) {
 		void test(`a program whose meta names the retired ${key} fails with the legacy contract error`, async () => {
 			const runs = await runSource(
-				`import { definePracticeScript } from "../lib/practice-script.ts";
+				`import {definePracticeScript,generateText} from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: { ${key}: ${key === "kinds" ? "{}" : "1"} },
 	run: async () => ({ leads: [] }),

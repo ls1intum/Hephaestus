@@ -11,8 +11,8 @@ digest-pinned Compose stacks. Deployment needs no inbound administration connect
 
 For a release deployment, the host verifies two signatures:
 
-| Artifact                                    | Signed by              | Answers                                                  |
-| ------------------------------------------- | ---------------------- | -------------------------------------------------------- |
+| Artifact                                    | Signed by              | Answers                                                |
+| ------------------------------------------- | ---------------------- | ------------------------------------------------------ |
 | The channel (`channels/<env>.json`)         | the promotion workflow | may this host move, and who said so                    |
 | The release lock (`release-<version>.json`) | the release workflow   | which source commit and image digests are this release |
 

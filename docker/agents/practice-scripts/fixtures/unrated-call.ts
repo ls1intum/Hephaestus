@@ -1,6 +1,6 @@
 // One embedding call, reported with the reason it was not rated. When the program cancels it, the
 // host stops waiting and the reason is "deadline".
-import { definePracticeScript, embedMany, step } from "../lib/practice-script.ts";
+import { definePracticeScript, embedMany, step } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { embedding: "required" } },

@@ -7,9 +7,9 @@ import { Ajv } from "ajv";
 import type { PublicReviewHistory } from "../../../main/resources/agent/pi-review-brief.ts";
 
 import {
-	type Channel,
+	type Destination,
 	type ComposedFeedbackEnvelope,
-	type ComposedFeedbackUnit,
+	type ComposedFeedbackPiece,
 	REVIEW_LIMITS,
 	DISPOSITIONS,
 	type ReviewedResult,
@@ -26,72 +26,77 @@ import {
 	publicResults,
 	type ReviewContext,
 	practiceStandard,
-	readInAppSupport,
-	readInChatEligibility,
+	readPracticePageSupport,
+	readConversationEligibility,
 	readReview,
 	reviewToolParameters,
 	notMetReference,
 	publicQualifications,
-	undeliverableUnits,
+	undeliverableFeedback,
 	validateFeedbackEvidence,
 } from "../../../main/resources/agent/pi-runner-composition.ts";
 
-const supersede = (threadKey: string): ComposedFeedbackUnit => ({
+const supersede = (threadKey: string): ComposedFeedbackPiece => ({
 	action: "SUPERSEDE",
-	channel: "IN_CHAT",
+	destination: "CONVERSATION",
 	practiceSlug: "writes-focused-pull-requests",
 	supersedesThreadKey: threadKey,
 });
 
-const target = (threadKey: string, channel: Channel = "IN_CHAT") => ({
+const target = (threadKey: string, destination: Destination = "CONVERSATION") => ({
 	threadKey,
-	channel,
+	destination,
 	practiceSlug: "writes-focused-pull-requests",
 });
 
-void test("an envelope that lists the threads its units supersede delivers all of them", () => {
+void test("an envelope that lists the threads its feedback supersede delivers all of them", () => {
 	const envelope = {
 		preparedTargets: [target("t-1"), target("t-2")],
-		units: [supersede("t-1"), supersede("t-2")],
+		feedback: [supersede("t-1"), supersede("t-2")],
 	};
 
-	assert.deepEqual(undeliverableUnits(envelope), []);
+	assert.deepEqual(undeliverableFeedback(envelope), []);
 });
 
-void test("only the unit naming an unlisted or other-lane thread is undeliverable", () => {
+void test("only the piece naming an unlisted or other-lane thread is undeliverable", () => {
 	assert.deepEqual(
-		undeliverableUnits({
+		undeliverableFeedback({
 			preparedTargets: [target("t-1")],
-			units: [supersede("t-1"), supersede("t-9")],
+			feedback: [supersede("t-1"), supersede("t-9")],
 		}),
 		[supersede("t-9")],
 	);
 	assert.deepEqual(
-		undeliverableUnits({ preparedTargets: [target("t-1", "IN_APP")], units: [supersede("t-1")] }),
+		undeliverableFeedback({
+			preparedTargets: [target("t-1", "PRACTICE_PAGE")],
+			feedback: [supersede("t-1")],
+		}),
 		[supersede("t-1")],
 	);
 	const quiet: ComposedFeedbackEnvelope = {
 		preparedTargets: [],
-		units: [
-			{ action: "WITHHOLD", channel: "IN_CHAT", practiceSlug: "p", withholdReason: "ALREADY_SAID" },
+		feedback: [
+			{
+				action: "WITHHOLD",
+				destination: "CONVERSATION",
+				practiceSlug: "p",
+				withholdReason: "ALREADY_SAID",
+			},
 		],
 	};
-	assert.deepEqual(undeliverableUnits(quiet), []);
-	assert.deepEqual(undeliverableUnits(undefined), []);
+	assert.deepEqual(undeliverableFeedback(quiet), []);
+	assert.deepEqual(undeliverableFeedback(undefined), []);
 });
 
-void test("private feedback rests on a problem of its own practice, named by its result or an observation", () => {
+void test("private feedback rests on a problem of its own practice, named by its result or a problem", () => {
 	const results = new Map([
-		[
-			"confirmed-criteria",
-			{ practiceSlug: "acceptance-criteria", outcome: "MET", observations: [] },
-		],
+		["confirmed-criteria", { practiceSlug: "acceptance-criteria", outcome: "MET", problems: [] }],
 		[
 			"unconfirmed-outcome",
 			{
 				practiceSlug: "issue-outcome",
 				outcome: "NOT_MET",
-				observations: [{ observationId: "no-closing-note" }],
+				problems: [{ problemId: "no-closing-note" }],
 			},
 		],
 	]);
@@ -99,29 +104,29 @@ void test("private feedback rests on a problem of its own practice, named by its
 
 	assert.match(
 		validateFeedbackEvidence("acceptance-criteria", basedOn, results) ?? "",
-		/must name the NOT_MET result of the primary practice 'acceptance-criteria' or one of its observations/u,
+		/must name the NOT_MET result of the primary practice 'acceptance-criteria' or one of its problems/u,
 	);
 	assert.equal(validateFeedbackEvidence("issue-outcome", basedOn, results), null);
-	// An observation stands for its result: it is what the unit rests on, and it decides the practice.
+	// An problem stands for its result: it is what the piece rests on, and it decides the practice.
 	assert.equal(validateFeedbackEvidence("issue-outcome", ["no-closing-note"], results), null);
 	const missing = validateFeedbackEvidence("issue-outcome", ["missing"], results) ?? "";
-	assert.match(missing, /does not name an admitted result or observation/u);
-	assert.match(missing, /unconfirmed-outcome \(its observations: no-closing-note\)/u);
+	assert.match(missing, /does not name an admitted result or problem/u);
+	assert.match(missing, /unconfirmed-outcome \(its problems: no-closing-note\)/u);
 });
 
-void test("every id a text or unit names is written as the reference it resolves to, each once", () => {
+void test("every id a text or piece names is written as the reference it resolves to, each once", () => {
 	const named = namedEvidence(
 		new Map([
-			["result-1", { observations: [{ observationId: "observation-1" }] }],
-			["result-2", { observations: [] }],
+			["result-1", { problems: [{ problemId: "problem-1" }] }],
+			["result-2", { problems: [] }],
 		]),
 	);
 	assert.deepEqual(
-		evidenceRefs(["observation-1", "result-1", "observation-1", "result-2", "result-1"], named),
+		evidenceRefs(["problem-1", "result-1", "problem-1", "result-2", "result-1"], named),
 		[
-			{ practiceResultId: "result-1", observationId: "observation-1" },
-			{ practiceResultId: "result-1" },
-			{ practiceResultId: "result-2" },
+			{ resultId: "result-1", problemId: "problem-1" },
+			{ resultId: "result-1" },
+			{ resultId: "result-2" },
 		],
 	);
 	// Only checked ids reach this point: an id that names nothing is a defect, never dropped.
@@ -130,57 +135,63 @@ void test("every id a text or unit names is written as the reference it resolves
 
 void test("the routing read after admission is one decision per NOT_MET result, or none", () => {
 	const current = [
-		{ practiceResultId: "r-1", practiceSlug: "one", outcome: "NOT_MET" },
-		{ practiceResultId: "r-2", practiceSlug: "two", outcome: "NOT_MET" },
-		{ practiceResultId: "r-3", practiceSlug: "three", outcome: "MET" },
+		{ resultId: "r-1", practiceSlug: "one", outcome: "NOT_MET" },
+		{ resultId: "r-2", practiceSlug: "two", outcome: "NOT_MET" },
+		{ resultId: "r-3", practiceSlug: "three", outcome: "MET" },
 	];
 	const readAt = "2026-10-12T09:41:07Z";
 	const routes = [
-		{ practiceResultId: "r-1", decision: "ADMIT" },
-		{ practiceResultId: "r-2", decision: "HAS_INLINE_ANCHOR" },
+		{ resultId: "r-1", decision: "ADMIT" },
+		{ resultId: "r-2", decision: "HAS_INLINE_ANCHOR" },
 	];
-	assert.deepEqual(readInChatEligibility({ state: "COMPLETE", readAt, results: routes }, current), {
-		state: "COMPLETE",
-		readAt,
-		results: routes,
-	});
-	assert.deepEqual(readInChatEligibility({ state: "UNAVAILABLE", readAt, results: [] }, current), {
-		state: "UNAVAILABLE",
-		readAt,
-	});
+	assert.deepEqual(
+		readConversationEligibility({ state: "COMPLETE", readAt, results: routes }, current),
+		{
+			state: "COMPLETE",
+			readAt,
+			results: routes,
+		},
+	);
+	assert.deepEqual(
+		readConversationEligibility({ state: "UNAVAILABLE", readAt, results: [] }, current),
+		{
+			state: "UNAVAILABLE",
+			readAt,
+		},
+	);
 	for (const malformed of [
 		// One NOT_MET result left without a decision, a MET result routed, a decision twice.
 		{ state: "COMPLETE", readAt, results: routes.slice(0, 1) },
 		{
 			state: "COMPLETE",
 			readAt,
-			results: [...routes, { practiceResultId: "r-3", decision: "ADMIT" }],
+			results: [...routes, { resultId: "r-3", decision: "ADMIT" }],
 		},
 		{ state: "COMPLETE", readAt, results: [...routes, routes[0]] },
-		// The retired per-observation shape is no routing at all.
+		// The retired per-problem shape is no routing at all.
 		{
 			state: "COMPLETE",
 			readAt,
-			observations: routes.map(({ practiceResultId, decision }) => ({
-				observationId: practiceResultId,
+			problems: routes.map(({ resultId, decision }) => ({
+				problemId: resultId,
 				decision,
 			})),
 		},
 		{ state: "UNAVAILABLE", readAt, results: routes },
-		{ state: "COMPLETE", readAt, results: [{ practiceResultId: "r-1", decision: "MAYBE" }] },
+		{ state: "COMPLETE", readAt, results: [{ resultId: "r-1", decision: "MAYBE" }] },
 	]) {
-		assert.equal(readInChatEligibility(malformed, current), null, JSON.stringify(malformed));
+		assert.equal(readConversationEligibility(malformed, current), null, JSON.stringify(malformed));
 	}
 	const occurrence = {
-		practiceResultId: "r-1",
-		artifactKind: "scm.pull_request",
-		artifactId: 7,
+		resultId: "r-1",
+		itemKind: "scm.pull_request",
+		itemId: "7",
 		outcome: "NOT_MET",
-		origin: "LIVE",
+		origin: "EVENT",
 		summary: "Errors are swallowed.",
-		observedAt: readAt,
+		recordedAt: readAt,
 	};
-	const support = readInAppSupport(
+	const support = readPracticePageSupport(
 		{
 			state: "COMPLETE",
 			readAt,
@@ -194,13 +205,13 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 	assert.ok(support?.state === "COMPLETE", JSON.stringify(support));
 	assert.deepEqual(support.practices[0]?.occurrences[0], {
 		...occurrence,
-		evidenceRationale: null,
+		explanation: null,
 		evidence: null,
-		practiceRevisionId: null,
+		practiceVersionId: null,
 	});
-	const { practiceResultId, ...legacy } = occurrence;
+	const { resultId, ...legacy } = occurrence;
 	assert.equal(
-		readInAppSupport(
+		readPracticePageSupport(
 			{
 				state: "COMPLETE",
 				readAt,
@@ -208,7 +219,7 @@ void test("the routing read after admission is one decision per NOT_MET result, 
 					{
 						practiceSlug: "one",
 						decision: "ADMIT",
-						occurrences: [{ ...legacy, observationId: practiceResultId }],
+						occurrences: [{ ...legacy, problemId: resultId }],
 					},
 					{ practiceSlug: "two", decision: "NO_EVIDENCE", occurrences: [] },
 				],
@@ -233,21 +244,21 @@ void test("negatives that quote the same line each keep their own standard, rati
 	const reference = notMetReference(
 		[
 			{
-				practiceResultId: "swallowed",
+				resultId: "swallowed",
 				practiceSlug: "handles-errors",
 				outcome: "NOT_MET",
 				publicEligible: true,
 				explanation: "The failure callback drops its error and nothing records it.",
 				citations: [],
-				observations: [
+				problems: [
 					{
-						observationId: "swallowed-callback",
+						problemId: "swallowed-callback",
 						citations: [{ ...sharedLine, quote: "func didFail(error: any Error) {}" }],
 					},
 				],
 			},
 			{
-				practiceResultId: "unfinished",
+				resultId: "unfinished",
 				practiceSlug: "ready-handoff",
 				outcome: "NOT_MET",
 				publicEligible: true,
@@ -259,9 +270,9 @@ void test("negatives that quote the same line each keep their own standard, rati
 						quote: "This change completes loading with a ready or failed preview state.",
 					},
 				],
-				observations: [
+				problems: [
 					{
-						observationId: "unfinished-callback",
+						problemId: "unfinished-callback",
 						citations: [{ ...sharedLine, quote: "func didFail(error: any Error) {}" }],
 					},
 				],
@@ -281,10 +292,10 @@ void test("negatives that quote the same line each keep their own standard, rati
 		"The failure callback drops its error and nothing records it.",
 		"The promised terminal preview state is not reached when this callback fails.",
 		"This change completes loading with a ready or failed preview state.",
-		'"practiceResultId": "swallowed"',
-		'"practiceResultId": "unfinished"',
-		'"observationId": "swallowed-callback"',
-		'"observationId": "unfinished-callback"',
+		'"resultId": "swallowed"',
+		'"resultId": "unfinished"',
+		'"problemId": "swallowed-callback"',
+		'"problemId": "unfinished-callback"',
 	]) {
 		assert.ok(reference.includes(shown), shown);
 	}
@@ -300,7 +311,7 @@ void test("negatives that quote the same line may take separate remedies or one 
 			{
 				practiceSlug: "handles-errors",
 				outcome: "NOT_MET",
-				observations: [{ observationId: "swallowed-callback", citations: [sharedLine] }],
+				problems: [{ problemId: "swallowed-callback", citations: [sharedLine] }],
 			},
 		],
 		[
@@ -308,14 +319,14 @@ void test("negatives that quote the same line may take separate remedies or one 
 			{
 				practiceSlug: "ready-handoff",
 				outcome: "NOT_MET",
-				observations: [{ observationId: "unfinished-callback", citations: [sharedLine] }],
+				problems: [{ problemId: "unfinished-callback", citations: [sharedLine] }],
 			},
 		],
 	]);
 	const context: ReviewContext = { witnesses: new Map<string, PriorAdviceWitness>() };
 	const decisions = [
-		{ practiceResultId: "swallowed", disposition: "RAISE" },
-		{ practiceResultId: "unfinished", disposition: "RAISE" },
+		{ resultId: "swallowed", disposition: "RAISE" },
+		{ resultId: "unfinished", disposition: "RAISE" },
 	];
 
 	// Separate remedies: the handoff ask in the summary, the handler's own repair on its line.
@@ -326,15 +337,15 @@ void test("negatives that quote the same line may take separate remedies or one 
 	const repair = {
 		body: "This handler drops the failure; record it or establish why safe recovery needs no report.",
 		basedOn: ["swallowed-callback"],
-		anchor: { observationId: "swallowed-callback", citationIndex: 0 },
+		anchor: { problemId: "swallowed-callback", citationIndex: 0 },
 	};
 	assert.deepEqual(readReview({ decisions, summary, inline: [repair] }, sameLine, true, context), {
 		review: {
-			summary: { ...summary, basedOn: [{ practiceResultId: "unfinished" }] },
+			summary: { ...summary, basedOn: [{ resultId: "unfinished" }] },
 			inline: [
 				{
 					...repair,
-					basedOn: [{ practiceResultId: "swallowed", observationId: "swallowed-callback" }],
+					basedOn: [{ resultId: "swallowed", problemId: "swallowed-callback" }],
 				},
 			],
 			withheld: [],
@@ -345,7 +356,7 @@ void test("negatives that quote the same line may take separate remedies or one 
 	const shared = {
 		body: "Handle this callback by recording the failure and setting the promised failed preview state.",
 		basedOn: ["swallowed", "unfinished"],
-		anchor: { observationId: "swallowed-callback", citationIndex: 0 },
+		anchor: { problemId: "swallowed-callback", citationIndex: 0 },
 	};
 	assert.deepEqual(
 		readReview({ decisions, summary: null, inline: [shared] }, sameLine, true, context),
@@ -355,11 +366,11 @@ void test("negatives that quote the same line may take separate remedies or one 
 				inline: [
 					{
 						...shared,
-						// The note sits on swallowed-callback, so it rests on that observation as well as its result.
+						// The note sits on swallowed-callback, so it rests on that problem as well as its result.
 						basedOn: [
-							{ practiceResultId: "swallowed" },
-							{ practiceResultId: "unfinished" },
-							{ practiceResultId: "swallowed", observationId: "swallowed-callback" },
+							{ resultId: "swallowed" },
+							{ resultId: "unfinished" },
+							{ resultId: "swallowed", problemId: "swallowed-callback" },
 						],
 					},
 				],
@@ -381,7 +392,7 @@ const diffCitation = (line: number) => ({
 });
 
 /**
- * One result per practice; each NOT_MET result holds its observations, and only an observation's citations can carry a
+ * One result per practice; each NOT_MET result holds its problems, and only a problem's citations can carry a
  * line note.
  */
 const results = new Map<string, ReviewedResult>([
@@ -390,9 +401,9 @@ const results = new Map<string, ReviewedResult>([
 		{
 			practiceSlug: "uses-adaptive-colors",
 			outcome: "NOT_MET",
-			observations: [
+			problems: [
 				{
-					observationId: "colors-fill",
+					problemId: "colors-fill",
 					citations: [diffCitation(13), { ...diffCitation(16), index: 1 }],
 				},
 			],
@@ -403,7 +414,7 @@ const results = new Map<string, ReviewedResult>([
 		{
 			practiceSlug: "honours-linked-issue-acceptance-criteria",
 			outcome: "NOT_MET",
-			observations: [{ observationId: "handoff-criteria", citations: [] }],
+			problems: [{ problemId: "handoff-criteria", citations: [] }],
 		},
 	],
 	[
@@ -411,19 +422,19 @@ const results = new Map<string, ReviewedResult>([
 		{
 			practiceSlug: "describe-what-and-why",
 			outcome: "NOT_MET",
-			observations: [{ observationId: "why-reason", citations: [] }],
+			problems: [{ problemId: "why-reason", citations: [] }],
 		},
 	],
-	["preview", { practiceSlug: "ships-a-preview", outcome: "MET", observations: [] }],
-	["unsure", { practiceSlug: "keeps-tests-honest", outcome: "UNDETERMINED", observations: [] }],
+	["preview", { practiceSlug: "ships-a-preview", outcome: "MET", problems: [] }],
+	["unsure", { practiceSlug: "keeps-tests-honest", outcome: "COULD_NOT_DETERMINE", problems: [] }],
 	[
 		"description",
 		{
 			practiceSlug: "states-how-to-verify",
 			outcome: "NOT_MET",
-			observations: [
+			problems: [
 				{
-					observationId: "description-steps",
+					problemId: "description-steps",
 					citations: [
 						{
 							index: 0,
@@ -450,8 +461,8 @@ const witnesses = new Map<string, PriorAdviceWitness>([
 
 const reviewContext: ReviewContext = { witnesses };
 
-const raise = (practiceResultId: string) => ({ practiceResultId, disposition: "RAISE" });
-const below = (practiceResultId: string) => ({ practiceResultId, disposition: "BELOW_BAR" });
+const raise = (resultId: string) => ({ resultId, disposition: "RAISE" });
+const below = (resultId: string) => ({ resultId, disposition: "BELOW_BAR" });
 const allRaised = [raise("colors"), raise("handoff"), raise("why"), raise("description")];
 
 const errorsOf = (value: unknown, lineNotes = true, context = reviewContext): string[] => {
@@ -475,8 +486,8 @@ void test("a complete summary is stored exactly as written, resting on exactly w
 	assert.ok("review" in read, JSON.stringify(read));
 	assert.equal(read.review.summary?.body, body);
 	assert.deepEqual(read.review.summary.basedOn, [
-		{ practiceResultId: "handoff" },
-		{ practiceResultId: "why", observationId: "why-reason" },
+		{ resultId: "handoff" },
+		{ resultId: "why", problemId: "why-reason" },
 	]);
 	assert.deepEqual(read.review.inline, []);
 });
@@ -488,13 +499,13 @@ void test("a review with only line notes is a whole review: no summary is requir
 				{
 					body: "This explicit RGB fill stays unchanged in Dark Mode; check contrast in both appearances and use an adaptive fill.",
 					basedOn: ["colors"],
-					anchor: { observationId: "colors-fill", citationIndex: 0 },
+					anchor: { problemId: "colors-fill", citationIndex: 0 },
 				},
 			],
 			decisions: [
 				raise("colors"),
-				...["handoff", "why", "description"].map((practiceResultId) => ({
-					practiceResultId,
+				...["handoff", "why", "description"].map((resultId) => ({
+					resultId,
 					disposition: "ALREADY_SAID",
 					witnessIds: ["github:review-comment:7"],
 				})),
@@ -507,17 +518,17 @@ void test("a review with only line notes is a whole review: no summary is requir
 	assert.ok("review" in read, JSON.stringify(read));
 	assert.equal(read.review.summary, null);
 	assert.deepEqual(read.review.inline[0]?.anchor, {
-		observationId: "colors-fill",
+		problemId: "colors-fill",
 		citationIndex: 0,
 	});
-	// The server places a note only on an observation its basedOn names: the anchor's observation joins the result.
+	// The server places a note only on a problem its basedOn names: the anchor's problem joins the result.
 	assert.deepEqual(read.review.inline[0].basedOn, [
-		{ practiceResultId: "colors" },
-		{ practiceResultId: "colors", observationId: "colors-fill" },
+		{ resultId: "colors" },
+		{ resultId: "colors", problemId: "colors-fill" },
 	]);
 });
 
-void test("a stored review is the wire shape: every basedOn a list of references, the anchor an observation's citation", () => {
+void test("a stored review is the wire shape: every basedOn a list of references, the anchor a problem's citation", () => {
 	const read = readReview(
 		{
 			decisions: [raise("colors"), raise("why"), below("handoff"), below("description")],
@@ -526,7 +537,7 @@ void test("a stored review is the wire shape: every basedOn a list of references
 				{
 					body: "Use an adaptive fill.",
 					basedOn: ["colors-fill", "colors"],
-					anchor: { observationId: "colors-fill", citationIndex: 1 },
+					anchor: { problemId: "colors-fill", citationIndex: 1 },
 				},
 			],
 		},
@@ -542,21 +553,18 @@ void test("a stored review is the wire shape: every basedOn a list of references
 		review: {
 			summary: {
 				body: "Say why the screen exists.",
-				basedOn: [{ practiceResultId: "why", observationId: "why-reason" }],
+				basedOn: [{ resultId: "why", problemId: "why-reason" }],
 			},
 			inline: [
 				{
 					body: "Use an adaptive fill.",
-					basedOn: [
-						{ practiceResultId: "colors", observationId: "colors-fill" },
-						{ practiceResultId: "colors" },
-					],
-					anchor: { observationId: "colors-fill", citationIndex: 1 },
+					basedOn: [{ resultId: "colors", problemId: "colors-fill" }, { resultId: "colors" }],
+					anchor: { problemId: "colors-fill", citationIndex: 1 },
 				},
 			],
 			withheld: [
-				{ basedOn: [{ practiceResultId: "handoff" }], reason: "BELOW_BAR" },
-				{ basedOn: [{ practiceResultId: "description" }], reason: "BELOW_BAR" },
+				{ basedOn: [{ resultId: "handoff" }], reason: "BELOW_BAR" },
+				{ basedOn: [{ resultId: "description" }], reason: "BELOW_BAR" },
 			],
 		},
 	});
@@ -565,7 +573,7 @@ void test("a stored review is the wire shape: every basedOn a list of references
 const note = (citationIndex: number) => ({
 	body: `The fill on this line fixes one appearance (${citationIndex}).`,
 	basedOn: ["colors"],
-	anchor: { observationId: "colors-fill", citationIndex },
+	anchor: { problemId: "colors-fill", citationIndex },
 });
 
 void test("one practice may carry several notes about different lines, never two on one line", () => {
@@ -587,39 +595,39 @@ void test("one practice may carry several notes about different lines, never two
 	);
 });
 
-void test("an anchor is a line of this change cited by an observation the note rests on, itself or through its result", () => {
+void test("an anchor is a line of this change cited by a problem the note rests on, itself or through its result", () => {
 	const errors = errorsOf({
 		inline: [
 			{
 				body: "One.",
 				basedOn: ["handoff"],
-				anchor: { observationId: "colors-fill", citationIndex: 0 },
+				anchor: { problemId: "colors-fill", citationIndex: 0 },
 			},
 			{
 				body: "Two.",
 				basedOn: ["description"],
-				anchor: { observationId: "description-steps", citationIndex: 0 },
+				anchor: { problemId: "description-steps", citationIndex: 0 },
 			},
 			{
 				body: "Three.",
 				basedOn: ["colors"],
-				anchor: { observationId: "colors-fill", citationIndex: 7 },
+				anchor: { problemId: "colors-fill", citationIndex: 7 },
 			},
-			{ body: "Four.", basedOn: ["colors"], anchor: { observationId: "colors", citationIndex: 0 } },
+			{ body: "Four.", basedOn: ["colors"], anchor: { problemId: "colors", citationIndex: 0 } },
 			{
 				body: "Five.",
 				basedOn: ["colors"],
-				anchor: { observationId: "elsewhere", citationIndex: 0 },
+				anchor: { problemId: "elsewhere", citationIndex: 0 },
 			},
 		],
 	}).join("\n");
 	assert.match(errors, /inline #1: anchor names colors-fill, which this note's basedOn does not/u);
 	assert.match(errors, /inline #2: citation 0 of description-steps is not a line of this change/u);
 	assert.match(errors, /inline #3: colors-fill has no citation 7/u);
-	// A result's own citations never anchor: the note names the observation whose citation it sits on.
+	// A result's own citations never anchor: the note names the problem whose citation it sits on.
 	assert.match(errors, /inline #4: anchor names colors, which is a result/u);
-	assert.match(errors, /inline #5: anchor names elsewhere, which is not an observation/u);
-	// Naming the observation itself rests the note on it, as naming its result does.
+	assert.match(errors, /inline #5: anchor names elsewhere, which is not a problem/u);
+	// Naming the problem itself rests the note on it, as naming its result does.
 	assert.ok(
 		"review" in
 			readReview(
@@ -629,7 +637,7 @@ void test("an anchor is a line of this change cited by an observation the note r
 						{
 							body: "Adapt.",
 							basedOn: ["colors-fill"],
-							anchor: { observationId: "colors-fill", citationIndex: 0 },
+							anchor: { problemId: "colors-fill", citationIndex: 0 },
 						},
 					],
 				},
@@ -645,7 +653,7 @@ void test("an anchor is a line of this change cited by an observation the note r
 					{
 						body: "x",
 						basedOn: ["colors"],
-						anchor: { observationId: "colors-fill", citationIndex: 0 },
+						anchor: { problemId: "colors-fill", citationIndex: 0 },
 					},
 				],
 			},
@@ -655,17 +663,17 @@ void test("an anchor is a line of this change cited by an observation the note r
 	);
 });
 
-void test("a part may rest only on admitted NOT_MET results or their observations, never on a MET result", () => {
+void test("a part may rest only on admitted NOT_MET results or their problems, never on a MET result", () => {
 	const errors = errorsOf({
 		summary: { body: "A sentence.", basedOn: ["why", "unsure", "elsewhere"] },
 	}).join("\n");
 	assert.match(
 		errors,
-		/elsewhere, which is not one of the NOT_MET results or observations this review may rest on/u,
+		/elsewhere, which is not one of the NOT_MET results or problems this review may rest on/u,
 	);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: ["unsure"] } }).join("\n"),
-		/basedOn names unsure, which is not a NOT_MET result or one of its observations/u,
+		/basedOn names unsure, which is not a NOT_MET result or one of its problems/u,
 	);
 	// The review on the work never acknowledges a MET result: a summary or a note resting on one is refused.
 	const acknowledged = {
@@ -678,13 +686,13 @@ void test("a part may rest only on admitted NOT_MET results or their observation
 			{
 				body: "Adapt this fill; the preview shows it well.",
 				basedOn: ["colors", "preview"],
-				anchor: { observationId: "colors-fill", citationIndex: 0 },
+				anchor: { problemId: "colors-fill", citationIndex: 0 },
 			},
 		],
 	};
 	assert.deepEqual(errorsOf(acknowledged), [
-		"summary: basedOn names preview, which is not a NOT_MET result or one of its observations. The review on the work speaks only about NOT_MET results and their observations; it never acknowledges a MET result",
-		"inline #1: basedOn names preview, which is not a NOT_MET result or one of its observations. The review on the work speaks only about NOT_MET results and their observations; it never acknowledges a MET result",
+		"summary: basedOn names preview, which is not a NOT_MET result or one of its problems. The review on the work speaks only about NOT_MET results and their problems; it never acknowledges a MET result",
+		"inline #1: basedOn names preview, which is not a NOT_MET result or one of its problems. The review on the work speaks only about NOT_MET results and their problems; it never acknowledges a MET result",
 	]);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: [] } }).join("\n"),
@@ -700,34 +708,34 @@ void test("a NOT_MET result is raised or withheld whole, and only a NOT_MET resu
 		}).join("\n"),
 		/why is withheld as BELOW_BAR, and a text speaks about it/u,
 	);
-	// A withheld result stays unsaid through every one of its observations.
+	// A withheld result stays unsaid through every one of its problems.
 	assert.match(
 		errorsOf({
 			decisions: [below("why")],
 			summary: { body: "A sentence.", basedOn: ["why-reason"] },
 		}).join("\n"),
-		/why is withheld as BELOW_BAR, and a text speaks about it or its observations/u,
+		/why is withheld as BELOW_BAR, and a text speaks about it or its problems/u,
 	);
 	assert.match(
 		errorsOf({ decisions: [below("preview")] }).join("\n"),
 		/preview is not a NOT_MET result/u,
 	);
-	// The decision is the result's: an observation's id is named back to its result.
+	// The decision is the result's: a problem's id is named back to its result.
 	assert.match(
 		errorsOf({ decisions: [below("why-reason")] }).join("\n"),
-		/why-reason is an observation of why; a decision names its result's practiceResultId/u,
+		/why-reason is a problem of why; a decision names its result's resultId/u,
 	);
 	assert.match(
-		errorsOf({ decisions: [{ observationId: "why", disposition: "BELOW_BAR" }] }).join("\n"),
-		/unknown decision field\(s\): observationId[\s\S]*practiceResultId is required/u,
+		errorsOf({ decisions: [{ problemId: "why", disposition: "BELOW_BAR" }] }).join("\n"),
+		/unknown decision field\(s\): problemId[\s\S]*resultId is required/u,
 	);
 	assert.match(
-		errorsOf({ decisions: [{ practiceResultId: "why", disposition: "BORED" }] }).join("\n"),
+		errorsOf({ decisions: [{ resultId: "why", disposition: "BORED" }] }).join("\n"),
 		/disposition must be one of RAISE, NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR/u,
 	);
 });
 
-void test("a raised result is spoken about through any of its observations", () => {
+void test("a raised result is spoken about through any of its problems", () => {
 	const read = readReview(
 		{
 			decisions: [raise("why"), raise("colors"), below("handoff"), below("description")],
@@ -749,7 +757,7 @@ void test("a raised result is spoken about through any of its observations", () 
 			decisions: [raise("why"), raise("colors"), below("handoff"), below("description")],
 			summary: { body: "Say why.", basedOn: ["why-reason"] },
 		}).join("\n"),
-		/colors is decided RAISE, and no text speaks about it or its observations/u,
+		/colors is decided RAISE, and no text speaks about it or its problems/u,
 	);
 });
 
@@ -791,7 +799,7 @@ void test("a review over the line-note bound is refused whole, not cut", () => {
 	const notes = Array.from({ length: REVIEW_LIMITS.inlineNotes + 1 }, () => ({
 		body: "x",
 		basedOn: ["colors"],
-		anchor: { observationId: "colors-fill", citationIndex: 0 },
+		anchor: { problemId: "colors-fill", citationIndex: 0 },
 	}));
 	assert.match(
 		errorsOf({ inline: notes }).join("\n"),
@@ -799,22 +807,22 @@ void test("a review over the line-note bound is refused whole, not cut", () => {
 	);
 });
 
-void test("what a review decided covers the results it says, through any observation, and those it withholds", () => {
+void test("what a review decided covers the results it says, through any problem, and those it withholds", () => {
 	assert.deepEqual(
 		[
 			...decidedByReview({
 				summary: {
 					body: "x",
-					basedOn: [{ practiceResultId: "why", observationId: "why-reason" }],
+					basedOn: [{ resultId: "why", problemId: "why-reason" }],
 				},
 				inline: [
 					{
 						body: "y",
-						basedOn: [{ practiceResultId: "colors" }],
-						anchor: { observationId: "colors-fill", citationIndex: 0 },
+						basedOn: [{ resultId: "colors" }],
+						anchor: { problemId: "colors-fill", citationIndex: 0 },
 					},
 				],
-				withheld: [{ basedOn: [{ practiceResultId: "handoff" }], reason: "ALREADY_SAID" }],
+				withheld: [{ basedOn: [{ resultId: "handoff" }], reason: "ALREADY_SAID" }],
 			}),
 		].toSorted(),
 		["colors", "handoff", "why"],
@@ -833,7 +841,7 @@ const WITHDRAWN = "No CSV download is requested. This work is withdrawn.";
 
 const admitted = [
 	{
-		practiceResultId: "current",
+		resultId: "current",
 		practiceSlug: "describe-what-and-why",
 		outcome: "NOT_MET",
 		summary: "The description gives no reason for the screen.",
@@ -849,9 +857,9 @@ const admitted = [
 			},
 			note: "The first line already names what changed.",
 		},
-		observations: [
+		problems: [
 			{
-				observationId: "current-reason",
+				problemId: "current-reason",
 				severity: "MINOR",
 				summary: "No reason for the screen",
 				citations: [
@@ -869,16 +877,16 @@ const admitted = [
 		],
 	},
 	{
-		practiceResultId: "from-history",
+		resultId: "from-history",
 		practiceSlug: "defers-review-asks-into-tracked-work",
 		outcome: "NOT_MET",
 		summary: PRIVATE_SENTENCE,
 		explanation: PRIVATE_SENTENCE,
 		publicEligible: false,
 		citations: [],
-		observations: [
+		problems: [
 			{
-				observationId: "from-history-ask",
+				problemId: "from-history-ask",
 				summary: PRIVATE_SENTENCE,
 				citations: [
 					{ index: 0, sourceKind: "hephaestus.feedback-history", path: "history/feedback.json" },
@@ -893,27 +901,27 @@ void test("the review composition sees only the NOT_MET results admission marked
 	const shown = publicResults([
 		...admitted,
 		{
-			practiceResultId: "named",
+			resultId: "named",
 			practiceSlug: "names-the-screen",
 			outcome: "MET",
 			summary: "The description names the screen.",
 			publicEligible: true,
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 	]);
 	assert.deepEqual(
-		shown.map((result) => result.practiceResultId),
+		shown.map((result) => result.resultId),
 		["current"],
 	);
 	assert.equal(
 		shown[0]?.explanation,
 		"The authored description names the screen and nothing about why.",
 	);
-	// Every citation keeps its quoted lines and coordinates, the observations' and the example's too; only digests go.
-	assert.deepEqual(shown[0].observations, [
+	// Every citation keeps its quoted lines and coordinates, the problems' and the example's too; only digests go.
+	assert.deepEqual(shown[0].problems, [
 		{
-			observationId: "current-reason",
+			problemId: "current-reason",
 			severity: "MINOR",
 			summary: "No reason for the screen",
 			citations: [
@@ -945,14 +953,14 @@ void test("the review composition sees only the NOT_MET results admission marked
 		qualifications: publicQualifications([
 			...admitted,
 			{
-				practiceResultId: "conflict",
+				resultId: "conflict",
 				practiceSlug: "issue-scoped-to-single-concern",
-				outcome: "UNDETERMINED",
+				outcome: "COULD_NOT_DETERMINE",
 				summary: CONFLICT_SUMMARY,
 				explanation: CONFLICT_RATIONALE,
 				publicEligible: true,
 				evidence: {
-					undecidability: [
+					openQuestions: [
 						{
 							openQuestion:
 								"Does the withdrawal or the delivery requirement state the current request?",
@@ -972,29 +980,29 @@ void test("the review composition sees only the NOT_MET results admission marked
 				],
 			},
 			{
-				practiceResultId: "na",
+				resultId: "na",
 				practiceSlug: "ships-tests",
-				outcome: "NOT_APPLICABLE",
+				outcome: "DOES_NOT_APPLY",
 				summary: "No behaviour changed, so no test is owed.",
 				explanation: "Nothing in this work needs a test.",
 				publicEligible: true,
 				evidence: {
 					inapplicability: {
 						consulted: ["scm.pull-request.diff"],
-						subject: "changed behaviour a test could cover",
+						prerequisite: "changed behaviour a test could cover",
 						ruledOutBy: "the diff changes only the text of one label",
 					},
 				},
 				citations: [{ index: 0, sourceKind: "scm.pull-request.diff", quote: "+ text" }],
 			},
 			{
-				practiceResultId: "reviewer-limit",
+				resultId: "reviewer-limit",
 				practiceSlug: "reviews-respectfully-asks-rather-than-demands",
-				outcome: "UNDETERMINED",
+				outcome: "COULD_NOT_DETERMINE",
 				summary: PRIVATE_SENTENCE,
 				publicEligible: false,
 				evidence: {
-					undecidability: [{ openQuestion: PRIVATE_SENTENCE, wouldSettleIt: PRIVATE_SENTENCE }],
+					openQuestions: [{ openQuestion: PRIVATE_SENTENCE, wouldSettleIt: PRIVATE_SENTENCE }],
 				},
 				citations: [],
 			},
@@ -1025,18 +1033,18 @@ void test("the review composition sees only the NOT_MET results admission marked
 	assert.ok(!turn.includes("from-history"), turn);
 	// The work is named before anything the review may rest on.
 	const record = turn.indexOf("Add the login screen.");
-	assert.ok(record !== -1 && record < turn.indexOf('"practiceResultId": "current"'), turn);
+	assert.ok(record !== -1 && record < turn.indexOf('"resultId": "current"'), turn);
 	// The whole standard of the NOT_MET practice comes before its result; a private practice's criteria are not read.
 	assert.deepEqual(read, ["describe-what-and-why"]);
 	const standard = turn.indexOf(`\`\`\`markdown\n${describeCriteria}\n\`\`\``);
-	assert.ok(record < standard && standard < turn.indexOf('"practiceResultId": "current"'), turn);
+	assert.ok(record < standard && standard < turn.indexOf('"resultId": "current"'), turn);
 	// Nothing offers recognition: no MET result, no index of one, and no tool to read one.
-	assert.doesNotMatch(turn, /"practiceResultId": "named"|recognition|read_practice/u);
+	assert.doesNotMatch(turn, /"resultId": "named"|recognition|read_practice/u);
 	// How to write ends the opening turn, after every reference it relies on.
 	assert.ok(turn.endsWith(WRITE_CONTRACT), turn);
-	// The concern carries its result with its observations nested, each by its own id.
-	assert.match(turn, /"practiceResultId": "current"/u);
-	assert.match(turn, /"observationId": "current-reason"/u);
+	// The concern carries its result with its problems nested, each by its own id.
+	assert.match(turn, /"resultId": "current"/u);
+	assert.match(turn, /"problemId": "current-reason"/u);
 	assert.doesNotMatch(turn, /"id":/u);
 	assert.match(turn, /"name": "Describe what changed and why"/u);
 	assert.doesNotMatch(turn, /whyItMatters/u);
@@ -1048,7 +1056,7 @@ void test("the review composition sees only the NOT_MET results admission marked
 	);
 	assert.match(limits, /"openQuestion": "Does the withdrawal or the delivery requirement/u);
 	assert.match(limits, /"wouldSettleIt": "An authored statement that resolves/u);
-	assert.match(limits, /"subject": "changed behaviour a test could cover"/u);
+	assert.match(limits, /"prerequisite": "changed behaviour a test could cover"/u);
 	assert.match(limits, /"ruledOutBy": "the diff changes only the text of one label"/u);
 	assert.equal(turn.split(WITHDRAWN).length - 1, 1, turn);
 	for (const hidden of [
@@ -1097,7 +1105,7 @@ void test("the public turn carries captured discussion once, with its locator an
 				body: "Please describe how to try the screen.",
 				statedAt: "2026-10-06T08:00:00Z",
 				updatedAt: null,
-				reviewedRevision: null,
+				itemVersion: null,
 				eligibleForPriorAdvice: true,
 				state: null,
 				dismissed: null,
@@ -1137,37 +1145,35 @@ void test("the public turn carries captured discussion once, with its locator an
 
 void test("a result admission did not mark, or one that decided nothing, is left out", () => {
 	assert.deepEqual(
-		publicResults([
-			{ practiceResultId: "unmarked", outcome: "NOT_MET", citations: [], observations: [] },
-		]),
+		publicResults([{ resultId: "unmarked", outcome: "NOT_MET", citations: [], problems: [] }]),
 		[],
 	);
 	assert.deepEqual(
 		publicResults([
 			{
-				practiceResultId: "unsure",
-				outcome: "UNDETERMINED",
+				resultId: "unsure",
+				outcome: "COULD_NOT_DETERMINE",
 				publicEligible: true,
 				citations: [],
-				observations: [],
+				problems: [],
 			},
 		]),
 		[],
 	);
 });
 
-void test("a text resting on anything but result and observation ids is refused whole, never filtered", () => {
+void test("a text resting on anything but result and problem ids is refused whole, never filtered", () => {
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: ["why", 42] } }).join("\n"),
-		/basedOn must be an array of result and observation id strings/u,
+		/basedOn must be an array of result and problem id strings/u,
 	);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: "why" } }).join("\n"),
-		/basedOn must be an array of result and observation id strings/u,
+		/basedOn must be an array of result and problem id strings/u,
 	);
 	assert.match(
 		errorsOf({
-			decisions: [{ practiceResultId: "why", disposition: "ALREADY_SAID", witnessIds: [null] }],
+			decisions: [{ resultId: "why", disposition: "ALREADY_SAID", witnessIds: [null] }],
 		}).join("\n"),
 		/witnessIds must be an array/u,
 	);
@@ -1178,9 +1184,9 @@ void test("only what was said on this same work, on the work, is supplied as alr
 	const history = {
 		feedback: [
 			{
-				channel: "IN_CONTEXT",
+				destination: "ON_WORK",
 				publicEligible: true,
-				artifact: {
+				item: {
 					kind: "scm.pull_request",
 					url: "https://gitlab.example/group/repo/-/merge_requests/3",
 				},
@@ -1189,17 +1195,17 @@ void test("only what was said on this same work, on the work, is supplied as alr
 				recordedClaimCurrentness: "CURRENT",
 			},
 			{
-				channel: "IN_APP",
-				artifact: {
+				destination: "PRACTICE_PAGE",
+				item: {
 					kind: "scm.pull_request",
 					url: "https://gitlab.example/group/repo/-/merge_requests/3",
 				},
 				body: "A card on their practice page.",
 			},
 			{
-				channel: "IN_CONTEXT",
+				destination: "ON_WORK",
 				publicEligible: true,
-				artifact: {
+				item: {
 					kind: "scm.pull_request",
 					url: "https://gitlab.example/group/repo/-/merge_requests/1",
 				},
@@ -1226,17 +1232,17 @@ const historyFeedbackId = (n: number) => `00000000-0000-4000-8000-00000000000${n
 
 void test("own feedback on this work stands as prior advice only when named, current, shown and delivered before the capture", () => {
 	const work = "scm.pull_request:https://gitlab.example/group/repo/-/merge_requests/3";
-	const artifact = {
+	const item = {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/3",
 	};
 	const entry = (n: number, overrides: Record<string, unknown> = {}) => ({
-		channel: "IN_CONTEXT",
+		destination: "ON_WORK",
 		publicEligible: true,
-		artifact,
+		item,
 		id: historyFeedbackId(n),
-		reviewedRevision: "a".repeat(40),
-		basedOn: [{ observationId: `earlier-${n}` }],
+		itemVersion: "a".repeat(40),
+		basedOn: [{ problemId: `earlier-${n}` }],
 		deliveredAt: "2026-10-05T09:00:00Z",
 		body: `Delivered comment ${n}.`,
 		recordedClaimCurrentness: "CURRENT",
@@ -1265,8 +1271,8 @@ void test("own feedback on this work stands as prior advice only when named, cur
 	// What the history recorded about the feedback stays as it was staged.
 	const original = said[0];
 	assert.ok(original);
-	assert.equal(original.reviewedRevision, "a".repeat(40));
-	assert.deepEqual(original.basedOn, [{ observationId: "earlier-1" }]);
+	assert.equal(original.itemVersion, "a".repeat(40));
+	assert.deepEqual(original.basedOn, [{ problemId: "earlier-1" }]);
 	// Without a known capture time nothing can be placed before it.
 	assert.ok(
 		priorPublicFeedback(history, work, null).feedback.every(
@@ -1285,7 +1291,7 @@ void test("own feedback on this work stands as prior advice only when named, cur
 			body: "Please describe how to try this.",
 			statedAt: "2026-10-05T08:00:00Z",
 			updatedAt: null,
-			reviewedRevision: null,
+			itemVersion: null,
 			eligibleForPriorAdvice: true,
 			state: null,
 			dismissed: null,
@@ -1307,14 +1313,14 @@ void test("own feedback on this work stands as prior advice only when named, cur
 });
 
 void test("own history omits whole oversized or over-budget entries without hiding later usable advice", () => {
-	const artifact = {
+	const item = {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/3",
 	};
 	const entry = (n: number, body: string) => ({
-		channel: "IN_CONTEXT",
+		destination: "ON_WORK",
 		publicEligible: true,
-		artifact,
+		item,
 		id: historyFeedbackId(n),
 		body,
 		deliveredAt: "2026-10-05T09:00:00Z",
@@ -1415,17 +1421,17 @@ void test("the native schema requires complete decisions and each text's fields 
 				{
 					body: "Adapt.",
 					basedOn: ["colors-fill"],
-					anchor: { observationId: "colors-fill", citationIndex: 1 },
+					anchor: { problemId: "colors-fill", citationIndex: 1 },
 				},
 			],
 		}),
 		JSON.stringify(valid.errors),
 	);
 	for (const malformed of [
-		{ ...quiet, decisions: [{ practiceResultId: "handoff" }] },
-		{ ...quiet, decisions: [{ observationId: "handoff", disposition: "BELOW_BAR" }] },
+		{ ...quiet, decisions: [{ resultId: "handoff" }] },
+		{ ...quiet, decisions: [{ problemId: "handoff", disposition: "BELOW_BAR" }] },
 		{ ...quiet, decisions: [below("preview"), ...quiet.decisions.slice(1)] },
-		// A decision names the result, never one of its observations.
+		// A decision names the result, never one of its problems.
 		{ ...quiet, decisions: [below("colors-fill"), ...quiet.decisions.slice(1)] },
 		{ ...quiet, summary: { body: "Say why." } },
 		{ ...quiet, summary: { body: "Say why.", basedOn: [] } },
@@ -1436,11 +1442,11 @@ void test("the native schema requires complete decisions and each text's fields 
 		{ ...quiet, summary: { body: "The preview helps.", basedOn: ["preview"] } },
 		{ ...quiet, summary: { body: "x".repeat(REVIEW_LIMITS.summaryChars + 1), basedOn: ["why"] } },
 		{ ...quiet, inline: [{ body: "Adapt.", basedOn: ["colors"] }] },
-		// A note sits on an observation's citation: neither a result nor an observation without a line takes one.
+		// A note sits on a problem's citation: neither a result nor a problem without a line takes one.
 		{
 			...quiet,
 			inline: [
-				{ body: "x", basedOn: ["colors"], anchor: { observationId: "colors", citationIndex: 0 } },
+				{ body: "x", basedOn: ["colors"], anchor: { problemId: "colors", citationIndex: 0 } },
 			],
 		},
 		{
@@ -1449,7 +1455,7 @@ void test("the native schema requires complete decisions and each text's fields 
 				{
 					body: "x",
 					basedOn: ["why"],
-					anchor: { observationId: "why-reason", citationIndex: 0 },
+					anchor: { problemId: "why-reason", citationIndex: 0 },
 				},
 			],
 		},
@@ -1462,7 +1468,7 @@ void test("the native schema requires complete decisions and each text's fields 
 		decisions: [
 			below("colors"),
 			{
-				practiceResultId: "handoff",
+				resultId: "handoff",
 				disposition: "ALREADY_SAID",
 				witnessIds: ["github:review-comment:7"],
 			},
@@ -1477,7 +1483,7 @@ void test("the native schema requires complete decisions and each text's fields 
 			decisions: [
 				below("colors"),
 				{
-					practiceResultId: "handoff",
+					resultId: "handoff",
 					disposition: "ALREADY_SAID",
 					witnessIds: ["github:issue-comment:9"],
 				},
@@ -1491,8 +1497,8 @@ void test("the native schema requires complete decisions and each text's fields 
 void test("native Responses serialization keeps a quiet summary nullable without accepting malformed text", () => {
 	const parameters = reviewToolParameters(decidedOnly, true, []);
 	const quiet = {
-		decisions: ["colors", "handoff", "why", "description"].map((practiceResultId) => ({
-			practiceResultId,
+		decisions: ["colors", "handoff", "why", "description"].map((resultId) => ({
+			resultId,
 			disposition: "BELOW_BAR",
 			witnessIds: [],
 		})),
@@ -1563,7 +1569,7 @@ void test("report_review exists only with a NOT_MET result to rest on, and work 
 			decisions: [
 				below("colors"),
 				{
-					practiceResultId: "handoff",
+					resultId: "handoff",
 					disposition: "ALREADY_SAID",
 					witnessIds: ["github:review-comment:7"],
 				},
@@ -1576,8 +1582,8 @@ void test("report_review exists only with a NOT_MET result to rest on, and work 
 
 void test("an empty or partial public review leaves negatives undecided", () => {
 	const negative = new Map<string, ReviewedResult>([
-		["one", { practiceSlug: "one", outcome: "NOT_MET", observations: [] }],
-		["two", { practiceSlug: "two", outcome: "NOT_MET", observations: [] }],
+		["one", { practiceSlug: "one", outcome: "NOT_MET", problems: [] }],
+		["two", { practiceSlug: "two", outcome: "NOT_MET", problems: [] }],
 	]);
 	const empty = readReview({}, negative, false, reviewContext);
 	assert.ok("errors" in empty);
@@ -1599,14 +1605,14 @@ void test("summary-only support refuses a whole inline body while allowing its s
 	const support = new Map<string, ReviewedResult>([
 		[
 			"summary",
-			{ practiceSlug: "description", outcome: "NOT_MET", observations: [], summaryOnly: true },
+			{ practiceSlug: "description", outcome: "NOT_MET", problems: [], summaryOnly: true },
 		],
 		[
 			"line",
 			{
 				practiceSlug: "code",
 				outcome: "NOT_MET",
-				observations: [{ observationId: "line-1", citations: [{ anchorable: true }] }],
+				problems: [{ problemId: "line-1", citations: [{ anchorable: true }] }],
 			},
 		],
 	]);
@@ -1618,7 +1624,7 @@ void test("summary-only support refuses a whole inline body while allowing its s
 						{
 							body: "Both concerns.",
 							basedOn: ["summary", "line"],
-							anchor: { observationId: "line-1", citationIndex: 0 },
+							anchor: { problemId: "line-1", citationIndex: 0 },
 						},
 					],
 				},
@@ -1650,7 +1656,7 @@ const wholeReview = (summaryBasedOn: string[]) => ({
 		{
 			body: "Use an adaptive color here.",
 			basedOn: ["colors"],
-			anchor: { observationId: "colors-fill", citationIndex: 0 },
+			anchor: { problemId: "colors-fill", citationIndex: 0 },
 		},
 	],
 	decisions: [raise("colors"), raise("why"), below("handoff"), below("description")],
@@ -1669,7 +1675,7 @@ void test("malformed lists and legacy selection or withholding authorities are r
 		]);
 	}
 	for (const container of [
-		{ practiceResultId: "handoff", disposition: "BELOW_BAR" },
+		{ resultId: "handoff", disposition: "BELOW_BAR" },
 		"BELOW_BAR",
 		false,
 		null,
@@ -1719,7 +1725,7 @@ void test("a whole review that also rests on a MET result is refused, with that 
 	const acknowledged = readReview(wholeReview(["why", "preview"]), results, true, reviewContext);
 	assert.ok("errors" in acknowledged);
 	assert.deepEqual(acknowledged.errors, [
-		"summary: basedOn names preview, which is not a NOT_MET result or one of its observations. The review on the work speaks only about NOT_MET results and their observations; it never acknowledges a MET result",
+		"summary: basedOn names preview, which is not a NOT_MET result or one of its problems. The review on the work speaks only about NOT_MET results and their problems; it never acknowledges a MET result",
 	]);
 });
 
@@ -1732,14 +1738,14 @@ const withholding = (decision: Record<string, unknown>) => ({
 void test("a withholding that says the advice was given names a statement that may stand as that advice", () => {
 	for (const reason of ["ALREADY_SAID", "NO_MATERIAL_CHANGE"]) {
 		assert.match(
-			errorsOf(withholding({ practiceResultId: "handoff", disposition: reason })).join("\n"),
+			errorsOf(withholding({ resultId: "handoff", disposition: reason })).join("\n"),
 			new RegExp(`decisions #4: ${reason} names in witnessIds`, "u"),
 		);
 	}
 	assert.match(
 		errorsOf(
 			withholding({
-				practiceResultId: "handoff",
+				resultId: "handoff",
 				disposition: "ALREADY_SAID",
 				witnessIds: ["github:issue-comment:9"],
 			}),
@@ -1749,7 +1755,7 @@ void test("a withholding that says the advice was given names a statement that m
 	assert.match(
 		errorsOf(
 			withholding({
-				practiceResultId: "handoff",
+				resultId: "handoff",
 				disposition: "ALREADY_SAID",
 				witnessIds: ["github:review-comment:8"],
 			}),
@@ -1764,7 +1770,7 @@ void test("a withholding that says the advice was given names a statement that m
 	]) {
 		const read = readReview(
 			withholding({
-				practiceResultId: "handoff",
+				resultId: "handoff",
 				disposition: "NO_MATERIAL_CHANGE",
 				witnessIds: [witness],
 			}),
@@ -1774,15 +1780,15 @@ void test("a withholding that says the advice was given names a statement that m
 		);
 		assert.ok("review" in read, JSON.stringify(read));
 		assert.deepEqual(read.review.withheld, [
-			{ basedOn: [{ practiceResultId: "description" }], reason: "BELOW_BAR" },
-			{ basedOn: [{ practiceResultId: "handoff" }], reason: "NO_MATERIAL_CHANGE" },
+			{ basedOn: [{ resultId: "description" }], reason: "BELOW_BAR" },
+			{ basedOn: [{ resultId: "handoff" }], reason: "NO_MATERIAL_CHANGE" },
 		]);
 	}
 	// Below the bar is a judgement about this reader, not a claim about what was said before.
 	assert.ok(
 		"review" in
 			readReview(
-				withholding({ practiceResultId: "handoff", disposition: "BELOW_BAR" }),
+				withholding({ resultId: "handoff", disposition: "BELOW_BAR" }),
 				results,
 				true,
 				reviewContext,
@@ -1819,11 +1825,11 @@ void test("a raised decision names no witness and unknown decision fields are re
 
 void test("concern projection preserves new same-practice grounds and wrong old advice without deciding their match", () => {
 	// Synthetic counterfactual: the old decoder claim is wrong; the newly changed status check is a distinct gap.
-	const artifact = { kind: "scm.pull_request", url: "https://example.test/pull/1" };
+	const item = { kind: "scm.pull_request", url: "https://example.test/pull/1" };
 	const old = {
-		channel: "IN_CONTEXT",
+		destination: "ON_WORK",
 		publicEligible: true,
-		artifact,
+		item,
 		id: historyFeedbackId(1),
 		deliveredAt: "2026-10-05T09:00:00Z",
 		recordedClaimCurrentness: "CURRENT",
@@ -1834,45 +1840,45 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 		{
 			feedback: [
 				old,
-				{ ...old, id: historyFeedbackId(2), channel: "IN_APP", body: PRIVATE_SENTENCE },
+				{ ...old, id: historyFeedbackId(2), destination: "PRACTICE_PAGE", body: PRIVATE_SENTENCE },
 				{
 					...old,
 					id: historyFeedbackId(3),
-					artifact: { ...artifact, url: "https://example.test/pull/2" },
+					item: { ...item, url: "https://example.test/pull/2" },
 				},
 				{ ...old, id: historyFeedbackId(4), withdrawn: true },
 				{ ...old, id: historyFeedbackId(5), basedOn: "handles-errors" },
 			],
 		},
-		`${artifact.kind}:${artifact.url}`,
+		`${item.kind}:${item.url}`,
 		"2026-10-06T09:00:00Z",
 	).feedback;
 	const current = [
 		{
-			practiceResultId: "new-status",
+			resultId: "new-status",
 			practiceSlug: "handles-errors",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The added request accepts a non-success response with a valid typed array.",
 			explanation: "Conditional typed-array case, not an ordinary error-object decoder claim.",
 			citations: [],
-			observations: [
+			problems: [
 				{
-					observationId: "new-status-check",
+					problemId: "new-status-check",
 					summary: "A non-success status is accepted",
 					citations: [{ path: "Loader.swift", startLine: 51, anchorable: true }],
 				},
 			],
 		},
 		{
-			practiceResultId: "caught-decode",
+			resultId: "caught-decode",
 			practiceSlug: "handles-errors",
 			outcome: "MET",
 			publicEligible: true,
 			summary: "Required fields are decoded inside a throwing try/catch.",
 			explanation: "Required id, name and URL have no defaults; errors reach failed.",
 			citations: [{ path: "Loader.swift", startLine: 63, anchorable: true }],
-			observations: [],
+			problems: [],
 		},
 	];
 	const [negative, positive] = current;
@@ -1905,7 +1911,7 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 		turn.split(old.body).length,
 		history.filter((entry) => entry.body === old.body).length + 1,
 	);
-	assert.ok(turn.indexOf(old.body) < turn.indexOf('"practiceResultId": "new-status"'));
+	assert.ok(turn.indexOf(old.body) < turn.indexOf('"resultId": "new-status"'));
 	assert.ok(!turn.includes(PRIVATE_SENTENCE));
 	assert.ok(!turn.includes(positive.explanation));
 	assert.ok(!turn.includes("Survey prose is not needed."));
@@ -1923,7 +1929,7 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 	assert.deepEqual(Reflect.get(concern, "candidatePriorWitnesses"), [
 		{
 			witnessId: `feedback:${historyFeedbackId(1)}`,
-			reviewedRevision: null,
+			itemVersion: null,
 			basedOn: old.basedOn,
 			eligibleForAlreadySaid: true,
 			eligibleForPriorAdvice: true,
@@ -1936,13 +1942,13 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 			{
 				practiceSlug: "handles-errors",
 				outcome: "NOT_MET",
-				observations: [{ observationId: "new-status-check", citations: [] }],
+				problems: [{ problemId: "new-status-check", citations: [] }],
 			},
 		],
 	]);
 	const decision = readReview(
 		{
-			decisions: [{ practiceResultId: "new-status", disposition: "RAISE" }],
+			decisions: [{ resultId: "new-status", disposition: "RAISE" }],
 			summary: {
 				body: "Check the added response status before accepting a typed array.",
 				basedOn: ["new-status-check"],
@@ -1957,22 +1963,22 @@ void test("concern projection preserves new same-practice grounds and wrong old 
 
 void test("practice references pair recorded assessment coordinates without inferring progress", () => {
 	const head = "a".repeat(40);
-	const artifact = { kind: "scm.pull_request", url: "https://example.test/pull/1" };
+	const item = { kind: "scm.pull_request", url: "https://example.test/pull/1" };
 	const current = [
 		{
-			practiceResultId: "current",
+			resultId: "current",
 			practiceSlug: "subjects",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The unchanged subjects do not identify the changes.",
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 	];
 	const priorSupport = {
 		id: "earlier",
 		practiceSlug: "subjects",
-		practiceRevision: { id: "10", number: 2 },
+		practiceVersion: { id: "10", number: 2 },
 		outcome: "NOT_MET",
 	};
 	for (const priorHead of [head, "b".repeat(40), undefined]) {
@@ -1980,11 +1986,11 @@ void test("practice references pair recorded assessment coordinates without infe
 			{
 				feedback: [
 					{
-						channel: "IN_CONTEXT",
+						destination: "ON_WORK",
 						publicEligible: true,
-						artifact,
+						item,
 						id: historyFeedbackId(1),
-						reviewedRevision: priorHead,
+						itemVersion: priorHead,
 						deliveredAt: "2026-10-05T09:00:00Z",
 						recordedClaimCurrentness: "STALE",
 						body: "Explain what the subject changes.",
@@ -1992,13 +1998,13 @@ void test("practice references pair recorded assessment coordinates without infe
 					},
 				],
 			},
-			`${artifact.kind}:${artifact.url}`,
+			`${item.kind}:${item.url}`,
 			"2026-10-06T09:00:00Z",
 		).feedback;
 		const text = notMetReference(
 			current,
 			() => "The whole subject standard.",
-			[{ slug: "subjects", name: "Commit subjects", revisionId: 11, knownLimitations: [] }],
+			[{ slug: "subjects", name: "Commit subjects", versionId: "11", knownLimitations: [] }],
 			history,
 			head,
 		);
@@ -2006,20 +2012,25 @@ void test("practice references pair recorded assessment coordinates without infe
 		assert.ok(body !== undefined);
 		const shown: unknown = JSON.parse(body);
 		assert.deepEqual(shown, {
-			reviewedRevision: head,
-			practice: { slug: "subjects", name: "Commit subjects", revisionId: 11, knownLimitations: [] },
+			itemVersion: head,
+			practice: {
+				slug: "subjects",
+				name: "Commit subjects",
+				versionId: "11",
+				knownLimitations: [],
+			},
 			results: current,
 			candidatePriorWitnesses: [
 				{
 					witnessId: `feedback:${historyFeedbackId(1)}`,
-					reviewedRevision: priorHead ?? null,
+					itemVersion: priorHead ?? null,
 					basedOn: [priorSupport],
 					eligibleForAlreadySaid: true,
 					eligibleForPriorAdvice: false,
 				},
 			],
 		});
-		assert.equal(history[0]?.reviewedRevision, priorHead);
+		assert.equal(history[0]?.itemVersion, priorHead);
 	}
 });
 
@@ -2031,39 +2042,39 @@ const ENGAGEMENT_CRITERIA =
 void test("the opening carries each NOT_MET practice's whole criteria once, and never a MET practice's", () => {
 	const reviewable = publicResults([
 		{
-			practiceResultId: "unanswered",
+			resultId: "unanswered",
 			practiceSlug: "engages-with-review",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "A design request has no reply",
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 		{
-			practiceResultId: "unanswered-again",
+			resultId: "unanswered-again",
 			practiceSlug: "engages-with-review",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "A second request has no reply",
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 		{
-			practiceResultId: "held",
+			resultId: "held",
 			practiceSlug: "describe-what-and-why",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The description gives no reason",
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 		{
-			practiceResultId: "routine",
+			resultId: "routine",
 			practiceSlug: "ships-a-preview",
 			outcome: "MET",
 			publicEligible: true,
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 	]);
 	const read: string[] = [];
@@ -2073,7 +2084,7 @@ void test("the opening carries each NOT_MET practice's whole criteria once, and 
 	};
 
 	// Every NOT_MET practice's criterion opens the review, once and whole; a MET practice's is never read.
-	assert.ok(!reviewable.some((result) => result.practiceResultId === "routine"));
+	assert.ok(!reviewable.some((result) => result.resultId === "routine"));
 	const opening = notMetReference(reviewable, staged);
 	assert.deepEqual(read, ["engages-with-review", "describe-what-and-why"]);
 	const criteria = `\`\`\`\`markdown\n${ENGAGEMENT_CRITERIA}\n\`\`\`\``;
@@ -2093,34 +2104,34 @@ const unreadableCriteria = (): string | null => {
 void test("a missing, unreadable, empty or blank criterion is shown as such and never counts as a standard", () => {
 	const reviewable = publicResults([
 		{
-			practiceResultId: "held",
+			resultId: "held",
 			practiceSlug: "describe-what-and-why",
 			outcome: "NOT_MET",
 			publicEligible: true,
 			summary: "The description gives no reason",
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 		{
-			practiceResultId: "shared",
+			resultId: "shared",
 			practiceSlug: "describe-what-and-why",
 			outcome: "MET",
 			publicEligible: true,
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 		{
-			practiceResultId: "kept",
+			resultId: "kept",
 			practiceSlug: "private-practice",
 			outcome: "MET",
 			publicEligible: false,
 			citations: [],
-			observations: [],
+			problems: [],
 		},
 	]);
 	// Only the public NOT_MET result of a practice with both outcomes is shown; a private result never is.
 	assert.deepEqual(
-		reviewable.map((result) => result.practiceResultId),
+		reviewable.map((result) => result.resultId),
 		["held"],
 	);
 	assert.equal(practiceStandard("describe-what-and-why", () => "Whole.").whole, true);
@@ -2147,13 +2158,13 @@ void test("a missing, unreadable, empty or blank criterion is shown as such and 
 });
 
 void test("public history excludes unqualified legacy and reviewer advice while preserving author advice", () => {
-	const artifact = {
+	const item = {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/3",
 	};
 	const row = {
-		channel: "IN_CONTEXT",
-		artifact,
+		destination: "ON_WORK",
+		item,
 		body: "Prior advice",
 		deliveredAt: "2026-10-05T09:00:00Z",
 		recordedClaimCurrentness: "CURRENT",
@@ -2162,14 +2173,14 @@ void test("public history excludes unqualified legacy and reviewer advice while 
 		feedback: [row, { ...row, publicEligible: false }, { ...row, publicEligible: true }],
 	};
 	assert.equal(
-		priorPublicFeedback(history, `${artifact.kind}:${artifact.url}`, "2026-10-06T09:00:00Z")
-			.feedback.length,
+		priorPublicFeedback(history, `${item.kind}:${item.url}`, "2026-10-06T09:00:00Z").feedback
+			.length,
 		1,
 	);
 });
 
 void test("unavailable historical words retain the delivery fact without supplying a novelty witness", () => {
-	const artifact = {
+	const item = {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/3",
 	};
@@ -2178,16 +2189,16 @@ void test("unavailable historical words retain the delivery fact without supplyi
 			feedback: [
 				{
 					id: historyFeedbackId(1),
-					channel: "IN_CONTEXT",
+					destination: "ON_WORK",
 					publicEligible: true,
-					artifact,
+					item,
 					deliveredAt: "2026-10-05T09:00:00Z",
 					recordedClaimCurrentness: "CURRENT",
 					wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE",
 				},
 			],
 		},
-		`${artifact.kind}:${artifact.url}`,
+		`${item.kind}:${item.url}`,
 		"2026-10-06T09:00:00Z",
 	);
 	assert.equal(view.feedback.length, 1);
@@ -2204,7 +2215,7 @@ void test("unavailable historical words retain the delivery fact without supplyi
 });
 
 void test("a delivery after work capture informs novelty without becoming advice the captured work answered", () => {
-	const artifact = {
+	const item = {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/3",
 	};
@@ -2212,9 +2223,9 @@ void test("a delivery after work capture informs novelty without becoming advice
 		feedback: [
 			{
 				id: historyFeedbackId(1),
-				channel: "IN_CONTEXT",
+				destination: "ON_WORK",
 				publicEligible: true,
-				artifact,
+				item,
 				body: "Handle the failure visibly.",
 				deliveredAt: "2026-10-07T10:00:00Z",
 				recordedClaimCurrentness: "CURRENT",
@@ -2224,7 +2235,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 	const original = JSON.stringify(history);
 	const said = priorPublicFeedback(
 		history,
-		`${artifact.kind}:${artifact.url}`,
+		`${item.kind}:${item.url}`,
 		"2026-10-07T09:00:00Z",
 		undefined,
 		"2026-10-07T11:00:00Z",
@@ -2235,14 +2246,14 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.equal(late.eligibleForPriorAdvice, false);
 	const proof = priorAdviceWitnesses(said, []);
 	const currentRows = new Map<string, ReviewedResult>([
-		["current", { practiceSlug: "errors", outcome: "NOT_MET", observations: [] }],
+		["current", { practiceSlug: "errors", outcome: "NOT_MET", problems: [] }],
 	]);
 	const selected = (reason: string) =>
 		readReview(
 			{
 				decisions: [
 					{
-						practiceResultId: "current",
+						resultId: "current",
 						disposition: reason,
 						witnessIds: [`feedback:${historyFeedbackId(1)}`],
 					},
@@ -2257,7 +2268,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.equal(JSON.stringify(history), original);
 	const unknownCapture = priorPublicFeedback(
 		history,
-		`${artifact.kind}:${artifact.url}`,
+		`${item.kind}:${item.url}`,
 		null,
 		undefined,
 		"2026-10-07T11:00:00Z",
@@ -2287,7 +2298,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.ok(!turn.includes("was delivered after this work was captured"));
 	const unknownDelivery = priorPublicFeedback(
 		{ feedback: history.feedback.map((row) => ({ ...row, deliveredAt: null })) },
-		`${artifact.kind}:${artifact.url}`,
+		`${item.kind}:${item.url}`,
 		"2026-10-07T09:00:00Z",
 		undefined,
 		"2026-10-07T11:00:00Z",
@@ -2300,7 +2311,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.equal(
 		priorPublicFeedback(
 			history,
-			`${artifact.kind}:${artifact.url}`,
+			`${item.kind}:${item.url}`,
 			"2026-10-07T10:30:00Z",
 			undefined,
 			"2026-10-07T11:00:00Z",
@@ -2310,7 +2321,7 @@ void test("a delivery after work capture informs novelty without becoming advice
 	assert.equal(
 		priorPublicFeedback(
 			history,
-			`${artifact.kind}:${artifact.url}`,
+			`${item.kind}:${item.url}`,
 			"2026-10-07T09:00:00Z",
 			undefined,
 			"2026-10-07T09:30:00Z",
@@ -2322,12 +2333,12 @@ void test("a delivery after work capture informs novelty without becoming advice
 		{ recordedClaimCurrentness: "UNVERIFIABLE" },
 		{ body: undefined },
 		{ publicEligible: false },
-		{ channel: "IN_CHAT" },
-		{ artifact: { ...artifact, url: "https://gitlab.example/group/repo/-/merge_requests/4" } },
+		{ destination: "CONVERSATION" },
+		{ item: { ...item, url: "https://gitlab.example/group/repo/-/merge_requests/4" } },
 	]) {
 		const limited = priorPublicFeedback(
 			{ feedback: history.feedback.map((row) => ({ ...row, ...change })) },
-			`${artifact.kind}:${artifact.url}`,
+			`${item.kind}:${item.url}`,
 			"2026-10-07T09:00:00Z",
 			undefined,
 			"2026-10-07T11:00:00Z",
@@ -2337,15 +2348,15 @@ void test("a delivery after work capture informs novelty without becoming advice
 });
 
 void test("STALE delivered words permit ALREADY_SAID by the read time, not NO_MATERIAL_CHANGE", () => {
-	const artifact = {
+	const item = {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/3",
 	};
 	const stale = {
 		id: historyFeedbackId(1),
-		channel: "IN_CONTEXT",
+		destination: "ON_WORK",
 		publicEligible: true,
-		artifact,
+		item,
 		body: "Handle the failure visibly.",
 		deliveredAt: "2026-10-07T08:00:00Z",
 		recordedClaimCurrentness: "STALE",
@@ -2353,7 +2364,7 @@ void test("STALE delivered words permit ALREADY_SAID by the read time, not NO_MA
 	const read = (row: Record<string, unknown>, readAt = "2026-10-07T11:00:00Z") =>
 		priorPublicFeedback(
 			{ feedback: [row] },
-			`${artifact.kind}:${artifact.url}`,
+			`${item.kind}:${item.url}`,
 			"2026-10-07T09:00:00Z",
 			undefined,
 			readAt,
@@ -2371,14 +2382,14 @@ void test("STALE delivered words permit ALREADY_SAID by the read time, not NO_MA
 	);
 	const proof = priorAdviceWitnesses(said, []);
 	const currentRows = new Map<string, ReviewedResult>([
-		["current", { practiceSlug: "errors", outcome: "NOT_MET", observations: [] }],
+		["current", { practiceSlug: "errors", outcome: "NOT_MET", problems: [] }],
 	]);
 	const selected = (reason: string) =>
 		readReview(
 			{
 				decisions: [
 					{
-						practiceResultId: "current",
+						resultId: "current",
 						disposition: reason,
 						witnessIds: [`feedback:${historyFeedbackId(1)}`],
 					},

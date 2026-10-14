@@ -1,27 +1,23 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelPurpose;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNeed;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelSlot;
+import de.tum.cit.aet.hephaestus.practices.spi.Need;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptStopReason;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -262,7 +258,7 @@ public class PiResultParser {
             return null;
         }
         Map<String, Object> assembled = new LinkedHashMap<>();
-        assembled.put("schemaVersion", 2);
+        assembled.put("contractVersion", 3);
         assembled.put("results", practiceResults);
         return objectMapper.writeValueAsBytes(assembled);
     }
@@ -285,11 +281,11 @@ public class PiResultParser {
      */
     public record PracticeScriptRunReport(
             String practiceSlug,
-            PracticeScriptRunStatus status,
-            PracticeProgramKind programKind,
+            ScriptRunStatus status,
+            ScriptKind programKind,
             @Nullable String programDigest,
-            @Nullable PracticeScriptStopReason stopReason,
-            @Nullable List<PracticeScriptModelUseDTO> models,
+            @Nullable ScriptStopReason stopReason,
+            @Nullable List<ScriptModelUse> models,
             @Nullable Map<String, Integer> calls,
             @Nullable Map<String, Integer> coverageReached,
             @Nullable String error,
@@ -301,23 +297,14 @@ public class PiResultParser {
         }
 
         /** An admitted practice the report does not name: the runner lists every admitted practice, finished or not. */
-        static PracticeScriptRunReport notFinished(String practiceSlug, PracticeProgramKind programKind) {
+        static PracticeScriptRunReport notFinished(String practiceSlug, ScriptKind programKind) {
             return new PracticeScriptRunReport(
-                    practiceSlug,
-                    PracticeScriptRunStatus.NOT_FINISHED,
-                    programKind,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null);
+                    practiceSlug, ScriptRunStatus.NOT_FINISHED, programKind, null, null, null, null, null, null, null);
         }
     }
 
     /** The version of {@link SandboxLayout#PRACTICE_SCRIPT_REPORT_FILE} this parser reads. */
-    static final int PRACTICE_SCRIPT_REPORT_VERSION = 2;
+    static final int PRACTICE_SCRIPT_REPORT_VERSION = 3;
 
     static final int PRACTICE_SCRIPT_REPORT_MAX_BYTES = 64 * 1024;
     static final int PRACTICE_SCRIPT_REPORT_MAX_ENTRIES = 256;
@@ -331,18 +318,18 @@ public class PiResultParser {
     private static final Pattern LINE_END = Pattern.compile("[\\r\\n]");
     private static final Pattern DIGEST = Pattern.compile("[0-9a-f]{64}");
 
-    private static final Map<String, PracticeScriptRunStatus> PRACTICE_SCRIPT_STATUSES = Map.of(
-            "ok", PracticeScriptRunStatus.OK,
-            "skipped", PracticeScriptRunStatus.SKIPPED,
-            "failed", PracticeScriptRunStatus.FAILED,
-            "not-reached", PracticeScriptRunStatus.NOT_REACHED);
+    private static final Map<String, ScriptRunStatus> PRACTICE_SCRIPT_STATUSES = Map.of(
+            "ok", ScriptRunStatus.OK,
+            "skipped", ScriptRunStatus.WITHHELD,
+            "failed", ScriptRunStatus.FAILED,
+            "not-reached", ScriptRunStatus.NOT_REACHED);
 
-    private static final Map<String, PracticeProgramKind> PROGRAM_KINDS =
-            Map.of("builtin", PracticeProgramKind.BUILTIN, "custom", PracticeProgramKind.CUSTOM);
+    private static final Map<String, ScriptKind> PROGRAM_KINDS =
+            Map.of("builtin", ScriptKind.BUILTIN, "custom", ScriptKind.CUSTOM);
 
-    private static final Map<String, PracticeScriptStopReason> STOP_REASONS = Arrays.stream(
-                    PracticeScriptStopReason.values())
-            .collect(Collectors.toUnmodifiableMap(PracticeScriptStopReason::wire, reason -> reason));
+    private static final Map<String, ScriptStopReason> STOP_REASONS = Arrays.stream(ScriptStopReason.values())
+            .collect(Collectors.toUnmodifiableMap(
+                    reason -> reason.name().toLowerCase(Locale.ROOT).replace('_', '-'), reason -> reason));
 
     /** The call counts of an entry, in their report order. */
     public static final List<String> CALL_KINDS = List.of("review", "chat", "decision", "embedding", "reranking");
@@ -360,21 +347,15 @@ public class PiResultParser {
             "coverageReached",
             "durationMs");
 
-    private static final Map<String, PracticeScriptNeed> PRACTICE_SCRIPT_NEEDS =
-            Map.of("required", PracticeScriptNeed.REQUIRED, "optional", PracticeScriptNeed.OPTIONAL);
-
-    private static final Map<String, PracticeScriptNotRatedReason> NOT_RATED_REASONS = Arrays.stream(
-                    PracticeScriptNotRatedReason.values())
-            .collect(Collectors.toUnmodifiableMap(PracticeScriptNotRatedReason::wire, reason -> reason));
+    private static final Map<String, Need> PRACTICE_SCRIPT_NEEDS =
+            Map.of("required", Need.REQUIRED, "optional", Need.OPTIONAL);
 
     /**
      * Each purpose by the slot of its agent purpose's model kind. Built from the mirror, so an agent purpose that
      * the mirror lacks leaves its slot unknown here instead of failing to load; a sync test names that drift.
      */
-    private static final Map<String, PracticeScriptModelPurpose> PURPOSES_BY_SLOT = Arrays.stream(
-                    PracticeScriptModelPurpose.values())
-            .collect(Collectors.toUnmodifiableMap(
-                    purpose -> AgentPurpose.valueOf(purpose.name()).kind().slot(), purpose -> purpose));
+    private static final Map<String, ModelSlot> PURPOSES_BY_SLOT =
+            Arrays.stream(ModelSlot.values()).collect(Collectors.toUnmodifiableMap(ModelSlot::wireValue, slot -> slot));
 
     /**
      * The program runs of one attempt, one per admitted practice. An entry with a value outside the contract, a
@@ -389,7 +370,7 @@ public class PiResultParser {
      * @param admitted the program kind of each admitted practice, by slug: custom when its revision holds a script
      */
     public List<PracticeScriptRunReport> parsePracticeScriptReport(
-            byte @Nullable [] reportFile, Map<String, PracticeProgramKind> admitted) {
+            byte @Nullable [] reportFile, Map<String, ScriptKind> admitted) {
         if (reportFile == null || reportFile.length == 0) {
             return List.of();
         }
@@ -409,7 +390,7 @@ public class PiResultParser {
         }
         JsonNode entries = root != null && root.isObject() ? root.get("practices") : null;
         JsonNode truncated = root != null && root.isObject() ? root.get("truncated") : null;
-        JsonNode version = root != null && root.isObject() ? root.get("schemaVersion") : null;
+        JsonNode version = root != null && root.isObject() ? root.get("contractVersion") : null;
         if (version == null
                 || !version.isIntegralNumber()
                 || version.asInt() != PRACTICE_SCRIPT_REPORT_VERSION
@@ -420,7 +401,7 @@ public class PiResultParser {
                 || !truncated.isBoolean()) {
             recordFailure(
                     "practice_script_report",
-                    new IllegalArgumentException("no version 2, bounded practices array or truncation flag"));
+                    new IllegalArgumentException("no contract version 3, bounded practices array or truncation flag"));
             return List.of();
         }
         Set<String> named = new HashSet<>();
@@ -452,12 +433,12 @@ public class PiResultParser {
     }
 
     private static @Nullable PracticeScriptRunReport practiceScriptRun(
-            String slug, JsonNode entry, @Nullable PracticeProgramKind admittedKind) {
+            String slug, JsonNode entry, @Nullable ScriptKind admittedKind) {
         if (!entry.isObject() || !ENTRY_KEYS.containsAll(entry.propertyNames())) return null;
-        PracticeScriptRunStatus status =
+        ScriptRunStatus status =
                 PRACTICE_SCRIPT_STATUSES.get(entry.path("status").asString(""));
         JsonNode program = entry.path("program");
-        PracticeProgramKind kind = PROGRAM_KINDS.get(program.path("kind").asString(""));
+        ScriptKind kind = PROGRAM_KINDS.get(program.path("kind").asString(""));
         JsonNode digestNode = program.path("digest");
         String digest =
                 digestNode.isString() && DIGEST.matcher(digestNode.asString()).matches() ? digestNode.asString() : null;
@@ -465,27 +446,27 @@ public class PiResultParser {
                 || kind == null
                 || kind != admittedKind
                 || !program.isObject()
-                || (kind == PracticeProgramKind.CUSTOM ? digest == null : !digestNode.isNull())) {
+                || (kind == ScriptKind.CUSTOM ? digest == null : !digestNode.isNull())) {
             return null;
         }
         JsonNode stop = entry.path("stopReason");
-        PracticeScriptStopReason stopReason = stop.isString() ? STOP_REASONS.get(stop.asString()) : null;
+        ScriptStopReason stopReason = stop.isString() ? STOP_REASONS.get(stop.asString()) : null;
         // A run that returned a candidate stopped for no reason; every other run names one.
-        if ((status == PracticeScriptRunStatus.OK) != stop.isNull() || (!stop.isNull() && stopReason == null)) {
+        if ((status == ScriptRunStatus.OK) != stop.isNull() || (!stop.isNull() && stopReason == null)) {
             return null;
         }
-        List<PracticeScriptModelUseDTO> models = modelUses(entry.path("models"));
+        List<ScriptModelUse> models = modelUses(entry.path("models"));
         Map<String, Integer> calls = counts(entry.path("calls"), CALL_KINDS);
         Map<String, Integer> coverage = counts(entry.path("coverageReached"), COVERAGE_COUNTS);
         if (models == null || calls == null || coverage == null) {
             return null;
         }
         // A program that did not start made no call and took no time.
-        boolean started = status != PracticeScriptRunStatus.NOT_REACHED;
+        boolean started = status != ScriptRunStatus.NOT_REACHED;
         if (!started && calls.values().stream().anyMatch(count -> count > 0)) {
             return null;
         }
-        String error = status == PracticeScriptRunStatus.FAILED ? errorLine(entry.path("error")) : null;
+        String error = status == ScriptRunStatus.FAILED ? errorLine(entry.path("error")) : null;
         // A duration only explains the run, so a missing or malformed one leaves the run without it.
         Integer durationMs = started ? count(entry.path("durationMs")) : null;
         return new PracticeScriptRunReport(
@@ -524,43 +505,28 @@ public class PiResultParser {
         return line.isEmpty() || !StorableText.isStorable(line) ? null : line;
     }
 
-    private static @Nullable List<PracticeScriptModelUseDTO> modelUses(JsonNode models) {
+    private static @Nullable List<ScriptModelUse> modelUses(JsonNode models) {
         if (!models.isArray()) return null;
-        List<PracticeScriptModelUseDTO> uses = new ArrayList<>();
-        Set<PracticeScriptModelPurpose> seen = new HashSet<>();
+        var uses = new ArrayList<ScriptModelUse>();
+        var seen = new HashSet<ModelSlot>();
         for (JsonNode model : models) {
-            PracticeScriptModelPurpose purpose =
-                    PURPOSES_BY_SLOT.get(model.path("slot").asString(""));
-            PracticeScriptNeed need =
-                    PRACTICE_SCRIPT_NEEDS.get(model.path("need").asString(""));
-            List<PracticeScriptNotRatedDTO> notRated = notRated(model.path("notRated"));
-            if (purpose == null
-                    || !seen.add(purpose)
+            ModelSlot slot = PURPOSES_BY_SLOT.get(model.path("slot").asString(""));
+            Need need = PRACTICE_SCRIPT_NEEDS.get(model.path("need").asString(""));
+            if (slot == null
+                    || !seen.add(slot)
                     || need == null
-                    || !model.path("bound").isBoolean()
-                    || notRated == null) {
-                return null;
+                    || !model.path("bound").isBoolean()) return null;
+            var failures = new ArrayList<ScriptModelUse.Failure>();
+            JsonNode counts = model.path("failures");
+            if (!counts.isObject()) return null;
+            for (var entry : counts.properties()) {
+                Integer amount = count(entry.getValue());
+                if (amount == null || !entry.getKey().matches("[a-z][a-z0-9-]{0,63}")) return null;
+                if (amount > 0) failures.add(new ScriptModelUse.Failure(entry.getKey(), amount));
             }
-            uses.add(new PracticeScriptModelUseDTO(
-                    purpose, need, model.path("bound").asBoolean(), notRated));
+            uses.add(new ScriptModelUse(slot, need, model.path("bound").asBoolean(), failures));
         }
-        return uses;
-    }
-
-    /** By reason, in the declared order of the reasons; a zero count is no fact and is left out. */
-    private static @Nullable List<PracticeScriptNotRatedDTO> notRated(JsonNode counts) {
-        if (counts.isMissingNode()) return List.of();
-        if (!counts.isObject()) return null;
-        Map<PracticeScriptNotRatedReason, Integer> byReason = new EnumMap<>(PracticeScriptNotRatedReason.class);
-        for (Map.Entry<String, JsonNode> property : counts.properties()) {
-            PracticeScriptNotRatedReason reason = NOT_RATED_REASONS.get(property.getKey());
-            Integer count = count(property.getValue());
-            if (reason == null || count == null) return null;
-            if (count > 0) byReason.put(reason, count);
-        }
-        return byReason.entrySet().stream()
-                .map(entry -> new PracticeScriptNotRatedDTO(entry.getKey(), entry.getValue()))
-                .toList();
+        return List.copyOf(uses);
     }
 
     /** A non-negative int, or null for anything else. */

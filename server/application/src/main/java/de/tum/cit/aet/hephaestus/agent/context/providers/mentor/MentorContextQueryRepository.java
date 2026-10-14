@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.RequestedReviewer;
@@ -12,7 +11,6 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
@@ -104,12 +102,12 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(work)
                 FROM PullRequest work
                 JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = work.repository.nameWithOwner
-                    AND monitor_covers_repository(rtmpr.workspace.id, rtmpr.nativeId, work.repository.nativeId, work.repository.provider.id) = true
+                    AND monitor_covers_repository(rtmpr.workspaceId, rtmpr.nativeId, work.repository.nativeId, work.repository.provider.id) = true
                 JOIN work.requestedReviewers request
-                WHERE request.user.id = :userId
+                WHERE request.accountId = :userId
                   AND work.deletedAt IS NULL
                   AND work.isDraft = false
-                  AND rtmpr.workspace.id = :workspaceId
+                  AND rtmpr.workspaceId = :workspaceId
                   AND work.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
                   AND
         """ + RequestedReviewer.AWAITING_REVIEW + """
@@ -172,7 +170,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         JOIN work.requestedReviewers request
         LEFT JOIN FETCH work.author
         LEFT JOIN FETCH work.repository
-        WHERE request.user.id = :userId
+        WHERE request.accountId = :userId
           AND work.deletedAt IS NULL
           AND work.isDraft = false
           AND rtm.workspace.id = :workspaceId
@@ -190,7 +188,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         SELECT t
         FROM ChatThread t
         WHERE t.workspace.id = :workspaceId
-          AND t.user.id = :userId
+          AND t.accountId = :userId
         ORDER BY t.createdAt DESC
         """)
     List<ChatThread> findRecentChatThreads(
@@ -394,21 +392,6 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             @Param("providerId") Long providerId,
             @Param("pullRequestId") Long pullRequestId,
             Pageable page);
-
-    /** Which of {@code refs} the delivery ledger records Hephaestus posting as feedback on this pull request. */
-    @Query("""
-        SELECT fp.postedCommentRef
-        FROM FeedbackPlacement fp
-        WHERE fp.feedback.workspaceId = :workspaceId
-          AND fp.feedback.artifactKind = :artifactKind
-          AND fp.feedback.artifactId = :pullRequestId
-          AND fp.postedCommentRef IN :refs
-        """)
-    Set<String> findPostedCommentRefs(
-            @Param("workspaceId") Long workspaceId,
-            @Param("artifactKind") ArtifactKind artifactKind,
-            @Param("pullRequestId") Long pullRequestId,
-            @Param("refs") Collection<String> refs);
 
     /** A pull request's inline comments, a thread at a time: unresolved threads first, each thread oldest first. */
     @Query("""

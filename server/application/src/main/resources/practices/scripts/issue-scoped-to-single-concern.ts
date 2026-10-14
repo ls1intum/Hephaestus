@@ -1,19 +1,21 @@
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { bodyFact, classifyIssue, subIssueRollup } from "../kits/scm/issue-classification.ts";
+import { checkableItems } from "../kits/scm/review.ts";
 // Counts the task-list items and the issue-number mentions in the issue body, and reads the captured
 // sub-issue rollup with its source. The review decides if the issue is one concern at its level.
-import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
-import { bodyFact, classifyIssue, subIssueRollup } from "../lib/issue-classification.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
-import { checkableItems } from "../lib/review.ts";
+import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.issue");
-		const shape = classifyIssue(ctx.work);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.issue");
+		const shape = classifyIssue(domain.item);
 		const { body, labels, emptyOrTitleEcho } = shape;
 		const checkboxes = checkableItems(body).length;
 		const issueMentions = new Set((body.match(/(?:^|\s)#\d+\b/gu) ?? []).map((s) => s.trim())).size;
-		const rollup = subIssueRollup(ctx.work);
+		const rollup = subIssueRollup(domain.item);
 		return ctx.review({
 			leads: [],
 			facts: {

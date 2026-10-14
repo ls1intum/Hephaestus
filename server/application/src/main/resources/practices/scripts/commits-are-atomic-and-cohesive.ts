@@ -1,9 +1,10 @@
 // Finds each authored commit in the commit record: its subject, if the subject joins clauses, and the
 // files that the commit touched with their line counts and moves. The criteria tell what one logical
 // change is, and the review judges the partition. A fact is a place to look, never a verdict.
-import { readCapturedCommits } from "../lib/change.ts";
-import { commitLeads, describeCommitCount, subjectFacts } from "../lib/commit-subjects.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { readCapturedCommits } from "../kits/scm/change.ts";
+import { commitLeads, describeCommitCount, subjectFacts } from "../kits/scm/commit-subjects.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	commit:
@@ -13,7 +14,8 @@ export const LABELS = {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
 		const captured = await readCapturedCommits(ctx.evidence);
 		const facts = subjectFacts(captured ?? []);
 		const authored = facts.filter((f) => !f.merge);

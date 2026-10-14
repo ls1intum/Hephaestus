@@ -14,14 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @ConditionalOnServerRole
 @RequiredArgsConstructor
-@PersonDataStores({
-    "workspace_membership",
-    "workspace_hidden_former_member",
-    "practice_review_person_target",
-    "account_ai_choice",
-    "workspace_member_onboarding",
-    "workspace_onboarding_settings"
-})
+@PersonDataStores({"membership", "workspace_onboarding_settings"})
 public class WorkspacePersonDataCatalog implements PersonDataCatalog {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -32,51 +25,11 @@ public class WorkspacePersonDataCatalog implements PersonDataCatalog {
                 new JdbcPersonDataStore(
                         jdbc,
                         mapper,
-                        "workspace_membership",
-                        "workspace_membership",
-                        "t.user_id = ANY(:users)",
-                        "created_at,role,user_id,workspace_id,hidden",
-                        "user_id,workspace_id",
-                        "",
-                        550),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "workspace_hidden_former_member",
-                        "workspace_hidden_former_member",
-                        "t.user_id = ANY(:users)",
-                        "user_id,workspace_id",
-                        "user_id,workspace_id",
-                        "",
-                        550),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "practice_review_person_target",
-                        "practice_review_person_target",
-                        "t.user_id = ANY(:users)",
-                        "workspace_id,user_id",
-                        "workspace_id,user_id",
-                        "",
-                        550),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "account_ai_choice",
-                        "account_ai_choice",
-                        "t.account_id = :account",
-                        "account_id,ai_choice,updated_at",
-                        "account_id",
-                        "",
-                        550),
-                new JdbcPersonDataStore(
-                        jdbc,
-                        mapper,
-                        "workspace_member_onboarding",
-                        "workspace_member_onboarding",
-                        "t.account_id = :account",
-                        "id,account_id,seen_revision,public_activity_seen,updated_at,workspace_id",
-                        "id",
+                        "membership",
+                        "membership",
+                        "t.account_id=:account",
+                        "workspace_id,account_id,role,hidden,review_selected,onboarding_seen_revision,public_activity_seen,joined_at,left_at",
+                        "workspace_id,account_id",
                         "",
                         550),
                 new JdbcPersonDataStore(

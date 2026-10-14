@@ -1,5 +1,5 @@
 // A program that cannot run without its decision model: without one, the practice is skipped.
-import { definePracticeScript } from "../lib/practice-script.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { decision: "required" } },

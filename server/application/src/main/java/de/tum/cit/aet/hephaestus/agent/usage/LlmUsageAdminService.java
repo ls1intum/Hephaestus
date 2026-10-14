@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateInfoDTO;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
@@ -33,7 +34,7 @@ public class LlmUsageAdminService {
     private final LlmUsageEventRepository usageRepository;
     private final WorkspaceRepository workspaceRepository;
     private final ConfigAuditPort configAudit;
-    private final AgentJobRepository jobRepository;
+    private final ReviewJobRepository jobRepository;
 
     /** Display-only; never an input to a cap comparison. */
     private final FxRateLookup fxRateLookup;
@@ -42,7 +43,7 @@ public class LlmUsageAdminService {
             LlmUsageEventRepository usageRepository,
             WorkspaceRepository workspaceRepository,
             ConfigAuditPort configAudit,
-            AgentJobRepository jobRepository,
+            ReviewJobRepository jobRepository,
             FxRateLookup fxRateLookup) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;

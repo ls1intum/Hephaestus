@@ -8,7 +8,7 @@ import java.util.Objects;
 public record AutomatedReviewReadinessReport(
         SourceContractVersion contractVersion,
         String catalogDigest,
-        String artifactKind,
+        String itemKind,
         Instant manifestCapturedAt,
         Instant decidedAt,
         List<AutomatedReviewReadinessDecision> decisions) {
@@ -18,7 +18,7 @@ public record AutomatedReviewReadinessReport(
         if (!catalogDigest.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("Invalid catalog digest: " + catalogDigest);
         }
-        Objects.requireNonNull(artifactKind, "artifactKind");
+        Objects.requireNonNull(itemKind, "itemKind");
         Objects.requireNonNull(manifestCapturedAt, "manifestCapturedAt");
         Objects.requireNonNull(decidedAt, "decidedAt");
         decisions = List.copyOf(Objects.requireNonNull(decisions, "decisions"));

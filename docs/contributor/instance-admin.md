@@ -109,13 +109,13 @@ A queued privileged write is exactly what an attacker would want confirmation to
 
 ## Read-only user views
 
-**Instance admin → Workspaces → View users → View as user** opens the normal workspace app as a
-human workspace member, including one without a Hephaestus account. The instance administrator
-remains authenticated as themselves. The viewed person is the synced SCM user behind a workspace
-membership ([auth glossary](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/auth-glossary.md)).
-**Linked account** reads `identity_link.external_actor_id`.
+**Instance admin → Workspaces → View users → View as user** opens the normal workspace app as a selected account member.
+The instance administrator remains authenticated as themselves.
+The selected identity is an account, including an unclaimed roster account.
+Its provider mirrors remain source attribution rather than sign-in principals.
+A view-as read does not record the developer's first read of private feedback.
 
-The browser keeps the selected workspace, user ID, and reason in the tab's session storage.
+The browser keeps the selected workspace, account ID, and reason in the tab's session storage.
 When a view starts or exits, the app reloads so cached results cannot cross identities.
 When it loads the current account, it drops a stored view opened by another account.
 `applyUserViewHeaders` adds `X-User-View-Workspace`, `X-User-View-User`, and the reason header to every request.
@@ -165,12 +165,12 @@ A missing result or conversation can still produce a 404 after the row commits.
 The row carries these fields:
 
 - `acting_account_id` = the instance administrator.
-- `account_id` = the viewed user's linked account or null.
-- `viewed_user_id` = the viewed user.
+- `account_id` = the acting administrator.
+- `viewed_account_id` = the selected account, with `viewed_actor_id` for the exact provider disclosure when present.
 - `workspace_id`.
 - `details` = `{"reason": …, "read": "<request path?query>"}`.
 
-`AccountPurger` nulls `ip_inet`, `user_agent`, and `details` when the erased account is either recorded account or the account behind `viewed_user_id`.
+`AccountPurger` nulls `ip_inet`, `user_agent`, and `details` when the erased account is either recorded account or the recorded viewed account.
 Thus, it runs before deletion of that account's identity links.
 The read budget is a [setting](/admin/configuration-readiness#session-deadlines).
 [ADR 0017](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0017-replace-keycloak-with-spring-native-auth.md#update--2026-09-11) explains why this does not use Spring Security's `SwitchUserFilter`.

@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-record SubmissionOutcome(@Nullable AgentJob job, @Nullable SignalStateReason refusal, boolean created) {
+record SubmissionOutcome(@Nullable ReviewJob job, @Nullable ItemEventReason refusal, boolean created) {
     SubmissionOutcome {
         if ((job == null) == (refusal == null)) {
             throw new IllegalArgumentException("A submission either produced a job or a reason it produced none");
@@ -14,19 +14,19 @@ record SubmissionOutcome(@Nullable AgentJob job, @Nullable SignalStateReason ref
         }
     }
 
-    static SubmissionOutcome created(AgentJob job) {
+    static SubmissionOutcome created(ReviewJob job) {
         return new SubmissionOutcome(Objects.requireNonNull(job, "job"), null, true);
     }
 
-    static SubmissionOutcome joined(AgentJob job) {
+    static SubmissionOutcome joined(ReviewJob job) {
         return new SubmissionOutcome(Objects.requireNonNull(job, "job"), null, false);
     }
 
-    static SubmissionOutcome refused(SignalStateReason refusal) {
+    static SubmissionOutcome refused(ItemEventReason refusal) {
         return new SubmissionOutcome(null, Objects.requireNonNull(refusal, "refusal"), false);
     }
 
-    SignalStateReason requireRefusal() {
+    ItemEventReason requireRefusal() {
         return Objects.requireNonNull(refusal, "refusal");
     }
 }

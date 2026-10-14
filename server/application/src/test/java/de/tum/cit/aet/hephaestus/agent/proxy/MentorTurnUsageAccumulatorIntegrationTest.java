@@ -7,10 +7,12 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
@@ -22,6 +24,7 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -40,14 +43,17 @@ import tools.jackson.databind.node.JsonNodeFactory;
 class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final LlmPriceSnapshot TEN_DOLLARS_PER_MILLION = new LlmPriceSnapshot(
-            FundingSource.INSTANCE,
-            PricingState.PRICED,
+            UsageFundingSource.INSTANCE,
+            UsagePricingState.PRICED,
             1L,
             null,
             new BigDecimal("10"),
             BigDecimal.ZERO,
             BigDecimal.ZERO,
             BigDecimal.ZERO);
+
+    @Autowired
+    private AccountRepository accounts;
 
     @Autowired
     private ChatMessageRepository chatMessageRepository;
@@ -74,7 +80,8 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
                 createWorkspace("mentor-usage-ws", "Mentor Usage", "mentor-usage-org", AccountType.ORG, owner);
         thread = new ChatThread();
         thread.setId(UUID.randomUUID());
-        thread.setUser(owner);
+        thread.setAccountId(Objects.requireNonNull(
+                accounts.saveAndFlush(new Account("Mentor usage owner")).getId()));
         thread.setWorkspace(workspace);
         thread.setTitle("usage");
         thread = chatThreadRepository.saveAndFlush(thread);
@@ -91,7 +98,7 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
     }
 
     private ProxyRouting.BilledAttempt attempt(UUID turnId) {
-        return new ProxyRouting.BilledAttempt(LlmUsageSourceType.MENTOR_TURN, turnId, 0, BigDecimal.ZERO, null);
+        return new ProxyRouting.BilledAttempt(UsageSourceType.MENTOR_TURN, turnId, 0, BigDecimal.ZERO, null);
     }
 
     private void accumulate(UUID turnId, ProxyTokenUsage usage) {
@@ -149,7 +156,7 @@ class MentorTurnUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegra
                 new MentorProxyCredentialRegistry.Route(
                         "openai-responses",
                         "https://upstream.example.com/v1",
-                        FundingSource.INSTANCE,
+                        UsageFundingSource.INSTANCE,
                         1L,
                         2L,
                         thread.getWorkspace().getId()));

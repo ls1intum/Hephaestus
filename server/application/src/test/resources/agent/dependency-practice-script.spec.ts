@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
 import {
 	leadKeys,
 	runBundled,
@@ -52,7 +52,7 @@ void test("an XcodeGen project.yml edit lists its changed package lines without 
 	assert.doesNotMatch((result.directions ?? []).join("\n"), /No changed line in these manifests/u);
 });
 
-void test("internal XcodeGen test-target and scheme wiring offers no dependency line and says the name is no occasion", async () => {
+void test("internal XcodeGen test-target and scheme wiring offers no dependency line and says the name is no applicability", async () => {
 	const result = await runBundled(SLUG, {
 		change: new Map([
 			[
@@ -61,7 +61,7 @@ void test("internal XcodeGen test-target and scheme wiring offers no dependency 
 					"      testTargets:",
 					"        - AppTests",
 					"  AppTests:",
-					"    type: bundle.unit-test",
+					"    type: bundle.piece-test",
 					"    dependencies:",
 					"      - target: App",
 				]),
@@ -72,7 +72,7 @@ void test("internal XcodeGen test-target and scheme wiring offers no dependency 
 	assert.equal(result.facts?.manifestsChanged, 1);
 	assert.equal(result.facts.unpairedManifestLines, 0);
 	const said = (result.directions ?? []).join("\n");
-	assert.match(said, /The name alone is no occasion/u);
+	assert.match(said, /The name alone is no applicability/u);
 	assert.match(
 		said,
 		/No changed line in these manifests has the dependency shape this script reads/u,
@@ -123,7 +123,10 @@ void test("a pom.xml version moved away from its artifactId is not a dropped pin
 });
 
 void test("raw manifest lines beyond the lead cap are counted but reported as not listed", async () => {
-	const artifacts = Array.from({ length: 45 }, (_, i) => `      <artifactId>lib-${i}</artifactId>`);
+	const sourceFiles = Array.from(
+		{ length: 45 },
+		(_, i) => `      <artifactId>lib-${i}</artifactId>`,
+	);
 	const result = await runBundled(SLUG, {
 		change: new Map([
 			[
@@ -134,7 +137,7 @@ void test("raw manifest lines beyond the lead cap are counted but reported as no
 					'    "c": "^3.0.0",',
 				]),
 			],
-			["pom.xml", diffFile("pom.xml", artifacts)],
+			["pom.xml", diffFile("pom.xml", sourceFiles)],
 		]),
 	});
 	const raw = (result.leads ?? []).filter((lead) => keyOf(lead.label) === "raw-manifest-line");
@@ -143,7 +146,7 @@ void test("raw manifest lines beyond the lead cap are counted but reported as no
 	assert.equal(result.facts.unpairedManifestLines, 45);
 	assert.equal(result.facts.rawLinesListed, 37);
 	assert.equal(raw.length, 37);
-	// The 37th artifact line, lib-36, is the last one listed.
+	// The 37th sourceFile line, lib-36, is the last one listed.
 	assert.deepEqual(raw.at(-1)?.at, { change: "pom.xml", line: 46, side: "NEW" });
 });
 

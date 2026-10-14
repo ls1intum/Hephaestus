@@ -26,9 +26,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for GitHubProjectStatusUpdateMessageHandler.
- * <p>
- * Verifies persistence, field-level correctness, domain event publishing,
- * and edge case handling for status update webhook events.
+ *
+ * <p>Verifies persistence, field-level correctness, domain event publishing, and edge case handling
+ * for status update webhook events.
  */
 class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -242,7 +242,7 @@ class GitHubProjectStatusUpdateMessageHandlerIntegrationTest extends BaseIntegra
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(testOrganization);
+        workspace.setOrganizationId(testOrganization.getId());
         workspace.setAccountLogin("HephaestusTest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

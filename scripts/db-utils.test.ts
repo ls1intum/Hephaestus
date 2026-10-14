@@ -259,7 +259,7 @@ mock.module("node:fs/promises", { exports: {
     writes.push(String(file));
   }
 }});
-mock.module(${JSON.stringify(new URL("./lib/process.ts", import.meta.url).href)}, { exports: {
+mock.module(${JSON.stringify(new URL("lib/process.ts", import.meta.url).href)}, { exports: {
   async run(executable, args, options) {
     calls.push({ executable, args });
     assert.notEqual(executable, "docker");

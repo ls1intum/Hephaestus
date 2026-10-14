@@ -1,98 +1,53 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
-import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.FeedbackStateCounts;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository.OperatorResultRow;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewFeedbackCountsDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ProblemSummaryDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDeveloperDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.Map;
+import java.util.List;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "A practice review result with its linked feedback outcomes")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record ReviewResultDTO(
-        @NonNull UUID id,
-        @NonNull UUID agentJobId,
-        @NonNull String practiceSlug,
-        @NonNull String practiceName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID reviewId,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ItemRefDTO item,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String practiceSlug,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String practiceName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ResultOutcome outcome,
 
-        @Schema(description = "Practice group; null when the practice is Unassigned") @Nullable
-        ReviewPracticeGroupDTO group,
-
-        @NonNull ReviewedWorkRefDTO reviewedWork,
-
-        @Schema(description = "Whose work the result is about; null when the identity is no longer resolvable")
-        @Nullable
-        ReviewSubjectDTO subject,
-
-        @Schema(description = "Result text; absent when source access cannot be verified") @Nullable
-        String summary,
-
-        @NonNull @Schema(description = "Result of the practice review")
-        Outcome outcome,
-
-        @Schema(description = "Severity band (null unless outcome is NOT_MET)") @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Severity severity,
 
-        @Schema(
-                description = "The located problems of the result; 0 for every outcome but NOT_MET",
-                requiredMode = Schema.RequiredMode.REQUIRED)
-        long problemCount,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String summary,
 
-        @NonNull
-        @Schema(
-                description = "What occasioned the measurement. BACKFILL came from a confirmed campaign over work "
-                        + "that already existed, so it is not a point on the live trend line.")
-        ResultOrigin origin,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ReviewOrigin origin,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant recordedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Currentness currentness,
 
-        @NonNull ReviewClaimCurrentness claimCurrentness,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant markedIncorrectAt,
 
-        @Schema(description = "When a workspace admin invalidated this result; null while it stands") @Nullable
-        Instant invalidatedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant acceptedAt,
 
-        @Schema(
-                description = "When the developer last disputed feedback written from this result; null while"
-                        + " nothing about it is disputed")
-        @Nullable
-        Instant disputedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ProblemSummaryDTO> problems,
 
-        @NonNull Instant observedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ReviewDeveloperDTO developer,
 
-        @NonNull @Schema(description = "Counts of linked feedback by delivery state")
-        ReviewFeedbackCountsDTO feedback) {
-
-    public static ReviewResultDTO from(
-            OperatorResultRow row,
-            @Nullable FeedbackStateCounts feedback,
-            ReviewedWorkRefDTO reviewedWork,
-            Map<Long, ReviewSubjectDTO> subjects,
-            boolean includeWords) {
-        return new ReviewResultDTO(
-                row.getId(),
-                row.getAgentJobId(),
-                row.getPracticeSlug(),
-                row.getPracticeName(),
-                ReviewPracticeGroupDTO.from(
-                        row.getGroupSlug(), row.getGroupName(), row.getGroupIcon(), row.getGroupColor()),
-                reviewedWork,
-                subjects.get(row.getAboutUserId()),
-                includeWords ? row.getSummary() : null,
-                row.getOutcome(),
-                row.getSeverity(),
-                row.getProblemCount(),
-                row.getOrigin(),
-                ReviewClaimCurrentness.of(
-                        row.getPracticeRevisionFingerprint(),
-                        row.getCurrentPracticeRevisionFingerprint(),
-                        row.getSupersededAt()),
-                row.getInvalidatedAt(),
-                row.getDisputedAt(),
-                row.getObservedAt(),
-                ReviewFeedbackCountsDTO.from(feedback));
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int problemCount,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ReviewFeedbackCountsDTO feedback) {
+    public ReviewResultDTO {
+        problems = List.copyOf(problems);
     }
 }

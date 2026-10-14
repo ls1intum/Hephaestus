@@ -9,7 +9,8 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.dto.WorkspaceReviewScopeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewVolumeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -17,8 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +26,7 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 
 class PracticeReviewSettingsServiceTest extends BaseUnitTest {
@@ -58,9 +59,18 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.setWorkspaceSlug("ws");
         context = new WorkspaceContext(1L, "ws", "Ws", AccountType.ORG, null, Set.of());
         lenient().when(coverageService.scope(workspace)).thenReturn(WorkspaceReviewScope.ALL);
+        lenient().when(coverageService.wireScope(workspace)).thenAnswer(i -> wire(coverageService.scope(workspace)));
+        lenient().when(coverageService.fromWire(ArgumentMatchers.eq(1L), any())).thenAnswer(i -> {
+            WorkspaceReviewScopeDTO dto = i.getArgument(1);
+            return new WorkspaceReviewScope(
+                    dto.repositories(),
+                    dto.people(),
+                    List.of(),
+                    dto.accountIds().stream().map(Long::parseLong).toList());
+        });
         lenient()
                 .when(coverageService.summary(workspace, 0))
-                .thenReturn(new PracticeReviewCoverageSummaryDTO(0, 0, 0, 0, 0, 30));
+                .thenReturn(new PracticeReviewScopeSummaryDTO(0, 0, 0, 0, 0, 30));
     }
 
     @Test
@@ -72,7 +82,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         assertThat(view.cooldownMinutes()).isEqualTo(15);
         assertThat(view.cooldownMinutesOverride()).isNull();
         assertThat(view.etag()).isEqualTo("\"0\"");
-        assertThat(view.revision()).isZero();
+        assertThat(view.revision()).isEqualTo("0");
     }
 
     @Test
@@ -101,7 +111,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         assertThat(workspace.getReviewSettings().getDeliverToMerged()).isTrue();
         assertThat(workspace.getReviewSettings().getCooldownMinutes()).isEqualTo(30);
-        assertThat(view.revision()).isEqualTo(1);
+        assertThat(view.revision()).isEqualTo("1");
         assertThat(view.etag()).isEqualTo("\"1\"");
         verify(configAudit).record(any());
     }
@@ -113,7 +123,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
                 context, new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, null, null, null), tag(0));
 
-        assertThat(view.revision()).isZero();
+        assertThat(view.revision()).isEqualTo("0");
         assertThat(view.etag()).isEqualTo("\"1\"");
     }
 
@@ -123,24 +133,24 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(context, patch(null, 30), tag(0));
 
-        assertThat(view.revision()).isZero();
+        assertThat(view.revision()).isEqualTo("0");
         assertThat(view.etag()).isEqualTo("\"1\"");
     }
 
     @Test
     void coverageIsReplacedWholesaleAndItsModesBecomeCurrent() {
         writesWorkspace();
-        WorkspaceReviewScope selectedEmpty = new WorkspaceReviewScope(
-                ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, List.of(), List.of());
+        WorkspaceReviewScope selectedEmpty =
+                new WorkspaceReviewScope(ReviewScopeMode.SELECTED, ReviewScopeMode.SELECTED, List.of(), List.of());
         when(coverageService.scope(workspace)).thenReturn(WorkspaceReviewScope.ALL, selectedEmpty, selectedEmpty);
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
                 context,
-                new UpdatePracticeReviewSettingsRequestDTO(null, null, selectedEmpty, null, null, null, null),
+                new UpdatePracticeReviewSettingsRequestDTO(null, null, wire(selectedEmpty), null, null, null, null),
                 tag(0));
 
         verify(coverageService).replace(workspace, selectedEmpty);
-        assertThat(view.reviewScope()).isEqualTo(selectedEmpty);
+        assertThat(view.reviewScope()).isEqualTo(wire(selectedEmpty));
     }
 
     @Test
@@ -165,8 +175,8 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     @Test
     void removingAndReaddingCoverageCannotMakeEarlierWorkCurrentAgain() {
         writesWorkspace();
-        WorkspaceReviewScope selectedEmpty = new WorkspaceReviewScope(
-                ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, List.of(), List.of());
+        WorkspaceReviewScope selectedEmpty =
+                new WorkspaceReviewScope(ReviewScopeMode.SELECTED, ReviewScopeMode.SELECTED, List.of(), List.of());
         when(coverageService.scope(workspace))
                 .thenReturn(
                         WorkspaceReviewScope.ALL,
@@ -178,12 +188,12 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         service.updatePracticeReview(
                 context,
-                new UpdatePracticeReviewSettingsRequestDTO(null, null, selectedEmpty, null, null, null, null),
+                new UpdatePracticeReviewSettingsRequestDTO(null, null, wire(selectedEmpty), null, null, null, null),
                 tag(0));
         service.updatePracticeReview(
                 context,
                 new UpdatePracticeReviewSettingsRequestDTO(
-                        null, null, WorkspaceReviewScope.ALL, null, null, null, null),
+                        null, null, wire(WorkspaceReviewScope.ALL), null, null, null, null),
                 tag(1));
 
         assertThat(workspace.getReviewSettings().getRolloutRevision()).isEqualTo(2);
@@ -195,11 +205,18 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         service.updatePracticeReview(
                 context,
-                new UpdatePracticeReviewSettingsRequestDTO(
-                        null, null, null, null, PracticeAutonomy.AUTOMATIC, null, null),
+                new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, FeedbackMode.AUTOMATIC, null, null),
                 tag(0));
 
         assertThat(workspace.getReviewSettings().getRolloutRevision()).isOne();
+    }
+
+    private static WorkspaceReviewScopeDTO wire(WorkspaceReviewScope scope) {
+        return new WorkspaceReviewScopeDTO(
+                scope.repositoryMode(),
+                scope.personMode(),
+                List.of(),
+                scope.accountIds().stream().map(Object::toString).toList());
     }
 
     private void readsWorkspace() {

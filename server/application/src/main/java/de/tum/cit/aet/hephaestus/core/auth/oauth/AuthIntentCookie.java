@@ -17,19 +17,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Short-lived signed cookie that carries the user's pre-OAuth intent across the IdP
- * round-trip: which workspace to land back in, where to redirect after success, and
- * whether this is a fresh login or a link-mode flow.
+ * Short-lived signed cookie that carries the user's pre-OAuth intent across the IdP round-trip:
+ * which workspace to land back in, where to redirect after success, and whether this is a fresh
+ * login or a link-mode flow.
  *
- * <p>Distinct from {@link CookieOAuth2AuthorizationRequestRepository}'s cookie (which
- * holds Spring's serialised {@code OAuth2AuthorizationRequest}). Separate concerns,
- * separate AADs, separate cookies.
+ * <p>Distinct from {@link CookieOAuth2AuthorizationRequestRepository}'s cookie (which holds
+ * Spring's serialised {@code OAuth2AuthorizationRequest}). Separate concerns, separate AADs,
+ * separate cookies.
  *
  * <h2>Cookie</h2>
- * Name {@value #COOKIE_NAME}; {@code HttpOnly}, {@code Secure}, {@code SameSite=Lax},
- * {@code Path=/}, 10-minute TTL.
+ *
+ * Name {@value #COOKIE_NAME}; {@code HttpOnly}, {@code Secure}, {@code SameSite=Lax}, {@code
+ * Path=/}, 10-minute TTL.
  *
  * <h2>Encryption</h2>
+ *
  * AES-256-GCM, AAD = {@code "auth-intent"} (distinct from {@code "oauth2-state"}).
  */
 public class AuthIntentCookie {
@@ -60,13 +62,14 @@ public class AuthIntentCookie {
     }
 
     /**
-     * The pre-OAuth intent — populated from /auth/login query params, consumed in the success handler.
+     * The pre-OAuth intent — populated from /auth/login query params, consumed in the success
+     * handler.
      *
      * <p>{@code issuedAt} (epoch millis) is stamped at write time and lives inside the sealed,
      * AES-GCM-authenticated plaintext, so it cannot be forged or replayed past the TTL. The cookie
-     * {@code Max-Age} is client-controlled and therefore only a hint; this field is the authoritative
-     * freshness check (see {@link AuthIntentCookie#read}). An old cookie minted before this field
-     * existed deserializes with {@code issuedAt == 0L} and is rejected as stale.
+     * {@code Max-Age} is client-controlled and therefore only a hint; this field is the
+     * authoritative freshness check (see {@link AuthIntentCookie#read}). An old cookie minted
+     * before this field existed deserializes with {@code issuedAt == 0L} and is rejected as stale.
      */
     public record Intent(
             @Nullable String workspaceSlug,
@@ -78,16 +81,19 @@ public class AuthIntentCookie {
         public enum Mode {
             /** Fresh login — JIT-create Account on first IdP subject we've never seen. */
             LOGIN,
-            /** Already authenticated; attach a new IdentityLink to the current Account. */
+            /** Already authenticated; attach a new Identity to the current Account. */
             LINK,
-            /** Fresh login for an installed client: ends in a PKCE-bound handoff, never in a cookie. */
+            /**
+             * Fresh login for an installed client: ends in a PKCE-bound handoff, never in a cookie.
+             */
             CLIENT,
         }
 
         /**
-         * What an installed-client sign-in brings with it: the registered client and callback it returns
-         * to, the S256 challenge the handoff code will be bound to, and the client's own {@code state}.
-         * Sealed here, the pair is still re-checked against the registry before anything is sent to it.
+         * What an installed-client sign-in brings with it: the registered client and callback it
+         * returns to, the S256 challenge the handoff code will be bound to, and the client's own
+         * {@code state}. Sealed here, the pair is still re-checked against the registry before
+         * anything is sent to it.
          */
         public record ClientRequest(String clientId, String redirectUri, String codeChallenge, String state) {}
 

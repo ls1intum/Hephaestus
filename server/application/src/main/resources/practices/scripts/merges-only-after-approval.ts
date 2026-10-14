@@ -1,9 +1,4 @@
-// Finds the merge as the record holds it, with the review decision of the provider, and each captured
-// review decision placed against the time of the merge. The last decision of each reviewer is a lead
-// of its own. The order of the leads does not show that the decision history is complete.
-import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
-import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	decisionLeads,
 	lastDecisionPerReviewer,
@@ -11,7 +6,13 @@ import {
 	mergeLead,
 	readReviewThreads,
 	reviewsMergedWork,
-} from "../lib/review.ts";
+} from "../kits/scm/review.ts";
+// Finds the merge as the record holds it, with the review decision of the provider, and each captured
+// review decision placed against the time of the merge. The last decision of each reviewer is a lead
+// of its own. The order of the leads does not show that the decision history is complete.
+import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	merge:
@@ -25,8 +26,9 @@ export const LABELS = {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		if (!reviewsMergedWork(ctx.cause)) {
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		if (!reviewsMergedWork(ctx.review)) {
 			return ctx.review({
 				leads: [],
 				directions: [
@@ -34,7 +36,7 @@ export default definePracticeScript({
 				],
 			});
 		}
-		const merge = mergeFacts(ctx.work);
+		const merge = mergeFacts(domain.item);
 		const record = await readReviewThreads(ctx.evidence);
 		const decisions = record?.decisions ?? [];
 		const rows = decisionLeads(decisions, merge, LABELS["review-decision"]);
@@ -74,7 +76,7 @@ export default definePracticeScript({
 				"Read decisionHistoryComplete in review_threads.json: the order of the leads does not establish complete historical coverage. Apply the practice criteria to that qualification.",
 			);
 		}
-		const leads = [mergeLead(ctx.work, merge, LABELS.merge), ...rows, ...last];
+		const leads = [mergeLead(domain.item, merge, LABELS.merge), ...rows, ...last];
 		return ctx.review({
 			leads: leads.slice(0, REVIEW_LEAD_LIMIT),
 			limitations:

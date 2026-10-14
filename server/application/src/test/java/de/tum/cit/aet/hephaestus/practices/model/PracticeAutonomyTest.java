@@ -18,9 +18,9 @@ class PracticeAutonomyTest extends BaseUnitTest {
 
         @Test
         void offIsTheOnlyTierThatStopsAReview() {
-            assertThat(PracticeAutonomy.OFF.admitsReview()).isFalse();
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.admitsReview()).isTrue();
-            assertThat(PracticeAutonomy.AUTOMATIC.admitsReview()).isTrue();
+            assertThat(FeedbackMode.OFF.admitsReview()).isFalse();
+            assertThat(FeedbackMode.APPROVE_FIRST.admitsReview()).isTrue();
+            assertThat(FeedbackMode.AUTOMATIC.admitsReview()).isTrue();
         }
     }
 
@@ -30,21 +30,21 @@ class PracticeAutonomyTest extends BaseUnitTest {
 
         @Test
         void shouldOnlyDeliverAutomaticallyAtAutomaticAutonomy() {
-            assertThat(PracticeAutonomy.OFF.deliversWithoutApproval()).isFalse();
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.deliversWithoutApproval())
+            assertThat(FeedbackMode.OFF.deliversWithoutApproval()).isFalse();
+            assertThat(FeedbackMode.APPROVE_FIRST.deliversWithoutApproval())
                     .isFalse();
-            assertThat(PracticeAutonomy.AUTOMATIC.deliversWithoutApproval()).isTrue();
+            assertThat(FeedbackMode.AUTOMATIC.deliversWithoutApproval()).isTrue();
         }
 
         @Test
         void shouldRequireApprovalAtHumanApprovalAutonomyForThePushedChannelOnly() {
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.deliversWithoutApproval())
+            assertThat(FeedbackMode.APPROVE_FIRST.deliversWithoutApproval())
                     .isFalse();
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.delivers(FeedbackChannel.IN_CONTEXT))
+            assertThat(FeedbackMode.APPROVE_FIRST.delivers(FeedbackChannel.IN_CONTEXT))
                     .isFalse();
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.delivers(FeedbackChannel.IN_APP))
+            assertThat(FeedbackMode.APPROVE_FIRST.delivers(FeedbackChannel.IN_APP))
                     .isTrue();
-            assertThat(PracticeAutonomy.HUMAN_APPROVAL.delivers(FeedbackChannel.IN_CHAT))
+            assertThat(FeedbackMode.APPROVE_FIRST.delivers(FeedbackChannel.IN_CHAT))
                     .isTrue();
         }
     }
@@ -55,8 +55,8 @@ class PracticeAutonomyTest extends BaseUnitTest {
 
         @Test
         void shouldExposeOnlyTheThreeCanonicalAutonomies() {
-            assertThat(PracticeAutonomy.values())
-                    .containsExactly(PracticeAutonomy.OFF, PracticeAutonomy.HUMAN_APPROVAL, PracticeAutonomy.AUTOMATIC);
+            assertThat(FeedbackMode.values())
+                    .containsExactly(FeedbackMode.OFF, FeedbackMode.APPROVE_FIRST, FeedbackMode.AUTOMATIC);
         }
     }
 
@@ -66,13 +66,13 @@ class PracticeAutonomyTest extends BaseUnitTest {
 
         @Test
         void everyConstantFitsTheColumn() {
-            assertThat(Arrays.stream(PracticeAutonomy.values()).map(Enum::name).map(String::length))
-                    .allSatisfy(length -> assertThat(length).isLessThanOrEqualTo(PracticeAutonomy.MAX_LENGTH));
+            assertThat(Arrays.stream(FeedbackMode.values()).map(Enum::name).map(String::length))
+                    .allSatisfy(length -> assertThat(length).isLessThanOrEqualTo(FeedbackMode.MAX_LENGTH));
         }
 
         @Test
         void shouldFailSafeByDefault() {
-            assertThat(PracticeAutonomy.DEFAULT).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(FeedbackMode.DEFAULT).isEqualTo(FeedbackMode.APPROVE_FIRST);
         }
     }
 }

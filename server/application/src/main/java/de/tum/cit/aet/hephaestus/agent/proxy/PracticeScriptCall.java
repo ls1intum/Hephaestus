@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import org.jspecify.annotations.Nullable;
 

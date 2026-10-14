@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.runtime;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import java.time.Duration;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -99,8 +98,7 @@ public final class SandboxLayout {
     public static final String PRACTICE_SCRIPT_PREFIX = WORK_PREFIX + "practice-scripts/";
 
     /**
-     * Workspace-relative prefix of the per-practice inputs: for every admitted practice {@code <slug>.cause.json}, why
-     * it is in this review and the scope it judges, and {@code <slug>.previous.json}, its previous claim on this work
+     * Workspace-relative prefix of the per-practice inputs: for every assigned practice {@code <slug>.inputs.json}, its frozen scope, standard and previous result
      * or {@code null}; {@code <slug>.ts} only for a practice that holds its own script. {@code lib/contract.ts} owns
      * their shape.
      */
@@ -113,11 +111,9 @@ public final class SandboxLayout {
     public static final String PRACTICE_SCRIPT_LIBRARY_LINK = PRACTICE_SCRIPT_PREFIX + "lib";
 
     /** Absolute image path of the practice toolkit that {@link #PRACTICE_SCRIPT_LIBRARY_LINK} names. */
+    public static final String PRACTICE_SCRIPT_INPUTS_SUFFIX = ".inputs.json";
+
     public static final String PRACTICE_SCRIPT_LIBRARY_TARGET = "/opt/practice-scripts/lib";
-
-    public static final String PRACTICE_SCRIPT_CAUSE_SUFFIX = ".cause.json";
-
-    public static final String PRACTICE_SCRIPT_PREVIOUS_SUFFIX = ".previous.json";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
     public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";

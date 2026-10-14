@@ -15,7 +15,8 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmDataOperator;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -23,7 +24,6 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.AiModelBrand;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import de.tum.cit.aet.hephaestus.workspace.spi.LlmConnectionPlatform;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceAiAvailability;
 import java.util.List;
@@ -76,13 +76,13 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         return binding;
     }
 
-    private void chose(MemberAiChoice choice) {
+    private void chose(AiChoice choice) {
         when(preferences.forDeveloper(1L, 20L)).thenReturn(new MemberAiPreferences.Decision(true, choice));
     }
 
     @Test
     void shouldNeverResolveAModelWhenMemberChoosesNoAi() {
-        chose(MemberAiChoice.NO_AI);
+        chose(AiChoice.NO_AI);
         assertThat(routing.binding(1L, AgentPurpose.PRACTICE_REVIEW, 20L)).isEmpty();
         assertThat(routing.binding(1L, AgentPurpose.MENTOR, 20L)).isEmpty();
         assertThat(routing.allows(1L, 20L, LlmModelResolver.ConnectionRef.NONE)).isFalse();
@@ -98,7 +98,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldPickTheLoosestBindingWithinTheChosenCeiling() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var inHouse = ready(DataHandlingTier.IN_HOUSE);
         var cloud = ready(DataHandlingTier.CLOUD);
         var undeclared = ready(DataHandlingTier.UNDECLARED);
@@ -109,7 +109,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldServeACloudMemberFromTheInHouseBindingWhenTheCloudTierIsUnbound() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var inHouse = ready(DataHandlingTier.IN_HOUSE);
         var undeclared = ready(DataHandlingTier.UNDECLARED);
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(List.of(undeclared, inHouse));
@@ -118,7 +118,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldNotFallBackToALooserOrUndeclaredBinding() {
-        chose(MemberAiChoice.IN_HOUSE_ONLY);
+        chose(AiChoice.IN_HOUSE_ONLY);
         var cloud = ready(DataHandlingTier.CLOUD);
         var undeclared = ready(DataHandlingTier.UNDECLARED);
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
@@ -128,7 +128,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldSkipABindingThatIsOff() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var off = ready(DataHandlingTier.CLOUD);
         off.setEnabled(false);
         var inHouse = ready(DataHandlingTier.IN_HOUSE);
@@ -138,7 +138,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldSkipABindingWhoseModelIsNotAvailable() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var unavailable = ready(DataHandlingTier.CLOUD);
         when(models.isAvailable(unavailable)).thenReturn(false);
         var inHouse = ready(DataHandlingTier.IN_HOUSE);
@@ -148,9 +148,8 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldKeepChoicesSeparateAcrossWorkspaces() {
-        chose(MemberAiChoice.NO_AI);
-        when(preferences.forDeveloper(2L, 20L))
-                .thenReturn(new MemberAiPreferences.Decision(true, MemberAiChoice.CLOUD));
+        chose(AiChoice.NO_AI);
+        when(preferences.forDeveloper(2L, 20L)).thenReturn(new MemberAiPreferences.Decision(true, AiChoice.CLOUD));
         var binding = ready(DataHandlingTier.CLOUD);
         when(bindings.findByWorkspaceIdAndPurpose(2L, AgentPurpose.MENTOR)).thenReturn(List.of(binding));
         assertThat(routing.binding(1L, AgentPurpose.MENTOR, 20L)).isEmpty();
@@ -159,8 +158,8 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldAllowAModelWithinTheCeilingAndRejectOneThatLoosenedAfterTheChoice() {
-        var model = new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 8L, 9L, 1L);
-        chose(MemberAiChoice.IN_HOUSE_ONLY);
+        var model = new LlmModelResolver.ConnectionRef(UsageFundingSource.WORKSPACE, 8L, 9L, 1L);
+        chose(AiChoice.IN_HOUSE_ONLY);
         when(models.dataHandlingTier(model))
                 .thenReturn(Optional.of(DataHandlingTier.IN_HOUSE))
                 .thenReturn(Optional.of(DataHandlingTier.CLOUD))
@@ -182,7 +181,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         assertThat(routing.binding(1L, AgentPurpose.MENTOR, 20L)).contains(binding);
         model.setDataHandling(DataHandlingFacts.of(LlmDataOperator.PROVIDER, null));
         assertThat(routing.binding(1L, AgentPurpose.MENTOR, 20L)).isEmpty();
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 8L, 9L, 1L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 8L, 9L, 1L);
         when(models.dataHandlingTier(ref))
                 .thenReturn(Optional.of(DataHandlingTier.UNDECLARED))
                 .thenReturn(Optional.of(DataHandlingTier.CLOUD));
@@ -202,8 +201,8 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR)).thenReturn(List.of(cloud, undeclared));
         assertThat(routing.options(1L))
                 .containsExactly(
-                        new WorkspaceAiAvailability.Option(MemberAiChoice.IN_HOUSE_ONLY, false, false, List.of()),
-                        new WorkspaceAiAvailability.Option(MemberAiChoice.CLOUD, false, true, List.of()));
+                        new WorkspaceAiAvailability.Option(AiChoice.IN_HOUSE_ONLY, false, false, List.of()),
+                        new WorkspaceAiAvailability.Option(AiChoice.CLOUD, false, true, List.of()));
         // One query per purpose, shared by both choices; reviews that are off load nothing.
         verify(bindings, times(1)).findByWorkspaceIdAndPurpose(1L, AgentPurpose.MENTOR);
         verify(bindings, never()).findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW);
@@ -315,7 +314,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldGiveACloudMemberNoCloudPracticeScriptModelWhenTheirReviewRunsInHouse() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var review = ready(DataHandlingTier.IN_HOUSE);
         var decision = ready(DataHandlingTier.CLOUD);
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
@@ -329,7 +328,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldGiveACloudMemberAStricterPracticeScriptModelThanTheirCloudReview() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var review = ready(DataHandlingTier.CLOUD);
         var decision = ready(DataHandlingTier.IN_HOUSE);
         when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW))
@@ -343,7 +342,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldGiveAnInHouseMemberNoPracticeScriptModelWhenOnlyACloudOneIsAssigned() {
-        chose(MemberAiChoice.IN_HOUSE_ONLY);
+        chose(AiChoice.IN_HOUSE_ONLY);
         var inHouseReview = ready(DataHandlingTier.IN_HOUSE);
         var cloudReview = ready(DataHandlingTier.CLOUD);
         var decision = ready(DataHandlingTier.CLOUD);
@@ -358,7 +357,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldGiveNoPracticeScriptModelWhenNoReviewModelServesTheMember() {
-        chose(MemberAiChoice.CLOUD);
+        chose(AiChoice.CLOUD);
         var decision = ready(DataHandlingTier.CLOUD);
         lenient()
                 .when(bindings.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DECISION))
@@ -441,8 +440,8 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
         var served = routing.servedTiers(1L).getOrDefault(AgentPurpose.PRACTICE_DECISION, Map.of());
         var unserved = routing.unservedTiers(1L, AgentPurpose.PRACTICE_DECISION);
         for (var expected : List.of(
-                new Served(MemberAiChoice.IN_HOUSE_ONLY, inHouseSlot, inHouseRoute),
-                new Served(MemberAiChoice.CLOUD, cloudSlot, cloudRoute))) {
+                new Served(AiChoice.IN_HOUSE_ONLY, inHouseSlot, inHouseRoute),
+                new Served(AiChoice.CLOUD, cloudSlot, cloudRoute))) {
             var choice = expected.choice();
             var member = choice.ceiling().orElseThrow();
             var slot = expected.slot();
@@ -465,7 +464,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
     }
 
     private record Served(
-            MemberAiChoice choice,
+            AiChoice choice,
             @Nullable DataHandlingTier slot,
             @Nullable DataHandlingTier route) {}
 
@@ -544,7 +543,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
 
     @Test
     void shouldNotRouteErasedIdentityToReviewsOrHephEvenWhenAiChoiceIsOptional() {
-        when(suppression.isUserSuppressed(20L)).thenReturn(true);
+        when(suppression.isAccountSuppressed(20L)).thenReturn(true);
         assertThat(routing.binding(1L, AgentPurpose.PRACTICE_REVIEW, 20L)).isEmpty();
         assertThat(routing.binding(1L, AgentPurpose.MENTOR, 20L)).isEmpty();
         assertThat(routing.allows(1L, 20L, LlmModelResolver.ConnectionRef.NONE)).isFalse();

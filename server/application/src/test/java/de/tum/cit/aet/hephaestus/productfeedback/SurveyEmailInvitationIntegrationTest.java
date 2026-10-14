@@ -6,8 +6,7 @@ import static org.awaitility.Awaitility.await;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.notification.SurveyEmailRequested;
 import de.tum.cit.aet.hephaestus.notification.SurveyEndedSummaryRequested;
@@ -22,7 +21,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import jakarta.mail.Multipart;
 import java.io.ByteArrayOutputStream;
 import java.net.ConnectException;
@@ -77,7 +76,7 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
     private AccountRepository accounts;
 
     @Autowired
-    private IdentityLinkRepository identities;
+    private IdentityRepository identities;
 
     @Autowired
     private NotificationSubscriptionService subscriptions;
@@ -217,7 +216,7 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
             case "unsubscribed" -> subscribe(recipient.accountId(), false);
             case "membership-removed" ->
                 jdbc.update(
-                        "DELETE FROM workspace_membership WHERE workspace_id = ?",
+                        "UPDATE membership SET left_at=now() WHERE workspace_id = ?",
                         recipient.workspace().getId());
             default -> throw new IllegalArgumentException(change);
         }
@@ -841,18 +840,16 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
         String slug = "survey-email-" + UUID.randomUUID();
         var actor = persistUser(slug);
         Workspace workspace = createWorkspace(slug, "Survey workspace", slug, AccountType.ORG, actor);
-        ensureWorkspaceMembership(workspace, actor, WorkspaceMembership.WorkspaceRole.MEMBER);
-        Account account = new Account("Survey recipient");
+        ensureWorkspaceMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
+        var providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
+        var link = identities.findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
+                .orElseThrow();
+        var account = link.getAccount();
+        account.setDisplayName("Survey recipient");
+        account.setStatus(Account.Status.ACTIVE);
         account.setPrimaryEmail(UUID.randomUUID() + "@hephaestus.test");
         account.setPrimaryEmailVerifiedAt(Instant.now());
         account = accounts.save(account);
-        IdentityLink link = new IdentityLink();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(ensureGitHubProvider().getId()));
-        link.setSubject(actor.getNativeId().toString());
-        link.setUsernameAtSignup(actor.getLogin());
-        link.setExternalActorId(actor.getId());
-        identities.save(link);
         long id = Objects.requireNonNull(account.getId());
         subscribe(id, true);
         return new Recipient(id, workspace);

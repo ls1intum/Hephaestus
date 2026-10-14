@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import com.slack.api.model.assistant.SuggestedPrompt;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import java.util.List;
 import java.util.Optional;
@@ -13,6 +14,7 @@ import tools.jackson.databind.JsonNode;
 
 /** Installs suggested prompts when a member opens the Slack agent Messages tab. */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackAssistantEventHandler {
 

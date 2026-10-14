@@ -1,10 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
@@ -20,6 +16,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
@@ -163,7 +163,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
             return null;
         }
 
-        // Sync returns a detached parent; event references must use this transaction's relationships.
+        // Sync returns a detached parent; event references must use this transaction's
+        // relationships.
         Issue parent = issueRepository
                 .findById(Objects.requireNonNull(suppliedParent.getId()))
                 .orElseThrow(() -> new IllegalStateException("The comment's reviewed work no longer exists"));
@@ -256,7 +257,8 @@ public class GitLabIssueCommentProcessor extends BaseGitLabProcessor {
         Long issueId = parent.getId();
         Optional<IssueComment> existingOpt =
                 commentRepository.findByNativeIdAndProviderId(attrs.id(), Objects.requireNonNull(context.providerId()));
-        // A note id is unique on the instance, so a note already stored under another issue or merge request is not
+        // A note id is unique on the instance, so a note already stored under another issue or
+        // merge request is not
         // this one's, whatever the payload says: it is never moved.
         if (existingOpt
                 .map(IssueComment::getIssue)

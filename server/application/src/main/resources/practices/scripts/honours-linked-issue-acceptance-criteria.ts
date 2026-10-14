@@ -1,8 +1,9 @@
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { readLinkedWorkItems } from "../kits/scm/review.ts";
 // Finds the issue references in the title, the body and the branch of a pull request, and the
 // acceptance-criteria blocks of the linked issues. It gives facts, never a verdict of compliance.
-import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
-import { readLinkedWorkItems } from "../lib/review.ts";
+import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 const CLOSE_KEYWORD = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\b/giu;
 // "closes #12", "fixes GH-12", "resolves group/proj#12" — capture the trailing issue number.
@@ -25,7 +26,7 @@ function collect(re: RegExp, text: string, into: Set<string>): void {
 	}
 }
 
-// A checkable acceptance-criteria artifact: an AC/DoD heading or a "- [ ]" checklist in the issue body.
+// A checkable acceptance-criteria section: an AC/DoD heading or a "- [ ]" checklist in the issue body.
 function acFacts(body: string): { heading: boolean; boxes: number } {
 	const heading =
 		/(?:acceptance criteria|definition of done|\bDoD\b|done when|expected (?:outcome|result|behaviou?r))/iu.test(
@@ -38,10 +39,11 @@ function acFacts(body: string): { heading: boolean; boxes: number } {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const title = ctx.work.title ?? "";
-		const body = ctx.work.body ?? "";
-		const branch = ctx.work.source_branch;
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const title = domain.item.title ?? "";
+		const body = domain.item.body ?? "";
+		const branch = domain.item.source_branch;
 
 		// Syntax matches are candidates, including examples and code spans. They establish neither a
 		// provider-reported relationship nor adoption of another issue's criteria by the author.

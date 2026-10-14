@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ObjectNode;
@@ -19,7 +19,7 @@ public record MetCandidate(
     }
 
     @Override
-    public Outcome outcome() {
-        return Outcome.MET;
+    public ResultOutcome outcome() {
+        return ResultOutcome.MET;
     }
 }

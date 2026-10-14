@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
@@ -32,7 +32,7 @@ public record TrendSupport(
         int opportunitiesUntilComparable,
         int standingWork,
         int reviewedWork,
-        @Nullable ArtifactKind reviewedWorkKind,
+        @Nullable ItemKind reviewedWorkKind,
         @Nullable Integer comparablePractices,
         @Nullable Integer eligiblePractices,
         @Nullable Instant firstOpportunityAt,

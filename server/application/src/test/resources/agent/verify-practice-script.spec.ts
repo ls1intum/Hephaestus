@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
 import {
 	leadKeys,
 	runBundled,
@@ -30,13 +30,13 @@ const metadata = (body: string) => ({
 	body,
 });
 
-void test("a diagram-and-README change is named as an occasion-gate kind, with the empty testing heading called out", async () => {
+void test("a diagram-and-README change is named as an applicability-gate kind, with the empty testing heading called out", async () => {
 	const result = await runBundled(SLUG, {
 		change: new Map([
 			changed("diagrams/aom.png", ["PNG"]),
 			changed("README.md", ["![AOM](diagrams/aom.png)"]),
 		]),
-		work: metadata("## Description\n\nCloses #4\n\n## Testing Instructions\n\n<!-- steps -->\n"),
+		item: metadata("## Description\n\nCloses #4\n\n## Testing Instructions\n\n<!-- steps -->\n"),
 		context: {
 			"linked_work_items.json": { workItems: [{ number: 4, title: "Day 2 AOM", body: null }] },
 		},
@@ -46,7 +46,7 @@ void test("a diagram-and-README change is named as an occasion-gate kind, with t
 	assert.match(result.directions?.[0] ?? "", /^No code, test or project-configuration file/u);
 	assert.match(
 		result.directions?.[1] ?? "",
-		/one of the kinds the criteria's Occasion section names/u,
+		/one of the kinds the criteria's applicability section names/u,
 	);
 	assert.match((result.directions ?? []).join("\n"), /testing heading .* has no content/u);
 	assert.match(
@@ -61,7 +61,7 @@ void test("a code change with a preview and a filled testing section is reported
 			changed("App/Views/QuizView.swift", ["struct QuizView: View {", "#Preview { QuizView() }"]),
 			changed("App/Tests/QuizTests.swift", ["func testScore() {}"]),
 		]),
-		work: metadata(
+		item: metadata(
 			"## Testing Instructions\n\n1. Open the Quiz tab\n2. Answer three questions\n3. The score reads 3/3\n\n![result](/uploads/x.png)\n",
 		),
 	});
@@ -82,7 +82,7 @@ void test("a code change with a preview and a filled testing section is reported
 });
 
 void test("an empty range is named as such", async () => {
-	const result = await runBundled(SLUG, { work: metadata("") });
+	const result = await runBundled(SLUG, { item: metadata("") });
 	assert.match(result.directions?.[0] ?? "", /empty diff is one of the kinds/u);
 });
 
@@ -97,7 +97,7 @@ void test("a closing keyword a template shows as an example adopts no issue, and
 	};
 	const result = await runBundled(SLUG, {
 		change: new Map([changed("Trivio/QuizView.swift", ["struct QuizView: View {"])]),
-		work: { ...metadata(`Closes #<!-- issue number -->\n\n${TEMPLATE}`), source_branch: "branch1" },
+		item: { ...metadata(`Closes #<!-- issue number -->\n\n${TEMPLATE}`), source_branch: "branch1" },
 		context,
 	});
 	const directions = (result.directions ?? []).join("\n");
@@ -120,7 +120,7 @@ void test("the author's own closing keyword is named beside the template's examp
 	};
 	const result = await runBundled(SLUG, {
 		change: new Map([changed("App/TileView.swift", ["struct TileView: View {"])]),
-		work: { ...metadata(`Closes #25\n\n${TEMPLATE}`), source_branch: "tiles" },
+		item: { ...metadata(`Closes #25\n\n${TEMPLATE}`), source_branch: "tiles" },
 		context,
 	});
 	const directions = (result.directions ?? []).join("\n");
@@ -134,7 +134,7 @@ void test("the author's own closing keyword is named beside the template's examp
 void test("a testing section of only N/A is stated as such, not as a section to judge, and an indented heading is found", async () => {
 	const result = await runBundled(SLUG, {
 		change: new Map([changed("App/HomeView.swift", ['AlertToast(type: .regular, title: "Hi")'])]),
-		work: metadata(
+		item: metadata(
 			"  ## Description\n\nadded AlertToast package to home screen showing a pop up message on the top of the screen\n\n  ## Testing Instructions\n\nN/A\n",
 		),
 	});
@@ -156,7 +156,7 @@ void test("moved files are counted apart from the files whose lines change, and 
 			changed("project.yml", ["name: Trivio"]),
 			changed("diagrams/class.png", []),
 		]),
-		work: metadata(""),
+		item: metadata(""),
 	});
 	assert.equal(
 		result.directions?.[0],
@@ -181,7 +181,7 @@ void test("a key the code reads at runtime and an ignored secrets file are locat
 				'Button(/*@START_MENU_TOKEN@*/"Button"/*@END_MENU_TOKEN@*/) {',
 			]),
 		]),
-		work: metadata(""),
+		item: metadata(""),
 	});
 	const keyOf = await leadKeys(SLUG);
 	assert.deepEqual(

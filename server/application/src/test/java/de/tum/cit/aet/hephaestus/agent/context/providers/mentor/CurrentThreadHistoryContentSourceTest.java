@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -38,7 +38,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
         CurrentThreadHistoryContentSource source =
                 new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
+        source.contribute(new MentorContextRequest(1L, 2L, threadId, null), files);
 
         JsonNode root = objectMapper.readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY));
         assertThat(root.get("threadId").asString()).isEqualTo(threadId.toString());
@@ -65,7 +65,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
         CurrentThreadHistoryContentSource source =
                 new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
+        source.contribute(new MentorContextRequest(1L, 2L, threadId, null), files);
 
         JsonNode messages = objectMapper
                 .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))
@@ -111,7 +111,7 @@ class CurrentThreadHistoryContentSourceTest extends BaseUnitTest {
         CurrentThreadHistoryContentSource source =
                 new CurrentThreadHistoryContentSource(chatMessageRepository, objectMapper);
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(new ContextRequest.MentorChatRequest(1L, 2L, threadId), files);
+        source.contribute(new MentorContextRequest(1L, 2L, threadId, null), files);
 
         assertThat(objectMapper
                         .readTree(files.get(CurrentThreadHistoryContentSource.OUTPUT_KEY))

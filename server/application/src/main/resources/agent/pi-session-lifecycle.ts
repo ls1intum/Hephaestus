@@ -9,10 +9,10 @@ export type SessionPhase = "practice" | "public-review" | "private-feedback";
 export interface ReviewSessionBinding {
 	phase: SessionPhase;
 	practiceSlug: string | null;
-	practiceRevisionId: number | null;
+	practiceVersionId: string | null;
 	model: string;
 	jobId: string | null;
-	workspaceId: number | null;
+	workspaceId: string | null;
 	openedAt: string;
 }
 

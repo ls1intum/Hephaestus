@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import static org.springframework.security.oauth2.core.authorization.OAuth2AuthorizationManagers.hasScope;
 
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxOutputArchive;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.core.auth.ratelimit.AuthRateLimitProperties;
@@ -60,7 +60,7 @@ class LlmProxySecurityConfig {
     SecurityFilterChain llmProxyFilterChain(
             HttpSecurity http,
             SandboxGatewayProperties gatewayProperties,
-            AgentJobRepository agentJobRepository,
+            ReviewJobRepository agentJobRepository,
             WorkerJwtVerifier jwtVerifier,
             MentorProxyCredentialRegistry mentorRegistry,
             BucketResolver bucketResolver,

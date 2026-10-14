@@ -5,9 +5,9 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -18,9 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Handles GitHub installation_target webhook events.
- */
+/** Handles GitHub installation_target webhook events. */
 @Component
 public class GitHubInstallationTargetMessageHandler
         extends AbstractIntegrationMessageHandler<GitHubInstallationTargetEventDTO> {
@@ -81,7 +79,7 @@ public class GitHubInstallationTargetMessageHandler
         upsertOrganization(event, installationId, newLogin);
 
         log.info(
-                "Processed installation_target rename: installationId={}, previousLogin={}, newLogin={}",
+                "Processed installation_target rename: installationId={}, previousLogin={}," + " newLogin={}",
                 installationId,
                 sanitizeForLog(previousLogin),
                 sanitizeForLog(newLogin));

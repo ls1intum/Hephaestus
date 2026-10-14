@@ -10,7 +10,7 @@ The report shows what Hephaestus recorded about the pull request, merge request,
 It includes the evidence and feedback delivery results. It is desktop Chrome only. Chrome on Android and
 iOS does not run desktop extensions.
 
-The extension is a place to read context, not a feedback channel. It never delivers feedback and never
+The extension is a place to read context, not a feedback destination. It never delivers feedback and never
 calls `GET /practices/feedback/in-app`, which marks the caller's own feedback delivered as a side
 effect. [The user guide](/user/browser-extension) is the product description and
 [the admin guide](/admin/browser-extension) the operator's. This page is how it is built.
@@ -163,7 +163,7 @@ The flow is in `docs/auth-architecture.md`.
   The report shows this first.
 - Other reads reuse existing endpoints for the reader's own reviewed-work runs and results.
   They request a trace by the latest own review id through `getOwnArtifactTrace`.
-  Results use exact `artifactKind` and `artifactId` filters when the report opens.
+  Results use the exact `itemId` filter when the report opens.
   The worker checks that each returned record concerns the resolved work, and refuses a list that does not.
   Admins use the same own-reader projection.
   A missing own run or refused trace is unavailable, not evidence that nobody reviewed the work.
@@ -305,7 +305,7 @@ startup. Do not add a second reload mechanism.
 
 `vp run check:affected` selects `affected:extension` for changes under `extension/` or to the web app's entry stylesheet.
 It also selects it for webapp files imported by path, including their imports.
-These include the brand mark, vocabulary registries, status definitions, artifact kinds and slugs, and sign-in providers. A change to the
+These include the brand mark, vocabulary registries, status definitions, item kinds and slugs, and sign-in providers. A change to the
 shared palette, `webapp/src/styles/theme-tokens.css`, selects the webapp, extension and docs scopes,
 because all three depend on it. A change to the webapp lint plugin, `extension/src/api` or
 `server/openapi.yaml` runs the whole gate.

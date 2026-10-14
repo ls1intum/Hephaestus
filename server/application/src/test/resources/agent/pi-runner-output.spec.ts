@@ -6,8 +6,8 @@ import { outputPath } from "../../../main/resources/agent/pi-runner-output.ts";
 void test("a short ASCII name is written where the collector looks for it", () => {
 	assert.equal(outputPath("/workspace/out", "result.json"), "/workspace/out/result.json");
 	assert.equal(
-		outputPath("/workspace/out", "observations/security/no-secrets.json"),
-		"/workspace/out/observations/security/no-secrets.json",
+		outputPath("/workspace/out", "problems/security/no-secrets.json"),
+		"/workspace/out/problems/security/no-secrets.json",
 	);
 });
 

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -86,10 +86,10 @@ public class LlmModelResolver {
     @Transactional(readOnly = true)
     public Optional<DataHandlingTier> dataHandlingTier(ConnectionRef ref) {
         if (ref.modelId() == null || ref.workspaceId() == null) return Optional.empty();
-        if (ref.scope() == FundingSource.INSTANCE) {
+        if (ref.scope() == UsageFundingSource.INSTANCE) {
             return llmModelRepository.findById(ref.modelId()).map(LlmModel::getDataHandlingTier);
         }
-        if (ref.scope() != FundingSource.WORKSPACE) return Optional.empty();
+        if (ref.scope() != UsageFundingSource.WORKSPACE) return Optional.empty();
         return workspaceLlmModelRepository
                 .findByIdAndWorkspaceId(ref.modelId(), ref.workspaceId())
                 .map(WorkspaceLlmModel::getDataHandlingTier);
@@ -131,7 +131,7 @@ public class LlmModelResolver {
      * (possibly since-changed) current binding.
      */
     public record ConnectionRef(
-            @Nullable FundingSource scope,
+            @Nullable UsageFundingSource scope,
             @Nullable Long connectionId,
             @Nullable Long modelId,
             @Nullable Long workspaceId) {
@@ -158,7 +158,7 @@ public class LlmModelResolver {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
             return new ConnectionRef(
-                    FundingSource.INSTANCE,
+                    UsageFundingSource.INSTANCE,
                     instance.getConnection().getId(),
                     instance.getId(),
                     config.getWorkspace().getId());
@@ -166,7 +166,7 @@ public class LlmModelResolver {
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
             return new ConnectionRef(
-                    FundingSource.WORKSPACE,
+                    UsageFundingSource.WORKSPACE,
                     byo.getConnection().getId(),
                     byo.getId(),
                     config.getWorkspace().getId());
@@ -181,7 +181,7 @@ public class LlmModelResolver {
      */
     @Transactional(readOnly = true)
     public @Nullable ProxyCredential resolveProxyCredential(ConnectionRef ref) {
-        if (ref.scope() == FundingSource.INSTANCE && ref.connectionId() != null) {
+        if (ref.scope() == UsageFundingSource.INSTANCE && ref.connectionId() != null) {
             if (!isUsableInstanceModel(ref)) {
                 return null;
             }
@@ -200,7 +200,7 @@ public class LlmModelResolver {
                             blankToNull(c.getApiKey())))
                     .orElse(null);
         }
-        if (ref.scope() == FundingSource.WORKSPACE && ref.connectionId() != null) {
+        if (ref.scope() == UsageFundingSource.WORKSPACE && ref.connectionId() != null) {
             if (!isUsableWorkspaceModel(ref)) {
                 return null;
             }

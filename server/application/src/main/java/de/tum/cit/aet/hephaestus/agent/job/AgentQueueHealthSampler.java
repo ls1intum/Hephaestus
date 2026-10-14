@@ -18,8 +18,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Queue-health gauges for the {@code agent_job} queue, sampled on a timer and never on a request path.
- * All of them come from ONE query ({@link AgentJobRepository#queueHealthSnapshot}): separate COUNT/MIN
+ * Queue-health gauges for the {@code review_job} queue, sampled on a timer and never on a request path.
+ * All of them come from ONE query ({@link ReviewJobRepository#queueHealthSnapshot}): separate COUNT/MIN
  * scans would cost the most exactly during the incident that makes the signal matter.
  *
  * <p>Must stay gated to the server role, not just to {@code @Scheduled}: a registered-but-never-sampled
@@ -34,29 +34,29 @@ public class AgentQueueHealthSampler {
 
     private static final Logger log = LoggerFactory.getLogger(AgentQueueHealthSampler.class);
 
-    private final AgentJobRepository jobRepository;
+    private final ReviewJobRepository jobRepository;
     private final AtomicLong depth = new AtomicLong();
     private final AtomicLong oldestAgeSeconds = new AtomicLong();
     private final AtomicLong held = new AtomicLong();
     private final AtomicLong running = new AtomicLong();
     private final Counter samplerFailures;
 
-    public AgentQueueHealthSampler(AgentJobRepository jobRepository, MeterRegistry meterRegistry) {
+    public AgentQueueHealthSampler(ReviewJobRepository jobRepository, MeterRegistry meterRegistry) {
         this.jobRepository = jobRepository;
         Gauge.builder(AgentMetrics.AGENT_QUEUE_DEPTH, depth, AtomicLong::get)
                 .description(
                         "QUEUED jobs currently eligible to run (available_at <= now); last-good on sampler failure")
                 .register(meterRegistry);
         Gauge.builder(AgentMetrics.AGENT_QUEUE_OLDEST_AGE_SECONDS, oldestAgeSeconds, AtomicLong::get)
-                .description(
-                        "Age in seconds of the oldest eligible QUEUED job; 0 when the queue is empty; last-good on sampler failure")
+                .description("Age in seconds of the oldest eligible QUEUED job; 0 when the queue is empty; last-good on"
+                        + " sampler failure")
                 .register(meterRegistry);
         // Without this, a workspace over its monthly LLM cap is indistinguishable from an idle instance:
         // its whole backlog sits at available_at in the future, so agent.queue.depth reads 0 and the
         // "queue is backed up" alert stays silent while nothing runs. Alert on held > 0 sustained.
         Gauge.builder(AgentMetrics.AGENT_QUEUE_HELD, held, AtomicLong::get)
-                .description(
-                        "QUEUED jobs parked on an admin-undoable hold (monthly LLM cap); excluded from agent.queue.depth; last-good on sampler failure")
+                .description("QUEUED jobs parked on an admin-undoable hold (monthly LLM cap); excluded from"
+                        + " agent.queue.depth; last-good on sampler failure")
                 .register(meterRegistry);
         Gauge.builder(AgentMetrics.AGENT_QUEUE_RUNNING, running, AtomicLong::get)
                 .description("Jobs currently RUNNING fleet-wide; last-good on sampler failure")
@@ -70,7 +70,7 @@ public class AgentQueueHealthSampler {
     public void sample() {
         Instant now = Instant.now();
         try {
-            AgentJobRepository.QueueHealthSnapshot snapshot = jobRepository.queueHealthSnapshot(now);
+            ReviewJobRepository.QueueHealthSnapshot snapshot = jobRepository.queueHealthSnapshot(now);
             depth.set(snapshot.getDepth());
             held.set(snapshot.getHeld());
             running.set(snapshot.getRunning());

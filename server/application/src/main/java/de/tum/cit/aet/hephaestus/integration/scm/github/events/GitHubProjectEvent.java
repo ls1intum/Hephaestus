@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.events;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Sealed events for GitHub Projects V2 — project, item, and status-update
- * lifecycles. GitLab has no equivalent product, so these live in the GitHub
- * package rather than in the cross-vendor SCM event hierarchy.
+ * Sealed events for GitHub Projects V2 — project, item, and status-update lifecycles. GitLab has no
+ * equivalent product, so these live in the GitHub package rather than in the cross-vendor SCM event
+ * hierarchy.
  */
 public final class GitHubProjectEvent {
 

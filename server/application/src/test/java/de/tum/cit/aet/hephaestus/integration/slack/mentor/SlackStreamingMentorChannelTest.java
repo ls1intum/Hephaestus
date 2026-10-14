@@ -105,8 +105,8 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         return UIMessageChunk.DataResult.of(UUID.randomUUID(), text);
     }
 
-    private static UIMessageChunk.DataResultObservation problemFeedback(String text) {
-        return UIMessageChunk.DataResultObservation.of(UUID.randomUUID(), UUID.randomUUID(), text);
+    private static UIMessageChunk.DataProblem problemFeedback(String text) {
+        return UIMessageChunk.DataProblem.of(UUID.randomUUID(), UUID.randomUUID(), text);
     }
 
     @Test
@@ -424,7 +424,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         verify(slack, timeout(4000)).startStream(WS, CH, THREAD, "first ");
         channel.send(feedback("Name the trade-off."));
 
-        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.NOT_DELIVERED);
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.UNCONFIRMED);
     }
 
     @Test
@@ -439,7 +439,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
 
         channel.send(feedback("Name the trade-off."));
 
-        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.NOT_DELIVERED);
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.UNCONFIRMED);
         verify(slack).startStream(WS, CH, THREAD, "Name the trade-off.\n\n");
     }
 
@@ -455,7 +455,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
     }
 
     @Test
-    void silentModeMidStreamSuppressesTheReply() {
+    void silentModeMidStreamLeavesTheVisiblePrefixUnconfirmed() {
         SlackMessageService slack = mock(SlackMessageService.class);
         when(slack.startStream(anyLong(), anyString(), anyString(), anyString()))
                 .thenReturn("ts");
@@ -470,7 +470,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         waitUntil(channel::isClientGone, 4000);
 
         assertThat(channel.isClientGone()).isTrue();
-        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.INSTANCE_SILENCED);
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.UNCONFIRMED);
     }
 
     @Test
@@ -487,7 +487,7 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         verify(slack, timeout(4000)).startStream(WS, CH, THREAD, "first ");
         channel.send(delta("tail"));
 
-        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.NOT_DELIVERED);
+        assertThat(channel.completeWithDone()).isEqualTo(MentorChannel.DeliveryOutcome.UNCONFIRMED);
     }
 
     @Test
@@ -525,6 +525,6 @@ class SlackStreamingMentorChannelTest extends BaseUnitTest {
         waitUntil(() -> finisher.getState() == Thread.State.WAITING, 4000);
         release.countDown();
 
-        assertThat(outcome.get(4, TimeUnit.SECONDS)).isEqualTo(MentorChannel.DeliveryOutcome.NOT_DELIVERED);
+        assertThat(outcome.get(4, TimeUnit.SECONDS)).isEqualTo(MentorChannel.DeliveryOutcome.UNCONFIRMED);
     }
 }

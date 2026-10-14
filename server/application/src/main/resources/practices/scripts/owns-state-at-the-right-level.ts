@@ -1,13 +1,9 @@
+import { scm } from "../kits/scm/index.ts";
+import { sampleNote, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 // Finds each state declaration and each state wiring that the change adds to Swift files, with the
 // type that encloses it. The review applies the four rules of the practice to each lead.
-import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
+import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
@@ -27,34 +23,38 @@ const STATE_DECLARATIONS: readonly SourcePattern[] = [
 	["published-property", /@Published\b/u],
 	[
 		"mutable-stored-property",
-		/^\s*(?:private\s+|fileprivate\s+|internal\s+)?var\s+[A-Za-z_][A-Za-z0-9_]*\s*(?::\s*[^{=\n]+)?(?:=\s*[^{\n]+)?\s*$/u,
+		/^\s*(?:private\s+|fileprivate\s+|internal\s+)?var\s+[A-Za-z_][A-Za-z0-9_]*\s*(?::\s*[^{=\n]+)?(?:=\s*[^{\n]+)?\s*$/mu,
 	],
 	["environment-injection", /\.environment(?:Object)?\s*\(/u],
 ];
 
 export const LABELS = {
-	"state-creating-an-object": "An added @State or @StateObject declaration that creates an object.",
-	"state-property": "An added @State declaration.",
-	"state-object": "An added @StateObject declaration.",
-	"observed-object": "An added @ObservedObject declaration.",
-	binding: "An added @Binding declaration.",
-	bindable: "An added @Bindable declaration.",
-	"environment-value": "An added @Environment or @EnvironmentObject declaration.",
-	"app-storage": "An added @AppStorage declaration.",
-	query: "An added @Query declaration.",
-	"observable-type": "An added line with @Observable, usually on a model type.",
-	"observable-object-type": "An added line that names ObservableObject, usually on a model type.",
-	"published-property": "An added @Published property.",
-	"mutable-stored-property": "An added stored var without a property wrapper.",
-	"environment-injection": "An added .environment or .environmentObject modifier.",
+	"state-creating-an-object":
+		"A selected @State or @StateObject declaration that creates an object.",
+	"state-property": "A selected @State declaration.",
+	"state-object": "A selected @StateObject declaration.",
+	"observed-object": "A selected @ObservedObject declaration.",
+	binding: "A selected @Binding declaration.",
+	bindable: "A selected @Bindable declaration.",
+	"environment-value": "A selected @Environment or @EnvironmentObject declaration.",
+	"app-storage": "A selected @AppStorage declaration.",
+	query: "A selected @Query declaration.",
+	"observable-type": "A selected line with @Observable, usually on a model type.",
+	"observable-object-type": "A selected line that names ObservableObject, usually on a model type.",
+	"published-property": "A selected @Published property.",
+	"mutable-stored-property": "A selected stored var without a property wrapper.",
+	"environment-injection": "A selected .environment or .environmentObject modifier.",
 };
 const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
+		const scan = await scanOccurrences(ctx, domain.files, {
 			languages: ["swift"],
 			patterns: STATE_DECLARATIONS,
 			scope: SWIFTUI_VIEW,
@@ -64,7 +64,13 @@ export default definePracticeScript({
 			const label = LABEL_OF.get(hint.pattern);
 			return label === undefined
 				? []
-				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+				: [
+						{
+							at: { file: hint.file, line: hint.line, endLine: hint.endLine },
+							label,
+							facts: factsOf(hint.flags),
+						},
+					];
 		});
 		const inViews = scan.hints.filter((hint) => hint.flags.inScope === true);
 		const objectsCreatedInViews = inViews.filter(
@@ -75,11 +81,11 @@ export default definePracticeScript({
 		).length;
 		const directions: string[] = [...sampleNote(scan)];
 		if (leads.length === 0) {
-			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
+			directions.push(...noMatchDirections(scan.linesSelected, scan.filesScanned));
 		}
 		if (scan.matched > 0) {
 			directions.push(
-				`${scan.matched} state declaration(s) or wiring line(s) added; ${inViews.length} of the listed rows lie inside view types. Walk each against the four rules.`,
+				`${scan.matched} state declaration(s) or wiring line(s) selected; ${inViews.length} of the listed rows lie inside view types. Walk each against the four rules.`,
 			);
 		}
 		if (objectsCreatedInViews > 0) {
@@ -95,13 +101,13 @@ export default definePracticeScript({
 		return ctx.review({
 			leads,
 			facts: {
-				stateDeclarationsAdded: scan.matched,
+				stateDeclarationsSelected: scan.matched,
 				stateDeclarationsInViews: inViews.length,
 				objectsCreatedInViews,
 				storedVarsInViews,
-				filesWithoutCheckout: scan.filesWithoutCheckout,
+				filesWithUnknownLocation: scan.filesWithUnknownLocation,
 				filesScanned: scan.filesScanned,
-				linesAdded: scan.linesAdded,
+				linesSelected: scan.linesSelected,
 			},
 			directions,
 		});

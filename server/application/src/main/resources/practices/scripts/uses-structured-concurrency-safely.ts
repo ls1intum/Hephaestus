@@ -1,15 +1,15 @@
+import { scm, type FileTree } from "../kits/scm/index.ts";
+import {
+	countLabel,
+	sampleNote,
+	scanOccurrences,
+	type SourcePattern,
+} from "../kits/scm/source-scan.ts";
 // Finds each concurrency construct that the change adds to Swift files, with the type that encloses
 // it, and the lines of the project files that name a default actor isolation. The review decides
 // from the checkout whether the work must outlive the view and where each mutation runs.
-import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type FileTree,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
+import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
@@ -23,7 +23,7 @@ const CONCURRENCY: readonly SourcePattern[] = [
 	["dispatch-queue", /\bDispatchQueue\b/u],
 	["main-actor-mark", /@MainActor\b/u],
 	["main-actor-run", /\bMainActor\.run\b/u],
-	["actor-declaration", /^\s*(?:\w+\s+)*actor\s+\w+/u],
+	["actor-declaration", /^\s*(?:\w+\s+)*actor\s+\w+/mu],
 	["async-function", /\bfunc\s+\w+[^{]*\basync\b/u],
 	["await", /\bawait\b/u],
 ];
@@ -77,17 +77,17 @@ async function defaultIsolationLines(
 }
 
 export const LABELS = {
-	"detached-task": "An added Task.detached call.",
-	"stored-task-handle": "An added property that stores a Task.",
-	"task-block": "An added unstructured Task { } block.",
-	"task-modifier": "An added .task view modifier.",
-	"on-appear": "An added .onAppear block.",
-	"dispatch-queue": "An added line that uses DispatchQueue.",
-	"main-actor-mark": "An added @MainActor attribute.",
-	"main-actor-run": "An added MainActor.run call.",
-	"actor-declaration": "An added actor declaration.",
-	"async-function": "An added async function declaration.",
-	await: "An added await expression.",
+	"detached-task": "A selected Task.detached call.",
+	"stored-task-handle": "A selected property that stores a Task.",
+	"task-block": "A selected unstructured Task { } block.",
+	"task-modifier": "A selected .task view modifier.",
+	"on-appear": "A selected .onAppear block.",
+	"dispatch-queue": "A selected line that uses DispatchQueue.",
+	"main-actor-mark": "A selected @MainActor attribute.",
+	"main-actor-run": "A selected MainActor.run call.",
+	"actor-declaration": "A selected actor declaration.",
+	"async-function": "A selected async function declaration.",
+	await: "A selected await expression.",
 	"default-isolation-setting":
 		"A line of a project file that names a default actor isolation for one target or module.",
 };
@@ -96,8 +96,11 @@ const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
+		const scan = await scanOccurrences(ctx, domain.files, {
 			languages: ["swift"],
 			patterns: CONCURRENCY,
 			scope: SWIFTUI_VIEW,
@@ -107,31 +110,37 @@ export default definePracticeScript({
 			const label = LABEL_OF.get(hint.pattern);
 			return label === undefined
 				? []
-				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+				: [
+						{
+							at: { file: hint.file, line: hint.line, endLine: hint.endLine },
+							label,
+							facts: factsOf(hint.flags),
+						},
+					];
 		});
 		const count = (label: string) => countLabel(scan, label);
 		const unstructuredInViews = scan.hints.filter(
 			(hint) => hint.pattern === "task-block" && hint.flags.inScope === true,
 		).length;
 		const facts = {
-			concurrencyLinesAdded: scan.matched,
+			concurrencyLinesSelected: scan.matched,
 			taskBlocks: count("task-block"),
 			taskBlocksInListedViewRows: unstructuredInViews,
 			taskModifiers: count("task-modifier"),
 			detachedTasks: count("detached-task"),
 			dispatchQueues: count("dispatch-queue"),
 			mainActorMarks: count("main-actor-mark") + count("main-actor-run"),
-			filesWithoutCheckout: scan.filesWithoutCheckout,
+			filesWithUnknownLocation: scan.filesWithUnknownLocation,
 			filesScanned: scan.filesScanned,
-			linesAdded: scan.linesAdded,
+			linesSelected: scan.linesSelected,
 		};
 		const directions: string[] = [...sampleNote(scan)];
 		if (leads.length === 0) {
-			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
+			directions.push(...noMatchDirections(scan.linesSelected, scan.filesScanned));
 		}
 		if (unstructuredInViews > 0) {
 			directions.push(
-				`${unstructuredInViews} Task { } block(s) added inside view types — read the lifetime each needs: work tied to the view belongs to a lifecycle that cancels it, while a Task started from a user action may legitimately finish after the view is gone.`,
+				`${unstructuredInViews} Task { } block(s) selected inside view types — read the lifetime each needs: work tied to the view belongs to a lifecycle that cancels it, while a Task started from a user action may legitimately finish after the view is gone.`,
 			);
 		}
 		if (facts.detachedTasks + facts.dispatchQueues > 0) {
@@ -140,7 +149,7 @@ export default definePracticeScript({
 			);
 		}
 		if (scan.matched > 0) {
-			const settings = await defaultIsolationLines(ctx.files?.head ?? null);
+			const settings = await defaultIsolationLines(domain.files?.head ?? null);
 			leads.push(
 				...settings.map((at): ReviewLead => ({ at, label: LABELS["default-isolation-setting"] })),
 			);
@@ -148,7 +157,7 @@ export default definePracticeScript({
 				settings.length > 0
 					? "Each default-isolation-setting lead applies only to its own target or SwiftPM module and build configuration, and a commented line sets nothing: read which target and configuration build the changed file before relying on any of them."
 					: "No default actor isolation text was found in the project files read, which leaves the module's default unknown rather than nonisolated.",
-				"A type's isolation comes from its declaration, its module's setting or what it inherits. A missing @MainActor on an added line does not by itself put a mutation off the main actor.",
+				"A type's isolation comes from its declaration, its module's setting or what it inherits. A missing @MainActor on a selected line does not by itself put a mutation off the main actor.",
 				"Check the SDK before relying on inherited SwiftUI View isolation. Swallowed failures belong to handles-errors-instead-of-swallowing-them, not this practice.",
 			);
 		}

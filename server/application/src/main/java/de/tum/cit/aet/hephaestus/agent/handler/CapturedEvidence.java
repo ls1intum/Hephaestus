@@ -1,69 +1,58 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
-import de.tum.cit.aet.hephaestus.agent.context.providers.RepositoryTreeContentSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
-import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.practices.PracticePreconditionClause;
+import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/** Typed access to the persisted evidence snapshot. */
+/** The canonical captured-file inventory; domain version strings remain opaque. */
 final class CapturedEvidence {
-
-    record Artifact(SourceKind kind, String sha256) {}
+    record FileProof(SourceKind kind, String sha256) {}
 
     private final JobFolderIndex manifest;
-    private final Set<SourceKind> availableSources;
-    private final Map<String, Artifact> artifacts;
+    private final Set<SourceKind> available;
+    private final Map<String, FileProof> files;
 
     private CapturedEvidence(JobFolderIndex manifest) {
         this.manifest = manifest;
-        Set<SourceKind> available = new HashSet<>();
-        Map<String, Artifact> byPath = new HashMap<>();
-        for (var source : manifest.sources()) {
-            if (source.state() instanceof SourceCaptureState.Available) available.add(source.kind());
+        var sources = new HashSet<SourceKind>();
+        manifest.sources().forEach(source -> {
+            if (source.state() instanceof SourceCaptureState.Available) sources.add(source.kind());
+        });
+        var indexed = new HashMap<String, FileProof>();
+        for (var entry : manifest.files()) {
+            if (indexed.put(
+                            entry.file().path(),
+                            new FileProof(entry.kind(), entry.file().sha256()))
+                    != null) {
+                throw new JobDeliveryException("A captured path belongs to multiple sources");
+            }
         }
-        for (var entry : manifest.artifacts()) {
-            available.add(entry.kind());
-            SourceArtifact artifact = entry.artifact();
-            if (byPath.put(artifact.path(), new Artifact(entry.kind(), artifact.sha256())) != null)
-                throw new JobDeliveryException("Folder artifact belongs to multiple sources: " + artifact.path());
-        }
-        this.availableSources = Set.copyOf(available);
-        this.artifacts = Map.copyOf(byPath);
+        available = Set.copyOf(sources);
+        files = Map.copyOf(indexed);
     }
 
     static CapturedEvidence of(JobFolderIndex manifest) {
         return new CapturedEvidence(manifest);
     }
 
-    static CapturedEvidence of(AgentJob job, ObjectMapper mapper) {
-        JsonNode snapshot = job.getEvidenceSnapshot();
-        if (snapshot == null || !snapshot.isObject()) {
-            throw new JobDeliveryException("Job has no evidence snapshot: jobId=" + job.getId());
+    static CapturedEvidence of(ReviewJob job, ObjectMapper mapper) {
+        var capture = job.getCapture();
+        if (capture == null || !capture.path("manifest").isObject()) {
+            throw new JobDeliveryException("The attempt has no captured source manifest");
         }
-        JsonNode manifest = snapshot.path("manifest");
-        if (!manifest.isObject()) {
-            throw new JobDeliveryException("Job evidence snapshot has no source manifest: jobId=" + job.getId());
-        }
-        try {
-            return new CapturedEvidence(mapper.treeToValue(manifest, JobFolderIndex.class));
-        } catch (JacksonException exception) {
-            throw new JobDeliveryException(
-                    "Job evidence snapshot is not a readable manifest: jobId=" + job.getId(), exception);
-        }
+        return of(mapper.treeToValue(capture.get("manifest"), JobFolderIndex.class));
     }
 
     SourceContractVersion contractVersion() {
@@ -71,56 +60,37 @@ final class CapturedEvidence {
     }
 
     Set<SourceKind> availableSources() {
-        return availableSources;
+        return available;
     }
 
-    Map<String, Artifact> artifacts() {
-        return artifacts;
-    }
-
-    @Nullable
-    Artifact artifact(String path) {
-        return artifacts.get(path);
-    }
-
-    Artifact requireArtifact(SourceKind kind, String path) {
-        Artifact artifact = artifacts.get(path);
-        if (!availableSources.contains(kind)
-                || artifact == null
-                || !artifact.kind().equals(kind)) {
-            throw new JobDeliveryException("Unavailable or misattributed evidence source " + kind + ": path=" + path);
-        }
-        return artifact;
+    Map<String, FileProof> files() {
+        return files;
     }
 
     @Nullable
-    String immutableIdentity(SourceKind kind) {
-        for (SourceCapture source : manifest.sources()) {
-            if (source.kind().equals(kind) && source.state() instanceof SourceCaptureState.Available available) {
-                return available.facts().immutableIdentity();
-            }
-        }
-        return null;
+    FileProof file(String path) {
+        return files.get(path);
     }
 
-    String pinnedHead() {
-        String identity = immutableIdentity(RepositoryTreeContentSource.KIND);
-        String head = identity == null ? "" : identity.split(":", 2)[0];
-        if (!head.matches(CitationVerification.GIT_OBJECT_ID)) {
-            throw new JobDeliveryException("Captured repository has no pinned commit identity");
+    CitableText resolve(SourceKind kind, String path, CitationSide side, @Nullable String revision) {
+        var matches = manifest.citableTexts().stream()
+                .filter(text -> text.source().equals(kind.value())
+                        && text.path().equals(path)
+                        && text.side() == side
+                        && Objects.equals(text.revision(), revision))
+                .toList();
+        if (!available.contains(kind) || matches.size() != 1) {
+            throw new CandidateEvidenceVerifier.Unverified(
+                    "quote_unverified", "The citation has no unique captured text", null);
         }
-        return head;
+        return matches.getFirst();
     }
 
-    /** The reviewed range as {@code {base, head}}, from the change the diff source pinned. */
-    String[] reviewRange() {
-        String identity = immutableIdentity(PracticePreconditionClause.DIFF_SOURCE);
-        String[] range = identity == null ? new String[0] : identity.split(":", -1);
-        if (range.length != 2
-                || !range[0].matches(CitationVerification.GIT_OBJECT_ID)
-                || !range[1].matches(CitationVerification.GIT_OBJECT_ID)) {
-            throw new JobDeliveryException("Captured change has no pinned base and head");
+    FileProof requireFile(SourceKind kind, String path) {
+        var file = files.get(path);
+        if (!available.contains(kind) || file == null || !file.kind().equals(kind)) {
+            throw new JobDeliveryException("The cited source was not captured at this path");
         }
-        return range;
+        return file;
     }
 }

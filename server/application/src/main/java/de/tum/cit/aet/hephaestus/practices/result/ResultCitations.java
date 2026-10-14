@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.Problem;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -20,7 +20,7 @@ public final class ResultCitations {
     private ResultCitations() {}
 
     /** The result's own citations: the stored list without any citation one of its problems carries. */
-    public static List<JsonNode> own(@Nullable JsonNode evidence, List<Observation> problems) {
+    public static List<JsonNode> own(@Nullable JsonNode evidence, List<Problem> problems) {
         Set<JsonNode> problemPlaces = new HashSet<>();
         problems.forEach(problem -> problem.getCitations().forEach(problemPlaces::add));
         List<JsonNode> own = new ArrayList<>();
@@ -33,7 +33,7 @@ public final class ResultCitations {
     }
 
     /** Every place the result cites: the stored list, the example's citation and each open question's. */
-    public static List<JsonNode> all(PracticeResult result) {
+    public static List<JsonNode> all(Result result) {
         return all(result.getEvidence(), result.getExample());
     }
 
@@ -41,7 +41,7 @@ public final class ResultCitations {
         List<JsonNode> all = new ArrayList<>();
         if (evidence != null) {
             evidence.path("citations").forEach(all::add);
-            for (JsonNode question : evidence.path("undecidability")) {
+            for (JsonNode question : evidence.path("openQuestions")) {
                 if (question.path("citation").isObject()) all.add(question.path("citation"));
             }
         }

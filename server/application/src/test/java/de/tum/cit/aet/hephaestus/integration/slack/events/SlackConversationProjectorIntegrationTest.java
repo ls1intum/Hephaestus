@@ -2,15 +2,24 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationThreadProjection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,11 +46,23 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
-    // Distinct workspace ids per test → isolation without a clean-between step (no FK to a workspace row).
-    private static final AtomicLong WS_SEQ = new AtomicLong(9_000_000L);
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private ConnectionRepository connections;
 
     private long newWorkspace() {
-        return WS_SEQ.incrementAndGet();
+        var workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("projector-" + UUID.randomUUID()));
+        connect(workspace);
+        return workspace.getId();
+    }
+
+    private void connect(Workspace workspace) {
+        var connection = new Connection(
+                workspace, IntegrationKind.SLACK, "T1", new ConnectionConfig.SlackConfig("T1", null, null, Set.of()));
+        connection.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(connection);
     }
 
     private SlackConversationTestSupport support;
@@ -50,7 +71,6 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void ensureUnmappedSlackThreadColumns() {
         support = new SlackConversationTestSupport(jdbc);
-        support.ensureUnmappedSlackThreadColumns();
     }
 
     private void seedChannel(long workspaceId, String channelId, String consentState) {
@@ -86,17 +106,23 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         seedMessage(workspace, "C1", "100.1", "100.0", "other participant reply");
         seedMessage(otherWorkspace, "C1", "200.0", null, "same native user in another team");
         jdbc.update(
-                "UPDATE slack_message SET author_slack_user_id='UPRIVACYTARGET' WHERE workspace_id=? AND slack_ts='100.0'",
+                "UPDATE slack_message SET author_slack_user_id='UPRIVACYTARGET' WHERE workspace_id=? AND"
+                        + " slack_ts='100.0'",
                 workspace);
         jdbc.update(
-                "UPDATE slack_message SET author_slack_user_id='UPRIVACYTARGET',slack_team_id='T2' WHERE workspace_id=?",
+                "UPDATE slack_message SET author_slack_user_id='UPRIVACYTARGET',slack_team_id='T2' WHERE"
+                        + " workspace_id=?",
                 otherWorkspace);
         jdbc.update("UPDATE slack_monitored_channel SET slack_team_id='T2' WHERE workspace_id=?", otherWorkspace);
+        jdbc.update("UPDATE connection SET instance_key='T2' WHERE workspace_id=? AND kind='SLACK'", otherWorkspace);
         Long providerId = jdbc.queryForObject(
-                "INSERT INTO identity_provider(type,server_url,created_at) VALUES ('SLACK','https://slack.com',CURRENT_TIMESTAMP) ON CONFLICT(type,server_url) DO UPDATE SET server_url=EXCLUDED.server_url RETURNING id",
+                "INSERT INTO identity_provider(type,server_url,created_at) VALUES"
+                        + " ('SLACK','https://slack.com',CURRENT_TIMESTAMP) ON CONFLICT(type,server_url) DO UPDATE SET"
+                        + " server_url=EXCLUDED.server_url RETURNING id",
                 Long.class);
         jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,'T1')",
+                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES"
+                        + " (?,?,?,'T1','ERASED')",
                 UUID.randomUUID(),
                 providerId,
                 "UPRIVACYTARGET");
@@ -109,14 +135,14 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         assertThat(projector.isMessageReadable(otherWorkspace, "C1", "200.0")).isTrue();
         var audience = conversations(projector.buildPayload(workspace, 100L));
         assertThat(audience).singleElement().satisfies(thread -> {
-            assertThat(thread.path("messageCount").asInt()).isEqualTo(1);
-            assertThat(thread.path("messages").get(0).path("text").asString()).isEqualTo("other participant reply");
+            assertThat(thread.path("messageCount").asInt()).isZero();
+            assertThat(thread.path("messages")).isEmpty();
+            assertThat(thread.path("truncated").asBoolean()).isTrue();
         });
-        assertThat(projector
-                        .buildThreadPayload(workspace, "C1", "100.0", 100L)
-                        .path("messages")
-                        .size())
-                .isEqualTo(1);
+        var withheldThread = projector.threadPayload(workspace, "C1", "100.0");
+        assertThat(withheldThread.path("messages")).isEmpty();
+        assertThat(projector.threadReadability(workspace, "C1", "100.0"))
+                .isEqualTo(ConversationThreadProjection.ThreadReadability.CONSENT_NOT_ACTIVE);
     }
 
     @Test
@@ -140,7 +166,8 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
         });
         assertThat(projector.isMessageReadable(workspace, "C1", "1704067200.0")).isTrue();
         jdbc.update(
-                "UPDATE slack_monitored_channel SET consent_state='REVOKED' WHERE workspace_id=? AND slack_channel_id='C1'",
+                "UPDATE slack_monitored_channel SET consent_state='REVOKED' WHERE workspace_id=? AND"
+                        + " slack_channel_id='C1'",
                 workspace);
         assertThat(projector.isMessageReadable(workspace, "C1", "1704067200.0")).isFalse();
         captured.clear();
@@ -241,12 +268,13 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(1);
 
         // The reordered base insert now arrives — ON CONFLICT DO NOTHING must NOT bring the deleted content back.
-        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "resurrected?"))
+        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", null, "resurrected?"))
                 .isZero();
 
         // The row stays a contentless tombstone: text NULL, deleted_at set.
         Map<String, @Nullable Object> row = jdbc.queryForMap(
-                "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND slack_ts = ?",
+                "SELECT text, deleted_at FROM slack_message WHERE workspace_id = ? AND slack_channel_id = ? AND"
+                        + " slack_ts = ?",
                 ws,
                 "C1",
                 "100.9");
@@ -255,8 +283,8 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName(
-            "durable edit: an edit arriving before its base insert re-ingests the EDITED text; the reordered base insert cannot clobber it")
+    @DisplayName("durable edit: an edit arriving before its base insert re-ingests the EDITED text; the reordered base"
+            + " insert cannot clobber it")
     void editBeforeInsert_isDurable() {
         long ws = newWorkspace();
         seedChannel(ws, "C1", "ACTIVE");
@@ -271,14 +299,14 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
         // The service's durable branch re-ingests the EDITED body (through the full consent stack) and stamps
         // edited_at.
-        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "EDITED body"))
+        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", null, "EDITED body"))
                 .isEqualTo(1);
         assertThat(messageRepository.applyEdit(ws, "C1", "100.9", "EDITED body", Instant.now()))
                 .isEqualTo(1);
 
         // The reordered base insert now arrives carrying the ORIGINAL text — ON CONFLICT DO NOTHING must NOT clobber
         // the durably-stored edited body (this is the invariant that fails if edits regress to lossy).
-        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", 100L, "original base text"))
+        assertThat(messageRepository.insertIfAbsent(ws, "T1", "C1", "100.9", "100.0", "U1", null, "original base text"))
                 .isZero();
 
         // The projector shows the edited text with the edited flag set — the edit survived the reorder.

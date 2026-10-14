@@ -39,7 +39,8 @@ public class PiEventToUiChunkTranslator {
             case "turn_end" -> handleTurnEnd(state);
             case "agent_end" -> handleAgentEnd(piEvent, state);
             case "link_result" -> handleLinkResult(piEvent, state);
-            case "link_observation" -> handleLinkObservation(piEvent, state);
+            case "link_problem" -> handleLinkProblem(piEvent, state);
+            case "show_feedback" -> handleShowFeedback(piEvent, state);
             case "pi_error" -> handleError(piEvent, state);
             case "turn_watchdog_fired" -> handleWatchdogFired(state);
             case "session_persisted" -> handleSessionPersisted(piEvent, state);
@@ -424,38 +425,51 @@ public class PiEventToUiChunkTranslator {
     }
 
     private List<UIMessageChunk> handleLinkResult(JsonNode event, TranslatorState state) {
-        // Runner emits camelCase `practiceResultId` and `text` (pi-mentor-runner.ts, its link_result tool).
+        // Runner emits camelCase `resultId` and `text` (pi-mentor-runner.ts, its link_result tool).
         // A link that cannot be read is feedback this turn would silently lose or show empty, so it fails the turn.
-        UUID practiceResultId = uuid(optionalString(event, "practiceResultId"));
+        UUID resultId = uuid(optionalString(event, "resultId"));
         String text = optionalString(event, "text");
-        if (practiceResultId == null || text == null || text.isBlank()) {
-            return failTurn(state, "a link_result without a readable practiceResultId and text");
+        if (resultId == null || text == null || text.isBlank()) {
+            return failTurn(state, "a link_result without a readable resultId and text");
         }
         // The runner emits a link only after the server admitted it, once per admission, so any other is a runner that
         // broke the protocol.
-        if (!state.consumeLinkAdmission(practiceResultId)) {
+        if (!state.consumeLinkAdmission(resultId)) {
             return failTurn(state, "a link_result the server did not admit");
         }
-        UIMessageChunk.DataResult link = UIMessageChunk.DataResult.of(practiceResultId, text);
+        UIMessageChunk.DataResult link = UIMessageChunk.DataResult.of(resultId, text);
         state.recordDataResult(link);
         return List.of(link);
     }
 
-    private List<UIMessageChunk> handleLinkObservation(JsonNode event, TranslatorState state) {
-        // Runner emits camelCase `observationId` and `text` (pi-mentor-runner.ts, its link_observation tool).
-        UUID observationId = uuid(optionalString(event, "observationId"));
+    private List<UIMessageChunk> handleLinkProblem(JsonNode event, TranslatorState state) {
+        // Runner emits camelCase `problemId` and `text` (pi-mentor-runner.ts, its link_problem tool).
+        UUID problemId = uuid(optionalString(event, "problemId"));
         String text = optionalString(event, "text");
-        if (observationId == null || text == null || text.isBlank()) {
-            return failTurn(state, "a link_observation without a readable observationId and text");
+        if (problemId == null || text == null || text.isBlank()) {
+            return failTurn(state, "a link_problem without a readable problemId and text");
         }
-        UUID practiceResultId = state.resultOfLinkedObservation(observationId);
-        if (practiceResultId == null || !state.consumeObservationLinkAdmission(observationId)) {
-            return failTurn(state, "a link_observation the server did not admit");
+        UUID resultId = state.resultOfLinkedProblem(problemId);
+        if (resultId == null || !state.consumeProblemLinkAdmission(problemId)) {
+            return failTurn(state, "a link_problem the server did not admit");
         }
-        UIMessageChunk.DataResultObservation link =
-                UIMessageChunk.DataResultObservation.of(practiceResultId, observationId, text);
-        state.recordDataResultObservation(link);
+        UIMessageChunk.DataProblem link = UIMessageChunk.DataProblem.of(resultId, problemId, text);
+        state.recordDataProblem(link);
         return List.of(link);
+    }
+
+    private List<UIMessageChunk> handleShowFeedback(JsonNode event, TranslatorState state) {
+        UUID feedbackId = uuid(optionalString(event, "feedbackId"));
+        String text = optionalString(event, "text");
+        if (feedbackId == null || text == null || text.isBlank() || !state.consumeFeedbackAdmission(feedbackId))
+            return failTurn(state, "prepared feedback the server did not admit");
+        String content = text + "\n\n";
+        String id = UUID.randomUUID().toString();
+        state.recordFeedbackText(feedbackId, content);
+        return List.of(
+                new UIMessageChunk.TextStart(id),
+                new UIMessageChunk.TextDelta(id, content),
+                new UIMessageChunk.TextEnd(id));
     }
 
     private static @Nullable UUID uuid(@Nullable String value) {

@@ -92,8 +92,8 @@ class ContentSourceContractTest extends BaseUnitTest {
     @DisplayName("catalogue slugs are the practices', never their groups'")
     void shouldReadPracticeSlugsButNotGroupSlugsWhenParsingTheCatalogue() {
         JsonNode catalogue = JSON.readTree("""
-                {"groups": [{"slug": "communication", "practices": [{"slug": "ready-and-traceable-handoff"}]}]}
-                """);
+            {"groups": [{"slug": "communication", "practices": [{"slug": "ready-and-traceable-handoff"}]}]}
+            """);
 
         assertThat(practiceSlugs(catalogue)).containsExactly("ready-and-traceable-handoff");
     }

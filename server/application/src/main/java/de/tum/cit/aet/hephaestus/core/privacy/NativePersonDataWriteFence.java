@@ -21,7 +21,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Component
 @RequiredArgsConstructor
-@WorkspaceAgnostic("Instance-wide exact native identity admission; content writers retain their workspace predicates")
+@WorkspaceAgnostic(
+        "Instance-wide exact native identity admission; content writers retain their workspace" + " predicates")
 public class NativePersonDataWriteFence implements PersonDataWriteFence {
     private final JdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -46,36 +47,58 @@ public class NativePersonDataWriteFence implements PersonDataWriteFence {
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public boolean holdForUserWrite(long userId) {
+    public boolean holdForAccountWrite(long accountId) {
         var identities = jdbc.query(
-                "SELECT provider_id,native_id::text FROM \"user\" WHERE id=?",
-                (rs, row) -> new PersonIdentity(rs.getLong(1), Objects.requireNonNull(rs.getString(2)), null),
-                userId);
-        return !identities.isEmpty() && holdIdentities(identities);
+                "SELECT i.provider_id,i.provider_user_key,i.team_key FROM identity i JOIN"
+                        + " account a ON a.id=i.account_id WHERE i.account_id=? AND a.status IN"
+                        + " ('ACTIVE','UNCLAIMED')",
+                (rs, row) ->
+                        new PersonIdentity(rs.getLong(1), Objects.requireNonNull(rs.getString(2)), rs.getString(3)),
+                accountId);
+        if (identities.isEmpty() || !holdIdentities(identities)) return false;
+        return jdbc
+                .query(
+                        "SELECT status IN ('ACTIVE','UNCLAIMED') FROM account WHERE id=? FOR SHARE",
+                        (rs, row) -> rs.getBoolean(1),
+                        accountId)
+                .stream()
+                .anyMatch(Boolean::booleanValue);
     }
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
-    public List<Long> holdForUserWrites(List<Long> userIds) {
+    public List<Long> holdForAccountWrites(List<Long> accountIds) {
         requireFreshControlReads();
-        if (userIds.isEmpty()) return List.of();
-        var users = jdbc.query(
-                "SELECT id,provider_id,native_id::text FROM \"user\" WHERE id=ANY(?) ORDER BY id",
-                (rs, row) -> new NativeUser(
+        if (accountIds.isEmpty()) return List.of();
+        var rows = jdbc.query(
+                "SELECT i.account_id,i.provider_id,i.provider_user_key,i.team_key FROM"
+                        + " identity i JOIN account a ON a.id=i.account_id WHERE"
+                        + " i.account_id=ANY(?) AND a.status IN ('ACTIVE','UNCLAIMED') ORDER BY"
+                        + " i.account_id,i.id",
+                (rs, row) -> new AccountIdentity(
                         rs.getLong(1),
-                        new PersonIdentity(rs.getLong(2), Objects.requireNonNull(rs.getString(3)), null)),
-                new SqlArrayValue("bigint", userIds.toArray()));
-        lock(users.stream().map(NativeUser::identity).toList(), true);
-        return users.stream()
-                .filter(user -> !suppression.isSuppressed(
-                        user.identity().providerId(),
-                        user.identity().subject(),
-                        user.identity().teamId()))
-                .map(NativeUser::userId)
+                        new PersonIdentity(rs.getLong(2), Objects.requireNonNull(rs.getString(3)), rs.getString(4))),
+                new SqlArrayValue("bigint", accountIds.toArray()));
+        lock(rows.stream().map(AccountIdentity::identity).toList(), true);
+        var usable = jdbc.query(
+                "SELECT id FROM account WHERE id=ANY(?) AND status IN"
+                        + " ('ACTIVE','UNCLAIMED') ORDER BY id FOR SHARE",
+                (rs, row) -> rs.getLong(1),
+                new SqlArrayValue("bigint", accountIds.toArray()));
+        return accountIds.stream()
+                .distinct()
+                .filter(usable::contains)
+                .filter(accountId -> rows.stream().anyMatch(row -> row.accountId() == accountId))
+                .filter(accountId -> rows.stream()
+                        .filter(row -> row.accountId() == accountId)
+                        .noneMatch(row -> suppression.isSuppressed(
+                                row.identity().providerId(),
+                                row.identity().subject(),
+                                row.identity().teamId())))
                 .toList();
     }
 
-    private record NativeUser(long userId, PersonIdentity identity) {}
+    private record AccountIdentity(long accountId, PersonIdentity identity) {}
 
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
@@ -109,19 +132,19 @@ public class NativePersonDataWriteFence implements PersonDataWriteFence {
                 (rs, row) -> new NativeKey(
                         Objects.requireNonNull(rs.getString(1)),
                         ScmOrigin.of(rs.getString(2))
-                                .orElseThrow(() ->
-                                        new IllegalStateException("Native admission requires a valid provider origin")),
+                                .orElseThrow(() -> new IllegalStateException(
+                                        "Native admission requires" + " a valid provider" + " origin")),
                         Objects.requireNonNull(rs.getString(3))),
                 mapper.writeValueAsString(identities));
         if (nativeKeys.size() != identities.size())
             throw new IllegalStateException("Native admission requires existing exact provider keys");
         var keys = jdbc.query("""
-                SELECT DISTINCT hashtextextended(
-                    jsonb_build_array(i."providerType",i."providerOrigin",i.subject)::text,0) AS lock_key
-                FROM jsonb_to_recordset(CAST(? AS jsonb))
-                    AS i("providerType" text,"providerOrigin" text,subject text)
-                ORDER BY lock_key
-                """, (rs, row) -> rs.getLong(1), mapper.writeValueAsString(nativeKeys));
+            SELECT DISTINCT hashtextextended(
+                jsonb_build_array(i."providerType",i."providerOrigin",i.subject)::text,0) AS lock_key
+            FROM jsonb_to_recordset(CAST(? AS jsonb))
+                AS i("providerType" text,"providerOrigin" text,subject text)
+            ORDER BY lock_key
+            """, (rs, row) -> rs.getLong(1), mapper.writeValueAsString(nativeKeys));
         String function = shared ? "pg_advisory_xact_lock_shared" : "pg_advisory_xact_lock";
         for (long key : keys) {
             jdbc.query("SELECT " + function + "(?)", rs -> {}, key);

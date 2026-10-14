@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.core.auth.web;
 
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,8 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * The current-user singleton: identity, linked accounts, and GDPR account deletion.
- * Thin HTTP adapter — all data access lives in {@link AccountService}.
+ * The current-user singleton: identity, linked accounts, and GDPR account deletion. Thin HTTP
+ * adapter — all data access lives in {@link AccountService}.
  */
 @ConditionalOnServerRole
 @RestController
@@ -50,18 +50,22 @@ public class AccountWebController {
             @Nullable String primaryEmail,
             String appRole,
             String status,
-            // Identity fields the SPA's useAuth() surface needs (sourced from the primary IdentityLink).
+            // Identity fields the SPA's useAuth() surface needs (sourced from the primary
+            // Identity).
             @Nullable String username,
             @Nullable String avatarUrl,
             @Nullable String profileUrl,
             @Nullable String identityProvider,
             @Nullable String gitProviderId,
-            // Every SCM instance the user has an active identity on, so the workspace-creation wizard can
+            // Every SCM instance the user has an active identity on, so the workspace-creation
+            // wizard can
             // gate on the *target instance* rather than merely "has any GitLab identity".
             List<LinkedProviderDTO> linkedProviders,
             List<String> roles,
-            // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh before it
-            // lapses, rather than waiting for a 401 (BFF pattern; see CurrentAccount.accessTokenExpiresAt).
+            // Access-token expiry (epoch seconds) so the SPA can schedule a proactive refresh
+            // before it
+            // lapses, rather than waiting for a 401 (BFF pattern; see
+            // CurrentAccount.accessTokenExpiresAt).
             @Nullable Long accessTokenExpiresAt) {}
 
     /** A provider instance the current user is linked to: its type + server-url origin. */
@@ -82,7 +86,12 @@ public class AccountWebController {
         Account account = accountService.requireById(CurrentAccount.requireId());
         var identities = accountService.activeIdentities(Objects.requireNonNull(account.getId()));
         // Primary identity = most recently used active link (login source for the SPA).
-        IdentityLink primary = identities.stream().findFirst().orElse(null);
+        Identity primary = identities.stream().findFirst().orElse(null);
+        var profile = primary == null
+                ? null
+                : gitProviderRegistry
+                        .profile(primary.getProviderId(), primary.getProviderUserKey(), primary.getTeamKey())
+                        .orElse(null);
         List<LinkedProviderDTO> linkedProviders = identities.stream()
                 .map(il -> new LinkedProviderDTO(
                         gitProviderRegistry.providerTypeName(il.getProviderId()),
@@ -95,11 +104,11 @@ public class AccountWebController {
                 account.getPrimaryEmail(),
                 account.getAppRole().name(),
                 account.getStatus().name(),
-                primary != null ? primary.getUsernameAtSignup() : account.getDisplayName(),
-                primary != null ? primary.getAvatarUrl() : null,
-                primary != null ? primary.getProfileUrl() : null,
+                profile != null ? profile.login() : null,
+                profile != null ? profile.avatarUrl() : null,
+                profile != null ? profile.profileUrl() : null,
                 primary != null ? gitProviderRegistry.providerTypeName(primary.getProviderId()) : null,
-                primary != null ? primary.getSubject() : null,
+                primary != null ? primary.getProviderUserKey() : null,
                 linkedProviders,
                 CurrentAccount.roles(),
                 CurrentAccount.accessTokenExpiresAt()));
@@ -139,15 +148,18 @@ public class AccountWebController {
         return ResponseEntity.noContent().build();
     }
 
-    private IdentityViewDTO toView(IdentityLink il) {
+    private IdentityViewDTO toView(Identity il) {
         String providerType = gitProviderRegistry.providerTypeName(il.getProviderId());
+        var profile = gitProviderRegistry
+                .profile(il.getProviderId(), il.getProviderUserKey(), il.getTeamKey())
+                .orElse(null);
         return new IdentityViewDTO(
                 il.getId(),
                 providerType,
-                il.getSubject(),
-                il.getUsernameAtSignup(),
-                il.getDisplayName(),
-                il.getAvatarUrl(),
+                il.getProviderUserKey(),
+                profile == null ? null : profile.login(),
+                profile == null ? null : profile.displayName(),
+                profile == null ? null : profile.avatarUrl(),
                 il.getLastLoginAt());
     }
 }

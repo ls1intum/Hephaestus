@@ -7,7 +7,7 @@ import org.jspecify.annotations.NonNull;
 /** One job type's slice of a month, inside {@link WorkspaceLlmUsageReportDTO}. */
 @Schema(description = "Month spend aggregated by job type")
 public record LlmUsageByJobTypeDTO(
-        @NonNull LlmUsageJobType jobType,
+        @NonNull String jobType,
 
         @NonNull @Schema(description = "Confirmed spend on shared (instance) models for this job type, in USD.")
         BigDecimal instanceTotalCostUsd,

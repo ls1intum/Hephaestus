@@ -37,9 +37,9 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
      */
     static List<Object[]> chunkFixtures() {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
-        UUID practiceResultId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        UUID resultId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         UUID partId = UUID.fromString("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
-        UUID observationId = UUID.fromString("cccccccc-dddd-eeee-ffff-000000000000");
+        UUID problemId = UUID.fromString("cccccccc-dddd-eeee-ffff-000000000000");
         UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
                 "openai/gpt-oss-120b", new UIMessageChunk.MessageMetadata.Usage(655, 65, null, null, 720), 0.0042);
         ObjectNode toolOutput = NODES.objectNode().put("status", "ok").put("count", 7);
@@ -117,22 +117,22 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                 },
                 new Object[] {
                     new UIMessageChunk.DataResult(
-                            partId, new UIMessageChunk.DataResult.DataResultPayload(practiceResultId, "Say why.")),
+                            partId, new UIMessageChunk.DataResult.DataResultPayload(resultId, "Say why.")),
                     "{\"type\":\"data-result\",\"id\":\"" + partId
-                            + "\",\"data\":{\"practiceResultId\":\""
-                            + practiceResultId
+                            + "\",\"data\":{\"resultId\":\""
+                            + resultId
                             + "\",\"text\":\"Say why.\"}}",
                 },
                 new Object[] {
-                    new UIMessageChunk.DataResultObservation(
+                    new UIMessageChunk.DataProblem(
                             partId,
-                            new UIMessageChunk.DataResultObservation.DataResultObservationPayload(
-                                    practiceResultId, observationId, "Log it before the retry.")),
-                    "{\"type\":\"data-result-observation\",\"id\":\"" + partId
-                            + "\",\"data\":{\"practiceResultId\":\""
-                            + practiceResultId
-                            + "\",\"observationId\":\""
-                            + observationId
+                            new UIMessageChunk.DataProblem.DataProblemPayload(
+                                    resultId, problemId, "Log it before the retry.")),
+                    "{\"type\":\"data-problem\",\"id\":\"" + partId
+                            + "\",\"data\":{\"resultId\":\""
+                            + resultId
+                            + "\",\"problemId\":\""
+                            + problemId
                             + "\",\"text\":\"Log it before the retry.\"}}",
                 },
                 new Object[] {
@@ -152,7 +152,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
 
     // A `dataChunkDiscriminatorSpelling` test would be pure duplication: the parameterised
     // chunkFixtures test above already pins the exact JSON for `data-mentor-status`, `data-result` and
-    // `data-result-observation` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
+    // `data-problem` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
     // BEFORE reaching the spelling assertion.
 
     @Test
@@ -169,7 +169,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
             registered.add(t.value());
         }
         // Sealed interface auto-permits its directly-nested record subtypes, DataMentorStatus, DataResult and
-        // DataResultObservation included. Reflectively enumerate permits via the
+        // DataProblem included. Reflectively enumerate permits via the
         // class-level `getPermittedSubclasses()` (Java 17+).
         Class<?>[] permitted = UIMessageChunk.class.getPermittedSubclasses();
         assertThat(permitted).as("sealed permits resolves").isNotEmpty();
@@ -189,37 +189,24 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
         UUID linkedResult = UUID.randomUUID();
         UUID problemResult = UUID.randomUUID();
         UUID problem = UUID.randomUUID();
-        UUID legacyResult = UUID.randomUUID();
         var parts = NODES.arrayNode();
         parts.addObject().put("type", "text").put("text", "Let me look.");
         parts.addObject()
                 .put("type", "data-result")
                 .put("id", "a")
                 .putObject("data")
-                .put("practiceResultId", linkedResult.toString())
+                .put("resultId", linkedResult.toString())
                 .put("text", "Say why.");
         parts.addObject()
-                .put("type", "data-result-observation")
+                .put("type", "data-problem")
                 .put("id", "b")
                 .putObject("data")
-                .put("practiceResultId", problemResult.toString())
-                .put("observationId", problem.toString())
+                .put("resultId", problemResult.toString())
+                .put("problemId", problem.toString())
                 .put("text", "Log it before the retry.");
-        // Stored before protocol 2: its observationId is the result's id.
-        parts.addObject()
-                .put("type", UIMessageChunk.LinkParts.LEGACY_PART_TYPE)
-                .put("id", "c")
-                .putObject("data")
-                .put("observationId", legacyResult.toString())
-                .put("text", "Name the trade-off.");
-
-        assertThat(UIMessageChunk.LinkParts.shownResultIds(parts))
-                .containsExactly(linkedResult, problemResult, legacyResult);
-        assertThat(UIMessageChunk.LinkParts.observationOf(parts.get(2))).isEqualTo(problem);
-        assertThat(UIMessageChunk.LinkParts.observationOf(parts.get(1))).isNull();
-        assertThat(UIMessageChunk.LinkParts.observationOf(parts.get(3)))
-                .as("a legacy link names a result, never a problem")
-                .isNull();
+        assertThat(UIMessageChunk.LinkParts.shownResultIds(parts)).containsExactly(linkedResult, problemResult);
+        assertThat(UIMessageChunk.LinkParts.problemOf(parts.get(2))).isEqualTo(problem);
+        assertThat(UIMessageChunk.LinkParts.problemOf(parts.get(1))).isNull();
         assertThat(UIMessageChunk.LinkParts.resultOf(parts.get(0))).isNull();
     }
 
@@ -230,19 +217,19 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                 .put("type", "data-result")
                 .put("id", "untexted")
                 .putObject("data")
-                .put("practiceResultId", UUID.randomUUID().toString());
+                .put("resultId", UUID.randomUUID().toString());
         parts.addObject()
-                .put("type", UIMessageChunk.LinkParts.LEGACY_PART_TYPE)
+                .put("type", "data-result")
                 .put("id", "blank")
                 .putObject("data")
-                .put("observationId", UUID.randomUUID().toString())
+                .put("resultId", UUID.randomUUID().toString())
                 .put("text", "  ");
         parts.addObject()
-                .put("type", "data-result-observation")
+                .put("type", "data-problem")
                 .put("id", "unreadable")
                 .putObject("data")
-                .put("practiceResultId", "not-a-uuid")
-                .put("observationId", UUID.randomUUID().toString())
+                .put("resultId", "not-a-uuid")
+                .put("problemId", UUID.randomUUID().toString())
                 .put("text", "Log it.");
 
         assertThat(UIMessageChunk.LinkParts.shownResultIds(parts)).isEmpty();

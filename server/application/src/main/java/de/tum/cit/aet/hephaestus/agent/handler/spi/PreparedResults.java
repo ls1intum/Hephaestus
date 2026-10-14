@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.spi;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 
 /**
  * A submission the handler has verified against the evidence captured for its job, waiting to be
@@ -9,5 +9,5 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 @FunctionalInterface
 public interface PreparedResults {
     /** Records the verified results; called once, inside the admission's ownership fence. */
-    void record(AgentJob job);
+    void record(ReviewJob job);
 }

@@ -1,14 +1,16 @@
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { bodyFact, classifyIssue } from "../kits/scm/issue-classification.ts";
 // Reads what the captured issue holds: if its body is empty or only repeats the title, its labels and
 // its type. The review decides from the whole text if a maintainer can see the work and start it.
-import { DIRECTION_CHARS, oneLine } from "../lib/bounded-text.ts";
-import { bodyFact, classifyIssue } from "../lib/issue-classification.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { DIRECTION_CHARS, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.issue");
-		const shape = classifyIssue(ctx.work);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.issue");
+		const shape = classifyIssue(domain.item);
 		const { body, issueType, labels, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } = shape;
 		return ctx.review({
 			leads: [],

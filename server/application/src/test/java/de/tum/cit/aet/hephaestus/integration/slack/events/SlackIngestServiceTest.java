@@ -12,7 +12,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
-import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
+import de.tum.cit.aet.hephaestus.integration.slack.identity.SlackRosterIdentityResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -48,7 +48,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
     private SlackThreadRepository threadRepository;
 
     @Mock
-    private SlackMentorIdentityResolver identityResolver;
+    private SlackRosterIdentityResolver identityResolver;
 
     @Mock
     private ConversationFeedbackErasure conversationFeedbackErasure;
@@ -189,7 +189,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
-        when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
+        when(identityResolver.humanAccountId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", "99.0", "U1", 42L, "hi"))
                 .thenReturn(1);
 
@@ -206,15 +206,15 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
-        when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.empty());
+        when(identityResolver.humanAccountId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(
-                        eq(7L), eq("T1"), eq("C1"), eq("100.1"), isNull(), eq("U1"), isNull(), eq("hi")))
+                        eq(7L), eq("T1"), eq("C1"), eq("100.1"), isNull(), eq("U1"), eq(42L), eq("hi")))
                 .thenReturn(1);
 
         service.ingestChannelMessage("T1", "C1", "100.1", null, "U1", "hi");
 
-        // Root (no thread_ts) → aggregate keyed on its own ts; unlinked author stamps a null member id.
-        verify(threadRepository).upsertOnMessage(7L, "C1", "100.1", "100.1", null);
+        // A root message uses its own timestamp and retains its roster account.
+        verify(threadRepository).upsertOnMessage(7L, "C1", "100.1", "100.1", 42L);
     }
 
     @Test
@@ -226,7 +226,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
         // Consent flip stops future ingestion + drops threads out of the ACTIVE-consent projectors…
         verify(monitoredChannelRepository).revokeConsent(7L, "C1");
-        // …the derived chat.conversation_thread results/feedback are hard-deleted through the practices port
+        // …the derived chat.thread results/feedback are hard-deleted through the practices port
         // (true erasure, not inert-by-gate)…
         verify(conversationFeedbackErasure).eraseForThreads(7L, List.of(11L, 22L));
         // …and the channel's raw content (messages) + thread aggregates are deleted now, not left for the sweep.
@@ -240,7 +240,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
         when(consentGate.ingestAllowed(7L, "C1")).thenReturn(true);
         when(monitoredChannelRepository.findConsentAnnouncedAt(7L, "C1")).thenReturn(Optional.of(ANNOUNCED_BEFORE));
         when(participantConsentGate.ingestionAllowed(7L, "U1")).thenReturn(true);
-        when(identityResolver.resolveMemberId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
+        when(identityResolver.humanAccountId(7L, "T1", "U1")).thenReturn(Optional.of(42L));
         when(messageRepository.insertIfAbsent(7L, "T1", "C1", "100.1", null, "U1", 42L, "hi"))
                 .thenReturn(0);
 

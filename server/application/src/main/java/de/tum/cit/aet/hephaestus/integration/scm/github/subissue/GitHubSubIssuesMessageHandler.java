@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.subissue;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
@@ -17,9 +17,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Handles GitHub sub_issues webhook events.
- */
+/** Handles GitHub sub_issues webhook events. */
 @Component
 public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHandler<GitHubSubIssuesEventDTO> {
 
@@ -57,7 +55,7 @@ public class GitHubSubIssuesMessageHandler extends AbstractIntegrationMessageHan
         }
 
         log.debug(
-                "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}, repoName={}",
+                "Received sub_issues event: action={}, parentIssueNumber={}, subIssueNumber={}," + " repoName={}",
                 event.action(),
                 parentIssueDto.number(),
                 subIssueDto.number(),

@@ -11,8 +11,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationFeedbackPreparedEvent;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
@@ -21,6 +19,8 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.ConversationFeedbackPreparedEvent;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -219,9 +219,9 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void sendFailure_releasesTheCooldownWindow_soTheNextEventRetries() {
+    void provenRejectionReleasesTheCooldownWindowForALaterEvent() {
         stubAllGuardsPass();
-        doThrow(new SlackSendException(WS, SLACK_USER, "transport_failure"))
+        doThrow(new SlackSendException(WS, SLACK_USER, "channel_not_found"))
                 .doNothing()
                 .when(slackMessageService)
                 .sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), anyString());
@@ -230,6 +230,17 @@ class SlackConversationNudgeServiceTest extends BaseUnitTest {
         service.onConversationFeedbackPrepared(event(2));
 
         verify(slackMessageService, times(2)).sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), anyString());
+    }
+
+    @Test
+    void uncertainVisibilityKeepsTheCooldownAndDoesNotRepeatTheNotification() {
+        stubAllGuardsPass();
+        doThrow(new SlackSendException(WS, SLACK_USER, "transport_failure"))
+                .when(slackMessageService)
+                .sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), anyString());
+        service.onConversationFeedbackPrepared(event(2));
+        service.onConversationFeedbackPrepared(event(2));
+        verify(slackMessageService, times(1)).sendForWorkspace(eq(WS), eq(SLACK_USER), anyList(), anyString());
     }
 
     @Test

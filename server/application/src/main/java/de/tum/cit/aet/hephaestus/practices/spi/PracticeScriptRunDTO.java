@@ -1,29 +1,26 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
+import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "What one practice's program did in one review")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PracticeScriptRunDTO(
-        @NonNull PracticeScriptRunStatus status,
-
-        @NonNull @Schema(description = "The built-in review, or the practice's own script")
-        PracticeProgramKind programKind,
-
-        @Schema(
-                description = "How the program reached its result, from the calls it made. Absent when the program "
-                        + "did not run, or the runner did not report its calls.")
-        @Nullable
-        PracticeProgramPath path,
-
-        @Schema(description = "Why the program stopped without a result. Absent when it returned one.") @Nullable
-        PracticeScriptStopReason stopReason,
-
-        @NonNull
-        @Schema(
-                description = "The direct models the program declared and what became of their calls. Empty for the "
-                        + "built-in program, for a script that declares none, and for one that ended before it "
-                        + "declared them.")
-        List<PracticeScriptModelUseDTO> models) {}
+        UUID jobId,
+        int attempt,
+        @Schema(type = "string", pattern = "^[1-9][0-9]*$") String practiceId,
+        @Schema(type = "string", pattern = "^[1-9][0-9]*$") String practiceVersionId,
+        ScriptRunStatus status,
+        ScriptKind scriptKind,
+        @Nullable ScriptStopReason stopReason,
+        Instant finishedAt,
+        @Nullable Long durationMs,
+        @Nullable String error,
+        List<PracticeScriptModelDTO> models) {
+    public PracticeScriptRunDTO {
+        models = List.copyOf(models);
+    }
+}

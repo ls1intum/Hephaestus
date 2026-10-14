@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -35,7 +35,7 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
     private AccountRepository accounts;
 
     @Autowired
-    private IdentityLinkRepository identities;
+    private IdentityRepository identities;
 
     @Autowired
     private AccountIdentityQuery identityQuery;
@@ -86,10 +86,10 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
                 userRepository.saveAndFlush(TestUserFactory.createUser(990L, "linked-twice", ensureGitLabProvider()));
         var gitHubActor = persistUser("linked-twice");
         for (var actor : List.of(gitLabActor, gitHubActor)) {
-            var link = new IdentityLink();
+            var link = new Identity();
             link.setAccount(account);
             link.setProviderId(Objects.requireNonNull(actor.getProvider().getId()));
-            link.setSubject(actor.getNativeId().toString());
+            link.setProviderUserKey(actor.getNativeId().toString());
             identities.saveAndFlush(link);
         }
         var request = new CreateWorkspaceRequestDTO(
@@ -114,8 +114,8 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var workspace = workspaces.findByWorkspaceSlug("github-owner").orElseThrow();
         assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspace.getId()))
                 .singleElement()
-                .satisfies(
-                        membership -> assertThat(membership.getId().getUserId()).isEqualTo(gitHubActor.getId()));
+                .satisfies(membership ->
+                        assertThat(membership.getId().getAccountId()).isEqualTo(accountId(gitHubActor)));
     }
 
     @Test
@@ -131,12 +131,10 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var account = accounts.saveAndFlush(new Account("Verified owner"));
         var accountId = account.getId();
         assertNotNull(accountId);
-        var link = new IdentityLink();
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(providerId);
-        link.setSubject(owner.getNativeId().toString());
-        link.setUsernameAtSignup("shared-login");
-        link.setExternalActorId(namesake.getId());
+        link.setProviderUserKey(owner.getNativeId().toString());
         link = identities.saveAndFlush(link);
         String token = "mock-jwt-user-sub-" + accountId;
         String path = "/workspaces/identity-http/members/me";
@@ -185,12 +183,12 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var provider = ensureGitLabProvider();
         var actor = userRepository.saveAndFlush(TestUserFactory.createUser(989L, "shared-profile", provider));
         var workspace = createWorkspace("identity-profile", "Profile", "profile", AccountType.ORG, namesake);
-        ensureWorkspaceMembership(workspace, actor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
         var account = accounts.saveAndFlush(new Account("GitLab namesake"));
-        var link = new IdentityLink();
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(Objects.requireNonNull(provider.getId()));
-        link.setSubject(actor.getNativeId().toString());
+        link.setProviderUserKey(actor.getNativeId().toString());
         identities.saveAndFlush(link);
         connectActivitySource(workspace, provider);
         recordIssueOpened(workspace, namesake);
@@ -214,15 +212,15 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         var olderActor = persistUser("older-http-actor");
         var firstActor = persistUser("first-http-actor");
         var workspace = createWorkspace("identity-http-roles", "Roles", "roles", AccountType.ORG, olderActor);
-        ensureWorkspaceMembership(workspace, firstActor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, firstActor, Membership.WorkspaceRole.MEMBER);
         var account = accounts.saveAndFlush(new Account("Multi-identity member"));
         var accountId = account.getId();
         assertNotNull(accountId);
         for (var actor : List.of(firstActor, olderActor)) {
-            var link = new IdentityLink();
+            var link = new Identity();
             link.setAccount(account);
             link.setProviderId(Objects.requireNonNull(actor.getProvider().getId()));
-            link.setSubject(actor.getNativeId().toString());
+            link.setProviderUserKey(actor.getNativeId().toString());
             identities.saveAndFlush(link);
         }
         client.get()
@@ -248,13 +246,14 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
         account = accounts.saveAndFlush(account);
         var accountId = account.getId();
         assertNotNull(accountId);
-        var link = new IdentityLink();
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(providerId);
-        link.setSubject("789");
+        link.setProviderUserKey("789");
         identities.saveAndFlush(link);
 
-        // Account lifecycle gates new interactions, not attribution of existing work or account exports.
+        // Account lifecycle gates new interactions, not attribution of existing work or account
+        // exports.
         assertThat(identityQuery.resolveAccountId(providerId, "789", null)).contains(accountId);
         assertThat(identityQuery.resolveActiveAccountId(providerId, "789", null).isPresent())
                 .isEqualTo(status == Account.Status.ACTIVE);

@@ -261,10 +261,12 @@ class WorkspaceSlugRenameIntegrationTest extends AbstractWorkspaceIntegrationTes
         User existingOwner = persistUser("existing-owner");
         Workspace existing = createWorkspace("collision", "Collision", "collision", AccountType.ORG, existingOwner);
         ensureOwnerMembership(existing);
-        existing.setOrganization(organizationService.upsertIdentity(
-                1112L,
-                "collision",
-                Objects.requireNonNull(ensureGitHubProvider().getId())));
+        existing.setOrganizationId(organizationService
+                .upsertIdentity(
+                        1112L,
+                        "collision",
+                        Objects.requireNonNull(ensureGitHubProvider().getId()))
+                .getId());
         workspaceRepository.saveAndFlush(existing);
 
         Workspace linked = githubLifecycleListener.createOrUpdateFromInstallation(

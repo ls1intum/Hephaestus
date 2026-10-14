@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.practice;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.util.Map;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;

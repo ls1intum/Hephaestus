@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.ClientDisconnectedException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import java.io.IOException;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -44,6 +46,9 @@ final class MentorSseChannel implements MentorChannel {
     private final ObjectMapper objectMapper;
     private final ScheduledExecutorService scheduler;
     private final AtomicBoolean clientGone = new AtomicBoolean(false);
+    private final AtomicReference<@Nullable UUID> messageId = new AtomicReference<>();
+    private final AtomicReference<@Nullable Instant> writeStartedAt = new AtomicReference<>();
+    private final AtomicReference<@Nullable Instant> confirmedAt = new AtomicReference<>();
     private final AtomicBoolean finishDelivered = new AtomicBoolean(false);
     /**
      * Set once {@link #completeWithDone}/{@link #completeWithError}/{@link #completeWithConflict}
@@ -184,10 +189,13 @@ final class MentorSseChannel implements MentorChannel {
         try {
             if (clientGone.get() || closed.get()) return;
             try {
+                if (chunk instanceof UIMessageChunk.Start start) messageId.set(start.messageId());
+                writeStartedAt.compareAndSet(null, Instant.now());
                 emitter.send(SseEmitter.event().data(payload));
                 lastSendNanos.set(System.nanoTime());
                 if (chunk instanceof UIMessageChunk.Finish) {
                     finishDelivered.set(true);
+                    confirmedAt.set(Instant.now());
                 }
             } catch (IOException e) {
                 flagDisconnected("chunk_write_failed");
@@ -199,6 +207,20 @@ final class MentorSseChannel implements MentorChannel {
         } finally {
             writeLock.unlock();
         }
+    }
+
+    @Override
+    public Optional<MentorTurnReceipt> receipt() {
+        UUID id = messageId.get();
+        return id == null
+                ? Optional.empty()
+                : Optional.of(new MentorTurnReceipt(
+                        id,
+                        null,
+                        null,
+                        writeStartedAt.get(),
+                        confirmedAt.get(),
+                        !finishDelivered.get() && writeStartedAt.get() != null));
     }
 
     /**

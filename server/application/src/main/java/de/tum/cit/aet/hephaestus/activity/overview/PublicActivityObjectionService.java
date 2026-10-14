@@ -8,11 +8,11 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
-import de.tum.cit.aet.hephaestus.workspace.HiddenFormerMember;
-import de.tum.cit.aet.hephaestus.workspace.HiddenFormerMemberRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Clock;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,10 +21,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 class PublicActivityObjectionService {
-    private final HiddenFormerMemberRepository hidden;
-    private final WorkspaceMembershipRepository memberships;
+    private final MembershipRepository memberships;
     private final WorkspaceRepository workspaces;
-    private final WorkspaceMembershipService memberVisibility;
+    private final MembershipService memberVisibility;
+    private final Clock clock;
     private final ActivityPeopleQueryRepository people;
     private final PublicRepositoryVisibility visibility;
     private final ConfigAuditPort audit;
@@ -47,22 +47,24 @@ class PublicActivityObjectionService {
     @Transactional
     public void hide(long workspaceId, long userId, boolean hide) {
         copyFence.holdForCapture();
-        if (!writeFence.holdForUserWrite(userId) || !people.canClassify(workspaceId, userId)) {
-            throw new EntityNotFoundException("Contributor", userId);
-        }
+        if (!people.canClassify(workspaceId, userId)) throw new EntityNotFoundException("Contributor", userId);
+        long accountId = memberVisibility.accountIdForUser(userId);
+        if (!writeFence.holdForAccountWrite(accountId)) throw new EntityNotFoundException("Contributor", userId);
         var workspace = workspaces.findByIdForUpdate(workspaceId).orElseThrow();
-        var member = memberships.findByWorkspace_IdAndUser_Id(workspaceId, userId);
-        boolean before = member.map(m -> m.isHidden())
-                .orElseGet(() -> hidden.existsById(new HiddenFormerMember.Key(workspaceId, userId)));
+        var member = memberships.findByWorkspace_IdAndAccount_Id(workspaceId, accountId);
+        boolean before = member.map(Membership::isHidden).orElse(false);
         if (before == hide) return;
-        if (member.isPresent()) {
-            memberVisibility.updateMemberVisibility(workspaceId, userId, hide);
+        if (member.isPresent() && member.get().getLeftAt() == null) {
+            memberVisibility.updateMemberVisibility(workspaceId, accountId, hide);
             return;
-        } else if (hide) {
-            hidden.save(new HiddenFormerMember(workspaceId, userId));
-        } else {
-            hidden.deleteByWorkspaceIdAndUserId(workspaceId, userId);
         }
+        var retainedMember = member.orElseGet(() -> {
+            var created = memberVisibility.createMembership(workspace, accountId, Membership.WorkspaceRole.MEMBER);
+            created.setLeftAt(clock.instant());
+            return created;
+        });
+        retainedMember.setHidden(hide);
+        memberships.save(retainedMember);
         audit.record(ConfigAuditEntry.updated(
                 ConfigAuditEntityType.WORKSPACE_VISIBILITY,
                 workspace.getId(),

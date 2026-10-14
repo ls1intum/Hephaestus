@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmMemberRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceTeamScopeResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceTeamScopeResolver;
 import java.text.Collator;
 import java.util.Comparator;
 import java.util.List;
@@ -27,7 +27,7 @@ class ActivityScopeResolver {
                     (User user) -> user.getName() != null ? user.getName() : user.getLogin(), NAMES)
             .thenComparing(User::getLogin, NAMES);
 
-    private final WorkspaceMembershipService memberships;
+    private final ScmMemberRepository memberships;
     private final WorkspaceRepository workspaces;
     private final WorkspaceTeamScopeResolver teamScopes;
     private final TeamRepository teams;

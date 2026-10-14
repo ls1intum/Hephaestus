@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -23,7 +23,7 @@ public record ProxyRouting(
         String principalDescription,
         String apiProtocol,
         String baseUrl,
-        @Nullable FundingSource connectionScope,
+        @Nullable UsageFundingSource connectionScope,
         @Nullable Long connectionId,
         @Nullable Long modelId,
         @Nullable Long workspaceId,
@@ -34,8 +34,8 @@ public record ProxyRouting(
      * The one execution this credential bills to, with identity and spend read in the same instant so
      * a caller cannot pair one execution's identity with another's spend.
      *
-     * @param sourceId the {@code agent_job} id, or the assistant {@code chat_message} id of the turn
-     * @param number the row's {@code retry_count} when the token was validated ({@code 0} for a mentor
+     * @param sourceId the {@code review_job} id, or the assistant {@code chat_message} id of the turn
+     * @param number the row's {@code attempt} when the token was validated ({@code 0} for a mentor
      *     turn, which never retries). Orphan recovery can requeue an agent job — zeroing its per-attempt
      *     accumulators — while a call this credential authenticated is still out, so a late write must
      *     be dropped rather than billed to whoever owns the row now.
@@ -47,7 +47,7 @@ public record ProxyRouting(
      *     {@code spentUsd}; 0 for every other call
      */
     public record BilledAttempt(
-            LlmUsageSourceType sourceType,
+            UsageSourceType sourceType,
             UUID sourceId,
             int number,
             BigDecimal spentUsd,
@@ -57,11 +57,7 @@ public record ProxyRouting(
 
         /** An attempt that makes no direct model calls. */
         public BilledAttempt(
-                LlmUsageSourceType sourceType,
-                UUID sourceId,
-                int number,
-                BigDecimal spentUsd,
-                @Nullable String workerId) {
+                UsageSourceType sourceType, UUID sourceId, int number, BigDecimal spentUsd, @Nullable String workerId) {
             this(sourceType, sourceId, number, spentUsd, workerId, 0L, 0L);
         }
     }

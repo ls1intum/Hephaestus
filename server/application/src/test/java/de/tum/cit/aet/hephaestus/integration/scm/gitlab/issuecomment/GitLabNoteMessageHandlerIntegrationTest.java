@@ -12,7 +12,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -31,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -296,9 +296,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Who requested changes is known only from a note that names them: GitLab's system note "requested changes". A
-     * note's embedded {@code detailed_merge_status} is the merge request's, stated on every note while anyone's request
-     * for changes stands.
+     * Who requested changes is known only from a note that names them: GitLab's system note
+     * "requested changes". A note's embedded {@code detailed_merge_status} is the merge request's,
+     * stated on every note while anyone's request for changes stands.
      */
     @Nested
     class ReviewDecisions {
@@ -392,7 +392,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             receive(loadPayload("note.mergerequest.system.requested_changes"));
 
             assertThat(reviewDecision())
-                    .as("a redelivered note changes no one's decision, so it leaves a newer sync's standing")
+                    .as("a redelivered note changes no one's decision, so it leaves a newer" + " sync's standing")
                     .isEqualTo(ReviewDecision.CHANGES_REQUESTED);
         }
 
@@ -440,8 +440,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * A diff note webhook and the discussion read name one thread through the discussion's GID; a stored thread's
-     * resolution follows the newest whole read of the merge request's discussions.
+     * A diff note webhook and the discussion read name one thread through the discussion's GID; a
+     * stored thread's resolution follows the newest whole read of the merge request's discussions.
      */
     @Nested
     class InlineDiscussions {
@@ -500,7 +500,10 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(commentThreadId()).isEqualTo(stored.getId());
         }
 
-        /** Reopened and resolved again by someone else between two reads: the second names who resolved it now. */
+        /**
+         * Reopened and resolved again by someone else between two reads: the second names who
+         * resolved it now.
+         */
         @Test
         void shouldNameWhoResolvedTheDiscussionLastAndKeepThemWhenAReadNamesNobody() throws Exception {
             receiveDiffNote();
@@ -543,7 +546,10 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             assertThat(commentThreadId()).isEqualTo(read.getId());
         }
 
-        /** Delayed read A saw the thread resolved; read B, begun later, saw it reopened and so changed nothing. */
+        /**
+         * Delayed read A saw the thread resolved; read B, begun later, saw it reopened and so
+         * changed nothing.
+         */
         @Test
         void shouldNotLetAnOlderReadUndoANewerSyncThatChangedNothing() throws Exception {
             receiveDiffNote();
@@ -576,8 +582,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * A sync begins reading a discussion no thread holds yet; a webhook read begun later records the opposite
-         * resolution before the sync stores the discussion's comments. The sync's older read changes nothing.
+         * A sync begins reading a discussion no thread holds yet; a webhook read begun later
+         * records the opposite resolution before the sync stores the discussion's comments. The
+         * sync's older read changes nothing.
          */
         @ParameterizedTest
         @ValueSource(booleans = {true, false})
@@ -615,7 +622,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             syncPages(page(List.of(discussion(true)), true, "c1"), last);
 
-            // The first page's notes are stored on a thread, but the page's resolution is not a whole read.
+            // The first page's notes are stored on a thread, but the page's resolution is not a
+            // whole read.
             assertThat(thread().getState()).isEqualTo(PullRequestReviewThread.State.UNRESOLVED);
             assertThat(thread().getResolvedAt()).isNull();
             assertThat(commentThreadId()).isEqualTo(thread().getId());
@@ -706,7 +714,10 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     .isEmpty();
         }
 
-        /** Handles MR !2's note hook as a diff note on a line of this discussion, in the delivery's transaction. */
+        /**
+         * Handles MR !2's note hook as a diff note on a line of this discussion, in the delivery's
+         * transaction.
+         */
         private void receiveDiffNote() throws IOException {
             ObjectNode payload =
                     (ObjectNode) objectMapper.readTree(new ClassPathResource("gitlab/note.mergerequest.create.json")
@@ -726,7 +737,10 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
             transactionTemplate.executeWithoutResult(status -> handler.handleEvent(event));
         }
 
-        /** Runs the discussion sync of MR !2 over one page holding this discussion, resolved as {@code resolved} says. */
+        /**
+         * Runs the discussion sync of MR !2 over one page holding this discussion, resolved as
+         * {@code resolved} says.
+         */
         private void sync(@Nullable Boolean resolved) {
             syncPages(onePage(discussion(resolved)));
         }
@@ -757,7 +771,10 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     gitLabProperties);
         }
 
-        /** The discussion sync, running {@code first} when GitLab is first asked, then reading {@code pages} in order. */
+        /**
+         * The discussion sync, running {@code first} when GitLab is first asked, then reading
+         * {@code pages} in order.
+         */
         @SafeVarargs
         private GitLabDiscussionSyncService serviceRunningFirst(
                 Runnable first, Map<String, @Nullable Object>... pages) {
@@ -806,8 +823,8 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * This discussion with its diff note, resolved as {@code resolved} says; null leaves the field out, as a read
-         * that could not state it.
+         * This discussion with its diff note, resolved as {@code resolved} says; null leaves the
+         * field out, as a read that could not state it.
          */
         private Map<String, @Nullable Object> discussion(@Nullable Boolean resolved) {
             return Boolean.TRUE.equals(resolved)
@@ -815,7 +832,9 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     : discussion(resolved, null, null);
         }
 
-        /** This discussion resolved at {@code at} by {@code resolver}, or by nobody the read names. */
+        /**
+         * This discussion resolved at {@code at} by {@code resolver}, or by nobody the read names.
+         */
         private Map<String, @Nullable Object> resolvedBy(@Nullable Map<String, @Nullable Object> resolver, Instant at) {
             return discussion(true, resolver, at);
         }
@@ -1058,7 +1077,7 @@ class GitLabNoteMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("HephaestusTest GitLab");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

@@ -11,8 +11,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.nats.client.Message;
 import java.io.IOException;
@@ -26,13 +24,14 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Unit tests for {@link AbstractIntegrationMessageHandler}. Locks the three contracts
- * that the concrete handlers depend on:
+ * Unit tests for {@link AbstractIntegrationMessageHandler}. Locks the three contracts that the
+ * concrete handlers depend on:
+ *
  * <ul>
- *   <li>Subject last-segment validation (with the {@code tag_push} vs {@code push}
- *       overlap regression),</li>
- *   <li>Deserialization-failure to {@link PayloadParsingException} translation,</li>
- *   <li>Tx-template wrapping of {@code handleEvent}.</li>
+ *   <li>Subject last-segment validation (with the {@code tag_push} vs {@code push} overlap
+ *       regression),
+ *   <li>Deserialization-failure to {@link PayloadParsingException} translation,
+ *   <li>Tx-template wrapping of {@code handleEvent}.
  * </ul>
  */
 class AbstractIntegrationMessageHandlerTest extends BaseUnitTest {

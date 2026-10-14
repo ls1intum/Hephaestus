@@ -1,7 +1,7 @@
 # How feedback reads
 
 Write plainly, like a colleague who read the work carefully. Name the specific thing in the work, with concrete
-subjects and verbs. For a concern, make the supported next action clear where the channel assigns it, and add only the
+subjects and verbs. For a concern, make the supported next action clear where the destination assigns it, and add only the
 context needed to locate it, understand it or choose how to do it. Keep it short where the point is simple, and give it
 the room it needs where it is not.
 
@@ -23,8 +23,8 @@ establishes it, and keep every qualification and uncertainty the evidence carrie
 
 A recorded outcome identifies the behavior that was assessed. It does not justify communicating a claim that the recorded
 evidence, read with its qualifications, and the assessed standard contradict. Read the three together to decide whether
-a claim is justified and useful, and stay quiet when it is not, with the withholding decisions the channel offers. This
-chooses what to say: it does not assess the work again, and it adds or changes no result or observation.
+a claim is justified and useful, and stay quiet when it is not, with the withholding decisions the destination offers. This
+chooses what to say: it does not assess the work again, and it adds or changes no result or problem.
 
 Use the reader's words rather than outcome codes, severity codes, scores or practice slugs.
 
@@ -33,5 +33,5 @@ several independent points, plain paragraphs when there is one. No fixed section
 needed only where it helps the reader understand or choose. Avoid the marks of a template: the same opening for every
 point, a label on every line, a closing line that repeats what came before.
 
-Each piece of feedback is read on its own and stands on its own. The same point may appear in more than one channel
-when it serves the reader there. On the work, the summary and its line notes form one review; they are not separate channels.
+Each piece of feedback is read on its own and stands on its own. The same point may appear in more than one destination
+when it serves the reader there. On the work, the summary and its line notes form one review; they are not separate destinations.

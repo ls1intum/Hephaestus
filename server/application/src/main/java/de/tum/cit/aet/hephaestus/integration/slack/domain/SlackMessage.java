@@ -26,10 +26,14 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
         name = "slack_message",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_slack_message",
-                        columnNames = {"workspace_id", "slack_channel_id", "slack_ts"}),
+        uniqueConstraints = {
+            @UniqueConstraint(
+                    name = "uk_slack_message_tenant",
+                    columnNames = {"id", "workspace_id"}),
+            @UniqueConstraint(
+                    name = "uk_slack_message",
+                    columnNames = {"workspace_id", "slack_channel_id", "slack_ts"})
+        },
         indexes = {
             @Index(name = "idx_slack_message_ingest", columnList = "workspace_id, ingested_at"),
             @Index(name = "idx_slack_message_thread", columnList = "workspace_id, slack_channel_id, slack_thread_ts"),
@@ -61,15 +65,9 @@ public class SlackMessage {
     @Column(name = "author_slack_user_id", length = 32)
     private @Nullable String authorSlackUserId;
 
-    /**
-     * The resolved workspace {@code User} id of the author, or {@code null} when the Slack sender is not a linked,
-     * workspace-member developer. This is the firewall stamp the conversation projector unions into
-     * {@code slack_thread}'s {@code participant_member_ids}. Written via the native ingest insert. FK'd to
-     * {@code "user"(id)} ON DELETE SET NULL ({@code sfk_slack_message_author_member}) — scalar reference only, no
-     * JPA association across modules.
-     */
-    @Column(name = "author_member_id")
-    private @Nullable Long authorMemberId;
+    /** Human author account in this workspace, or null for an unresolved sender. */
+    @Column(name = "author_account_id")
+    private @Nullable Long authorAccountId;
 
     @Column(name = "text", columnDefinition = "TEXT")
     private @Nullable String text;

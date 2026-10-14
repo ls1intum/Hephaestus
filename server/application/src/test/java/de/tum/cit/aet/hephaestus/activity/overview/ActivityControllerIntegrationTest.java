@@ -28,8 +28,8 @@ import de.tum.cit.aet.hephaestus.activity.overview.dto.WorkItemDTO;
 import de.tum.cit.aet.hephaestus.core.auth.AccountPurger;
 import de.tum.cit.aet.hephaestus.core.auth.AccountService;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPublicActivity;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRegistry;
@@ -79,9 +79,9 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsService;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.settings.WorkspaceTeamSettingsService;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -127,7 +127,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private ConnectionService connectionService;
 
     @Autowired
-    private IdentityLinkRepository publicIdentities;
+    private IdentityRepository publicIdentities;
 
     @Autowired
     private AccountPublicActivity publicationChoice;
@@ -268,12 +268,12 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 assertThat(excluded.coverage().totalRepositories()).isZero();
                 assertThat(excluded.from()).isNotEqualTo(DAY);
                 jdbc.update(
-                        "UPDATE workspace_membership SET hidden=true WHERE workspace_id=? AND user_id=?",
+                        "UPDATE membership SET hidden=true WHERE workspace_id=? AND account_id=(SELECT i.account_id FROM identity i JOIN \"user\" u ON u.provider_id=i.provider_id AND u.native_id::text=i.provider_user_key WHERE u.id=? AND i.team_key='')",
                         workspace.getId(),
                         ada.getId());
                 assertThat(publicObjections.hiddenPeople(workspace.getId())).isZero();
                 jdbc.update(
-                        "UPDATE workspace_membership SET hidden=false WHERE workspace_id=? AND user_id=?",
+                        "UPDATE membership SET hidden=false WHERE workspace_id=? AND account_id=(SELECT i.account_id FROM identity i JOIN \"user\" u ON u.provider_id=i.provider_id AND u.native_id::text=i.provider_user_key WHERE u.id=? AND i.team_key='')",
                         workspace.getId(),
                         ada.getId());
                 jdbc.update(
@@ -449,7 +449,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             long accountId = Objects.requireNonNull(account.getId());
             var otherProvider = gitProviderRepository.save(
                     new IdentityProvider(IdentityProviderType.GITLAB, "https://unlink.example"));
-            var second = new IdentityLink();
+            var second = new Identity();
             second.setAccount(account);
             second.setProviderId(Objects.requireNonNull(otherProvider.getId()));
             second.setSubject("purge-subject");
@@ -560,13 +560,13 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -1, DAY);
             record(zoe, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -2, DAY);
             jdbc.update(
-                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity_link WHERE provider_id=? AND subject=?)",
+                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity WHERE provider_id=? AND provider_user_key=? AND team_key='')",
                     ada.getProvider().getId(),
                     ada.getNativeId().toString());
-            workspaceMembershipService.updateMemberVisibility(workspace.getId(), zoe.getId(), true);
+            workspaceMembershipService.updateMemberVisibility(workspace.getId(), workspaceMembershipService.accountIdForUser(zoe.getId()), true);
             assertThat(page().people()).isEmpty();
             jdbc.update(
-                    "UPDATE account SET public_activity_visible=true WHERE id IN (SELECT account_id FROM identity_link WHERE provider_id=? AND subject=?)",
+                    "UPDATE account SET public_activity_visible=true WHERE id IN (SELECT account_id FROM identity WHERE provider_id=? AND provider_user_key=? AND team_key='')",
                     ada.getProvider().getId(),
                     ada.getNativeId().toString());
             assertThat(page().people()).extracting(p -> p.login()).containsExactly(ada.getLogin());
@@ -617,7 +617,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     .containsExactly(1L);
             assertThat(before.coverage().totalRepositories()).isEqualTo(1);
             jdbc.update(
-                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity_link WHERE provider_id=? AND subject=?)",
+                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity WHERE provider_id=? AND provider_user_key=? AND team_key='')",
                     ada.getProvider().getId(),
                     ada.getNativeId().toString());
             var after = page();
@@ -630,13 +630,13 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         void shouldExcludeSuppressedPeopleEvenWhenTheirLedgerRowsRemain() {
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -1, DAY);
             jdbc.update(
-                    "INSERT INTO person_suppression (id,provider_id,subject,team_key) VALUES (?,?,?,'')",
+                    "INSERT INTO identity_restriction (id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,'','ERASED')",
                     UUID.randomUUID(),
                     ada.getProvider().getId(),
                     ada.getNativeId().toString());
             assertThat(page().people()).isEmpty();
             jdbc.update(
-                    "UPDATE workspace_membership SET hidden=true WHERE workspace_id=? AND user_id=?",
+                    "UPDATE membership SET hidden=true WHERE workspace_id=? AND account_id=(SELECT i.account_id FROM identity i JOIN \"user\" u ON u.provider_id=i.provider_id AND u.native_id::text=i.provider_user_key WHERE u.id=? AND i.team_key='')",
                     workspace.getId(),
                     ada.getId());
             assertThat(publicObjections.hiddenPeople(workspace.getId())).isZero();
@@ -1108,7 +1108,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             record(zoe, ActivityEventType.REVIEW_APPROVED, ActivityTargetType.REVIEW, approval.getId(), DAY);
             assertThat(person(zoe).counts().peopleHelped()).isEqualTo(1);
             jdbc.update(
-                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity_link WHERE provider_id=? AND subject=?)",
+                    "UPDATE account SET public_activity_visible=false WHERE id IN (SELECT account_id FROM identity WHERE provider_id=? AND provider_user_key=? AND team_key='')",
                     ada.getProvider().getId(),
                     ada.getNativeId().toString());
             var visible = person(zoe);
@@ -1460,7 +1460,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                     -2L,
                     DAY.plusSeconds(60),
                     monitored);
-            workspaceMembershipService.updateMemberVisibility(workspace.getId(), ada.getId(), true);
+            workspaceMembershipService.updateMemberVisibility(workspace.getId(), workspaceMembershipService.accountIdForUser(ada.getId()), true);
             var result = peopleService.people(
                     workspace.getId(),
                     new ActivityPeopleRangeParams("custom", Instant.parse(FROM), Instant.parse(TO)),
@@ -1697,7 +1697,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .orElseThrow();
         var issue = issue(monitored, Issue.State.OPEN, caller);
         record(caller, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, issue.getId(), DAY);
-        workspaceMembershipService.updateMemberVisibility(workspace.getId(), caller.getId(), true);
+        workspaceMembershipService.updateMemberVisibility(workspace.getId(), workspaceMembershipService.accountIdForUser(caller.getId()), true);
         assertThat(members(uri -> uri)).extracting(row -> row.person().id()).doesNotContain(caller.getId());
         var detail = Objects.requireNonNull(get("/people/" + caller.getId(), uri -> uri)
                 .isOk()
@@ -1715,7 +1715,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     void shouldHideAnotherMembersWorkOnEveryPersonReadPath() {
         var issue = issue(monitored, Issue.State.OPEN, ada);
         record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, issue.getId(), DAY);
-        workspaceMembershipService.updateMemberVisibility(workspace.getId(), ada.getId(), true);
+        workspaceMembershipService.updateMemberVisibility(workspace.getId(), workspaceMembershipService.accountIdForUser(ada.getId()), true);
         get("/people/" + ada.getId(), uri -> uri).isNotFound().expectBody(Void.class);
         get("/people/" + ada.getId() + "/work", uri -> uri).isNotFound().expectBody(Void.class);
         get("/work", uri -> uri.queryParam("login", ada.getLogin()))
@@ -1729,7 +1729,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .findByLoginAndProviderId(
                         "mentor", Objects.requireNonNull(ensureGitHubProvider().getId()))
                 .orElseThrow();
-        workspaceMembershipService.updateMemberVisibility(workspace.getId(), caller.getId(), true);
+        workspaceMembershipService.updateMemberVisibility(workspace.getId(), workspaceMembershipService.accountIdForUser(caller.getId()), true);
         get("/people/" + caller.getId(), uri -> uri)
                 .isOk()
                 .expectBody(ActivityPersonDetailDTO.class)
@@ -1949,8 +1949,8 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                             .containsExactly(new ActivityActionDTO(ActivityKind.PULL_REQUEST_OPENED, 1));
                 });
                 assertThat(page.nextCursor()).isNull();
-                assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
-                                workspace.getId(), contributor.getId()))
+                assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                                workspace.getId(), workspaceMembershipService.accountIdForUser(contributor.getId())))
                         .isEmpty();
             }
         }
@@ -1965,7 +1965,7 @@ class ActivityControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             }
             record(ada, ActivityEventType.ISSUE_CREATED, ActivityTargetType.ISSUE, -904L, DAY, monitored);
             var membership = workspaceMembershipRepository
-                    .findByWorkspace_IdAndUser_Id(workspace.getId(), ada.getId())
+                    .findByWorkspace_IdAndAccount_Id(workspace.getId(), workspaceMembershipService.accountIdForUser(ada.getId()))
                     .orElseThrow();
             membership.setHidden(true);
             workspaceMembershipRepository.save(membership);

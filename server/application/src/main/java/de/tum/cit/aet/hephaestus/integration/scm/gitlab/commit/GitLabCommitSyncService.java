@@ -3,10 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributor;
@@ -14,6 +10,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributor
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import java.net.URLEncoder;
@@ -40,14 +40,14 @@ import org.springframework.web.reactive.function.client.WebClientResponseExcepti
 
 /**
  * Incremental commit sync for GitLab repositories via the REST API.
- * <p>
- * Uses {@code GET /api/v4/projects/:id/repository/commits} to fetch commits
- * on the default branch. The list endpoint returns commit metadata (SHA, message,
- * author/committer info, timestamps) but not diff statistics; those come from the
- * JGit walk in {@link GitLabCommitBackfillService} and the push handler.
- * <p>
- * Supports incremental sync via the {@code since} parameter (ISO 8601 date),
- * which maps to the repository's {@code lastSyncAt} timestamp.
+ *
+ * <p>Uses {@code GET /api/v4/projects/:id/repository/commits} to fetch commits on the default
+ * branch. The list endpoint returns commit metadata (SHA, message, author/committer info,
+ * timestamps) but not diff statistics; those come from the JGit walk in {@link
+ * GitLabCommitBackfillService} and the push handler.
+ *
+ * <p>Supports incremental sync via the {@code since} parameter (ISO 8601 date), which maps to the
+ * repository's {@code lastSyncAt} timestamp.
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -83,9 +83,9 @@ public class GitLabCommitSyncService {
     /**
      * Syncs commits for a repository from the GitLab REST API.
      *
-     * @param scopeId    the workspace scope ID
+     * @param scopeId the workspace scope ID
      * @param repository the repository to sync commits for
-     * @param since      optional lower bound for incremental sync (ISO 8601)
+     * @param since optional lower bound for incremental sync (ISO 8601)
      * @return sync result with count of commits processed
      */
     public SyncResult syncCommitsForRepository(Long scopeId, Repository repository, @Nullable OffsetDateTime since) {
@@ -157,7 +157,8 @@ public class GitLabCommitSyncService {
             @Nullable OffsetDateTime since,
             int page) {
         String base = serverUrl.endsWith("/") ? serverUrl.substring(0, serverUrl.length() - 1) : serverUrl;
-        String commitUrl = base + "/api/v4/projects/"
+        String commitUrl = base
+                + "/api/v4/projects/"
                 + projectId
                 + "/repository/commits"
                 + "?ref_name="

@@ -1,22 +1,20 @@
+import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 /**
  * The host's check of what a review session submits with `submit_result`: one result for its one
  * practice. This module repairs what it can and notes each repair. It refuses the rest and names every
  * problem at once. After the host adds the coverage it measured, `parseCandidate` in the contract
- * applies the final rules. The quote helpers at the end resolve each citation against its artifact.
+ * applies the final rules. The quote helpers at the end resolve each citation against its sourceFile.
  */
 import {
 	CANDIDATE_LIMITS,
 	type Citation,
 	type ClaimBasis,
-	DIFF_SOURCE,
-	isCommit,
 	type Outcome,
 	OUTCOMES,
 	PRACTICE_SLUG,
 	type Severity,
 	SEVERITIES,
-	TREE_SOURCE,
-} from "./work/practice-scripts/lib/contract.ts";
+} from "./work/practice-scripts/lib/core/contract.ts";
 
 /**
  * The captured witness of a checkout that a repository citation names (`CandidateEvidenceVerifier.CHECKOUT_WITNESS` on
@@ -44,10 +42,10 @@ export interface RecordedSearch {
 	boundary: string;
 }
 
-/** Why this practice has no subject here: the warrant of a NOT_APPLICABLE result. */
+/** Why this practice has no prerequisite here: the warrant of a DOES_NOT_APPLY result. */
 export interface RecordedInapplicability {
 	consulted: string[];
-	subject: string;
+	prerequisite: string;
 	ruledOutBy: string;
 }
 
@@ -82,12 +80,11 @@ export interface NormalizedSubmission {
 	explanation: string;
 	citations: NormalizedCitation[];
 	problems?: NormalizedProblem[];
-	severity?: Severity;
 	example?: { citation: NormalizedCitation; note: string };
 	evidence: {
 		search?: RecordedSearch;
 		inapplicability?: RecordedInapplicability;
-		undecidability?: RecordedOpenQuestion[];
+		openQuestions?: RecordedOpenQuestion[];
 	};
 }
 
@@ -108,13 +105,13 @@ export const OUTCOME_DESCRIPTIONS: Record<Outcome, string> = {
 	NOT_MET:
 		"The work does not meet the practice. Submit one result for the practice and list each distinct gap in problems, " +
 		"each with its severity, summary, explanation, citations and basis. The problems carry the citations, so the " +
-		"result itself may cite nothing. The result severity is optional; without it, the worst problem's severity applies.",
-	NOT_APPLICABLE:
-		"A concrete fact rules out the practice's prerequisite occasion. Record the prerequisite and the exclusion in " +
+		"result itself may cite nothing. Only problems carry severity.",
+	DOES_NOT_APPLY:
+		"A concrete fact rules out the practice's prerequisite applicability. Record the prerequisite and the exclusion in " +
 		"evidence.inapplicability. This is not missing or incomplete evidence.",
-	UNDETERMINED:
+	COULD_NOT_DETERMINE:
 		"Relevant evidence was captured and read, but it does not settle whether the work meets the practice. Record each " +
-		"open question in evidence.undecidability: the question, what would settle it, and a citation where it is located. " +
+		"open question in evidence.openQuestions: the question, what would settle it, and a citation where it is located. " +
 		"A capture failure is a review readiness failure, not a result.",
 };
 
@@ -130,9 +127,10 @@ export const SEVERITY_DESCRIPTIONS: Record<Severity, string> = {
 		"A real defect to fix before merging, whose consequence is contained and correctable. Differs from " +
 		"MINOR by whether a reader of this change would be wrong about how it behaves.",
 	MINOR:
-		"A craft-level improvement worth making that nobody would block a merge on. Differs from INFO by " +
+		"A craft-level improvement worth making that nobody would block a merge on. Differs from TRIVIAL by " +
 		"whether there is a specific edit to make.",
-	INFO: "A real gap with trivial impact. Still a problem of a NOT_MET result; a strength is never a problem.",
+	TRIVIAL:
+		"A real gap with trivial impact. Still a problem of a NOT_MET result; a strength is never a problem.",
 };
 
 /** Require a model-facing description for each enum value. */
@@ -237,21 +235,21 @@ export function normalizeInapplicability(inapplicability: unknown): RecordedInap
 		"inapplicability.consulted",
 		"name at least one source you read to conclude this",
 	);
-	const subject = trimmedText(inapplicability.subject);
+	const prerequisite = trimmedText(inapplicability.prerequisite);
 	const ruledOutBy = trimmedText(inapplicability.ruledOutBy);
-	if (!subject) {
-		throw new Error("inapplicability.subject is required: name what this practice looks for");
+	if (!prerequisite) {
+		throw new Error("inapplicability.prerequisite is required: name what this practice looks for");
 	}
 	if (!ruledOutBy) {
 		throw new Error(
-			"inapplicability.ruledOutBy is required: state the fact about THIS work that means the subject " +
-				"cannot occur in it. If you are merely unsure, the answer is UNDETERMINED, not NOT_APPLICABLE",
+			"inapplicability.ruledOutBy is required: state the fact about THIS work that means the prerequisite " +
+				"cannot occur in it. If you are merely unsure, the answer is COULD_NOT_DETERMINE, not DOES_NOT_APPLY",
 		);
 	}
 	const max = CANDIDATE_LIMITS.warrantFieldChars;
 	return {
 		consulted,
-		subject: withinBound(subject, "inapplicability.subject", max),
+		prerequisite: withinBound(prerequisite, "inapplicability.prerequisite", max),
 		ruledOutBy: withinBound(ruledOutBy, "inapplicability.ruledOutBy", max),
 	};
 }
@@ -293,8 +291,8 @@ export function normalizeOpenQuestion(
  * made on the way in are reported, one line each.
  */
 export interface CitationRepairs {
-	/** The source kind that the manifest staged an artifact under; undefined when it staged no such artifact. */
-	sourceOf?: (artifactPath: string) => string | undefined;
+	/** The source kind that the manifest staged a source file under; undefined when it staged no such sourceFile. */
+	sourceOf?: (sourcePath: string) => string | undefined;
 	notes?: string[];
 }
 
@@ -314,11 +312,11 @@ function citedLine(value: unknown): number {
 function insideCheckout(
 	path: string,
 	sourceKind: string,
-	artifactPath: string,
+	sourcePath: string,
 	noteRead: (read: string) => void,
 ): string {
 	const checkout =
-		sourceKind === TREE_SOURCE ? CHECKOUT_WITNESS.exec(artifactPath)?.groups?.root : undefined;
+		sourceKind === TREE_SOURCE ? CHECKOUT_WITNESS.exec(sourcePath)?.groups?.root : undefined;
 	if (checkout === undefined || !path.startsWith(checkout)) {
 		return path;
 	}
@@ -328,8 +326,8 @@ function insideCheckout(
 }
 
 /**
- * What the manifest already knows is filled in, not asked for: the artifact of a staged record is its
- * own path, and the source of an artifact is the source that staged it. Each fill is noted.
+ * What the manifest already knows is filled in, not asked for: the sourceFile of a staged record is its
+ * own path, and the source of a source file is the source that staged it. Each fill is noted.
  */
 function completedFromManifest(
 	fields: Record<string, unknown>,
@@ -337,24 +335,24 @@ function completedFromManifest(
 	which: string,
 	sourceOf: CitationRepairs["sourceOf"],
 	notes: string[],
-): { artifactPath: string; sourceKind: string } {
-	let artifactPath = typeof fields.artifactPath === "string" ? fields.artifactPath : "";
-	if (!artifactPath.trim() && path.trim() && sourceOf?.(path) !== undefined) {
-		artifactPath = path;
-		notes.push(`${which}artifactPath filled in as ${path}, the staged record the path names`);
+): { sourcePath: string; sourceKind: string } {
+	let sourcePath = typeof fields.sourcePath === "string" ? fields.sourcePath : "";
+	if (!sourcePath.trim() && path.trim() && sourceOf?.(path) !== undefined) {
+		sourcePath = path;
+		notes.push(`${which}sourcePath filled in as ${path}, the staged record the path names`);
 	}
 	let sourceKind = trimmedText(fields.sourceKind);
-	const staged = artifactPath.trim() ? sourceOf?.(artifactPath) : undefined;
+	const staged = sourcePath.trim() ? sourceOf?.(sourcePath) : undefined;
 	if (!sourceKind && staged !== undefined) {
 		sourceKind = staged;
-		notes.push(`${which}sourceKind filled in as ${staged}, the source that staged ${artifactPath}`);
+		notes.push(`${which}sourceKind filled in as ${staged}, the source that staged ${sourcePath}`);
 	}
-	return { artifactPath, sourceKind };
+	return { sourcePath, sourceKind };
 }
 
 /**
  * One citation, checked and completed from the manifest. An empty quote stays "": it is a citation by
- * coordinates alone, and {@link resolveQuote} fills it from the artifact later.
+ * coordinates alone, and {@link resolveQuote} fills it from the sourceFile later.
  * @param which prefixes each note and error, e.g. "problem 2 citation 1: ", so that the session knows
  *   which citation it is about.
  */
@@ -367,17 +365,17 @@ export function normalizeCitation(
 	// checks below refuse it by name.
 	const fields: Record<string, unknown> = isPlainRecord(raw) ? raw : {};
 	const given = typeof fields.path === "string" ? fields.path : "";
-	const { artifactPath, sourceKind } = completedFromManifest(fields, given, which, sourceOf, notes);
-	const path = insideCheckout(given, sourceKind, artifactPath, (read) => {
+	const { sourcePath, sourceKind } = completedFromManifest(fields, given, which, sourceOf, notes);
+	const path = insideCheckout(given, sourceKind, sourcePath, (read) => {
 		notes.push(`${which}path ${given} read as ${read}, its path inside the checkout`);
 	});
 	const declaredSide = nullish(fields.side) ? null : trimmedText(fields.side).toUpperCase();
 	const revision = nullish(fields.revision) ? null : trimmedText(fields.revision);
 	// Whether a revision applies is settled once the source is (the caller drops it elsewhere). Its
 	// form is not the caller's to guess.
-	if (revision !== null && !isCommit(revision)) {
+	if (revision !== null && (revision.length === 0 || revision.length > 1024)) {
 		throw new Error(
-			`${which}revision must be a full commit SHA, received ${JSON.stringify(fields.revision)}`,
+			`${which}revision must be an opaque nonempty version of at most 1024 characters, received ${JSON.stringify(fields.revision)}`,
 		);
 	}
 	const startLine = citedLine(fields.startLine);
@@ -394,14 +392,14 @@ export function normalizeCitation(
 	if (!sourceKind) {
 		throw new Error(`${which}evidence citation sourceKind is required`);
 	}
-	if (!artifactPath.trim()) {
+	if (!sourcePath.trim()) {
 		throw new Error(
-			`${which}evidence citation artifactPath is required: the staged artifact the lines are in`,
+			`${which}evidence citation sourcePath is required: the staged sourceFile the lines are in`,
 		);
 	}
-	if (sourceKind === TREE_SOURCE && !CHECKOUT_WITNESS.test(artifactPath)) {
+	if (sourceKind === TREE_SOURCE && !CHECKOUT_WITNESS.test(sourcePath)) {
 		throw new Error(
-			`${which}repository citations must use the captured .git/HEAD artifact and a repository-relative path`,
+			`${which}repository citations must use the captured .git/HEAD sourceFile and a repository-relative path`,
 		);
 	}
 	if (!path.trim()) {
@@ -414,12 +412,7 @@ export function normalizeCitation(
 				"(scm.pull-request.core) for the pull request's own facts",
 		);
 	}
-	if (
-		sourceKind === DIFF_SOURCE &&
-		declaredSide !== null &&
-		declaredSide !== "OLD" &&
-		declaredSide !== "NEW"
-	) {
+	if (declaredSide !== null && declaredSide !== "OLD" && declaredSide !== "NEW") {
 		throw new Error(`${which}diff evidence citation side must be OLD or NEW`);
 	}
 	// Number(undefined) is NaN and Number(null) is 0. An omitted line must be named as omitted, not as
@@ -427,7 +420,7 @@ export function normalizeCitation(
 	if (nullish(fields.startLine) || fields.startLine === "") {
 		throw new Error(
 			`${which}evidence citation startLine is required:` +
-				" the 1-based line of the quoted text in the artifact " +
+				" the 1-based line of the quoted text in the sourceFile " +
 				"(for a quote of the change, the [L<n>] coordinate of work/change/diff.patch)",
 		);
 	}
@@ -448,12 +441,10 @@ export function normalizeCitation(
 	}
 	// A side on anything but a quote of the change says nothing. It is surplus: dropped, not refused.
 	const side: DiffSide | null =
-		sourceKind === DIFF_SOURCE && (declaredSide === "OLD" || declaredSide === "NEW")
-			? declaredSide
-			: null;
+		declaredSide === "OLD" || declaredSide === "NEW" ? declaredSide : null;
 	return {
 		sourceKind,
-		artifactPath,
+		sourcePath,
 		path,
 		...(side === null ? {} : { side }),
 		...(revision === null ? {} : { revision }),
@@ -507,11 +498,10 @@ const RESULT_FIELDS = [
 	"explanation",
 	"citations",
 	"problems",
-	"severity",
 	"example",
 	"evidence",
 ] as const;
-const EVIDENCE_FIELDS = ["search", "inapplicability", "undecidability"] as const;
+const EVIDENCE_FIELDS = ["search", "inapplicability", "openQuestions"] as const;
 const PROBLEM_FIELDS = [
 	"key",
 	"severity",
@@ -529,24 +519,6 @@ const BASIS_FIELDS = {
 	state: ["type", "explanation"],
 } as const satisfies Record<ClaimBasis["type"], readonly string[]>;
 
-/** Keys that the host binds or measures itself. A session that sends one is told so, and nothing else. */
-const HOST_FIELDS = {
-	practiceSlug: "the host binds the practice",
-	revises: "the host binds the result to this practice's session",
-	coverage: "coverage is what the host measured from your reads",
-} as const;
-
-/**
- * The fields of each evidence branch. They arrive loose, beside the result or straight under evidence,
- * when the session forgets the branch that wraps them. Two branches share `consulted`, so a branch is
- * named by its own fields. A lone `consulted` belongs to the search.
- */
-const BRANCH_FIELDS = [
-	{ branch: "inapplicability", own: ["subject", "ruledOutBy"], consulted: true },
-	{ branch: "undecidability", own: ["openQuestion", "wouldSettleIt"], consulted: false },
-	{ branch: "search", own: ["lookedFor", "boundary", "consulted"], consulted: true },
-] as const;
-
 /** Run one check. Its error joins the problems, and the result is undefined. */
 function collect<T>(problems: string[], check: () => T): T | undefined {
 	try {
@@ -555,131 +527,6 @@ function collect<T>(problems: string[], check: () => T): T | undefined {
 		problems.push(error instanceof Error ? error.message : String(error));
 		return undefined;
 	}
-}
-
-/**
- * Move each field that was sent where it does not belong to its home, and note each move. A field
- * sent in two places is not guessed at: it is a problem. Keys that the host binds are dropped.
- */
-function rehomed(
-	sent: Record<string, unknown>,
-	notes: string[],
-	problems: string[],
-): Record<string, unknown> {
-	const root = new Map(Object.entries(sent));
-	const sentEvidence = root.get("evidence");
-	// Evidence of another type is refused when it is read. Then nothing moves into it.
-	if (nullish(sentEvidence) || isPlainRecord(sentEvidence)) {
-		const evidence = new Map(isPlainRecord(sentEvidence) ? Object.entries(sentEvidence) : []);
-		// An explicit null carries nothing: it reads as absent, wherever it was sent.
-		for (const key of ["citations", ...EVIDENCE_FIELDS]) {
-			if (root.has(key) && nullish(root.get(key))) {
-				root.delete(key);
-			}
-			if (evidence.has(key) && nullish(evidence.get(key))) {
-				evidence.delete(key);
-			}
-		}
-		if (evidence.has("citations")) {
-			if (root.has("citations")) {
-				problems.push(
-					"citations was sent both beside the result and under evidence; send one list, beside the result",
-				);
-			} else {
-				root.set("citations", evidence.get("citations"));
-				notes.push(
-					"citations read from under evidence and recorded beside it, where they belong; nothing to resend",
-				);
-			}
-			evidence.delete("citations");
-		}
-		const moved: string[] = [];
-		for (const key of EVIDENCE_FIELDS) {
-			if (!root.has(key)) {
-				continue;
-			}
-			if (evidence.has(key)) {
-				problems.push(`${key} was sent both beside the result and under evidence; send one value`);
-			} else {
-				evidence.set(key, root.get(key));
-				moved.push(key);
-			}
-			root.delete(key);
-		}
-		const loose = (key: string) => root.has(key) || evidence.has(key);
-		const take = (key: string) => {
-			if (root.has(key) && evidence.has(key)) {
-				problems.push(`${key} was sent both beside the result and under evidence; send one value`);
-			}
-			const value = root.has(key) ? root.get(key) : evidence.get(key);
-			root.delete(key);
-			evidence.delete(key);
-			return value;
-		};
-		for (const { branch, own, consulted } of BRANCH_FIELDS) {
-			if (evidence.has(branch) || !own.some(loose)) {
-				continue;
-			}
-			const fields =
-				consulted && !own.some((key) => key === "consulted") ? [...own, "consulted"] : own;
-			const value = Object.fromEntries(fields.filter(loose).map((key) => [key, take(key)]));
-			evidence.set(branch, value);
-			moved.push(`${branch}{${Object.keys(value).join(", ")}}`);
-		}
-		if (evidence.has("evidenceRationale") && !root.has("evidenceRationale")) {
-			root.set("evidenceRationale", evidence.get("evidenceRationale"));
-			evidence.delete("evidenceRationale");
-		}
-		if (moved.length > 0) {
-			notes.push(
-				`${moved.join(", ")} read from where they were sent and recorded under evidence, where they belong; nothing to resend`,
-			);
-		}
-		const opened = evidence.get("undecidability");
-		if (isPlainRecord(opened)) {
-			evidence.set("undecidability", [opened]);
-			notes.push(
-				"undecidability sent as one open question and recorded as a list of one; nothing to resend",
-			);
-		}
-		root.set("evidence", Object.fromEntries(evidence));
-	}
-	for (const [key, why] of Object.entries(HOST_FIELDS)) {
-		if (root.has(key)) {
-			root.delete(key);
-			notes.push(`${key} dropped: ${why}`);
-		}
-	}
-	if (root.has("evidenceRationale")) {
-		const rationale = root.get("evidenceRationale");
-		root.delete("evidenceRationale");
-		if (nullish(root.get("explanation"))) {
-			root.set("explanation", rationale);
-			notes.push("evidenceRationale read as explanation, its name in a result; nothing to resend");
-		} else if (!nullish(rationale) && rationale !== "") {
-			problems.push(
-				"evidenceRationale and explanation were both sent: evidenceRationale is the old name of explanation, so send explanation only",
-			);
-		}
-	}
-	const allowed = new Set<string>(RESULT_FIELDS);
-	// A stray key with no value (`practiceSlug2: null`) carries nothing: dropped, and said so.
-	const empty = [...root.keys()].filter(
-		(key) => !allowed.has(key) && (nullish(root.get(key)) || root.get(key) === ""),
-	);
-	for (const key of empty) {
-		root.delete(key);
-	}
-	if (empty.length > 0) {
-		notes.push(`empty field(s) ${empty.join(", ")} dropped`);
-	}
-	const unknown = [...root.keys()].filter((key) => !allowed.has(key));
-	if (unknown.length > 0) {
-		problems.push(
-			`unknown result field(s): ${unknown.join(", ")}; a result has only ${RESULT_FIELDS.join(", ")}`,
-		);
-	}
-	return Object.fromEntries(root);
 }
 
 /** A one-line summary as the developer's practice page shows it, or undefined with the problem noted. */
@@ -933,7 +780,7 @@ function checkedProblems(
 		return undefined;
 	}
 	if (outcome !== undefined && outcome !== "NOT_MET") {
-		if (listed.length > 0) {
+		if (!nullish(value)) {
 			problems.push(`a ${outcome} result has no problems: a problem makes it NOT_MET`);
 		}
 		return undefined;
@@ -1015,7 +862,7 @@ function checkedEvidence(
 ): NormalizedSubmission["evidence"] | undefined {
 	const sent = nullish(value) ? {} : value;
 	if (!isPlainRecord(sent)) {
-		problems.push("evidence must be an object with search, inapplicability or undecidability");
+		problems.push("evidence must be an object with search, inapplicability or openQuestions");
 		return undefined;
 	}
 	const before = problems.length;
@@ -1029,10 +876,10 @@ function checkedEvidence(
 	}
 	let search: RecordedSearch | undefined;
 	if (!nullish(sent.search)) {
-		if (outcome === "NOT_APPLICABLE") {
+		if (outcome === "DOES_NOT_APPLY") {
 			problems.push(
-				"evidence.search is not permitted for NOT_APPLICABLE: a NOT_APPLICABLE result carries " +
-					"evidence.inapplicability only. If you searched and could not tell, say UNDETERMINED instead",
+				"evidence.search is not permitted for DOES_NOT_APPLY: a DOES_NOT_APPLY result carries " +
+					"evidence.inapplicability only. If you searched and could not tell, say COULD_NOT_DETERMINE instead",
 			);
 		} else {
 			search = collect(problems, () => normalizeSearch(sent.search));
@@ -1041,30 +888,30 @@ function checkedEvidence(
 	let inapplicability: RecordedInapplicability | undefined;
 	if (nullish(sent.inapplicability)) {
 		// Inapplicability is a positive claim about scope, not an uncertain assessment.
-		if (outcome === "NOT_APPLICABLE") {
+		if (outcome === "DOES_NOT_APPLY") {
 			problems.push(
-				"a NOT_APPLICABLE result must say why the practice does not apply: " +
-					"evidence.inapplicability with consulted, subject and ruledOutBy. If you looked and could " +
-					"not tell, say UNDETERMINED instead",
+				"a DOES_NOT_APPLY result must say why the practice does not apply: " +
+					"evidence.inapplicability with consulted, prerequisite and ruledOutBy. If you looked and could " +
+					"not tell, say COULD_NOT_DETERMINE instead",
 			);
 		}
-	} else if (outcome !== undefined && outcome !== "NOT_APPLICABLE") {
-		problems.push("evidence.inapplicability is permitted only for NOT_APPLICABLE");
+	} else if (outcome !== undefined && outcome !== "DOES_NOT_APPLY") {
+		problems.push("evidence.inapplicability is permitted only for DOES_NOT_APPLY");
 	} else {
 		inapplicability = collect(problems, () => normalizeInapplicability(sent.inapplicability));
 	}
-	const undecidability = checkedOpenQuestions(sent.undecidability, outcome, repairs, problems);
+	const openQuestions = checkedOpenQuestions(sent.openQuestions, outcome, repairs, problems);
 	if (problems.length > before) {
 		return undefined;
 	}
 	return {
 		...(search === undefined ? {} : { search }),
 		...(inapplicability === undefined ? {} : { inapplicability }),
-		...(undecidability === undefined ? {} : { undecidability }),
+		...(openQuestions === undefined ? {} : { openQuestions }),
 	};
 }
 
-/** The open questions of a NOT_MET or UNDETERMINED result. Uncertainty never silently becomes a verdict. */
+/** The open questions of a NOT_MET or COULD_NOT_DETERMINE result. Uncertainty never silently becomes a verdict. */
 function checkedOpenQuestions(
 	value: unknown,
 	outcome: Outcome | undefined,
@@ -1073,25 +920,25 @@ function checkedOpenQuestions(
 ): RecordedOpenQuestion[] | undefined {
 	const listed = nullish(value) ? [] : value;
 	if (!Array.isArray(listed)) {
-		problems.push("evidence.undecidability must be a list of open questions");
+		problems.push("evidence.openQuestions must be a list of open questions");
 		return undefined;
 	}
 	if (listed.length === 0) {
-		if (outcome === "UNDETERMINED") {
+		if (outcome === "COULD_NOT_DETERMINE") {
 			problems.push(
-				"an UNDETERMINED result must say what it could not settle: evidence.undecidability lists each " +
+				"an COULD_NOT_DETERMINE result must say what it could not settle: evidence.openQuestions lists each " +
 					"open question with openQuestion and wouldSettleIt, and a citation where it is located",
 			);
 		}
 		return undefined;
 	}
-	if (outcome === "MET" || outcome === "NOT_APPLICABLE") {
-		problems.push("evidence.undecidability is permitted only for NOT_MET or UNDETERMINED");
+	if (outcome === "MET" || outcome === "DOES_NOT_APPLY") {
+		problems.push("evidence.openQuestions is permitted only for NOT_MET or COULD_NOT_DETERMINE");
 		return undefined;
 	}
 	if (listed.length > CANDIDATE_LIMITS.openQuestions) {
 		problems.push(
-			`evidence.undecidability lists ${listed.length} open questions; at most ${CANDIDATE_LIMITS.openQuestions}`,
+			`evidence.openQuestions lists ${listed.length} open questions; at most ${CANDIDATE_LIMITS.openQuestions}`,
 		);
 		return undefined;
 	}
@@ -1114,25 +961,16 @@ function checkedOpenQuestions(
 export function normalizeSubmission(
 	raw: unknown,
 	notes: string[] = [],
-	sourceOf?: (artifactPath: string) => string | undefined,
+	sourceOf?: (sourcePath: string) => string | undefined,
 ): NormalizedSubmission {
 	if (!isPlainRecord(raw)) {
 		throw new Error("the arguments must be one result object");
 	}
 	const problems: string[] = [];
 	const repairs: CitationRepairs = { sourceOf, notes };
-	const sent = rehomed(raw, notes, problems);
+	const sent = raw;
+	checkedKeys(sent, RESULT_FIELDS, "result", problems);
 	const outcome = collect(problems, () => parseVocabulary(OUTCOMES, sent.outcome, "outcome"));
-	let severity: Severity | undefined;
-	if (!nullish(sent.severity)) {
-		if (outcome !== undefined && outcome !== "NOT_MET") {
-			problems.push(
-				`severity is permitted only for NOT_MET; a ${outcome} result has none, and its problems carry their own`,
-			);
-		} else {
-			severity = collect(problems, () => parseVocabulary(SEVERITIES, sent.severity, "severity"));
-		}
-	}
 	const summary = checkedSummary(sent.summary, "", problems);
 	const explanation = checkedText(
 		sent.explanation,
@@ -1179,7 +1017,6 @@ export function normalizeSubmission(
 		explanation,
 		citations,
 		...(listed === undefined ? {} : { problems: listed }),
-		...(severity === undefined ? {} : { severity }),
 		...(example === undefined ? {} : { example }),
 		evidence,
 	};
@@ -1194,17 +1031,17 @@ export function submissionCitations(submission: NormalizedSubmission): Normalize
 		...submission.citations,
 		...(submission.problems ?? []).flatMap((problem) => problem.citations),
 		...(submission.example === undefined ? [] : [submission.example.citation]),
-		...(submission.evidence.undecidability ?? []).flatMap((question) =>
+		...(submission.evidence.openQuestions ?? []).flatMap((question) =>
 			question.citation === undefined ? [] : [question.citation],
 		),
 	];
 }
 
-/** Requires each citation of the submission to name an artifact that its declared source staged. */
+/** Requires each citation of the submission to name a source file that its declared source staged. */
 export function validateEvidenceSources(
 	submission: NormalizedSubmission,
 	availableSourceKinds: ReadonlySet<string>,
-	artifactSources: ReadonlyMap<string, string> = new Map(),
+	sourceFileSources: ReadonlyMap<string, string> = new Map(),
 	reviewedCheckout = REVIEWED_CHECKOUT,
 ): void {
 	for (const citation of submissionCitations(submission)) {
@@ -1215,23 +1052,23 @@ export function validateEvidenceSources(
 					`the task-declared manifest: ${describeAvailableSources(availableSourceKinds)}`,
 			);
 		}
-		const artifactSource = artifactSources.get(citation.artifactPath);
-		if (artifactSource !== sourceKind) {
-			if (artifactSource === undefined) {
+		const sourceFileSource = sourceFileSources.get(citation.sourcePath);
+		if (sourceFileSource !== sourceKind) {
+			if (sourceFileSource === undefined) {
 				// The container derives the change view under work/ from the checkout. A quote of it is a
-				// quote of the change: the pinned range is the artifact, and the diff holds its lines.
-				const derived = citation.artifactPath.startsWith("work/")
-					? " The change view under work/ is derived here and is not an artifact: quote a changed line " +
+				// quote of the change: the pinned range is the sourceFile, and the diff holds its lines.
+				const derived = citation.sourcePath.startsWith("work/")
+					? " The change view under work/ is derived here and is not a source file: quote a changed line " +
 						`from work/change/diff.patch as ${DIFF_SOURCE} with the pinned change.json as ` +
-						"artifactPath, or the pull request record (metadata.json) as scm.pull-request.core."
+						"sourcePath, or the pull request record (metadata.json) as scm.pull-request.core."
 					: "";
 				throw new Error(
-					`artifact '${citation.artifactPath}' was not staged by '${sourceKind}'; ` +
-						`choose a staged artifact for this source from the task-declared manifest.${derived}`,
+					`sourceFile '${citation.sourcePath}' was not staged by '${sourceKind}'; ` +
+						`choose a staged sourceFile for this source from the task-declared manifest.${derived}`,
 				);
 			}
 			throw new Error(
-				`artifact '${citation.artifactPath}' belongs to evidence source '${artifactSource}', not '${sourceKind}'`,
+				`sourceFile '${citation.sourcePath}' belongs to evidence source '${sourceFileSource}', not '${sourceKind}'`,
 			);
 		}
 		const checkout = checkoutOf(citation, reviewedCheckout);
@@ -1243,7 +1080,7 @@ export function validateEvidenceSources(
 		const captured =
 			availableSourceKinds.has(TREE_SOURCE) &&
 			[`${checkout}.git/HEAD`, `${checkout}${CAPTURED_REFS}`].every(
-				(witness) => artifactSources.get(witness) === TREE_SOURCE,
+				(witness) => sourceFileSources.get(witness) === TREE_SOURCE,
 			);
 		if (!captured) {
 			throw new Error(
@@ -1261,7 +1098,7 @@ function checkoutOf(citation: NormalizedCitation, reviewedCheckout: string): str
 		return reviewedCheckout;
 	}
 	return citation.sourceKind === TREE_SOURCE
-		? CHECKOUT_WITNESS.exec(citation.artifactPath)?.groups?.root
+		? CHECKOUT_WITNESS.exec(citation.sourcePath)?.groups?.root
 		: undefined;
 }
 
@@ -1287,8 +1124,8 @@ export function validateSearchScope(
 		throw new Error(
 			"MET for this practice rests on an absence claim, and the practice declares no source it " +
 				"searches exhaustively, so no search can bound that claim. Record what the evidence does " +
-				"show: MET from cited evidence, NOT_APPLICABLE when the work gives the practice no " +
-				"occasion, or UNDETERMINED with what would settle it",
+				"show: MET from cited evidence, DOES_NOT_APPLY when the work gives the practice no " +
+				"applicability, or COULD_NOT_DETERMINE with what would settle it",
 		);
 	}
 	const consulted = new Set(search.consulted);
@@ -1316,12 +1153,12 @@ export function validateInapplicabilityScope(
 	submission: NormalizedSubmission,
 	availableSourceKinds: ReadonlySet<string>,
 ): void {
-	if (submission.outcome !== "NOT_APPLICABLE") {
+	if (submission.outcome !== "DOES_NOT_APPLY") {
 		return;
 	}
 	const { inapplicability } = submission.evidence;
 	if (!inapplicability) {
-		throw new Error("a NOT_APPLICABLE result must say why the practice does not apply");
+		throw new Error("a DOES_NOT_APPLY result must say why the practice does not apply");
 	}
 	for (const sourceKind of inapplicability.consulted) {
 		if (!availableSourceKinds.has(sourceKind)) {
@@ -1333,27 +1170,38 @@ export function validateInapplicabilityScope(
 	}
 }
 
-/** The thread a conversation review judges. Each turn states whether the reviewed participant wrote it. */
+/** The thread a conversation review judges. Native account identities identify each author. */
 export const CONVERSATION_THREAD = "context/conversation_thread.json";
 
 /**
- * Whether a citation lies inside a turn of the conversation record marked `underReview: true`.
- * Admission applies the same rule to a NOT_MET of a conversation review.
+ * Whether a citation lies inside a turn whose native account matches the frozen developer.
  */
 export function citesReviewedTurn(
 	citations: readonly NormalizedCitation[],
 	thread: string,
+	developerId: string,
 ): boolean {
-	const turns = reviewedTurnLines(thread);
+	const turns = reviewedTurnLines(thread, developerId);
 	return citations.some(
 		(citation) =>
-			citation.artifactPath === CONVERSATION_THREAD &&
-			turns.some((turn) => turn.first <= citation.startLine && citation.endLine <= turn.last),
+			citation.sourcePath === CONVERSATION_THREAD &&
+			turns.some((turn) => {
+				const pointer =
+					/^context\/conversation_thread\.json#\/messages\/(?<index>\d+)\/text$/u.exec(
+						citation.path,
+					);
+				return pointer === null
+					? turn.first <= citation.startLine && citation.endLine <= turn.last
+					: Number(pointer.groups?.index) === turn.index;
+			}),
 	);
 }
 
 /** The first and last line of each turn under review, read from the record as written. */
-function reviewedTurnLines(thread: string): { first: number; last: number }[] {
+function reviewedTurnLines(
+	thread: string,
+	developerId: string,
+): { first: number; last: number; index: number }[] {
 	let parsed: unknown;
 	try {
 		parsed = JSON.parse(thread);
@@ -1362,7 +1210,7 @@ function reviewedTurnLines(thread: string): { first: number; last: number }[] {
 	}
 	const messages = isRecord(parsed) && Array.isArray(parsed.messages) ? parsed.messages : [];
 	// JSON.parse keeps no positions, so one pass finds each turn's lines, in the same order.
-	const spans: { first: number; last: number }[] = [];
+	const spans: { first: number; last: number; index: number }[] = [];
 	let line = 1;
 	let depth = 0;
 	let inString = false;
@@ -1403,7 +1251,7 @@ function reviewedTurnLines(thread: string): { first: number; last: number }[] {
 			}
 		} else if (char === "}" || char === "]") {
 			if (char === "}" && inMessages && depth === 3) {
-				spans.push({ first, last: line });
+				spans.push({ first, last: line, index: spans.length });
 			}
 			if (char === "]" && inMessages && depth === 2) {
 				inMessages = false;
@@ -1413,7 +1261,7 @@ function reviewedTurnLines(thread: string): { first: number; last: number }[] {
 	}
 	return spans.filter((_, index) => {
 		const message: unknown = messages[index];
-		return isRecord(message) && message.underReview === true;
+		return isRecord(message) && message.accountId === developerId;
 	});
 }
 
@@ -1423,8 +1271,8 @@ const MISMATCH_EXCERPT_CHARS = 160;
 /** The most a citation by coordinates alone may record; beyond it, the model names a fragment. */
 const COORDINATE_QUOTE_MAX_CHARS = 2000;
 
-/** Whether a citation is really in the artifact it names. */
-export function citationMatchesArtifact(citation: NormalizedCitation, content: string): boolean {
+/** Whether a citation is really in the sourceFile it names. */
+export function citationMatchesSourceFile(citation: NormalizedCitation, content: string): boolean {
 	return describeCitationMismatch(citation, content) === null;
 }
 
@@ -1438,7 +1286,7 @@ export function describeCitationMismatch(
 }
 
 /**
- * Resolve a citation to the artifact's exact text for admission. Accepted formatting differences
+ * Resolve a citation to the sourceFile's exact text for admission. Accepted formatting differences
  * are replaced with source text; an omitted quote is filled from the supplied coordinates.
  */
 export function resolveQuote(
@@ -1453,51 +1301,60 @@ export function resolveQuote(
 	return resolved;
 }
 
+/** Resolve plain captured text independently of a provider's source naming. */
+export function resolveCapturedText(
+	citation: NormalizedCitation,
+	content: string,
+): ResolvedQuote | { mismatch: string } {
+	const quote = citation.quote.replace(/\r?\n$/u, "");
+	const lines = content.split(/(?<=\n)/u);
+	if (citation.startLine > lines.length) {
+		return {
+			mismatch: `the sourceFile has ${lines.length} line(s), so there is no [L${citation.startLine}]`,
+		};
+	}
+	const citedText = lines
+		.slice(citation.startLine - 1, citation.endLine)
+		.join("")
+		.replace(/\n$/u, "");
+	const where = `[L${citation.startLine}]${citation.endLine === citation.startLine ? "" : `-[L${citation.endLine}]`}`;
+	if (quote === "") {
+		return citedText.length > COORDINATE_QUOTE_MAX_CHARS
+			? {
+					mismatch: `${where} is ${citedText.length} characters; cite fewer lines or quote a fragment of them`,
+				}
+			: { quote: citedText };
+	}
+	const found = findAsWritten(citedText, quote);
+	if (found !== null) {
+		return { quote: found };
+	}
+	// The text is real but the coordinates are not: a file read without line numbers is cited by
+	// a guess. When the quote occurs exactly once in the sourceFile, that is where it is recorded.
+	const elsewhere = locateAsWritten(content, quote);
+	if (elsewhere.length === 1 && elsewhere[0] !== undefined) {
+		return elsewhere[0];
+	}
+	if (elsewhere.length > 1) {
+		return {
+			mismatch: `${where} does not hold that text; it occurs at ${elsewhere.map((hit) => `[L${hit.startLine}]`).join(", ")} — cite the one you mean`,
+		};
+	}
+	// A body serialized into one JSON line reads as one line, escapes and all: the excerpt shows
+	// it, and the hint says how to quote it, since a quote spanning its line breaks is never found.
+	const hint = citedText.includes(String.raw`\n`)
+		? String.raw`; this is a JSON string whose line breaks are the two characters \n, so quote a fragment from between two of them, or spell them as the line does`
+		: "";
+	return { mismatch: `${where} reads ${excerpt(citedText)}, not ${excerpt(quote)}${hint}` };
+}
+
 function resolveQuoteText(
 	citation: NormalizedCitation,
 	content: string,
 ): ResolvedQuote | { mismatch: string } {
 	const quote = citation.quote.replace(/\r?\n$/u, "");
 	if (citation.sourceKind !== DIFF_SOURCE) {
-		const lines = content.split(/(?<=\n)/u);
-		if (citation.startLine > lines.length) {
-			return {
-				mismatch: `the artifact has ${lines.length} line(s), so there is no [L${citation.startLine}]`,
-			};
-		}
-		const citedText = lines
-			.slice(citation.startLine - 1, citation.endLine)
-			.join("")
-			.replace(/\n$/u, "");
-		const where = `[L${citation.startLine}]${citation.endLine === citation.startLine ? "" : `-[L${citation.endLine}]`}`;
-		if (quote === "") {
-			return citedText.length > COORDINATE_QUOTE_MAX_CHARS
-				? {
-						mismatch: `${where} is ${citedText.length} characters; cite fewer lines or quote a fragment of them`,
-					}
-				: { quote: citedText };
-		}
-		const found = findAsWritten(citedText, quote);
-		if (found !== null) {
-			return { quote: found };
-		}
-		// The text is real but the coordinates are not: a file read without line numbers is cited by
-		// a guess. When the quote occurs exactly once in the artifact, that is where it is recorded.
-		const elsewhere = locateAsWritten(content, quote);
-		if (elsewhere.length === 1 && elsewhere[0] !== undefined) {
-			return elsewhere[0];
-		}
-		if (elsewhere.length > 1) {
-			return {
-				mismatch: `${where} does not hold that text; it occurs at ${elsewhere.map((hit) => `[L${hit.startLine}]`).join(", ")} — cite the one you mean`,
-			};
-		}
-		// A body serialized into one JSON line reads as one line, escapes and all: the excerpt shows
-		// it, and the hint says how to quote it, since a quote spanning its line breaks is never found.
-		const hint = citedText.includes(String.raw`\n`)
-			? String.raw`; this is a JSON string whose line breaks are the two characters \n, so quote a fragment from between two of them, or spell them as the line does`
-			: "";
-		return { mismatch: `${where} reads ${excerpt(citedText)}, not ${excerpt(quote)}${hint}` };
+		return resolveCapturedText(citation, content);
 	}
 	const lines = annotatedDiff(content);
 	if (typeof lines === "string") {
@@ -1620,10 +1477,10 @@ function diffLinesMatch(
 	return { text: recorded.join("\n") };
 }
 
-/** A quote found in the artifact, so it always has the lines it is on. */
+/** A quote found in the sourceFile, so it always has the lines it is on. */
 type LocatedQuote = ResolvedQuote & { startLine: number; endLine: number };
 
-/** Every place the quote occurs in the whole artifact, as written there, with its line range. */
+/** Every place the quote occurs in the whole sourceFile, as written there, with its line range. */
 function locateAsWritten(content: string, quote: string): LocatedQuote[] {
 	const hits: LocatedQuote[] = [];
 	for (const candidate of [quote, JSON.stringify(quote).slice(1, -1)]) {
@@ -1640,7 +1497,7 @@ function locateAsWritten(content: string, quote: string): LocatedQuote[] {
 }
 
 /**
- * The text as the artifact writes it, when the quote is a reading of it: verbatim, or with the
+ * The text as the sourceFile writes it, when the quote is a reading of it: verbatim, or with the
  * escapes a JSON string uses, or with a non-breaking space where the quote has a space. Null when
  * the text holds no such reading.
  */
@@ -1920,7 +1777,7 @@ function flattened(text: string): { flat: string; offsets: Uint32Array } {
 }
 
 /**
- * Where the quote occurs in the text as the artifact may write it, leftmost first and never
+ * Where the quote occurs in the text as the sourceFile may write it, leftmost first and never
  * overlapping: the same characters and line breaks, each break `\n` or `\r\n`, with horizontal spacing
  * in the text only where the quote has spacing or a line break beside it. Spacing in the quote may be
  * absent from the text. The whole quote, spacing removed, is found by plain search in the text, spacing

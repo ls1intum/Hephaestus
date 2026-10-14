@@ -82,12 +82,16 @@ public final class PostgreSQLTestContainer {
     public static void migrateDatabase(TestDatabase testDatabase, String contexts) {
         String validationSetting = System.getProperty("liquibase.validateXmlChangelogFiles");
         System.setProperty("liquibase.validateXmlChangelogFiles", "false");
-        try (Connection connection =
-                DriverManager.getConnection(testDatabase.jdbcUrl(), testDatabase.username(), testDatabase.password())) {
-            Database database =
-                    DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connection));
-            try (Liquibase liquibase = new Liquibase("db/master.xml", new ClassLoaderResourceAccessor(), database)) {
-                liquibase.update(new Contexts(contexts));
+        try {
+            for (String changelog : new String[] {"db/practice-cutover/released-main.xml", "db/master.xml"}) {
+                try (Connection connection = DriverManager.getConnection(
+                        testDatabase.jdbcUrl(), testDatabase.username(), testDatabase.password())) {
+                    Database database = DatabaseFactory.getInstance()
+                            .findCorrectDatabaseImplementation(new JdbcConnection(connection));
+                    try (Liquibase liquibase = new Liquibase(changelog, new ClassLoaderResourceAccessor(), database)) {
+                        liquibase.update(new Contexts(contexts));
+                    }
+                }
             }
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to prepare migrated test database template", exception);
@@ -134,6 +138,12 @@ public final class PostgreSQLTestContainer {
         ensureExtensions(
                 database(newContainer, "template1").jdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
         ensureExtensions(newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword());
+        try (var connection = DriverManager.getConnection(
+                newContainer.getJdbcUrl(), newContainer.getUsername(), newContainer.getPassword())) {
+            TestReviewSchemaFunctions.install(connection, "review_model_digest", "practice_review_digest");
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Failed to initialize Hibernate's generated review functions", exception);
+        }
 
         LOGGER.info(
                 "Started PostgreSQL Testcontainer: jdbcUrl={}, username={}, database={}",

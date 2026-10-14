@@ -1,13 +1,15 @@
 // A model call that never answers, next to a line that plain code found. The call ends unrated when
 // the host stops the program, and the program still has the time it takes to return its own result.
 import { setTimeout as sleep } from "node:timers/promises";
+import { scm } from "../kits/scm/index.ts";
 
-import { definePracticeScript, embedMany, step } from "../lib/practice-script.ts";
+import { definePracticeScript, embedMany, step } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { embedding: "required" } },
 	async run(ctx) {
-		const found = await ctx.files?.change?.cite("src/cart.ts", "NEW", 2);
+		const domain = scm(ctx);
+		const found = await domain.files?.change?.cite("src/cart.ts", "NEW", 2);
 		if (found === undefined) {
 			throw new Error("the change was not captured");
 		}
@@ -17,12 +19,12 @@ export default definePracticeScript({
 		await sleep(500);
 		const reason = "unrated" in outcome ? outcome.unrated : "selection";
 		return {
-			outcome: "UNDETERMINED",
+			outcome: "COULD_NOT_DETERMINE",
 			summary: "The added comment was not compared with the others",
 			explanation: "Plain code found the comment. The embedding that compares it gave no answer.",
 			citations: [found],
 			evidence: {
-				undecidability: [
+				openQuestions: [
 					{
 						openQuestion: "Does the comment repeat another one?",
 						wouldSettleIt: "An embedding of the added comments.",

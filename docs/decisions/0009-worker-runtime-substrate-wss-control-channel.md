@@ -28,7 +28,7 @@ WSS over TLS-443 with sealed-record JSON frames, gated by `runtime.worker.enable
 | Drain | `WorkerDrainCoordinator` (`SmartLifecycle`, phase `< WebServerGracefulShutdownLifecycle.SMART_LIFECYCLE_PHASE`). Sequence: publish `REFUSING_TRAFFIC` → emit final draining heartbeat + zero-capacity → close mentor sessions → `AgentJobExecutor.awaitInFlight(timeout)` then `cancelInFlight(reason)`. One Duration knob (`hephaestus.worker.drain.timeout`, default 5m). |
 | Hub shutdown | `WorkerSessionRegistry` is `SmartLifecycle` at the same phase: emits `ForceReconnect` + closes with `GOING_AWAY` before Tomcat stops accepting traffic. |
 | Backpressure | Per-session `ConcurrentWebSocketSessionDecorator` (`sendBufferSize`, `sendTimeLimit`). Binary frames refused with WS code 1003. |
-| Audit | New `agent_job.cancellation_reason` column for drain-initiated cancels (`DRAIN_GRACEFUL` / `DRAIN_IMMEDIATE` / `USER` / `TIMEOUT`). No separate phase-log table. |
+| Audit | New `review_job.cancellation_reason` column for drain-initiated cancels (`DRAIN_GRACEFUL` / `DRAIN_IMMEDIATE` / `USER` / `TIMEOUT`). No separate phase-log table. |
 
 `AgentJobExecutor` exposes three orthogonal methods — `stopAcceptingNewJobs()` /
 `awaitInFlight(Duration)` / `cancelInFlight(reason)` — composed by the drain coordinator.
@@ -72,7 +72,7 @@ It first attempts a worker-fenced requeue (`RUNNING → QUEUED`, retry-capped �
 `AgentJobZombieSweeper` uses for orphan recovery), for both `DRAIN_GRACEFUL` and the `timeout=0`
 `DRAIN_IMMEDIATE` case; only a job that has already exhausted its retry budget, or lost the fence to
 a concurrent user-cancel, falls back to a worker-fenced terminal cancel, which populates
-`agent_job.cancellation_reason` as the Audit row says. This is the drain `docs/admin/runtime-roles.mdx`
+`review_job.cancellation_reason` as the Audit row says. This is the drain `docs/admin/runtime-roles.mdx`
 describes: jobs return to the queue, bounded by `AGENT_MAX_RETRIES`.
 
 ## Update — 2026-09-03 (issue #1719)

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.conformance;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.slack.manifest.SlackManifest;
 import java.util.List;
 
@@ -14,7 +14,7 @@ class SlackManifestContractTest extends IntegrationManifestContractTest {
     }
 
     @Override
-    protected List<ArtifactDescriptor> descriptors() {
+    protected List<ItemDescriptor> descriptors() {
         return List.of();
     }
 }

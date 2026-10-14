@@ -1,9 +1,10 @@
+import { readCommits } from "../kits/scm/change.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { branchIssueReferences, issueNumberReferences } from "../kits/scm/references.ts";
 // Finds the issue references of the handoff and counts its checklist. The review judges readiness
 // from the captured handoff.
-import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/bounded-text.ts";
-import { readCommits } from "../lib/change.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
-import { branchIssueReferences, issueNumberReferences } from "../lib/references.ts";
+import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 /** The characters of a branch name that a direction quotes. */
 const BRANCH_CHARS = 80;
@@ -11,14 +12,15 @@ const BRANCH_CHARS = 80;
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const description = ctx.work.body ?? "";
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const description = domain.item.body ?? "";
 		const directions: string[] = [];
 
 		// Traceability: does the handoff reference a motivating issue at all?
 		const commits = await readCommits(ctx.evidence);
 		const body = `${description}\n${commits.map((c) => c.message).join("\n")}`;
-		const branch = ctx.work.source_branch;
+		const branch = domain.item.source_branch;
 		const quotedBranch = oneLine(branch, BRANCH_CHARS);
 		const bodyRefs = new Set(issueNumberReferences(body).map((n) => `#${n}`));
 		const branchRefs = new Set(branchIssueReferences(branch).map((n) => `#${n}`));

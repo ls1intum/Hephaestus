@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -21,10 +20,10 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
      * detoasts the multi-MB session JSONL just to render the sidebar.
      */
     @Query("SELECT new de.tum.cit.aet.hephaestus.mentor.ChatThreadSummaryDTO(t.id, t.title, t.createdAt) "
-            + "FROM ChatThread t WHERE t.workspace.id = :workspaceId AND t.user.id IN :userIds "
+            + "FROM ChatThread t WHERE t.workspace.id = :workspaceId AND t.accountId = :accountId "
             + "ORDER BY t.createdAt DESC, t.id DESC")
-    Page<ChatThreadSummaryDTO> findSummariesByWorkspaceAndUserIdIn(
-            @Param("workspaceId") Long workspaceId, @Param("userIds") Collection<Long> userIds, Pageable pageable);
+    Page<ChatThreadSummaryDTO> findSummariesByWorkspaceAndAccountId(
+            @Param("workspaceId") Long workspaceId, @Param("accountId") long accountId, Pageable pageable);
 
     /**
      * Resolve a thread within a workspace; returns empty when the thread either does not
@@ -32,7 +31,7 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
      */
     Optional<ChatThread> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
-    Optional<ChatThread> findByIdAndWorkspaceIdAndUserIdIn(UUID id, Long workspaceId, Collection<Long> userIds);
+    Optional<ChatThread> findByIdAndWorkspaceIdAndAccountId(UUID id, Long workspaceId, long accountId);
 
     /**
      * Holds the thread's row until the caller's transaction ends, so turn admissions in one thread run one at a time
@@ -63,8 +62,8 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     @Transactional
     @WorkspaceAgnostic("Caller has already resolved thread ownership via findByIdAndWorkspaceId")
     @Query(
-            value =
-                    "UPDATE chat_thread SET session_jsonl = :bytes WHERE id = :threadId AND CAST(xmin AS text) = :version",
+            value = "UPDATE chat_thread SET session_jsonl = :bytes WHERE id = :threadId AND CAST(xmin AS text) ="
+                    + " :version",
             nativeQuery = true)
     int updateSessionJsonl(
             @Param("threadId") UUID threadId, @Param("bytes") byte[] bytes, @Param("version") String version);

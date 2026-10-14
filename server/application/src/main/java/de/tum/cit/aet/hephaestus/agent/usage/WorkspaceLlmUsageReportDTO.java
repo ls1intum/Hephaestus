@@ -68,9 +68,9 @@ public record WorkspaceLlmUsageReportDTO(
 
         @NonNull
         @Schema(
-                description = "Whether work on SHARED models is currently paused for this workspace. Authoritative — "
-                        + "it mirrors the live gate rather than being derivable from the verdict alone. Always false for a "
-                        + "past month, which cannot pause anything.")
+                description = "Whether work on SHARED models is currently paused for this workspace. Authoritative —"
+                    + " it mirrors the live gate rather than being derivable from the verdict alone. Always false for"
+                    + " a past month, which cannot pause anything.")
         Boolean instancePaused,
 
         @NonNull @Schema(description = "Whether work on this workspace's OWN provider is currently paused.")

@@ -2,185 +2,141 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.model.ResultMark;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewTestData;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
-import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentMatchers;
+import org.springframework.test.util.ReflectionTestUtils;
+import tools.jackson.databind.json.JsonMapper;
 
-class ResultVisibilityPolicyTest extends BaseUnitTest {
+@Tag("unit")
+class ResultVisibilityPolicyTest {
+    private final EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
+    private final ResultMarkRepository marks = mock(ResultMarkRepository.class);
+    private final PracticeRepository practices = mock(PracticeRepository.class);
+    private final PracticeVersionRepository versions = mock(PracticeVersionRepository.class);
+    private final ResultVisibilityPolicy policy = new ResultVisibilityPolicy(authorization, marks, practices, versions);
+    private final Practice practice = ReviewTestData.practice(1, 1, "test-practice");
 
-    private final PracticeResultInvalidationRepository invalidations = mock(PracticeResultInvalidationRepository.class);
-
-    /**
-     * Currentness is the policy's own conjunct; the rest of the answer is whatever evidence authorization
-     * says, passed through unchanged in both directions.
-     */
-    @ParameterizedTest
-    @ValueSource(booleans = {true, false})
-    void answersWhatEvidenceAuthorizationAnswersForACurrentResult(boolean authorized) {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult practiceResult = practiceResult("v5:fingerprint", "v5:fingerprint");
-        when(authorization.permitsAll(7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .thenReturn(authorized ? Set.of(practiceResult.getId()) : Set.<UUID>of());
-
-        Set<UUID> permitted = new ResultVisibilityPolicy(authorization, invalidations)
-                .permitsAll(7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-
-        assertThat(permitted.contains(practiceResult.getId())).isEqualTo(authorized);
-        verify(authorization).permitsAll(7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-    }
-
-    /**
-     * The currentness conjunct stays ahead of the authorization one: a stale claim is refused without an
-     * evidence read, so it can never be admitted by an authorization answer given about the batch it was in.
-     */
-    @Test
-    void authorizesOnlyTheCurrentResultsOfABatch() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult current = practiceResult("v5:fingerprint", "v5:fingerprint");
-        PracticeResult stale = practiceResult("v5:old", "v5:current");
-        when(authorization.permitsAll(7L, List.of(current), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .thenReturn(Set.of(current.getId()));
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsAll(7L, List.of(current, stale), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .containsExactly(current.getId());
+    @BeforeEach
+    void catalog() {
+        when(practices.findByWorkspaceId(1L)).thenReturn(List.of(practice));
+        when(versions.findAllById(ArgumentMatchers.any())).thenReturn(List.of(practice.getCurrentVersion()));
+        when(marks.findByWorkspaceIdAndResultIdInAndRemovedAtIsNull(ArgumentMatchers.eq(1L), ArgumentMatchers.any()))
+                .thenReturn(List.of());
     }
 
     @Test
-    void refusesAnInvalidatedResultWithoutAnEvidenceRead() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult current = practiceResult("v5:fingerprint", "v5:fingerprint");
-        PracticeResult invalidated = practiceResult("v5:fingerprint", "v5:fingerprint");
-        when(invalidations.findActiveResultIds(7L, List.of(current.getId(), invalidated.getId())))
-                .thenReturn(Set.of(invalidated.getId()));
-        when(authorization.permitsAll(7L, List.of(current), SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .thenReturn(Set.of(current.getId()));
-
-        ResultVisibilityPolicy policy = new ResultVisibilityPolicy(authorization, invalidations);
-
-        assertThat(policy.permitsAll(7L, List.of(current, invalidated), SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .containsExactly(current.getId());
-        assertThat(policy.permitsShown(7L, List.of(current, invalidated), SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .containsExactly(current.getId());
+    void forwardsTheActualSourceAuthorizationForCurrentProof() {
+        var r = result();
+        when(authorization.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of(r.getId()));
+        assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .containsExactly(r.getId());
     }
 
     @Test
-    void asksNothingOfEvidenceAuthorizationWhenEveryResultIsStale() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsAll(
-                                7L,
-                                List.of(practiceResult("v5:old", "v5:current")),
-                                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .isEmpty();
-        verifyNoInteractions(authorization);
-    }
-
-    /**
-     * The card keeps a claim whose rules the practice has since changed — closed is something the developer
-     * may see — and drops only the one whose rules cannot be verified, which never reaches authorization.
-     */
-    @Test
-    void shouldKeepStaleEvidenceAndDropUnverifiableEvidenceWhenFilteringWhatIsShown() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult current = practiceResult("v5:fingerprint", "v5:fingerprint");
-        PracticeResult stale = practiceResult("v5:old", "v5:current");
-        PracticeResult unverifiable = practiceResult(null, "v5:current");
-        when(authorization.permitsAll(7L, List.of(current, stale), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .thenReturn(Set.of(current.getId(), stale.getId()));
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsShown(
-                                7L, List.of(current, stale, unverifiable), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .containsExactlyInAnyOrder(current.getId(), stale.getId());
-    }
-
-    @Test
-    void shouldAskNothingOfEvidenceAuthorizationWhenNothingShownCanBeVerified() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsShown(
-                                7L,
-                                List.of(practiceResult(null, "v5:current")),
-                                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .isEmpty();
-        verifyNoInteractions(authorization);
-    }
-
-    @Test
-    void shouldHideShownEvidenceWhenEvidenceAuthorizationRefusesIt() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult current = practiceResult("v5:fingerprint", "v5:fingerprint");
-        when(authorization.permitsAll(7L, List.of(current), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .thenReturn(Set.of());
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsShown(7L, List.of(current), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+    void endedProofNeverCountsAsCurrent() {
+        var r = result();
+        r.end(ResultEndReason.REPLACED, r.getRecordedAt().plusSeconds(1));
+        assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
     }
 
     @Test
-    void shouldNotAuthorizeSupersededIssueFeedbackForNewDelivery() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult historical = historicalResult();
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsForNewDelivery(7L, List.of(historical), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+    void archivedProofIsUnverifiableForNewClaims() {
+        var r = result();
+        r.setEvidenceVersion((short) 0);
+        assertThat(ResultVisibilityPolicy.currentness(r, practice.getCurrentVersion(), practice.getCurrentVersion()))
+                .isEqualTo(Currentness.UNVERIFIABLE);
+        assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
-        verifyNoInteractions(authorization);
     }
 
     @Test
-    void shouldShowAuthorizedHistoricalResultsInReviewRunHistory() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-        PracticeResult historical = historicalResult();
-        when(authorization.permitsAll(7L, List.of(historical), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .thenReturn(Set.of(historical.getId()));
-
-        assertThat(new ResultVisibilityPolicy(authorization, invalidations)
-                        .permitsHistory(7L, List.of(historical), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .containsExactly(historical.getId());
+    void aChangedStandardMakesProofStale() {
+        var r = result();
+        var old = new PracticeVersion(
+                practice, 1, new JsonMapper().valueToTree(DefinitionTestFixtures.definition()), null);
+        ReflectionTestUtils.setField(old, "reviewDigest", "v6:" + "b".repeat(64));
+        assertThat(ResultVisibilityPolicy.currentness(r, old, practice.getCurrentVersion()))
+                .isEqualTo(Currentness.STALE);
     }
 
-    private static PracticeResult practiceResult(
-            @Nullable String evaluatedFingerprint, @Nullable String currentFingerprint) {
-        PracticeRevision evaluated = mock(PracticeRevision.class);
-        PracticeRevision current = mock(PracticeRevision.class);
-        Practice practice = mock(Practice.class);
-        when(evaluated.getReviewRuleFingerprint()).thenReturn(evaluatedFingerprint);
-        when(current.getReviewRuleFingerprint()).thenReturn(currentFingerprint);
-        when(practice.getCurrentRevision()).thenReturn(current);
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
+    @Test
+    void anIncorrectMarkWithholdsCurrentProof() {
+        var r = result();
+        var mark = ResultMark.builder()
                 .id(UUID.randomUUID())
-                .agentJobId(UUID.randomUUID())
-                .practice(practice)
-                .practiceRevision(evaluated)
+                .workspaceId(1)
+                .resultId(r.getId())
+                .kind(ResultMarkKind.INCORRECT)
+                .reason("Incorrect attribution")
+                .createdAt(r.getRecordedAt())
                 .build();
+        when(marks.findByWorkspaceIdAndResultIdInAndRemovedAtIsNull(1L, List.of(r.getId())))
+                .thenReturn(List.of(mark));
+        assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isEmpty();
     }
 
-    private static PracticeResult historicalResult() {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
+    @Test
+    void acceptanceDoesNotEraseAuthorizedProof() {
+        var r = result();
+        var mark = ResultMark.builder()
                 .id(UUID.randomUUID())
-                .supersededAt(Instant.now())
+                .workspaceId(1)
+                .resultId(r.getId())
+                .kind(ResultMarkKind.ACCEPTED)
+                .reason("Recorded and accepted")
+                .createdAt(r.getRecordedAt())
+                .build();
+        when(marks.findByWorkspaceIdAndResultIdInAndRemovedAtIsNull(1L, List.of(r.getId())))
+                .thenReturn(List.of(mark));
+        when(authorization.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .thenReturn(Set.of(r.getId()));
+        assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .containsExactly(r.getId());
+    }
+
+    @Test
+    void foreignRowsAreNotSentForSourceAuthorization() {
+        var r = result();
+        r.setWorkspaceId(2);
+        assertThat(policy.permitsHistory(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isEmpty();
+    }
+
+    private Result result() {
+        return Result.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(1)
+                .reviewId(UUID.randomUUID())
+                .practiceId(1)
+                .practiceVersionId(practice.getCurrentVersion().getId())
+                .itemId(1)
+                .outcome(ResultOutcome.MET)
+                .recordedAt(Instant.parse("2026-08-01T00:00:00Z"))
                 .build();
     }
 }

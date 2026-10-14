@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 
 /**
  * The practice script calls that one attempt made with one kind of model, over every practice. This is the

@@ -382,7 +382,7 @@ controller's assessment. In particular, the maintainer approval in
 
 Adversarial cases for the full assessment include:
 
-- A course leader reads disputes.
+- A course leader reads disagreements.
 - A reviewer who never signed in appears in a colleague's evidence.
 - Shared repository evidence contains work by someone who chose No AI.
 - A long-lived Slack thread contains sensitive content.

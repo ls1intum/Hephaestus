@@ -1,5 +1,5 @@
 // Two reviews at once through the context: the second is refused, and the first returns its result.
-import { definePracticeScript, reasonOf } from "../lib/practice-script.ts";
+import { definePracticeScript, reasonOf } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: {},

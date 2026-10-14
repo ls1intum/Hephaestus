@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentProperties;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -55,7 +55,7 @@ class PracticeReviewHealthIndicatorTest extends BaseUnitTest {
 
     private static PracticeReviewHealthIndicator indicator(
             boolean agentEnabled, boolean gitEnabled, Optional<Instant> expiry, boolean workerRole) {
-        ArtifactSourceCatalogRegistry sourceCatalog = mock(ArtifactSourceCatalogRegistry.class);
+        SourceCatalogRegistry sourceCatalog = mock(SourceCatalogRegistry.class);
         expiry.ifPresent(
                 value -> when(sourceCatalog.earliestUseDecisionExpiry(SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                         .thenReturn(Optional.of(value)));

@@ -36,14 +36,14 @@ final class OutlineCollaboratorPersonDataContributor implements PersonDataContri
     public PersonDataSelection select(PersonScope person) {
         return new PersonDataSelection(jdbc.query(
                 """
-            SELECT t.id, jsonb_agg(DISTINCT i.subject ORDER BY i.subject)::text
-            FROM outline_document t
-            JOIN connection c ON c.id=t.connection_id
-            JOIN identity_provider p ON p.type='OUTLINE' AND p.server_url=c.config->>'serverUrl'
-            JOIN jsonb_to_recordset(CAST(:identities AS jsonb)) AS i("providerId" bigint,subject text,"teamId" text)
-              ON i."providerId"=p.id AND jsonb_exists(COALESCE(t.collaborator_subjects,'[]'::jsonb),i.subject)
-            GROUP BY t.id ORDER BY t.id
-            """,
+                SELECT t.id, jsonb_agg(DISTINCT i.subject ORDER BY i.subject)::text
+                FROM outline_document t
+                JOIN connection c ON c.id=t.connection_id AND c.workspace_id=t.workspace_id
+                JOIN identity_provider p ON p.type='OUTLINE' AND p.server_url=c.config->>'serverUrl'
+                JOIN jsonb_to_recordset(CAST(:identities AS jsonb)) AS i("providerId" bigint,subject text,"teamId" text)
+                  ON i."providerId"=p.id AND COALESCE(i."teamId",'')=COALESCE(c.instance_key,'') AND jsonb_exists(COALESCE(t.collaborator_subjects,'[]'::jsonb),i.subject)
+                GROUP BY t.id ORDER BY t.id
+                """,
                 JdbcPersonDataStore.parameters(person, mapper),
                 (rs, row) -> new PersonDataSelection.RowKey(Map.of(
                         "id", Long.toString(rs.getLong(1)), "subjects", Objects.requireNonNull(rs.getString(2))))));
@@ -63,10 +63,10 @@ final class OutlineCollaboratorPersonDataContributor implements PersonDataContri
         for (var key : selection.rows())
             rows.addAll(jdbc.query(
                     """
-            SELECT jsonb_build_object('id',id,'workspaceId',workspace_id,'connectionId',connection_id,
-              'documentId',document_id,'collaboratorSubjects',CAST(:subjects AS jsonb))::text
-            FROM outline_document WHERE id=:id
-            """, parameters(key), (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1)))));
+                    SELECT jsonb_build_object('id',id,'workspaceId',workspace_id,'connectionId',connection_id,
+                      'documentId',document_id,'collaboratorSubjects',CAST(:subjects AS jsonb))::text
+                    FROM outline_document WHERE id=:id
+                    """, parameters(key), (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1)))));
         return List.copyOf(rows);
     }
 

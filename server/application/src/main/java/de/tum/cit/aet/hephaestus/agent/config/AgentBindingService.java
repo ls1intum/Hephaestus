@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
@@ -12,6 +11,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -123,7 +123,8 @@ public class AgentBindingService {
             @Nullable Long workspaceModelId) {
         if ((instanceModelId == null) == (workspaceModelId == null)) {
             throw new IllegalArgumentException(
-                    "A binding must reference exactly one model. Use a shared model or a model from your own provider.");
+                    "A binding must reference exactly one model. Use a shared model or a model from your own"
+                            + " provider.");
         }
         if (instanceModelId != null) {
             LlmModel model = llmModelRepository

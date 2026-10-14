@@ -1,14 +1,23 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionField;
+import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.jspecify.annotations.NonNull;
+import java.util.List;
+import org.jspecify.annotations.Nullable;
 
-@Schema(description = "The catalog entry a workspace copy came from and whether it differs now")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record CatalogOriginDTO(
-        @NonNull @Schema(description = "Slug of the catalog entry this copy was made from")
-        String slug,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
+        String catalogSlug,
 
-        @NonNull CatalogLink link,
+        CatalogEntryState state,
+        List<PracticeDefinitionField> localEdits,
 
-        @NonNull @Schema(description = "Whether new workspaces receive the source entry")
-        Boolean sourceOffered) {}
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
+        String offeredDigest) {
+    public CatalogOriginDTO {
+        localEdits = List.copyOf(localEdits);
+    }
+}

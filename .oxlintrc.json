@@ -499,12 +499,13 @@
 		{
 			// `tsconfig.agents.json` overlays this directory with `docker/agents/practice-scripts`
 			// through `rootDirs`, and the agent image reproduces that layout under
-			// `/opt/practice-scripts`. `../lib/x` is the spelling both resolve; an alias would typecheck
-			// and then fail in the sandbox. The runner's fixtures are staged next to the same `lib` link,
-			// so they use the same spelling.
+			// `/opt/practice-scripts`. Relative imports between scripts, lib/core and domain kits must
+			// resolve in both layouts. The runner's fixtures use the same staged directories.
 			"files": [
 				"server/application/src/main/resources/practices/scripts/**",
-				"docker/agents/practice-scripts/fixtures/**"
+				"docker/agents/practice-scripts/fixtures/**",
+				"docker/agents/practice-scripts/lib/core/**",
+				"docker/agents/practice-scripts/kits/**"
 			],
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},

@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -23,6 +22,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueTypeDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.label.dto.GitHubLabelDTO;
@@ -144,7 +144,7 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         testWorkspace.setDisplayName("Hephaestus Test");
         testWorkspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         testWorkspace.setPublicActivityEnabled(true);
-        testWorkspace.setOrganization(testOrganization);
+        testWorkspace.setOrganizationId(testOrganization.getId());
         testWorkspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         testWorkspace.setAccountType(AccountType.ORG);
         testWorkspace = workspaceRepository.save(testWorkspace);
@@ -193,7 +193,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
                 );
     }
 
-    /** GitHub's issue payload for a pull request carries {@code pull_request}; it is never stored as an issue. */
+    /**
+     * GitHub's issue payload for a pull request carries {@code pull_request}; it is never stored as
+     * an issue.
+     */
     @Nested
     class PullRequestMarkedPayload {
 
@@ -249,10 +252,10 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         @Test
         void shouldRefuseAnUnmarkedIssuePayloadForAStoredPullRequestWithoutChangingNativeIdentity() {
             jdbc.update("""
-                    INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
-                        created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
-                    VALUES ('PULL_REQUEST',9201,?, ?,43,now(),'OPEN',0,false,false,'Pull request',false,0,0,0,0)
-                    """, githubProvider.getId(), testRepository.getId());
+                INSERT INTO issue(issue_type,native_id,provider_id,repository_id,number,
+                    created_at,state,comments_count,is_locked,is_merged,title,is_draft,additions,deletions,changed_files,commits)
+                VALUES ('PULL_REQUEST',9201,?, ?,43,now(),'OPEN',0,false,false,'Pull request',false,0,0,0,0)
+                """, githubProvider.getId(), testRepository.getId());
             var dto = createBasicIssueDto(9301L, 43);
 
             assertThat(processor.process(dto, createContext())).isNull();
@@ -263,7 +266,8 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
             assertThat(issueRepository.findByRepositoryIdAndNumber(testRepository.getId(), 43))
                     .isEmpty();
             assertThat(jdbc.queryForObject(
-                            "SELECT native_id FROM issue WHERE repository_id=? AND number=43 AND issue_type='PULL_REQUEST'",
+                            "SELECT native_id FROM issue WHERE repository_id=? AND"
+                                    + " number=43 AND issue_type='PULL_REQUEST'",
                             Long.class,
                             testRepository.getId()))
                     .isEqualTo(9201L);
@@ -820,9 +824,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * Assignees live in a join table the atomic upsert cannot touch, so a change to them is reported
-         * under one name for labels and assignees alike — which is what the review pipeline reads to
-         * decide that a triage action moved evidence a practice can see.
+         * Assignees live in a join table the atomic upsert cannot touch, so a change to them is
+         * reported under one name for labels and assignees alike — which is what the review
+         * pipeline reads to decide that a triage action moved evidence a practice can see.
          */
         @Test
         void shouldReportRelationshipsWhenAnIssueIsAssigned() {
@@ -851,8 +855,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
 
         /**
          * Locking an issue and commenting on it move no field the issue evidence is built from. The
-         * mirror still reports them, and reporting them under their own names is what lets the review
-         * pipeline decline the occasion instead of spending a review on evidence that did not move.
+         * mirror still reports them, and reporting them under their own names is what lets the
+         * review pipeline decline the occasion instead of spending a review on evidence that did
+         * not move.
          */
         @Test
         void shouldNameOnlyTheFieldsThatMovedWhenAnIssueIsLockedAndCommentedOn() {
@@ -1289,9 +1294,9 @@ class GitHubIssueProcessorIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * A native type is one of the fields the issue evidence is built from, so typing an issue that
-         * already exists has to be reported as a moved field — that, not the IssueTyped event, is what
-         * occasions the review of the retyped issue.
+         * A native type is one of the fields the issue evidence is built from, so typing an issue
+         * that already exists has to be reported as a moved field — that, not the IssueTyped event,
+         * is what occasions the review of the retyped issue.
          */
         @Test
         void shouldReportIssueTypeWhenAnExistingIssueIsTyped() {

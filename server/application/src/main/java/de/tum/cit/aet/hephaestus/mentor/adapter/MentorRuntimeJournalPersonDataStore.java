@@ -20,14 +20,14 @@ import tools.jackson.databind.ObjectMapper;
  */
 final class MentorRuntimeJournalPersonDataStore extends JdbcPersonDataStore {
     private static final String PERSON_WORKSPACES = """
-            SELECT workspace_id FROM workspace_membership WHERE user_id = ANY(:users)
-            UNION SELECT workspace_id FROM slack_thread WHERE id = ANY(:conversations)
-            UNION SELECT workspace_id FROM outline_document WHERE id = ANY(:documents)
-            UNION SELECT rm.workspace_id FROM repository_to_monitor rm
-                JOIN repository r ON r.native_id = rm.native_id JOIN issue i ON i.repository_id = r.id
-                WHERE i.id = ANY(:artifacts)
-            UNION SELECT workspace_id FROM agent_job WHERE id = ANY(:derivedJobs)
-            """;
+        SELECT workspace_id FROM membership WHERE account_id = :account
+        UNION SELECT workspace_id FROM slack_thread WHERE id = ANY(:conversations)
+        UNION SELECT workspace_id FROM outline_document WHERE id = ANY(:documents)
+        UNION SELECT rm.workspace_id FROM repository_to_monitor rm
+            JOIN repository r ON r.native_id = rm.native_id JOIN issue i ON i.repository_id = r.id
+            WHERE i.id = ANY(:artifacts)
+        UNION SELECT workspace_id FROM review_job WHERE id = ANY(:derivedJobs)
+        """;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
@@ -52,7 +52,7 @@ final class MentorRuntimeJournalPersonDataStore extends JdbcPersonDataStore {
         return new PersonDataSelection(jdbc.query(
                 """
                 SELECT DISTINCT workspace_id FROM chat_thread
-                WHERE length(session_jsonl) > 0 AND (user_id IS NULL OR user_id <> ALL(:users))
+                WHERE length(session_jsonl) > 0 AND (account_id IS NULL OR account_id <> :account)
                   AND workspace_id IN (%s)
                 ORDER BY workspace_id
                 """.formatted(PERSON_WORKSPACES),

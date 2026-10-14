@@ -26,10 +26,10 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for GitHubProjectItemMessageHandler.
- * <p>
- * Tests verify that the handler correctly processes project item events
- * (create, edit, archive, restore, convert, reorder, delete) using JSON fixtures
- * parsed directly into DTOs for complete isolation.
+ *
+ * <p>Tests verify that the handler correctly processes project item events (create, edit, archive,
+ * restore, convert, reorder, delete) using JSON fixtures parsed directly into DTOs for complete
+ * isolation.
  */
 class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -103,7 +103,7 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(testOrganization);
+        workspace.setOrganizationId(testOrganization.getId());
         workspace.setAccountLogin("HephaestusTest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
@@ -190,7 +190,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isTrue();
         });
 
-        // Verify domain events: processArchived() calls process() first (Updated since item exists),
+        // Verify domain events: processArchived() calls process() first (Updated since item
+        // exists),
         // then publishes ProjectItemArchived
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
@@ -341,7 +342,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isFalse();
         });
 
-        // Verify domain events: processRestored() calls process() first (Updated since item exists),
+        // Verify domain events: processRestored() calls process() first (Updated since item
+        // exists),
         // then publishes ProjectItemRestored
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
@@ -374,7 +376,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isFalse();
         });
 
-        // Verify domain events: processConverted() calls process() first (Updated since item exists),
+        // Verify domain events: processConverted() calls process() first (Updated since item
+        // exists),
         // then publishes ProjectItemConverted
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);
@@ -406,7 +409,8 @@ class GitHubProjectItemMessageHandlerIntegrationTest extends BaseIntegrationTest
             assertThat(i.isArchived()).isFalse();
         });
 
-        // Verify domain events: processReordered() calls process() first (Updated since item exists),
+        // Verify domain events: processReordered() calls process() first (Updated since item
+        // exists),
         // then publishes ProjectItemReordered
         assertThat(eventListener.ofType(GitHubProjectEvent.ProjectItemUpdated.class))
                 .hasSize(1);

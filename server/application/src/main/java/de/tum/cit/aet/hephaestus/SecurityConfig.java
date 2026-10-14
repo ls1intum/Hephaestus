@@ -515,7 +515,7 @@ public class SecurityConfig {
                 "X-XSRF-TOKEN",
                 UserViewContextHolder.REASON_HEADER,
                 UserViewContextHolder.WORKSPACE_HEADER,
-                UserViewContextHolder.USER_HEADER,
+                UserViewContextHolder.ACCOUNT_HEADER,
                 // Every endpoint that hands out an ETag reads it back from If-Match (EntityTagPrecondition); a
                 // header not listed here never leaves the browser when the SPA runs on another origin, as in dev.
                 HttpHeaders.IF_MATCH));

@@ -116,7 +116,7 @@ void test("the review tool list excludes write and edit from direct and nested c
 void test("public composition cannot discover or read private history through native or nested tools", async () => {
 	const privateText = "private history that must not reach a public review";
 	mkdirSync(path.join(CWD, "inputs", "history"), { recursive: true });
-	writeFileSync(path.join(CWD, "inputs", "history", "observations.json"), privateText);
+	writeFileSync(path.join(CWD, "inputs", "history", "problems.json"), privateText);
 	const settingsManager = SettingsManager.create(CWD, AGENT_DIR, SANDBOX_SETTINGS_MANAGER_OPTIONS);
 	const resourceLoader = new DefaultResourceLoader({
 		cwd: CWD,

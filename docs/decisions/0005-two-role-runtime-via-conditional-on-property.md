@@ -95,7 +95,7 @@ property.
 
 The "agent NATS pull consumer" named in the Context section, and `hephaestus.agent.nats.enabled`
 in the 2026-07-20 update above, no longer exist. The agent job queue moved off NATS JetStream onto
-PostgreSQL — each worker replica polls `agent_job` and claims a batch with
+PostgreSQL — each worker replica polls `review_job` and claims a batch with
 `FOR UPDATE SKIP LOCKED` instead of pulling ids off a stream — see **ADR 0025**. The job-execution
 capability expression `AgentJobExecutor` and the LLM proxy key off is now
 `hephaestus.agent.enabled AND hephaestus.runtime.worker.enabled`: same shape, the left-hand

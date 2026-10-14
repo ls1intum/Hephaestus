@@ -23,21 +23,21 @@ import org.springframework.stereotype.Component;
 /**
  * Single source of truth for workspace-scoped vs. global SQL tables.
  *
- * <p>At {@link ApplicationReadyEvent}, walks Hibernate's mapping metamodel for the
- * physical table name of every {@code @Entity} AND every many-to-many {@code @JoinTable}
- * collection. Any table not in {@link #GLOBAL_TABLES} is treated as workspace-scoped.
+ * <p>At {@link ApplicationReadyEvent}, walks Hibernate's mapping metamodel for the physical table
+ * name of every {@code @Entity} AND every many-to-many {@code @JoinTable} collection. Any table not
+ * in {@link #GLOBAL_TABLES} is treated as workspace-scoped.
  *
- * <p>Join tables are critical: they have no {@code workspace_id} column of their own but
- * still need a predicate — they share the parent entity's tenancy boundary. A bare
- * {@code SELECT * FROM issue_label} without a join to the scoped parent leaks across
- * workspaces, so the inspector must treat join tables as scoped.
+ * <p>Join tables are critical: they have no {@code workspace_id} column of their own but still need
+ * a predicate — they share the parent entity's tenancy boundary. A bare {@code SELECT * FROM
+ * issue_label} without a join to the scoped parent leaks across workspaces, so the inspector must
+ * treat join tables as scoped.
  *
- * <p>Using the physical metamodel (rather than reflecting on {@code @Table.name()})
- * avoids the silent landmine of entities without explicit {@code @Table.name} — Hibernate
- * emits snake_case while {@code entity.getName()} returns CamelCase.
+ * <p>Using the physical metamodel (rather than reflecting on {@code @Table.name()}) avoids the
+ * silent landmine of entities without explicit {@code @Table.name} — Hibernate emits snake_case
+ * while {@code entity.getName()} returns CamelCase.
  *
- * <p>Adding to {@link #GLOBAL_TABLES} is a security decision: each entry carries a
- * one-line rationale and must be reviewed.
+ * <p>Adding to {@link #GLOBAL_TABLES} is a security decision: each entry carries a one-line
+ * rationale and must be reviewed.
  */
 @Component
 public class WorkspaceScopedTables {
@@ -50,7 +50,6 @@ public class WorkspaceScopedTables {
             "workspace_slug_history",
             "workspace_slug_reservation",
             "user",
-            "user_preferences",
             // Synced upstream identity (workspace linked separately via FK)
             "organization",
             "identity_provider",
@@ -58,50 +57,55 @@ public class WorkspaceScopedTables {
             // Fleet-wide worker JWT revocation; worker JWTs are not workspace-scoped
             "worker_token_denylist",
             // core.auth (ADR 0017) — identity is user/system-scoped, not workspace-scoped.
-            // Account ↔ Workspace association lives on workspace_membership, not these tables.
+            // Account ↔ Workspace association lives on membership, not these tables.
             "account",
-            "identity_link",
+            "identity",
             "account_feature",
             "auth_event",
             "issued_jwt",
             "jwt_signing_key",
-            // Installed-client sessions and their single-use sign-in handoffs; account-scoped like issued_jwt
+            // Installed-client sessions and their single-use sign-in handoffs;
+            // account-scoped like issued_jwt
             "client_session",
             "client_sign_in_handoff",
-            // GDPR Art. 20 self-service export — account-scoped, spans a principal's data across workspaces.
+            // GDPR Art. 20 self-service export — account-scoped, spans a principal's data
+            // across workspaces.
             "account_export",
             // Instance-wide rights requests and exact provider-identity controls.
             "person_data_request",
-            "person_suppression",
-            "public_activity_objection",
+            "identity_restriction",
             // Account-scoped consent evidence; spans workspaces
             "consent_decision",
-            // The account's own AI choice; one answer for every workspace it is a member of
-            "account_ai_choice",
             // Fleet-wide worker liveness/capacity registry; not workspace-scoped
             "worker_registry",
-            // Instance-scoped OAuth login providers (sign-in options); shared across all workspaces
+            // Instance-scoped OAuth login providers (sign-in options); shared across all
+            // workspaces
             "login_provider",
-            // Singleton instance-wide operator settings (silent-mode brake); no tenant dimension exists
+            // Singleton instance-wide operator settings (silent-mode brake); no tenant
+            // dimension exists
             "instance_settings",
             // The releases this instance started; no tenant dimension exists
             "release_start",
             // Native-account email subscriptions are independent of workspace membership.
             "notification_subscription",
-            // Instance LLM-config catalog — app_admin-owned, curated, shared across all workspaces
+            // Instance LLM-config catalog — app_admin-owned, curated, shared across all
+            // workspaces
             "llm_connection",
-            // Instance-curated models behind a catalog connection; global, not tenant-scoped
+            // Instance-curated models behind a catalog connection; global, not
+            // tenant-scoped
             "llm_model",
             // Instance model price history; global pricing authority, not tenant-scoped
             "llm_model_price",
-            // llm_model_workspace_grant is deliberately absent: it carries a workspace_id, so the
-            // inspector watches it and its cross-tenant admin reads opt out per method instead.
+            // llm_model_workspace_grant is deliberately absent: it carries a workspace_id,
+            // so the
+            // inspector watches it and its cross-tenant admin reads opt out per method
+            // instead.
             // Instance LLM settings singleton (egress allowlist + BYO enable); global
             "instance_llm_settings",
             // Instance-wide practice catalog overrides; no workspace owner
-            "curated_practice_override",
-            "curated_group_override",
-            // ECB daily reference rates for display-only currency conversion; not a tenant's property
+            "catalog_entry",
+            // ECB daily reference rates for display-only currency conversion; not a
+            // tenant's property
             "fx_rate",
             // Liquibase machinery
             "databasechangelog",
@@ -113,12 +117,11 @@ public class WorkspaceScopedTables {
     private final ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider;
 
     /**
-     * Takes an {@link ObjectProvider} rather than {@link EntityManagerFactory} directly to
-     * break a startup cycle: this bean is consumed (transitively) by Spring Boot's
-     * {@code HibernatePropertiesCustomizer}, which itself is needed to BUILD the
-     * {@code EntityManagerFactory}. Lazy resolution via {@code ObjectProvider} means the
-     * EMF lookup only happens at {@link ApplicationReadyEvent}, after the EMF is fully
-     * built.
+     * Takes an {@link ObjectProvider} rather than {@link EntityManagerFactory} directly to break a
+     * startup cycle: this bean is consumed (transitively) by Spring Boot's {@code
+     * HibernatePropertiesCustomizer}, which itself is needed to BUILD the {@code
+     * EntityManagerFactory}. Lazy resolution via {@code ObjectProvider} means the EMF lookup only
+     * happens at {@link ApplicationReadyEvent}, after the EMF is fully built.
      */
     public WorkspaceScopedTables(ObjectProvider<EntityManagerFactory> entityManagerFactoryProvider) {
         this.entityManagerFactoryProvider = entityManagerFactoryProvider;
@@ -150,8 +153,10 @@ public class WorkspaceScopedTables {
         Set<String> joinTables = new TreeSet<>();
         metamodel.forEachCollectionDescriptor(collection -> {
             addIfScoped(tables, collection.getTableName());
-            // A many-to-many join table is the one shape whose rows Hibernate deletes by both
-            // foreign keys; the inspector allows exactly that statement, for exactly these tables.
+            // A many-to-many join table is the one shape whose rows Hibernate deletes by
+            // both
+            // foreign keys; the inspector allows exactly that statement, for exactly these
+            // tables.
             if (collection.isManyToMany()) addIfScoped(joinTables, collection.getTableName());
         });
 
@@ -159,7 +164,8 @@ public class WorkspaceScopedTables {
         // mapping metamodel call chain regressed. A silently-empty set would turn the
         // inspector into a no-op — worst failure mode for a security control.
         if (tables.isEmpty() && !entities.isEmpty()) {
-            throw new IllegalStateException("WorkspaceScopedTables populated zero scoped tables from " + entities.size()
+            throw new IllegalStateException("WorkspaceScopedTables populated zero scoped tables from "
+                    + entities.size()
                     + " entities. Tenancy enforcement would silently disable. "
                     + "Check Hibernate MappingMetamodel API compatibility.");
         }
@@ -167,7 +173,7 @@ public class WorkspaceScopedTables {
         this.manyToManyJoinTables = Set.copyOf(joinTables);
         this.primaryKeyColumns = Map.copyOf(keys);
         log.info(
-                "WorkspaceScopedTables populated: {} workspace-scoped tables (incl. join tables), {} global",
+                "WorkspaceScopedTables populated: {} workspace-scoped tables (incl. join tables)," + " {} global",
                 scopedTables.size(),
                 GLOBAL_TABLES.size());
     }
@@ -211,10 +217,10 @@ public class WorkspaceScopedTables {
     }
 
     /**
-     * The table's complete primary-key columns per the mapping metamodel, or empty when the table is
-     * unknown — before {@link ApplicationReadyEvent}, or for a table no entity maps. Empty is the
-     * fail-closed answer: a caller comparing a WHERE clause against it can never conclude the clause
-     * covers the whole key.
+     * The table's complete primary-key columns per the mapping metamodel, or empty when the table
+     * is unknown — before {@link ApplicationReadyEvent}, or for a table no entity maps. Empty is
+     * the fail-closed answer: a caller comparing a WHERE clause against it can never conclude the
+     * clause covers the whole key.
      */
     public Set<String> primaryKeyColumns(String tableName) {
         if (tableName == null) return Set.of();

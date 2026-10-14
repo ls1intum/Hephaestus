@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +19,7 @@ public class OutlinePersonSourceIdentityContributor implements PersonSourceIdent
     private final OutlineDocumentRepository repository;
 
     @Override
-    public Set<String> artifactKinds() {
+    public Set<String> itemKinds() {
         return Set.of("docs.document");
     }
 
@@ -26,14 +27,15 @@ public class OutlinePersonSourceIdentityContributor implements PersonSourceIdent
     public List<Long> sourceIds(PersonScope person) {
         Set<Long> ids = new TreeSet<>();
         for (var identity : person.identities())
-            ids.addAll(repository.findPersonSourceIds(identity.providerId(), identity.subject()));
+            ids.addAll(repository.findPersonSourceIds(
+                    identity.providerId(), identity.subject(), Objects.requireNonNullElse(identity.teamId(), "")));
         return List.copyOf(ids);
     }
 
     @Override
-    public List<PersonIdentity> identitiesForSource(long workspaceId, String artifactKind, long artifactId) {
-        return repository.findPersonSourceIdentities(workspaceId, artifactId).stream()
-                .map(row -> new PersonIdentity(row.getProviderId(), row.getSubject(), null))
+    public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
+        return repository.findPersonSourceIdentities(workspaceId, sourceId).stream()
+                .map(row -> new PersonIdentity(row.getProviderId(), row.getSubject(), row.getTeamId()))
                 .toList();
     }
 }

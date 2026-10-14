@@ -1,17 +1,18 @@
-// Finds each issue that the change names as its own, with the time when it was opened, the time when
-// the earliest commit of the change was authored, and the time between them. The review reads the two
-// times beside each other.
-import { factsOf, listWithin } from "../lib/bounded-text.ts";
-import { readCapturedCommits } from "../lib/change.ts";
-import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
-import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
+import { readCapturedCommits } from "../kits/scm/change.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
 	relatedReferences,
-} from "../lib/references.ts";
-import { millisBetween, readLinkedWorkItemCapture } from "../lib/review.ts";
+} from "../kits/scm/references.ts";
+import { millisBetween, readLinkedWorkItemCapture } from "../kits/scm/review.ts";
+// Finds each issue that the change names as its own, with the time when it was opened, the time when
+// the earliest commit of the change was authored, and the time between them. The review reads the two
+// times beside each other.
+import { factsOf, listWithin } from "../lib/core/bounded-text.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"candidate-issue":
@@ -36,11 +37,12 @@ function hours(millis: number): string {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
 		const leads: ReviewLead[] = [];
 		const directions: string[] = [];
-		const body = ctx.work.body ?? "";
-		const title = ctx.work.title ?? "";
+		const body = domain.item.body ?? "";
+		const title = domain.item.title ?? "";
 		const capture = await readLinkedWorkItemCapture(ctx.evidence);
 		const linked = capture?.items ?? null;
 		const named = new Map<number, string[]>();
@@ -55,7 +57,7 @@ export default definePracticeScript({
 		);
 		name("closing keyword", closingReferences(body));
 		name("title", issueNumberReferences(title));
-		name("branch", branchIssueReferences(ctx.work.source_branch));
+		name("branch", branchIssueReferences(domain.item.source_branch));
 		name("Related to", relatedReferences(body));
 		const capturedCommits = await readCapturedCommits(ctx.evidence);
 		const commitsCaptured = capturedCommits !== null;
@@ -80,7 +82,7 @@ export default definePracticeScript({
 				}
 			}
 			let relation =
-				"the commit record is missing or malformed: a collection gap, not a timing observation";
+				"the commit record is missing or malformed: a collection gap, not a timing problem";
 			if (commitsCaptured) {
 				relation =
 					item.createdAt === undefined
@@ -109,7 +111,7 @@ export default definePracticeScript({
 		const unresolved = [...named.keys()].filter((n) => capture?.unresolved.includes(n) ?? false);
 		if (!commitsCaptured) {
 			directions.push(
-				"The commit record is missing or malformed: report a collection gap and record no observation.",
+				"The commit record is missing or malformed: report a collection gap and record no problem.",
 			);
 		} else if (capture === null) {
 			directions.push(
@@ -126,7 +128,7 @@ export default definePracticeScript({
 						unresolved.map((n) => `#${String(n)}`),
 						100,
 					)} are among the capture's unresolved references: this repository holds no synchronized issue with that number, so no opening time.`,
-					"Whether one is the issue this change implements is read from the description: if it is, the record cannot settle the order, so name that issue and its missing opening time (never a timing judgement on another issue instead); if the description rules it out, it is no occasion.",
+					"Whether one is the issue this change implements is read from the description: if it is, the record cannot settle the order, so name that issue and its missing opening time (never a timing judgement on another issue instead); if the description rules it out, it is no applicability.",
 				);
 			}
 			if (leads.length > 0) {
@@ -143,7 +145,7 @@ export default definePracticeScript({
 				);
 				if (relatedOnly) {
 					directions.push(
-						"An issue named only by `Related to` is the occasion only when the description or the issue shows this change implements part of it, not when the sentence is about other work.",
+						"An issue named only by `Related to` is the applicability only when the description or the issue shows this change implements part of it, not when the sentence is about other work.",
 						"It was captured as a mention, not a closing candidate: nothing here says the issue closed or will close on merge.",
 					);
 				}

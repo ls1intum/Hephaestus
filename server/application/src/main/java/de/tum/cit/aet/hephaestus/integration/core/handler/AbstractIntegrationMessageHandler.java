@@ -4,8 +4,6 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.PayloadParsingException;
 import io.nats.client.Message;
 import java.io.IOException;
 import java.time.Instant;
@@ -15,15 +13,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Reusable scaffolding for {@link IntegrationMessageHandler}. Centralises subject-suffix
- * validation (including the GitLab {@code tag_push} vs {@code push} overlap guard),
- * Jackson deserialization, and a {@link TransactionTemplate} boundary that survives
- * Spring's self-invocation limitation.
+ * Reusable scaffolding for {@link IntegrationMessageHandler}. Centralises subject-suffix validation
+ * (including the GitLab {@code tag_push} vs {@code push} overlap guard), Jackson deserialization,
+ * and a {@link TransactionTemplate} boundary that survives Spring's self-invocation limitation.
  *
- * <p>{@code eventType} is the registry index. For GitHub it carries a tier prefix
- * ({@code "repository.issues"}) that the {@code GitHubSubjectParser} folds in; the raw
- * subject only carries the token after the last {@code '.'}. The base validates the
- * inbound subject's last segment against that derived token by exact equality.
+ * <p>{@code eventType} is the registry index. For GitHub it carries a tier prefix ({@code
+ * "repository.issues"}) that the {@code GitHubSubjectParser} folds in; the raw subject only carries
+ * the token after the last {@code '.'}. The base validates the inbound subject's last segment
+ * against that derived token by exact equality.
  *
  * @param <T> DTO type of the deserialized webhook payload.
  */
@@ -33,12 +30,12 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
 
     private final EventTypeKey key;
     private final String eventType;
+
     /**
-     * The raw last-segment of the subject this handler accepts (e.g. {@code "issues"}
-     * for GitHub's {@code repository.issues} key, {@code "merge_request"} for GitLab).
-     * This is what the producer actually puts on the wire — the per-kind
-     * {@code SubjectParser} re-encodes it into the prefixed registry key, but the
-     * subject itself never carries the tier prefix.
+     * The raw last-segment of the subject this handler accepts (e.g. {@code "issues"} for GitHub's
+     * {@code repository.issues} key, {@code "merge_request"} for GitLab). This is what the producer
+     * actually puts on the wire — the per-kind {@code SubjectParser} re-encodes it into the
+     * prefixed registry key, but the subject itself never carries the tier prefix.
      */
     private final String subjectEventToken;
 
@@ -47,16 +44,14 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
     private final TransactionTemplate transactionTemplate;
 
     /**
-     * @param kind                the integration this handler belongs to; folded into
-     *                            {@link #key()}.
-     * @param eventType           the eventType portion of {@link EventTypeKey}. For
-     *                            GitHub this is {@code "<tier>.<event>"} (e.g.
-     *                            {@code "repository.issues"}); for GitLab it is the
-     *                            flat event token (e.g. {@code "merge_request"}).
-     * @param payloadType         {@code Class<T>} for Jackson deserialization.
-     * @param deserializer        shared {@link NatsMessageDeserializer} bean.
-     * @param transactionTemplate the framework's {@link TransactionTemplate} (the
-     *                            handler runs DB writes; we need a real tx boundary).
+     * @param kind the integration this handler belongs to; folded into {@link #key()}.
+     * @param eventType the eventType portion of {@link EventTypeKey}. For GitHub this is {@code
+     *     "<tier>.<event>"} (e.g. {@code "repository.issues"}); for GitLab it is the flat event
+     *     token (e.g. {@code "merge_request"}).
+     * @param payloadType {@code Class<T>} for Jackson deserialization.
+     * @param deserializer shared {@link NatsMessageDeserializer} bean.
+     * @param transactionTemplate the framework's {@link TransactionTemplate} (the handler runs DB
+     *     writes; we need a real tx boundary).
      */
     protected AbstractIntegrationMessageHandler(
             @Nullable IntegrationKind kind,
@@ -122,16 +117,16 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
     }
 
     /**
-     * When JetStream stored the message, on the NATS server's clock; a JetStream redelivery keeps it. A core NATS
-     * message has no stored time and arrives now.
+     * When JetStream stored the message, on the NATS server's clock; a JetStream redelivery keeps
+     * it. A core NATS message has no stored time and arrives now.
      */
     private static Instant arrivedAt(Message msg) {
         return msg.isJetStream() ? msg.metaData().timestamp().toInstant() : Instant.now();
     }
 
     /**
-     * Override when the handling compares when Hephaestus received the payload: {@code arrivedAt} is when JetStream
-     * stored it, however long it then waited in the stream.
+     * Override when the handling compares when Hephaestus received the payload: {@code arrivedAt}
+     * is when JetStream stored it, however long it then waited in the stream.
      */
     protected void dispatchEvent(T eventPayload, Instant arrivedAt) {
         dispatchEvent(eventPayload);
@@ -143,8 +138,8 @@ public abstract class AbstractIntegrationMessageHandler<T> implements Integratio
     }
 
     /**
-     * Handles the deserialized payload. The default {@link #dispatchEvent(Object)} wraps
-     * this call in a transaction; orchestration handlers own their persistence boundaries.
+     * Handles the deserialized payload. The default {@link #dispatchEvent(Object)} wraps this call
+     * in a transaction; orchestration handlers own their persistence boundaries.
      */
     protected abstract void handleEvent(T eventPayload);
 

@@ -15,7 +15,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.StreamSupport;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -163,47 +162,37 @@ final class PracticeCriteriaCaseFixtures {
                 if (!scenario.path("expected").has(slug)) {
                     continue;
                 }
+
+                var definition = practice.path("definition");
+                long id = index.size() + 1L;
                 ObjectNode entry = index.addObject()
                         .put("slug", slug)
-                        .put("name", practice.path("name").asString());
-                List<JsonNode> requirements = StreamSupport.stream(
-                                practice.path("evidenceRequirements").spliterator(), false)
-                        .toList();
-                ArrayNode readsSources = entry.putArray("readsSources");
-                requirements.stream()
-                        .map(need -> need.path("sourceKind").asString())
-                        .distinct()
-                        .sorted()
-                        .forEach(readsSources::add);
-                ArrayNode exhaustiveSources = entry.putArray("exhaustiveSources");
-                requirements.stream()
-                        .filter(need -> need.path("stance").asString().equals("EXHAUSTIVE"))
-                        .map(need -> need.path("sourceKind").asString())
-                        .distinct()
-                        .sorted()
-                        .forEach(exhaustiveSources::add);
-                String preamble = practice.path("preamble")
-                        .asString(coreKind.equals("scm.issue.core") ? "scm.issue" : "scm.pull_request");
-                String criteria =
-                        catalogue.path("criteriaPreambles").path(preamble).asString() + "\n\n---\n\n"
-                                + practice.path("criteria").asString();
-                Files.writeString(practices.resolve(slug + ".md"), criteria);
+                        .put("name", definition.path("name").asString())
+                        .put("practiceId", Long.toString(id))
+                        .put("versionId", Long.toString(id))
+                        .put("reviewDigest", "a".repeat(64));
+                entry.set("definition", definition.deepCopy());
+                var reads = entry.putArray("readsSources");
+                for (var source : definition.path("reads").path("sources"))
+                    reads.add(source.path("source").asString());
+                Files.writeString(
+                        practices.resolve(slug + ".md"),
+                        definition.path("criteria").asString());
             }
         }
         Files.write(workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json"), MAPPER.writeValueAsBytes(index));
         TaskEnvelope envelope = TaskEnvelope.of(
                 UUID.randomUUID(),
+                UUID.randomUUID(),
+                0,
                 1L,
-                new Task(
-                        "Review the captured " + scenario.path("workType").asString()
-                                + " in context/description.md, context/metadata.json, "
-                                + "context/docs/ and work/change/diff.patch. The checkout is "
-                                + SandboxLayout.REPO_MOUNT_RELATIVE + ". "
-                                + "Read inputs/practices/index.json and each listed practice. "
-                                + "Submit one justified result for each listed practice. "
-                                + "Follow " + SandboxLayout.ORCHESTRATOR_PATH + ".",
-                        1,
-                        "test/fixture"));
+                new Task("Review the captured " + scenario.path("workType").asString()
+                        + " in context/description.md, context/metadata.json, "
+                        + "context/docs/ and work/change/diff.patch. The checkout is "
+                        + SandboxLayout.REPO_MOUNT_RELATIVE + ". "
+                        + "Read inputs/practices/index.json and each listed practice. "
+                        + "Submit one justified result for each listed practice. "
+                        + "Follow " + SandboxLayout.ORCHESTRATOR_PATH + "."));
         Files.write(workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME), MAPPER.writeValueAsBytes(envelope));
         deriveChangeView(workspace);
         JsonNode files = MAPPER.readTree(

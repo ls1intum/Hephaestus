@@ -1,61 +1,40 @@
 #!/usr/bin/env node
-/**
- * Run one practice program on local captures as the host runs it, with no model and no review session.
- * It prints the report `<slug>.json`: how the program ran, each review input it asked for, and the
- * result it returned. It prints the section `<slug>.review-<n>.md` that each review session would read.
- *
- * No model is bound: an optional slot is absent, and a required slot skips the program. No review
- * session runs: `review()` returns the result in `--review` after the host's checks, and without it
- * `review()` rejects with "unavailable". The tool never makes up a result.
- *
- * Without `--cause` or `--signal`, the program runs as a review that a person requested, of the kind
- * of work that `--metadata` holds, or of a pull request. Without `--previous`, no review came before.
- * Without `--diff`, the work has no captured change. The base commit of the change is not known here,
- * so `files.change.base` is empty. A citation of a captured record needs the server's folder index,
- * which a local run does not have, so `citeRecord` fails here.
- *
- * Exit codes: 0 when the program returned a result, 1 when it failed, was skipped or returned none,
- * 2 when an option or an input file is not usable.
- */
+/** Run a v3 practice script against local pinned captures without model access. */
 import { mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { parseArgs } from "node:util";
 
+import { parseDiff } from "./kits/scm/diff-parser.ts";
+import type { DiffFile } from "./kits/scm/types.ts";
 import {
-	KINDS,
-	MOMENTS,
 	parseCandidate,
 	PRACTICE_SLUG,
-	WORK_RECORDS,
 	type Candidate,
-	type Kind,
 	type ReviewOptions,
-} from "./lib/contract.ts";
-import { parseDiff } from "./lib/diff-parser.ts";
-import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/evidence-reader.ts";
-import type { JobFiles } from "./lib/ipc.ts";
-import { isJsonObject } from "./lib/json.ts";
-import { renderReviewInput, resolveLeads } from "./lib/leads.ts";
-import { ModelBudget } from "./lib/models-host.ts";
-import { reasonOf, UnratedError, type UnratedReason } from "./lib/practice-script.ts";
+} from "./lib/core/contract.ts";
+import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/core/evidence-reader.ts";
+import type { JobFiles } from "./lib/core/ipc.ts";
+import { isJsonObject } from "./lib/core/json.ts";
+import { renderReviewInput, resolveLeads } from "./lib/core/leads.ts";
+import { ModelBudget } from "./lib/core/models-host.ts";
+import { reasonOf, UnratedError, type UnratedReason } from "./lib/core/practice-script.ts";
 import {
 	notReached,
 	runPracticeProgram,
 	type PracticeProgram,
 	type ProgramOutcome,
-} from "./lib/program-host.ts";
-import { changeSince, parseInputs } from "./lib/script-inputs.ts";
-import type { DiffFile } from "./lib/types.ts";
+} from "./lib/core/program-host.ts";
+import { parseInputs } from "./lib/core/script-inputs.ts";
 import { stagePracticeScripts } from "./stage.ts";
 
 const USAGE =
-	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] [--metadata <json>] [--context <dir>] [--cause <json> | --signal <moment> [--recheck]] [--previous <json>] [--review <candidate.json>] [--out <dir>]";
+	"Usage: node validate.ts --script <file.ts> --repo <clone> [--diff <patch>] --inputs <json> [--context <dir>] [--review <candidate.json>] [--out <dir>]";
 
 /** How long the program may run. */
 const DEADLINE_MS = 600_000;
 /** Where citations name the context folder and the checkout, as the sandbox stages them. */
 const CONTEXT_REFERENCE = "context";
-const TREE_ARTIFACT = "repos/reviewed/.git/HEAD";
+const TREE_SOURCE_PATH = "repos/reviewed/.git/HEAD";
 
 /** Stop on input that the command cannot use, with one line and exit code 2. */
 function stop(problem: string): never {
@@ -99,12 +78,8 @@ function parsedArgs() {
 				script: { type: "string" },
 				repo: { type: "string" },
 				diff: { type: "string" },
-				metadata: { type: "string" },
 				context: { type: "string" },
-				cause: { type: "string" },
-				signal: { type: "string" },
-				recheck: { type: "boolean" },
-				previous: { type: "string" },
+				inputs: { type: "string" },
 				review: { type: "string" },
 				out: { type: "string" },
 			},
@@ -115,21 +90,9 @@ function parsedArgs() {
 	}
 }
 
-const {
-	script,
-	repo,
-	context,
-	out,
-	diff,
-	metadata: metadataFile,
-	cause: causeFile,
-	signal,
-	recheck,
-	previous: previousFile,
-	review: reviewFile,
-} = parsedArgs();
-if (script === undefined || repo === undefined) {
-	stop(`--script and --repo are required. ${USAGE}`);
+const { script, repo, context, out, diff, inputs: inputsFile, review: reviewFile } = parsedArgs();
+if (script === undefined || repo === undefined || inputsFile === undefined) {
+	stop(`--script, --repo and --inputs are required. ${USAGE}`);
 }
 const slug = path.basename(script, ".ts");
 if (!PRACTICE_SLUG.test(slug)) {
@@ -149,14 +112,6 @@ if (diff !== undefined) {
 		stop(`--diff: ${diff} holds no unified diff`);
 	}
 }
-let metadata: Record<string, unknown> | undefined;
-if (metadataFile !== undefined) {
-	const value = await json("metadata", metadataFile);
-	if (!isJsonObject(value)) {
-		stop(`--metadata: ${metadataFile} must hold a JSON object`);
-	}
-	metadata = value;
-}
 let reviewed: Candidate | undefined;
 if (reviewFile !== undefined) {
 	const parsed = parseCandidate(await json("review", reviewFile));
@@ -168,45 +123,9 @@ if (reviewFile !== undefined) {
 	reviewed = parsed.candidate;
 }
 
-/** The kind whose record `metadata` holds, if one does. */
-const kindOfRecord = (record: unknown): Kind | undefined =>
-	KINDS.find((kind) => WORK_RECORDS[kind].schema.safeParse(record).success);
-
-function signalKind(moment: string): Kind {
-	const kind = KINDS.find((candidate) => MOMENTS[candidate].some((m) => m === moment));
-	return kind ?? stop(`--signal: ${moment} is not a moment of any kind of work`);
-}
-
-if (causeFile !== undefined && signal !== undefined) {
-	stop(`--cause and --signal exclude each other. ${USAGE}`);
-}
-if (recheck === true && signal === undefined) {
-	stop(`--recheck needs --signal. ${USAGE}`);
-}
 const started = Date.now();
 const admittedAt = new Date(started).toISOString();
-const kind =
-	signal === undefined ? (kindOfRecord(metadata) ?? "scm.pull_request") : signalKind(signal);
-const cause: unknown =
-	causeFile === undefined
-		? {
-				kind,
-				subject: { role: "AUTHOR" },
-				practice: { revisionId: 1 },
-				scope: { key: `${kind}:1:AUTHOR`, mode: "change", description: "the reviewed work" },
-				cause:
-					signal === undefined
-						? { type: "requested", origin: "MANUAL", state: {}, admittedAt }
-						: {
-								type: recheck === true ? "recheck" : "moment",
-								signal,
-								origin: "LIVE",
-								state: {},
-								admittedAt,
-							},
-			}
-		: await json("cause", causeFile);
-const previous = previousFile === undefined ? null : await json("previous", previousFile);
+const stagedInputs = await json("inputs", inputsFile);
 if (out !== undefined) {
 	await mkdir(out, { recursive: true }).catch((error: unknown) => {
 		stop(`--out: ${messageOf(error)}`);
@@ -235,7 +154,7 @@ try {
 	const program: PracticeProgram = {
 		script: { path: path.join(staged.practices, `${slug}.ts`), source: Buffer.from(source) },
 	};
-	const parsed = parseInputs(slug, cause, previous, metadata);
+	const parsed = parseInputs(slug, stagedInputs);
 	if ("error" in parsed) {
 		outcome = {
 			...notReached(program, "unavailable"),
@@ -245,21 +164,21 @@ try {
 		};
 	} else {
 		const { inputs } = parsed;
-		let since: Map<string, DiffFile> | undefined;
-		if (inputs.kind === "scm.pull_request" && inputs.previous?.head !== undefined) {
-			const found = await changeSince(repo, inputs.previous.head, inputs.work.commit_sha);
-			if ("change" in found) {
-				since = found.change;
-			} else {
-				console.error(`No change since the previous review: ${found.unknown}`);
+		const { item } = inputs;
+		let head: string | null = null;
+		if (isJsonObject(item)) {
+			if (typeof item.commitId === "string") {
+				head = item.commitId;
+			} else if (typeof item.commit_sha === "string") {
+				head = item.commit_sha;
 			}
 		}
-		const head = inputs.kind === "scm.pull_request" ? inputs.work.commit_sha : null;
+
 		const captured = change === null || head === null ? null : { base: "", head, files: change };
 		const sources: EvidenceSources = {
 			repo: path.resolve(repo),
 			headRevision: head,
-			treeArtifact: TREE_ARTIFACT,
+			treeSourceFile: TREE_SOURCE_PATH,
 			contextDir: context === undefined ? null : path.resolve(context),
 			contextReference: CONTEXT_REFERENCE,
 			change: captured,
@@ -274,7 +193,7 @@ try {
 				slug,
 				inputs,
 				criteria: "",
-				...(since === undefined ? {} : { changeSince: since }),
+
 				files,
 				now: admittedAt,
 				deadline: started + DEADLINE_MS,
@@ -287,7 +206,7 @@ try {
 					const asked: AskedReview = { input: options };
 					reviews.push(asked);
 					try {
-						const leads = await resolveLeads(options.leads ?? [], sources, since);
+						const leads = await resolveLeads(options.leads ?? [], sources);
 						asked.input = leads.length === 0 ? options : { ...options, leads };
 						const prepared =
 							leads.length > 0 ||
@@ -301,7 +220,7 @@ try {
 								leads,
 								CONTEXT_REFERENCE,
 								`\`${jsonPath}\``,
-								since !== undefined,
+								false,
 							);
 						}
 					} catch (error) {

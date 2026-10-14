@@ -6,16 +6,12 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPeopleDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPersonDTO;
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
@@ -24,28 +20,20 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
-import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.PracticePageFeedbackBody;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -61,18 +49,21 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Cross-tenant probes use two workspaces with the same account login and an overlapping member. This
- * keeps authentication valid while distinguishing workspace scoping from organization- or user-based
- * filtering. Detail probes include a successful same-workspace request before the foreign request.
+ * Cross-tenant probes use two workspaces with the same account login and an overlapping member.
+ * This keeps authentication valid while distinguishing workspace scoping from organization- or
+ * user-based filtering. Detail probes include a successful same-workspace request before the
+ * foreign request.
  */
 class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTest {
+    @Autowired
+    private PracticeModelTestFixtures modelFixtures;
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SHARED_LOGIN = "shared-org";
     private static final String DIFF_EVIDENCE_JSON =
             "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"context/diff.patch\","
-                    + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
-                    + "\"quoteRedacted\":false}]}";
+                + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
+                + "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -81,19 +72,19 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
+    private ReviewJobRepository agentJobRepository;
 
     @Autowired
-    private PracticeResultRepository practiceResultRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
-    private PracticeRevisionRepository practiceRevisionRepository;
+    private PracticeVersionRepository practiceRevisionRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -139,15 +130,15 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         User ownerA = persistUser("owner-a");
         workspaceA = createWorkspace("tenant-a", "Tenant A", SHARED_LOGIN, AccountType.ORG, ownerA);
-        ensureWorkspaceMembership(workspaceA, overlapUser, WorkspaceRole.ADMIN);
+        ensureMembership(workspaceA, overlapUser, WorkspaceRole.ADMIN);
         User aliceOnlyA = persistUser("alice-only-a");
-        ensureWorkspaceMembership(workspaceA, aliceOnlyA, WorkspaceRole.MEMBER);
+        ensureMembership(workspaceA, aliceOnlyA, WorkspaceRole.MEMBER);
 
         User ownerB = persistUser("owner-b");
         workspaceB = createWorkspace("tenant-b", "Tenant B", SHARED_LOGIN, AccountType.ORG, ownerB);
-        ensureWorkspaceMembership(workspaceB, overlapUser, WorkspaceRole.ADMIN);
+        ensureMembership(workspaceB, overlapUser, WorkspaceRole.ADMIN);
         bobOnlyB = persistUser("bob-only-b");
-        ensureWorkspaceMembership(workspaceB, bobOnlyB, WorkspaceRole.MEMBER);
+        ensureMembership(workspaceB, bobOnlyB, WorkspaceRole.MEMBER);
 
         User ownerC = persistUser("owner-c");
         outsiderWorkspace = createWorkspace("tenant-c", "Tenant C", "org-c", AccountType.ORG, ownerC);
@@ -157,73 +148,18 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     }
 
     private TenantData seed(Workspace ws) {
-        String practiceSlug = "practice-" + ws.getWorkspaceSlug();
-        Practice practice = new Practice();
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-        practice.setWorkspace(ws);
-        practice.setSlug(practiceSlug);
-        practice.setName("Practice of " + ws.getWorkspaceSlug());
-        practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
-        practice.setSignals(PracticeTestEvidence.signals(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ScmSignals.PULL_REQUEST_OPENED.artifactKind()));
-        practice.setReviewWhen(Map.of());
-        practice.setSubject(ActorRole.AUTHOR);
-        practice.setPrecondition(null);
-        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        practice = practiceRepository.save(practice);
-
-        AgentJob job = new AgentJob();
-        job.setWorkspace(ws);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
-        job = agentJobRepository.save(job);
-
-        UUID practiceResultId = UUID.randomUUID();
-        practiceResultRepository.insertIfAbsent(
-                practiceResultId,
-                "occ-" + practiceResultId,
-                job.getId(),
-                job.getWorkspace().getId(),
-                practice.getId(),
-                null,
-                "scm.pull_request",
-                1L,
-                overlapUser.getId(),
-                "Result in " + ws.getWorkspaceSlug(),
-                "MET",
-                null,
-                null,
-                "reasoning",
-                "test-scope",
-                null,
-                null,
-                null,
-                Instant.now(),
-                "LIVE");
-
-        Feedback feedback = feedbackRepository.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(ws.getId())
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(42L)
-                .recipientUserId(overlapUser.getId())
-                .aboutUserId(overlapUser.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .position(0)
-                .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .body("Advice in " + ws.getWorkspaceSlug())
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build());
-
-        ChatThread thread = new ChatThread();
+        String slug = "practice-" + ws.getWorkspaceSlug();
+        var work = modelFixtures.work(ws, slug, "scm.pull_request", 1L);
+        var result = modelFixtures.result(work, accountId(overlapUser), "Result in " + ws.getWorkspaceSlug());
+        var feedback = modelFixtures.feedback(
+                result, FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, "Advice in " + ws.getWorkspaceSlug());
+        var thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setTitle("Thread in " + ws.getWorkspaceSlug());
         thread.setWorkspace(ws);
-        thread.setUser(overlapUser);
+        thread.setAccountId(accountId(overlapUser));
         chatThreadRepository.save(thread);
-
-        return new TenantData(practiceSlug, practiceResultId, feedback.getId(), thread.getId());
+        return new TenantData(slug, result.getId(), feedback.getId(), thread.getId());
     }
 
     private void linkSyncedOrg(Workspace ws, IdentityProvider provider) {
@@ -233,7 +169,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         org.setHtmlUrl("https://example.com/" + ws.getAccountLogin());
         org.setProvider(provider);
         org = organizationRepository.save(org);
-        ws.setOrganization(org);
+        ws.setOrganizationId(org.getId());
         workspaceRepository.save(ws);
     }
 
@@ -283,8 +219,8 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     }
 
     @Nested
-    @DisplayName("Observations")
-    class PracticeResults {
+    @DisplayName("Problems")
+    class Results {
 
         @Test
         @WithMentorUser
@@ -344,33 +280,14 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         }
     }
 
-    private void bindAdvice(Workspace ws, UUID practiceResultId, String body, Instant createdAt) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(ws);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
-        job = agentJobRepository.save(job);
-
-        Feedback unit = feedbackRepository.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(ws.getId())
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(42L)
-                .recipientUserId(overlapUser.getId())
-                .aboutUserId(overlapUser.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .position(0)
-                .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .body(body)
-                .source(FeedbackSource.AGENT)
-                .createdAt(createdAt)
-                .build());
-        feedbackEvidenceRepository.insertIfAbsent(unit.getId(), practiceResultId, null, "PRIMARY", 0);
+    private void bindAdvice(Workspace ws, UUID resultId, String body, Instant createdAt) {
+        var result = practiceResultRepository.findById(resultId).orElseThrow();
+        modelFixtures.feedback(result, FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, body, createdAt);
     }
 
     @Nested
     @DisplayName("Feedback reactions")
-    class FeedbackReactions {
+    class FeedbackFeedbackResponses {
 
         @Test
         @WithMentorUser
@@ -385,7 +302,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Nested
     @DisplayName("In-app feedback (the developer's own practice pages)")
-    class InAppFeedback {
+    class PracticePageFeedback {
 
         @Test
         @WithMentorUser
@@ -410,20 +327,14 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @Test
         @WithMentorUser
         void neverRetiresACardQueuedInAnotherTenant() {
-            String sharedKey = FeedbackThreadKey.forPractice(
-                    "ships-tests-with-the-change", overlapUser.getId(), FeedbackChannel.IN_APP);
-            Feedback inA = seedInAppUnit(workspaceA, "A way of working measured in tenant A", sharedKey);
-            Feedback inB = seedInAppUnit(workspaceB, "A way of working measured in tenant B", sharedKey);
-
-            assertThat(feedbackRepository.findLatestOnThread(
-                            workspaceA.getId(), overlapUser.getId(), FeedbackChannel.IN_APP.name(), sharedKey))
-                    .contains(inA.getId());
-            assertThat(feedbackRepository.markSuperseded(workspaceA.getId(), inB.getId()))
-                    .as("tenant A cannot retire tenant B's card even holding its id")
-                    .isZero();
-            assertThat(feedbackRepository.markSuperseded(workspaceB.getId(), inB.getId()))
-                    .as("positive control: the card was still queued, so the refusal above was the predicate")
-                    .isEqualTo(1);
+            Feedback inA = seedInAppUnit(workspaceA, "A way of working measured in tenant A");
+            Feedback inB = seedInAppUnit(workspaceB, "A way of working measured in tenant B");
+            assertThat(feedbackRepository.findByIdAndWorkspaceId(inA.getId(), workspaceA.getId()))
+                    .isPresent();
+            assertThat(feedbackRepository.findByIdAndWorkspaceId(inB.getId(), workspaceA.getId()))
+                    .isEmpty();
+            assertThat(feedbackRepository.findByIdAndWorkspaceId(inB.getId(), workspaceB.getId()))
+                    .isPresent();
         }
 
         @Test
@@ -432,12 +343,11 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             Feedback inA = seedInAppUnit(workspaceA, "A way of working measured in tenant A");
             Feedback inB = seedInAppUnit(workspaceB, "A way of working measured in tenant B");
 
-            assertThat(feedbackRepository.findHeadlinePractices(workspaceA.getId(), List.of(inA.getId(), inB.getId())))
-                    .singleElement()
-                    .satisfies(row -> {
-                        assertThat(row.getFeedbackId()).isEqualTo(inA.getId());
-                        assertThat(row.getPracticeSlug()).isEqualTo("in-app-" + workspaceA.getWorkspaceSlug());
-                    });
+            assertThat(feedbackRepository.findByWorkspaceIdAndReviewIdOrderByCreatedAtAscIdAsc(
+                            workspaceA.getId(), inA.getReviewId()))
+                    .extracting(Feedback::getId)
+                    .containsExactly(inA.getId())
+                    .doesNotContain(inB.getId());
         }
     }
 
@@ -446,68 +356,20 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     }
 
     private Feedback seedInAppUnit(Workspace ws, String headline, @Nullable String threadKey) {
-        Practice practice = new Practice();
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-        practice.setWorkspace(ws);
-        practice.setSlug("in-app-" + ws.getWorkspaceSlug());
-        practice.setName("In-app practice of " + ws.getWorkspaceSlug());
-        practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
-        practice.setSignals(PracticeTestEvidence.signals(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ScmSignals.PULL_REQUEST_OPENED.artifactKind()));
-        practice.setReviewWhen(Map.of());
-        practice.setSubject(ActorRole.AUTHOR);
-        practice.setPrecondition(null);
-        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        practice = practiceRepository.saveAndFlush(practice);
-        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
-        practice.setCurrentRevision(revision);
-        practice = practiceRepository.saveAndFlush(practice);
-
-        AgentJob job = new AgentJob();
-        job.setWorkspace(ws);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
-        job.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.2.0"))));
-        job = agentJobRepository.save(job);
-
-        UUID practiceResultId = UUID.randomUUID();
-        practiceResultRepository.insertIfAbsent(
-                practiceResultId,
-                "in-app-occ-" + practiceResultId,
-                job.getId(),
-                job.getWorkspace().getId(),
-                practice.getId(),
-                revision.getId(),
+        var work = modelFixtures.work(
+                ws,
+                "in-app-"
+                        + ws.getWorkspaceSlug()
+                        + "-"
+                        + UUID.randomUUID().toString().substring(0, 8),
                 "scm.pull_request",
-                2L,
-                overlapUser.getId(),
-                "In-app evidence in " + ws.getWorkspaceSlug(),
-                "NOT_MET",
-                "MAJOR",
-                DIFF_EVIDENCE_JSON,
-                "reasoning",
-                "test-scope",
-                null,
-                null,
-                null,
-                Instant.now(),
-                "LIVE");
-
-        Feedback unit = feedbackRepository.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(ws.getId())
-                .recipientUserId(overlapUser.getId())
-                .aboutUserId(overlapUser.getId())
-                .channel(FeedbackChannel.IN_APP)
-                .position(7000)
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .body(InAppFeedbackBody.render(headline, "The message.", "The way of working to try."))
-                .source(FeedbackSource.AGENT)
-                .threadKey(threadKey)
-                .createdAt(Instant.now())
-                .build());
-        feedbackEvidenceRepository.insertIfAbsent(unit.getId(), practiceResultId, null, "PRIMARY", 0);
-        return unit;
+                2L);
+        var result = modelFixtures.result(work, accountId(overlapUser), "Evidence in " + ws.getWorkspaceSlug());
+        return modelFixtures.feedback(
+                result,
+                FeedbackDestination.PRACTICE_PAGE,
+                FeedbackState.READY,
+                PracticePageFeedbackBody.render(headline, "The feedback.", "The way of working to try."));
     }
 
     @Nested

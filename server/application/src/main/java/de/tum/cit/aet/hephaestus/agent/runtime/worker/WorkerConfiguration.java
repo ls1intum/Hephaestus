@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.MentorProxyCredentialRegistry;
 import de.tum.cit.aet.hephaestus.agent.sandbox.InteractiveSandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
-import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.FrameCodec;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -28,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
  * (matchIfMissing=true) AND by a non-empty {@code hephaestus.worker.control.endpoint}: the
  * substrate has exactly one runtime path — a WSS-connected worker pod. Monolith dev mode
  * leaves the gate set but never points at an endpoint, so no substrate beans wire; the in-process
- * executor claims jobs from the {@code agent_job} table regardless.
+ * executor claims jobs from the {@code review_job} table regardless.
  */
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnWorkerRole
@@ -158,7 +157,7 @@ public class WorkerConfiguration {
      */
     @Bean
     SmartInitializingSingleton workerCancelHandlerWiring(
-            WorkerControlClient client, Optional<AgentJobExecutor> executor) {
+            WorkerControlClient client, Optional<ReviewJobExecutor> executor) {
         return () -> executor.ifPresent(e -> client.setCancelHandler(e::cancelLocalJob));
     }
 
@@ -178,7 +177,7 @@ public class WorkerConfiguration {
             WorkerControlClient client,
             WorkerCapacityState state,
             WorkerProperties properties,
-            Optional<AgentJobExecutor> executor,
+            Optional<ReviewJobExecutor> executor,
             Optional<WorkerMentorSessions> mentorSessions,
             ApplicationEventPublisher events,
             MeterRegistry meterRegistry) {

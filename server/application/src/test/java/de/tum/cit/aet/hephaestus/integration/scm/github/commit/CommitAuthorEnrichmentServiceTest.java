@@ -9,10 +9,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlSyncCoordinator;
@@ -222,7 +222,8 @@ class CommitAuthorEnrichmentServiceTest extends BaseUnitTest {
             // alice@example.com can be resolved by email, unknown@personal.com cannot
             when(commitRepository.findDistinctUnresolvedAuthorEmailsByRepositoryId(1L))
                     .thenReturn(List.of("alice@example.com", "unknown@personal.com"))
-                    .thenReturn(List.of("unknown@personal.com")); // unknown still unresolved after email
+                    .thenReturn(List.of("unknown@personal.com")); // unknown still unresolved after
+            // email
             when(commitRepository.findDistinctUnresolvedCommitterEmailsByRepositoryId(1L))
                     .thenReturn(List.of())
                     .thenReturn(List.of());

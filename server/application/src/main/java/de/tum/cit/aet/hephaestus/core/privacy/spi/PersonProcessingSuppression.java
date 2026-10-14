@@ -7,11 +7,14 @@ import org.jspecify.annotations.Nullable;
 public interface PersonProcessingSuppression {
     boolean isSuppressed(long providerId, String subject, @Nullable String teamId);
 
-    boolean isUserSuppressed(long userId);
+    boolean isAccountSuppressed(long accountId);
 
     /** Frozen review jobs are unavailable from erasure admission through every resumable step. */
     boolean isReviewJobSuppressed(UUID jobId);
 
-    /** Current source attribution, including resynced provider records, scoped to the requesting workspace. */
-    boolean isArtifactSuppressed(long workspaceId, String artifactKind, long artifactId);
+    /**
+     * Current source attribution, including resynced provider records, scoped to the requesting
+     * workspace.
+     */
+    boolean isSourceSuppressed(long workspaceId, String itemKind, long sourceId);
 }

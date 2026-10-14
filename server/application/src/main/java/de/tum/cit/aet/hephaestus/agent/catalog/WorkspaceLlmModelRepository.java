@@ -16,8 +16,8 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
 
     List<WorkspaceLlmModel> findByWorkspaceId(Long workspaceId);
 
-    @Query(
-            "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.workspace.id = :workspaceId ORDER BY m.id")
+    @Query("SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.workspace.id = :workspaceId ORDER BY"
+            + " m.id")
     List<WorkspaceLlmModel> findByWorkspaceIdWithConnection(@Param("workspaceId") Long workspaceId);
 
     boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
@@ -34,8 +34,8 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
      * {@code connection} is fetched eagerly because callers map the entity to a DTO after the
      * transaction closes and OSIV is off.
      */
-    @Query(
-            "SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.id = :id AND m.workspace.id = :workspaceId")
+    @Query("SELECT m FROM WorkspaceLlmModel m JOIN FETCH m.connection WHERE m.id = :id AND m.workspace.id ="
+            + " :workspaceId")
     Optional<WorkspaceLlmModel> findByIdAndWorkspaceIdWithConnection(
             @Param("id") Long id, @Param("workspaceId") Long workspaceId);
 

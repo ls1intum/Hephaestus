@@ -5,9 +5,9 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelVisibility;
 import de.tum.cit.aet.hephaestus.agent.mentor.MentorLlmConfig;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import java.math.BigDecimal;
 
 /**
@@ -71,13 +71,13 @@ public final class LlmCatalogTestFixtures {
                 null,
                 null,
                 null,
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 1L,
                 1L,
                 null,
                 new LlmPriceSnapshot(
-                        FundingSource.INSTANCE,
-                        PricingState.PRICED,
+                        UsageFundingSource.INSTANCE,
+                        UsagePricingState.PRICED,
                         12L,
                         null,
                         new BigDecimal("10"),

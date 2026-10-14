@@ -8,10 +8,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Routes a job cancellation to the worker that owns the running job, over the WSS control channel.
- * The caller (e.g. {@code AgentJobService.cancel}) performs the authoritative
- * {@code agent_job} status transition first; this just asks the owning worker to stop its container
- * promptly. If the owning worker is not connected to this hub, the cancel still takes effect via the
- * DB transition + reconciler/zombie-sweeper backstops — the container is simply not stopped early.
+ * The caller (e.g. {@code ReviewJobService.cancel}) performs the authoritative {@code agent_job}
+ * status transition first; this just asks the owning worker to stop its container promptly. If the
+ * owning worker is not connected to this hub, the cancel still takes effect via the DB transition +
+ * reconciler/zombie-sweeper backstops — the container is simply not stopped early.
  */
 public class WorkerJobCancelDispatcher {
 
@@ -40,7 +40,7 @@ public class WorkerJobCancelDispatcher {
                 })
                 .orElseGet(() -> {
                     log.debug(
-                            "No live session for worker {} to cancel job {}; relying on DB + backstops",
+                            "No live session for worker {} to cancel job {}; relying on DB" + " + backstops",
                             workerId,
                             jobId);
                     return false;

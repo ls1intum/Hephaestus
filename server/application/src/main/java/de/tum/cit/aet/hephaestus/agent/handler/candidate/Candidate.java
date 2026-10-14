@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ObjectNode;
@@ -11,9 +10,10 @@ import tools.jackson.databind.node.ObjectNode;
  * outcome may carry. Citations, warrants, open questions, the example and the coverage stay JSON objects, each a
  * private copy, because admission verifies and annotates the citations in place before it stores them.
  */
-public sealed interface Candidate permits MetCandidate, NotMetCandidate, NotApplicableCandidate, UndeterminedCandidate {
+public sealed interface Candidate
+        permits MetCandidate, NotMetCandidate, DoesNotApplyCandidate, CouldNotDetermineCandidate {
 
-    Outcome outcome();
+    ResultOutcome outcome();
 
     /** One line. */
     String summary();
@@ -45,10 +45,5 @@ public sealed interface Candidate permits MetCandidate, NotMetCandidate, NotAppl
     /** The located open questions, {@code {openQuestion, wouldSettleIt, citation?}}. */
     default List<ObjectNode> openQuestions() {
         return List.of();
-    }
-
-    /** The severity to store: on {@link NotMetCandidate} the declared one, or else its worst problem's. */
-    default @Nullable Severity severity() {
-        return null;
     }
 }

@@ -6,16 +6,17 @@ import static com.slack.api.model.block.composition.BlockCompositions.markdownTe
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationFeedbackPreparedEvent;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackSendException;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.ConversationFeedbackPreparedEvent;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
 
 /** Notifies a recipient that conversational feedback is ready without exposing what it says. */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackConversationNudgeService {
 
@@ -71,19 +73,19 @@ public class SlackConversationNudgeService {
             nudge(event);
         } catch (RuntimeException e) {
             log.warn(
-                    "slack.nudge: failed for workspaceId={}, recipientUserId={}: {}",
+                    "slack.nudge: failed for workspaceId={}, developerId={}: {}",
                     event.workspaceId(),
-                    event.recipientUserId(),
+                    event.developerId(),
                     e.toString());
         }
     }
 
     private void nudge(ConversationFeedbackPreparedEvent event) {
-        if (event.unitCount() <= 0 || event.workspaceId() == null || event.recipientUserId() == null) {
+        if (event.feedbackCount() <= 0 || event.workspaceId() <= 0 || event.developerId() <= 0) {
             return;
         }
         long workspaceId = event.workspaceId();
-        long recipientId = event.recipientUserId();
+        long recipientId = event.developerId();
         if (!mentorReadinessQuery.isReady(workspaceId)) {
             log.debug("slack.nudge: skip, mentor unavailable: workspaceId={}", workspaceId);
             return;
@@ -95,20 +97,20 @@ public class SlackConversationNudgeService {
         }
         boolean practiceFeedbackDeliveryEnabled = accountPreferencesQuery.practiceFeedbackDeliveryEnabled(recipientId);
         if (!practiceFeedbackDeliveryEnabled) {
-            log.debug("slack.nudge: skip, feedback delivery disabled: recipientUserId={}", recipientId);
+            log.debug("slack.nudge: skip, feedback delivery disabled: developerId={}", recipientId);
             return;
         }
         Optional<String> slackUserId = identityResolver.resolveSlackUserId(
                 recipientId, connection.get().getInstanceKey());
         if (slackUserId.isEmpty()) {
-            log.debug("slack.nudge: skip, no Slack identity link: recipientUserId={}", recipientId);
+            log.debug("slack.nudge: skip, no Slack identity link: developerId={}", recipientId);
             return;
         }
         // Eligibility can change while the notification event waits in the async queue.
         Optional<MentorRefusal> refusal = mentorTurnRunner.refusal(workspaceId, recipientId);
         if (refusal.isPresent()) {
             log.debug(
-                    "slack.nudge: skip, Heph declines the recipient: recipientUserId={}, refusal={}",
+                    "slack.nudge: skip, Heph declines the recipient: developerId={}, refusal={}",
                     recipientId,
                     refusal.get());
             return;
@@ -116,17 +118,17 @@ public class SlackConversationNudgeService {
         Recipient recipient = new Recipient(workspaceId, recipientId);
         Instant now = Instant.now();
         if (!claimWindow(recipient, now)) {
-            log.debug("slack.nudge: skip, on cooldown: recipientUserId={}", recipientId);
+            log.debug("slack.nudge: skip, on cooldown: developerId={}", recipientId);
             return;
         }
-        String text = message(event.unitCount());
+        String text = message(event.feedbackCount());
         try {
             slackMessageService.sendForWorkspace(
                     workspaceId, slackUserId.get(), asBlocks(section(s -> s.text(markdownText(text)))), text);
         } catch (SlackSendException e) {
-            cooldowns.asMap().remove(recipient, now);
+            if (!e.visibilityUnknown()) cooldowns.asMap().remove(recipient, now);
             log.warn(
-                    "slack.nudge: send failed: workspaceId={}, recipientUserId={}, slackError={}",
+                    "slack.nudge: send failed: workspaceId={}, developerId={}, slackError={}",
                     workspaceId,
                     recipientId,
                     e.slackError());
@@ -137,12 +139,12 @@ public class SlackConversationNudgeService {
         return cooldowns.asMap().putIfAbsent(recipient, now) == null;
     }
 
-    /** Count-only copy — deliberately no result details, no severity, no artifact references. */
-    static String message(int unitCount) {
-        return unitCount == 1
+    /** Count-only copy — deliberately no result details, no severity, no item references. */
+    static String message(int feedbackCount) {
+        return feedbackCount == 1
                 ? "You have 1 piece of feedback to explore. Reply here to go through it."
-                : "You have " + unitCount + " pieces of feedback to explore. Reply here to go through them.";
+                : "You have " + feedbackCount + " pieces of feedback to explore. Reply here to go through them.";
     }
 
-    private record Recipient(long workspaceId, long userId) {}
+    private record Recipient(long workspaceId, long accountId) {}
 }

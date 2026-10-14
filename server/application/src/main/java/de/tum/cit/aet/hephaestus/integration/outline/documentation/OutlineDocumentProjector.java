@@ -1,13 +1,14 @@
 package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
-import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
@@ -39,6 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link OutlineIdentityResolver}. An unlinked author degrades to name-only — no member id is ever stamped on the row.
  */
 @Component
+@ConditionalOnCaptureRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 @Transactional(readOnly = true)
 public class OutlineDocumentProjector implements DocumentProjection {
@@ -183,10 +185,10 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 doc.getOutlineUpdatedAt(),
                 doc.getCreatedByName(),
                 doc.getCreatedBySubject(),
-                authors.memberIdFor(doc.getCreatedBySubject()),
+                authors.accountIdFor(doc.getCreatedBySubject()),
                 doc.getUpdatedByName(),
                 doc.getUpdatedBySubject(),
-                authors.memberIdFor(doc.getUpdatedBySubject()),
+                authors.accountIdFor(doc.getUpdatedBySubject()),
                 collaborators(doc, authors),
                 doc.isArchived(),
                 collectionNames.get(doc.getCollectionId()),
@@ -198,7 +200,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
      * The workspace's collection id → display name map, loaded once per projection call (mirrors
      * {@link #authorContext}'s per-batch resolution). A collection with no captured name is absent from
      * the map, so {@code Map#get} degrades to {@code null} — the graceful floor for {@link
-     * de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument#collectionName}.
+     * de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection.ProjectedDocument#collectionName}.
      */
     private Map<String, String> collectionNames(long workspaceId) {
         Map<String, String> names = new HashMap<>();
@@ -232,7 +234,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
             } else if (subject.equals(doc.getUpdatedBySubject())) {
                 name = doc.getUpdatedByName();
             }
-            result.add(new ProjectedDocument.Collaborator(subject, name, authors.memberIdFor(subject)));
+            result.add(new ProjectedDocument.Collaborator(subject, name, authors.accountIdFor(subject)));
         }
         return List.copyOf(result);
     }
@@ -262,7 +264,7 @@ public class OutlineDocumentProjector implements DocumentProjection {
         private final long workspaceId;
         private final @Nullable String serverUrl;
         private final @Nullable String teamId;
-        private final Map<String, Optional<Long>> memberIdBySubject = new HashMap<>();
+        private final Map<String, Optional<Long>> accountIdBySubject = new HashMap<>();
 
         private AuthorContext(
                 @Nullable OutlineIdentityResolver resolver,
@@ -280,12 +282,12 @@ public class OutlineDocumentProjector implements DocumentProjection {
         }
 
         @Nullable
-        Long memberIdFor(@Nullable String subject) {
+        Long accountIdFor(@Nullable String subject) {
             if (resolver == null || serverUrl == null || subject == null || subject.isBlank()) {
                 return null;
             }
-            return memberIdBySubject
-                    .computeIfAbsent(subject, s -> resolver.resolveMemberId(workspaceId, serverUrl, teamId, s))
+            return accountIdBySubject
+                    .computeIfAbsent(subject, s -> resolver.resolveAccountId(workspaceId, serverUrl, teamId, s))
                     .orElse(null);
         }
     }

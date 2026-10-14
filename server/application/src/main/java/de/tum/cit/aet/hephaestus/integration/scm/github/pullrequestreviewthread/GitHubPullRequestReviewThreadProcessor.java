@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreviewthread;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import java.time.Instant;
 import java.util.Objects;
 import org.jspecify.annotations.NonNull;
@@ -17,9 +17,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Processor for GitHub pull request review threads.
- */
+/** Processor for GitHub pull request review threads. */
 @Service
 public class GitHubPullRequestReviewThreadProcessor {
 
@@ -35,8 +33,8 @@ public class GitHubPullRequestReviewThreadProcessor {
     }
 
     /**
-     * @param resolvedAt when the event says the thread was resolved — the only source of that moment
-     *     on GitHub, whose GraphQL thread carries none
+     * @param resolvedAt when the event says the thread was resolved — the only source of that
+     *     moment on GitHub, whose GraphQL thread carries none
      */
     @Transactional
     public boolean resolve(

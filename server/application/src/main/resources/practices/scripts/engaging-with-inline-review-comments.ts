@@ -1,17 +1,5 @@
-// Finds each note by someone other than the author, inline and in the conversation, one lead each, with
-// what the record shows beside it: the author's later reply, the resolution of the thread and who
-// resolved it, the reviewer's own later note, if and how soon the same reviewer approved after it, if
-// the note came after the work merged or closed, and the authored commits after it. The review decides
-// for each note if it asked something of this change and if the author engaged. The script never does.
-import { factsOf } from "../lib/bounded-text.ts";
-import { type ChangeCommit, readCapturedCommits } from "../lib/change.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type Facts,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { type ChangeCommit, readCapturedCommits } from "../kits/scm/change.ts";
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import {
 	type GeneralComment,
 	type ReviewDecision,
@@ -24,7 +12,14 @@ import {
 	readReviewComments,
 	readReviewThreads,
 	reviewerCommentRows,
-} from "../lib/review.ts";
+} from "../kits/scm/review.ts";
+// Finds each note by someone other than the author, inline and in the conversation, one lead each, with
+// what the record shows beside it: the author's later reply, the resolution of the thread and who
+// resolved it, the reviewer's own later note, if and how soon the same reviewer approved after it, if
+// the note came after the work merged or closed, and the authored commits after it. The review decides
+// for each note if it asked something of this change and if the author engaged. The script never does.
+import { factsOf } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type Facts, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"reviewer-comment": "An inline comment by someone other than the author.",
@@ -86,16 +81,17 @@ interface Note {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
-		const author = ctx.work.author ?? "";
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
+		const author = domain.item.author ?? "";
 		const inline = await readReviewComments(ctx.evidence);
 		const general = await readGeneralComments(ctx.evidence);
 		const record = await readReviewThreads(ctx.evidence);
 		const capturedCommits = await readCapturedCommits(ctx.evidence);
 		const commits = capturedCommits ?? [];
 		const decisions = record?.decisions ?? [];
-		const handOff = ctx.work.merged_at ?? ctx.work.closed_at;
+		const handOff = domain.item.merged_at ?? domain.item.closed_at;
 		const byOthers = (note: { author?: string }) =>
 			note.author !== undefined && note.author !== author;
 		const authorNotes = [

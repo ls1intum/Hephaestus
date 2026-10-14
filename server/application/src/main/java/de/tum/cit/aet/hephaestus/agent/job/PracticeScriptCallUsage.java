@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One proxied practice script call, as {@link AgentJobRepository#accumulatePracticeScriptUsage} adds it to its row.
+ * One proxied practice script call, as {@link ReviewJobRepository#accumulatePracticeScriptUsage} adds it to its row.
  * The buckets are those of the review's own counters: {@code inputTokens} excludes the cache reads and writes, so
  * each is priced at its own rate.
  *

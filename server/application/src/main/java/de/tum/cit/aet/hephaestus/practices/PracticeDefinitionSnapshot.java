@@ -1,62 +1,36 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 record PracticeDefinitionSnapshot(
         String slug,
-        String name,
-        ArtifactKind artifactKind,
-        List<SignalName> signals,
-        List<PracticeEvidenceRequirement> evidenceRequirements,
-        Map<String, Set<String>> reviewWhen,
-        ActorRole subject,
-        @Nullable PracticePrecondition precondition,
-        @Nullable Integer criteriaRevision,
-        String criteriaSha256,
-        @Nullable String practiceScriptSha256,
-        String automatedReviewPolicySha256,
-        @Nullable String whyItMatters,
-        @Nullable String whatGoodLooksLike,
-        @Nullable String visualSha256,
-        @Nullable String guideSha256,
+        String kind,
+        Long versionId,
+        String reviewDigest,
         @Nullable String groupSlug,
-        @Nullable String sourceCuratedSlug,
-        @Nullable String sourceCuratedFingerprint,
-        @Nullable AdoptedBaseSource adoptedBaseSource,
-        PracticeDeliveryBehavior deliveryBehavior,
-        @Nullable String declinedOfferedDigest)
+        int position,
+        @Nullable FeedbackMode feedbackMode,
+        @Nullable String catalogSlug,
+        @Nullable String catalogBaseDigest)
         implements ConfigAuditSnapshot {
-    static PracticeDefinitionSnapshot of(Practice practice, @Nullable Integer criteriaRevision) {
+    static PracticeDefinitionSnapshot of(Practice practice) {
         return new PracticeDefinitionSnapshot(
                 practice.getSlug(),
-                practice.getName(),
-                practice.getArtifactKind(),
-                practice.getSignals(),
-                practice.getEvidenceRequirements(),
-                practice.getReviewWhen(),
-                practice.getSubject(),
-                practice.getPrecondition(),
-                criteriaRevision,
-                CanonicalDigest.sha256Hex(practice.getCriteria()),
-                practice.getPracticeScript() == null ? null : CanonicalDigest.sha256Hex(practice.getPracticeScript()),
-                PracticeAutomatedReviewPolicyDigest.digest(practice.getAutomatedReviewPolicy()),
-                practice.getWhyItMatters(),
-                practice.getWhatGoodLooksLike(),
-                practice.getVisual() == null ? null : practice.getVisual().digest(),
-                practice.getGuide() == null ? null : practice.getGuide().digest(),
+                practice.getKind().value(),
+                Objects.requireNonNull(practice.getCurrentVersion().getId()),
+                practice.getCurrentVersion().getReviewDigest(),
                 practice.getGroup() == null ? null : practice.getGroup().getSlug(),
-                practice.getSourceCuratedSlug(),
-                practice.getSourceCuratedFingerprint(),
-                practice.getAdoptedBaseSource(),
-                practice.getDeliveryBehavior(),
-                practice.getDeclinedOfferedDigest());
+                practice.getPosition(),
+                practice.getFeedbackMode(),
+                practice.getCatalogSlug(),
+                practice.getCatalogBase() == null
+                        ? null
+                        : new CanonicalDigest()
+                                .add(practice.getCatalogBase().toString())
+                                .hex());
     }
 }

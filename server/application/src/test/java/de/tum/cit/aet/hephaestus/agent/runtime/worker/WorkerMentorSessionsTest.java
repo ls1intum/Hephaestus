@@ -20,7 +20,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxIdentity;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionCommand;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -94,7 +94,7 @@ class WorkerMentorSessionsTest extends BaseUnitTest {
         body.set(
                 "route",
                 mapper.valueToTree(new MentorProxyCredentialRegistry.Route(
-                        "openai-completions", "https://upstream.test", FundingSource.INSTANCE, 1L, 1L, 1L)));
+                        "openai-completions", "https://upstream.test", UsageFundingSource.INSTANCE, 1L, 1L, 1L)));
         return new MentorSessionCommand(sessionId, UUID.randomUUID(), MentorSessionCommand.Operation.OPEN, body);
     }
 

@@ -65,15 +65,15 @@ The staged flow prevents this.
 Both catalogs use the same fields.
 Only `displayName`, `baseUrl`, and `apiProtocol` are required.
 
-| Field                          | Required | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Display name**               | yes      | Free text, ≤ 128 characters. Editable after creation. Display name, service declaration, API key, and enabled state can change. Routing identity and slug cannot.                                                                                                                                                                                                                                                                                                                                                                                |
-| **Base URL**                   | yes      | The provider's OpenAI-compatible root, ≤ 2048 characters. Examples: `https://api.openai.com/v1`, or `https://<resource>.openai.azure.com/openai/v1` for Azure. Requires HTTPS. Must have no credentials, query string, or fragment. **Immutable after create.**                                                                                                                                                                                                                                                                                  |
-| **API**                        | yes      | The API that the endpoint serves. Under **Chat models**: **Responses API** (`openai-responses`), the default, and **Chat Completions API** (`openai-completions`). Under **For practice scripts**: **Decisions API**, **Embeddings API**, and **Rerank API (Cohere-compatible)**. [Models for practice scripts](#models-for-practice-scripts) describes these three. Prefer Responses API for reviews and the mentor, which call tools across many turns. It can preserve reasoning between tool calls for supported models and providers. OpenAI, Vercel AI Gateway, OpenRouter, and vLLM offer it. Support depends on the model and deployment. For Chat Completions-only endpoints, choose **Chat Completions API**. **Immutable after create.** The edit form shows the API as text.                     |
-| **Authentication**             | no       | `BEARER` → `Authorization: Bearer <key>`, or `API_KEY` → `api-key: <key>`. Defaults to `BEARER`. Azure needs `API_KEY`. **Immutable after create.**                                                                                                                                                                                                                                                                                                                                                                                              |
-| **Service receiving requests** | no       | Search for the service that receives requests from the configured endpoint, such as Logos, Azure, or Vercel AI Gateway. If absent or uncertain, leave **Not listed or unknown**. This display declaration does not prove where inference runs or who operates the model. You can change or clear it later.                                                                                                                                                                                                                                       |
-| **API key**                    | no       | Write-only and encrypted at rest. Never returned. A saved connection reports only `hasApiKey` and the last four characters. On edit, leave blank to keep the stored key. To delete it, select **Remove stored API key**. Optional: a self-hosted vLLM or Ollama gateway may need no credential.                                                                                                                                                                                                                                                  |
-| **Slug**                       | no       | Internal identifier, ≤ 63 characters. Derived from the display name if omitted. **Immutable after create.**                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Field                          | Required | What it is                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Display name**               | yes      | Free text, ≤ 128 characters. Editable after creation. Display name, service declaration, API key, and enabled state can change. Routing identity and slug cannot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Base URL**                   | yes      | The provider's OpenAI-compatible root, ≤ 2048 characters. Examples: `https://api.openai.com/v1`, or `https://<resource>.openai.azure.com/openai/v1` for Azure. Requires HTTPS. Must have no credentials, query string, or fragment. **Immutable after create.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **API**                        | yes      | The API that the endpoint serves. Under **Chat models**: **Responses API** (`openai-responses`), the default, and **Chat Completions API** (`openai-completions`). Under **For practice scripts**: **Decisions API**, **Embeddings API**, and **Rerank API (Cohere-compatible)**. [Models for practice scripts](#models-for-practice-scripts) describes these three. Prefer Responses API for reviews and the mentor, which call tools across many turns. It can preserve reasoning between tool calls for supported models and providers. OpenAI, Vercel AI Gateway, OpenRouter, and vLLM offer it. Support depends on the model and deployment. For Chat Completions-only endpoints, choose **Chat Completions API**. **Immutable after create.** The edit form shows the API as text. |
+| **Authentication**             | no       | `BEARER` → `Authorization: Bearer <key>`, or `API_KEY` → `api-key: <key>`. Defaults to `BEARER`. Azure needs `API_KEY`. **Immutable after create.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Service receiving requests** | no       | Search for the service that receives requests from the configured endpoint, such as Logos, Azure, or Vercel AI Gateway. If absent or uncertain, leave **Not listed or unknown**. This display declaration does not prove where inference runs or who operates the model. You can change or clear it later.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **API key**                    | no       | Write-only and encrypted at rest. Never returned. A saved connection reports only `hasApiKey` and the last four characters. On edit, leave blank to keep the stored key. To delete it, select **Remove stored API key**. Optional: a self-hosted vLLM or Ollama gateway may need no credential.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Slug**                       | no       | Internal identifier, ≤ 63 characters. Derived from the display name if omitted. **Immutable after create.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 
 **Three fields are immutable on purpose.**
 Base URL, API, and authentication mode form the connection's *routing identity*.
@@ -381,7 +381,7 @@ This also clears the grant list.
 A revoked grant or disabled connection stops every workspace that has an assignment to that model.
 The assignment stays in place and appears correct.
 This is a common cause of silently stopped workspace reviews.
-If that happens, use [the triage list](./practice-review#when-a-workspace-goes-quiet).
+If that happens, use [the triage list](./practice-review#follow-one-review-end-to-end).
 
 A workspace admin who chooses a model sees its display name, connection name, reasoning effort, and price framing.
 They never see an upstream model ID, base URL, or credential.
@@ -395,7 +395,7 @@ The UI shows the title.
 | Status | `type`                           | When                                                                                                                                                                                                             |
 | ------ | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 409    | `llm-connection-in-use`          | A connection still has models. Delete the models before the connection.                                                                                                                                          |
-| 409    | `llm-model-in-use`               | A model still has an assignment. Assign another model in that workspace before deletion.                                                                                                                       |
+| 409    | `llm-model-in-use`               | A model still has an assignment. Assign another model in that workspace before deletion.                                                                                                                         |
 | 409    | `llm-connection-slug-conflict`   | Your supplied slug is taken.                                                                                                                                                                                     |
 | 409    | `llm-model-slug-conflict`        | The model slug is taken on this connection.                                                                                                                                                                      |
 | 409    | `llm-model-upstream-id-conflict` | Two catalog entries would use the same upstream id on one connection. This is refused because price selection would be nondeterministic. A `NO_CHARGE` copy could silently replace a `PRICED` model for billing. |
@@ -406,7 +406,7 @@ The UI shows the title.
 
 - **Budgets, caps, and what a cap pauses:** [Workspace budgets and alerting](./production-setup#workspace-budgets-and-alerting).
 - **The environment variables that *are* deploy-time facts:** [Instance-wide LLM settings](./production-setup#instance-wide-llm-settings).
-- **Nothing is being reviewed:** [When a workspace goes quiet](./practice-review#when-a-workspace-goes-quiet).
+- **Nothing is being reviewed:** [When a workspace goes quiet](./practice-review#follow-one-review-end-to-end).
 - **Models for practice scripts:** [Models for practice scripts](#models-for-practice-scripts).
 
 ## Data handling and members' AI choices
@@ -595,12 +595,12 @@ A script can use four kinds of model.
 The chat model is always the practice review's own model.
 You assign the three other kinds on **AI models**, under **Models for practice scripts**:
 
-| Purpose | API in the connection form | `apiProtocol` | Endpoint the proxy calls | Example providers |
-| --- | --- | --- | --- | --- |
-| **Decision model** | **Decisions API** | `openai-decisions` | `{baseUrl}/decisions` | The [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions) |
-| **Decision model** | **Chat Completions API** | `openai-completions` | `{baseUrl}/chat/completions` | A chat model that returns `top_logprobs`, such as a vLLM deployment |
-| **Embedding model** | **Embeddings API** | `openai-embeddings` | `{baseUrl}/embeddings` | OpenAI, Azure OpenAI, vLLM |
-| **Reranking model** | **Rerank API (Cohere-compatible)** | `cohere-rerank` | `{baseUrl}/rerank` | Cohere, Jina, vLLM |
+| Purpose             | API in the connection form         | `apiProtocol`        | Endpoint the proxy calls     | Example providers                                                                   |
+| ------------------- | ---------------------------------- | -------------------- | ---------------------------- | ----------------------------------------------------------------------------------- |
+| **Decision model**  | **Decisions API**                  | `openai-decisions`   | `{baseUrl}/decisions`        | The [OpenAI Decisions API](https://developers.openai.com/api/docs/guides/decisions) |
+| **Decision model**  | **Chat Completions API**           | `openai-completions` | `{baseUrl}/chat/completions` | A chat model that returns `top_logprobs`, such as a vLLM deployment                 |
+| **Embedding model** | **Embeddings API**                 | `openai-embeddings`  | `{baseUrl}/embeddings`       | OpenAI, Azure OpenAI, vLLM                                                          |
+| **Reranking model** | **Rerank API (Cohere-compatible)** | `cohere-rerank`      | `{baseUrl}/rerank`           | Cohere, Jina, vLLM                                                                  |
 
 The **Decision model** accepts a model on a Decisions API or a Chat Completions API connection.
 With a chat completions model, Hephaestus reads each answer from the token log probabilities.
@@ -700,6 +700,7 @@ Each purpose row under **Models for practice scripts** shows these facts:
 
   While practice reviews are on, a purpose that serves every member shows no badge.
   A purpose for practice scripts that no practice uses also shows no badge then, whatever it assigns.
+
 - **Used by**, when you open the row: each practice that uses the model.
   A practice that requires the model shows **Required**.
   A practice that uses the model only when it is available shows no badge.
@@ -761,9 +762,9 @@ Declare **Operated by** for a model for practice scripts with the same care as f
 Price a model for practice scripts like any other model.
 Its calls count against the shared-model budget or the provider cap of the purse that pays for it.
 
-| Model | How Hephaestus bills it |
-| --- | --- |
-| Chat | On the review's own usage row, with the review's price. |
+| Model                          | How Hephaestus bills it                                                                                                                                                                                            |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Chat                           | On the review's own usage row, with the review's price.                                                                                                                                                            |
 | Decision, embedding, reranking | One usage row for each kind and review attempt, with the price frozen when the attempt was admitted. The source types are `PRACTICE_SCRIPT_DECISION`, `PRACTICE_SCRIPT_EMBEDDING` and `PRACTICE_SCRIPT_RERANKING`. |
 
 A cached prompt token costs the cache rate of its model, as on the review's own usage row.
@@ -773,10 +774,10 @@ A direct model call is a call that a script makes through one of its model slots
 The review sessions that a script opens with `ctx.review()` are not direct calls.
 They count against the work budget of the review, as [Practice review operations](./practice-review-operations.mdx) tells.
 
-| Limit | What it counts | Default | Environment variable and property |
-| --- | --- | --- | --- |
-| Direct model token limit | Input tokens, cached ones included, and output tokens of all direct calls, chat calls included | 200 000 | `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT`, `hephaestus.practice-review.direct-model-tokens-per-attempt` |
-| Direct model search unit limit | The search units that direct reranking calls billed | 1 000 | `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT`, `hephaestus.practice-review.direct-model-search-units-per-attempt` |
+| Limit                          | What it counts                                                                                 | Default | Environment variable and property                                                                                           |
+| ------------------------------ | ---------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Direct model token limit       | Input tokens, cached ones included, and output tokens of all direct calls, chat calls included | 200 000 | `PRACTICE_REVIEW_DIRECT_MODEL_TOKENS_PER_ATTEMPT`, `hephaestus.practice-review.direct-model-tokens-per-attempt`             |
+| Direct model search unit limit | The search units that direct reranking calls billed                                            | 1 000   | `PRACTICE_REVIEW_DIRECT_MODEL_SEARCH_UNITS_PER_ATTEMPT`, `hephaestus.practice-review.direct-model-search-units-per-attempt` |
 
 Only an operator can change them.
 Some reranking providers, such as Cohere, bill a call in search units and report no tokens.
@@ -801,7 +802,7 @@ A caller with a leaked job token can send more, and only the rate limit of the s
 
 Each call from a practice script names the practice whose script makes it.
 The proxy refuses a call without a practice with HTTP 400.
-The [workspace ABI](/contributor/agent/agent-workspace-abi#models-for-practice-scripts) gives the header, and [Practice review operations](./practice-review-operations.mdx#practice-script-metrics) gives the metric that counts these refusals.
+The [workspace ABI](/contributor/agent/agent-workspace-abi#practice-script-validation-and-limits) gives the header, and [Practice review operations](./practice-review-operations.mdx#practice-script-metrics) gives the metric that counts these refusals.
 
 ### Usage by practice
 
@@ -857,15 +858,15 @@ To see the practices of one workspace, open its details.
 
 The table has one row for each practice:
 
-| Column | What it shows |
-| --- | --- |
-| **Practice** | The practice. A practice that the workspace no longer has shows its identifier and **Not a current practice**. |
-| **Models** | The models for practice scripts that its script called: decision, embedding, or reranking. Each kind has its own icon. |
-| **Shared models**: **Spend**, **Avg per review** | Its share of the cost on the instance catalog's models, and that cost divided by its reviews. |
-| **Own provider**: **Spend**, **Avg per review** | Its share of the cost on the workspace's own provider, and that cost divided by its reviews. |
-| **Reviews** | The reviews whose scripts called its models. |
-| **No price set** | The reviews with a usage row without a price that it had a share in. |
-| **Input tokens**, **Output tokens**, **Calls** | Its own counts from the proxy. |
+| Column                                           | What it shows                                                                                                          |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| **Practice**                                     | The practice. A practice that the workspace no longer has shows its identifier and **Not a current practice**.         |
+| **Models**                                       | The models for practice scripts that its script called: decision, embedding, or reranking. Each kind has its own icon. |
+| **Shared models**: **Spend**, **Avg per review** | Its share of the cost on the instance catalog's models, and that cost divided by its reviews.                          |
+| **Own provider**: **Spend**, **Avg per review**  | Its share of the cost on the workspace's own provider, and that cost divided by its reviews.                           |
+| **Reviews**                                      | The reviews whose scripts called its models.                                                                           |
+| **No price set**                                 | The reviews with a usage row without a price that it had a share in.                                                   |
+| **Input tokens**, **Output tokens**, **Calls**   | Its own counts from the proxy.                                                                                         |
 
 The rows show the highest spend first.
 Select the heading of any column except **Models** to sort by that column.

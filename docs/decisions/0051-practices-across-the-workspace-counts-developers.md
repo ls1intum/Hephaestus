@@ -83,7 +83,7 @@ The same rules apply whether the reader is in the count or not, so every reader 
 - The tiles show the number of developers with a standing in the window, also when it is small.
 
 The amendment changes no rule about who and what is counted.
-Hidden members, hidden repositories, and invalidated observations stay out of every count.
+Hidden members, hidden repositories, and results marked incorrect stay out of every count.
 **No AI** stops new reviews about a developer. A standing from earlier reviews still counts.
 
 ### What the page shows of the reader
@@ -108,10 +108,10 @@ The TUM/AET data-protection coordinator confirms it in the full DPIA.
 The reasons:
 
 - With K = 3, most bars in a real workspace stayed held back until many developers had a review. The page then showed almost nothing.
-- The page shows only a coarse standing per practice group and practice, as counts. It shows no feedback text, no observations, and no work content.
+- The page shows only a coarse standing per practice group and practice, as counts. It shows no feedback text, no results, and no work content.
 - The workspace is closed. Its members already see the pull requests that the standing comes from.
 - A standing is not a grade, and a person still assesses the work. Thus, the page makes no automated decision under Art. 22 GDPR.
-- Tutors, as workspace admins, already see individual observations. Thus, the extra exposure is only towards peers.
+- Tutors, as workspace admins, already see individual results. Thus, the extra exposure is only towards peers.
 - The realistic worst case is mild social discomfort.
 - The page says that a standing comes from AI review and can be wrong. The admin docs say that standings must not be used to grade or assess a person.
 
@@ -146,7 +146,7 @@ The page has no smallest count, so it does not guard a count, a difference betwe
 
 ## Open decisions
 
-- **Source use.** The page reads observations of other developers under `PRACTICE_FEEDBACK_DELIVERY`. The maintainer and the controller decide if a count needs its own purpose. See `docs/admin/dsms/artifact-source-governance.md`.
+- **Source use.** The page reads results of other developers under `PRACTICE_FEEDBACK_DELIVERY`. The maintainer and the controller decide if a count needs its own purpose. See `docs/admin/dsms/artifact-source-governance.md`.
 
 ## Revisit trigger
 

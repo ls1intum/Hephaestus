@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.core.oauth;
 
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -33,17 +33,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Application-layer facade for the OAuth callback flow. Owns all repository access so
- * the {@link OAuthCallbackController} stays a thin HTTP adapter — required by the
- * {@code ArchitectureTest.controllersDoNotAccessRepositories} rule and the
- * {@code CodeQualityTest.controllersAreThin} 5-param ceiling.
+ * Application-layer facade for the OAuth callback flow. Owns all repository access so the {@link
+ * OAuthCallbackController} stays a thin HTTP adapter — required by the {@code
+ * ArchitectureTest.controllersDoNotAccessRepositories} rule and the {@code
+ * CodeQualityTest.controllersAreThin} 5-param ceiling.
  *
- * <p>This is intentionally a separate type from {@link ConnectionService}: that one
- * owns the state-machine + audit invariants and has many callers (credential
- * providers, lifecycle webhooks, purge contributor). This service owns the
- * OAuth-finalization-specific orchestration: find-or-create in-flight Connection,
- * stamp the vendor-side instance_key + display_name, persist credentials placeholder,
- * and transition PENDING → ACTIVE.
+ * <p>This is intentionally a separate type from {@link ConnectionService}: that one owns the
+ * state-machine + audit invariants and has many callers (credential providers, lifecycle webhooks,
+ * purge contributor). This service owns the OAuth-finalization-specific orchestration:
+ * find-or-create in-flight Connection, stamp the vendor-side instance_key + display_name, persist
+ * credentials placeholder, and transition PENDING → ACTIVE.
  */
 @Service
 public class OAuthCallbackService {
@@ -51,8 +50,9 @@ public class OAuthCallbackService {
     private static final Logger log = LoggerFactory.getLogger(OAuthCallbackService.class);
 
     /**
-     * The kinds whose instance one workspace holds at a time: the states in which a connection holds it, the unique
-     * index that settles a race the check here cannot, and the words that name it to the person connecting.
+     * The kinds whose instance one workspace holds at a time: the states in which a connection
+     * holds it, the unique index that settles a race the check here cannot, and the words that name
+     * it to the person connecting.
      */
     private record ExclusiveInstance(Set<IntegrationState> holdingStates, String index, String noun, String provider) {}
 
@@ -74,7 +74,7 @@ public class OAuthCallbackService {
     private final ConnectionService connectionService;
     private final WorkspaceRepository workspaceRepository;
     private final CredentialBundleConverter credentialBundleConverter;
-    private final AccountWorkspaceMembershipQuery membershipQuery;
+    private final AccountMembershipQuery membershipQuery;
     private final TransactionTemplate transactionTemplate;
 
     public String workspaceSlug(long workspaceId) {
@@ -89,7 +89,7 @@ public class OAuthCallbackService {
             ConnectionService connectionService,
             WorkspaceRepository workspaceRepository,
             CredentialBundleConverter credentialBundleConverter,
-            AccountWorkspaceMembershipQuery membershipQuery,
+            AccountMembershipQuery membershipQuery,
             PlatformTransactionManager transactionManager) {
         this.connectionRepository = connectionRepository;
         this.connectionService = connectionService;
@@ -100,10 +100,10 @@ public class OAuthCallbackService {
     }
 
     /**
-     * Resolve the Connection row that the in-flight OAuth should bind to. Look up an
-     * existing PENDING row first; fall back to ACTIVE (credential refresh on reconnect);
-     * create a fresh PENDING row only if neither exists. UNINSTALLED rows are
-     * intentionally NOT reused — they're terminal; a new row is correct.
+     * Resolve the Connection row that the in-flight OAuth should bind to. Look up an existing
+     * PENDING row first; fall back to ACTIVE (credential refresh on reconnect); create a fresh
+     * PENDING row only if neither exists. UNINSTALLED rows are intentionally NOT reused — they're
+     * terminal; a new row is correct.
      */
     @Transactional
     public Connection findOrCreatePendingConnection(long workspaceId, IntegrationKind kind) {
@@ -119,17 +119,17 @@ public class OAuthCallbackService {
         }
         Workspace workspace = workspaceRepository
                 .findById(workspaceId)
-                .orElseThrow(
-                        () -> new EntityNotFoundException(
-                                "We could not find that workspace. It may have been deleted. Reload the page to see what is current."));
+                .orElseThrow(() -> new EntityNotFoundException("We could not find that workspace. It may have been"
+                        + " deleted. Reload the page to see what is"
+                        + " current."));
         Connection fresh = new Connection(workspace, kind, /* instanceKey */ null, defaultConfig(kind));
         return connectionRepository.save(fresh);
     }
 
     /**
-     * Finalize a successful OAuth flow: stamp instance_key + display_name, persist the
-     * credential placeholder, and transition PENDING (or ACTIVE on reconnect) → ACTIVE
-     * with an audit row attributed to {@code actorAccountId}.
+     * Finalize a successful OAuth flow: stamp instance_key + display_name, persist the credential
+     * placeholder, and transition PENDING (or ACTIVE on reconnect) → ACTIVE with an audit row
+     * attributed to {@code actorAccountId}.
      *
      * <p>Throws {@link InstanceConnectedElsewhereException} if another workspace holds the Slack
      * team or GitHub App installation, and {@link IllegalStateException} if the transition guard
@@ -146,7 +146,8 @@ public class OAuthCallbackService {
             if (exclusive == null || !DataIntegrityViolationConstraints.hasName(e, exclusive.index())) {
                 throw e;
             }
-            // A concurrent connect of the same instance committed after this one's ownership check passed.
+            // A concurrent connect of the same instance committed after this one's ownership check
+            // passed.
             String conflict = connectedElsewhere(
                             pending.getKind(), pending.getWorkspace().getId(), completed.instanceKey(), actorAccountId)
                     .orElseThrow(() -> e);
@@ -183,8 +184,9 @@ public class OAuthCallbackService {
     }
 
     /**
-     * The row to complete. A kind whose instance one workspace holds refuses an instance another workspace holds, and
-     * reuses this workspace's own row for it rather than colliding with it on {@code (workspace, kind, instance_key)}.
+     * The row to complete. A kind whose instance one workspace holds refuses an instance another
+     * workspace holds, and reuses this workspace's own row for it rather than colliding with it on
+     * {@code (workspace, kind, instance_key)}.
      */
     private Connection resolveCompletionTarget(
             Connection connection, ConnectFinalization.Completed completed, @Nullable Long actorAccountId) {
@@ -207,8 +209,9 @@ public class OAuthCallbackService {
     }
 
     /**
-     * Why {@code instanceKey} cannot be connected to {@code workspaceId}, if another workspace holds it. The holder is
-     * named only to an administrator of it; the log names it for the operator.
+     * Why {@code instanceKey} cannot be connected to {@code workspaceId}, if another workspace
+     * holds it. The holder is named only to an administrator of it; the log names it for the
+     * operator.
      */
     private Optional<String> connectedElsewhere(
             IntegrationKind kind, long workspaceId, String instanceKey, @Nullable Long actorAccountId) {
@@ -224,22 +227,34 @@ public class OAuthCallbackService {
                 .findFirst()
                 .map(owner -> {
                     log.warn(
-                            "Rejected {} connect: instanceKey={} is held by workspace={}, target workspace={}",
+                            "Rejected {} connect: instanceKey={} is held by workspace={}," + " target workspace={}",
                             kind,
                             sanitizeForLog(instanceKey),
                             owner.getId(),
                             workspaceId);
                     return administers(owner.getId(), actorAccountId)
-                            ? "This " + exclusive.noun() + " is already connected to the Hephaestus workspace \""
-                                    + owner.getDisplayName() + "\" (" + owner.getWorkspaceSlug()
-                                    + "). Disconnect " + exclusive.provider() + " there before you connect it here."
-                            : "This " + exclusive.noun() + " is already connected to another Hephaestus workspace."
-                                    + " A workspace admin there must disconnect " + exclusive.provider()
+                            ? "This "
+                                    + exclusive.noun()
+                                    + " is already connected to the Hephaestus workspace \""
+                                    + owner.getDisplayName()
+                                    + "\" ("
+                                    + owner.getWorkspaceSlug()
+                                    + "). Disconnect "
+                                    + exclusive.provider()
+                                    + " there before you connect it here."
+                            : "This "
+                                    + exclusive.noun()
+                                    + " is already connected to another Hephaestus"
+                                    + " workspace. A workspace admin there must disconnect "
+                                    + exclusive.provider()
                                     + " first.";
                 });
     }
 
-    /** The OAuth state's {@code actorAccountId} is the initiating account id; anything else is not an administrator. */
+    /**
+     * The OAuth state's {@code actorAccountId} is the initiating account id; anything else is not
+     * an administrator.
+     */
     private boolean administers(long workspaceId, @Nullable Long actorAccountId) {
         if (actorAccountId == null) {
             return false;
@@ -258,9 +273,9 @@ public class OAuthCallbackService {
     }
 
     /**
-     * Per-kind empty config seed for newly-created PENDING rows. The strategy's
-     * {@code finalizeConnect} may upgrade the config later — we just need a non-null
-     * config so JPA doesn't reject the INSERT.
+     * Per-kind empty config seed for newly-created PENDING rows. The strategy's {@code
+     * finalizeConnect} may upgrade the config later — we just need a non-null config so JPA doesn't
+     * reject the INSERT.
      */
     private static ConnectionConfig defaultConfig(IntegrationKind kind) {
         return switch (kind) {
@@ -294,9 +309,10 @@ public class OAuthCallbackService {
     }
 
     /**
-     * Reauthorizing the Slack team an active or suspended connection already holds refreshes its credential and team
-     * name only: the provider knows nothing of the workspace's retention or streams, so its defaults must not replace
-     * them. An uninstalled row starts over, because disconnecting erased what those settings governed.
+     * Reauthorizing the Slack team an active or suspended connection already holds refreshes its
+     * credential and team name only: the provider knows nothing of the workspace's retention or
+     * streams, so its defaults must not replace them. An uninstalled row starts over, because
+     * disconnecting erased what those settings governed.
      */
     private static ConnectionConfig refreshedConfig(Connection connection, ConnectionConfig vendor) {
         if ((connection.getState() == IntegrationState.ACTIVE || connection.getState() == IntegrationState.SUSPENDED)
@@ -310,7 +326,10 @@ public class OAuthCallbackService {
         return vendor;
     }
 
-    /** A Slack team or GitHub App installation that another workspace holds; the message is safe to show the caller. */
+    /**
+     * A Slack team or GitHub App installation that another workspace holds; the message is safe to
+     * show the caller.
+     */
     static final class InstanceConnectedElsewhereException extends RuntimeException {
 
         private static final long serialVersionUID = 1L;

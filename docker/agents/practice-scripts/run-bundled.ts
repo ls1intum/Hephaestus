@@ -1,6 +1,6 @@
 /**
  * Run one bundled practice program in the test process, with the context `child.ts` gives it and a
- * recording fake `review()`: no model, no session. A test gives the record of the work, the cause, the
+ * recording fake `review()`: no model, no session. A test gives the record of the work, the inputs record, the
  * change, and the files of the checkout and of the context folder. The harness validates the inputs as
  * the host validates them, answers reads as the host answers them, checks each review input and
  * resolves its leads as the host does, and returns what the program asked the review and what it
@@ -10,27 +10,23 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
+import type { DiffFile } from "./kits/scm/types.ts";
 import {
-	KINDS,
-	MOMENTS,
 	parseCandidate,
 	parseReviewOptions,
 	practiceInputsSchema,
 	type Candidate,
-	type Kind,
-	type Moment,
 	type ReviewOptions,
-} from "./lib/contract.ts";
-import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/evidence-reader.ts";
-import { isJsonObject } from "./lib/json.ts";
-import { resolveLeads } from "./lib/leads.ts";
+} from "./lib/core/contract.ts";
+import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/core/evidence-reader.ts";
+import { isJsonObject } from "./lib/core/json.ts";
+import { resolveLeads } from "./lib/core/leads.ts";
 import {
 	isPracticeScriptDefinition,
 	type ModelNeeds,
 	type PracticeScriptDefinition,
-} from "./lib/practice-script.ts";
-import { programContext } from "./lib/program-context.ts";
-import type { DiffFile } from "./lib/types.ts";
+} from "./lib/core/practice-script.ts";
+import { programContext } from "./lib/core/program-context.ts";
 import { stagePracticeScripts } from "./stage.ts";
 
 const SCRIPTS_DIR = path.resolve(
@@ -53,7 +49,7 @@ export function pullRequestRecord(fields: Record<string, unknown> = {}): Record<
 		source_branch: "feature",
 		target_branch: "main",
 		commit_sha: COMMIT,
-		subject_role: "AUTHOR",
+		about_role: "AUTHOR",
 		is_draft: false,
 		is_merged: false,
 		additions: 0,
@@ -89,42 +85,58 @@ export function issueRecord(fields: Record<string, unknown> = {}): Record<string
 	};
 }
 
-/** The practice revision and authored scope that every staged cause names. */
-const BOUND = {
-	practice: { revisionId: 1 },
-	scope: { key: "scm.pull_request:1:AUTHOR", mode: "change", description: "the reviewed change" },
-} as const;
-
-/** The cause file of a review of `kind` that a person requested, in the review state `state`. */
-export function requested(kind: Kind = "scm.pull_request", state: Record<string, string> = {}) {
+/** Frozen v3 inputs for an authored script test. */
+export function requested(kind = "scm.pull_request", state: Record<string, string> = {}) {
 	return {
+		contractVersion: 3,
 		kind,
-		subject: { role: "AUTHOR" },
-		...BOUND,
-		cause: { type: "requested", origin: "MANUAL", state, admittedAt: ADMITTED_AT },
+		item: kind === "scm.issue" ? issueRecord() : pullRequestRecord(),
+		about: { role: "AUTHOR", developerId: "1" },
+		practice: {
+			id: "1",
+			versionId: "1",
+			reviewDigest: "v6:test",
+			slug: "fixture",
+			criteria: "Review the captured work.",
+		},
+		scope: { kind: "ITEM", item: { id: "1", kind }, version: COMMIT },
+		review: {
+			id: "11111111-1111-4111-8111-111111111111",
+			origin: "REQUEST",
+			startedAt: ADMITTED_AT,
+			...(Object.keys(state).length === 0 ? {} : { event: { name: `${kind}.updated`, state } }),
+		},
+		previous: null,
 	};
 }
-
-/** The cause file of a review at `signal`, to which the practice is bound. */
-export function moment(signal: Moment, type: "moment" | "recheck" = "moment") {
-	const kind = KINDS.find((candidate) => MOMENTS[candidate].some((m) => m === signal));
+export function event(name: string, origin: "EVENT" | "REQUEST" = "EVENT") {
+	const kind = name.split(".").slice(0, 2).join(".");
+	const inputs = requested(kind);
+	return { ...inputs, review: { ...inputs.review, origin, event: { name, state: {} } } };
+}
+export function scan(filePath: string) {
+	const inputs = requested("scm.file");
 	return {
-		kind,
-		subject: { role: "AUTHOR" },
-		...BOUND,
-		cause: { type, signal, origin: "LIVE", state: {}, admittedAt: ADMITTED_AT },
+		...inputs,
+		item: { repositoryId: "1", providerId: "1", path: filePath, blobId: COMMIT, commitId: COMMIT },
+		about: null,
+		scope: {
+			kind: "SCAN",
+			item: { id: "2", kind: "scm.file", parentId: "1", path: filePath },
+			version: `scm.file:v1:${COMMIT}:${"b".repeat(64)}`,
+		},
 	};
 }
 
 /** The result the fake review returns: an open question about the cited change, with host coverage. */
 export const REVIEWED: Candidate = {
-	outcome: "UNDETERMINED",
+	outcome: "COULD_NOT_DETERMINE",
 	summary: "The fake review leaves the practice open",
 	explanation: "The test harness answers every review with this result.",
 	citations: [
 		{
 			sourceKind: "scm.pull-request.core",
-			artifactPath: "context/metadata.json",
+			sourcePath: "context/metadata.json",
 			path: "context/metadata.json",
 			startLine: 1,
 			endLine: 1,
@@ -132,11 +144,18 @@ export const REVIEWED: Candidate = {
 		},
 	],
 	evidence: {
-		undecidability: [
+		openQuestions: [
 			{ openQuestion: "What would the review decide?", wouldSettleIt: "A review session." },
 		],
 	},
-	coverage: { source: "host", reads: 0, truncatedReads: 0, failedReads: 0, complete: true },
+	coverage: {
+		source: "host",
+		reads: 0,
+		truncatedReads: 0,
+		failedReads: 0,
+		receipts: [],
+		complete: true,
+	},
 };
 
 /** Files by their path in a folder: a string is the text of the file, and any other value is JSON. */
@@ -144,12 +163,12 @@ export type Files = Record<string, unknown>;
 
 export interface RunInputs {
 	/**
-	 * The record of the work, which the program reads as `ctx.work`. For a pull request or an issue,
+	 * The record of the work, which the program reads as `ctx.item`. For a pull request or an issue,
 	 * these fields go over a record that holds every required field.
 	 */
-	work?: Record<string, unknown>;
-	/** The cause file: `kind`, `subject`, `practice`, `scope` and `cause`. The default is a requested pull request review. */
-	cause?: unknown;
+	item?: Record<string, unknown>;
+	/** The inputs record file: `kind`, `subject`, `practice`, `scope` and `inputs record`. The default is a requested pull request review. */
+	inputs?: unknown;
 	previous?: unknown;
 	/** The checkout: a folder, or the files of a new one. The default is an empty checkout. */
 	repo?: string | Files;
@@ -194,11 +213,11 @@ async function folder(root: string, name: string, given: string | Files | undefi
 }
 
 /** The record of the work: `work` over the full record of a pull request or an issue. */
-function recordOf(kind: unknown, work: Record<string, unknown> | undefined): unknown {
+function recordOf(kind: unknown, item: Record<string, unknown> | undefined): unknown {
 	if (kind === "scm.issue") {
-		return issueRecord(work);
+		return issueRecord(item);
 	}
-	return kind === "scm.pull_request" ? pullRequestRecord(work) : work;
+	return kind === "scm.pull_request" ? pullRequestRecord(item) : item;
 }
 
 /** Stage the bundled program beside a `lib` link, as the server stages it, and import it. */
@@ -251,26 +270,48 @@ export async function leadKeys(slug: string): Promise<(label: string) => string>
  * Run the bundled program `slug` on validated inputs with the fake review, and return each review it
  * asked for and what it returned or threw.
  */
+/** Assemble the complete pinned fixture, including unchanged hunk context. */
+function fixtureSource(change: DiffFile): string {
+	const captured = new Map(change.addedLines);
+	for (const hunk of change.hunks) {
+		let line = hunk.newStart;
+		for (const text of hunk.lines) {
+			if (text.startsWith(" ") || text.startsWith("+")) {
+				captured.set(line, text.slice(1));
+				line += 1;
+			}
+		}
+	}
+	const last = Math.max(0, ...captured.keys());
+	return Array.from({ length: last }, (_, i) => captured.get(i + 1) ?? "").join("\n");
+}
+
 export async function runBundledProgram(slug: string, inputs: RunInputs = {}): Promise<BundledRun> {
 	const { definition, root } = await load(slug);
 	try {
-		const cause = inputs.cause ?? requested();
-		if (!isJsonObject(cause)) {
-			throw new TypeError("the cause must be an object");
+		const staged = inputs.inputs ?? requested();
+		if (!isJsonObject(staged)) {
+			throw new TypeError("the inputs must be an object");
 		}
 		const parsed = practiceInputsSchema.parse({
-			...cause,
-			previous: inputs.previous ?? null,
-			work: recordOf(cause.kind, inputs.work),
+			...staged,
+			previous: inputs.previous ?? staged.previous ?? null,
+			item: inputs.item === undefined ? staged.item : recordOf(staged.kind, inputs.item),
 		});
-		const repo = await folder(root, "repo", inputs.repo);
+		const testFiles: Files = {};
+		if (inputs.repo === undefined && inputs.change !== null) {
+			for (const [filePath, change] of inputs.change ?? []) {
+				testFiles[filePath] = fixtureSource(change);
+			}
+		}
+		const repo = await folder(root, "repo", inputs.repo ?? testFiles);
 		const contextDir =
 			inputs.context === undefined ? null : await folder(root, "context", inputs.context);
 		const change = inputs.change === undefined ? new Map<string, DiffFile>() : inputs.change;
 		const sources: EvidenceSources = {
 			repo,
 			headRevision: COMMIT,
-			treeArtifact: "repos/reviewed/.git/HEAD",
+			treeSourceFile: "repos/reviewed/.git/HEAD",
 			contextDir,
 			contextReference: inputs.contextReference ?? "",
 			change: change === null ? null : { base: "b".repeat(40), head: COMMIT, files: change },
@@ -285,7 +326,7 @@ export async function runBundledProgram(slug: string, inputs: RunInputs = {}): P
 				inputs: parsed,
 				criteria: "",
 				files:
-					parsed.kind === "scm.pull_request"
+					parsed.kind === "scm.pull_request" || parsed.kind === "scm.file"
 						? {
 								head: { revision: COMMIT },
 								change:

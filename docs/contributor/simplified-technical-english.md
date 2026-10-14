@@ -285,7 +285,7 @@ Keep such sentences short. A green gate is not proof of full STE compliance.
 
 [Vale](https://vale.sh/) checks Markdown and MDX with a repository-owned style.
 The house oxlint rule `ui-text-voice` checks literal UI text in `webapp/src` and `extension/src`.
-Both read `.vale/words.json` and the product vocabulary.
+Both use `.vale/words.json` and the technical names from the two glossary owners.
 The [tool source record](https://github.com/hephaestus-build/Hephaestus/blob/main/.vale/README.md) gives the license, pins, and commands.
 
 Vale reports these errors in all docs:

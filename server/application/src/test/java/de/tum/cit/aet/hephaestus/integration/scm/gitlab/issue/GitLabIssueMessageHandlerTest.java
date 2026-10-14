@@ -9,7 +9,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
@@ -92,7 +92,8 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
         @Test
         void updateAction_routesToProcessUpdated() throws IOException {
             // GitLab has no native "labeled" action — a label add arrives as action=update with a
-            // changes.labels diff. UPDATE therefore routes to processUpdated (which derives the added
+            // changes.labels diff. UPDATE therefore routes to processUpdated (which derives the
+            // added
             // labels and publishes IssueLabeled), not the plain process() path.
             GitLabIssueEventDTO event = createEvent("update", "closed", false);
             setupRepository();
@@ -143,8 +144,10 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
         @Test
         void nullAction_skipsProcessing() throws IOException {
-            // A genuinely malformed payload omits object_attributes.action entirely (null), not a bogus
-            // string. actionType() guards null → UNKNOWN → the default/skip branch, so no processor runs.
+            // A genuinely malformed payload omits object_attributes.action entirely (null), not a
+            // bogus
+            // string. actionType() guards null → UNKNOWN → the default/skip branch, so no processor
+            // runs.
             var attrs = new GitLabIssueEventDTO.ObjectAttributes(
                     422296L,
                     5,
@@ -187,7 +190,8 @@ class GitLabIssueMessageHandlerTest extends BaseUnitTest {
 
         @Test
         void confidentialIssue_purgesSnapshotInsteadOfProcessing() throws IOException {
-            // A public → confidential flip must NOT (re)ingest, but MUST purge any already-mirrored public
+            // A public → confidential flip must NOT (re)ingest, but MUST purge any already-mirrored
+            // public
             // snapshot — so the handler resolves the context (to know the repo) and delegates to
             // purgeConfidential rather than short-circuiting before context resolution.
             GitLabIssueEventDTO event = createEvent("update", "opened", true);

@@ -20,14 +20,14 @@ record PracticeReviewSnapshot(
         @Nullable WorkspaceReviewScope reviewScope,
         String deliveryStatus,
         long revision,
-        @Nullable String defaultAutonomy,
+        @Nullable String defaultFeedbackMode,
         Map<String, List<String>> generatedPaths)
         implements ConfigAuditSnapshot {
     boolean sameRolloutPolicyAs(PracticeReviewSnapshot other) {
         return (Objects.equals(deliverToMerged, other.deliverToMerged)
                 && Objects.equals(reviewScope, other.reviewScope)
                 && Objects.equals(deliveryStatus, other.deliveryStatus)
-                && Objects.equals(defaultAutonomy, other.defaultAutonomy)
+                && Objects.equals(defaultFeedbackMode, other.defaultFeedbackMode)
                 && Objects.equals(generatedPaths, other.generatedPaths));
     }
 
@@ -39,7 +39,7 @@ record PracticeReviewSnapshot(
                 scope,
                 s.getDeliveryStatus().name(),
                 s.getRolloutRevision(),
-                s.getDefaultAutonomy(),
+                s.getDefaultFeedbackMode(),
                 generatedPaths);
     }
 }

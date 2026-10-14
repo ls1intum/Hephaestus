@@ -1,40 +1,31 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+import de.tum.cit.aet.hephaestus.practices.ClosedPracticeInput;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.PositiveOrZero;
-import jakarta.validation.constraints.Size;
+import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "Request to update an existing practice group (PATCH — only non-null fields applied)")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record UpdatePracticeGroupRequestDTO(
-        @Size(min = 3, max = 128, message = "Name must be between 3 and 128 characters")
-        @Pattern(regexp = ".*\\S.*", message = "Name must not be blank")
-        @Schema(description = "Human-readable name")
-        @Nullable
-        String name,
+        @JsonProperty(required = true) String name,
 
-        @Size(max = 5000, message = "Description must be at most 5000 characters")
-        @Schema(description = "What this group develops")
-        @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @JsonProperty(required = true) @Nullable
         String description,
 
-        @PositiveOrZero(message = "Display order must be zero or positive")
-        @Schema(description = "Sort order within the workspace")
-        @Nullable
-        Integer displayOrder,
-
-        @Schema(description = "Whether this group is shown in practice dashboards") @Nullable
-        Boolean visibleInPracticeDashboards,
-
-        @Size(max = 64, message = "Icon must be at most 64 characters")
-        @Pattern(regexp = "^[A-Za-z0-9]+$", message = "Icon must be a lucide icon name (letters and digits only)")
-        @Schema(description = "Optional lucide icon name giving the group a glanceable identity")
-        @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @JsonProperty(required = true) @Nullable
         String icon,
 
-        @Size(max = 32, message = "Color must be at most 32 characters")
-        @Pattern(regexp = "^[a-z]+$", message = "Color must be a lowercase palette key")
-        @Schema(description = "Optional palette colour key for the group's chip")
-        @Nullable
-        String color) {}
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @JsonProperty(required = true) @Nullable
+        String color,
+
+        @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL)
+        boolean shownToDevelopers)
+        implements ClosedPracticeInput {
+    public UpdatePracticeGroupRequestDTO {
+        Objects.requireNonNull(name);
+    }
+}

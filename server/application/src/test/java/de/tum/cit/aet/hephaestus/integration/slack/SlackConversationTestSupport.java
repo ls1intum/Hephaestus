@@ -1,50 +1,40 @@
 package de.tum.cit.aet.hephaestus.integration.slack;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasis;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
+import de.tum.cit.aet.hephaestus.practices.review.model.Review;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Shared raw-JDBC seed helpers for the Slack conversation SPI integration tests
- * ({@code SlackConversationProjectorIntegrationTest}, {@code ConversationThreadTriggerIntegrationTest}).
- *
- * <p>Two things are single-sourced here:
- *
- * <ul>
- *   <li>{@link #ensureUnmappedSlackThreadColumns()} — idempotent {@code IF NOT EXISTS} DDL for the
- *       {@code participant_member_ids bigint[]} + GIN index and {@code last_reviewed_ts VARCHAR(32)} column,
- *       so the two SPI ITs cannot drift from each other on this DDL. That the shape actually matches the
- *       production Liquibase migration is proven independently by
- *       {@code SlackConversationSchemaContractIntegrationTest} against the real schema.</li>
- *   <li>{@link #seedChannel}/{@link #seedThread}/{@link #seedMessage} — the raw {@code INSERT}s the projector and
- *       trigger scans read over. Superset signatures so both callers share one SQL string per table.</li>
- * </ul>
- *
- * <p>The seed helpers are also reused by the real-Liquibase {@code SlackConversationSchemaContractIntegrationTest}
- * (where {@link #ensureUnmappedSlackThreadColumns()} is deliberately NOT called — those columns already exist as the
- * real migrated types).
- */
+/** Workspace-scoped Slack source and product review fixtures. */
 public final class SlackConversationTestSupport {
 
     private final JdbcTemplate jdbc;
@@ -53,23 +43,11 @@ public final class SlackConversationTestSupport {
         this.jdbc = jdbc;
     }
 
-    /**
-     * Idempotently add the raw-JDBC-only {@code slack_thread} columns to the entity-derived test schema, mirroring
-     * the production Liquibase migration. No-op on the real Liquibase schema (the columns already exist).
-     */
-    public void ensureUnmappedSlackThreadColumns() {
-        jdbc.execute(
-                "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'");
-        jdbc.execute("ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS last_reviewed_ts VARCHAR(32)");
-        jdbc.execute(
-                "CREATE INDEX IF NOT EXISTS idx_slack_thread_participants ON slack_thread USING GIN (participant_member_ids)");
-    }
-
     /** Seed one monitored channel with an explicit consent state. */
     public void seedChannel(long workspaceId, String channelId, String consentState) {
         jdbc.update(
-                "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, channel_name, consent_state, created_at) "
-                        + "VALUES (?, 'T1', ?, 'engineering', ?, now())",
+                "INSERT INTO slack_monitored_channel (workspace_id, slack_team_id, slack_channel_id, channel_name,"
+                        + " consent_state, created_at) VALUES (?, 'T1', ?, 'engineering', ?, now())",
                 workspaceId,
                 channelId,
                 consentState);
@@ -88,8 +66,9 @@ public final class SlackConversationTestSupport {
             int messageCount,
             String participantArrayLiteral) {
         jdbc.update(
-                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, CAST(? AS bigint[]), now())",
+                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts,"
+                        + " message_count, participant_account_ids, created_at) VALUES (?, ?, ?, ?, ?, ?, CAST(? AS"
+                        + " bigint[]), now())",
                 workspaceId,
                 channelId,
                 threadTs,
@@ -102,8 +81,8 @@ public final class SlackConversationTestSupport {
     /** Seed one non-tombstoned message (author {@code U1}). */
     public void seedMessage(long workspaceId, String channelId, String ts, @Nullable String threadTs, String text) {
         jdbc.update(
-                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, author_slack_user_id, text, ingested_at) "
-                        + "VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts,"
+                        + " author_slack_user_id, text, ingested_at) VALUES (?, 'T1', ?, ?, ?, 'U1', ?, now())",
                 workspaceId,
                 channelId,
                 ts,
@@ -113,94 +92,122 @@ public final class SlackConversationTestSupport {
 
     private static final ObjectMapper OM = new ObjectMapper();
 
-    /** Result of {@link #seedBoundConversation}: the ids of the two rows it inserted, for later erasure assertions. */
-    public record BoundConversation(UUID practiceResultId, UUID feedbackId) {}
+    public record BoundConversation(UUID resultId, UUID feedbackId) {}
 
-    /**
-     * Saves a CONVERSATION-channel {@link Practice} + {@link AgentJob} owned by the given workspace. Shared by the
-     * consent-lifecycle E2E, opt-out erasure, and channel-admin controller integration tests, which each seed exactly
-     * this fixture pair before deriving result/feedback rows from it.
-     */
-    public static AgentJob newConversationReviewJob(AgentJobRepository agentJobRepository, Workspace workspace) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(job);
+    public static Practice newPractice(PracticeVersionService versions, Workspace workspace, String slugPrefix) {
+        PracticeDefinition definition = OM.treeToValue(OM.readTree("""
+            {"name":"Test practice","reviewOn":{"events":["chat.thread.settled"],"state":{}},
+             "appliesWhen":null,"about":"AUTHOR","reads":{"contract":"2.0.0","sources":[{"source":"slack.conversation.thread","need":"REQUIRED"}]},
+             "reviewedBy":{"by":"HEPHAESTUS","humanReason":null,"limits":[]},"criteria":"Give a clear answer.",
+             "script":null,"scan":null,"lineNotes":false,"guidance":{"whyItMatters":null,"whatGoodLooksLike":null,"goingWell":null,"visual":null,"guide":null}}
+            """), PracticeDefinition.class);
+        return versions.create(
+                workspace, slugPrefix + "-" + UUID.randomUUID(), ThreadEvents.THREAD, definition, null, 0, null);
     }
 
-    /** Saves a minimal {@link Practice} owned by the given workspace, slugged so repeated calls do not collide. */
-    public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
-        Practice practice = new Practice();
-        practice.setSignals(PracticeTestEvidence.signals(ArtifactKinds.CONVERSATION_THREAD));
-        practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.CONVERSATION_THREAD));
-        practice.setReviewWhen(Map.of());
-        practice.setSubject(ActorRole.AUTHOR);
-        practice.setPrecondition(null);
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
-        practice.setWorkspace(workspace);
-        practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
-        practice.setName("Test Practice");
-        practice.setCriteria("Test description");
-        practice.setSignals(PracticeTestEvidence.signals(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ScmSignals.PULL_REQUEST_OPENED.artifactKind()));
-        practice.setReviewWhen(Map.of());
-        practice.setSubject(ActorRole.AUTHOR);
-        practice.setPrecondition(null);
-        return practiceRepository.save(practice);
-    }
-
-    /**
-     * Inserts a derived chat.conversation_thread {@link de.tum.cit.aet.hephaestus.practices.result.PracticeResult} +
-     * {@link Feedback} pair about {@code aboutUserId}, anchored to {@code threadId} — the shape the Slack consent
-     * erasure paths (person opt-out, channel revoke) must sweep.
-     */
-    public static BoundConversation seedBoundConversation(
-            PracticeResultRepository practiceResultRepository,
-            FeedbackRepository feedbackRepository,
-            FeedbackEvidenceRepository feedbackEvidenceRepository,
+    public static UUID seedResult(
+            ReviewRepository reviews,
+            ReviewPracticeRepository assignments,
+            ReviewItemRepository reviewItems,
+            ItemWriter items,
+            ResultRepository results,
             long workspaceId,
-            UUID jobId,
-            long practiceId,
-            long threadId,
-            long aboutUserId) {
-        UUID practiceResultId = UUID.randomUUID();
-        practiceResultRepository.insertIfAbsent(
-                practiceResultId,
-                "occ-" + practiceResultId,
-                jobId,
-                workspaceId,
-                practiceId,
-                null,
-                ArtifactKinds.CONVERSATION_THREAD.value(),
-                threadId,
-                aboutUserId,
-                "Result title",
-                "MET",
-                "MAJOR",
-                null,
-                null,
-                "test-scope",
-                null,
-                null,
-                null,
-                Instant.now(),
-                "LIVE");
-        Feedback feedback = feedbackRepository.save(Feedback.builder()
-                .agentJobId(jobId)
+            Practice practice,
+            ItemKind kind,
+            long sourceId,
+            long developerId) {
+        var item = items.upsert(new ItemRegistration(workspaceId, kind, sourceId, null, null));
+        Instant at = Instant.now();
+        var review = reviews.saveAndFlush(Review.builder()
+                .id(UUID.randomUUID())
                 .workspaceId(workspaceId)
-                .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                .artifactId(threadId)
-                .recipientUserId(aboutUserId)
-                .aboutUserId(aboutUserId)
-                .channel(FeedbackChannel.IN_CHAT)
-                .position((int) ((threadId * 10 + aboutUserId) % 1000))
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .source(FeedbackSource.AGENT)
+                .itemId(item.itemId())
+                .kind(ReviewKind.ITEM)
+                .itemVersion("test-version")
+                .origin(ReviewOrigin.EVENT)
+                .status(ReviewStatus.COMPLETE)
+                .orderedAt(at)
+                .createdAt(at)
+                .admittedAt(at)
+                .completedAt(at)
+                .build());
+        assignments.saveAndFlush(ReviewPractice.builder()
+                .workspaceId(workspaceId)
+                .reviewId(review.getId())
+                .practiceId(practice.getId())
+                .practiceVersionId(practice.getCurrentVersion().getId())
+                .status(ReviewPracticeStatus.DONE)
+                .itemsListed(1)
+                .listingComplete(true)
+                .build());
+        var assignment = reviewItems.saveAndFlush(ReviewItem.builder()
+                .workspaceId(workspaceId)
+                .reviewId(review.getId())
+                .practiceId(practice.getId())
+                .itemId(item.itemId())
+                .itemVersion("test-version")
+                .state(ReviewItemState.LISTED)
+                .build());
+        var result = results.saveAndFlush(Result.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .reviewId(review.getId())
+                .practiceId(practice.getId())
+                .practiceVersionId(practice.getCurrentVersion().getId())
+                .itemId(item.itemId())
+                .itemVersion("test-version")
+                .developerId(developerId)
+                .outcome(ResultOutcome.MET)
+                .recordedAt(at)
+                .build());
+        assignment.setState(ReviewItemState.JUDGED);
+        assignment.setResultId(result.getId());
+        reviewItems.saveAndFlush(assignment);
+        return result.getId();
+    }
+
+    public static BoundConversation seedBoundConversation(
+            ReviewRepository reviews,
+            ReviewPracticeRepository assignments,
+            ReviewItemRepository reviewItems,
+            ItemWriter items,
+            ResultRepository results,
+            FeedbackRepository feedbacks,
+            FeedbackBasisRepository bases,
+            long workspaceId,
+            Practice practice,
+            long threadId,
+            long developerId) {
+        UUID resultId = seedResult(
+                reviews,
+                assignments,
+                reviewItems,
+                items,
+                results,
+                workspaceId,
+                practice,
+                ThreadEvents.THREAD,
+                threadId,
+                developerId);
+        var result = results.findById(resultId).orElseThrow();
+        var feedback = feedbacks.save(Feedback.builder()
+                .id(UUID.randomUUID())
+                .reviewId(result.getReviewId())
+                .workspaceId(workspaceId)
+                .itemId(result.getItemId())
+                .developerId(developerId)
+                .destination(FeedbackDestination.CONVERSATION)
+                .state(FeedbackState.READY)
                 .createdAt(Instant.now())
                 .build());
-        feedbackEvidenceRepository.insertIfAbsent(
-                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
-        return new BoundConversation(practiceResultId, feedback.getId());
+        bases.save(FeedbackBasis.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(workspaceId)
+                .feedbackId(feedback.getId())
+                .resultId(resultId)
+                .developerId(developerId)
+                .ordinal(0)
+                .build());
+        return new BoundConversation(resultId, feedback.getId());
     }
 }

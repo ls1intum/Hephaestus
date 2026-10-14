@@ -143,7 +143,7 @@ Thus, the operator stops every runtime role and active attempt, makes a verified
 Rollback after the contraction is a restore of that backup with the previous release, never an old binary on the new schema.
 
 The release ships a `.migration` fragment that gives these steps to the operator.
-[Practice result transition before 1.0](#practice-result-transition-before-10) is the approved instance.
+[Practice model cutover before 1.0](#practice-model-cutover-before-10) is the approved instance.
 
 CI enforces 1 and 2 mechanically (see below). 3 is a review responsibility. The sole archival
 transition is the verified v0.77.4 baseline: archived files remain byte-identical and test-only.
@@ -229,55 +229,54 @@ The baseline integration suite proves these properties in both `dev` and `prod`:
 
 - [Liquibase documentation](https://docs.liquibase.com/) for change set syntax.
 
-## Observation outcome transition before 1.0
+## Practice model cutover before 1.0
 
-The cutover stores one explicit outcome: `MET`, `NOT_MET`, `NOT_APPLICABLE` or `UNDETERMINED`.
-Severity is required only for `NOT_MET`. The forward migration maps the previous behavior-level
-outcomes for archival integrity and refuses inconsistent historical rows rather than inventing
-certainty or severity. It does not reassess old evidence against the complete practice standard.
+The maintainer approved one single-release contraction for the entire practice model.
+Released changelogs remain immutable.
+This branch's one changelog transforms the complete released schema directly to the final model.
+It creates no intermediate result or problem schema.
 
-Historical revision fingerprints remain unchanged. Earlier fingerprint schemes and missing fingerprints are `UNVERIFIABLE` under the current standard.
-These results remain available in authorized history, but do not count as current evidence. A review-run summary counts their met or
-not-met verdict as undecided. A new review receives a new immutable revision under the current
-fingerprint scheme. Old results retain their original revision.
+The atomic cutover preserves retained verdict IDs, practice versions, accounts and feedback relationships.
+Separate cards retain their original bodies, responses and identifiers.
+Provider write keys and receipts remain exact. Migrated delivery is never posted again.
+Historical unknown visibility stays Unconfirmed.
+Unknown proof stays historical evidence version 0 and cannot enter strict new admission or reuse.
 
-The migration keeps criteria as written before cutover, including instructions for the presence and assessment matrix.
-This applies to installed bundled workspace copies, instance overrides of bundled practices, and custom definitions.
-Keep automated reviews paused until every active definition states its positive standard under the new outcome contract.
-Update instance overrides first.
-Then update workspace copies through audited catalog releases and custom practices in the editor.
+The database recomputes derived practice digests from each recorded definition.
+Missing historical fields remain missing.
+A digest change does not prove that an earlier positive measurement met the complete standard.
+New active contracts arrive through appended practice versions.
 
-Before upgrading, make and verify a database backup. Upgrade the server, sandbox runtime, webapp
-and custom API consumers together. The migration removes the old assessment axes and nested
-practice bindings. There are no compatibility readers. Consumers must use the explicit `outcome`
-and the flat practice definition. Restore the verified backup to undo the destructive cutover.
+Membership uses accounts. Roster sync can create unclaimed human accounts, but never bot accounts.
+Account absorption preserves verified identities, existing authority, scope selections and restrictive delivery choices.
+Current-result ranking preserves the newest claim, including marked claims.
+Marks affect eligibility and open counts, not the result's end time.
 
-Preserve schema versions on exported evaluation data. Frozen historical reports must not be silently
-reinterpreted as assessments of the current standard.
+The new runtime cannot resume earlier contract jobs.
+The migration cancels retained queued or running work with CONTRACT_CHANGED and keeps its proof and write receipts.
+Already-terminal execution stays recorded as it occurred.
+Fresh reviews use current versions and new review identities.
 
-## Practice result transition before 1.0
+## Prove the released-state upgrade
 
-The maintainer approved this change as a single-release contraction under the pre-1.0 exception to rule 3.
-The branch changelog appends the change sets, and no released changeset changes.
-The [product vocabulary](./practice-feedback-language.md) owns the meaning of a result and an observation.
+Seed the schema at the complete released changelog tail before the branch changelog.
+Use realistic results, unclaimed people, disabled identities, separate cards and uncertain provider writes.
+Run Liquibase, without Hibernate creating the final schema.
+Assert preserved IDs, tenant relationships, exact receipts, actor redaction and current-claim order.
+Check native constraints, partial indexes and source-person erasure.
+Fresh and upgraded databases must have the same final schema.
 
-The migration does these steps in one release:
+The drift gate alone cannot prove data migration or native database behavior.
+The generated ERD must come from the final migrated schema.
 
-1. It renames `observation` to `practice_result`, `observation_invalidation` to `practice_result_invalidation`, and `feedback_observation` to `feedback_evidence`.
-   Every row keeps its ID, so an old observation ID is now a result ID.
-2. It adds `scope_key`, `example`, `coverage` and `provenance` to `practice_result`.
-   It fills `scope_key` from the recorded job attribution.
-   It leaves `example`, `coverage` and `provenance` empty on old rows, because nothing recorded them.
-3. It turns a legacy open-question object into a list of one open question.
-4. It creates `practice_observation` and writes one observation for each legacy `NOT_MET` result, with a new ID.
-   That observation copies the result's severity, summary, rationale, citations and recurrence key.
-   Its claim basis stays empty, because no proof was recorded.
-5. It gives `feedback_evidence` its own ID, the workspace and an optional observation.
-   Migrated rows name only their result.
+## Upgrade and recovery
 
-Deferred constraint triggers make a `NOT_MET` result have at least one observation, and every other outcome have none.
-They also keep a result at least as severe as its worst observation.
-A database test proves that root IDs stay, that observation IDs are new, and that delivered feedback is not sent again.
+The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the release procedure.
+Drain active work, stop every runtime role and verify a database backup before migration.
+Upgrade all runtime roles, agent image, webapp, browser extension and custom clients together.
+Rollback restores the verified backup with the previous release.
+Old binaries cannot use the migrated database.
 
-The release also renames the result API routes and fields, so the webapp, the browser extension, and custom API clients must upgrade with it.
-The entry "Practice scripts are the review program" in [`MIGRATION.md`](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) gives the operator steps.
+A developer database that applied an earlier push of this unreleased changelog requires `vp run dev:reset`.
+This deletes local database data.
+Released installations use the forward migration and backup procedure, not a reset.

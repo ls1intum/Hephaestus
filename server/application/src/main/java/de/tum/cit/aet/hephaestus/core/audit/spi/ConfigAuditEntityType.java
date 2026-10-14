@@ -3,12 +3,13 @@ package de.tum.cit.aet.hephaestus.core.audit.spi;
 /**
  * The kind of admin-configurable resource a {@code config_audit_event} row describes.
  *
- * <p>Mirrored by the {@code ck_config_audit_event_entity_type} CHECK constraint;
- * {@code ConfigAuditImmutabilityIntegrationTest} reads {@code pg_constraint} on the migrated schema and
+ * <p>Mirrored by the {@code ck_config_audit_event_entity_type} CHECK constraint; {@code
+ * ConfigAuditImmutabilityIntegrationTest} reads {@code pg_constraint} on the migrated schema and
  * fails if the two drift. Widening is a changeset that drops and re-adds the constraint.
  *
  * <p>Values marked historical are no longer written but must stay: the table is append-only, so
- * rewriting an old row to the current spelling is the exact mutation the immutability trigger refuses.
+ * rewriting an old row to the current spelling is the exact mutation the immutability trigger
+ * refuses.
  */
 public enum ConfigAuditEntityType {
     PRACTICE_REVIEW_SETTINGS,
@@ -19,9 +20,9 @@ public enum ConfigAuditEntityType {
     /** Historical only — an earlier spelling of {@link #AGENT_BINDING}. */
     AI_CONFIG_BINDING,
     /**
-     * A contributor's role or roster visibility: admin-initiated changes, plus role changes org sync applies
-     * (actor {@code SYSTEM}). Memberships org sync itself creates or removes are excluded as roster churn
-     * that would bury the admin-initiated rows.
+     * A contributor's role or roster visibility: admin-initiated changes, plus role changes org
+     * sync applies (actor {@code SYSTEM}). Memberships org sync itself creates or removes are
+     * excluded as roster churn that would bury the admin-initiated rows.
      */
     WORKSPACE_ROLE,
     ACTIVITY_AUTOMATION,
@@ -50,13 +51,16 @@ public enum ConfigAuditEntityType {
     WORKSPACE_BYO_LLM_BUDGET,
 
     /**
-     * A backfill campaign, which can commit a month's LLM budget in a single request; who authorised it
+     * A review batch, which can commit a month's LLM budget in a single request; who authorised it
      * must be answerable from the record.
      */
-    REVIEW_BACKFILL_RUN,
+    REVIEW_BATCH,
 
-    /** A standing instruction to review recent work on a cadence — authorised once, spends every night. */
-    REVIEW_SWEEP_SCHEDULE,
+    /**
+     * A review schedule: a standing instruction to review recent work on a cadence — authorised
+     * once, spends every night.
+     */
+    REVIEW_SCHEDULE,
 
     WORKSPACE_LLM_CONNECTION,
     /** A model on a workspace's own BYO connection, including its inline price and enablement. */

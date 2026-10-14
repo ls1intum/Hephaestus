@@ -1,23 +1,23 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 
 /** Counts every recorded result; abstentions do not change the decided denominator. */
-public record OutcomeVector(int met, int notMet, int notApplicable, int undetermined) {
+public record OutcomeVector(int met, int notMet, int doesNotApply, int couldNotDetermine) {
     static final OutcomeVector EMPTY = new OutcomeVector(0, 0, 0, 0);
 
     public OutcomeVector {
-        if (met < 0 || notMet < 0 || notApplicable < 0 || undetermined < 0) {
-            throw new IllegalArgumentException("Outcome counts must be non-negative");
+        if (met < 0 || notMet < 0 || doesNotApply < 0 || couldNotDetermine < 0) {
+            throw new IllegalArgumentException("ResultOutcome counts must be non-negative");
         }
     }
 
-    public static OutcomeVector of(Outcome outcome) {
+    public static OutcomeVector of(ResultOutcome outcome) {
         return switch (outcome) {
             case MET -> new OutcomeVector(1, 0, 0, 0);
             case NOT_MET -> new OutcomeVector(0, 1, 0, 0);
-            case NOT_APPLICABLE -> new OutcomeVector(0, 0, 1, 0);
-            case UNDETERMINED -> new OutcomeVector(0, 0, 0, 1);
+            case DOES_NOT_APPLY -> new OutcomeVector(0, 0, 1, 0);
+            case COULD_NOT_DETERMINE -> new OutcomeVector(0, 0, 0, 1);
         };
     }
 
@@ -25,8 +25,8 @@ public record OutcomeVector(int met, int notMet, int notApplicable, int undeterm
         return new OutcomeVector(
                 met + other.met,
                 notMet + other.notMet,
-                notApplicable + other.notApplicable,
-                undetermined + other.undetermined);
+                doesNotApply + other.doesNotApply,
+                couldNotDetermine + other.couldNotDetermine);
     }
 
     public int decided() {

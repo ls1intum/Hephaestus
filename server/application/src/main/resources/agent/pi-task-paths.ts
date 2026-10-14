@@ -1,6 +1,6 @@
 import path from "node:path";
 
-export const SUPPORTED_SCHEMA_VERSION = 5;
+export const SUPPORTED_SCHEMA_VERSION = 6;
 
 export function taskPaths(value: unknown) {
 	if (typeof value !== "object" || value === null || Array.isArray(value)) {

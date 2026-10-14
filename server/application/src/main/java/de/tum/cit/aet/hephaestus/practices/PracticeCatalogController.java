@@ -3,46 +3,36 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
-import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
-import de.tum.cit.aet.hephaestus.practices.dto.AutonomyRollupDTO;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.FeedbackModeRollupDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.GroupRefDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGuidanceDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeRevisionDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReviewedPracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.SetFeedbackModeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyRollupService;
+import de.tum.cit.aet.hephaestus.practices.review.feedbackmode.FeedbackModeRollupService;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptSummaries;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptSummaryDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.ArraySchema;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.CacheControl;
-import org.springframework.http.MediaType;
-import org.springframework.http.ProblemDetail;
+import org.springframework.http.ETag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -50,377 +40,185 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @WorkspaceScopedController
 @RequestMapping("/practices")
-@Tag(name = "Practice Catalog", description = "Manage practice definitions")
 @RequiredArgsConstructor
-@Validated
+@ConditionalOnServerRole
 public class PracticeCatalogController {
-
-    private final PracticeService practiceService;
+    private final PracticeService practices;
+    private final PracticeGroupService groups;
+    private final PracticeVersionService versions;
+    private final PracticeReleaseService releases;
     private final CatalogOriginPresenter presenter;
-    private final AutonomyRollupService rollupService;
-    private final PracticeGroupService groupService;
-    private final PracticeDefinitionOptionsService definitionOptionsService;
-    private final PracticeRevisionService practiceRevisionService;
-    private final PracticeScriptSummaries practiceScriptSummaries;
-
-    @GetMapping("/definition-options")
-    @Operation(
-            summary = "Read practice definition options",
-            description =
-                    "Returns available review events, recommended requirements, and allowed evidence sources by work type",
-            operationId = "getPracticeDefinitionOptions")
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeDefinitionOptionsDTO> definitionOptions(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(definitionOptionsService.options());
-    }
+    private final PracticeDefinitionOptionsService options;
+    private final FeedbackModeRollupService modes;
+    private final PracticeScriptSummaries scripts;
 
     @GetMapping
-    @Operation(
-            summary = "List practice definitions",
-            description = "Returns this workspace's practices, each with the autonomy in force for it, "
-                    + "whether that autonomy was set on the practice or inherited from its group or the workspace, and "
-                    + "which level decided it. Optionally narrowed to one autonomy.")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practices returned",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class))))
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<List<PracticeDTO>> listPractices(
-            WorkspaceContext workspaceContext,
-            @RequestParam(name = "autonomy", required = false)
-                    @Parameter(
-                            description =
-                                    "Keep only the practices whose autonomy IN FORCE is exactly this one, inherited or not")
-                    @Nullable
-                    PracticeAutonomy autonomy) {
-        List<PracticeDTO> practices = presenter.presentPractices(
-                workspaceContext.id(), practiceService.listPractices(workspaceContext, autonomy));
-        return ResponseEntity.ok(practices);
-    }
-
-    @GetMapping("/practice-script-needs")
-    @Operation(
-            summary = "List what each practice's script needs",
-            description = "One entry per practice with a practice script: the models the script declared in the "
-                    + "newest review that ran it, and for each model the member tiers that no ready binding serves "
-                    + "today. A script declares its models only when it runs, so a practice whose script no review "
-                    + "ran yet, or whose script changed since, has no needs and no asOf review.")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practice script needs returned",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeScriptSummaryDTO.class))))
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<List<PracticeScriptSummaryDTO>> listPracticeScriptNeeds(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(practiceScriptSummaries.latestCurrent(workspaceContext.id()));
-    }
-
-    @GetMapping("/reviewed")
-    @Operation(
-            summary = "List reviewed practices, developer-facing",
-            description = "Returns the developer-facing name, group, rationale, and example for every practice the "
-                    + "workspace reviews (any autonomy above OFF)")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Developer practices returned",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = ReviewedPracticeDTO.class))))
-    public ResponseEntity<List<ReviewedPracticeDTO>> listReviewedPractices(WorkspaceContext workspaceContext) {
-        List<ReviewedPracticeDTO> practices = practiceService.listReviewedPractices(workspaceContext).stream()
-                .map(ReviewedPracticeDTO::from)
-                .toList();
-        return ResponseEntity.ok(practices);
+    @Operation(operationId = "listPractices")
+    public List<PracticeDTO> list(
+            WorkspaceContext ctx, @RequestParam(required = false) @Nullable FeedbackMode feedbackMode) {
+        return presenter.presentPractices(ctx.id(), practices.listPractices(ctx, feedbackMode));
     }
 
     @GetMapping("/{practiceSlug}")
-    @Operation(summary = "Get a practice definition")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practice returned",
-            content = @Content(schema = @Schema(implementation = PracticeDTO.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<PracticeDTO> getPractice(
-            WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
-        Practice practice = practiceService.getPractice(workspaceContext, practiceSlug);
-        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
-    }
-
-    @GetMapping("/{practiceSlug}/guidance")
-    @Operation(
-            summary = "Read one practice's visual and guide",
-            description = "Returns the visual and the guide that the practice panel shows. Any workspace "
-                    + "member can read them. Carries an ETag, so an unchanged visual and guide answer 304.")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Guidance returned",
-            content = @Content(schema = @Schema(implementation = PracticeGuidanceDTO.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @PreAuthorize("@workspaceSecure.isMember()")
-    public ResponseEntity<PracticeGuidanceDTO> getPracticeGuidance(
-            WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
-        PracticeGuidanceDTO guidance =
-                PracticeGuidanceDTO.from(practiceService.getPractice(workspaceContext, practiceSlug));
-        // Weak: the tag follows the guidance, not the bytes of its JSON (RFC 9110 8.8.1). Spring answers a matching
-        // If-None-Match with 304 and these same headers.
-        return ResponseEntity.ok()
-                .eTag("W/\"" + guidance.entityTag() + "\"")
-                .cacheControl(
-                        UserViewContextHolder.get() == null
-                                ? CacheControl.noCache().cachePrivate()
-                                : CacheControl.noStore())
-                .body(guidance);
-    }
-
-    @GetMapping("/{practiceSlug}/revisions")
-    @Operation(
-            summary = "List the versions of a practice definition",
-            description = "Every stored version, newest first, with the parts of the definition that differ from the"
-                    + " version before it and whether what a review checks changed.",
-            operationId = "listPracticeRevisions")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Versions returned",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeRevisionDTO.class))))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<List<PracticeRevisionDTO>> listPracticeRevisions(
-            WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
-        Practice practice = practiceService.getPractice(workspaceContext, practiceSlug);
-        return ResponseEntity.ok(practiceRevisionService.history(practice));
+    @Operation(operationId = "getPractice")
+    public PracticeDTO get(WorkspaceContext ctx, @PathVariable String practiceSlug) {
+        return presenter.present(ctx.id(), practices.getPractice(ctx, practiceSlug));
     }
 
     @PostMapping
-    @Operation(summary = "Create a new practice definition")
-    @ApiResponse(
-            responseCode = "201",
-            description = "Practice created",
-            content = @Content(schema = @Schema(implementation = PracticeDTO.class)))
-    @ApiResponse(
-            responseCode = "409",
-            description = "Practice slug already exists in this workspace",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice group not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<PracticeDTO> createPractice(
-            WorkspaceContext workspaceContext, @Valid @RequestBody CreatePracticeRequestDTO request) {
-        Practice practice = practiceService.createPractice(workspaceContext, request);
-        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
-                .path("/{slug}")
-                .buildAndExpand(practice.getSlug())
-                .toUri();
-        return ResponseEntity.created(location).body(presenter.present(workspaceContext.id(), practice));
-    }
-
-    @PatchMapping("/reorder")
-    @Operation(
-            summary = "Reorder the practices within a group",
-            description =
-                    "Sets each practice's display order to its index in the provided slug list (one atomic write)")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practices reordered; the full ordered practice list is returned",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class))))
-    @ApiResponse(
-            responseCode = "400",
-            description = "orderedSlugs is empty, has duplicates, or is not the group's complete set",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @RequireAtLeastWorkspaceAdmin
-    @AuditExempt(reason = "catalog order affects presentation, not review execution or delivery")
-    public ResponseEntity<List<PracticeDTO>> reorderPractices(
-            WorkspaceContext workspaceContext, @Valid @RequestBody ReorderPracticesRequestDTO request) {
-        practiceService.reorderPractices(
-                workspaceContext, Objects.requireNonNull(request.groupSlug()), request.orderedSlugs());
-        List<PracticeDTO> practices = presenter.presentPractices(
-                workspaceContext.id(), practiceService.listPractices(workspaceContext, null));
-        return ResponseEntity.ok(practices);
+    @Operation(operationId = "createPractice")
+    public ResponseEntity<PracticeDTO> create(WorkspaceContext ctx, @RequestBody CreatePracticeRequestDTO input) {
+        var created = practices.createPractice(ctx, input);
+        return ResponseEntity.created(URI.create("/api/workspaces/" + ctx.slug() + "/practices/" + created.getSlug()))
+                .body(presenter.present(ctx.id(), created));
     }
 
     @PatchMapping("/{practiceSlug}")
-    @Operation(summary = "Update a practice")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practice updated",
-            content = @Content(schema = @Schema(implementation = PracticeDTO.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice or practice group not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<PracticeDTO> updatePractice(
-            WorkspaceContext workspaceContext,
-            @PathVariable String practiceSlug,
-            @Valid @RequestBody UpdatePracticeRequestDTO request) {
-        Practice practice = practiceService.updatePractice(workspaceContext, practiceSlug, request);
-        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
-    }
-
-    @PatchMapping("/{practiceSlug}/autonomy")
-    @Operation(
-            summary = "Set how much autonomy the system has over one practice",
-            description = "OFF stops the review entirely. HUMAN_APPROVAL runs it and records every result, holds "
-                    + "feedback on the work for an authorized reviewer, and still writes the developer's practice pages "
-                    + "and the mentor, which are read on request. AUTOMATIC sends feedback on the work without asking, as "
-                    + "far as this workspace's reach allows. Send a null autonomy to clear the practice's own setting so "
-                    + "it follows its group, and through the group the workspace default.")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Autonomy updated; the response carries the autonomy now in force and where it came from",
-            content = @Content(schema = @Schema(implementation = PracticeDTO.class)))
-    @ApiResponse(
-            responseCode = "400",
-            description = "The autonomy cannot be selected because this practice's "
-                    + "review settings cannot run an automated review at any autonomy above OFF",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @RequireAtLeastWorkspaceAdmin
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_USAGE")
-    public ResponseEntity<PracticeDTO> setAutonomy(
-            WorkspaceContext workspaceContext,
-            @PathVariable String practiceSlug,
-            @Valid @RequestBody UpdatePracticeAutonomyRequestDTO request) {
-        Practice practice = practiceService.setAutonomy(workspaceContext, practiceSlug, request.autonomy());
-        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
-    }
-
-    @PutMapping("/{practiceSlug}/group")
-    @Operation(
-            summary = "Move a practice",
-            description = "Moves the practice to the requested group, or to Unassigned when groupSlug is null")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practice moved",
-            content = @Content(schema = @Schema(implementation = PracticeDTO.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice or group not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @RequireAtLeastWorkspaceAdmin
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<PracticeDTO> bindGroup(
-            WorkspaceContext workspaceContext,
-            @PathVariable String practiceSlug,
-            @Valid @RequestBody BindPracticeGroupRequestDTO request) {
-        Practice practice = groupService.bindPractice(workspaceContext, practiceSlug, request.groupSlug());
-        return ResponseEntity.ok(presenter.present(workspaceContext.id(), practice));
-    }
-
-    @PutMapping("/{practiceSlug}/placement")
-    @Operation(
-            summary = "Place a practice in the catalog",
-            description =
-                    "Moves the practice and sets its exact position in one atomic write; omit groupSlug for Unassigned")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Practice placed; the full updated practice list is returned",
-            content = @Content(array = @ArraySchema(schema = @Schema(implementation = PracticeDTO.class))))
-    @ApiResponse(
-            responseCode = "400",
-            description = "position is missing, negative, or beyond the destination",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice or group not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
-    @RequireAtLeastWorkspaceAdmin
-    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<List<PracticeDTO>> placePractice(
-            WorkspaceContext workspaceContext,
-            @PathVariable String practiceSlug,
-            @Valid @RequestBody PlacePracticeRequestDTO request) {
-        List<PracticeDTO> practices = presenter.presentPractices(
-                workspaceContext.id(),
-                practiceService.placePractice(workspaceContext, practiceSlug, request.groupSlug(), request.position()));
-        return ResponseEntity.ok(practices);
+    @Operation(operationId = "updatePractice")
+    public PracticeDTO update(
+            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody UpdatePracticeRequestDTO input) {
+        return presenter.present(ctx.id(), practices.updatePractice(ctx, practiceSlug, input));
     }
 
     @DeleteMapping("/{practiceSlug}")
-    @Operation(summary = "Delete a practice definition")
-    @ApiResponse(responseCode = "204", description = "Practice deleted")
-    @ApiResponse(
-            responseCode = "404",
-            description = "Practice not found",
-            content =
-                    @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
-    public ResponseEntity<Void> deletePractice(WorkspaceContext workspaceContext, @PathVariable String practiceSlug) {
-        practiceService.deletePractice(workspaceContext, practiceSlug);
+    @Operation(operationId = "deletePractice")
+    public ResponseEntity<Void> delete(WorkspaceContext ctx, @PathVariable String practiceSlug) {
+        practices.deletePractice(ctx, practiceSlug);
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/autonomy")
-    @Operation(
-            summary = "Summarise how much autonomy this workspace grants, by group",
-            description = "How many practices sit at each autonomy, for the whole workspace and for each "
-                    + "group, plus the workspace default and where feedback may go. The summary a hundred-practice "
-                    + "catalogue is read through — answered here so a client never has to fetch every practice to "
-                    + "count them.")
-    @ApiResponse(
-            responseCode = "200",
-            description = "Rollup returned",
-            content = @Content(schema = @Schema(implementation = AutonomyRollupDTO.class)))
+    @GetMapping("/{practiceSlug}/versions")
     @RequireAtLeastWorkspaceAdmin
-    public ResponseEntity<AutonomyRollupDTO> autonomyRollup(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(rollupService.rollup(workspaceContext.id()));
+    @Operation(operationId = "listPracticeVersions")
+    public List<PracticeVersionDTO> history(WorkspaceContext ctx, @PathVariable String practiceSlug) {
+        return versions.history(practices.getPractice(ctx, practiceSlug));
+    }
+
+    @GetMapping("/definition-options")
+    @RequireAtLeastWorkspaceAdmin
+    @Operation(operationId = "getPracticeDefinitionOptions")
+    public PracticeDefinitionOptionsDTO options(WorkspaceContext ctx) {
+        return options.options(ctx.id());
+    }
+
+    @GetMapping("/practice-script-needs")
+    @RequireAtLeastWorkspaceAdmin
+    @Operation(operationId = "listPracticeScriptNeeds")
+    public List<PracticeScriptSummaryDTO> scriptNeeds(WorkspaceContext ctx) {
+        return scripts.latestCurrent(ctx.id());
+    }
+
+    @GetMapping("/feedback-modes")
+    @RequireAtLeastWorkspaceAdmin
+    @Operation(operationId = "getFeedbackModeRollup")
+    public FeedbackModeRollupDTO modes(WorkspaceContext ctx) {
+        return modes.rollup(ctx.id());
+    }
+
+    @PatchMapping("/{practiceSlug}/feedback-mode")
+    @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_USAGE")
+    @Operation(operationId = "setPracticeFeedbackMode")
+    public PracticeDTO mode(
+            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody SetFeedbackModeRequestDTO input) {
+        return presenter.present(ctx.id(), practices.setFeedbackMode(ctx, practiceSlug, input.feedbackMode()));
+    }
+
+    @PatchMapping("/reorder")
+    @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "Order changes presentation only")
+    @Operation(operationId = "reorderPractices")
+    public List<PracticeDTO> reorder(WorkspaceContext ctx, @RequestBody ReorderPracticesRequestDTO input) {
+        practices.reorderPractices(ctx, input.slugs());
+        return presenter.presentPractices(ctx.id(), practices.listPractices(ctx, null));
+    }
+
+    @PutMapping("/{practiceSlug}/group")
+    @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
+    @Operation(operationId = "bindPracticeGroup")
+    public PracticeDTO bind(
+            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody BindPracticeGroupRequestDTO input) {
+        return presenter.present(ctx.id(), groups.bindPractice(ctx, practiceSlug, input.groupSlug()));
+    }
+
+    @PutMapping("/{practiceSlug}/placement")
+    @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
+    @Operation(operationId = "placePractice")
+    public List<PracticeDTO> place(
+            WorkspaceContext ctx, @PathVariable String practiceSlug, @RequestBody PlacePracticeRequestDTO input) {
+        return presenter.presentPractices(
+                ctx.id(), practices.placePractice(ctx, practiceSlug, input.groupSlug(), input.position()));
+    }
+
+    @DeleteMapping("/{practiceSlug}/catalog-customization")
+    @RequireAtLeastWorkspaceAdmin
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
+    @Operation(operationId = "resetPracticeToCatalog")
+    public PracticeDTO reset(
+            WorkspaceContext ctx,
+            @PathVariable String practiceSlug,
+            @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {
+        return presenter.present(
+                ctx.id(),
+                releases.reset(ctx, practiceSlug, ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch)));
+    }
+
+    @GetMapping("/reviewed")
+    @PreAuthorize("@workspaceSecure.isMember()")
+    @Operation(operationId = "listReviewedPractices")
+    public List<ReviewedPracticeDTO> reviewed(WorkspaceContext ctx) {
+        return practices.listReviewedPractices(ctx).stream()
+                .map(practice -> {
+                    var definition = versions.definitionOf(practice.getCurrentVersion());
+                    var group = practice.getGroup();
+                    return new ReviewedPracticeDTO(
+                            practice.getSlug(),
+                            definition.name(),
+                            group == null
+                                    ? null
+                                    : new GroupRefDTO(
+                                            group.getSlug(), group.getName(), group.getIcon(), group.getColor()),
+                            definition.guidance().whyItMatters(),
+                            definition.guidance().whatGoodLooksLike());
+                })
+                .toList();
+    }
+
+    @GetMapping("/{practiceSlug}/guidance")
+    @PreAuthorize("@workspaceSecure.isMember()")
+    @Operation(operationId = "getPracticeGuidance")
+    public ResponseEntity<PracticeGuidanceDTO> guidance(
+            WorkspaceContext ctx,
+            @PathVariable String practiceSlug,
+            @RequestHeader(name = "If-None-Match", required = false) @Nullable String ifNoneMatch) {
+        var value = versions.definitionOf(
+                        practices.getPractice(ctx, practiceSlug).getCurrentVersion())
+                .guidance();
+        String tag = new CanonicalDigest()
+                .addNullable(value.visual() == null ? null : value.visual().digest())
+                .addNullable(value.guide() == null ? null : value.guide().digest())
+                .hex();
+        if (ifNoneMatch != null
+                && EntityTagPrecondition.parse(ifNoneMatch).candidates().stream()
+                        .anyMatch(
+                                candidate -> candidate.isWildcard() || candidate.compare(new ETag(tag, false), false)))
+            return ResponseEntity.status(304).eTag(tag).build();
+        return ResponseEntity.ok().eTag(tag).body(new PracticeGuidanceDTO(practiceSlug, value.visual(), value.guide()));
     }
 }

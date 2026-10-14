@@ -11,8 +11,8 @@ import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
 import de.tum.cit.aet.hephaestus.testconfig.PiSdkInstallation;
@@ -276,12 +276,16 @@ class PracticeRunnerLiveLlmTest {
             LiveRunnerWorkspace.stageTask(
                     WORKSPACE,
                     "Review merge request #1 in test/fixture against " + PRACTICE + ". Follow "
-                            + SandboxLayout.ORCHESTRATOR_PATH + ".");
+                            + SandboxLayout.ORCHESTRATOR_PATH + ".",
+                    UUID.randomUUID(),
+                    UUID.randomUUID(),
+                    0,
+                    1L);
         } else {
             PracticeCriteriaCaseFixtures.stage(WORKSPACE, scenario);
             if (scenario.path("workType").asString().equals("issue")) kind = "scm.issue";
         }
-        LiveRunnerWorkspace.stagePracticeInputs(WORKSPACE, kind, null);
+        LiveRunnerWorkspace.stageFixtureInputs(WORKSPACE, kind);
         return spec.environment();
     }
 
@@ -436,13 +440,13 @@ class PracticeRunnerLiveLlmTest {
             return answer;
         }
 
-        /** As admission records it: the outcome as sent, which must name an {@link Outcome}. */
+        /** As admission records it: the outcome as sent, which must name an {@link ResultOutcome}. */
         private static String outcomeOf(JsonNode candidate) {
             JsonNode outcome = candidate.path("outcome");
             if (!outcome.isString()) {
                 throw new IllegalArgumentException("An admitted result needs a string outcome");
             }
-            return Outcome.valueOf(outcome.asString()).name();
+            return ResultOutcome.valueOf(outcome.asString()).name();
         }
 
         /** The severity admission stores: the one the candidate states, else its worst problem's; none for others. */

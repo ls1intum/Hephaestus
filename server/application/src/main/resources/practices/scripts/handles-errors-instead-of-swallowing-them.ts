@@ -1,16 +1,17 @@
-// Finds the added code that can discard or swallow an error, in all languages. Each lead is a
-// candidate: the review decides if the error is really lost, with no report, log or recovery. An empty
-// catch body often spans lines, so the patterns run over each block of consecutive added lines of a
-// file, not over one line. To add a language, add a row.
-import { noMatchDirections } from "../lib/bounded-text.ts";
-import { isCommentLine } from "../lib/declarations.ts";
-import { languageOf } from "../lib/languages.ts";
+import { scm } from "../kits/scm/index.ts";
 import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+	occurrences,
+	selectedSources,
+	selectedOccurrences,
+	occurrenceLead,
+	sortOccurrenceLeads,
+} from "../kits/scm/occurrences.ts";
+// Finds the selected code that can discard or swallow an error, in all languages. Each lead is a
+// candidate: the review decides if the error is really lost, with no report, log or recovery. An empty
+// catch body often spans lines, so the patterns run over each block of consecutive selected lines of a
+// file, not over one line. To add a language, add a row.
+import { noMatchDirections } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"try-discards-error": "A Swift `try?` that turns a thrown error into nil.",
@@ -39,7 +40,7 @@ export const LABELS = {
 };
 type ErrorKind = keyof typeof LABELS;
 
-// language key -> [kind, regex] of constructs in ADDED code that discard or swallow an error. The `\s`
+// language key -> [kind, regex] of constructs in selected code that discard or swallow an error. The `\s`
 // in each regex spans the newlines joined into a window, so multi-line empty bodies match.
 const LANG_PATTERNS: Record<string, [ErrorKind, RegExp][]> = {
 	swift: [
@@ -105,70 +106,38 @@ const LANG_PATTERNS: Record<string, [ErrorKind, RegExp][]> = {
 	],
 };
 
-// Group a file's added lines into windows of CONSECUTIVE line numbers so a multi-line construct
-// (e.g. `catch {` then `}`) is one searchable text block without falsely joining distant additions.
-function consecutiveWindows(added: Map<number, string>): { start: number; lines: string[] }[] {
-	const windows: { start: number; lines: string[] }[] = [];
-	// The open window carries its own first and last line number, so "is there a window" and "what does
-	// it end at" are one nullable value rather than length checks against a scratch array.
-	let open: { start: number; end: number; lines: string[] } | null = null;
-	for (const n of [...added.keys()].toSorted((a, b) => a - b)) {
-		if (open !== null && n !== open.end + 1) {
-			windows.push({ start: open.start, lines: open.lines });
-			open = null;
-		}
-		open ??= { start: n, end: n, lines: [] };
-		open.end = n;
-		open.lines.push(added.get(n) ?? "");
-	}
-	if (open !== null) {
-		windows.push({ start: open.start, lines: open.lines });
-	}
-	return windows;
-}
-
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
 		const leads: ReviewLead[] = [];
 		const byLang: Record<string, number> = {};
 		let filesScanned = 0;
-		let linesAdded = 0;
-		for (const [path, df] of requireChange(ctx.files)) {
-			const lang = languageOf(path);
-			if (lang === null) {
-				continue;
-			}
-			const patterns = LANG_PATTERNS[lang];
-			if (!patterns) {
+		let linesSelected = 0;
+		for (const file of await selectedSources(ctx, domain.files)) {
+			const lang = file.language;
+			const patterns = lang === null ? undefined : LANG_PATTERNS[lang];
+			if (lang === null || patterns === undefined) {
 				continue;
 			}
 			filesScanned += 1;
-			linesAdded += df.addedLines.size;
-			for (const w of consecutiveWindows(df.addedLines)) {
-				const text = w.lines.join("\n");
-				for (const [kind, re] of patterns) {
-					const match = text.match(re);
-					if (!match || match.index === undefined) {
-						continue;
-					}
-					const offset = text.slice(0, match.index).split("\n").length - 1;
-					const lineNum = w.start + offset;
-					const lineContent = w.lines[offset] ?? "";
-					if (isCommentLine(lineContent, lang)) {
-						continue;
-					}
-					leads.push({
-						at: { change: path, line: lineNum },
-						label: LABELS[kind],
-						facts: { language: lang },
-					});
-					byLang[lang] = (byLang[lang] ?? 0) + 1;
-					// One lead for each window: the review reads the full diff for the rest.
-					break;
-				}
-			}
+			linesSelected +=
+				ctx.scope.kind === "SCAN"
+					? file.text.split("\n").length
+					: (domain.files?.change?.files.get(file.path)?.addedLines.size ?? 0);
+			const found = selectedOccurrences(
+				ctx,
+				domain.files,
+				occurrences(
+					file,
+					patterns.map(([kind, test]) => ({ label: LABELS[kind], test })),
+				),
+			);
+			leads.push(...found.map(occurrenceLead));
+			byLang[lang] = (byLang[lang] ?? 0) + found.length;
 		}
 		const directions =
 			leads.length > 0
@@ -176,10 +145,10 @@ export default definePracticeScript({
 						`Found ${leads.length} possible error-discard constructs in ${Object.keys(byLang).length} languages. First establish whether each call can fail. For each failure, inspect whether it stays visible.`,
 						"A valid fixed URL has no runtime-dependent parse failure. A later empty-value check does not swallow an error already recorded by its handler.",
 					]
-				: noMatchDirections(linesAdded, filesScanned);
+				: noMatchDirections(linesSelected, filesScanned);
 		return ctx.review({
-			leads: leads.slice(0, 40),
-			facts: { errorSwallowCandidates: leads.length, filesScanned, linesAdded, ...byLang },
+			leads: sortOccurrenceLeads(leads).slice(0, 40),
+			facts: { errorSwallowCandidates: leads.length, filesScanned, linesSelected, ...byLang },
 			directions,
 		});
 	},

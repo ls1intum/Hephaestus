@@ -7,7 +7,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
@@ -74,7 +74,7 @@ class LlmModelResolverTest extends BaseUnitTest {
      */
     @Test
     void shouldResolveEveryCredentialFieldForAnActivePublicInstanceModel() {
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L);
 
         LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(ref);
 
@@ -94,7 +94,7 @@ class LlmModelResolverTest extends BaseUnitTest {
     @Test
     void shouldReportABlankApiKeyAsNoCredentialAtAll() {
         connection.setApiKey("   ");
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L);
 
         LlmModelResolver.ProxyCredential credential = resolver.resolveProxyCredential(ref);
 
@@ -105,7 +105,7 @@ class LlmModelResolverTest extends BaseUnitTest {
     @Test
     void shouldRejectDisabledInstanceModelEvenWhenConnectionIsActive() {
         model.setEnabled(false);
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L);
         assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
@@ -145,7 +145,7 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldReportTheModelsDerivedTierForAConnectionRef() {
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L);
         assertThat(resolver.dataHandlingTier(ref)).contains(DataHandlingTier.UNDECLARED);
         model.setDataHandling(DataHandlingFacts.of(LlmDataOperator.PROVIDER, null));
         assertThat(resolver.dataHandlingTier(ref)).contains(DataHandlingTier.CLOUD);
@@ -166,7 +166,7 @@ class LlmModelResolverTest extends BaseUnitTest {
 
     @Test
     void shouldRejectCatalogSnapshotWithoutModelIdentity() {
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, null, null);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, null, null);
         assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
@@ -174,7 +174,7 @@ class LlmModelResolverTest extends BaseUnitTest {
     void shouldRejectRevokedGrantedInstanceModel() {
         model.setVisibility(ModelVisibility.GRANTED);
         when(grants.existsByIdModelIdAndIdWorkspaceId(20L, 30L)).thenReturn(false);
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L);
         assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 
@@ -191,7 +191,7 @@ class LlmModelResolverTest extends BaseUnitTest {
         workspaceModel.setWorkspace(owner);
         workspaceModel.setConnection(workspaceConnection);
         workspaceModel.setEnabled(true);
-        var ref = new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L);
+        var ref = new LlmModelResolver.ConnectionRef(UsageFundingSource.WORKSPACE, 11L, 21L, 30L);
         assertThat(resolver.resolveProxyCredential(ref)).isNull();
     }
 

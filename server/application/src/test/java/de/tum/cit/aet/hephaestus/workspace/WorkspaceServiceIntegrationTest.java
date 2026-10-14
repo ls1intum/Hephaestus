@@ -44,10 +44,12 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 kind == AccountKind.USER ? AccountType.USER : AccountType.ORG,
                 formerAccount);
         if (kind == AccountKind.ORGANIZATION) {
-            existing.setOrganization(organizationService.upsertIdentity(
-                    998880L,
-                    "former-organization-name",
-                    Objects.requireNonNull(ensureGitHubProvider().getId())));
+            existing.setOrganizationId(organizationService
+                    .upsertIdentity(
+                            998880L,
+                            "former-organization-name",
+                            Objects.requireNonNull(ensureGitHubProvider().getId()))
+                    .getId());
             workspaceRepository.saveAndFlush(existing);
         }
 
@@ -59,7 +61,8 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(incoming.getWorkspaceSlug()).isNotEqualTo(existing.getWorkspaceSlug());
         assertThat(connectionService.findActiveGitHubAppConfig(existing.getId()))
                 .isEmpty();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(incoming.getId(), formerAccount.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
+                        incoming.getId(), formerAccount.getId()))
                 .isEmpty();
 
         Workspace renamed = githubLifecycleListener.createOrUpdateFromInstallation(
@@ -88,11 +91,10 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         Objects.requireNonNull(ensureGitHubProvider().getId()))
                 .orElseThrow();
         assertThat(installedActor.getId()).isNotEqualTo(formerLoginOwner.getId());
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
                         workspace.getId(), installedActor.getId()))
-                .hasValueSatisfying(
-                        member -> assertThat(member.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER));
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(
+                .hasValueSatisfying(member -> assertThat(member.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER));
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(
                         workspace.getId(), formerLoginOwner.getId()))
                 .isEmpty();
     }
@@ -115,9 +117,9 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(workspace.getAccountType()).isEqualTo(AccountType.ORG);
 
         var membership = workspaceMembershipRepository
-                .findByWorkspace_IdAndUser_Id(workspace.getId(), owner.getId())
+                .findByWorkspace_IdAndAccount_Id(workspace.getId(), owner.getId())
                 .orElseThrow();
-        assertThat(membership.getRole()).isEqualTo(WorkspaceMembership.WorkspaceRole.OWNER);
+        assertThat(membership.getRole()).isEqualTo(Membership.WorkspaceRole.OWNER);
     }
 
     @Test
@@ -150,10 +152,12 @@ class WorkspaceServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void patWorkspaceWithoutTokenIsPromoted() {
         User owner = persistUser("ls1intum-owner");
         Workspace workspace = createWorkspace("ls1intum", "ls1intum", "ls1intum", AccountType.ORG, owner);
-        workspace.setOrganization(organizationService.upsertIdentity(
-                95711018L,
-                "ls1intum",
-                Objects.requireNonNull(ensureGitHubProvider().getId())));
+        workspace.setOrganizationId(organizationService
+                .upsertIdentity(
+                        95711018L,
+                        "ls1intum",
+                        Objects.requireNonNull(ensureGitHubProvider().getId()))
+                .getId());
         workspaceRepository.saveAndFlush(workspace);
 
         // No PAT Connection on the workspace — this mirrors the legacy

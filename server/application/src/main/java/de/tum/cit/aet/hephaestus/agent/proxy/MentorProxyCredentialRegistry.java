@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Ticker;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -19,7 +19,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Mints and validates proxy-scoped bearer tokens for the mentor's interactive sandbox, which is a
- * reused developer-attached session rather than an {@code agent_job} row and so cannot use the
+ * reused developer-attached session rather than an {@code review_job} row and so cannot use the
  * DB-backed job token. A token grants exactly what a job token grants: the proxy will resolve ONE
  * connection's credential for the holder, nothing else. Process-local, like the interactive sandbox
  * registry it shadows.
@@ -86,7 +86,7 @@ public class MentorProxyCredentialRegistry {
     public record Route(
             String apiProtocol,
             String baseUrl,
-            @Nullable FundingSource connectionScope,
+            @Nullable UsageFundingSource connectionScope,
             @Nullable Long connectionId,
             @Nullable Long modelId,
             @Nullable Long workspaceId) {}
@@ -99,7 +99,7 @@ public class MentorProxyCredentialRegistry {
             UUID sessionId,
             String apiProtocol,
             String baseUrl,
-            @Nullable FundingSource connectionScope,
+            @Nullable UsageFundingSource connectionScope,
             @Nullable Long connectionId,
             @Nullable Long modelId,
             @Nullable Long workspaceId,
@@ -110,14 +110,14 @@ public class MentorProxyCredentialRegistry {
      *     #revoke(UUID)} uses to find this token again at teardown
      */
     public String mint(UUID sessionId, Route route) {
-        String token = AgentJob.generateJobToken();
+        String token = ReviewJob.generateJobToken();
         install(sessionId, token, route);
         return token;
     }
 
     /** Install the server-minted scoped credential on its owning worker. Never log this token. */
     public void install(UUID sessionId, String token, Route route) {
-        String hash = AgentJob.computeTokenHash(token);
+        String hash = ReviewJob.computeTokenHash(token);
         byTokenHash.put(
                 hash,
                 new Entry(
@@ -157,7 +157,7 @@ public class MentorProxyCredentialRegistry {
      * nothing would record its tokens.
      */
     public Optional<ProxyRouting> validate(String token) {
-        Entry entry = byTokenHash.getIfPresent(AgentJob.computeTokenHash(token));
+        Entry entry = byTokenHash.getIfPresent(ReviewJob.computeTokenHash(token));
         if (entry == null) {
             return Optional.empty();
         }
@@ -176,7 +176,7 @@ public class MentorProxyCredentialRegistry {
                 turn == null
                         ? null
                         : new ProxyRouting.BilledAttempt(
-                                LlmUsageSourceType.MENTOR_TURN,
+                                UsageSourceType.MENTOR_TURN,
                                 turn.turnId(),
                                 // A turn never retries, so there is only ever attempt 0 of a given turn id.
                                 0,

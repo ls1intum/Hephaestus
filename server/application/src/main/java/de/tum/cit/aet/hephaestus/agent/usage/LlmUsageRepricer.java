@@ -7,6 +7,11 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
@@ -60,7 +65,7 @@ public class LlmUsageRepricer {
     }
 
     /** What happened to one row. */
-    public enum Outcome {
+    public enum ResultOutcome {
         /** A rate was found and applied; the row now counts toward its purse's total. */
         REPRICED,
         /** The row lacks complete usage or a usable rate, or another pass already priced it. Nothing was written. */
@@ -75,17 +80,17 @@ public class LlmUsageRepricer {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Outcome reprice(UnpricedLedgerRow row) {
+    public ResultOutcome reprice(UnpricedLedgerRow row) {
         if (!row.hasTokenEvidence()) {
-            return Outcome.NO_TOKEN_EVIDENCE;
+            return ResultOutcome.NO_TOKEN_EVIDENCE;
         }
         Rates rates = resolveRates(row);
         if (rates == null) {
-            return Outcome.UNIDENTIFIABLE;
+            return ResultOutcome.UNIDENTIFIABLE;
         }
         LlmPriceSnapshot price = rates.toSnapshot(row.fundingSource());
-        if (price.pricingState() == PricingState.UNPRICED) {
-            return Outcome.STILL_UNPRICEABLE;
+        if (price.pricingState() == UsagePricingState.UNPRICED) {
+            return ResultOutcome.STILL_UNPRICEABLE;
         }
         LlmPriceSnapshot.Cost computed = price.calculateCost(
                 row.inputTokens(), row.outputTokens(), row.cacheReadTokens(), row.cacheWriteTokens());
@@ -93,11 +98,11 @@ public class LlmUsageRepricer {
             // The catalogue row exists and claims to be priced, but not for every bucket this event
             // actually used. Charging the buckets it does cover would under-bill silently, which is the
             // one thing UNPRICED exists to prevent.
-            return Outcome.STILL_UNPRICEABLE;
+            return ResultOutcome.STILL_UNPRICEABLE;
         }
         int updated = usageRepository.applyResolvedPrice(row.id(), computed.usd(), price);
         if (updated == 0) {
-            return Outcome.STILL_UNPRICEABLE;
+            return ResultOutcome.STILL_UNPRICEABLE;
         }
         log.info(
                 "Repriced ledger event {} ({} tokens in / {} out, model {}) as {} at {} USD",
@@ -107,7 +112,7 @@ public class LlmUsageRepricer {
                 row.model(),
                 price.pricingState(),
                 computed.usd());
-        return Outcome.REPRICED;
+        return ResultOutcome.REPRICED;
     }
 
     /**
@@ -118,7 +123,7 @@ public class LlmUsageRepricer {
      */
     private static boolean missesARateItNeeds(UnpricedLedgerRow row, LlmPriceSnapshot price) {
         // NO_CHARGE has no rates by design and is a real zero, not a gap. No price has a rate for search units.
-        return (price.pricingState() == PricingState.PRICED
+        return (price.pricingState() == UsagePricingState.PRICED
                 && ((row.inputTokens() > 0 && price.per1mInputUsd() == null)
                         || (row.outputTokens() > 0 && price.per1mOutputUsd() == null)
                         || (row.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
@@ -150,7 +155,7 @@ public class LlmUsageRepricer {
         if (row.model() == null || row.model().isBlank()) {
             return null;
         }
-        return row.fundingSource() == FundingSource.WORKSPACE
+        return row.fundingSource() == UsageFundingSource.WORKSPACE
                 ? uniqueWorkspaceModel(row).map(Rates::of).orElse(null)
                 : uniqueInstancePrice(row).map(Rates::of).orElse(null);
     }
@@ -219,12 +224,12 @@ public class LlmUsageRepricer {
                     model.getPer1mCacheWriteUsd());
         }
 
-        LlmPriceSnapshot toSnapshot(FundingSource fundingSource) {
-            PricingState state =
+        LlmPriceSnapshot toSnapshot(UsageFundingSource fundingSource) {
+            UsagePricingState state =
                     switch (mode) {
-                        case PRICED -> PricingState.PRICED;
-                        case NO_CHARGE -> PricingState.NO_CHARGE;
-                        case UNPRICED -> PricingState.UNPRICED;
+                        case PRICED -> UsagePricingState.PRICED;
+                        case NO_CHARGE -> UsagePricingState.NO_CHARGE;
+                        case UNPRICED -> UsagePricingState.UNPRICED;
                     };
             return new LlmPriceSnapshot(
                     fundingSource, state, priceId, workspaceModelId, input, output, cacheRead, cacheWrite);

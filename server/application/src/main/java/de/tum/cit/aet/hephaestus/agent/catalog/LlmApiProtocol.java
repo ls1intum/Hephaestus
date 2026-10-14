@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.util.Arrays;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;

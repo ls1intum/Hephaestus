@@ -23,8 +23,10 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
 
     @AfterEach
     void clearBypass() {
-        // Fail loud if a test leaked ThreadLocal bypass state (BaseUnitTest does not fork): a bypass is
-        // only opened via try-with-resources, so an active bypass here means someone forgot to close it.
+        // Fail loud if a test leaked ThreadLocal bypass state (BaseUnitTest does not fork): a
+        // bypass is
+        // only opened via try-with-resources, so an active bypass here means someone forgot to
+        // close it.
         if (TenancyBypass.isActive()) {
             throw new IllegalStateException("TenancyBypass not closed by prior test");
         }
@@ -87,8 +89,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // The inspector MUST treat this as a legitimate workspace_id reference and not
         // throw.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        String sql = "select wm.user_id, wm.workspace_id from workspace_membership wm "
-                + "where (wm.user_id, wm.workspace_id) in ((?,?))";
+        String sql = "select wm.account_id, wm.workspace_id from membership wm "
+                + "where (wm.account_id, wm.workspace_id) in ((?,?))";
         inspector.inspect(sql);
         verifyNoInteractions(reporter, scopedTables);
     }
@@ -213,8 +215,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     void optimisticLockUpdateIsAllowed() {
         // Hibernate appends "AND version = ?" to UPDATEs for entities with @Version.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect(
-                "update chat_message set metadata=?,parts=?,role=?,status=?,thread_id=?,version=? where id=? and version=?");
+        inspector.inspect("update chat_message set metadata=?,parts=?,role=?,status=?,thread_id=?,version=?"
+                + " where id=? and version=?");
         verifyNoInteractions(reporter, scopedTables);
     }
 
@@ -243,7 +245,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     void hibernateEntityLoadByPkWithJoinsIsAllowed() {
         // Eager @ManyToOne fetches add LEFT JOINs but the WHERE is still <alias>.id = ?.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect("select r1_0.id,o1_0.id,o1_0.login " + "from repository r1_0 "
+        inspector.inspect("select r1_0.id,o1_0.id,o1_0.login "
+                + "from repository r1_0 "
                 + "left join organization o1_0 on r1_0.organization_id=o1_0.id "
                 + "where r1_0.id=?");
         verifyNoInteractions(reporter, scopedTables);
@@ -268,7 +271,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // filtered by the parent's FK column. The join table inherits scope from the
         // parent's PK, which the caller already had.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect("select i1_0.label_id,i1_1.id,i1_1.body,i1_1.title " + "from issue_label i1_0 "
+        inspector.inspect("select i1_0.label_id,i1_1.id,i1_1.body,i1_1.title "
+                + "from issue_label i1_0 "
                 + "join issue i1_1 on i1_0.issue_id=i1_1.id "
                 + "where i1_0.label_id=?");
         verifyNoInteractions(reporter, scopedTables);
@@ -300,15 +304,17 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // result set. A disjunction widens it past those keys exactly as it does for "= ?".
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("label")).thenReturn(true);
-        String sql = "select l1_0.id from label l1_0 where l1_0.repository_id=any(?) or l1_0.is_public=true";
+        String sql = "select l1_0.id from label l1_0 where l1_0.repository_id=any(?) or" + " l1_0.is_public=true";
         inspector.inspect(sql);
         verify(reporter).report(sql, Set.of("label"), TenancyEnforcement.LOG);
     }
 
     @Test
     void pkPredicateDisjoinedWithOrStillEnforced() {
-        // The PK-only fast path tolerates extra CONJUNCTIVE predicates, but a DISJUNCTION broadens the
-        // result set past the single keyed row — "WHERE id = ? OR is_public = true" returns every public
+        // The PK-only fast path tolerates extra CONJUNCTIVE predicates, but a DISJUNCTION broadens
+        // the
+        // result set past the single keyed row — "WHERE id = ? OR is_public = true" returns every
+        // public
         // row regardless of the key. That must NOT bypass enforcement.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("practice")).thenReturn(true);
@@ -320,17 +326,20 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
     @Test
     void pkLoadWithCorrelationFreeExistsSubqueryIsAllowed() {
         // Policy: an outer load still pinned to a single keyed row by <alias>.id = ?, with a
-        // correlation-free EXISTS guard, stays on the PK-only fast path — the projected result set is
+        // correlation-free EXISTS guard, stays on the PK-only fast path — the projected result set
+        // is
         // still the one keyed row, so it is tenancy-safe by construction.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect("select p1_0.id from practice p1_0 where p1_0.id=? and exists (select 1 from result o)");
+        inspector.inspect("select p1_0.id from practice p1_0 where p1_0.id=? and exists (select 1 from result" + " o)");
         verifyNoInteractions(reporter, scopedTables);
     }
 
     @Test
     void malformedSingleQuotedTableIdentifierStillEnforced() {
-        // A malformed single open-quote identifier ("practice with no closing quote) must not slip past the
-        // scoped lookup: unqualify strips every stray quote char so the lowercase name still resolves to the
+        // A malformed single open-quote identifier ("practice with no closing quote) must not slip
+        // past the
+        // scoped lookup: unqualify strips every stray quote char so the lowercase name still
+        // resolves to the
         // scoped set (degrade toward OVER-reporting, never under-reporting).
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("practice")).thenReturn(true);
@@ -344,7 +353,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // Single-table inheritance: SELECT … FROM issue alias WHERE alias.id = ? AND
         // alias.<discriminator> = '<subtype>'. The PK predicate still pins the result set.
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
-        inspector.inspect("select pr1_0.id,pr1_0.body,pr1_0.title " + "from issue pr1_0 "
+        inspector.inspect("select pr1_0.id,pr1_0.body,pr1_0.title "
+                + "from issue pr1_0 "
                 + "where pr1_0.id=? and pr1_0.issue_type='PullRequest'");
         verifyNoInteractions(reporter, scopedTables);
     }
@@ -360,7 +370,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         // assertion below holds even if the rule under test never fires.
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         when(scopedTables.primaryKeyColumns("repository_collaborator")).thenReturn(Set.of("repository_id", "user_id"));
-        inspector.inspect("update repository_collaborator set permission=? where repository_id=? and \"user_id\"=?");
+        inspector.inspect(
+                "update repository_collaborator set permission=? where repository_id=? and" + " \"user_id\"=?");
         inspector.inspect("delete from repository_collaborator where repository_id=? and user_id=?");
         verifyNoInteractions(reporter);
     }
@@ -370,8 +381,8 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.THROW);
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         when(scopedTables.primaryKeyColumns("repository_collaborator")).thenReturn(Set.of("repository_id", "user_id"));
-        inspector.inspect(
-                "update repository_collaborator set permission=? where repository_id=? and user_id=? and version=?");
+        inspector.inspect("update repository_collaborator set permission=? where repository_id=? and"
+                + " user_id=? and version=?");
         verifyNoInteractions(reporter);
     }
 
@@ -383,11 +394,12 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         when(scopedTables.primaryKeyColumns("repository_collaborator")).thenReturn(Set.of("repository_id", "user_id"));
         for (String sql : List.of(
-                "update repository_collaborator set permission=? where repository_id=? and permission=?",
-                "delete from repository_collaborator where repository_id=? and user_id=? and permission=?",
+                "update repository_collaborator set permission=? where repository_id=? and" + " permission=?",
+                "delete from repository_collaborator where repository_id=? and user_id=?" + " and permission=?",
                 "delete from repository_collaborator where repository_id=? or user_id=?",
-                "delete from repository_collaborator where repository_id=? and repository_id=?",
-                "delete from repository_collaborator where repository_id=? and user_id in (select id from \"user\")")) {
+                "delete from repository_collaborator where repository_id=? and" + " repository_id=?",
+                "delete from repository_collaborator where repository_id=? and user_id in"
+                        + " (select id from \"user\")")) {
             inspector.inspect(sql);
             verify(reporter).report(sql, Set.of("repository_collaborator"), TenancyEnforcement.LOG);
         }
@@ -399,7 +411,7 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         WorkspaceStatementInspector inspector = newInspector(TenancyEnforcement.LOG);
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         when(scopedTables.primaryKeyColumns("repository_collaborator")).thenReturn(Set.of());
-        String sql = "update repository_collaborator set permission=? where repository_id=? and user_id=?";
+        String sql = "update repository_collaborator set permission=? where repository_id=? and" + " user_id=?";
         inspector.inspect(sql);
         verify(reporter).report(sql, Set.of("repository_collaborator"), TenancyEnforcement.LOG);
     }
@@ -423,9 +435,10 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         when(scopedTables.primaryKeyColumns("repository_collaborator")).thenReturn(Set.of("repository_id", "user_id"));
         for (String sql : List.of(
-                "update repository_collaborator set permission=?\n-- where repository_id=? and user_id=?",
-                "update repository_collaborator set permission=? /* */ where repository_id=? and user_id=?",
-                "update repository_collaborator set permission=? where repository_id=? and user_id=? -- and more")) {
+                "update repository_collaborator set permission=?\n" + "-- where repository_id=? and user_id=?",
+                "update repository_collaborator set permission=? /* */ where" + " repository_id=? and user_id=?",
+                "update repository_collaborator set permission=? where repository_id=? and"
+                        + " user_id=? -- and more")) {
             inspector.inspect(sql);
             verify(reporter).report(sql, Set.of("repository_collaborator"), TenancyEnforcement.LOG);
         }
@@ -451,11 +464,13 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         when(scopedTables.primaryKeyColumns("repository_collaborator")).thenReturn(Set.of("repository_id", "user_id"));
         for (String sql : List.of(
-                "update repository_collaborator set permission=case when exists (table repository_collaborator "
-                        + "offset 1) then ? else ? end where repository_id=? and user_id=?",
-                "update repository_collaborator set permission=(select max(permission) from repository_collaborator) "
-                        + "where repository_id=? and user_id=?",
-                "update repository_collaborator set permission=coalesce(permission,?) where repository_id=? and user_id=?")) {
+                "update repository_collaborator set permission=case when exists (table"
+                        + " repository_collaborator offset 1) then ? else ? end where"
+                        + " repository_id=? and user_id=?",
+                "update repository_collaborator set permission=(select max(permission) from"
+                        + " repository_collaborator) where repository_id=? and user_id=?",
+                "update repository_collaborator set permission=coalesce(permission,?) where"
+                        + " repository_id=? and user_id=?")) {
             inspector.inspect(sql);
             verify(reporter).report(sql, Set.of("repository_collaborator"), TenancyEnforcement.LOG);
         }
@@ -467,10 +482,11 @@ class WorkspaceStatementInspectorTest extends BaseUnitTest {
         when(scopedTables.isScoped("repository_collaborator")).thenReturn(true);
         for (String sql : List.of(
                 "update repository_collaborator set permission=?\n-- where repository_id=?",
-                "update repository_collaborator set permission=(select max(permission) from repository_collaborator) "
-                        + "where repository_id=?",
-                "update repository_collaborator set permission=case when exists (table repository_collaborator) "
-                        + "then ? else ? end where repository_id=?")) {
+                "update repository_collaborator set permission=(select max(permission) from"
+                        + " repository_collaborator) where repository_id=?",
+                "update repository_collaborator set permission=case when exists (table"
+                        + " repository_collaborator) then ? else ? end where"
+                        + " repository_id=?")) {
             inspector.inspect(sql);
             verify(reporter).report(sql, Set.of("repository_collaborator"), TenancyEnforcement.LOG);
         }

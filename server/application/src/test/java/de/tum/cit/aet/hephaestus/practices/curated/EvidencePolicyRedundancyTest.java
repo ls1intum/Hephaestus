@@ -3,17 +3,22 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.framework.ItemDescriptorRegistry;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.FileItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestReviewItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.RepositoryItemDescriptor;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
-import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
-import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
+import de.tum.cit.aet.hephaestus.practices.PracticeItemOptions;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
+import java.util.List;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -25,25 +30,31 @@ import tools.jackson.databind.json.JsonMapper;
 class EvidencePolicyRedundancyTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
-    private final ClasspathArtifactSourceCatalogRegistry registry =
-            new ClasspathArtifactSourceCatalogRegistry(objectMapper, Clock.systemUTC());
-    private final PracticeSignalOptions signalOptions = PracticeSignalOptionsFixture.real();
-    private final BundledPracticeCatalogLoader loader = new BundledPracticeCatalogLoader(
-            objectMapper,
-            new PracticeDefinitionValidator(registry, signalOptions),
-            new PracticeEvidenceDefaults(registry, PracticeSignalOptionsFixture.catalog()));
+    private final ClasspathSourceCatalogRegistry registry =
+            new ClasspathSourceCatalogRegistry(objectMapper, Clock.systemUTC());
+    private final PracticeItemOptions itemOptions = new PracticeItemOptions(new ItemDescriptorRegistry(List.of(
+            new PullRequestItemDescriptor(),
+            new PullRequestReviewItemDescriptor(),
+            new IssueItemDescriptor(),
+            new FileItemDescriptor(),
+            new RepositoryItemDescriptor(),
+            new ThreadItemDescriptor(),
+            new DocumentItemDescriptor())));
+    private final BundledPracticeCatalogLoader loader =
+            new BundledPracticeCatalogLoader(objectMapper, new PracticeDefinitionValidator(registry, itemOptions));
 
     /**
      * Every kind a practice can be authored against has at least one source that declares it applies —
      * checked at build time, because the alternative is discovering it at review time, unwatched.
      */
     @Test
-    void everyAuthorableArtifactKindHasEvidenceThatAppliesToIt() {
-        for (ArtifactKind kind : signalOptions.authorableKinds()) {
+    void shouldProvideApplicableSourcesForEveryAuthorableItemKind() {
+        for (var descriptor : itemOptions.all()) {
+            var kind = descriptor.kind();
             assertThat(registry.current().sourcesFor(kind.value()))
                     .as(
-                            "artifact kind '%s' can be authored against but no source declares it applies; a practice "
-                                    + "written on it would refuse every review it triggered",
+                            "item kind '%s' can be authored against but no source declares it applies; a practice "
+                                    + "written on it would refuse every review that selected it",
                             kind)
                     .isNotEmpty();
         }
@@ -53,36 +64,14 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     void shouldRequireCompleteCaptureOnlyFromSourcesThatCanProvideIt() {
         loader.catalog()
                 .practices()
-                .forEach(practice -> practice.definition().evidenceRequirements().stream()
-                        .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
+                .forEach(practice -> practice.definition().definition().reads().sources().stream()
+                        .filter(need -> need.need() == ReadNeed.COMPLETE)
                         .forEach(need -> assertThat(registry.requireSource(
-                                                registry.current().version(), need.sourceKind())
+                                                registry.current().version(), need.source())
                                         .completenessPolicy()
                                         .supportsComplete())
-                                .as("%s requires complete capture of %s", practice.slug(), need.sourceKind())
+                                .as("%s requires complete capture of %s", practice.slug(), need.source())
                                 .isTrue()));
-    }
-
-    /**
-     * A practice that declares only the change and the repository tree may have its earlier answer reused on
-     * identical code, so its criteria must read nothing else. {@code context/change.json} is the change's own pinned
-     * range; every other staged context file belongs to a source such a practice would have to declare.
-     */
-    @Test
-    void shouldDeclareEveryContextFileACodeOnlyPracticeReads() {
-        Set<SourceKind> code = Set.of(new SourceKind("scm.pull-request.diff"), new SourceKind("scm.repository.tree"));
-        Pattern contextFile = Pattern.compile("context/([a-z_]+\\.[a-z]+)");
-        assertThat(loader.catalog().practices())
-                .filteredOn(practice ->
-                        !practice.definition().evidenceRequirements().isEmpty()
-                                && practice.definition().evidenceRequirements().stream()
-                                        .allMatch(need -> code.contains(need.sourceKind())))
-                .allSatisfy(practice -> assertThat(contextFile
-                                .matcher(practice.definition().criteria())
-                                .results()
-                                .map(match -> match.group(1)))
-                        .as("%s declares only the change and the tree", practice.slug())
-                        .allMatch("change.json"::equals));
     }
 
     @Test
@@ -94,9 +83,9 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
                                 "keeps-views-free-of-networking-and-persistence")
                         .contains(practice.slug()))
                 .hasSize(3)
-                .allSatisfy(practice -> assertThat(practice.definition().evidenceRequirements().stream()
-                                .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
-                                .map(need -> need.sourceKind()))
+                .allSatisfy(practice -> assertThat(practice.definition().definition().reads().sources().stream()
+                                .filter(need -> need.need() == ReadNeed.COMPLETE)
+                                .map(need -> need.source()))
                         .containsExactly(new SourceKind("scm.pull-request.diff")));
     }
 }

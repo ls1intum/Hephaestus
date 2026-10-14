@@ -1,17 +1,16 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import java.util.Collection;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
 public interface EvidenceAuthorization {
-    Set<UUID> permitsForNewDelivery(
-            long workspaceId, Collection<PracticeResult> practiceResults, SourceUsePurpose purpose);
+    Set<UUID> permitsForNewDelivery(long workspaceId, Collection<Result> practiceResults, SourceUsePurpose purpose);
 
-    boolean permits(long workspaceId, PracticeResult practiceResult, SourceUsePurpose purpose);
+    boolean permits(long workspaceId, Result result, SourceUsePurpose purpose);
 
     /**
      * The ids of the results {@link #permits} would admit, for a whole list at once.
@@ -23,7 +22,7 @@ public interface EvidenceAuthorization {
      *
      * @return the permitted result ids; never null, possibly empty
      */
-    Set<UUID> permitsAll(long workspaceId, Collection<PracticeResult> practiceResults, SourceUsePurpose purpose);
+    Set<UUID> permitsAll(long workspaceId, Collection<Result> practiceResults, SourceUsePurpose purpose);
 
     /**
      * Runs {@code read} as one read of the workspace for {@code purpose}: every authorization inside it shares

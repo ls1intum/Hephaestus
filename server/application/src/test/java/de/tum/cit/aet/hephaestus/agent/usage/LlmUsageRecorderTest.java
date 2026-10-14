@@ -6,6 +6,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.math.BigDecimal;
@@ -27,8 +34,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
     private static LlmUsageRecorder.LlmUsageSample sample(LlmPriceSnapshot price, int attempt) {
         return new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
                 UUID.randomUUID(),
                 attempt,
                 "authoritative-model",
@@ -46,8 +54,8 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
     private static LlmPriceSnapshot priced() {
         return new LlmPriceSnapshot(
-                FundingSource.WORKSPACE,
-                PricingState.PRICED,
+                UsageFundingSource.WORKSPACE,
+                UsagePricingState.PRICED,
                 null,
                 42L,
                 new BigDecimal("1"),
@@ -155,8 +163,8 @@ class LlmUsageRecorderTest extends BaseUnitTest {
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         LlmPriceSnapshot missingOutputRate = new LlmPriceSnapshot(
-                FundingSource.WORKSPACE,
-                PricingState.PRICED,
+                UsageFundingSource.WORKSPACE,
+                UsagePricingState.PRICED,
                 null,
                 42L,
                 new BigDecimal("1"),
@@ -215,8 +223,9 @@ class LlmUsageRecorderTest extends BaseUnitTest {
     void nonsensicalCountsAreClampedBeforeTheyReachTheLedger() {
         AtomicReference<LlmUsageInsert> event = new AtomicReference<>();
         LlmUsageRecorder.LlmUsageSample negative = new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
                 UUID.randomUUID(),
                 -1,
                 "authoritative-model",
@@ -291,18 +300,26 @@ class LlmUsageRecorderTest extends BaseUnitTest {
 
     private static LlmPriceSnapshot instancePriced() {
         return new LlmPriceSnapshot(
-                FundingSource.INSTANCE, PricingState.PRICED, 40L, null, new BigDecimal("1"), null, null, null);
+                UsageFundingSource.INSTANCE,
+                UsagePricingState.PRICED,
+                40L,
+                null,
+                new BigDecimal("1"),
+                null,
+                null,
+                null);
     }
 
     private static LlmPriceSnapshot pricedWithInputRate(BigDecimal per1mInputUsd) {
         return new LlmPriceSnapshot(
-                FundingSource.WORKSPACE, PricingState.PRICED, null, 42L, per1mInputUsd, null, null, null);
+                UsageFundingSource.WORKSPACE, UsagePricingState.PRICED, null, 42L, per1mInputUsd, null, null, null);
     }
 
     private static LlmUsageRecorder.LlmUsageSample sampleOfInputTokensOnly(LlmPriceSnapshot price, long inputTokens) {
         return new LlmUsageRecorder.LlmUsageSample(
-                LlmUsageJobType.PULL_REQUEST_REVIEW,
-                LlmUsageSourceType.AGENT_JOB,
+                null,
+                "PRACTICE_REVIEW",
+                UsageSourceType.REVIEW_JOB,
                 UUID.randomUUID(),
                 1,
                 "authoritative-model",

@@ -2,374 +2,72 @@ package de.tum.cit.aet.hephaestus.practices.adapter;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluation;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
-import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import tools.jackson.databind.ObjectMapper;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.web.reactive.server.WebTestClient;
 
-/**
- * Real-Postgres proof of the practices-owned {@link ConversationFeedbackErasure} port. Erasing a set of Slack
- * thread ids for one workspace hard-deletes exactly the {@code chat.conversation_thread} results/feedback (and
- * their {@code feedback_evidence} join rows, via DB {@code ON DELETE CASCADE}) whose {@code artifact_id} is one
- * of those threads in that workspace — while leaving PR/ISSUE rows and another workspace's rows (even one carrying
- * the same {@code artifact_id}) fully intact. The no-regression + tenant-isolation assertions fail if the delete
- * over-reaches. Deterministic.
- */
+@Import(ReviewIntegrationData.class)
 class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
-
-    private static final ObjectMapper OM = new ObjectMapper();
+    @Autowired
+    ReviewIntegrationData data;
 
     @Autowired
-    private ConversationFeedbackErasure erasure;
+    WebTestClient http;
 
-    @Autowired
-    private PracticeResultRepository practiceResultRepository;
-
-    @Autowired
-    private FeedbackRepository feedbackRepository;
-
-    @Autowired
-    private FeedbackEvidenceRepository feedbackEvidenceRepository;
-
-    @Autowired
-    private DeliveryPolicyEvaluationRepository evaluationRepository;
-
-    @Autowired
-    private PracticeRepository practiceRepository;
-
-    @Autowired
-    private AgentJobRepository agentJobRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private WorkspaceRepository workspaceRepository;
-
-    @Autowired
-    private IdentityProviderRepository identityProviderRepository;
-
-    private final AtomicInteger positionSeq = new AtomicInteger();
-
-    private Workspace workspaceA;
-    private Workspace workspaceB;
-    private Practice practiceA;
-    private Practice practiceB;
-    private User recipientA;
-    private User recipientB;
-    private User recipientC;
-    private AgentJob jobA;
-    private AgentJob jobB;
+    Scenario scenario;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        IdentityProvider provider = identityProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseGet(() -> identityProviderRepository.save(
-                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
-        workspaceA = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("erasure-ws-a"));
-        workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("erasure-ws-b"));
-        practiceA = savePractice(workspaceA);
-        practiceB = savePractice(workspaceB);
-        recipientA = userRepository.save(TestUserFactory.createUser(100L, "recipient-a", provider));
-        recipientB = userRepository.save(TestUserFactory.createUser(200L, "recipient-b", provider));
-        recipientC = userRepository.save(TestUserFactory.createUser(300L, "recipient-c", provider));
-        jobA = newJob(workspaceA);
-        jobB = newJob(workspaceB);
+        scenario = data.scenario();
+    }
+
+    String root() {
+        return "/workspaces/" + scenario.workspace().getWorkspaceSlug();
+    }
+
+    WebTestClient.ResponseSpec get(String path) {
+        return http.get()
+                .uri(root() + path)
+                .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
+                .exchange();
+    }
+
+    @Autowired
+    ConversationFeedbackErasureAdapter erasure;
+
+    @Autowired
+    ResultRepository results;
+
+    @Test
+    void emptyThreadSelectionDeletesNothing() {
+        var r = data.result(scenario, ResultOutcome.MET, Instant.now());
+        assertThat(erasure.eraseForThreads(r.getWorkspaceId(), List.of())).isZero();
+        assertThat(results.findById(r.getId())).isPresent();
     }
 
     @Test
-    @DisplayName(
-            "erases only chat.conversation_thread rows for the given threads/workspace; PR + other-tenant rows survive")
-    void erasesConversationRowsForThreadsWithoutOverreaching() {
-        long thread1 = 5001L;
-        long thread2 = 5002L;
-
-        // Workspace A: two conversation threads, each a result + feedback + join (the erasure targets).
-        UUID convObs1 =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, thread1);
-        UUID convFb1 = lastFeedbackId;
-        UUID convObs2 =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, thread2);
-        UUID convFb2 = lastFeedbackId;
-
-        // Workspace A: a PR result + feedback + join — a different artifact type, MUST survive.
-        UUID prObs = seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.PULL_REQUEST, thread1);
-        UUID prFb = lastFeedbackId;
-
-        // Workspace B: a conversation result + feedback on the SAME artifact_id as thread1 — a different
-        // tenant, MUST survive (proves the workspace predicate, not just the artifact_id, is load-bearing).
-        UUID otherWsObs =
-                seedBoundResultAndFeedback(jobB, practiceB, recipientB, ArtifactKinds.CONVERSATION_THREAD, thread1);
-        UUID otherWsFb = lastFeedbackId;
-        seedEvaluation(jobA);
-        seedEvaluation(jobB);
-
-        assertThat(feedbackEvidenceRepository.count()).isEqualTo(4);
-
-        int deleted = erasure.eraseForThreads(workspaceA.getId(), List.of(thread1, thread2));
-
-        // 2 conversation results + 2 conversation feedback units deleted.
-        assertThat(deleted).isEqualTo(4);
-
-        // The targeted conversation rows are gone…
-        assertThat(practiceResultRepository.findById(convObs1)).isEmpty();
-        assertThat(practiceResultRepository.findById(convObs2)).isEmpty();
-        assertThat(feedbackRepository.findById(convFb1)).isEmpty();
-        assertThat(feedbackRepository.findById(convFb2)).isEmpty();
-
-        // …the PR rows (same workspace, different artifact type) survive…
-        assertThat(practiceResultRepository.findById(prObs)).isPresent();
-        assertThat(feedbackRepository.findById(prFb)).isPresent();
-
-        // …and the other workspace's conversation rows (same artifact_id, different tenant) survive.
-        assertThat(practiceResultRepository.findById(otherWsObs)).isPresent();
-        assertThat(feedbackRepository.findById(otherWsFb)).isPresent();
-        assertThat(evaluationsFor(workspaceA, jobA)).isEmpty();
-        assertThat(evaluationsFor(workspaceB, jobB)).hasSize(1);
-
-        // The join rows of the two erased conversation feedback units cascaded away; the 2 survivors' joins remain.
-        assertThat(feedbackEvidenceRepository.count()).isEqualTo(2);
+    void conversationErasureDoesNotEraseScmResults() {
+        var r = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
+        assertThat(erasure.eraseAllConversationForWorkspace(r.getWorkspaceId())).isZero();
+        assertThat(results.findById(r.getId())).isPresent();
     }
 
     @Test
-    @DisplayName(
-            "eraseAllConversationForWorkspace deletes every CONVERSATION row for the workspace; PR + other tenant survive")
-    void eraseAllConversationForWorkspaceScopedToTenantAndArtifactKind() {
-        // Workspace A: two CONVERSATION threads (different artifact ids) + one PR unit (must survive).
-        UUID convObs1 =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 8001L);
-        UUID convFb1 = lastFeedbackId;
-        UUID convObs2 =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 8002L);
-        UUID convFb2 = lastFeedbackId;
-        UUID prObs = seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.PULL_REQUEST, 8001L);
-        UUID prFb = lastFeedbackId;
-
-        // Workspace B: an IN_CHAT unit — a different tenant, MUST survive.
-        UUID otherWsObs =
-                seedBoundResultAndFeedback(jobB, practiceB, recipientB, ArtifactKinds.CONVERSATION_THREAD, 8003L);
-        UUID otherWsFb = lastFeedbackId;
-
-        assertThat(feedbackEvidenceRepository.count()).isEqualTo(4);
-
-        int deleted = erasure.eraseAllConversationForWorkspace(workspaceA.getId());
-
-        // 2 conversation results + 2 conversation feedback units deleted (NOT the PR unit).
-        assertThat(deleted).isEqualTo(4);
-        assertThat(practiceResultRepository.findById(convObs1)).isEmpty();
-        assertThat(practiceResultRepository.findById(convObs2)).isEmpty();
-        assertThat(feedbackRepository.findById(convFb1)).isEmpty();
-        assertThat(feedbackRepository.findById(convFb2)).isEmpty();
-
-        // PR row (same workspace, different artifact type) survives…
-        assertThat(practiceResultRepository.findById(prObs)).isPresent();
-        assertThat(feedbackRepository.findById(prFb)).isPresent();
-        // …and the other tenant's conversation row survives.
-        assertThat(practiceResultRepository.findById(otherWsObs)).isPresent();
-        assertThat(feedbackRepository.findById(otherWsFb)).isPresent();
-
-        assertThat(feedbackEvidenceRepository.count()).isEqualTo(2);
-        // Idempotent: a second whole-workspace erasure is a no-op.
-        assertThat(erasure.eraseAllConversationForWorkspace(workspaceA.getId())).isZero();
-    }
-
-    @Test
-    @DisplayName(
-            "eraseConversationFeedbackAboutUser deletes only that subject's CONVERSATION rows; other user + PR/ISSUE + other tenant survive")
-    void eraseConversationFeedbackAboutUserScopedToSubject() {
-        // Workspace A, subject = recipientA: one IN_CHAT unit (target) + one PR unit + one ISSUE unit (survive).
-        UUID convObsA =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9001L);
-        UUID convFbA = lastFeedbackId;
-        UUID prObsA = seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.PULL_REQUEST, 9001L);
-        UUID prFbA = lastFeedbackId;
-        UUID issueObsA = seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.ISSUE, 9002L);
-        UUID issueFbA = lastFeedbackId;
-
-        // Workspace A, subject = recipientC: an IN_CHAT unit for a DIFFERENT person — MUST survive.
-        UUID convObsOther =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientC, ArtifactKinds.CONVERSATION_THREAD, 9003L);
-        UUID convFbOther = lastFeedbackId;
-
-        // Workspace B, subject = recipientA (same user id, different tenant): an IN_CHAT unit — MUST survive.
-        UUID convObsWsB =
-                seedBoundResultAndFeedback(jobB, practiceB, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9004L);
-        UUID convFbWsB = lastFeedbackId;
-
-        int deleted = erasure.eraseConversationFeedbackAboutUser(workspaceA.getId(), recipientA.getId());
-
-        // Exactly recipientA's single CONVERSATION result + feedback in workspace A.
-        assertThat(deleted).isEqualTo(2);
-        assertThat(practiceResultRepository.findById(convObsA)).isEmpty();
-        assertThat(feedbackRepository.findById(convFbA)).isEmpty();
-
-        // recipientA's PR + ISSUE units (same subject, different artifact type) survive.
-        assertThat(practiceResultRepository.findById(prObsA)).isPresent();
-        assertThat(feedbackRepository.findById(prFbA)).isPresent();
-        assertThat(practiceResultRepository.findById(issueObsA)).isPresent();
-        assertThat(feedbackRepository.findById(issueFbA)).isPresent();
-
-        // The other person's conversation row (same workspace) survives.
-        assertThat(practiceResultRepository.findById(convObsOther)).isPresent();
-        assertThat(feedbackRepository.findById(convFbOther)).isPresent();
-
-        // The same user's conversation row in another tenant survives.
-        assertThat(practiceResultRepository.findById(convObsWsB)).isPresent();
-        assertThat(feedbackRepository.findById(convFbWsB)).isPresent();
-    }
-
-    @Test
-    void erasesConversationPolicyTracesWithTheirSubjectWithoutCrossingTenants() {
-        seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9101L);
-        seedEvaluation(jobA);
-        seedBoundResultAndFeedback(jobB, practiceB, recipientA, ArtifactKinds.CONVERSATION_THREAD, 9102L);
-        seedEvaluation(jobB);
-
-        erasure.eraseConversationFeedbackAboutUser(workspaceA.getId(), recipientA.getId());
-
-        assertThat(evaluationsFor(workspaceA, jobA)).isEmpty();
-        assertThat(evaluationsFor(workspaceB, jobB)).hasSize(1);
-    }
-
-    @Test
-    @DisplayName("idempotent: empty thread set and threads with no derived rows delete nothing")
-    void idempotentOnEmptyOrUnmatchedInput() {
-        UUID convObs =
-                seedBoundResultAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.CONVERSATION_THREAD, 7001L);
-
-        assertThat(erasure.eraseForThreads(workspaceA.getId(), List.of())).isZero();
-        assertThat(erasure.eraseForThreads(workspaceA.getId(), List.of(9999L))).isZero();
-
-        // The unrelated row is untouched by both no-op calls.
-        assertThat(practiceResultRepository.findById(convObs)).isPresent();
-        assertThat(feedbackEvidenceRepository.count()).isEqualTo(1);
-    }
-
-    private UUID lastFeedbackId = UUID.randomUUID();
-
-    /** Save a result, a feedback unit anchored to the same (artifactKind, artifactId), and the join between them. */
-    private UUID seedBoundResultAndFeedback(
-            AgentJob job, Practice practice, User recipient, ArtifactKind artifactKind, long artifactId) {
-        UUID practiceResultId = UUID.randomUUID();
-        practiceResultRepository.insertIfAbsent(
-                practiceResultId,
-                "occ-" + practiceResultId,
-                job.getId(),
-                job.getWorkspace().getId(),
-                practice.getId(),
-                null,
-                artifactKind.value(),
-                artifactId,
-                recipient.getId(),
-                "Result title",
-                "NOT_MET",
-                "MAJOR",
-                null,
-                null,
-                "test-scope",
-                null,
-                null,
-                null,
-                Instant.now(),
-                "LIVE");
-
-        Feedback feedback = feedbackRepository.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(practice.getWorkspace().getId())
-                .artifactKind(artifactKind)
-                .artifactId(artifactId)
-                .recipientUserId(recipient.getId())
-                .aboutUserId(recipient.getId())
-                .channel(FeedbackChannel.IN_CHAT)
-                .position(positionSeq.getAndIncrement())
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build());
-        lastFeedbackId = feedback.getId();
-
-        feedbackEvidenceRepository.insertIfAbsent(
-                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
-        return practiceResultId;
-    }
-
-    private Practice savePractice(Workspace workspace) {
-        Practice practice = new Practice();
-        PracticeTestEvidence.configure(practice, ArtifactKinds.CONVERSATION_THREAD);
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
-        practice.setWorkspace(workspace);
-        practice.setSlug("erasure-practice-" + workspace.getId());
-        practice.setName("Erasure Practice");
-        practice.setCriteria("Test description");
-        PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_OPENED);
-        return practiceRepository.save(practice);
-    }
-
-    private AgentJob newJob(Workspace workspace) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        job.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
-        job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(job);
-    }
-
-    private void seedEvaluation(AgentJob job) {
-        evaluationRepository.save(DeliveryPolicyEvaluation.builder()
-                .workspaceId(job.getWorkspace().getId())
-                .agentJobId(job.getId())
-                .admittedRevision(0L)
-                .resolverVersion("1")
-                .surface(DeliveryPolicySurface.CONVERSATION)
-                .stage(DeliveryPolicyStage.EGRESS)
-                .allowed(true)
-                .checks(OM.createArrayNode())
-                .facts(OM.createObjectNode())
-                .build());
-    }
-
-    private List<DeliveryPolicyEvaluation> evaluationsFor(Workspace workspace, AgentJob job) {
-        return evaluationRepository.findByWorkspaceIdAndAgentJobIdAndFeedbackIdIsNullOrderByEvaluatedAtAsc(
-                workspace.getId(), job.getId());
+    void developerSelectionRetainsOtherWorkKinds() {
+        var r = data.result(scenario, ResultOutcome.MET, Instant.now());
+        assertThat(erasure.eraseConversationFeedbackAboutUser(
+                        r.getWorkspaceId(), scenario.account().getId()))
+                .isZero();
+        assertThat(results.findById(r.getId())).isPresent();
     }
 }

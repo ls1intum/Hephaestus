@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.OutlineDocumentContentSource;
 import java.util.Set;
 
 /**
@@ -20,10 +19,10 @@ public final class MentorContextKeys {
             RecentAuthoredWorkContentSource.OUTPUT_KEY,
             MergeReadinessContentSource.OUTPUT_KEY,
             ReviewAttemptsContentSource.OUTPUT_KEY,
-            SlackConversationContentSource.OUTPUT_KEY,
+            "inputs/context/slack_conversations.json",
             PreparedConversationFeedbackContentSource.OUTPUT_KEY,
             CurrentThreadHistoryContentSource.OUTPUT_KEY,
-            OutlineDocumentContentSource.OUTPUT_KEY);
+            "inputs/context/outline_docs.json");
 
     /**
      * The runner's {@code FETCH_CONTEXT_MAX_CHARS}: beyond it the runner slices the JSON mid-document. Both count

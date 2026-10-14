@@ -12,12 +12,12 @@ The [product vocabulary](./practice-feedback-language.md) defines both terms.
 
 Other pages own the related facts:
 
-- [Add a visual and a guide](/admin/writing-practices#add-a-visual-and-a-guide) owns the markup that the server accepts, the limits, and the `pv-*` color classes.
+- [Add a visual and a guide](/admin/writing-practices#write-guidance) owns the markup that the server accepts, the limits, and the `pv-*` color classes.
 - [Bundled visuals and guides](./practice-catalogue.md#bundled-visuals-and-guides) owns the files and the catalog fields.
 
 The rules below are strict.
 All bundled practices use one grammar, so a developer learns it once.
-The [starter templates](/admin/writing-practices#start-from-a-template) are the reference for the contrast pair, the fork, and the sequence.
+The [starter templates](/admin/writing-practices#write-guidance) are the reference for the contrast pair, the fork, and the sequence.
 The visual of `scope-one-reviewable-change` is the reference for the [whole versus parts](#whole-versus-parts) pattern.
 Its figure is the reference for a sequence figure.
 
@@ -98,7 +98,7 @@ Their contrast is below the 3:1 of [WCAG 1.4.11](https://www.w3.org/WAI/WCAG22/U
 - Do not use `opacity`, `fill-opacity`, or `stroke-opacity`. The same opacity gives a different contrast in each theme.
 - Do not write color values. `PRACTICE_SVG_THEME` in `webapp/src/components/practice-guidance/PracticeVisual.tsx` maps each class to a theme token.
 
-The prompt in [Draw a visual with an AI assistant](/admin/writing-practices#draw-a-visual-with-an-ai-assistant) repeats these meanings, because an admin sends it alone.
+The prompt in [Draw a visual with an AI assistant](/admin/writing-practices#write-guidance) repeats these meanings, because an admin sends it alone.
 When you change this table, change the prompt too.
 If the prompt and this page disagree, this page is correct.
 
@@ -542,12 +542,12 @@ A bundled guide uses these level-2 headings, in this order:
 4. `## Sources`
 
 Before you write, read the criteria.
-Find the **Standard** and **Judge**, the **Occasion**, and the sentences that reject a misreading.
+Find the **Standard** and **Judge**, the **Applies when**, and the sentences that reject a misreading.
 Each sentence of the guide must come from one of them or from an entry in **Sources**.
 Use **Defer** to find what to leave out: do not teach what **Defer** gives to another practice.
 
 - **How to do it**: 3 to 5 bullets. Each bullet gives one instruction in the imperative. A condition can come before it. Give exactly one realistic example in the form "instead of …, do …".
-- **When it does not apply**: one bullet for each fact in the **Occasion**, in the developer's words. Add no case and drop no case. If the criteria name a case that still counts, end with "It still applies when …".
+- **When it does not apply**: one bullet for each fact in the **Applies when**, in the developer's words. Add no case and drop no case. If the criteria name a case that still counts, end with "It still applies when …".
 - **Common mistakes**: 2 to 4 bullets. Each names a wrong action and what to do instead. Start with the misreading that the criteria reject, such as a line limit.
 - **Sources**: 2 to 4 entries. The next section gives the quality bar.
 
@@ -570,7 +570,7 @@ More rules:
 - After the name and the year, write one sentence that says what the source supports.
 - Say so in the entry when a source argues for a kind of product that its publisher sells. An example is a study of code review by a seller of review tools.
 - Official documentation of a platform or tool needs no such note.
-- Do not state a claim more strongly than its class allows. The [catalog curation rules](./practice-catalogue.md#selecting-a-practice) give the classes.
+- Do not state a claim more strongly than its class allows. The [catalog curation rules](./practice-catalogue.md#authoring-experience) give the classes.
 - Read the claim in the source itself, not in a summary. Do not cite a source for a number that the practice does not use.
 - Do not cite blog platforms, AI summaries, marketing pages, Wikipedia, or pages behind a paywall with no public abstract.
 
@@ -609,7 +609,7 @@ Thus, the GitHub preview checks the paths and the text, not the colors.
 - The picture reaches the edges, and no large area stays empty.
 - Both themes look correct.
 - The description follows the picture and names no drawing device.
-- Each guide sentence comes from the criteria or a source. **When it does not apply** agrees with the **Occasion**.
+- Each guide sentence comes from the criteria or a source. **When it does not apply** agrees with the **Applies when**.
 - Each source is authoritative and supports the claim that the guide makes.
 
 ## Basis for these rules

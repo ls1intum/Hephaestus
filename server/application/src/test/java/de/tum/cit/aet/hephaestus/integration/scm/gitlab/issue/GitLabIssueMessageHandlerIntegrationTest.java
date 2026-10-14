@@ -4,35 +4,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueTypeRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueEvidenceVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmReviewFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -42,7 +37,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -123,10 +117,19 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
-    private PracticeResultRepository practiceResultRepository;
+    private IssueEvidenceVersion issueVersions;
+
+    @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+
+    @Autowired
+    private ItemWriter fixtureItems;
+
+    @Autowired
+    private PeopleRegistry fixturePeople;
 
     private Organization savedOrg;
     private Repository savedRepo;
@@ -153,12 +156,12 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     class BasicLifecycleEvents {
 
         @Test
-        void shouldAdvanceReviewSnapshotWhenSyncChangesAnOpenIssue() throws Exception {
+        void shouldAdvanceTheContentVersionWhenSyncChangesAnOpenIssue() throws Exception {
             handler.handleEvent(loadPayload("issue.open"));
             Issue before = issueRepository
                     .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
                     .orElseThrow();
-            var previousSnapshot = before.getReviewSnapshotId();
+            var previousVersion = issueVersions.of(ScmEventPayload.IssueData.from(before));
             eventListener.clear();
 
             processor.processFromSync(
@@ -193,7 +196,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     .findByRepositoryIdAndNumber(savedRepo.getId(), ISSUE_IID)
                     .orElseThrow();
             assertThat(after.getTitle()).isEqualTo("Updated title");
-            assertThat(after.getReviewSnapshotId()).isNotNull().isNotEqualTo(previousSnapshot);
+            assertThat(issueVersions.of(ScmEventPayload.IssueData.from(after))).isNotEqualTo(previousVersion);
         }
 
         @Test
@@ -356,9 +359,9 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * The webhook and the GraphQL sync must resolve the same issue review revision for the same GitLab issue:
-     * a sync that finds nothing new may not retire the result the webhook edit was reviewed into, while
-     * a sync that does bring a change still must.
+     * The webhook and the GraphQL sync must resolve the same issue review revision for the same
+     * GitLab issue: a sync that finds nothing new may not retire the result the webhook edit was
+     * reviewed into, while a sync that does bring a change still must.
      */
     @Nested
     class ReviewRevision {
@@ -373,7 +376,6 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
             handler.handleEvent(edited(loadPayload("issue.open"), REVIEWED_BODY));
             Issue reviewed = currentIssue();
             String reviewedRevision = reviewRevision();
-            assertThat(reviewed.getReviewSnapshotDigest()).isEqualTo(reviewedRevision);
             UUID practiceResultId = recordResult(reviewed);
             eventListener.clear();
 
@@ -381,11 +383,10 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
             assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class)).isEmpty();
             assertThat(reviewRevision()).isEqualTo(reviewedRevision);
-            assertThat(currentIssue().getReviewSnapshotId()).isEqualTo(reviewed.getReviewSnapshotId());
             assertThat(practiceResultRepository
                             .findById(practiceResultId)
                             .orElseThrow()
-                            .getSupersededAt())
+                            .getEndedAt())
                     .isNull();
 
             processor.processFromSync(
@@ -396,11 +397,11 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                     null);
 
             assertThat(eventListener.ofType(ScmDomainEvent.IssueUpdated.class)).hasSize(1);
-            assertThat(currentIssue().getReviewSnapshotId()).isNotEqualTo(reviewed.getReviewSnapshotId());
+            assertThat(reviewRevision()).isNotEqualTo(reviewedRevision);
             assertThat(practiceResultRepository
                             .findById(practiceResultId)
                             .orElseThrow()
-                            .getSupersededAt())
+                            .getEndedAt())
                     .isNotNull();
         }
 
@@ -434,7 +435,10 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
                             null, null, new GitLabIssueEventDTO.AttributeChange(), null, null, null));
         }
 
-        /** The issue as GitLab GraphQL returns it; {@code ISSUE} is its enum form of the webhook's {@code Issue}. */
+        /**
+         * The issue as GitLab GraphQL returns it; {@code ISSUE} is its enum form of the webhook's
+         * {@code Issue}.
+         */
         private GitLabIssueProcessor.SyncIssueData sync(String body, List<String> labels) {
             return new GitLabIssueProcessor.SyncIssueData(
                     "gid://gitlab/Issue/" + NATIVE_ISSUE_ID,
@@ -481,54 +485,21 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
         /** The revision the capture fence compares a review against. */
         private String reviewRevision() {
-            return Objects.requireNonNull(transactionTemplate.execute(
-                    status -> ScmSignals.issueUpdatedRevision(ScmEventPayload.IssueData.from(currentIssue()))
-                            .value()));
+            return Objects.requireNonNull(transactionTemplate.execute(status -> issueVersions
+                    .of(ScmEventPayload.IssueData.from(currentIssue()))
+                    .value()));
         }
 
         private UUID recordResult(Issue issue) {
-            Practice practice = new Practice();
-            practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE));
-            practice.setWorkspace(savedWorkspace);
-            practice.setSlug("trackable-subtasks");
-            practice.setName("Trackable subtasks");
-            practice.setCriteria("Break the work into trackable subtasks");
-            practice.setSignals(PracticeTestEvidence.signals(ScmSignals.ISSUE_UPDATED));
-            practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ScmSignals.ISSUE_UPDATED.artifactKind()));
-            practice.setReviewWhen(Map.of());
-            practice.setSubject(ActorRole.AUTHOR);
-            practice.setPrecondition(null);
-            practice = practiceRepository.save(practice);
-            AgentJob job = new AgentJob();
-            job.setWorkspace(savedWorkspace);
-            job.setJobType(AgentJobType.ISSUE_REVIEW);
-            job.setStatus(AgentJobStatus.COMPLETED);
-            job.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
-            job = agentJobRepository.save(job);
-            UUID id = UUID.randomUUID();
-            assertThat(practiceResultRepository.insertIfAbsent(
-                            id,
-                            "issue-" + id,
-                            job.getId(),
+            return new ScmReviewFixtures(fixtureJdbc, fixtureItems, fixturePeople, transactionTemplate, objectMapper)
+                    .result(
                             savedWorkspace.getId(),
-                            practice.getId(),
-                            null,
-                            "scm.issue",
-                            issue.getId(),
-                            Objects.requireNonNull(issue.getAuthor()).getId(),
-                            "The work is not broken into trackable subtasks",
-                            "NOT_MET",
-                            "MAJOR",
-                            null,
-                            null,
-                            "test-scope",
-                            null,
-                            null,
-                            null,
-                            Instant.now(),
-                            "LIVE"))
-                    .isOne();
-            return id;
+                            issue,
+                            issueVersions
+                                    .of(ScmEventPayload.IssueData.from(issue))
+                                    .value(),
+                            Instant.now())
+                    .resultId();
         }
     }
 
@@ -724,7 +695,7 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("HephaestusTest GitLab");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         savedWorkspace = workspaceRepository.save(workspace);

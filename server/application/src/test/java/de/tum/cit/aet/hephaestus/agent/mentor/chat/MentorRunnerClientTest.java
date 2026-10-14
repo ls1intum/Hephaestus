@@ -314,24 +314,24 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldSpeakProtocolTwo() {
-        assertThat(MentorRunnerClient.PROTOCOL_VERSION).isEqualTo(2);
+    void shouldSpeakProtocolThree() {
+        assertThat(MentorRunnerClient.PROTOCOL_VERSION).isEqualTo(3);
     }
 
     /** Fields of any other shape are refused at once, the same way as an unknown result, never left to time out. */
     @ParameterizedTest
     @ValueSource(
             strings = {
-                "link_result|{\"threadId\":\"%s\",\"practiceResultId\":{\"id\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}}",
-                "link_result|{\"threadId\":[\"%s\"],\"practiceResultId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
-                "link_result|{\"threadId\":\"%s\",\"practiceResultId\":7}",
-                "link_result|{\"threadId\":\"%s\",\"practiceResultId\":\"not-a-uuid\"}",
-                "link_result|{\"threadId\":\"%s\",\"observationId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
+                "link_result|{\"threadId\":\"%s\",\"resultId\":{\"id\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}}",
+                "link_result|{\"threadId\":[\"%s\"],\"resultId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
+                "link_result|{\"threadId\":\"%s\",\"resultId\":7}",
+                "link_result|{\"threadId\":\"%s\",\"resultId\":\"not-a-uuid\"}",
+                "link_result|{\"threadId\":\"%s\",\"problemId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
                 "link_result|[\"%s\"]",
-                "link_observation|{\"threadId\":\"%s\",\"observationId\":7}",
-                "link_observation|{\"threadId\":\"%s\",\"observationId\":\"not-a-uuid\"}",
-                "link_observation|{\"threadId\":\"%s\",\"practiceResultId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
-                "link_observation|[\"%s\"]"
+                "link_problem|{\"threadId\":\"%s\",\"problemId\":7}",
+                "link_problem|{\"threadId\":\"%s\",\"problemId\":\"not-a-uuid\"}",
+                "link_problem|{\"threadId\":\"%s\",\"resultId\":\"3ec24178-2219-4af4-bebf-077c73a0435e\"}",
+                "link_problem|[\"%s\"]"
             })
     void shouldRefuseALinkWhoseFieldsAreNotUuidStrings(String methodAndParams) {
         String[] parts = methodAndParams.split("\\|", 2);
@@ -352,12 +352,11 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"link_result", "link_observation"})
+    @ValueSource(strings = {"link_result", "link_problem"})
     void shouldEchoTheLinkedIdWhenTheServerAdmitsTheLink(String method) {
         UUID linkedId = UUID.randomUUID();
-        MentorRunnerClient.LinkKind kind = "link_result".equals(method)
-                ? MentorRunnerClient.LinkKind.RESULT
-                : MentorRunnerClient.LinkKind.OBSERVATION;
+        MentorRunnerClient.LinkKind kind =
+                "link_result".equals(method) ? MentorRunnerClient.LinkKind.RESULT : MentorRunnerClient.LinkKind.PROBLEM;
         admits = link -> link.linkedId().equals(linkedId);
 
         sandbox.pushFrame(linkCallback("cb-admitted", method, kind.idKey(), linkedId));
@@ -371,11 +370,10 @@ class MentorRunnerClientTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"link_result", "link_observation"})
+    @ValueSource(strings = {"link_result", "link_problem"})
     void shouldRefuseALinkWhenTheServerDoesNotKnowItsId(String method) {
-        MentorRunnerClient.LinkKind kind = "link_result".equals(method)
-                ? MentorRunnerClient.LinkKind.RESULT
-                : MentorRunnerClient.LinkKind.OBSERVATION;
+        MentorRunnerClient.LinkKind kind =
+                "link_result".equals(method) ? MentorRunnerClient.LinkKind.RESULT : MentorRunnerClient.LinkKind.PROBLEM;
         UUID unknown = UUID.randomUUID();
 
         sandbox.pushFrame(linkCallback("cb-unknown", method, kind.idKey(), unknown));

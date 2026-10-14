@@ -5,6 +5,9 @@
  * {@code reaction} persistence name. Suppression follows a concern through the results bound to its
  * delivered feedback.
  */
-@org.springframework.modulith.NamedInterface("reaction")
-@org.jspecify.annotations.NullMarked
+@NamedInterface("reaction")
+@NullMarked
 package de.tum.cit.aet.hephaestus.practices.result.reaction;
+
+import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.NamedInterface;

@@ -1,10 +1,3 @@
-/**
- * Provider adapters and shared integration infrastructure. Cross-provider contracts live in
- * {@code integration.core.spi} and {@code integration.core.events}; family-specific contracts belong
- * to their family module.
- */
-@org.springframework.modulith.ApplicationModule(
-        displayName = "Integration Framework",
-        type = org.springframework.modulith.ApplicationModule.Type.OPEN)
+/** Integration domains and providers declare their module boundaries in their own packages. */
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration;

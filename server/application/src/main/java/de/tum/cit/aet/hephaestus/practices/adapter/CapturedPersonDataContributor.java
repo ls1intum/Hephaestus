@@ -1,0 +1,100 @@
+package de.tum.cit.aet.hephaestus.practices.adapter;
+
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataContributor;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataSelection;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+/** Retained product custody keeps exact-person selection independent of runtime receipt lifetime. */
+final class CapturedPersonDataContributor implements PersonDataContributor {
+    private final PersonDataContributor store;
+    private final PersonIdentityResolver identities;
+    private final NamedParameterJdbcTemplate jdbc;
+    private final ObjectMapper mapper;
+
+    CapturedPersonDataContributor(
+            PersonDataContributor store,
+            PersonIdentityResolver identities,
+            NamedParameterJdbcTemplate jdbc,
+            ObjectMapper mapper) {
+        this.store = store;
+        this.identities = identities;
+        this.jdbc = jdbc;
+        this.mapper = mapper;
+    }
+
+    @Override
+    public String store() {
+        return store.store();
+    }
+
+    @Override
+    public int getOrder() {
+        return store.getOrder();
+    }
+
+    @Override
+    public List<JsonNode> export(PersonDataSelection selection) {
+        return store.export(selection);
+    }
+
+    @Override
+    public long erase(PersonDataSelection selection) {
+        return store.erase(selection);
+    }
+
+    @Override
+    public void prepareErasure(PersonDataSelection selection) {
+        store.prepareErasure(selection);
+    }
+
+    @Override
+    public List<ExternalDelivery> externalDeliveries(PersonDataSelection selection) {
+        return store.externalDeliveries(selection);
+    }
+
+    @Override
+    public PersonDataSelection select(PersonScope person) {
+        if (person.identities().isEmpty()) return store.select(person);
+        var providers = identities.providers();
+        var copied = person.identities().stream()
+                .flatMap(identity -> providers.stream()
+                        .filter(provider -> provider.id() == identity.providerId())
+                        .map(provider -> new PersonCopyIdentity(
+                                provider.type(), provider.serverUrl(), identity.subject(), identity.teamId())))
+                .distinct()
+                .toList();
+        if (copied.isEmpty()) return store.select(person);
+        var jobs = new LinkedHashSet<>(person.derivedJobIds());
+        jobs.addAll(jdbc.query(
+                "SELECT DISTINCT captured.job_id FROM review_item member CROSS JOIN LATERAL (SELECT member.job_id"
+                    + " UNION ALL SELECT source.value::uuid FROM"
+                    + " jsonb_array_elements_text(COALESCE(member.detail->'custody'->'sourceJobIds','[]'::jsonb))"
+                    + " source(value)) captured WHERE member.result_id IS NOT NULL AND captured.job_id IS NOT NULL AND"
+                    + " EXISTS(SELECT 1 FROM"
+                    + " jsonb_array_elements(COALESCE(member.detail->'custody'->'copiedIdentities','[]'::jsonb)) copy,"
+                    + " jsonb_array_elements(CAST(:copies AS jsonb)) person WHERE"
+                    + " copy->>'providerType'=person->>'providerType' AND"
+                    + " copy->>'providerOrigin'=person->>'providerOrigin' AND copy->>'subject'=person->>'subject' AND"
+                    + " copy->>'teamId' IS NOT DISTINCT FROM person->>'teamId')",
+                Map.of("copies", mapper.writeValueAsString(copied)),
+                (rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class))));
+        return store.select(new PersonScope(
+                person.accountId(),
+                person.identities(),
+                person.userIds(),
+                person.conversationIds(),
+                person.outlineDocumentIds(),
+                person.scmArtifactIds(),
+                List.copyOf(jobs)));
+    }
+}

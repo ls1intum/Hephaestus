@@ -149,19 +149,19 @@ public class ChatMessage {
      */
     @ColumnDefault("0")
     @Column(name = "llm_total_calls", nullable = false, insertable = false, updatable = false)
-    private int llmTotalCalls;
+    private int llmCalls;
 
     @ColumnDefault("0")
     @Column(name = "llm_total_input_tokens", nullable = false, insertable = false, updatable = false)
-    private long llmTotalInputTokens;
+    private long llmInputTokens;
 
     @ColumnDefault("0")
     @Column(name = "llm_total_output_tokens", nullable = false, insertable = false, updatable = false)
-    private long llmTotalOutputTokens;
+    private long llmOutputTokens;
 
     @ColumnDefault("0")
     @Column(name = "llm_total_reasoning_tokens", nullable = false, insertable = false, updatable = false)
-    private long llmTotalReasoningTokens;
+    private long llmReasoningTokens;
 
     @ColumnDefault("0")
     @Column(name = "llm_cache_read_tokens", nullable = false, insertable = false, updatable = false)

@@ -2,13 +2,16 @@ package de.tum.cit.aet.hephaestus.workspace.onboarding;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import java.util.List;
 import java.util.Map;
@@ -26,10 +29,10 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
     private WebTestClient client;
 
     @Autowired
-    private WorkspaceMemberOnboardingRepository members;
+    private MembershipRepository members;
 
     @Autowired
-    private AccountAiChoiceRepository choices;
+    private AccountRepository choices;
 
     @Autowired
     private WorkspaceOnboardingSettingsRepository settings;
@@ -43,7 +46,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
     private Workspace workspace(String slug, User member) {
         var workspace = createWorkspace(slug, "Engineering", slug, AccountType.ORG, persistUser("owner-" + slug));
         ensureOwnerMembership(workspace);
-        ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
         return workspace;
     }
 
@@ -76,16 +79,16 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
         var first = workspace("onboarding-one", user);
         var second = workspace("onboarding-two", user);
         var result = choose(first.getWorkspaceSlug(), "NO_AI");
-        assertThat(result.aiChoice()).isEqualTo(MemberAiChoice.NO_AI);
+        assertThat(result.aiChoice()).isEqualTo(AiChoice.NO_AI);
         assertThat(result.needsSetup()).isFalse();
         assertThat(choices.findById(accountId(user)))
                 .get()
-                .extracting(AccountAiChoice::getAiChoice)
-                .isEqualTo(MemberAiChoice.NO_AI);
+                .extracting(Account::getAiChoice)
+                .isEqualTo(AiChoice.NO_AI);
         // Answering is not finishing a workspace's setup; neither workspace gets a setup row.
-        assertThat(members.findByWorkspace_IdAndAccountId(first.getId(), accountId(user)))
+        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), accountId(user)))
                 .isEmpty();
-        assertThat(members.findByWorkspace_IdAndAccountId(second.getId(), accountId(user)))
+        assertThat(members.findByWorkspace_IdAndAccount_Id(second.getId(), accountId(user)))
                 .isEmpty();
         assertThat(preferences.forDeveloper(first.getId(), user.getId()).permitsAi())
                 .isFalse();
@@ -93,7 +96,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .isFalse();
         // A developer no account resolves to has not answered; the choice is optional here.
         assertThat(preferences.forDeveloper(first.getId(), null).permitsAi()).isTrue();
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_Id(first.getId(), user.getId()))
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_Id(first.getId(), user.getId()))
                 .isPresent();
 
         // The account endpoint reads and writes the same answer without a workspace.
@@ -180,7 +183,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 AccountType.ORG,
                 persistUser("owner-onboarding-admin-reads"));
         ensureOwnerMembership(workspace);
-        ensureWorkspaceMembership(workspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
+        ensureMembership(workspace, admin, Membership.WorkspaceRole.ADMIN);
         client.get()
                 .uri("/workspaces/{slug}/onboarding/settings", workspace.getWorkspaceSlug())
                 .headers(headers -> headers.setBearerAuth(MEMBER))
@@ -275,7 +278,7 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .jsonPath("$.needsSetup")
                 .isEqualTo(false);
 
-        assertThat(members.findByWorkspace_IdAndAccountId(workspace.getId(), accountId(user)))
+        assertThat(members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user)))
                 .isEmpty();
         assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
                 .isTrue();
@@ -303,9 +306,9 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
                 .isEqualTo(false)
                 .jsonPath("$.aiChoice")
                 .doesNotExist();
-        var member = members.findByWorkspace_IdAndAccountId(workspace.getId(), accountId(user))
+        var member = members.findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId(user))
                 .orElseThrow();
-        assertThat(member.getSeenRevision()).isEqualTo(policy.getRevision());
+        assertThat(member.getOnboardingSeenRevision()).isEqualTo(policy.getRevision());
         assertThat(choices.findById(accountId(user))).isEmpty();
         assertThat(preferences.forDeveloper(workspace.getId(), user.getId()).permitsAi())
                 .isFalse();

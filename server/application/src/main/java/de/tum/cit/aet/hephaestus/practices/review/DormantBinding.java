@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -12,14 +12,14 @@ import java.util.stream.Collectors;
  * over it would break every workspace that has simply not connected an integration yet.
  *
  * @param practiceId    the practice that cannot fire
- * @param signals       the signals it is bound to, none of which anything connected here raises
+ * @param events       the events it is bound to, none of which anything connected here raises
  * @param raisedByAnyOf the integrations that <em>could</em> raise at least one of them if connected;
  *                      empty means no compiled integration covers it either, which is a build problem
  *                      rather than an onboarding one
  */
-public record DormantBinding(Long practiceId, Set<SignalName> signals, Set<IntegrationKind> raisedByAnyOf) {
+public record DormantBinding(Long practiceId, Set<ItemEventName> events, Set<IntegrationKind> raisedByAnyOf) {
     public DormantBinding {
-        signals = Set.copyOf(signals);
+        events = Set.copyOf(events);
         raisedByAnyOf = Set.copyOf(raisedByAnyOf);
     }
 
@@ -31,8 +31,9 @@ public record DormantBinding(Long practiceId, Set<SignalName> signals, Set<Integ
      * @param signalName      a signal's display name
      * @param integrationName an integration's display name
      */
-    public String reason(Function<SignalName, String> signalName, Function<IntegrationKind, String> integrationName) {
-        String moments = signals.stream().map(signalName).distinct().sorted().collect(Collectors.joining(", "));
+    public String reason(
+            Function<ItemEventName, String> signalName, Function<IntegrationKind, String> integrationName) {
+        String moments = events.stream().map(signalName).distinct().sorted().collect(Collectors.joining(", "));
         if (raisedByAnyOf.isEmpty()) {
             return "Nothing that Hephaestus can connect reports the moments this practice watches for (" + moments
                     + "), so no review ever covers this practice.";

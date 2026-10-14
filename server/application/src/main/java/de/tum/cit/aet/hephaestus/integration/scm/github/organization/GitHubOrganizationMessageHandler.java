@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -24,9 +24,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Handles GitHub organization webhook events.
- */
+/** Handles GitHub organization webhook events. */
 @Component
 public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessageHandler<GitHubOrganizationEventDTO> {
 
@@ -91,7 +89,7 @@ public class GitHubOrganizationMessageHandler extends AbstractIntegrationMessage
                     OrganizationMemberRole role = parseRole(event.membership().role());
                     membershipRepository.upsertMembership(organizationId, Objects.requireNonNull(user.getId()), role);
                     log.info(
-                            "Added member to organization: orgId={}, orgLogin={}, userLogin={}, role={}",
+                            "Added member to organization: orgId={}, orgLogin={}, userLogin={}," + " role={}",
                             orgDto.id(),
                             sanitizeForLog(orgDto.login()),
                             sanitizeForLog(userDto.login()),

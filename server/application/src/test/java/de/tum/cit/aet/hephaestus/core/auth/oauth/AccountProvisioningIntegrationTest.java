@@ -1,17 +1,20 @@
 package de.tum.cit.aet.hephaestus.core.auth.oauth;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 import org.assertj.core.api.Assertions;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -20,19 +23,20 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * nOAuth defence against a REAL Postgres: the mock-based {@link AccountProvisioningServiceTest} stubs
- * {@code findActiveByProviderSubject}, so it cannot prove the persisted data keys on (provider,
- * subject) rather than email. Two identities sharing one verified email must resolve to DISTINCT
- * accounts — email is contact metadata, never a join key.
+ * nOAuth defence against a REAL Postgres: the mock-based {@link AccountProvisioningServiceTest}
+ * stubs {@code findActiveByProviderSubject}, so it cannot prove the persisted data keys on
+ * (provider, subject) rather than email. Two identities sharing one verified email must resolve to
+ * DISTINCT accounts — email is contact metadata, never a join key.
  *
- * <p>The concurrent-first-login convergence is pinned separately by {@code
- * IdentityLinkUniquenessLiquibaseTest} (its {@code COALESCE(team_id,'')} index is unreproducible
- * under this profile's ddl-auto schema); the read-after-conflict recovery is unit-covered by {@link
- * AccountProvisioningServiceTest}.
+ * <p>PeopleRegistryIntegrationTest proves concurrent roster/claim convergence at the exact identity
+ * key. These tests also prove that enclosing provisioning rollback removes a newly claimed account.
  *
- * @see <a href="https://www.descope.com/blog/post/noauth">nOAuth: account takeover via email merging</a>
+ * @see <a href="https://www.descope.com/blog/post/noauth">nOAuth: account takeover via email
+ *     merging</a>
  */
 class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
 
@@ -43,10 +47,38 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
     private AccountRepository accountRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinkRepository;
+    private IdentityRepository identityRepository;
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactions;
+
+    @Test
+    void shouldRollBackNewlyClaimedAccountWhenTheEnclosingProvisioningTransactionFails() {
+        String registration = "rollback-" + UUID.randomUUID();
+        String subject = "subject-" + UUID.randomUUID();
+        seedProvider(registration, LoginProvider.ProviderType.GITHUB);
+        var createdId = new AtomicLong();
+        var transaction = new TransactionTemplate(transactions);
+
+        assertThatThrownBy(() -> transaction.executeWithoutResult(status -> {
+                    var resolved = service.resolveOrProvision(
+                            registration,
+                            subject,
+                            principal(subject, "rollback@example.com", true, "Rollback developer"),
+                            AuthIntentCookie.Intent.login(null, null));
+                    createdId.set(persistedId(resolved.account().getId()));
+                    throw new IllegalStateException("Provisioning aborted");
+                }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Provisioning aborted");
+
+        assertThat(createdId.get()).isPositive();
+        assertThat(accountRepository.findById(createdId.get())).isEmpty();
+        assertThat(identityRepository.findByAccount_Id(createdId.get())).isEmpty();
+    }
 
     @Test
     void twoIdentitiesSharingOneEmailResolveToSeparateAccounts() {
@@ -60,7 +92,8 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
                         principal("gh-subject-victim", sharedEmail, true, "victim"),
                         AuthIntentCookie.Intent.login(null, null))
                 .account();
-        // A DIFFERENT provider + subject carrying the SAME verified email — the nOAuth attack shape.
+        // A DIFFERENT provider + subject carrying the SAME verified email — the nOAuth attack
+        // shape.
         Account viaGitlab = service.resolveOrProvision(
                         "gitlab-noauth-b",
                         "gl-subject-attacker",
@@ -74,11 +107,11 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
         assertThat(viaGithub.getPrimaryEmail()).isEqualTo(sharedEmail);
         assertThat(viaGitlab.getPrimaryEmail()).isEqualTo(sharedEmail);
         // Each account owns exactly its own identity link, on its own provider+subject.
-        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(viaGithub.getId())))
-                .extracting(IdentityLink::getSubject)
+        assertThat(identityRepository.findActiveByAccountId(persistedId(viaGithub.getId())))
+                .extracting(Identity::getProviderUserKey)
                 .containsExactly("gh-subject-victim");
-        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(viaGitlab.getId())))
-                .extracting(IdentityLink::getSubject)
+        assertThat(identityRepository.findActiveByAccountId(persistedId(viaGitlab.getId())))
+                .extracting(Identity::getProviderUserKey)
                 .containsExactly("gl-subject-attacker");
     }
 
@@ -114,8 +147,10 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
                         principal("returning-subject", "ada@returning.example", true, "ada"),
                         AuthIntentCookie.Intent.login(null, null))
                 .account();
-        // A second login for the SAME (provider, subject) must reuse the account, not JIT a new one —
-        // even though the IdP now reports a different email (people change emails; the link is the key).
+        // A second login for the SAME (provider, subject) must reuse the account, not JIT a new one
+        // —
+        // even though the IdP now reports a different email (people change emails; the link is the
+        // key).
         Account secondLogin = service.resolveOrProvision(
                         "github-returning",
                         "returning-subject",
@@ -125,7 +160,7 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
 
         assertThat(persistedId(secondLogin.getId())).isEqualTo(persistedId(firstLogin.getId()));
         // Idempotent: still exactly one identity link for the account.
-        assertThat(identityLinkRepository.findActiveByAccountId(persistedId(firstLogin.getId())))
+        assertThat(identityRepository.findActiveByAccountId(persistedId(firstLogin.getId())))
                 .hasSize(1);
     }
 
@@ -154,8 +189,8 @@ class AccountProvisioningIntegrationTest extends RealAuthIntegrationTest {
                         principal("original-native-subject", "contact@example.test", true, "display"),
                         AuthIntentCookie.Intent.login(null, null)))
                 .isInstanceOf(OAuth2AuthenticationException.class);
-        assertThat(identityLinkRepository.findActiveByAccountId(accountId))
-                .extracting(IdentityLink::getSubject)
+        assertThat(identityRepository.findActiveByAccountId(accountId))
+                .extracting(Identity::getProviderUserKey)
                 .containsExactly("original-native-subject");
     }
 

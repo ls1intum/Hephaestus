@@ -3,115 +3,45 @@ package de.tum.cit.aet.hephaestus.practices;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class PracticeDefinitionMergeTest extends BaseUnitTest {
-
-    private static final PracticeDefinition BASE = new PracticeDefinition(
-            "Original",
-            PracticeTestEvidence.signals(ArtifactKinds.PULL_REQUEST),
-            PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST),
-            Map.of(),
-            ActorRole.AUTHOR,
-            null,
-            "Original criteria",
-            null,
-            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
-            "Original rationale",
-            null,
-            null);
-
     @Test
-    void reportsSameFieldEditsAsConflictsEvenWhenValuesMatch() {
-        PracticeDefinition current = change("Shared name", "Local criteria", "Local rationale");
-        PracticeDefinition offered = change("Shared name", "Offered criteria", "Original rationale");
-
-        assertThat(PracticeDefinitionMerge.changes(BASE, current, offered))
-                .containsExactly(
-                        new PracticeDefinitionMerge.FieldChange(PracticeDefinitionField.NAME, true, true),
-                        new PracticeDefinitionMerge.FieldChange(PracticeDefinitionField.CRITERIA, true, true),
-                        new PracticeDefinitionMerge.FieldChange(PracticeDefinitionField.WHY_IT_MATTERS, false, false));
+    void shouldKeepLocalPresentationWhenTakingTheOfferedCriteria() {
+        var base = DefinitionTestFixtures.definition();
+        var local = DefinitionTestFixtures.rename(base, "Local description");
+        var offered = DefinitionTestFixtures.definition(base.name(), "Use the updated criteria.");
+        var merged = PracticeDefinitionMerge.apply(
+                base, local, offered, Map.of(PracticeDefinitionField.CRITERIA, PracticeReleaseChoice.OFFERED));
+        assertThat(merged.name()).isEqualTo(local.name());
+        assertThat(merged.criteria()).isEqualTo(offered.criteria());
+        assertThat(merged.guidance()).isEqualTo(base.guidance());
     }
 
     @Test
-    void appliesOnlySelectedOfferFieldsAndKeepsUnchangedLocalWork() {
-        PracticeDefinition current = change("Local name", "Local criteria", "Local rationale");
-        PracticeDefinition offered = change("Offered name", "Original criteria", "Original rationale");
-
-        PracticeDefinition result = PracticeDefinitionMerge.apply(
-                BASE, current, offered, Map.of(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED));
-
-        assertThat(result.name()).isEqualTo("Offered name");
-        assertThat(result.criteria()).isEqualTo("Local criteria");
-        assertThat(result.whyItMatters()).isEqualTo("Local rationale");
+    void shouldReportConflictOnlyWhenBothValuesDifferFromTheBaseAndEachOther() {
+        var base = DefinitionTestFixtures.definition();
+        var same = DefinitionTestFixtures.rename(base, "New name");
+        assertThat(PracticeDefinitionMerge.changes(base, same, same))
+                .singleElement()
+                .satisfies(change -> {
+                    assertThat(change.changedLocally()).isTrue();
+                    assertThat(change.offeredChanged()).isTrue();
+                    assertThat(change.conflict()).isFalse();
+                });
+        var offered = DefinitionTestFixtures.rename(base, "Another name");
+        assertThat(PracticeDefinitionMerge.changes(base, same, offered))
+                .singleElement()
+                .satisfies(change -> assertThat(change.conflict()).isTrue());
     }
 
     @Test
-    void requiresExactlyOneChoiceForEachChangedOfferField() {
-        PracticeDefinition offered = change("Offered name", "Offered criteria", "Original rationale");
-
-        assertThatThrownBy(() -> PracticeDefinitionMerge.apply(
-                        BASE, BASE, offered, Map.of(PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED)))
+    void shouldRequireAnExplicitChoiceForEveryOfferedField() {
+        var base = DefinitionTestFixtures.definition();
+        var offered = DefinitionTestFixtures.rename(base, "New name");
+        assertThatThrownBy(() -> PracticeDefinitionMerge.apply(base, base, offered, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> PracticeDefinitionMerge.apply(
-                        BASE,
-                        BASE,
-                        offered,
-                        Map.of(
-                                PracticeDefinitionField.NAME, PracticeReleaseChoice.OFFERED,
-                                PracticeDefinitionField.CRITERIA, PracticeReleaseChoice.CURRENT,
-                                PracticeDefinitionField.SIGNALS, PracticeReleaseChoice.OFFERED)))
-                .isInstanceOf(IllegalArgumentException.class);
-    }
-
-    @Test
-    void includesDeclaredDeliveryBehaviorInComparisonAndMerge() {
-        PracticeDefinition offered = new PracticeDefinition(
-                BASE.name(),
-                BASE.signals(),
-                BASE.evidenceRequirements(),
-                BASE.reviewWhen(),
-                BASE.subject(),
-                BASE.precondition(),
-                BASE.criteria(),
-                BASE.practiceScript(),
-                BASE.automatedReviewPolicy(),
-                BASE.whyItMatters(),
-                BASE.whatGoodLooksLike(),
-                BASE.groupSlug(),
-                new PracticeDeliveryBehavior(true, "related", null),
-                null,
-                null);
-
-        assertThat(PracticeDefinitionMerge.changes(BASE, BASE, offered))
-                .containsExactly(new PracticeDefinitionMerge.FieldChange(
-                        PracticeDefinitionField.DELIVERY_BEHAVIOR, true, false));
-        assertThat(PracticeDefinitionMerge.apply(
-                                BASE,
-                                BASE,
-                                offered,
-                                Map.of(PracticeDefinitionField.DELIVERY_BEHAVIOR, PracticeReleaseChoice.OFFERED))
-                        .deliveryBehavior())
-                .isEqualTo(offered.deliveryBehavior());
-    }
-
-    private static PracticeDefinition change(String name, String criteria, String rationale) {
-        return new PracticeDefinition(
-                name,
-                BASE.signals(),
-                BASE.evidenceRequirements(),
-                BASE.reviewWhen(),
-                BASE.subject(),
-                BASE.precondition(),
-                criteria,
-                BASE.practiceScript(),
-                BASE.automatedReviewPolicy(),
-                rationale,
-                BASE.whatGoodLooksLike(),
-                BASE.groupSlug());
     }
 }

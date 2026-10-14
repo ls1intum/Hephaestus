@@ -5,7 +5,7 @@ The files below are shown whole; reading them again returns the same text. Every
 
 ### `evidence/metadata.json`
 ```json
-[L1] {"basis":{"admission_fields":[],"other_fields":"CAPTURE"},"pr_number":3,"pr_url":"https://gitlab.example/group/repo/-/merge_requests/3","repository_full_name":"group/repo","source_branch":"login","target_branch":"main","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","subject_role":"AUTHOR","title":"Add login","is_draft":false,"is_merged":false,"additions":1,"deletions":0,"changed_files":1,"labels":[],"assignees":[]}
+[L1] {"basis":{"admission_fields":[],"other_fields":"CAPTURE"},"pr_number":3,"pr_url":"https://gitlab.example/group/repo/-/merge_requests/3","repository_full_name":"group/repo","source_branch":"login","target_branch":"main","commit_sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","about_role":"AUTHOR","title":"Add login","is_draft":false,"is_merged":false,"additions":1,"deletions":0,"changed_files":1,"labels":[],"assignees":[]}
 ```
 
 ### `work/change/diff.patch` — derived here, not citable
@@ -32,7 +32,7 @@ Exhaustive sources (an absence claim must have searched all of them): scm.pull-r
 ## Standard
 Added authentication calls use checked(), not insecure().
 
-## Occasion
+## applicability
 An authentication call was added.
 
 ## Judge
@@ -45,52 +45,58 @@ MAJOR for an added insecure() call.
 Other code is outside this practice.
 
 
-## How report_observation takes observations
-The arguments are one complete observation object for this session's practice, not a list and not a JSON-encoded string. Each block below is a whole alternative call, with an illustrative outcome, not evidence from this work:
+## How submit_result takes a result
+The arguments are one complete result object for this session's practice, not a list and not a JSON-encoded string. Each block below is a whole alternative call, with an illustrative outcome, not evidence from this work:
 ```json
 {
- "revises": null,
- "practiceSlug": "<the practice's slug>",
- "summary": "Added test asserts that malformed date input is rejected",
  "outcome": "MET",
- "severity": null,
- "evidenceRationale": "The added assertion passes \"not-a-date\" to DateParser.parse and expects an error.",
- "evidence": {
-  "citations": [
-   {
-    "sourceKind": "scm.pull-request.diff",
-    "artifactPath": "evidence/change.json",
-    "path": "Tests/DateParserTests.swift",
-    "side": "NEW",
-    "startLine": 12,
-    "endLine": 12,
-    "quote": "XCTAssertThrowsError(try DateParser.parse(\"not-a-date\"))"
-   }
-  ]
- }
+ "summary": "Added test asserts that malformed date input is rejected",
+ "explanation": "The added assertion passes \"not-a-date\" to DateParser.parse and expects an error.",
+ "citations": [
+  {
+   "sourceKind": "scm.pull-request.diff",
+   "sourcePath": "evidence/change.json",
+   "path": "Tests/DateParserTests.swift",
+   "side": "NEW",
+   "startLine": 12,
+   "endLine": 12,
+   "quote": "XCTAssertThrowsError(try DateParser.parse(\"not-a-date\"))"
+  }
+ ],
+ "evidence": {}
 }
 ```
 
 ```json
 {
- "revises": null,
- "practiceSlug": "<the practice's slug>",
- "summary": "New error branch of the parser ships without a test",
  "outcome": "NOT_MET",
- "severity": "MINOR",
- "evidenceRationale": "The change adds a branch that rejects an empty string; no added test feeds the parser one.",
- "evidence": {
-  "citations": [
-   {
-    "sourceKind": "scm.pull-request.diff",
-    "artifactPath": "evidence/change.json",
-    "path": "App/DateParser.swift",
-    "side": "NEW",
-    "startLine": 30,
-    "endLine": 30,
-    "quote": "guard !text.isEmpty else { throw ParseError.empty }"
+ "summary": "New error branch of the parser ships without a test",
+ "explanation": "The change adds a branch that rejects an empty string; no added test feeds the parser one.",
+ "citations": [],
+ "problems": [
+  {
+   "severity": "MINOR",
+   "summary": "Empty-string branch of the parser has no test",
+   "explanation": "The change adds a guard that throws for an empty string; no added test passes one.",
+   "citations": [
+    {
+     "sourceKind": "scm.pull-request.diff",
+     "sourcePath": "evidence/change.json",
+     "path": "App/DateParser.swift",
+     "side": "NEW",
+     "startLine": 30,
+     "endLine": 30,
+     "quote": "guard !text.isEmpty else { throw ParseError.empty }"
+    }
+   ],
+   "basis": {
+    "type": "introduced",
+    "head": 0,
+    "explanation": "The change adds this branch on the new side."
    }
-  ],
+  }
+ ],
+ "evidence": {
   "search": {
    "consulted": [
     "scm.pull-request.diff"
@@ -104,32 +110,29 @@ The arguments are one complete observation object for this session's practice, n
 
 ```json
 {
- "revises": null,
- "practiceSlug": "<the practice's slug>",
+ "outcome": "DOES_NOT_APPLY",
  "summary": "No completed merge is recorded",
- "outcome": "NOT_APPLICABLE",
- "severity": null,
- "evidenceRationale": "The captured provider record states that this work has not merged.",
+ "explanation": "The captured provider record states that this work has not merged.",
+ "citations": [
+  {
+   "sourceKind": "scm.pull-request.core",
+   "sourcePath": "evidence/metadata.json",
+   "path": "evidence/metadata.json",
+   "startLine": 3,
+   "endLine": 3,
+   "quote": "\"is_merged\": false"
+  }
+ ],
  "evidence": {
-  "citations": [
-   {
-    "sourceKind": "scm.pull-request.core",
-    "artifactPath": "evidence/metadata.json",
-    "path": "evidence/metadata.json",
-    "startLine": 3,
-    "endLine": 3,
-    "quote": "\"is_merged\": false"
-   }
-  ],
   "inapplicability": {
    "consulted": [
     "scm.pull-request.core"
    ],
-   "subject": "work that has merged",
+   "prerequisite": "work that has merged",
    "ruledOutBy": "the provider records is_merged as false"
   }
  }
 }
 ```
 
-Record one observation for test-practice with report_observation: the outcome its criterion above decides through its Occasion, Judge and Defer, as the evidence supports it, NOT_APPLICABLE and UNDETERMINED included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session records and revises only this practice.
+Submit one result for test-practice with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.

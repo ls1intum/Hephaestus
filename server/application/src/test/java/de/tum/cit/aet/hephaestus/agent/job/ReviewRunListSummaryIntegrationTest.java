@@ -1,15 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.practices.model.Outcome.MET;
-import static de.tum.cit.aet.hephaestus.practices.model.Outcome.NOT_MET;
+import static de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome.MET;
+import static de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome.NOT_MET;
 
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ResultMark;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
+import de.tum.cit.aet.hephaestus.practices.result.ResultMarkRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -43,7 +42,7 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
     private ObjectMapper objectMapper;
 
     @Autowired
-    private PracticeResultInvalidationRepository invalidationRepository;
+    private ResultMarkRepository invalidationRepository;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -51,9 +50,9 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
     private Workspace workspace;
     private User developer;
     private Practice smallDiff;
-    private AgentJob firstReview;
-    private AgentJob secondReview;
-    private AgentJob queuedReview;
+    private ReviewJob firstReview;
+    private ReviewJob secondReview;
+    private ReviewJob queuedReview;
 
     @BeforeEach
     void seedReviews() {
@@ -83,9 +82,9 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
     }
 
     /** The base class seeds a review without a purpose; the admin list reads practice reviews only. */
-    private AgentJob reviewAt(AgentJob review, Instant createdAt) {
-        review.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        review.setCreatedAt(createdAt);
+    private ReviewJob reviewAt(ReviewJob review, Instant createdAt) {
+
+        review.setAvailableAt(createdAt);
         return agentJobRepository.save(review);
     }
 
@@ -155,21 +154,21 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
     @DisplayName("two reviews of one work requested at the same instant take their places in the list order")
     void shouldOrderReviewsOfOneWorkRequestedAtTheSameInstantByTheListOrder() {
         Instant tied = NOW.minus(Duration.ofMinutes(30));
-        AgentJob one = reviewAt(persistPullRequestReview(workspace, 14, null), tied);
-        AgentJob two = reviewAt(persistPullRequestReview(workspace, 14, null), tied);
+        ReviewJob one = reviewAt(persistPullRequestReview(workspace, 14, null), tied);
+        ReviewJob two = reviewAt(persistPullRequestReview(workspace, 14, null), tied);
         // The entity does not update its creation time, so the tie is written directly.
         jdbcTemplate.update(
-                "UPDATE agent_job SET created_at = ? WHERE id IN (?, ?)",
+                "UPDATE review_job SET created_at = ? WHERE id IN (?, ?)",
                 Timestamp.from(tied),
                 one.getId(),
                 two.getId());
         boolean oneFirst = one.getId().toString().compareTo(two.getId().toString()) < 0;
-        AgentJob newer = oneFirst ? two : one;
+        ReviewJob newer = oneFirst ? two : one;
 
-        AgentJob older = oneFirst ? one : two;
+        ReviewJob older = oneFirst ? one : two;
 
         // Counted in (created at, id) order, so the tie has one answer however the page sorts it.
-        list("?artifactKind=scm.pull_request&artifactId=14")
+        list("?itemKind=scm.pull_request&artifactId=14")
                 .jsonPath("$.content.length()")
                 .isEqualTo(2)
                 .jsonPath("$.content[?(@.id == '" + newer.getId() + "')].positionOnWork")
@@ -187,7 +186,7 @@ class ReviewRunListSummaryIntegrationTest extends AbstractPracticeReviewIntegrat
         User other = persistUser("run-list-other");
         UUID wrong =
                 observe(smallDiff, firstReview, 12L, other, NOT_MET, Severity.MINOR, NOW.minus(Duration.ofHours(3)));
-        invalidationRepository.save(new PracticeResultInvalidation(
+        invalidationRepository.save(new ResultMark(
                 practiceResultRepository.findById(wrong).orElseThrow(), 1L, "About the wrong person", NOW));
 
         list("").jsonPath("$.content[2].id")

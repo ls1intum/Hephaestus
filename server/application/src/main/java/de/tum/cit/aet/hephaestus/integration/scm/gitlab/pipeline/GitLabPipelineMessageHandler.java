@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pipeline;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -65,9 +65,10 @@ public class GitLabPipelineMessageHandler extends AbstractIntegrationMessageHand
     }
 
     /**
-     * Records the pipeline Hephaestus received at {@code arrivedAt}, where nothing observed later is stored: a
-     * delayed hook does not put back a status the pipeline or a later read has since replaced. Runs in the caller's
-     * transaction, which holds each merge request's row while it compares.
+     * Records the pipeline Hephaestus received at {@code arrivedAt}, where nothing observed later
+     * is stored: a delayed hook does not put back a status the pipeline or a later read has since
+     * replaced. Runs in the caller's transaction, which holds each merge request's row while it
+     * compares.
      */
     void handle(GitLabPipelineEventDTO event, Instant arrivedAt) {
         var pipeline = event.objectAttributes();

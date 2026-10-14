@@ -2,14 +2,13 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -17,6 +16,8 @@ import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
 
@@ -30,7 +31,7 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
 
         Set<String> offenders = new TreeSet<>();
         for (Map.Entry<String, JsonNode> e : practices.entrySet()) {
-            String criteria = e.getValue().path("criteria").asText("");
+            String criteria = e.getValue().path("criteria").asString("");
             Matcher m = SLUG_SHAPED.matcher(criteria);
             while (m.find()) {
                 String token = m.group();
@@ -49,8 +50,8 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
         }
 
         assertThat(offenders)
-                .as(
-                        "every slug-shaped criteria reference must name a real practice slug; these are truncations of a real slug")
+                .as("every slug-shaped criteria reference must name a real practice slug; these are truncations of"
+                        + " a real slug")
                 .isEmpty();
 
         // Belt-and-braces: these known phantom slugs must never appear, even though they are not prefixes
@@ -78,12 +79,12 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
     }
 
     private static Map<String, JsonNode> loadPractices() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
+        JsonMapper mapper = JsonMapper.builder().build();
         JsonNode root = mapper.readTree(readCatalogue());
         Map<String, JsonNode> practices = new LinkedHashMap<>();
         for (JsonNode group : root.path("groups")) {
             for (JsonNode practice : group.path("practices")) {
-                practices.put(practice.path("slug").asText(), practice);
+                practices.put(practice.path("slug").asString(), practice.path("definition"));
             }
         }
         assertThat(practices).as("catalogue must declare practices").isNotEmpty();
@@ -97,7 +98,7 @@ class CatalogCriteriaSlugReferenceTest extends BaseUnitTest {
             assertThat(in)
                     .as("practices/default-catalog.json must be on the classpath")
                     .isNotNull();
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            return new String(Objects.requireNonNull(in).readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

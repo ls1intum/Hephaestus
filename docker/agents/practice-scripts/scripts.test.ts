@@ -5,12 +5,11 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
 
-import { KINDS, type Kind } from "./lib/contract.ts";
-import { isJsonObject } from "./lib/json.ts";
-import { isPracticeScriptDefinition, UnratedError } from "./lib/practice-script.ts";
-import type { DiffFile } from "./lib/types.ts";
+import type { DiffFile } from "./kits/scm/types.ts";
+import { isJsonObject } from "./lib/core/json.ts";
+import { isPracticeScriptDefinition, UnratedError } from "./lib/core/practice-script.ts";
 import {
-	moment,
+	event,
 	requested,
 	runBundled,
 	runBundledProgram,
@@ -18,6 +17,9 @@ import {
 	type RunInputs,
 } from "./run-bundled.ts";
 import { stagePracticeScripts } from "./stage.ts";
+
+const KINDS = ["scm.pull_request", "scm.issue", "chat.thread", "docs.document"] as const;
+type Kind = string;
 
 const SCRIPTS_DIR = path.resolve(
 	import.meta.dirname,
@@ -93,7 +95,7 @@ void describe("issue classification across practices", () => {
 		"issue-scoped-to-single-concern",
 	];
 
-	const opened = moment("scm.issue.opened");
+	const opened = event("scm.issue.opened");
 
 	for (const { name, metadata, emptyOrTitleEcho, hasDeliverableType, looksUmbrella } of [
 		{
@@ -195,7 +197,7 @@ void describe("issue classification across practices", () => {
 	]) {
 		void it(`preserves shared facts for a ${name}`, async () => {
 			for (const scriptName of names) {
-				const result = await runBundled(scriptName, { work: metadata, cause: opened });
+				const result = await runBundled(scriptName, { item: metadata, inputs: opened });
 				assert.equal(result.facts?.emptyOrTitleEcho, emptyOrTitleEcho, scriptName);
 				assert.deepEqual(result.leads, [], scriptName);
 				if (scriptName !== "issue-scoped-to-single-concern") {
@@ -285,7 +287,7 @@ void describe("issue classification across practices", () => {
 			{ slug: "issue-scoped-to-single-concern", checkboxes: "checkboxes" },
 		]) {
 			for (const [rollup, text, facts, unsaid] of subIssueCases) {
-				const result = await runBundled(slug, { work: { ...issue, ...rollup }, cause: opened });
+				const result = await runBundled(slug, { item: { ...issue, ...rollup }, inputs: opened });
 				const said = (result.directions ?? []).join("\n");
 				assert.deepEqual(result.leads, [], slug);
 				assert.match(said, text, slug);
@@ -317,7 +319,7 @@ void describe("issue classification across practices", () => {
 
 void it("testing guidance keeps words separated by template comments apart", async () => {
 	const result = await runBundled("states-how-to-verify-the-change", {
-		work: { title: "", source_branch: "", body: "## How to test\nn<!-- template -->a" },
+		item: { title: "", source_branch: "", body: "## How to test\nn<!-- template -->a" },
 	});
 	assert.match((result.directions ?? []).join("\n"), /holds 1 line\(s\) of author text/u);
 });
@@ -345,13 +347,13 @@ void it("linked-work analysis reads only explicitly supplied context, never a re
 				],
 			}),
 		);
-		const work = { source_branch: "fix-example", title: "Fixes #12" };
-		const explicit = await runBundled(slug, { work, repo, context });
+		const item = { source_branch: "fix-example", title: "Fixes #12" };
+		const explicit = await runBundled(slug, { item, repo, context });
 		assert.equal(explicit.facts?.acceptanceCriteriaCheckboxes, 2);
 		assert.deepEqual(explicit.leads, []);
-		const absent = await runBundled(slug, { work, repo });
+		const absent = await runBundled(slug, { item, repo });
 		assert.equal(absent.facts?.linkedItemsFilePresent, 0);
-		const missing = await runBundled(slug, { work, repo, context: path.join(root, "missing") });
+		const missing = await runBundled(slug, { item, repo, context: path.join(root, "missing") });
 		assert.equal(missing.facts?.linkedItemsFilePresent, 0);
 	} finally {
 		await rm(root, { recursive: true, force: true });
@@ -420,13 +422,13 @@ void it("issue-reference syntax in templates remains a candidate rather than an 
 		target_branch: "main",
 		commit_sha: "a".repeat(40),
 	};
-	const result = await runBundled("honours-linked-issue-acceptance-criteria", { work: metadata });
+	const result = await runBundled("honours-linked-issue-acceptance-criteria", { item: metadata });
 	const said = (result.directions ?? []).join("\n");
 	assert.equal(result.facts?.issueReferenceSyntaxCandidateCount, 1);
 	assert.match(said, /syntax candidate/u);
 	assert.match(said, /before establishing that the author/u);
 	assert.doesNotMatch(said, /this change claims to close/u);
-	const trace = await runBundled("ready-and-traceable-handoff", { work: metadata });
+	const trace = await runBundled("ready-and-traceable-handoff", { item: metadata });
 	assert.equal(trace.facts?.issueMentionSyntaxCandidateCount, 1);
 	assert.match(
 		(trace.directions ?? []).join("\n"),
@@ -445,7 +447,7 @@ void it("the readiness practice script leaves every title to the model and keeps
 		"WIP: add the quiz results screen",
 	]) {
 		const trace = await runBundled("ready-and-traceable-handoff", {
-			work: {
+			item: {
 				source_branch: "plain-branch",
 				title,
 				body: "Closes #42\n\n- [x] Results screen\n- [ ] Empty state\n",
@@ -463,15 +465,15 @@ void it("the readiness practice script leaves every title to the model and keeps
 
 /** The smallest valid inputs of each kind: a pull request with a captured empty change, and empty records. */
 const MINIMAL_INPUTS: Record<Kind, RunInputs> = {
-	"scm.pull_request": { cause: requested("scm.pull_request"), change: new Map() },
-	"scm.issue": { cause: requested("scm.issue") },
+	"scm.pull_request": { inputs: requested("scm.pull_request"), change: new Map() },
+	"scm.issue": { inputs: requested("scm.issue") },
 	"chat.conversation_thread": {
-		cause: requested("chat.conversation_thread"),
-		work: { channel: "C1", threadTs: "1.0", messages: [], messageCount: 0, truncated: false },
+		inputs: requested("chat.conversation_thread"),
+		item: { channel: "C1", threadTs: "1.0", messages: [], messageCount: 0, truncated: false },
 	},
 	"docs.document": {
-		cause: requested("docs.document"),
-		work: {
+		inputs: requested("docs.document"),
+		item: {
 			title: null,
 			collection: null,
 			collectionSlug: null,

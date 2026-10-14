@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.MentorBusyException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerControlWebSocketHandler;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerDisconnectedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerMentorSessionEvent;
@@ -88,7 +88,7 @@ class WorkerInteractiveSandboxServiceTest extends BaseUnitTest {
         String token = credentials.mint(
                 id,
                 new MentorProxyCredentialRegistry.Route(
-                        "openai-completions", "https://example.test/v1", FundingSource.INSTANCE, 1L, 2L, 3L));
+                        "openai-completions", "https://example.test/v1", UsageFundingSource.INSTANCE, 1L, 2L, 3L));
         return new InteractiveSandboxSpec(
                 id,
                 developer,

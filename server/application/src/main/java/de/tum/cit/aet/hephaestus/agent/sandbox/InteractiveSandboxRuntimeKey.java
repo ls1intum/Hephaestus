@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SecurityProfile;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,7 +44,7 @@ public record InteractiveSandboxRuntimeKey(
     private record RoutingKey(
             String apiProtocol,
             String baseUrl,
-            @Nullable FundingSource connectionScope,
+            @Nullable UsageFundingSource connectionScope,
             @Nullable Long connectionId,
             @Nullable Long modelId,
             @Nullable Long workspaceId) {

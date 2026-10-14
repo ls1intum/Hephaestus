@@ -18,7 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -75,7 +75,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
                 connectionService,
                 new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
                 natsConsumerService,
-                mock(PracticeReviewRepositoryTargetRepository.class));
+                mock(ReviewScopeRepositoryRepository.class));
     }
 
     private RepositoryToMonitor monitor(@Nullable Long nativeId, String nameWithOwner) {

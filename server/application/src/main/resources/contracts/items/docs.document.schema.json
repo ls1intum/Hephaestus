@@ -1,0 +1,88 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"type": "object",
+	"properties": {
+		"id": {
+			"type": "string",
+			"pattern": "^[1-9][0-9]*$"
+		},
+		"sourceId": {
+			"type": "string",
+			"pattern": "^[1-9][0-9]*$"
+		},
+		"title": {
+			"type": [
+				"string",
+				"null"
+			]
+		},
+		"collection": {
+			"type": [
+				"string",
+				"null"
+			]
+		},
+		"collectionSlug": {
+			"type": [
+				"string",
+				"null"
+			]
+		},
+		"slug": {
+			"type": [
+				"string",
+				"null"
+			]
+		},
+		"createdBy": {
+			"type": [
+				"string",
+				"null"
+			]
+		},
+		"createdByAccountId": {
+			"anyOf": [
+				{
+					"type": "string",
+					"pattern": "^[1-9][0-9]*$"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"updatedBy": {
+			"type": [
+				"string",
+				"null"
+			]
+		},
+		"updatedByAccountId": {
+			"anyOf": [
+				{
+					"type": "string",
+					"pattern": "^[1-9][0-9]*$"
+				},
+				{
+					"type": "null"
+				}
+			]
+		},
+		"archived": {
+			"type": "boolean"
+		}
+	},
+	"required": [
+		"id",
+		"sourceId",
+		"title",
+		"collection",
+		"collectionSlug",
+		"slug",
+		"createdBy",
+		"createdByAccountId",
+		"updatedBy",
+		"updatedByAccountId",
+		"archived"
+	]
+}

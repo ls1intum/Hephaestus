@@ -1,14 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -30,7 +29,7 @@ record TerminalUsage(
         UsageProvenance provenance) {
     /**
      * @param runnerUsage what the agent runner reported, or {@code null} when it never produced one
-     * @param proxyCounts the {@code agent_job} row's proxy accumulators, read BEFORE any requeue
+     * @param proxyCounts the {@code review_job} row's proxy accumulators, read BEFORE any requeue
      *     (which zeroes them) and BEFORE the runner's totals are written over them
      * @param practiceScript the attempt's practice script totals by model kind. Its chat total is added to the
      *     runner's report: its session events contain no direct calls, while the proxy's counters do.
@@ -38,7 +37,7 @@ record TerminalUsage(
      */
     static TerminalUsage resolve(
             @Nullable LlmUsage runnerUsage,
-            @Nullable AgentJobLlmUsage proxyCounts,
+            @Nullable ReviewJobLlmUsage proxyCounts,
             List<PracticeScriptKindTotal> practiceScript) {
         boolean fromRunner = hasTokens(runnerUsage);
         boolean fromProxy = proxyCounts != null && proxyCounts.hasReportedUsage();
@@ -80,7 +79,7 @@ record TerminalUsage(
      * An attempt that ended without a runner report. The proxy's counters already hold its practice script
      * chat calls.
      */
-    static TerminalUsage fromProxy(@Nullable AgentJobLlmUsage proxyCounts) {
+    static TerminalUsage fromProxy(@Nullable ReviewJobLlmUsage proxyCounts) {
         return resolve(null, proxyCounts, List.of());
     }
 
@@ -90,7 +89,7 @@ record TerminalUsage(
     }
 
     /**
-     * Append this ending attempt to the spend ledger — the ONE way an {@code agent_job} attempt becomes
+     * Append this ending attempt to the spend ledger — the ONE way an {@code review_job} attempt becomes
      * ledger rows: its own row, then one row for each model for practice scripts other than chat that it called,
      * over all its practices. The ledger key holds no practice, so one row per practice would keep only
      * the first.
@@ -109,23 +108,24 @@ record TerminalUsage(
      */
     boolean appendTo(
             LlmUsageRecorder recorder,
-            AgentJobRepository jobs,
+            ReviewJobRepository jobs,
             Long workspaceId,
-            AgentJob job,
+            ReviewJob job,
             @Nullable ConfigSnapshot snapshot,
             LlmPriceSnapshot price) {
         // One instant for every row of the attempt, so midnight on the 1st cannot split it across two months.
         Instant occurredAt = Instant.now();
         List<PracticeScriptKindTotal> practiceScript =
-                jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getRetryCount());
+                jobs.sumPracticeScriptUsageByKind(workspaceId, job.getId(), job.getAttempt());
         boolean billed = append(
                 recorder,
                 workspaceId,
                 new LlmUsageRecorder.LlmUsageSample(
-                        LlmUsageJobType.from(job.getJobType()),
-                        LlmUsageSourceType.AGENT_JOB,
+                        job.getReviewId(),
+                        "PRACTICE_REVIEW",
+                        UsageSourceType.REVIEW_JOB,
                         job.getId(),
-                        job.getRetryCount(),
+                        job.getAttempt(),
                         snapshot == null ? null : snapshot.upstreamModelId(),
                         inputTokens,
                         outputTokens,
@@ -148,10 +148,11 @@ record TerminalUsage(
                     recorder,
                     workspaceId,
                     new LlmUsageRecorder.LlmUsageSample(
-                            LlmUsageJobType.from(job.getJobType()),
-                            AgentJobPracticeScriptUsage.ledgerSourceType(total.modelKind()),
+                            job.getReviewId(),
+                            "PRACTICE_REVIEW",
+                            ScriptUsage.ledgerSourceType(total.modelKind()),
                             job.getId(),
-                            job.getRetryCount(),
+                            job.getAttempt(),
                             model == null ? null : model.upstreamModelId(),
                             total.inputTokens(),
                             total.outputTokens(),
@@ -223,7 +224,7 @@ record TerminalUsage(
                     Math.max(0, usage.totalCalls()));
         }
 
-        static Buckets of(AgentJobLlmUsage counts) {
+        static Buckets of(ReviewJobLlmUsage counts) {
             return new Buckets(
                     counts.inputTokens(),
                     counts.outputTokens(),

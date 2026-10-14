@@ -8,6 +8,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -245,28 +247,33 @@ class LlmBudgetServiceTest extends BaseUnitTest {
         @ParameterizedTest(name = "{4}")
         @MethodSource("de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetServiceTest#exhaustedCaps")
         void anExhaustedCapBlocksOnlyItsOwnFundingSource(
-                String instanceSpend, String byoSpend, FundingSource blockedSource, String expectedCapTag, String why) {
+                String instanceSpend,
+                String byoSpend,
+                UsageFundingSource blockedSource,
+                String expectedCapTag,
+                String why) {
             stubLedger(instanceSpend, false, byoSpend, false);
             Workspace workspace = workspaceWithBudgets(new BigDecimal("10.00"), new BigDecimal("10.00"));
-            FundingSource openSource =
-                    blockedSource == FundingSource.INSTANCE ? FundingSource.WORKSPACE : FundingSource.INSTANCE;
+            UsageFundingSource openSource = blockedSource == UsageFundingSource.INSTANCE
+                    ? UsageFundingSource.WORKSPACE
+                    : UsageFundingSource.INSTANCE;
 
-            assertThat(budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", openSource))
+            assertThat(budgetService.blockSubmission(workspace, "PRACTICE_REVIEW", openSource))
                     .as(why)
                     .isFalse();
-            assertThat(budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", blockedSource))
+            assertThat(budgetService.blockSubmission(workspace, "PRACTICE_REVIEW", blockedSource))
                     .isTrue();
             assertThat(meterRegistry
-                            .counter("llm.budget.blocked", "surface", "agent_job", "cap", expectedCapTag)
+                            .counter("llm.budget.blocked", "surface", "review_job", "cap", expectedCapTag)
                             .count())
                     .isEqualTo(1d);
 
             // An unattributable submission is blocked by either cap — and is filed under the cap that
             // actually refused it, not the one the caller happened to be asking about.
-            assertThat(budgetService.blockSubmission(workspace, "PULL_REQUEST_REVIEW", null))
+            assertThat(budgetService.blockSubmission(workspace, "PRACTICE_REVIEW", null))
                     .isTrue();
             assertThat(meterRegistry
-                            .counter("llm.budget.blocked", "surface", "agent_job", "cap", expectedCapTag)
+                            .counter("llm.budget.blocked", "surface", "review_job", "cap", expectedCapTag)
                             .count())
                     .isEqualTo(2d);
         }
@@ -277,13 +284,13 @@ class LlmBudgetServiceTest extends BaseUnitTest {
                 Arguments.of(
                         "10.00",
                         "0.00",
-                        FundingSource.INSTANCE,
+                        UsageFundingSource.INSTANCE,
                         "instance",
                         "an exhausted instance cap does not block workspace-funded work"),
                 Arguments.of(
                         "0.00",
                         "10.00",
-                        FundingSource.WORKSPACE,
+                        UsageFundingSource.WORKSPACE,
                         "byo",
                         "an exhausted BYO cap does not block instance-funded work"));
     }

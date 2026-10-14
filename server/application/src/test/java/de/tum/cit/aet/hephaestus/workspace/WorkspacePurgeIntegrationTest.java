@@ -6,14 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
@@ -39,20 +35,17 @@ import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles.LateFailingWorkspacePurgeContributor;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -78,13 +71,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Integration tests for workspace purge (deletion) covering data cleanup completeness,
- * idempotency, shared entity protection, credential clearing, and authorization.
+ * Integration tests for workspace purge (deletion) covering data cleanup completeness, idempotency,
+ * shared entity protection, credential clearing, and authorization.
  */
 class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
-
     @Autowired
-    private HiddenFormerMemberRepository hiddenFormerMemberRepository;
+    private PracticeModelTestFixtures modelFixtures;
 
     @Autowired
     private LateFailingWorkspacePurgeContributor lateFailingContributor;
@@ -141,19 +133,19 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeResultRepository practiceResultRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
-    private FeedbackPlacementRepository feedbackPlacementRepository;
+    private FeedbackCopyRepository feedbackPlacementRepository;
 
     @Autowired
-    private AgentJobRepository agentJobRepository;
+    private ReviewJobRepository agentJobRepository;
 
     @Autowired
     private ConnectionRepository connectionRepository;
@@ -169,9 +161,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OM = new ObjectMapper();
 
-    /**
-     * Creates a GitLab workspace with typical associated data for purge testing.
-     */
+    /** Creates a GitLab workspace with typical associated data for purge testing. */
     private Workspace createGitLabWorkspaceWithData(String slug) {
         User owner = persistUser(slug + "-owner");
         Workspace workspace = workspaceService.createWorkspace(new CreateWorkspaceRequestDTO(
@@ -184,7 +174,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 "glpat-purge-test-token",
                 null));
 
-        // The workspace creation request above encrypted the PAT onto the GitLab Connection, which is what
+        // The workspace creation request above encrypted the PAT onto the GitLab Connection, which
+        // is what
         // the credential-clearing assertion below exercises.
 
         // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
@@ -223,7 +214,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         org.setCreatedAt(Instant.now());
         org.setUpdatedAt(Instant.now());
         org = organizationRepository.save(org);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace = workspaceRepository.save(workspace);
 
         // Ensure OWNER membership for the "admin" test user (for HTTP endpoint tests)
@@ -272,8 +263,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             UUID targetedParticipation = seedParticipation(targeted, accountId, workspaceId);
             UUID feedback = UUID.randomUUID();
             jdbcTemplate.update(
-                    "INSERT INTO product_feedback (id, account_id, workspace_id, kind, message, app_version, created_at, submission_minute) "
-                            + "VALUES (?, ?, ?, 'FEEDBACK', 'From the purged workspace', 'test', now(), now())",
+                    "INSERT INTO product_feedback (id, account_id, workspace_id, kind, message,"
+                            + " app_version, created_at, submission_minute) VALUES (?, ?, ?,"
+                            + " 'FEEDBACK', 'From the purged workspace', 'test', now(), now())",
                     feedback,
                     accountId,
                     workspaceId);
@@ -295,8 +287,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         private UUID seedSurvey(@Nullable Long workspaceId) {
             UUID id = UUID.randomUUID();
             jdbcTemplate.update(
-                    "INSERT INTO product_survey (id, title, description, questions_json, workspace_id, starts_at, active, created_at) "
-                            + "VALUES (?, 'Survey', 'Description', CAST('[]' AS jsonb), ?, now(), true, now())",
+                    "INSERT INTO product_survey (id, title, description, questions_json,"
+                            + " workspace_id, starts_at, active, created_at) VALUES (?, 'Survey',"
+                            + " 'Description', CAST('[]' AS jsonb), ?, now(), true, now())",
                     id,
                     workspaceId);
             return id;
@@ -305,8 +298,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         private UUID seedParticipation(UUID surveyId, long accountId, Long workspaceId) {
             UUID id = UUID.randomUUID();
             jdbcTemplate.update(
-                    "INSERT INTO product_survey_participation (id, survey_id, account_id, workspace_id, status, invited_at) "
-                            + "VALUES (?, ?, ?, ?, 'INVITED', now())",
+                    "INSERT INTO product_survey_participation (id, survey_id, account_id,"
+                            + " workspace_id, status, invited_at) VALUES (?, ?, ?, ?, 'INVITED',"
+                            + " now())",
                     id,
                     surveyId,
                     accountId,
@@ -328,7 +322,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     null));
             Long workspaceId = workspace.getId();
 
-            // Add a monitored repository (saved directly — purge reloads workspace with EAGER fetch)
+            // Add a monitored repository (saved directly — purge reloads workspace with EAGER
+            // fetch)
             RepositoryToMonitor monitor = new RepositoryToMonitor();
             monitor.setNameWithOwner("cleanup-group/repo");
             monitor.setWorkspace(workspace);
@@ -354,8 +349,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "pull_request",
                     1L);
 
-            hiddenFormerMemberRepository.save(new HiddenFormerMember(workspaceId, owner.getId()));
-
             // Purge
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
@@ -369,8 +362,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(workspaceMembershipRepository.findByWorkspace_Id(workspaceId))
                     .isEmpty();
             assertThat(activityEventRepository.countByWorkspaceId(workspaceId)).isZero();
-            assertThat(hiddenFormerMemberRepository.existsById(new HiddenFormerMember.Key(workspaceId, owner.getId())))
-                    .isFalse();
         }
     }
 
@@ -433,11 +424,9 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @Test
         void purgeRefusesQueuedAgentWork() {
             Workspace workspace = createGitLabWorkspaceWithData("queued-agent");
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setStatus(AgentJobStatus.QUEUED);
-            job.setConfigSnapshot(OM.createObjectNode());
+            var work = modelFixtures.work(workspace, "queued-work-" + workspace.getId(), "scm.pull_request", 1L);
+            var job = work.job();
+            job.setStatus(ReviewJobStatus.QUEUED);
             agentJobRepository.saveAndFlush(job);
 
             assertThatThrownBy(() -> workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
@@ -459,15 +448,14 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         void purgePreservesOrganization() {
             Workspace workspace = createGitLabWorkspaceWithData("org-protect");
             Long workspaceId = workspace.getId();
-            Organization organization = workspace.getOrganization();
-            assertNotNull(organization);
-            Long orgId = organization.getId();
+            Long orgId = workspace.getOrganizationId();
+            assertNotNull(orgId);
 
             workspaceLifecycleService.purgeWorkspace(workspace.getWorkspaceSlug());
 
             // Workspace org link cleared
             Workspace purged = workspaceRepository.findById(workspaceId).orElseThrow();
-            assertThat(purged.getOrganization()).isNull();
+            assertThat(purged.getOrganizationId()).isNull();
 
             // Organization entity still exists
             assertThat(organizationRepository.findById(orgId)).isPresent();
@@ -479,8 +467,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         /**
          * Per-workspace credentials live on the {@code Connection} aggregate. On workspace purge,
-         * {@code ConnectionPurgeContributor} transitions every still-ACTIVE Connection to
-         * {@code UNINSTALLED}, which clears the encrypted credential blob inside the same transaction.
+         * {@code ConnectionPurgeContributor} transitions every still-ACTIVE Connection to {@code
+         * UNINSTALLED}, which clears the encrypted credential blob inside the same transaction.
          */
         @Test
         void purgeClearsCredentialBlobsOnConnections() {
@@ -526,12 +514,12 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             t1.setId(UUID.randomUUID());
             t1.setTitle("Thread A");
             t1.setWorkspace(workspace);
-            t1.setUser(owner);
+            t1.setAccountId(accountId(owner));
             ChatThread t2 = new ChatThread();
             t2.setId(UUID.randomUUID());
             t2.setTitle("Thread B");
             t2.setWorkspace(workspace);
-            t2.setUser(owner);
+            t2.setAccountId(accountId(owner));
             chatThreadRepository.save(t1);
             chatThreadRepository.save(t2);
 
@@ -575,7 +563,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 null));
 
         User mentorUser = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentorUser, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentorUser, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .delete()
@@ -621,11 +609,14 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             return slackThreadRepository.save(thread);
         }
 
-        /** Insert one ingested Slack message with a controlled {@code ingested_at} (native — bypasses @CreationTimestamp). */
+        /**
+         * Insert one ingested Slack message with a controlled {@code ingested_at} (native —
+         * bypasses @CreationTimestamp).
+         */
         private void insertMessage(Long workspaceId, String slackTs, String slackThreadTs, Instant ingestedAt) {
             jdbcTemplate.update(
-                    "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) "
-                            + "VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id,"
+                            + " slack_ts, slack_thread_ts, ingested_at) VALUES (?, ?, ?, ?, ?, ?)",
                     workspaceId,
                     "T1",
                     "C1",
@@ -650,13 +641,14 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             channel.setConsentState(SlackMonitoredChannel.ConsentState.PENDING);
             slackMonitoredChannelRepository.save(channel);
 
-            // mentor_slack_thread.chat_thread_id is a NOT NULL FK → chat_thread(id); seed a real thread first.
+            // mentor_slack_thread.chat_thread_id is a NOT NULL FK → chat_thread(id); seed a real
+            // thread first.
             User owner = persistUser(channelId + "-mentor-owner");
             ChatThread chatThread = new ChatThread();
             chatThread.setId(UUID.randomUUID());
             chatThread.setTitle("Slack DM " + channelId);
             chatThread.setWorkspace(workspace);
-            chatThread.setUser(owner);
+            chatThread.setAccountId(accountId(owner));
             chatThreadRepository.save(chatThread);
 
             MentorSlackThread mentorThread = new MentorSlackThread();
@@ -673,13 +665,17 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName(
-                "retention sweep processes each workspace independently: B's recent message survives A's expired prune")
+        @DisplayName("retention sweep processes each workspace independently: B's recent message"
+                + " survives A's expired prune")
         void retentionSweepIsWorkspaceIsolated() {
-            // Age-based pruning itself (which ts survives, message-grain vs. thread-grain) is proven by
-            // SlackRetentionErasureIntegrationTest; this is the cross-workspace delta it doesn't cover — that the
-            // sweep loop enumerates workspaces independently, so A's expired data cannot affect B's recent data.
-            // Neither workspace has a Slack Connection, so both resolve to DEFAULT_RETENTION_DAYS (30d).
+            // Age-based pruning itself (which ts survives, message-grain vs. thread-grain) is
+            // proven by
+            // SlackRetentionErasureIntegrationTest; this is the cross-workspace delta it doesn't
+            // cover — that the
+            // sweep loop enumerates workspaces independently, so A's expired data cannot affect B's
+            // recent data.
+            // Neither workspace has a Slack Connection, so both resolve to DEFAULT_RETENTION_DAYS
+            // (30d).
             Instant now = Instant.now();
             Workspace a = createBareWorkspace("slack-retain-a");
             Workspace b = createBareWorkspace("slack-retain-b");
@@ -697,7 +693,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName("purge empties every Slack table for the workspace while other workspaces stay intact")
+        @DisplayName("purge empties every Slack table for the workspace while other workspaces stay" + " intact")
         void purgeEmptiesAllSlackTables() {
             // Seed all four Slack tables for both A and B.
             Instant now = Instant.now();
@@ -731,8 +727,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @DisplayName(
-                "SlackWorkspacePurgeAdapter erases the workspace's derived CONVERSATION rows; another workspace's survive")
+        @DisplayName("SlackWorkspacePurgeAdapter erases the workspace's derived CONVERSATION rows;"
+                + " another workspace's survive")
         void purgeAdapterErasesDerivedConversationRows() {
             Workspace a = createBareWorkspace("slack-conv-a");
             Workspace b = createBareWorkspace("slack-conv-b");
@@ -743,7 +739,8 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             SlackThread threadB = insertThread(b.getId(), "CB", "600.1", "600.1");
             DerivedConversation derivedB = seedDerivedConversation(b, threadB.getId());
 
-            // Run this contributor alone to prove it erases derived rows without the practices contributor.
+            // Run this contributor alone to prove it erases derived rows without the practices
+            // contributor.
             TransactionTemplate tx = new TransactionTemplate(transactionManager);
             tx.executeWithoutResult(status -> slackWorkspacePurgeAdapter.deleteWorkspaceData(a.getId()));
 
@@ -780,16 +777,16 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(feedbackRepository.findById(derived.preparedId()))
                     .get()
                     .extracting(Feedback::getDeliveryState)
-                    .isEqualTo(FeedbackDeliveryState.PREPARED);
+                    .isEqualTo(FeedbackState.READY);
             assertThat(feedbackRepository.findById(derived.deliveredId()))
                     .get()
                     .extracting(Feedback::getDeliveryState)
-                    .isEqualTo(FeedbackDeliveryState.DELIVERED);
+                    .isEqualTo(FeedbackState.DELIVERED);
             assertThat(boundFeedbackIds(derived))
                     .containsExactlyInAnyOrder(derived.preparedId(), derived.deliveredId());
             assertThat(feedbackPlacementRepository.findByFeedbackId(derived.deliveredId()))
                     .singleElement()
-                    .extracting(FeedbackPlacement::getChatMessageId)
+                    .extracting(FeedbackCopy::getChatMessageId)
                     .isEqualTo(derived.messageId());
         }
 
@@ -817,7 +814,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             ChatThread chatThread = new ChatThread();
             chatThread.setId(UUID.randomUUID());
             chatThread.setWorkspace(workspace);
-            chatThread.setUser(owner);
+            chatThread.setAccountId(accountId(owner));
             chatThreadRepository.save(chatThread);
             ChatMessage message = new ChatMessage();
             message.setId(UUID.randomUUID());
@@ -828,86 +825,25 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             message.setMetadata(OM.createObjectNode());
             chatMessageRepository.save(message);
 
-            Practice practice = new Practice();
-            practice.setSignals(PracticeTestEvidence.signals(ArtifactKinds.CONVERSATION_THREAD));
-            practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.CONVERSATION_THREAD));
-            practice.setReviewWhen(Map.of());
-            practice.setSubject(ActorRole.AUTHOR);
-            practice.setPrecondition(null);
-            practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
-            practice.setWorkspace(workspace);
-            practice.setSlug("conv-practice-" + workspace.getId());
-            practice.setName("Conversation Practice");
-            practice.setCriteria("Test description");
-            practice = practiceRepository.save(practice);
-
-            AgentJob job = new AgentJob();
-            job.setWorkspace(workspace);
-            job.setJobType(AgentJobType.CONVERSATION_REVIEW);
-            job.setArtifactKind(ArtifactKinds.CONVERSATION_THREAD);
-            job.setStatus(AgentJobStatus.COMPLETED);
-            job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-            job = agentJobRepository.save(job);
-
-            List<UUID> practiceResultIds = List.of(UUID.randomUUID(), UUID.randomUUID());
-            for (UUID practiceResultId : practiceResultIds) {
-                practiceResultRepository.insertIfAbsent(
-                        practiceResultId,
-                        "occ-" + practiceResultId,
-                        job.getId(),
-                        job.getWorkspace().getId(),
-                        practice.getId(),
-                        null,
-                        ArtifactKinds.CONVERSATION_THREAD.value(),
-                        threadId,
-                        owner.getId(),
-                        "Result title",
-                        "NOT_MET",
-                        "MAJOR",
-                        null,
-                        null,
-                        "test-scope",
-                        null,
-                        null,
-                        null,
-                        Instant.now(),
-                        "LIVE");
-            }
-            Feedback prepared = feedbackRepository.save(Feedback.builder()
-                    .agentJobId(job.getId())
+            var work = modelFixtures.work(workspace, "conv-practice-" + workspace.getId(), "chat.thread", threadId);
+            var first = modelFixtures.result(work, accountId(owner), "Result title");
+            var second = modelFixtures.result(work, accountId(owner), "Result title");
+            List<UUID> practiceResultIds = List.of(first.getId(), second.getId());
+            var prepared = modelFixtures.feedback(
+                    first, FeedbackDestination.CONVERSATION, FeedbackState.READY, "Prepared guidance");
+            var delivered = modelFixtures.feedback(
+                    second, FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, "Delivered guidance");
+            UUID copyId = UUID.randomUUID();
+            feedbackPlacementRepository.save(FeedbackCopy.builder()
+                    .id(copyId)
+                    .writeKey(copyId.toString())
+                    .writeMarker("hephaestus:" + copyId)
                     .workspaceId(workspace.getId())
-                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                    .artifactId(threadId)
-                    .recipientUserId(owner.getId())
-                    .aboutUserId(owner.getId())
-                    .channel(FeedbackChannel.IN_CHAT)
-                    .position(0)
-                    .deliveryState(FeedbackDeliveryState.PREPARED)
-                    .source(FeedbackSource.AGENT)
-                    .createdAt(Instant.now())
-                    .build());
-            feedbackEvidenceRepository.insertIfAbsent(
-                    prepared.getId(), practiceResultIds.get(0), null, EvidenceRole.PRIMARY.name(), 0);
-            Feedback delivered = feedbackRepository.save(Feedback.builder()
-                    .agentJobId(job.getId())
-                    .workspaceId(workspace.getId())
-                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                    .artifactId(threadId)
-                    .recipientUserId(owner.getId())
-                    .aboutUserId(owner.getId())
-                    .channel(FeedbackChannel.IN_CHAT)
-                    .position(1)
-                    .deliveryState(FeedbackDeliveryState.DELIVERED)
-                    .source(FeedbackSource.AGENT)
-                    .createdAt(Instant.now())
-                    .deliveredAt(Instant.now())
-                    .build());
-            feedbackEvidenceRepository.insertIfAbsent(
-                    delivered.getId(), practiceResultIds.get(1), null, EvidenceRole.PRIMARY.name(), 0);
-            feedbackPlacementRepository.save(FeedbackPlacement.builder()
-                    .feedback(delivered)
-                    .placementType(PlacementType.CONVERSATION_TURN)
+                    .feedbackId(delivered.getId())
+                    .kind(FeedbackCopyKind.CHAT_TURN)
+                    .state(FeedbackCopyState.POSTED)
                     .chatMessageId(message.getId())
+                    .postedAt(Instant.now())
                     .createdAt(Instant.now())
                     .build());
             return new DerivedConversation(practiceResultIds, prepared.getId(), delivered.getId(), message.getId());

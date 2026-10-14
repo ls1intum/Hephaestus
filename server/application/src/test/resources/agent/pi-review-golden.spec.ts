@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
 	mkdirSync,
 	mkdtempSync,
@@ -12,6 +13,7 @@ import {
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { mock, test } from "node:test";
+import { scan } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 import {
 	GOLDEN_RECORD,
@@ -23,13 +25,9 @@ import {
 	goldenLeads,
 	stageGoldenWorkspace,
 } from "./golden-review-workspace.ts";
-import { REVIEWED_CHANGES } from "./golden-reviewed-changes.ts";
 
-// Golden prompts: what one practice's review session is told. The runner reads /workspace at module scope, so each
-// scenario is a child process that re-enters this file with the SDK mocked. The frozen prompts in golden-prompts/
-// were captured from commit 5347f0108 over the same workspace (golden-review-workspace.ts); only the reviewed blocks
-// of golden-reviewed-changes.ts may differ. golden-prompts/final/ pins the new submit_result tool and the new form of
-// the prepared review input.
+// Each child captures the full v3 prompts and tools for one frozen workspace.
+// A separate process keeps the runner's module-level paths and state local to that scenario.
 
 const GOLDEN = nodePath.join(import.meta.dirname, "golden-prompts");
 const LIB = nodePath.resolve(
@@ -40,7 +38,7 @@ const LIB = nodePath.resolve(
 // The workspace captures no checkout witness, so a quote of code would be refused; the record is a staged source.
 const recordCitation = {
 	sourceKind: "scm.pull-request.core",
-	artifactPath: "evidence/metadata.json",
+	sourcePath: "evidence/metadata.json",
 	path: "evidence/metadata.json",
 	startLine: 1,
 	endLine: 1,
@@ -53,7 +51,7 @@ function preparingProgram(many: boolean): string {
 		...lead,
 		label: LEAD_LABELS[kind],
 	}));
-	return `import { definePracticeScript } from "../lib/practice-script.ts";
+	return `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 meta: {},
 async run(ctx) {
@@ -69,12 +67,98 @@ function runScenario(name: string): Map<string, string> {
 	try {
 		stageGoldenWorkspace(
 			cwd,
-			5,
+			6,
 			readFileSync(
 				new URL("../../../main/resources/agent/pi-orchestrator.md", import.meta.url),
 				"utf8",
 			),
 		);
+		if (name === "scan") {
+			const inputs = scan("src/healthy.ts");
+			inputs.practice.slug = "test-practice";
+			mkdirSync(nodePath.join(cwd, "repos/primary/.git"), { recursive: true });
+			mkdirSync(nodePath.join(cwd, "repos/primary/src"), { recursive: true });
+			writeFileSync(nodePath.join(cwd, "repos/primary/.git/HEAD"), "a".repeat(40));
+			writeFileSync(nodePath.join(cwd, "repos/primary/src/healthy.ts"), "const healthy = true;\n");
+			writeFileSync(
+				nodePath.join(cwd, PRACTICES_DIR, "test-practice.inputs.json"),
+				JSON.stringify(inputs),
+			);
+			writeFileSync(
+				nodePath.join(cwd, "catalog/practices/index.json"),
+				JSON.stringify([
+					{
+						slug: "test-practice",
+						readsSources: ["scm.repository.tree"],
+						exhaustiveSources: ["scm.repository.tree"],
+						contextPaths: [],
+					},
+				]),
+			);
+			writeFileSync(
+				nodePath.join(cwd, "evidence/manifest.json"),
+				JSON.stringify({
+					itemKind: "scm.file",
+					files: [
+						{ kind: "scm.repository.tree", file: { path: "repos/primary/.git/HEAD" } },
+						{
+							kind: "scm.repository.tree",
+							file: { path: "repos/primary/.git/hephaestus-captured-refs" },
+						},
+					],
+					citableTexts: [],
+					sources: [
+						{
+							kind: "scm.repository.tree",
+							state: { availability: "AVAILABLE", completeness: "COMPLETE" },
+							files: [{ path: "repos/primary/.git/HEAD" }],
+							citation: { side: "FORBIDDEN", revision: "OPTIONAL" },
+						},
+					],
+				}),
+			);
+		}
+
+		if (name === "registered-text") {
+			const text = "First line.\nSecond line is the open question.\n";
+			writeFileSync(nodePath.join(cwd, "evidence/message.txt"), text);
+			writeFileSync(
+				nodePath.join(cwd, "catalog/practices/index.json"),
+				JSON.stringify([
+					{
+						slug: "test-practice",
+						readsSources: ["scm.pull-request.core"],
+						exhaustiveSources: ["scm.pull-request.core"],
+					},
+				]),
+			);
+			writeFileSync(
+				nodePath.join(cwd, "evidence/manifest.json"),
+				JSON.stringify({
+					itemKind: "scm.pull_request",
+					files: [{ kind: "scm.pull-request.core", file: { path: "evidence/metadata.json" } }],
+					citableTexts: [
+						{
+							source: "scm.pull-request.core",
+							path: "thread/message",
+							side: "NEW",
+							revision: null,
+							stagedPath: "evidence/message.txt",
+							sha256: createHash("sha256").update(text).digest("hex"),
+						},
+					],
+					sources: [
+						{
+							kind: "scm.pull-request.core",
+							state: { availability: "AVAILABLE", completeness: "COMPLETE" },
+							files: [{ path: "evidence/metadata.json" }],
+							citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
+						},
+					],
+				}),
+			);
+		}
+
 		if (name.startsWith("leads")) {
 			writeFileSync(nodePath.join(cwd, "package.json"), '{"type":"module"}\n');
 			symlinkSync(LIB, nodePath.join(cwd, nodePath.dirname(PRACTICES_DIR), "lib"));
@@ -117,75 +201,6 @@ function runScenario(name: string): Map<string, string> {
 	}
 }
 
-/** The prepared review input's section of a turn, and the turn without it. */
-function cutSection(prompt: string): { section: string; rest: string } {
-	const start = prompt.indexOf("#### Leads from the practice script");
-	if (start === -1) {
-		return { section: "", rest: prompt };
-	}
-	const end = prompt.search(/\n\n(?:Record one observation|Submit one result) for /u);
-	assert.ok(end > start, "the section ends before the closing instruction");
-	return { section: prompt.slice(start, end), rest: prompt.slice(0, start) + prompt.slice(end) };
-}
-
-/** The headings of a section and the part of it each one starts. */
-const SECTION_PARTS = new Map<string, "kinds" | "leads" | "facts">([
-	["**Lead kinds:**", "kinds"],
-	["**Leads:**", "leads"],
-	["**Facts:**", "facts"],
-]);
-
-/** What a section says, line kind by line kind: directions, leads in order, facts, not-rated notices, cut notice. */
-function sectionContent(section: string, legacy: boolean) {
-	const lines = section.split("\n").slice(1);
-	const kinds = new Map<string, string>();
-	const leads: string[] = [];
-	const directions: string[] = [];
-	const facts: string[] = [];
-	const notRated: string[] = [];
-	let cut: string | null = null;
-	let part: "directions" | "kinds" | "leads" | "facts" = "directions";
-	let label = "";
-	for (const line of lines) {
-		const heading = SECTION_PARTS.get(line);
-		if (heading !== undefined) {
-			part = heading;
-			continue;
-		}
-		if (line === "") {
-			continue;
-		}
-		if (line.startsWith("- Not rated: ")) {
-			notRated.push(line);
-		} else if (/^- \d+ more lines are not shown/u.test(line)) {
-			cut = line;
-		} else if (part === "directions") {
-			directions.push(line);
-		} else if (part === "kinds") {
-			const kind = /^- (?<kind>[a-z-]+): (?<label>.*)$/u.exec(line)?.groups;
-			assert.ok(kind?.kind !== undefined && kind.label !== undefined, line);
-			kinds.set(kind.kind, kind.label);
-		} else if (part === "facts") {
-			facts.push(line);
-		} else if (legacy) {
-			const row = /^- (?<kind>[a-z-]+) at (?<rest>.*)$/u.exec(line)?.groups;
-			assert.ok(row?.kind !== undefined && row.rest !== undefined, line);
-			leads.push(`${kinds.get(row.kind) ?? row.kind} at ${row.rest}`);
-		} else if (line.startsWith("  - at ")) {
-			leads.push(`${label} at ${line.slice("  - at ".length)}`);
-		} else {
-			label = line.slice("- ".length);
-		}
-	}
-	return { directions, leads, facts, notRated, cut };
-}
-
-/** The tool names a captured tool list holds. */
-function toolsOf(text: string): unknown {
-	const parsed: unknown = JSON.parse(text);
-	return typeof parsed === "object" && parsed !== null ? Reflect.get(parsed, "tools") : null;
-}
-
 const scenario = process.env.PI_GOLDEN_SCENARIO;
 if (scenario !== undefined && scenario !== "") {
 	const cwd = process.env.PI_RUNNER_CWD;
@@ -197,17 +212,28 @@ if (scenario !== undefined && scenario !== "") {
 	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
 	const derived: unknown = await import(change);
 	assert.ok(typeof derived === "object" && derived !== null);
-	mock.module(change, { namedExports: { ...derived, writeChangeView: () => undefined } });
+	mock.module(change, {
+		namedExports: {
+			...derived,
+			writeChangeView: () => undefined,
+			...(scenario === "scan"
+				? { readChange: () => null, checkedOutCommit: () => "a".repeat(40) }
+				: {}),
+		},
+	});
 	mock.method(globalThis, "fetch", async (_input: unknown, init?: RequestInit) => {
 		assert.ok(typeof init?.body === "string");
 		const posted: unknown = JSON.parse(init.body);
 		assert.ok(typeof posted === "object" && posted !== null);
 		const results: unknown = Reflect.get(posted, "results");
 		assert.ok(Array.isArray(results));
+		if (scenario === "scan" || scenario === "registered-text") {
+			capture("admission.json", JSON.stringify(posted));
+		}
 		return Response.json({
-			schemaVersion: 2,
+			contractVersion: 3,
 			admissionDigest: "golden-digest",
-			results: [],
+			admitted: [],
 			withheld: [],
 		});
 	});
@@ -280,6 +306,75 @@ if (scenario !== undefined && scenario !== "") {
 						found.execute(id, found.prepareArguments?.(args) ?? args);
 				};
 				const submitResult = async () => {
+					if (scenario === "registered-text") {
+						const reply = await tool("submit_result")("registered-1", {
+							outcome: "COULD_NOT_DETERMINE",
+							summary: "Captured text leaves one open question",
+							explanation: "The captured logical text names the question without settling it.",
+							citations: [
+								{
+									sourceKind: "scm.pull-request.core",
+									sourcePath: "evidence/metadata.json",
+									path: "thread/message",
+									startLine: 2,
+									endLine: 2,
+									quote: "Second line is the open question.",
+								},
+							],
+							evidence: {
+								openQuestions: [
+									{
+										openQuestion: "What settles the question?",
+										wouldSettleIt: "The missing decision.",
+									},
+								],
+							},
+						});
+						capture("submitted.json", JSON.stringify(reply));
+						return;
+					}
+
+					if (scenario === "scan") {
+						await assert.rejects(
+							tool("submit_result")("outside-grant", {
+								outcome: "MET",
+								summary: "A file outside the frozen context",
+								explanation: "This citation must never be read by the host.",
+								citations: [
+									{
+										sourceKind: "scm.repository.tree",
+										sourcePath: "repos/primary/.git/HEAD",
+										path: "src/foreign.ts",
+										startLine: 1,
+										endLine: 1,
+										quote: "const foreign = true;",
+									},
+								],
+								evidence: {},
+							}),
+							/outside its frozen context/u,
+						);
+
+						const reply = await tool("submit_result")("scan-1", {
+							outcome: "MET",
+							summary: "Captured source meets the criterion",
+							explanation: "The complete assigned file meets the bounded criterion.",
+							citations: [
+								{
+									sourceKind: "scm.repository.tree",
+									sourcePath: "repos/primary/.git/HEAD",
+									path: "src/healthy.ts",
+									startLine: 1,
+									endLine: 1,
+									quote: "const healthy = true;",
+								},
+							],
+							evidence: {},
+						});
+						capture("submitted.json", JSON.stringify(reply));
+						return;
+					}
+
 					const reply = await tool("submit_result")("golden-1", {
 						outcome: "NOT_MET",
 						summary: "Added authentication call is insecure",
@@ -394,66 +489,70 @@ if (scenario !== undefined && scenario !== "") {
 		}
 	}
 
+	void test("the runner verifies logical plaintext against its registered bytes rather than metadata JSON", () => {
+		const captured = runScenario("registered-text");
+		const posted: unknown = JSON.parse(captured.get("admission.json") ?? "null");
+		assert.ok(typeof posted === "object" && posted !== null);
+		const results: unknown = Reflect.get(posted, "results");
+		assert.ok(Array.isArray(results) && results.length === 1);
+		assert.partialDeepStrictEqual(results[0], {
+			candidate: {
+				citations: [
+					{
+						path: "thread/message",
+						quote: "Second line is the open question.",
+						startLine: 2,
+						endLine: 2,
+					},
+				],
+			},
+		});
+	});
+
+	void test("the native scan submits pinned file proof with its item attribution and governed tools", () => {
+		const captured = runScenario("scan");
+		const posted: unknown = JSON.parse(captured.get("admission.json") ?? "null");
+		assert.ok(typeof posted === "object" && posted !== null);
+		const results: unknown = Reflect.get(posted, "results");
+		assert.ok(Array.isArray(results) && results.length === 1);
+		const result: unknown = results[0];
+		assert.ok(typeof result === "object" && result !== null);
+		assert.equal(Reflect.get(result, "itemId"), "2");
+		assert.equal(Reflect.get(result, "itemVersion"), scan("src/healthy.ts").scope.version);
+		const receipts: unknown = Reflect.get(result, "readReceipts");
+		assert.ok(Array.isArray(receipts) && receipts.length === 1);
+		assert.partialDeepStrictEqual(receipts[0], {
+			path: "src/healthy.ts",
+			status: "COMPLETE",
+			version: "a".repeat(40),
+		});
+		const tools: unknown = JSON.parse(captured.get("tools.json") ?? "null");
+		assert.ok(typeof tools === "object" && tools !== null);
+		assert.deepEqual(Reflect.get(tools, "tools"), ["read", "submit_result"]);
+		assert.match(
+			captured.get("prompt-1.md") ?? "",
+			/Assigned scan file[\s\S]*const healthy = true;/u,
+		);
+	});
+
 	for (const name of SCENARIOS) {
-		void test(`only the reviewed output-contract blocks of the ${name} prompts changed since 5347f0108`, () => {
+		void test(`the v3 ${name} prompts and tools match the frozen contract`, () => {
 			const captured = captures.get(name);
 			assert.ok(captured !== undefined);
-			const frozen = nodePath.join(GOLDEN, name);
-			for (const file of readdirSync(frozen)) {
-				if (file === "tools.json") {
-					continue;
+			for (const file of readdirSync(nodePath.join(GOLDEN, name))) {
+				const actual = captured.get(file);
+				assert.ok(actual !== undefined);
+				const expected = readFileSync(nodePath.join(GOLDEN, name, file), "utf8");
+				if (file.endsWith(".json")) {
+					const actualValue: unknown = JSON.parse(actual);
+					const expectedValue: unknown = JSON.parse(expected);
+					assert.deepEqual(actualValue, expectedValue, `${name}/${file}`);
+				} else {
+					assert.equal(actual, expected, `${name}/${file}`);
 				}
-				let expected = readFileSync(nodePath.join(frozen, file), "utf8");
-				let actual = captured.get(file);
-				assert.ok(actual !== undefined, `${name}/${file} was not told`);
-				if (name.startsWith("leads")) {
-					// The prepared input: the same labels, directions, leads in order with their quotes and facts, notices
-					// and cut, as far as both sections show them; its new form is pinned whole beside the frozen turn.
-					const before = cutSection(expected);
-					const after = cutSection(actual);
-					if (before.section !== "") {
-						const old = sectionContent(before.section, true);
-						const now = sectionContent(after.section, false);
-						assert.deepEqual(now.directions, old.directions);
-						assert.deepEqual(now.notRated, old.notRated);
-						const shown = Math.min(old.leads.length, now.leads.length);
-						assert.ok(shown > 0);
-						assert.deepEqual(now.leads.slice(0, shown), old.leads.slice(0, shown));
-						if (old.facts.length > 0 && now.facts.length > 0) {
-							assert.deepEqual(now.facts, old.facts);
-						}
-						assert.equal(now.cut !== null, old.cut !== null, "a cut section says so, now as then");
-						assert.equal(
-							after.section,
-							readFileSync(nodePath.join(GOLDEN, "final", `${name}-review-input.md`), "utf8"),
-						);
-						expected = before.rest;
-						actual = after.rest;
-					}
-				}
-				for (const [block, replacement] of REVIEWED_CHANGES[
-					file === "system-prompt.md" ? "system" : "turn"
-				]) {
-					expected = expected.split(block).join(replacement);
-				}
-				assert.equal(actual, expected, `${name}/${file}`);
 			}
 		});
 	}
-
-	void test("the review session's tools are the evidence tools and submit_result, as the final contract fixes them", () => {
-		const final = readFileSync(nodePath.join(GOLDEN, "final", "tools.json"), "utf8");
-		for (const name of SCENARIOS) {
-			assert.equal(captures.get(name)?.get("tools.json"), final, name);
-		}
-		// The frozen session had the same evidence tools, with report_observation where submit_result is now.
-		const frozen = toolsOf(readFileSync(nodePath.join(GOLDEN, "first-turn/tools.json"), "utf8"));
-		assert.ok(Array.isArray(frozen));
-		assert.deepEqual(
-			toolsOf(final),
-			frozen.map((tool: unknown) => (tool === "report_observation" ? "submit_result" : tool)),
-		);
-	});
 
 	void test("the built-in program opens one native review session and returns its result, with no measuring session after it", () => {
 		const captured = captures.get("first-turn");

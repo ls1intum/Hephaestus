@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -22,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -100,7 +100,7 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
 
     private long author(long nativeId, String login) {
         return Objects.requireNonNull(jdbc.queryForObject(
-                "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES (?,?,?,'USER') RETURNING id",
+                "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES" + " (?,?,?,'USER') RETURNING id",
                 Long.class,
                 nativeId,
                 providerId,
@@ -138,7 +138,8 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
         new TransactionTemplate(transactions).executeWithoutResult(status -> {
             var pr = pullRequests.findById(prId).orElseThrow();
             var author = users.findById(authorId).orElseThrow();
-            // The webhook user may be absent; the source lookup still supplies the stored author.
+            // The webhook user may be absent; the source lookup still supplies the
+            // stored author.
             when(userService.findOrCreateUser((GitLabWebhookUser) null, providerId))
                     .thenReturn(author);
             var context =
@@ -154,7 +155,8 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
                         "SELECT count(*) FROM pull_request_review WHERE pull_request_id=?", Integer.class, prId))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject(
-                        "SELECT count(*) FROM pull_request_review_comment WHERE pull_request_id=? AND in_reply_to_id IS NOT NULL",
+                        "SELECT count(*) FROM pull_request_review_comment WHERE"
+                                + " pull_request_id=? AND in_reply_to_id IS NOT NULL",
                         Integer.class,
                         prId))
                 .isEqualTo(1);
@@ -275,10 +277,13 @@ class GitLabDiscussionSyncServiceIntegrationTest extends BaseIntegrationTest {
                         "SELECT author_id FROM pull_request_review WHERE pull_request_id=?", Long.class, prId))
                 .containsExactly(authorId);
         assertThat(jdbc.queryForObject(
-                        "SELECT count(*) FROM pull_request_review_comment WHERE pull_request_id=?", Long.class, prId))
+                        "SELECT count(*) FROM pull_request_review_comment WHERE" + " pull_request_id=?",
+                        Long.class,
+                        prId))
                 .isEqualTo(2);
         assertThat(jdbc.queryForObject(
-                        "SELECT count(*) FROM pull_request_review_comment WHERE pull_request_id=? AND in_reply_to_id IS NOT NULL",
+                        "SELECT count(*) FROM pull_request_review_comment WHERE"
+                                + " pull_request_id=? AND in_reply_to_id IS NOT NULL",
                         Long.class,
                         prId))
                 .isEqualTo(1);

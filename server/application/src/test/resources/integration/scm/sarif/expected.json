@@ -1,0 +1,105 @@
+{
+  "version": "2.1.0",
+  "$schema": "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Hephaestus",
+          "version": "1.0.0",
+          "rules": [
+            {
+              "id": "clear-code",
+              "name": "clear-code",
+              "shortDescription": {
+                "text": "Clear code"
+              },
+              "fullDescription": {
+                "text": "Keep code clear."
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "clear-code",
+          "kind": "fail",
+          "level": "error",
+          "message": {
+            "text": "Explain the branch."
+          },
+          "partialFingerprints": {
+            "hephaestus/problem/v1": "scheme-1-identity"
+          },
+          "baselineState": "new",
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "src/a%20%23%25%0A%C3%A4.java",
+                  "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                  "startLine": 2,
+                  "endLine": 2,
+                  "snippet": {
+                    "text": "if (ready) run();"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "problemId": "00000000-0000-0000-0000-000000000003",
+            "resultId": "00000000-0000-0000-0000-000000000004",
+            "itemId": "3",
+            "practiceVersionId": "4",
+            "reviewDigest": "digest",
+            "itemVersion": "frozen",
+            "severity": "MAJOR"
+          }
+        }
+      ],
+      "baselineGuid": "00000000-0000-0000-0000-000000000002",
+      "automationDetails": {
+        "id": "hephaestus/1/2/default/selected/model/1/"
+      },
+      "invocations": [
+        {
+          "executionSuccessful": false,
+          "toolExecutionNotifications": [
+            {
+              "level": "warning",
+              "message": {
+                "text": "The scan did not review the complete selected scope."
+              }
+            }
+          ]
+        }
+      ],
+      "versionControlProvenance": [
+        {
+          "repositoryUri": "https://example.test/team/repo",
+          "revisionId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "properties": {
+        "hephaestus": {
+          "scanId": "00000000-0000-0000-0000-000000000001",
+          "repositoryItemId": "2",
+          "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "listingComplete": true,
+          "complete": false,
+          "epoch": 1,
+          "counts": {
+            "problems": 1
+          },
+          "comparisonReasons": [
+            "INCOMPLETE"
+          ]
+        }
+      }
+    }
+  ]
+}

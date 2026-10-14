@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.practice;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
@@ -13,7 +12,9 @@ import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -107,7 +108,7 @@ public class PracticePiAdapter {
         models.forEach((kind, model) -> {
             if (LlmApiProtocol.parse(model.apiProtocol()).isPresent()) {
                 bound.put(
-                        kind.slot(),
+                        kind.name().toLowerCase(Locale.ROOT),
                         new BoundModel(model.apiProtocol(), model.upstreamModelId(), model.reasoningEffort()));
             }
         });

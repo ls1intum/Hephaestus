@@ -40,8 +40,8 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
                     .should()
                     .dependOnClassesThat()
                     .resideInAnyPackage(PRACTICE, MENTOR)
-                    .because(
-                            "agent.runtime is the shared Pi kernel reused by both domains — it must stay role-agnostic");
+                    .because("agent.runtime is the shared Pi kernel reused by both domains — it must stay"
+                            + " role-agnostic");
             rule.check(classes);
         }
     }
@@ -70,7 +70,7 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         void providersInProviderPackage() {
             ArchRule rule = classes()
                     .that()
-                    .implement("de.tum.cit.aet.hephaestus.agent.context.ContentSource")
+                    .implement("de.tum.cit.aet.hephaestus.evidence.capture.ContentSource")
                     .should()
                     .resideInAPackage(CONTEXT_PROVIDERS)
                     .because("Provider implementations must live next to each other for discovery and arch hygiene");
@@ -89,8 +89,8 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
                     .implement("de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile")
                     .should()
                     .resideInAnyPackage(PRACTICE, MENTOR)
-                    .because(
-                            "Each runner kind owns its profile next to its adapter; the kernel sees only the interface");
+                    .because("Each runner kind owns its profile next to its adapter; the kernel sees only the"
+                            + " interface");
             rule.check(classes);
         }
     }

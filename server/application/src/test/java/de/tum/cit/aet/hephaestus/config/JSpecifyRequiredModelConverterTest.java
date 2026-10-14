@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverters;
 import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
@@ -60,6 +61,20 @@ class JSpecifyRequiredModelConverterTest {
 
         assertThat(schema.getRequired()).containsExactlyInAnyOrder("parentNonNull", "childNonNull");
     }
+
+    @Test
+    void shouldPublishEveryAlwaysPresentResponseKeyAndItsNullableType() {
+        Schema<?> schema = resolve(CompleteResponse.class).get("CompleteResponse");
+        assertThat(schema).isNotNull();
+        assertThat(schema.getRequired()).containsExactlyInAnyOrder("reason", "count", "detail");
+        assertThat(schema.getProperties().get("reason").getTypes()).containsExactlyInAnyOrder("string", "null");
+        assertThat(schema.getProperties().get("detail").getAnyOf()).anySatisfy(member -> {
+            assertThat(member.getType()).isEqualTo("null");
+        });
+    }
+
+    @JsonInclude(JsonInclude.Include.ALWAYS)
+    record CompleteResponse(@Nullable String reason, int count, @Nullable Nested detail) {}
 
     record Sample(
             @NonNull String nonNull,

@@ -1,14 +1,15 @@
+import { scm } from "../kits/scm/index.ts";
+import {
+	countLabel,
+	sampleNote,
+	scanOccurrences,
+	type SourcePattern,
+} from "../kits/scm/source-scan.ts";
 // Finds the interface lines that the change adds in Swift files and that the criteria ask about:
 // icon-only controls, images, fixed-size fonts, height caps and colour-only state. It also finds the
 // accessibility modifiers that the change adds with them. The review reads the view chain.
-import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
+import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 // Font.custom(_:size:) scales with the body style, custom(_:size:relativeTo:) with the style it names;
 // only custom(_:fixedSize:) does not scale. Font.system(size:) is fixed at the size it is given.
@@ -39,28 +40,31 @@ const INTERFACE_LINES: readonly SourcePattern[] = [
 
 export const LABELS = {
 	"accessibility-modifier":
-		"An added accessibility modifier, such as accessibilityLabel or accessibilityHidden.",
-	"label-with-text": "An added Label with a text title.",
-	"symbol-image": "An added Image(systemName:).",
-	"asset-image": "An added Image from an asset or a decorative image.",
+		"A selected accessibility modifier, such as accessibilityLabel or accessibilityHidden.",
+	"label-with-text": "A selected Label with a text title.",
+	"symbol-image": "A selected Image(systemName:).",
+	"asset-image": "A selected Image from an asset or a decorative image.",
 	"fixed-size-custom-font":
-		"An added custom font with fixedSize:, which does not scale with the text size.",
-	"system-font-with-a-point-size": "An added system font with a point size.",
-	"scaled-custom-font": "An added custom font with size:, which scales with the body style.",
-	"semantic-font": "An added semantic font, such as .headline or .body.",
-	"height-cap": "An added frame with a fixed height.",
-	"line-limit": "An added lineLimit with a number.",
-	"colour-by-state": "An added foreground colour that a condition selects, such as red or green.",
-	button: "An added Button.",
-	toggle: "An added Toggle.",
+		"A selected custom font with fixedSize:, which does not scale with the text size.",
+	"system-font-with-a-point-size": "A selected system font with a point size.",
+	"scaled-custom-font": "A selected custom font with size:, which scales with the body style.",
+	"semantic-font": "A selected semantic font, such as .headline or .body.",
+	"height-cap": "A selected frame with a fixed height.",
+	"line-limit": "A selected lineLimit with a number.",
+	"colour-by-state": "A selected foreground colour that a condition selects, such as red or green.",
+	button: "A selected Button.",
+	toggle: "A selected Toggle.",
 };
 const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
+		const scan = await scanOccurrences(ctx, domain.files, {
 			languages: ["swift"],
 			patterns: INTERFACE_LINES,
 			maxHints: 60,
@@ -69,11 +73,17 @@ export default definePracticeScript({
 			const label = LABEL_OF.get(hint.pattern);
 			return label === undefined
 				? []
-				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+				: [
+						{
+							at: { file: hint.file, line: hint.line, endLine: hint.endLine },
+							label,
+							facts: factsOf(hint.flags),
+						},
+					];
 		});
 		const count = (label: string) => countLabel(scan, label);
 		const facts = {
-			interfaceLinesAdded: scan.matched,
+			interfaceLinesSelected: scan.matched,
 			symbolImages: count("symbol-image"),
 			assetImages: count("asset-image"),
 			accessibilityModifiers: count("accessibility-modifier"),
@@ -83,33 +93,33 @@ export default definePracticeScript({
 			semanticFonts: count("semantic-font"),
 			heightCaps: count("height-cap"),
 			colourByState: count("colour-by-state"),
-			filesWithoutCheckout: scan.filesWithoutCheckout,
+			filesWithUnknownLocation: scan.filesWithUnknownLocation,
 			filesScanned: scan.filesScanned,
-			linesAdded: scan.linesAdded,
+			linesSelected: scan.linesSelected,
 		};
 		const directions: string[] = [...sampleNote(scan)];
 		if (facts.symbolImages + facts.assetImages > 0) {
 			directions.push(
-				`${String(facts.symbolImages + facts.assetImages)} image(s) added against ${String(facts.accessibilityModifiers)} accessibility modifier(s) — for each image inside a Button, Toggle or tap gesture, read the whole view chain for a label or a Label title.`,
+				`${String(facts.symbolImages + facts.assetImages)} image(s) selected against ${String(facts.accessibilityModifiers)} accessibility modifier(s) — for each image inside a Button, Toggle or tap gesture, read the whole view chain for a label or a Label title.`,
 			);
 		}
 		if (facts.fixedSizeCustomFonts > 0) {
 			directions.push(
-				`${String(facts.fixedSizeCustomFonts)} custom font(s) with fixedSize: added — these do not scale with the user's text size.`,
+				`${String(facts.fixedSizeCustomFonts)} custom font(s) with fixedSize: selected — these do not scale with the user's text size.`,
 			);
 		}
 		if (facts.systemFontsWithPointSize > 0) {
 			directions.push(
-				`${String(facts.systemFontsWithPointSize)} system font(s) with a point size added — fixed unless the size itself scales (a @ScaledMetric value); read where each size comes from. A custom font given size: scales with the body style and is not fixed.`,
+				`${String(facts.systemFontsWithPointSize)} system font(s) with a point size selected — fixed unless the size itself scales (a @ScaledMetric value); read where each size comes from. A custom font given size: scales with the body style and is not fixed.`,
 			);
 		}
 		if (facts.heightCaps > 0) {
 			directions.push(
-				`${String(facts.heightCaps)} height cap(s) added — a cap clips only when the container holds text.`,
+				`${String(facts.heightCaps)} height cap(s) selected — a cap clips only when the container holds text.`,
 			);
 		}
 		if (leads.length === 0) {
-			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
+			directions.push(...noMatchDirections(scan.linesSelected, scan.filesScanned));
 		}
 		return ctx.review({ leads, facts, directions });
 	},

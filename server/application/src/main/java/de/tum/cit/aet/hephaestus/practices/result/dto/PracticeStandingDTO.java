@@ -1,101 +1,42 @@
 package de.tum.cit.aet.hephaestus.practices.result.dto;
 
-import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendSupportDTO;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-/** Current standing and supporting practice feedback for one developer and practice. */
-@Schema(description = "A developer's readable feedback for one practice")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PracticeStandingDTO(
-        @NonNull @Schema(description = "Practice slug") String slug,
-        @NonNull @Schema(description = "Practice name") String name,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String slug,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String name,
 
-        @Nullable @Schema(description = "Group slug this practice belongs to, if any")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String groupSlug,
 
-        @Nullable @Schema(description = "Group name this practice belongs to, if any")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String groupName,
 
-        @Nullable @Schema(description = "Why this practice matters, in plain language")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String whyItMatters,
 
-        @Nullable @Schema(description = "A concrete picture of doing this well")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String whatGoodLooksLike,
 
-        @NonNull
-        @Schema(
-                description = "Where the developer stands on this practice, or why no standing could be formed",
-                allowableValues = {"DEVELOPING", "STRENGTH", "MIXED", "NOT_OBSERVED", "NO_OPPORTUNITY"})
-        Standing standing,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) PracticeStanding standing,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<PracticeStandingResultDTO> toWorkOn,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<PracticeStandingResultDTO> strengths,
 
-        @NonNull @Schema(description = "Specific feedback to act on (highest-impact first)")
-        List<PracticeStandingResultDTO> toWorkOn,
-
-        @NonNull @Schema(description = "What the developer already does well here")
-        List<PracticeStandingResultDTO> strengths,
-
-        @Nullable
-        @Schema(
-                description = "Opportunity-indexed direction of this practice's recent evidence",
-                allowableValues = {"IMPROVING", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE"})
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         TrendDirection direction,
 
-        @Nullable @Schema(description = "Evidence support and provenance for the direction")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         TrendSupportDTO trendSupport,
 
-        @Schema(
-                description = "True when the newest review of each piece of work in the look-back found that this"
-                        + " practice did not apply to it; false when anything else was recorded, or nothing at all")
-        boolean notApplicableOnly) {
-    /**
-     * Coarse, human standing derived from the developer's most recent evidence for this practice.
-     *
-     * <p>The first three are verdicts, read off the share of that evidence that was positive. The last two are
-     * the reasons there is NO verdict, and they are deliberately separate: a developer cannot act on an empty
-     * state that means "nothing was reviewed" and "your work offered no opportunity" interchangeably. The same
-     * split runs through the group standing and, as {@code UNCERTAIN} against {@code INSUFFICIENT_EVIDENCE},
-     * through the trend — absence of a claim is not the same fact as a claim of absence.
-     *
-     * <p>Carrying the non-verdicts HERE rather than beside the practice response is what lets the group be a pure roll-up of
-     * its practices. It costs a longer list: a practice the workspace watches appears even when it has nothing
-     * to say yet, which is also the honest answer to "what is being looked at".
-     */
-    public enum Standing {
-        /** Recent evidence was mostly problems — the focus of attention. */
-        DEVELOPING,
-        /** Recent evidence was almost entirely positive — a confirmed strength. */
-        STRENGTH,
-        /** Recent evidence carries both sides in comparable measure. */
-        MIXED,
-        /** No result reached this practice at all. */
-        NOT_OBSERVED,
-        /**
-         * The practice was evaluated but produced nothing to report: the reviewed work offered no relevant
-         * opportunity or the evidence did not settle the question.
-         */
-        NO_OPPORTUNITY;
-
-        /**
-         * Where this standing sorts: the verdicts worst first, then the silences, {@code NO_OPPORTUNITY} before
-         * {@code NOT_OBSERVED} because a review that ran and found nothing to say is a working instrument, not
-         * an unconfigured one. Between two verdicts, the higher rank is the better standing.
-         */
-        public int rank() {
-            return switch (this) {
-                case DEVELOPING -> 0;
-                case MIXED -> 1;
-                case STRENGTH -> 2;
-                case NO_OPPORTUNITY -> 3;
-                case NOT_OBSERVED -> 4;
-            };
-        }
-    }
-
-    /** Whether this standing is a claim about the developer's work, rather than a reason none could be made. */
-    public static boolean isVerdict(Standing standing) {
-        return standing == Standing.DEVELOPING || standing == Standing.MIXED || standing == Standing.STRENGTH;
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean doesNotApplyOnly) {
+    public PracticeStandingDTO {
+        toWorkOn = List.copyOf(toWorkOn);
+        strengths = List.copyOf(strengths);
     }
 }

@@ -10,8 +10,8 @@ import {
 	parseCandidate,
 	REASONS,
 	type ExecutionReport,
-} from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
-import type { ProgramOutcome } from "../../../../../../docker/agents/practice-scripts/lib/program-host.ts";
+} from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
+import type { ProgramOutcome } from "../../../../../../docker/agents/practice-scripts/lib/core/program-host.ts";
 import {
 	executionReport,
 	PRACTICE_SCRIPT_ERROR_MAX_CHARS,
@@ -53,7 +53,7 @@ const slugOf = (i: number) => `p-${String(i).padStart(3, "0")}`;
 
 /** A file of the fixtures that the server's tests share: `practice-results/`. */
 const sharedFixture = (name: string): unknown =>
-	JSON.parse(readFileSync(path.join(import.meta.dirname, "../practice-results", name), "utf8"));
+	JSON.parse(readFileSync(path.join(import.meta.dirname, "contract-v3", name), "utf8"));
 
 /**
  * `PiResultParserPracticeScriptReportTest` and `lib/contract.test.ts` read the same shared fixture, so a field
@@ -92,12 +92,12 @@ void test("a custom program is reported with the digest of its staged bytes and 
 				outcome({
 					program: { kind: "custom", digest },
 					models: [
-						{ slot: "chat", need: "optional", bound: true, notRated: {} },
+						{ slot: "chat", need: "optional", bound: true, failures: {} },
 						{
 							slot: "decision",
 							need: "required",
 							bound: true,
-							notRated: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
+							failures: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
 						},
 					],
 					calls: { review: 0, chat: 2, decision: 9, embedding: 0, reranking: 0 },
@@ -110,12 +110,12 @@ void test("a custom program is reported with the digest of its staged bytes and 
 			practiceSlug: "decides",
 			program: { kind: "custom", digest },
 			models: [
-				{ slot: "chat", need: "optional", bound: true, notRated: {} },
+				{ slot: "chat", need: "optional", bound: true, failures: {} },
 				{
 					slot: "decision",
 					need: "required",
 					bound: true,
-					notRated: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
+					failures: { unavailable: 1, budget: 2, deadline: 3, "too-large": 4 },
 				},
 			],
 			status: "ok",
@@ -131,7 +131,7 @@ void test("an error is reported only for a failed practice", () => {
 	const report = parsed(
 		executionReport([
 			["ok", outcome({ error: "a note the host kept" })],
-			["skipped", outcome({ status: "skipped", stopReason: "unavailable", error: "no model" })],
+			["withheld", outcome({ status: "withheld", stopReason: "unavailable", error: "no model" })],
 			[
 				"not-reached",
 				outcome({ status: "not-reached", stopReason: "deadline", durationMs: null, error: "late" }),
@@ -145,7 +145,7 @@ void test("an error is reported only for a failed practice", () => {
 			["failed", "Cannot read x"],
 			["not-reached", undefined],
 			["ok", undefined],
-			["skipped", undefined],
+			["withheld", undefined],
 		],
 	);
 });
@@ -251,7 +251,7 @@ const large = outcome({
 		slot,
 		need: "optional",
 		bound: true,
-		notRated: Object.fromEntries(REASONS.map((reason) => [reason, 1_000_000])),
+		failures: Object.fromEntries(REASONS.map((reason) => [reason, 1_000_000])),
 	})),
 });
 

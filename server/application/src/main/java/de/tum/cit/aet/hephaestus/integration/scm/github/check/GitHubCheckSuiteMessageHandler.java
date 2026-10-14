@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.check;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -84,7 +84,7 @@ public class GitHubCheckSuiteMessageHandler extends AbstractIntegrationMessageHa
         CheckState state = GitHubHeadCheckProcessor.fromCheckSuite(suite.status(), suite.conclusion());
         if (state == null) {
             log.debug(
-                    "Skipped check_suite event: reason=saysNothingAboutTheHead, action={}, conclusion={}",
+                    "Skipped check_suite event: reason=saysNothingAboutTheHead, action={}," + " conclusion={}",
                     event.action(),
                     suite.conclusion());
             return null;

@@ -18,7 +18,7 @@ public class EntityNotFoundException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     private static final Map<String, String> NOUNS = Map.ofEntries(
-            Map.entry("AgentJob", "review"),
+            Map.entry("ReviewJob", "review"),
             Map.entry("ChatMessage", "message"),
             Map.entry("ChatThread", "conversation"),
             Map.entry("LlmConnection", "AI provider"),
@@ -39,7 +39,7 @@ public class EntityNotFoundException extends RuntimeException {
             Map.entry("TeamRepositoryPermission", "team permission"),
             Map.entry("WorkspaceLlmConnection", "AI provider"),
             Map.entry("WorkspaceLlmModel", "AI model"),
-            Map.entry("WorkspaceMembership", "member"));
+            Map.entry("Membership", "member"));
 
     /** What was looked up, for the debug log. The text for people leaves the id out. */
     private final String lookup;

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import java.io.Serial;
 
 /**
@@ -14,12 +15,12 @@ public class LlmUnpricedUsageBlockedException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public LlmUnpricedUsageBlockedException(FundingSource fundingSource) {
+    public LlmUnpricedUsageBlockedException(UsageFundingSource fundingSource) {
         super(message(fundingSource));
     }
 
-    private static String message(FundingSource fundingSource) {
-        return fundingSource == FundingSource.WORKSPACE
+    private static String message(UsageFundingSource fundingSource) {
+        return fundingSource == UsageFundingSource.WORKSPACE
                 ? "Some usage has no price, so the server cannot check it against the cap. A workspace admin can "
                         + "add the price or remove the cap."
                 : "Some usage has no price, so the server cannot check it against the budget. An instance admin "

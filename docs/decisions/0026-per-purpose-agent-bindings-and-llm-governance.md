@@ -12,9 +12,9 @@
 > present is retained as the record of the decision, not as a description of the current code.
 >
 > **Amendment (2026-09-22):** a developer's AI choice — the data-handling ceiling over the tiers
-> the bindings are assigned by, or No AI — is stored once per account (`account_ai_choice`,
+> the bindings are assigned by, or No AI — is stored once per account (`account`,
 > registered GLOBAL in the tenancy layer) and holds in every workspace the account is a member of
-> on the instance; `workspace_member_onboarding` keeps only the settings revision at which the
+> on the instance; `membership` keeps only the settings revision at which the
 > member finished or skipped a workspace's setup page. The tiers follow from who operates a
 > model, which does not vary by workspace, and comparable products keep
 > the person's data-use choice with the signed-in identity while organisations only tighten. The

@@ -6,11 +6,11 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryWriter;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -20,14 +20,14 @@ public class AgentHandlerTestDoubles {
 
     @Bean
     @Primary
-    PullRequestCommentPoster testPullRequestCommentPoster() {
-        return mock(PullRequestCommentPoster.class);
+    ScmSummaryPoster testPullRequestCommentPoster() {
+        return mock(ScmSummaryPoster.class);
     }
 
     @Bean
     @Primary
-    DiffNotePoster testDiffNotePoster() {
-        return mock(DiffNotePoster.class);
+    ScmLineNotePoster testDiffNotePoster() {
+        return mock(ScmLineNotePoster.class);
     }
 
     @Bean
@@ -36,19 +36,18 @@ public class AgentHandlerTestDoubles {
         return mock(AccountPreferencesQuery.class);
     }
 
-    static void resolveSummaryWrites(PullRequestCommentPoster poster) {
-        SummaryChannel channel = mock(SummaryChannel.class);
+    static void resolveSummaryWrites(ScmSummaryPoster poster) {
+        SummaryWriter channel = mock(SummaryWriter.class);
         when(poster.summaryWrite(any(), anyBoolean(), anyString(), anyString())).thenAnswer(invocation -> {
-            AgentJob job = invocation.getArgument(0);
-            return new PullRequestCommentPoster.SummaryWrite(
+            ReviewJob job = invocation.getArgument(0);
+            return new ScmSummaryPoster.SummaryWrite(
                     job,
                     channel,
-                    new SummaryChannel.FeedbackTarget(
-                            new IntegrationRef(
-                                    IntegrationKind.GITLAB, job.getWorkspace().getId(), null),
+                    new SummaryWriter.FeedbackTarget(
+                            new IntegrationRef(IntegrationKind.GITLAB, job.getWorkspaceId(), null),
                             "test-subject",
                             null),
-                    new SummaryChannel.FeedbackContent(invocation.getArgument(2), invocation.getArgument(3)));
+                    new SummaryWriter.FeedbackContent(invocation.getArgument(2), invocation.getArgument(3)));
         });
     }
 }

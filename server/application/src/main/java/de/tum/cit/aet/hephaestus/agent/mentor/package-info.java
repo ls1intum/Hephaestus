@@ -14,5 +14,7 @@
  * <p>Turn cost is derived from the admission-frozen {@code LlmPriceSnapshot} — the single pricing
  * authority shared with the usage ledger in {@code agent.usage}; there is no separate pricing table.
  */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package de.tum.cit.aet.hephaestus.agent.mentor;
+
+import org.jspecify.annotations.NullMarked;

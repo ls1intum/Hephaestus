@@ -10,10 +10,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitDetailsPersister.Outcome;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.PassThroughTransactionTemplate;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
@@ -66,7 +66,8 @@ class CommitDetailsPersisterTest extends BaseUnitTest {
                 0,
                 1,
                 List.of(new CommitDetails.FileChange(filename, CommitFileChange.ChangeType.ADDED, 1, 0, 1, filename)),
-                List.of());
+                List.of(),
+                message);
     }
 
     @Test
@@ -126,7 +127,10 @@ class CommitDetailsPersisterTest extends BaseUnitTest {
         assertThat(event.getValue().context().providerType()).isEqualTo(IdentityProviderType.GITHUB);
     }
 
-    /** A webhook leaves a row without Git details; completing it is a capture, not a second creation. */
+    /**
+     * A webhook leaves a row without Git details; completing it is a capture, not a second
+     * creation.
+     */
     @Test
     void shouldCompleteAnUncapturedRowWithoutPublishingAnotherCreatedEvent() {
         Commit stub = TestEntities.commit(1L, SHA);

@@ -1,7 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.practice.live;
 
-import de.tum.cit.aet.hephaestus.agent.context.providers.IssueContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ScmCapturedWork;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -29,7 +30,7 @@ final class LiveWorkRecords {
     private LiveWorkRecords() {}
 
     /** The metadata a pull request review is admitted with, as the job carries it. */
-    static ObjectNode pullRequestJob(
+    static ScmCapturedWork capturedPullRequest(
             long pullRequestId,
             long repositoryId,
             int number,
@@ -37,17 +38,20 @@ final class LiveWorkRecords {
             String title,
             @Nullable String body,
             String source) {
-        return MAPPER.createObjectNode()
-                .put("pull_request_id", pullRequestId)
-                .put("repository_id", repositoryId)
-                .put("repository_full_name", REPOSITORY)
-                .put("pr_number", number)
-                .put("pr_url", "https://github.com/" + REPOSITORY + "/pull/" + number)
-                .put("commit_sha", head)
-                .put("source_branch", source)
-                .put("target_branch", "main")
-                .put("title", title)
-                .put("body", body);
+        return new ScmCapturedWork(
+                pullRequestId,
+                repositoryId,
+                number,
+                "https://github.com/" + REPOSITORY + "/pull/" + number,
+                REPOSITORY,
+                title,
+                body,
+                head,
+                null,
+                source,
+                "main",
+                null,
+                null);
     }
 
     /** An open pull request of the fixture repository, by its author, at {@code head}. */
@@ -66,7 +70,7 @@ final class LiveWorkRecords {
         pullRequest.setChangedFiles(1);
         pullRequest.setHeadRefOid(head);
         return PullRequestContentSource.workRecord(
-                pullRequest, pullRequestJob(1L, REPOSITORY_ID, 1, head, title, body, "feat/login"), AT);
+                pullRequest, capturedPullRequest(1L, REPOSITORY_ID, 1, head, title, body, "feat/login"), AT);
     }
 
     /** An open issue of the fixture repository, by its author. */
@@ -80,11 +84,23 @@ final class LiveWorkRecords {
         issue.setRepository(repository());
         issue.setAuthor(author());
         issue.setCreatedAt(AT);
-        JsonNode job = MAPPER.createObjectNode()
-                .put("issue_id", 1L)
-                .put("repository_id", REPOSITORY_ID)
-                .put("issue_number", 1);
-        return IssueContentSource.workRecord(issue, job, null);
+        return IssueContentSource.workRecord(
+                issue,
+                new ScmCapturedWork(
+                        1L,
+                        REPOSITORY_ID,
+                        1,
+                        issue.getHtmlUrl(),
+                        REPOSITORY,
+                        title,
+                        body,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null),
+                null);
     }
 
     /** The bytes the content source stages: its mapper's default pretty printer. */

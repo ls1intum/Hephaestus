@@ -12,9 +12,6 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionPropert
 import de.tum.cit.aet.hephaestus.workspace.audit.WorkspaceAuditSnapshots;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.exception.WorkspaceLifecycleViolationException;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamLabelFilterRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamRepositorySettingsRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceTeamSettingsRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeGuard;
 import java.util.Comparator;
@@ -26,8 +23,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service coordinating workspace lifecycle state transitions and validation.
- * Manages suspend, resume, and purge operations with proper guardrails.
+ * Service coordinating workspace lifecycle state transitions and validation. Manages suspend,
+ * resume, and purge operations with proper guardrails.
  */
 @Service
 public class WorkspaceLifecycleService {
@@ -37,14 +34,12 @@ public class WorkspaceLifecycleService {
     private final ConfigAuditPort configAudit;
     private final NatsConnectionProperties natsProperties;
     private final WorkspaceRepository workspaceRepository;
+
     /** Absent under webhook profile (server.enabled=false). */
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
     // Repositories for workspace-scoped data cleanup
-    private final WorkspaceMembershipRepository workspaceMembershipRepository;
-    private final WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository;
-    private final WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository;
-    private final WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository;
+    private final MembershipRepository workspaceMembershipRepository;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
 
     private final List<WorkspacePurgeGuard> purgeGuards;
@@ -54,10 +49,7 @@ public class WorkspaceLifecycleService {
             NatsConnectionProperties natsProperties,
             WorkspaceRepository workspaceRepository,
             ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-            WorkspaceMembershipRepository workspaceMembershipRepository,
-            WorkspaceTeamSettingsRepository workspaceTeamSettingsRepository,
-            WorkspaceTeamLabelFilterRepository workspaceTeamLabelFilterRepository,
-            WorkspaceTeamRepositorySettingsRepository workspaceTeamRepositorySettingsRepository,
+            MembershipRepository workspaceMembershipRepository,
             WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
             List<WorkspacePurgeGuard> purgeGuards,
             List<WorkspacePurgeContributor> purgeContributors,
@@ -67,17 +59,14 @@ public class WorkspaceLifecycleService {
         this.workspaceRepository = workspaceRepository;
         this.natsConsumerService = natsConsumerService;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
-        this.workspaceTeamSettingsRepository = workspaceTeamSettingsRepository;
-        this.workspaceTeamLabelFilterRepository = workspaceTeamLabelFilterRepository;
-        this.workspaceTeamRepositorySettingsRepository = workspaceTeamRepositorySettingsRepository;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.purgeGuards = purgeGuards;
         this.purgeContributors = purgeContributors;
     }
 
     /**
-     * Suspend a workspace, preventing new sync cycles and making it read-only.
-     * Idempotent: calling suspend on an already suspended workspace is a no-op.
+     * Suspend a workspace, preventing new sync cycles and making it read-only. Idempotent: calling
+     * suspend on an already suspended workspace is a no-op.
      *
      * @param workspaceSlug the workspace slug
      * @return the suspended workspace
@@ -117,8 +106,8 @@ public class WorkspaceLifecycleService {
     }
 
     /**
-     * Resume a suspended workspace, making it active again.
-     * Idempotent: calling resume on an already active workspace is a no-op.
+     * Resume a suspended workspace, making it active again. Idempotent: calling resume on an
+     * already active workspace is a no-op.
      *
      * @param workspaceSlug the workspace slug
      * @return the resumed workspace
@@ -182,21 +171,17 @@ public class WorkspaceLifecycleService {
 
         stopNatsForWorkspacePurge(workspace);
 
-        workspaceTeamLabelFilterRepository.deleteAllByWorkspaceId(workspaceId);
-        workspaceTeamRepositorySettingsRepository.deleteAllByWorkspaceId(workspaceId);
-        workspaceTeamSettingsRepository.deleteAllByWorkspaceId(workspaceId);
-
-        workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
-
         purgeContributors.stream()
                 .sorted(Comparator.comparingInt(WorkspacePurgeContributor::getOrder))
                 .forEach(contributor -> contributor.deleteWorkspaceData(workspaceId));
+        workspaceMembershipRepository.deleteAllByWorkspaceId(workspaceId);
 
-        // Bulk deletion would leave these managed children queued for a second orphan-removal delete.
+        // Bulk deletion would leave these managed children queued for a second orphan-removal
+        // delete.
         workspace.getRepositoriesToMonitor().clear();
 
         workspaceSlugHistoryRepository.deleteAllByWorkspaceId(workspaceId);
-        workspace.setOrganization(null);
+        workspace.setOrganizationId(null);
 
         workspace.setUsersSyncedAt(null);
         workspace.setTeamsSyncedAt(null);
@@ -240,8 +225,8 @@ public class WorkspaceLifecycleService {
     /**
      * Update the lifecycle status for the workspace.
      *
-     * <p>{@code PURGED} is rejected here: purge is owner-only and irreversible, and routing it through
-     * the admin-level status endpoint would bypass the owner requirement.
+     * <p>{@code PURGED} is rejected here: purge is owner-only and irreversible, and routing it
+     * through the admin-level status endpoint would bypass the owner requirement.
      */
     @Transactional
     public Workspace updateStatus(String workspaceSlug, WorkspaceStatus targetStatus) {
@@ -254,7 +239,9 @@ public class WorkspaceLifecycleService {
             case SUSPENDED -> suspendWorkspaceInTransaction(workspaceSlug);
             case PURGED ->
                 throw new WorkspaceLifecycleViolationException(
-                        "You cannot purge a workspace with the status endpoint. Use DELETE /workspaces/{workspaceSlug}. This request needs the OWNER role.");
+                        "You cannot purge a workspace with the status endpoint. Use DELETE"
+                                + " /workspaces/{workspaceSlug}. This request needs the OWNER"
+                                + " role.");
         };
     }
 
@@ -279,8 +266,8 @@ public class WorkspaceLifecycleService {
     // NATS consumer lifecycle helpers
 
     /**
-     * Stop NATS consumer for a workspace.
-     * Applies to all provider types (GitHub App, GitLab PAT, etc.) when NATS is enabled.
+     * Stop NATS consumer for a workspace. Applies to all provider types (GitHub App, GitLab PAT,
+     * etc.) when NATS is enabled.
      */
     private void stopNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
@@ -295,8 +282,8 @@ public class WorkspaceLifecycleService {
     }
 
     /**
-     * Start NATS consumer for a workspace.
-     * Applies to all provider types (GitHub App, GitLab PAT, etc.) when NATS is enabled.
+     * Start NATS consumer for a workspace. Applies to all provider types (GitHub App, GitLab PAT,
+     * etc.) when NATS is enabled.
      */
     private void startNatsForWorkspace(Workspace workspace) {
         if (shouldUseNats(workspace)) {
@@ -305,8 +292,8 @@ public class WorkspaceLifecycleService {
     }
 
     /**
-     * Checks if NATS should be used for the given workspace.
-     * Must match the logic in {@code WorkspaceActivationService.shouldUseNats()}.
+     * Checks if NATS should be used for the given workspace. Must match the logic in {@code
+     * WorkspaceActivationService.shouldUseNats()}.
      */
     private boolean shouldUseNats(Workspace workspace) {
         return natsProperties.enabled() && workspace != null;

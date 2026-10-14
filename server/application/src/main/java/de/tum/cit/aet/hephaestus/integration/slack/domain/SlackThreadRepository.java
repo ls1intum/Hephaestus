@@ -16,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code StatementInspector} requires.
  */
 public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> {
+    Optional<SlackThread> findByWorkspaceIdAndId(Long workspaceId, Long id);
+
     Optional<SlackThread> findByWorkspaceIdAndSlackChannelIdAndSlackThreadTs(
             Long workspaceId, String slackChannelId, String slackThreadTs);
 
@@ -24,20 +26,20 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * {@code (workspace_id, slack_channel_id, slack_thread_ts)} row on first sight and, on the unique conflict,
      * advances the {@code first_ts}/{@code last_ts} window (Slack {@code ts} strings sort lexicographically —
      * fixed {@code <10-digit>.<6-digit>} format), bumps {@code message_count}, and unions the author's resolved
-     * member id into {@code participant_member_ids} (the GIN-indexed {@code bigint[]} the participant firewall
+     * member id into {@code participant_account_ids} (the GIN-indexed {@code bigint[]} the participant firewall
      * matches with {@code = ANY(...)}). Native — the conflict-resolving merge has no Spring Data derived form.
      *
      * <p>The caller passes {@code slackThreadTs := thread_ts} for a reply and {@code := ts} for a thread root, so
-     * a root and its replies collapse onto one aggregate row. {@code authorMemberId} is nullable (an unlinked
+     * a root and its replies collapse onto one aggregate row. {@code authorAccountId} is nullable (an unlinked
      * Slack author stamps no member id); the union is a no-op in that case.
      */
     @Modifying
     @Transactional
     @Query(value = """
-        INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at)
+        INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_account_ids, created_at)
         VALUES (
             :workspaceId, :slackChannelId, :slackThreadTs, :slackTs, :slackTs, 1,
-            CASE WHEN :authorMemberId IS NULL THEN '{}'::bigint[] ELSE ARRAY[CAST(:authorMemberId AS bigint)] END,
+            CASE WHEN :authorAccountId IS NULL THEN '{}'::bigint[] ELSE ARRAY[CAST(:authorAccountId AS bigint)] END,
             now()
         )
         ON CONFLICT (workspace_id, slack_channel_id, slack_thread_ts) DO UPDATE SET
@@ -48,22 +50,22 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
                 WHEN slack_thread.last_ts IS NULL OR EXCLUDED.last_ts > slack_thread.last_ts
                 THEN EXCLUDED.last_ts ELSE slack_thread.last_ts END,
             message_count = slack_thread.message_count + 1,
-            participant_member_ids = CASE
-                WHEN :authorMemberId IS NULL OR CAST(:authorMemberId AS bigint) = ANY(slack_thread.participant_member_ids)
-                THEN slack_thread.participant_member_ids
-                ELSE array_append(slack_thread.participant_member_ids, CAST(:authorMemberId AS bigint)) END
+            participant_account_ids = CASE
+                WHEN :authorAccountId IS NULL OR CAST(:authorAccountId AS bigint) = ANY(slack_thread.participant_account_ids)
+                THEN slack_thread.participant_account_ids
+                ELSE array_append(slack_thread.participant_account_ids, CAST(:authorAccountId AS bigint)) END
         """, nativeQuery = true)
     void upsertOnMessage(
             @Param("workspaceId") long workspaceId,
             @Param("slackChannelId") String slackChannelId,
             @Param("slackThreadTs") String slackThreadTs,
             @Param("slackTs") String slackTs,
-            @Param("authorMemberId") @Nullable Long authorMemberId);
+            @Param("authorAccountId") @Nullable Long authorAccountId);
 
     /**
      * The ids of every thread aggregate on one channel — collected on channel erasure so the derived
-     * {@code chat.conversation_thread} results/feedback (keyed by these {@code slack_thread} ids as
-     * {@code artifact_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
+     * {@code chat.thread} results/feedback (keyed by these {@code slack_thread} ids as
+     * {@code item.source_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
      * are dropped.
      */
     @Query("SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.slackChannelId = :slackChannelId")
@@ -75,7 +77,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * Channel erasure: delete every thread aggregate of one channel promptly when its consent is withdrawn (the
-     * aggregates hold the {@code participant_member_ids} personal data and are the artifact the derived CONVERSATION
+     * aggregates hold the {@code participant_account_ids} personal data and are the artifact the derived CONVERSATION
      * feedback points at). Idempotent (returns 0 when the channel had no threads).
      */
     long deleteByWorkspaceIdAndSlackChannelId(Long workspaceId, String slackChannelId);
@@ -85,15 +87,15 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      * activity ({@code last_ts}, the newest message in the thread) is strictly older than {@code cutoffTs}.
      * Because {@code last_ts} is the maximum message {@code ts} in the thread, "last_ts older than the cutoff" is
      * exactly "every message in the thread is older than the cutoff", so the whole thread (raw messages, the
-     * {@code participant_member_ids} aggregate, and the derived CONVERSATION feedback) can be erased together.
+     * {@code participant_account_ids} aggregate, and the derived CONVERSATION feedback) can be erased together.
      *
      * <p>{@code cutoffTs} is the retention cutoff rendered as a Slack {@code ts} string
      * ({@code <10-digit-epoch-seconds>.000000}); the comparison is lexicographic, which equals numeric ordering for
      * the fixed {@code <10-digit>.<6-digit>} Slack {@code ts} format (the same invariant {@link #upsertOnMessage}
      * relies on).
      */
-    @Query(
-            "SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.lastTs IS NOT NULL AND t.lastTs < :cutoffTs")
+    @Query("SELECT t.id FROM SlackThread t WHERE t.workspaceId = :workspaceId AND t.lastTs IS NOT NULL AND t.lastTs <"
+            + " :cutoffTs")
     List<Long> findAgedThreadIds(@Param("workspaceId") Long workspaceId, @Param("cutoffTs") String cutoffTs);
 
     /**
@@ -108,9 +110,9 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * Person erasure (opt-out / account hard-delete): drop one member's id out of every thread's
-     * {@code participant_member_ids} for a workspace via {@code array_remove}. The append-only participant array
+     * {@code participant_account_ids} for a workspace via {@code array_remove}. The append-only participant array
      * otherwise keeps a person's id (and, on id reuse, their thread visibility) after they leave — this prunes it.
-     * The {@code :memberId = ANY(participant_member_ids)} guard narrows the write set to rows that actually contain
+     * The {@code :memberId = ANY(participant_account_ids)} guard narrows the write set to rows that actually contain
      * the member (GIN-indexed), so unaffected threads are not rewritten. Idempotent.
      *
      * @return the number of thread aggregates pruned
@@ -118,8 +120,8 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     @Modifying
     @Transactional
     @Query(
-            value = "UPDATE slack_thread SET participant_member_ids = array_remove(participant_member_ids, :memberId) "
-                    + "WHERE workspace_id = :workspaceId AND :memberId = ANY(participant_member_ids)",
+            value = "UPDATE slack_thread SET participant_account_ids = array_remove(participant_account_ids,"
+                    + " :memberId) WHERE workspace_id = :workspaceId AND :memberId = ANY(participant_account_ids)",
             nativeQuery = true)
     int pruneParticipant(@Param("workspaceId") long workspaceId, @Param("memberId") long memberId);
 
@@ -134,11 +136,12 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         SELECT t.workspaceId AS workspaceId,
                t.id AS threadId,
                t.slackChannelId AS slackChannelId,
+               c.slackTeamId AS slackTeamId,
                c.channelName AS slackChannelName,
                t.slackThreadTs AS slackThreadTs,
                t.lastTs AS lastTs,
                t.lastReviewedTs AS lastReviewedTs,
-               t.participantMemberIds AS participantMemberIds
+               t.participantAccountIds AS participantAccountIds
         FROM SlackThread t
         JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId
         WHERE c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
@@ -160,11 +163,12 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         SELECT t.workspaceId AS workspaceId,
                t.id AS threadId,
                t.slackChannelId AS slackChannelId,
+               c.slackTeamId AS slackTeamId,
                c.channelName AS slackChannelName,
                t.slackThreadTs AS slackThreadTs,
                t.lastTs AS lastTs,
                t.lastReviewedTs AS lastReviewedTs,
-               t.participantMemberIds AS participantMemberIds
+               t.participantAccountIds AS participantAccountIds
         FROM SlackThread t
         JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId
         WHERE c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
@@ -182,6 +186,8 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
         String getSlackChannelId();
 
+        String getSlackTeamId();
+
         @Nullable
         String getSlackChannelName();
 
@@ -192,20 +198,19 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         @Nullable
         String getLastReviewedTs();
 
-        long[] getParticipantMemberIds();
+        long[] getParticipantAccountIds();
     }
 
     /**
      * Agent-owned {@code ConversationSourceLiveness} SPI: the subset of {@code threadIds} whose source channel
      * consent is still {@code ACTIVE} in this workspace — the fail-closed allow-set a
-     * {@code chat.conversation_thread}-derived row must belong to before it may reach the mentor. Callers guard an
+     * {@code chat.thread}-derived row must belong to before it may reach the mentor. Callers guard an
      * empty {@code threadIds}.
      */
-    @Query(
-            "SELECT t.id FROM SlackThread t "
-                    + "JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId "
-                    + "WHERE t.workspaceId = :workspaceId AND t.id IN :threadIds "
-                    + "AND c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE")
+    @Query("SELECT t.id FROM SlackThread t JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND"
+            + " c.slackChannelId = t.slackChannelId WHERE t.workspaceId = :workspaceId AND t.id IN :threadIds AND"
+            + " c.consentState ="
+            + " de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE")
     List<Long> findActiveThreadIds(
             @Param("workspaceId") long workspaceId, @Param("threadIds") Collection<Long> threadIds);
 
@@ -220,7 +225,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
               AND t.slack_channel_id = :channelId
               AND t.slack_thread_ts = :threadTs
               AND c.consent_state = 'ACTIVE'
-              AND :participantId = ANY(t.participant_member_ids)
+              AND :participantId = ANY(t.participant_account_ids)
         )
         """, nativeQuery = true)
     boolean existsDeliverableThread(
@@ -232,8 +237,8 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * Agent-owned {@code ConversationThreadProjection} SPI (participant-firewalled thread listing): threads in the
-     * workspace whose channel consent is {@code ACTIVE} and whose participant set contains {@code audienceMemberId},
-     * newest-active first, capped at {@code limit}. Native — Postgres {@code = ANY(participant_member_ids)} GIN
+     * workspace whose channel consent is {@code ACTIVE} and whose participant set contains {@code audienceAccountId},
+     * newest-active first, capped at {@code limit}. Native — Postgres {@code = ANY(participant_account_ids)} GIN
      * array-membership has no portable JPQL form. Columns: {@code slack_channel_id}, {@code channel_name}
      * (nullable), {@code slack_thread_ts}, {@code message_count} — unpacked by the caller into its own row type.
      */
@@ -243,13 +248,13 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
         JOIN slack_monitored_channel c ON c.workspace_id = t.workspace_id AND c.slack_channel_id = t.slack_channel_id
         WHERE t.workspace_id = :workspaceId
           AND c.consent_state = 'ACTIVE'
-          AND :audienceMemberId = ANY(t.participant_member_ids)
+          AND :audienceAccountId = ANY(t.participant_account_ids)
         ORDER BY t.last_ts DESC NULLS LAST
         LIMIT :limit
         """, nativeQuery = true)
     List<Object[]> findParticipatingThreadRows(
             @Param("workspaceId") long workspaceId,
-            @Param("audienceMemberId") long audienceMemberId,
+            @Param("audienceAccountId") long audienceAccountId,
             @Param("limit") int limit);
 
     /**
@@ -258,8 +263,8 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
      */
     @Modifying
     @Transactional
-    @Query(
-            "UPDATE SlackThread t SET t.lastReviewedTs = :lastTs WHERE t.workspaceId = :workspaceId AND t.id = :threadId")
+    @Query("UPDATE SlackThread t SET t.lastReviewedTs = :lastTs WHERE t.workspaceId = :workspaceId AND t.id ="
+            + " :threadId")
     int advanceReviewWatermark(
             @Param("workspaceId") long workspaceId, @Param("threadId") long threadId, @Param("lastTs") String lastTs);
 

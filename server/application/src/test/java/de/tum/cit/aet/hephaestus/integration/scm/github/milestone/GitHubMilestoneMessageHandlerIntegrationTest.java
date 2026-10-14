@@ -35,9 +35,9 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Note: This test class uses @Transactional because it directly calls handler methods
- * and needs to access lazy-loaded relationships. This is safe because there are no
- * parallel HTTP handler threads that would compete for database connections.
+ * Note: This test class uses @Transactional because it directly calls handler methods and needs to
+ * access lazy-loaded relationships. This is safe because there are no parallel HTTP handler threads
+ * that would compete for database connections.
  */
 @Transactional
 class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
@@ -123,7 +123,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);
@@ -248,9 +248,7 @@ class GitHubMilestoneMessageHandlerIntegrationTest extends BaseIntegrationTest {
         return objectMapper.readValue(json, GitHubMilestoneEventDTO.class);
     }
 
-    /**
-     * Creates a test repository reference DTO matching the fixture data.
-     */
+    /** Creates a test repository reference DTO matching the fixture data. */
     private GitHubRepositoryRefDTO createTestRepoRef() {
         return new GitHubRepositoryRefDTO(
                 FIXTURE_REPO_ID,

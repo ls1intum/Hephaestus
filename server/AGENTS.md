@@ -60,6 +60,17 @@ authorization logic.
 never log a token) · `@Transactional` on a controller (service layer only) · expose an entity from a
 controller.
 
+## Practice model boundaries
+
+Core owns neutral item, review, result, feedback and person contracts.
+Domain modules own kinds, versions, role meaning and citation-basis checks.
+Provider adapters own APIs, capture and delivery. Core imports neither provider persistence nor a diff type.
+A practice Problem is distinct from HTTP ProblemDetail.
+Accounts own developer identity and choices. SCM users remain source mirrors.
+Erasure removes dependent proof and feedback before membership. It never makes personal proof anonymous.
+Both result marks preserve the current claim and its end time.
+The two owning [glossaries](../docs/contributor/practice-review-glossary.mdx) define all practice vocabulary.
+
 ## Null-safety
 
 NullAway checks all handwritten production and test code in JSpecify mode. Generated sources are

@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.workspace.authorization;
 
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import org.springframework.stereotype.Component;
 
 /**
- * Custom Spring Security expressions for workspace authorization.
- * Used in @PreAuthorize annotations on controller methods.
+ * Custom Spring Security expressions for workspace authorization. Used in @PreAuthorize annotations
+ * on controller methods.
  */
 @Component("workspaceSecure")
 public class WorkspaceSecurityExpressions {
@@ -42,8 +42,8 @@ public class WorkspaceSecurityExpressions {
     }
 
     /**
-     * Check if user is authenticated and has at least MEMBER role in the workspace.
-     * Use in SpEL: {@code @PreAuthorize("@workspaceSecure.isMember()")}.
+     * Check if user is authenticated and has at least MEMBER role in the workspace. Use in SpEL:
+     * {@code @PreAuthorize("@workspaceSecure.isMember()")}.
      *
      * @return true if user has any workspace role (MEMBER, ADMIN, or OWNER)
      */
@@ -52,19 +52,21 @@ public class WorkspaceSecurityExpressions {
     }
 
     /**
-     * Like {@link #isMember()}, but instance-admin elevation does not count: for what a workspace offers
-     * its own members, such as Heph. Use in SpEL: {@code @PreAuthorize("@workspaceSecure.isMemberWithoutElevation()")}.
+     * Like {@link #isMember()}, but instance-admin elevation does not count: for what a workspace
+     * offers its own members, such as Heph. Use in SpEL:
+     * {@code @PreAuthorize("@workspaceSecure.isMemberWithoutElevation()")}.
      *
-     * @return true if the caller (or, in a user view, the viewed member) holds a workspace membership
+     * @return true if the caller (or, in a user view, the viewed member) holds a workspace
+     *     membership
      */
     public boolean isMemberWithoutElevation() {
         return accessService.isMemberWithoutElevation();
     }
 
     /**
-     * Check if user has permission to manage the specified role.
-     * OWNER can manage all roles, ADMIN can manage ADMIN and MEMBER.
-     * Can be used in SpEL: @PreAuthorize("@workspaceSecure.canManageRole(#role)")
+     * Check if user has permission to manage the specified role. OWNER can manage all roles, ADMIN
+     * can manage ADMIN and MEMBER. Can be used in
+     * SpEL: @PreAuthorize("@workspaceSecure.canManageRole(#role)")
      *
      * @param role Role to manage
      * @return true if user can manage this role

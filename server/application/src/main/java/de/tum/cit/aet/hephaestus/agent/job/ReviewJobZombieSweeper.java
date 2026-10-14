@@ -1,0 +1,355 @@
+package de.tum.cit.aet.hephaestus.agent.job;
+
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.observability.StructuredLogKeys;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+/**
+ * Periodic recovery for {@code review_job} rows stuck RUNNING or stuck mid-delivery.
+ *
+ * <p><b>No {@code @SchedulerLock} on anything in this class, deliberately.</b> Every sweep here acts
+ * through a conditional UPDATE that names the state it expects, so two replicas sweeping the same row
+ * produce one winner and one no-op; delivery recovery additionally claims via an attempt-counter CAS
+ * BEFORE any external post. Any {@code @Scheduled} method added here must earn that the same way, or
+ * take the lock.
+ */
+@ConditionalOnServerRole
+@Component
+@ConditionalOnBooleanProperty(RuntimeRole.AGENT_ENABLED_PROPERTY)
+@WorkspaceAgnostic("Zombie sweeper operates across all workspaces")
+public class ReviewJobZombieSweeper {
+
+    private static final Logger log = LoggerFactory.getLogger(ReviewJobZombieSweeper.class);
+
+    private static final Duration RUNNING_BUFFER = SandboxLayout.RESULT_UPLOAD_GRACE.plusMinutes(5);
+
+    /** Grace before a RUNNING job is judged orphaned, so a (re)started worker can write its first heartbeat. */
+    private static final Duration ORPHAN_STARTUP_GRACE = Duration.ofMinutes(2);
+
+    /**
+     * Must stay well above {@link AgentProperties#WORKER_LEASE_TTL} so a dead worker's jobs are requeued
+     * before its registry row goes.
+     */
+    private static final Duration STALE_REGISTRATION_TTL = Duration.ofHours(1);
+
+    /** Timeout applied when a job's frozen snapshot cannot be read. */
+    private static final int FALLBACK_TIMEOUT_SECONDS = 600;
+
+    private final ReviewJobRepository jobRepository;
+    private final WorkerRegistryRepository workerRegistryRepository;
+    private final AgentProperties agentProperties;
+    private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
+    private final LlmUsageRecorder usageRecorder;
+    private final Counter zombieReaped;
+    private final Counter orphanRequeued;
+    private final Counter orphanFailed;
+    private final Counter snapshotUnreadable;
+    private final ReviewJobTelemetry jobTelemetry;
+
+    private @Nullable ReviewCompositionContinuation compositionContinuation;
+
+    @Autowired(required = false)
+    void setCompositionContinuation(ReviewCompositionContinuation continuing) {
+        this.compositionContinuation = continuing;
+    }
+
+    @Autowired
+    public ReviewJobZombieSweeper(
+            ReviewJobRepository jobRepository,
+            WorkerRegistryRepository workerRegistryRepository,
+            AgentProperties agentProperties,
+            ObjectMapper objectMapper,
+            TransactionTemplate transactionTemplate,
+            LlmUsageRecorder usageRecorder,
+            MeterRegistry meterRegistry,
+            ReviewJobTelemetry jobTelemetry) {
+        this.jobRepository = jobRepository;
+        this.workerRegistryRepository = workerRegistryRepository;
+        this.agentProperties = agentProperties;
+        this.objectMapper = objectMapper;
+        this.transactionTemplate = transactionTemplate;
+        this.usageRecorder = usageRecorder;
+        this.zombieReaped = Counter.builder(AgentMetrics.AGENT_JOB_ZOMBIE_REAPED)
+                .description("Stale RUNNING jobs marked as TIMED_OUT")
+                .register(meterRegistry);
+        this.orphanRequeued = Counter.builder(AgentMetrics.AGENT_JOB_ORPHAN_REQUEUED)
+                .description("RUNNING jobs whose owning worker was lost, requeued for another worker")
+                .register(meterRegistry);
+        this.orphanFailed = Counter.builder(AgentMetrics.AGENT_JOB_ORPHAN_FAILED)
+                .description("Orphaned jobs that hit the retry cap and were failed")
+                .register(meterRegistry);
+        this.snapshotUnreadable = Counter.builder(AgentMetrics.AGENT_JOB_SNAPSHOT_UNREADABLE)
+                .description("Terminal accounting events whose config snapshot could not be read; billed UNPRICED")
+                .register(meterRegistry);
+        this.jobTelemetry = jobTelemetry;
+    }
+
+    /**
+     * Absolute-timeout backstop for the case where {@link #recoverOrphanedJobs} cannot run at all: mark
+     * RUNNING jobs {@code TIMED_OUT} once they exceed their per-job timeout + {@link #RUNNING_BUFFER}.
+     */
+    @Scheduled(fixedDelay = 2, timeUnit = TimeUnit.MINUTES, initialDelay = 1)
+    public void reapStaleRunningJobs() {
+        Instant conservativeCutoff = Instant.now().minus(RUNNING_BUFFER);
+        List<ReviewJob> staleJobs = jobRepository.findStaleRunningJobs(conservativeCutoff);
+
+        if (staleJobs.isEmpty()) {
+            return;
+        }
+
+        // Per-job transaction, never a method-level @Transactional: one poison job must not roll back
+        // the jobs the batch already reaped (and their ledger events) at commit time.
+        for (ReviewJob job : staleJobs) {
+            try {
+                ReviewJob reaped = transactionTemplate.execute(status -> reapIfStale(job.getId()));
+                if (reaped != null) {
+                    // The sweeper thread has no ambient trace context; restore the job's own trace ID
+                    // (with a fresh span so no stale scheduler-thread value pairs with it) so the
+                    // terminal event joins the lifecycle it closes.
+                    MDC.put(StructuredLogKeys.TRACE_ID, reaped.getTraceId());
+                    MDC.put(StructuredLogKeys.SPAN_ID, ReviewJobExecutor.randomSpanId());
+                    try {
+                        jobTelemetry.terminal(reaped, ReviewJobStatus.TIMED_OUT, ReviewJobTelemetry.age(reaped));
+                    } finally {
+                        MDC.remove(StructuredLogKeys.TRACE_ID);
+                        MDC.remove(StructuredLogKeys.SPAN_ID);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("Failed to reap stale job: jobId={}, error={}", job.getId(), e.getMessage());
+            }
+        }
+    }
+
+    private @Nullable ReviewJob reapIfStale(UUID jobId) {
+        ReviewJob lockedJob = jobRepository.lockById(jobId).orElse(null);
+        if (lockedJob == null || lockedJob.getStatus() != ReviewJobStatus.RUNNING) return null;
+        int timeoutSeconds = getTimeoutFromSnapshot(lockedJob);
+        Duration maxLifetime = Duration.ofSeconds(timeoutSeconds).plus(RUNNING_BUFFER);
+        Instant deadlineAnchor = lockedJob.getExecutionStartedAt() != null
+                ? lockedJob.getExecutionStartedAt()
+                : lockedJob.getStartedAt();
+        if (deadlineAnchor != null && deadlineAnchor.plus(maxLifetime).isAfter(Instant.now())) {
+            return null;
+        }
+
+        int updated = jobRepository.transitionStatus(
+                jobId,
+                ReviewJobStatus.TIMED_OUT,
+                Instant.now(),
+                "The job exceeded its timeout. The executor may have crashed.",
+                Set.of(ReviewJobStatus.RUNNING));
+
+        if (updated > 0) {
+            recordUnverifiableUsage(lockedJob);
+            zombieReaped.increment();
+            log.warn("Reaped stale RUNNING job: jobId={}, startedAt={}", jobId, lockedJob.getStartedAt());
+            return lockedJob;
+        }
+        return null;
+    }
+
+    /**
+     * Requeue RUNNING jobs whose owning worker stopped heartbeating, so a sibling picks them up instead
+     * of waiting out the full job timeout; jobs past the retry cap are failed instead.
+     */
+    @Scheduled(fixedDelay = 20, timeUnit = TimeUnit.SECONDS, initialDelay = 30)
+    public void recoverOrphanedJobs() {
+        List<OrphanedJobRef> orphans = jobRepository.findOrphanedRunningJobs(
+                Instant.now().minus(ORPHAN_STARTUP_GRACE), AgentProperties.WORKER_LEASE_TTL.toSeconds());
+        if (orphans.isEmpty()) {
+            return;
+        }
+        log.warn("Found {} orphaned RUNNING job(s) (owning worker lost); recovering", orphans.size());
+        for (OrphanedJobRef orphan : orphans) {
+            try {
+                OrphanRecovery outcome = transactionTemplate.execute(s -> recoverOrphan(orphan));
+                if (outcome == OrphanRecovery.REQUEUED) {
+                    orphanRequeued.increment();
+                    log.warn("Requeued orphaned job {} (retry {})", orphan.getJobId(), orphan.getAttempt() + 1);
+                } else if (outcome == OrphanRecovery.FAILED) {
+                    orphanFailed.increment();
+                    log.warn("Orphaned job {} failed at attempt {}", orphan.getJobId(), orphan.getAttempt());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to recover orphaned job {}: {}", orphan.getJobId(), e.getMessage());
+            }
+        }
+    }
+
+    private enum OrphanRecovery {
+        NONE,
+        REQUEUED,
+        FAILED,
+    }
+
+    /**
+     * Under the row lock the admission takes, so the two decisions serialize. Only the attempt the sweep
+     * found is touched: a row another claim has taken since, or that has ended, is left as it is. An
+     * attempt whose results were admitted is never measured again, at or below the retry cap.
+     */
+    private OrphanRecovery recoverOrphan(OrphanedJobRef orphan) {
+        ReviewCompositionContinuation continuing = compositionContinuation;
+        if (continuing != null) continuing.holdRecoveryCustody();
+        ReviewJob job = jobRepository.lockById(orphan.getJobId()).orElse(null);
+        if (job == null
+                || job.getStatus() != ReviewJobStatus.RUNNING
+                || !orphan.getWorkerId().equals(job.getWorkerId())
+                || job.getAttempt() != orphan.getAttempt()) {
+            return OrphanRecovery.NONE;
+        }
+        // Read the token counts BEFORE requeuing: requeueOrphan zeroes the row's accumulators.
+        ReviewJobLlmUsage counts = job.getExecutionStartedAt() != null
+                ? jobRepository.findLlmUsageById(job.getId()).orElse(null)
+                : null;
+        if (orphan.getAttempt() < agentProperties.maxRetries()) {
+            Instant availableAt = Instant.now().plus(ReviewJobBackoff.compute(orphan.getAttempt() + 1));
+            String newToken = ReviewJob.generateJobToken();
+            if (jobRepository.requeueOrphan(
+                            orphan.getJobId(),
+                            orphan.getWorkerId(),
+                            agentProperties.maxRetries(),
+                            availableAt,
+                            ReviewJob.computeTokenHash(newToken))
+                    > 0) {
+                recordUnverifiableUsage(job, counts);
+                return OrphanRecovery.REQUEUED;
+            }
+        }
+        boolean admitted = ResultAdmissionService.isAdmitted(job);
+        // A lost admitted attempt continues as a writer only when its admission kept the original inputs.
+        if (admitted && continuing != null) {
+            Instant now = Instant.now();
+            String newToken = ReviewJob.generateJobToken();
+            if (continuing.requeue(
+                            job,
+                            orphan.getWorkerId(),
+                            new ReviewJobRepository.CompositionRequeue(
+                                    orphan.getAttempt(),
+                                    agentProperties.maxRetries(),
+                                    now,
+                                    now.plus(ReviewJobBackoff.compute(orphan.getAttempt() + 1)),
+                                    newToken,
+                                    ReviewJob.computeTokenHash(newToken)))
+                    > 0) {
+                recordUnverifiableUsage(job, counts);
+                return OrphanRecovery.REQUEUED;
+            }
+        }
+        if (!admitted && orphan.getAttempt() < agentProperties.maxRetries()) {
+            return OrphanRecovery.NONE;
+        }
+        int failed = admitted
+                ? jobRepository.failAdmittedOwnedBy(
+                        orphan.getJobId(),
+                        orphan.getWorkerId(),
+                        orphan.getAttempt(),
+                        Instant.now(),
+                        ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION)
+                : jobRepository.transitionStatusOwnedBy(
+                        orphan.getJobId(),
+                        ReviewJobStatus.FAILED,
+                        Instant.now(),
+                        "The worker that owned this job was lost. The retry limit is reached.",
+                        Set.of(ReviewJobStatus.RUNNING),
+                        orphan.getWorkerId());
+        if (failed == 0) {
+            return OrphanRecovery.NONE;
+        }
+        recordUnverifiableUsage(job, counts);
+        return OrphanRecovery.FAILED;
+    }
+
+    /**
+     * Bound {@code worker_registry} growth: no worker ever deletes its own row (see
+     * {@link WorkerLivenessReporter#stop()}), so every departed worker is reaped here once its heartbeat
+     * has been stale for {@link #STALE_REGISTRATION_TTL}.
+     */
+    @Scheduled(fixedDelay = 60, initialDelay = 5, timeUnit = TimeUnit.MINUTES)
+    public void purgeStaleWorkerRegistrations() {
+        Integer removed = transactionTemplate.execute(
+                s -> workerRegistryRepository.deleteStale(STALE_REGISTRATION_TTL.toSeconds()));
+        if (removed != null && removed > 0) {
+            log.info("Purged {} stale worker_registry row(s)", removed);
+        }
+    }
+
+    /**
+     * Read a job's frozen {@link ConfigSnapshot}, or {@code null} when it cannot be read — which is an
+     * expected state, not corruption ({@link ConfigSnapshot#fromJson} rejects a snapshot written by a
+     * newer schema version). Never fatal here: refusing to terminalise such a job leaves it RUNNING
+     * forever.
+     */
+    private @Nullable ConfigSnapshot parseSnapshot(ReviewJob job) {
+        if (job.getConfigSnapshot() == null) {
+            return null;
+        }
+        try {
+            return ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+        } catch (RuntimeException e) {
+            log.warn("Could not read config snapshot for job {}: {}", job.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private int getTimeoutFromSnapshot(ReviewJob job) {
+        ConfigSnapshot snapshot = parseSnapshot(job);
+        return snapshot != null ? snapshot.timeoutSeconds() : FALLBACK_TIMEOUT_SECONDS;
+    }
+
+    private void recordUnverifiableUsage(ReviewJob job) {
+        recordUnverifiableUsage(
+                job,
+                job.getExecutionStartedAt() != null
+                        ? jobRepository.findLlmUsageById(job.getId()).orElse(null)
+                        : null);
+    }
+
+    /**
+     * Bill a reaped attempt from token counts the caller read BEFORE any requeue of the job (see
+     * {@link ReviewJobRepository#requeueOrphan}, which zeroes the row's accumulators).
+     *
+     * <p><b>Must not throw.</b> Every caller runs it inside the same transaction as the state
+     * transition it accompanies, so an exception here rolls that transition back and the job returns to
+     * RUNNING to fail identically on the next sweep, forever.
+     */
+    private void recordUnverifiableUsage(ReviewJob job, @Nullable ReviewJobLlmUsage counts) {
+        if (job.getExecutionStartedAt() == null) return;
+        ConfigSnapshot snapshot = parseSnapshot(job);
+        if (snapshot == null) {
+            snapshotUnreadable.increment();
+        }
+        LlmPriceSnapshot price = snapshot != null && snapshot.priceSnapshot() != null
+                ? snapshot.priceSnapshot()
+                : LlmPriceSnapshot.unpricedInstance();
+        TerminalUsage.fromProxy(counts)
+                .appendTo(usageRecorder, jobRepository, job.getWorkspaceId(), job, snapshot, price);
+    }
+}

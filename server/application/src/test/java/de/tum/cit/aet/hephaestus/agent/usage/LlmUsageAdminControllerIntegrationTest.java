@@ -9,6 +9,11 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRate;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -58,15 +63,16 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     private void seedEvent(Workspace workspace, String cost) {
-        seedEvent(workspace, cost, FundingSource.INSTANCE, PricingState.PRICED);
+        seedEvent(workspace, cost, UsageFundingSource.INSTANCE, UsagePricingState.PRICED);
     }
 
-    private void seedEvent(Workspace workspace, @Nullable String cost, FundingSource funding, PricingState pricing) {
+    private void seedEvent(
+            Workspace workspace, @Nullable String cost, UsageFundingSource funding, UsagePricingState pricing) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
-        event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
-        event.setSourceType(LlmUsageSourceType.AGENT_JOB);
+        event.setJobType("PRACTICE_REVIEW");
+        event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setSourceId(UUID.randomUUID());
         event.setCostUsd(cost == null ? null : new BigDecimal(cost));
         // Budgeted spend only counts PRICED + INSTANCE-funded rows — both are the
@@ -124,7 +130,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("5.00")); // workspace's own cap: reached
         workspaceRepository.save(workspace);
         seedEvent(workspace, "1.00");
-        seedEvent(workspace, "5.00", FundingSource.WORKSPACE, PricingState.PRICED);
+        seedEvent(workspace, "5.00", UsageFundingSource.WORKSPACE, UsagePricingState.PRICED);
 
         var row = rollupFor(workspace);
 
@@ -146,7 +152,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("100.00"));
         workspaceRepository.save(workspace);
         seedEvent(workspace, "1.00");
-        seedEvent(workspace, null, FundingSource.WORKSPACE, PricingState.UNPRICED);
+        seedEvent(workspace, null, UsageFundingSource.WORKSPACE, UsagePricingState.UNPRICED);
 
         var row = rollupFor(workspace);
 
@@ -176,7 +182,7 @@ class LlmUsageAdminControllerIntegrationTest extends AbstractWorkspaceIntegratio
         model.setEnabled(true);
         workspaceLlmModelRepository.save(model);
         Workspace zeroCalls = setupWorkspace("adm-own-zero-calls");
-        seedEvent(zeroCalls, "0.00", FundingSource.WORKSPACE, PricingState.NO_CHARGE);
+        seedEvent(zeroCalls, "0.00", UsageFundingSource.WORKSPACE, UsagePricingState.NO_CHARGE);
         Workspace sharedOnly = setupWorkspace("adm-own-shared-only");
         seedEvent(sharedOnly, "1.00");
 

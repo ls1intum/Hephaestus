@@ -3,14 +3,14 @@ package de.tum.cit.aet.hephaestus.agent.task;
 import java.util.Objects;
 import java.util.UUID;
 
-/** One flat task.json record. The staged runner and task schema change together. */
+/** The generic task.json envelope read by image contract 6. */
 public record TaskEnvelope(
         int schemaVersion,
+        UUID reviewId,
         UUID jobId,
-        long workspaceId,
+        int attempt,
+        String workspaceId,
         String prompt,
-        int pullRequestNumber,
-        String repositoryFullName,
         String contextRoot,
         String repositoryRoot,
         String manifest,
@@ -18,11 +18,14 @@ public record TaskEnvelope(
         String compositionRequest,
         String preparedFeedback,
         String practiceScripts) {
-    public static final int SCHEMA_VERSION = 5;
+    public static final int SCHEMA_VERSION = 6;
 
     public TaskEnvelope {
+        Objects.requireNonNull(reviewId, "reviewId");
         Objects.requireNonNull(jobId, "jobId");
-        new Task(prompt, pullRequestNumber, repositoryFullName);
+        if (attempt < 0) throw new IllegalArgumentException("Attempt must not be negative");
+        Objects.requireNonNull(workspaceId, "workspaceId");
+        new Task(prompt);
         new TaskPaths(
                 contextRoot,
                 repositoryRoot,
@@ -31,23 +34,22 @@ public record TaskEnvelope(
                 compositionRequest,
                 preparedFeedback,
                 practiceScripts);
-        if (schemaVersion != SCHEMA_VERSION) {
-            throw new IllegalArgumentException("Unsupported schemaVersion: " + schemaVersion);
+        if (schemaVersion != SCHEMA_VERSION) throw new IllegalArgumentException("Unsupported task schema version");
+        if (!workspaceId.matches("[1-9][0-9]*") || workspaceId.length() > 19) {
+            throw new IllegalArgumentException("Workspace id must be a positive decimal id");
         }
-        if (workspaceId <= 0) {
-            throw new IllegalArgumentException("workspaceId must be positive, got " + workspaceId);
-        }
+        Long.parseLong(workspaceId);
     }
 
-    public static TaskEnvelope of(UUID jobId, long workspaceId, Task task) {
+    public static TaskEnvelope of(UUID reviewId, UUID jobId, int attempt, long workspaceId, Task task) {
         var paths = TaskPaths.capturedInputs();
         return new TaskEnvelope(
                 SCHEMA_VERSION,
+                reviewId,
                 jobId,
-                workspaceId,
+                attempt,
+                Long.toString(workspaceId),
                 task.prompt(),
-                task.pullRequestNumber(),
-                task.repositoryFullName(),
                 paths.contextRoot(),
                 paths.repositoryRoot(),
                 paths.manifest(),

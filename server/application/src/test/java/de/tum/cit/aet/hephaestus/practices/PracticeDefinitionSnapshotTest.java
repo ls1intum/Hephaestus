@@ -1,45 +1,29 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
-import com.fasterxml.jackson.databind.json.JsonMapper;
-import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.util.List;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.json.JsonMapper;
 
 class PracticeDefinitionSnapshotTest extends BaseUnitTest {
-
     @Test
-    void fingerprintsReviewContentWithoutRecordingIt() throws Exception {
-        Practice practice = new Practice();
-        practice.setSlug("focused-reviews");
-        practice.setName("Focused reviews");
-        PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_REVIEWED, ScmSignals.PULL_REQUEST_OPENED);
-        practice.setCriteria("abc");
-        practice.setPracticeScript("console.log('x')");
-        practice.setAutomatedReviewPolicy(new PracticeAutomatedReviewPolicy(
-                new SourceContractVersion("1.2.0"),
-                new PracticeAutomatedReview(
-                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                        PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET),
-                PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-                List.of(),
-                null));
-        practice.setWhyItMatters("Keeps feedback useful.");
-        practice.setWhatGoodLooksLike("Each comment addresses one concern.");
-
-        PracticeDefinitionSnapshot snapshot = PracticeDefinitionSnapshot.of(practice, 3);
+    void shouldKeepOnlyVersionIdentityAndDigestWhenAnAuditSnapshotIsWritten() {
+        var version = mock(PracticeVersion.class);
+        when(version.getId()).thenReturn(17L);
+        when(version.getReviewDigest()).thenReturn("v6:" + "a".repeat(64));
+        var practice = new Practice();
+        practice.setSlug("private-script");
+        practice.setKind(new ItemKind("scm.pull_request"));
+        practice.setCurrentVersion(version);
+        var snapshot = PracticeDefinitionSnapshot.of(practice);
         String json = JsonMapper.builder().build().writeValueAsString(snapshot);
-
-        assertThat(snapshot.criteriaSha256())
-                .isEqualTo("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
-        assertThat(snapshot.practiceScriptSha256())
-                .isEqualTo("93f0d05c1fdeaf00615a94221cd849ea93ce5a5d19e130931fc5766637a21bb3");
-        assertThat(snapshot.signals())
-                .containsExactly(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED);
-        assertThat(json).doesNotContain("abc", "console.log");
+        assertThat(snapshot.versionId()).isEqualTo(17L);
+        assertThat(json).contains("reviewDigest").doesNotContain("criteria", "script", "definition");
     }
 }

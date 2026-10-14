@@ -1,30 +1,33 @@
-// Finds the added code lines that match a pattern of an insecure default, an over-broad permission or
+import { scm } from "../kits/scm/index.ts";
+import {
+	occurrences,
+	selectedSources,
+	selectedOccurrences,
+	occurrenceLead,
+	sortOccurrenceLeads,
+} from "../kits/scm/occurrences.ts";
+// Finds the selected code lines that match a pattern of an insecure default, an over-broad permission or
 // an exposed secret, in all languages. Each lead is a candidate: the review decides if it is real and
 // exploitable on a reachable path.
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"credential-named-value-in-url-path-query":
-		"An added line that puts a credential-named value into a URL path or query.",
+		"A selected line that puts a credential-named value into a URL path or query.",
 	"keychain-write":
-		"An added keychain write, whose accessibility class comes from kSecAttrAccessible.",
+		"A selected keychain write, whose accessibility class comes from kSecAttrAccessible.",
 	"logs-credential-named-value-response-body":
-		"An added log or print call whose arguments name a token, a password, a credential or a response body.",
+		"A selected log or print call whose arguments name a token, a password, a credential or a response body.",
 	"insecure-transport-tls-off":
-		"An added line that allows plain HTTP or turns off the verification of TLS certificates.",
+		"A selected line that allows plain HTTP or turns off the verification of TLS certificates.",
 	"over-broad-permission-wildcard":
-		"An added line that grants world-writable file modes, permits all requests, or allows every origin.",
+		"A selected line that grants world-writable file modes, permits all requests, or allows every origin.",
 	"credential-named-literal":
-		"An added line that assigns a literal value to a credential-named field.",
+		"A selected line that assigns a literal value to a credential-named field.",
 };
 type InsecureKind = keyof typeof LABELS;
 
-// Each pattern fires on an added line. They are tuned to the surface of authentication, transport and
+// Each pattern fires on a selected line. They are tuned to the surface of authentication, transport and
 // secrets that a login or API change touches, where a quick review most often misses an insecure default.
 const PATTERNS: [InsecureKind, RegExp][] = [
 	// A credential-named value interpolated into a URL path or query. Matches ${...} and #{...} (JS,
@@ -66,33 +69,34 @@ function countFact(kind: InsecureKind): string {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
 		const leads: ReviewLead[] = [];
 		const byKind: Record<string, number> = {};
-		for (const [path, df] of requireChange(ctx.files)) {
-			for (const [line, content] of df.addedLines) {
-				if (isComment(content.trimStart())) {
-					continue;
-				}
-				const match = PATTERNS.find(([, re]) => re.test(content));
-				if (match !== undefined) {
-					const [kind] = match;
-					leads.push({ at: { change: path, line }, label: LABELS[kind] });
-					byKind[countFact(kind)] = (byKind[countFact(kind)] ?? 0) + 1;
-				}
+		for (const file of await selectedSources(ctx, domain.files)) {
+			for (const [kind, test] of PATTERNS) {
+				const found = selectedOccurrences(
+					ctx,
+					domain.files,
+					occurrences(file, [{ label: LABELS[kind], test }], { includeComments: true }),
+				).filter((row) => !isComment(file.text.split("\n")[row.startLine - 1]?.trimStart() ?? ""));
+				leads.push(...found.map(occurrenceLead));
+				byKind[countFact(kind)] = (byKind[countFact(kind)] ?? 0) + found.length;
 			}
 		}
 		const directions =
 			leads.length > 0
 				? [
-						`Found ${leads.length} insecure-default or secret-exposure candidate(s) on added lines. Investigate each on the reachable auth and transport surface.`,
+						`Found ${leads.length} insecure-default or secret-exposure candidate(s) on selected lines. Investigate each on the reachable auth and transport surface.`,
 						"For credential-named URL, literal and logging leads, establish the value’s role under class 5 of the standard before deciding whether it exposes credential material.",
 						"A keychain write takes its accessibility from kSecAttrAccessible, WhenUnlocked when omitted, which is not a defect by itself.",
 						"Disabled TLS, wildcard CORS and world-writable permissions are over-broad. Confirm whether each is real and exploitable before deciding.",
 					]
 				: [];
 		return ctx.review({
-			leads: leads.slice(0, 40),
+			leads: sortOccurrenceLeads(leads).slice(0, 40),
 			facts: { insecureDefaultCandidates: leads.length, ...byKind },
 			directions,
 		});

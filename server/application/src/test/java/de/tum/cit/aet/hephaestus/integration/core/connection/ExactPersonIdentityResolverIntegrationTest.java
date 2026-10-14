@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataRequest.State;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataService;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataStoreReceipt;
@@ -67,7 +67,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     private AccountRepository accounts;
 
     @Autowired
-    private IdentityLinkRepository links;
+    private IdentityRepository links;
 
     @Test
     void shouldPreviewAndExportEveryRegisteredStoreForGitLabOnlyPerson() {
@@ -148,14 +148,20 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldHaveExactlyOneSourceAttributionOwnerForEachShippedArtifactKind() {
+    void shouldHaveExactlyOneSourceAttributionOwnerForEachShippedItemKind() {
         var kinds = sourceOwners.stream()
-                .flatMap(owner -> owner.artifactKinds().stream())
+                .flatMap(owner -> owner.itemKinds().stream())
                 .toList();
         assertThat(kinds)
                 .doesNotHaveDuplicates()
                 .containsExactlyInAnyOrder(
-                        "scm.issue", "scm.pull_request", "chat.conversation_thread", "docs.document");
+                        "scm.issue",
+                        "scm.pull_request",
+                        "scm.pull_request_review",
+                        "scm.repository",
+                        "scm.file",
+                        "chat.thread",
+                        "docs.document");
     }
 
     @Test
@@ -194,7 +200,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
                         "GITLAB",
                         "config",
                         "{\"serverUrl\":\"" + provider.getServerUrl() + "\"}"));
-        for (long sourceId : List.of(995202L, 995203L, 995204L, 995205L)) {
+        for (long sourceId : List.of(995202L, 995203L, 995204L, 995205L, 995208L)) {
             var source = new HashMap<String, Object>(Map.of(
                     "id",
                     sourceId,
@@ -229,7 +235,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         }
         jdbc.update("INSERT INTO issue_assignee(issue_id,user_id) VALUES (?,?)", 995202L, target.getId());
         jdbc.update(
-                "INSERT INTO pull_request_requested_reviewers(pull_request_id,user_id) VALUES (?,?)",
+                "INSERT INTO pull_request_requested_reviewers(pull_request_id,user_id) VALUES" + " (?,?)",
                 995203L,
                 target.getId());
         seed.insert(
@@ -246,10 +252,25 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
                         "committer_id",
                         target.getId()));
         jdbc.update("INSERT INTO commit_pull_request(commit_id,pull_request_id) VALUES (?,?)", 995206L, 995204L);
+        seed.insert(
+                "pull_request_review_thread",
+                Map.of(
+                        "id",
+                        995209L,
+                        "native_id",
+                        995209L,
+                        "provider_id",
+                        provider.getId(),
+                        "pull_request_id",
+                        995208L,
+                        "resolved_by_id",
+                        target.getId(),
+                        "state",
+                        "RESOLVED"));
         var scope = resolver.resolve(null, List.of(identity(provider, "42", null)));
         assertThat(scope.userIds()).containsExactly(target.getId());
         assertThat(scope.scmArtifactIds())
-                .containsExactly(995202L, 995203L, 995204L)
+                .containsExactly(995202L, 995203L, 995204L, 995208L)
                 .doesNotContain(995205L);
         assertThat(resolver.resolve(null, List.of(identity(provider, "84", null)))
                         .scmArtifactIds())
@@ -261,12 +282,12 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var request = personData.preview(administratorId, null, List.of(identity(provider, "42", null)));
         personData.requestErasure(request.request().getId(), administratorId, true);
         for (long sourceId : scope.scmArtifactIds()) {
-            assertThat(suppression.isArtifactSuppressed(workspaceId, "scm.pull_request", sourceId))
+            assertThat(suppression.isSourceSuppressed(workspaceId, "scm.pull_request", sourceId))
                     .isTrue();
-            assertThat(suppression.isArtifactSuppressed(-1, "scm.pull_request", sourceId))
+            assertThat(suppression.isSourceSuppressed(-1, "scm.pull_request", sourceId))
                     .isFalse();
         }
-        assertThat(suppression.isArtifactSuppressed(workspaceId, "scm.pull_request", 995205L))
+        assertThat(suppression.isSourceSuppressed(workspaceId, "scm.pull_request", 995205L))
                 .isFalse();
         personData.run(request.request().getId());
         assertThat(personData.get(request.request().getId()).request().getState())
@@ -276,6 +297,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         jdbc.update("DELETE FROM git_commit WHERE id=?", 995206L);
         jdbc.update("DELETE FROM issue_assignee WHERE issue_id=?", 995202L);
         jdbc.update("DELETE FROM pull_request_requested_reviewers WHERE pull_request_id=?", 995203L);
+        jdbc.update("DELETE FROM pull_request_review_thread WHERE id=?", 995209L);
         jdbc.update("DELETE FROM issue WHERE repository_id=?", repositoryId);
         jdbc.update("DELETE FROM repository_to_monitor WHERE native_id=?", repositoryId);
         jdbc.update("DELETE FROM repository WHERE id=?", repositoryId);
@@ -437,18 +459,18 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         return new PersonIdentity(Objects.requireNonNull(provider.getId()), subject, teamId);
     }
 
-    private IdentityLink link(
+    private Identity link(
             Account account,
             IdentityProvider provider,
             String subject,
             @Nullable String teamId,
             @Nullable Long actorId) {
-        var link = new IdentityLink();
+        var link = new Identity();
         link.setAccount(account);
         link.setProviderId(Objects.requireNonNull(provider.getId()));
-        link.setSubject(subject);
-        link.setTeamId(teamId);
-        link.setExternalActorId(actorId);
+        link.setProviderUserKey(subject);
+        link.setTeamKey(teamId == null ? "" : teamId);
+
         return links.saveAndFlush(link);
     }
 

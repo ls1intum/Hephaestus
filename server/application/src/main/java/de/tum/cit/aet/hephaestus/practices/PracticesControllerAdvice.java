@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredEx
 import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.CatalogAdoptionPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.curated.adoption.StaleCatalogAdoptionPlanException;
-import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewCoverageException;
+import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewScopeException;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;
 import java.util.Objects;
@@ -19,12 +19,22 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Error mapper for practices-specific exceptions.
- * Kept in the practices module to avoid a cyclic dependency between practices and core.
+ * Error mapper for practices-specific exceptions. Kept in the practices module to avoid a cyclic
+ * dependency between practices and core.
  */
 @RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class PracticesControllerAdvice {
+
+    @ExceptionHandler(StalePracticeVersionException.class)
+    ProblemDetail handleStaleVersion(StalePracticeVersionException exception) {
+        var detail = problem(
+                HttpStatus.CONFLICT,
+                "Practice version changed",
+                Objects.toString(exception.getMessage(), "The practice version changed."));
+        detail.setProperty("currentVersionId", exception.currentVersionId());
+        return detail;
+    }
 
     @ExceptionHandler(PracticeSlugConflictException.class)
     ProblemDetail handleSlugConflict(PracticeSlugConflictException exception) {
@@ -53,7 +63,7 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(StaleCuratedEntryException.class)
     ProblemDetail handleStaleCuratedEntry(StaleCuratedEntryException exception) {
         return problem(
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.CONFLICT,
                 "Practice catalog changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
@@ -69,7 +79,7 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(StaleCatalogAdoptionPlanException.class)
     ProblemDetail handleStaleAdoptionPlan(StaleCatalogAdoptionPlanException exception) {
         return problem(
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.CONFLICT,
                 "Practice adoption preview changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
@@ -85,7 +95,7 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(StalePracticeReviewSettingsException.class)
     ProblemDetail handleStaleReviewSettings(StalePracticeReviewSettingsException exception) {
         return problem(
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.CONFLICT,
                 "Practice review settings changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
@@ -109,16 +119,16 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(StalePracticeReleaseException.class)
     ProblemDetail handleStaleRelease(StalePracticeReleaseException exception) {
         return problem(
-                HttpStatus.PRECONDITION_FAILED,
+                HttpStatus.CONFLICT,
                 "Practice release changed",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 
-    @ExceptionHandler(InvalidReviewCoverageException.class)
-    ProblemDetail handleInvalidReviewCoverage(InvalidReviewCoverageException exception) {
+    @ExceptionHandler(InvalidReviewScopeException.class)
+    ProblemDetail handleInvalidReviewScope(InvalidReviewScopeException exception) {
         return problem(
                 HttpStatus.BAD_REQUEST,
-                "Invalid practice review coverage",
+                "We could not save the review scope",
                 Objects.toString(exception.getMessage(), "Request failed"));
     }
 

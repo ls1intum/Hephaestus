@@ -4,12 +4,13 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.judg
 import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.noVerdict;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -42,8 +43,8 @@ class GroupTrendAggregatorTest {
         PracticeTrend judged = PracticeTrendCalculator.calculatePractice(
                 "testing",
                 List.of(
-                        judged(40L, "2026-05-01T09:00:00Z", Outcome.NOT_MET),
-                        judged(55L, "2026-06-01T09:00:00Z", Outcome.MET)),
+                        judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(55L, "2026-06-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
@@ -62,12 +63,12 @@ class GroupTrendAggregatorTest {
         // opportunity counts from inflating with the number of practices rather than the amount of work.
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
                 "naming",
-                List.of(judged(40L, "2026-05-01T09:00:00Z", Outcome.MET)),
+                List.of(judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
                 "testing",
-                List.of(judged(40L, "2026-05-01T10:00:00Z", Outcome.NOT_MET)),
+                List.of(judged(40L, "2026-05-01T10:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
@@ -86,27 +87,27 @@ class GroupTrendAggregatorTest {
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
                 "naming",
                 List.of(
-                        judged(100L, "2026-06-10T09:00:00Z", Outcome.MET),
-                        judged(101L, "2026-06-09T09:00:00Z", Outcome.MET),
-                        judged(102L, "2026-06-08T09:00:00Z", Outcome.MET),
-                        judged(103L, "2026-06-07T09:00:00Z", Outcome.MET),
-                        judged(104L, "2026-06-06T09:00:00Z", Outcome.NOT_MET),
-                        judged(105L, "2026-06-05T09:00:00Z", Outcome.NOT_MET),
-                        judged(106L, "2026-06-04T09:00:00Z", Outcome.NOT_MET),
-                        judged(107L, "2026-06-03T09:00:00Z", Outcome.NOT_MET)),
+                        judged(100L, "2026-06-10T09:00:00Z", ResultOutcome.MET),
+                        judged(101L, "2026-06-09T09:00:00Z", ResultOutcome.MET),
+                        judged(102L, "2026-06-08T09:00:00Z", ResultOutcome.MET),
+                        judged(103L, "2026-06-07T09:00:00Z", ResultOutcome.MET),
+                        judged(104L, "2026-06-06T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(105L, "2026-06-05T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(106L, "2026-06-04T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(107L, "2026-06-03T09:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
                 "testing",
                 List.of(
-                        judged(200L, "2026-06-14T09:00:00Z", Outcome.MET),
-                        judged(201L, "2026-06-13T09:00:00Z", Outcome.MET),
-                        judged(202L, "2026-06-12T09:00:00Z", Outcome.MET),
-                        judged(203L, "2026-06-11T09:00:00Z", Outcome.MET),
-                        judged(100L, "2026-06-10T09:00:00Z", Outcome.NOT_MET),
-                        judged(204L, "2026-06-09T09:00:00Z", Outcome.NOT_MET),
-                        judged(205L, "2026-06-08T09:00:00Z", Outcome.NOT_MET),
-                        judged(206L, "2026-06-07T09:00:00Z", Outcome.NOT_MET)),
+                        judged(200L, "2026-06-14T09:00:00Z", ResultOutcome.MET),
+                        judged(201L, "2026-06-13T09:00:00Z", ResultOutcome.MET),
+                        judged(202L, "2026-06-12T09:00:00Z", ResultOutcome.MET),
+                        judged(203L, "2026-06-11T09:00:00Z", ResultOutcome.MET),
+                        judged(100L, "2026-06-10T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(204L, "2026-06-09T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(205L, "2026-06-08T09:00:00Z", ResultOutcome.NOT_MET),
+                        judged(206L, "2026-06-07T09:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
@@ -129,8 +130,8 @@ class GroupTrendAggregatorTest {
         PracticeTrend two = PracticeTrendCalculator.calculatePractice(
                 "naming",
                 List.of(
-                        judged(1L, "2026-05-01T09:00:00Z", Outcome.MET),
-                        judged(2L, "2026-05-02T09:00:00Z", Outcome.MET)),
+                        judged(1L, "2026-05-01T09:00:00Z", ResultOutcome.MET),
+                        judged(2L, "2026-05-02T09:00:00Z", ResultOutcome.MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend none = PracticeTrendCalculator.calculatePractice(
@@ -148,15 +149,15 @@ class GroupTrendAggregatorTest {
         PracticeTrend naming = PracticeTrendCalculator.calculatePractice(
                 "naming",
                 List.of(
-                        judged(1L, "2026-05-01T09:00:00Z", Outcome.MET),
-                        judged(2L, "2026-05-02T09:00:00Z", Outcome.NOT_MET)),
+                        judged(1L, "2026-05-01T09:00:00Z", ResultOutcome.MET),
+                        judged(2L, "2026-05-02T09:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
         PracticeTrend testing = PracticeTrendCalculator.calculatePractice(
                 "testing",
                 List.of(
-                        judged(2L, "2026-05-02T09:00:00Z", Outcome.MET),
-                        judged(3L, "2026-05-03T09:00:00Z", Outcome.MET),
+                        judged(2L, "2026-05-02T09:00:00Z", ResultOutcome.MET),
+                        judged(3L, "2026-05-03T09:00:00Z", ResultOutcome.MET),
                         noVerdict(4L, "2026-05-04T09:00:00Z")),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
@@ -171,15 +172,15 @@ class GroupTrendAggregatorTest {
 
     @Test
     void shouldReadTheGroupsStandingWorkOffEveryPracticeNotOnlyTheComparedOnes() {
-        List<PracticeResult> compared = new ArrayList<>();
+        List<ResultView> compared = new ArrayList<>();
         for (int day = 1; day <= 8; day++) {
-            compared.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), Outcome.MET));
+            compared.add(judged(day, "2026-05-%02dT09:00:00Z".formatted(day), ResultOutcome.MET));
         }
         PracticeTrend full = PracticeTrendCalculator.calculatePractice(
                 "naming", compared, Instant.parse("2026-01-01T00:00:00Z"), properties);
         PracticeTrend thin = PracticeTrendCalculator.calculatePractice(
                 "testing",
-                List.of(judged(50L, "2026-05-20T09:00:00Z", Outcome.NOT_MET)),
+                List.of(judged(50L, "2026-05-20T09:00:00Z", ResultOutcome.NOT_MET)),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 
@@ -217,7 +218,7 @@ class GroupTrendAggregatorTest {
                 OutcomeVector.EMPTY,
                 OutcomeVector.EMPTY,
                 List.of(),
-                Set.of(),
+                Map.of(),
                 difference);
     }
 }

@@ -1,13 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -23,12 +22,11 @@ import org.jspecify.annotations.Nullable;
  * @param dataHandlingTier the tier slot of the binding that supplied this model
  * @param priceSnapshot the price frozen when the job was admitted; {@code null} until then
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
 public record FrozenModel(
         String apiProtocol,
         String baseUrl,
         String upstreamModelId,
-        @Nullable FundingSource connectionScope,
+        @Nullable UsageFundingSource connectionScope,
         @Nullable Long connectionId,
         @Nullable Long modelId,
         @Nullable Long workspaceId,

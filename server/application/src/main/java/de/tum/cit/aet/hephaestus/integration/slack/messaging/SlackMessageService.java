@@ -228,7 +228,10 @@ public class SlackMessageService {
             if (!r.isOk()) {
                 throw new SlackSendException(workspaceId, channel, r.getError() == null ? "unknown" : r.getError());
             }
-            return r.getTs();
+            String receipt = r.getTs();
+            if (receipt == null || receipt.isBlank())
+                throw new SlackSendException(workspaceId, channel, "invalid_receipt");
+            return receipt;
         } catch (OutboundEgressSuppressedException e) {
             throw new SlackSendException(workspaceId, channel, "silent_mode_engaged", e);
         } catch (SlackApiException e) {
@@ -366,6 +369,34 @@ public class SlackMessageService {
                             req -> req.channelId(channel).title(title).prompts(prompts));
         } catch (Exception e) {
             log.debug("Slack setSuggestedPrompts skipped (channel={}): {}", channel, e.getMessage());
+        }
+    }
+
+    /** A verified native human profile; bot and cross-team profiles never enter the people roster. */
+    public Optional<String> humanDisplayName(long workspaceId, String teamId, String subject) {
+        var token = resolveToken(workspaceId);
+        if (token.isEmpty()) throw new SlackSendException(workspaceId, subject, "no_active_slack_connection");
+        try {
+            var response = callHonoringRateLimit(
+                    workspaceId, () -> slack.methods(token.get()).usersInfo(request -> request.user(subject)));
+            if (!response.isOk())
+                throw new SlackSendException(
+                        workspaceId, subject, response.getError() == null ? "unknown" : response.getError());
+            var user = response.getUser();
+            if (user == null
+                    || !subject.equals(user.getId())
+                    || !teamId.equals(user.getTeamId())
+                    || user.isBot()
+                    || user.isAppUser()
+                    || user.isDeleted()) return Optional.empty();
+            var profile = user.getProfile();
+            String name = profile == null ? null : profile.getDisplayName();
+            if (name == null || name.isBlank()) name = profile == null ? null : profile.getRealName();
+            if (name == null || name.isBlank()) name = user.getName();
+            if (name == null || name.isBlank()) return Optional.empty();
+            return Optional.of(name);
+        } catch (SlackApiException | IOException e) {
+            throw new SlackSendException(workspaceId, subject, "transport_failure", e);
         }
     }
 

@@ -1,98 +1,33 @@
 # ADR 0050: One practice standard, one outcome
 
-**Status:** Accepted (amended 2026-10-12 — a result holds the outcome, see [ADR 0055](0055-practice-scripts-call-models-through-the-runner.md))
-**Date:** 2026-10-02
-**Supersedes:** The observation axes in [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md).
+**Status:** Accepted
+**Date:** 2026-10-14
+**Authors:** Hephaestus maintainers
 
 ## Context
 
-The presence/desirability matrix describes a behavior, but readers need conformance to a practice.
-A desirable behavior being present does not prove the complete standard was met. The derived result
-also requires every caller to reverse the meaning of absence correctly. The nested occasion list
-suggests different evidence and subjects per signal even though the review operates on one definition.
-
-## Decision drivers
-
-- Make the result understandable without reversing presence and desirability.
-- Distinguish lack of occasion, unresolved assessment, and failed capture.
-- Preserve scientific records and reject unsupported equivalence claims.
-- Use one model across persistence, runtime, API, UI, and evaluation.
-
-## Considered options
-
-1. Keep the matrix. Rejected: behavior classification is not full-standard conformance and duplicates
-   interpretation across consumers.
-2. Use only met/not met. Rejected: irrelevant work and unresolved evidence would become false
-   failures or disappear from coverage accounting.
-3. Use nullable conformance plus a separate status. Rejected: this retains multiple fields and invalid
-   combinations without improving the four distinct facts.
-4. Use one four-value outcome and flat review fields. Selected: the smallest model preserving the
-   distinctions needed for accurate reporting and trustworthy feedback.
+A developer needs a verdict about the practice standard within captured evidence.
+A positive behavior alone does not prove the complete standard.
+Missing evidence, excluded applicability and unresolved meaning are different facts.
 
 ## Decision
 
-Use one `outcome`: `MET`, `NOT_MET`, `NOT_APPLICABLE`, or `UNDETERMINED`. Criteria defines the positive
-standard. Severity exists exactly for `NOT_MET`. Keep citations and claim-specific evidence warrants,
-not a second behavioral classification. Capture failures create no observation.
+Use Met, Not met, Does not apply and Could not determine.
+The [outcome contract](../contributor/practice-feedback-language.md#result-outcomes) owns their exact evidence requirements.
+A result concerns one practice, item version and optional developer.
+A scan has many file results, not one verdict for the repository.
+Failed required capture creates no result.
 
-Keep applicability separate from undecidability. Removing these distinctions would conflate no
-occasion with unresolved assessment and distort the decided-result denominator. Reports disclose
-both separately. Structural validation does not prove an assessment accurate.
-
-Flatten practice review configuration into `signals`, `evidenceRequirements`, `reviewWhen`, `subject`,
-and optional `precondition`. Keep `anyOf` in the precondition because alternatives are real logic,
-not presentation nesting. Keep evidence requirements structured because source, quality, and stance
-are distinct facts. Do not split free-text criteria into duplicate model-authored rubrics.
-
-Perform one forward pre-1.0 cutover without fallback readers. Released migrations and original
-research data remain immutable. Historical revisions with genuinely unknown metadata retain that
-absence; new definitions are complete. Do not translate old empirical positive labels into claims
-of full-standard conformance without an independently justified equivalence.
-
-Automatic scheduling uses descriptor-owned finite state selections. `reviewWhen` has no duplicate
-artifact-kind discriminator: signals already identify that family. `{}` is unrestricted; selected
-values are alternatives within a dimension and all selected dimensions must match. Unsupported
-states are rejected, and missing required facts do not match. A pull request's draft state is not
-assigned to issues, documents or conversations. State is captured at admission for later preparation.
-
-Scheduling (`signals`, `reviewWhen`) remains part of the immutable full definition digest but not
-of the assessment fingerprint. It changes when to assess, not what the same evidence establishes.
-Assessment preconditions remain in that fingerprint and are validated against descriptor capabilities.
+Historical empirical records retain original criteria and evidence qualification.
+A name conversion or recomputed digest does not establish scientific equivalence.
+[ADR 0056](0056-one-practice-model-for-items-and-scans.md) owns the complete consolidated model.
 
 ## Consequences
 
-All persistence, runtime, HTTP, UI, and evaluation consumers must change together. A verified backup
-is required before upgrade. Feedback and delivery remain separate from observation outcomes.
-A schema-valid model response can still be wrong; tests cover admission and evidence boundaries,
-and research evaluates correctness against independently authored references.
+Persistence, scripts, HTTP and UI use the same four outcomes.
+Feedback state and result marks remain separate from the outcome.
+Research must assess factual accuracy independently of structural admission.
 
 ## Revisit trigger
 
-Revisit if independently reviewed evaluation cases establish that the four outcomes cannot express
-an important assessment distinction, or if a shipped use case requires different subjects or evidence
-contracts for signals within one practice. Do not add states only to encode feedback delivery.
-
-## Evidence
-
-- [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/os/sarif-v2.1.0-os.html)
-  distinguishes pass, fail, not applicable, and open results. This supports separation of result facts,
-  not a claim that practice assessment has been empirically validated.
-- [FEVER](https://arxiv.org/abs/1803.05355) distinguishes insufficient information from refutation.
-  Its task differs from practice review; the useful principle is not treating unknown as failure.
-- [OpenAI Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs)
-  constrains response shape, not factual correctness, and requires refusal handling.
-- [React state structure](https://react.dev/learn/choosing-the-state-structure) recommends avoiding
-  contradictory and redundant state. Editors keep one definition rather than mirrored occasion lists.
-- [GitHub pull-request event payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)
-  and the [GitLab merge-request API](https://docs.gitlab.com/api/merge_requests/) treat draft state and
-  lifecycle as separate facts. A signal is not a substitute for either recorded fact.
-- [Slack message events](https://docs.slack.dev/reference/events/message/) do not supply a shared
-  pull-request lifecycle. A descriptor exposes only state its adapter records.
-
-## Update — 2026-10-12 (#2656): a result holds the outcome
-
-The one outcome of this ADR now belongs to a **result**. A `NOT_MET` result has one or more observations,
-and each observation is one problem with its own severity. The result's severity is at least that of its
-worst observation. `INFO` is a real gap with trivial impact. A result can also hold one example and, for
-`NOT_MET` and `UNDETERMINED`, located open questions. The single outcome and its rules stand.
-[ADR 0055](0055-practice-scripts-call-models-through-the-runner.md) owns the decision.
+Revisit when independently reviewed cases establish an evidence distinction that these outcomes cannot express.

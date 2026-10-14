@@ -1,5 +1,5 @@
 // More requests at once than the host answers for one program.
-import { definePracticeScript, embedMany } from "../lib/practice-script.ts";
+import { definePracticeScript, embedMany } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { embedding: "required" } },

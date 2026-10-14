@@ -332,7 +332,7 @@ Each has a variable reference in [Integrations & Reference Deployment](./product
 | GitLab             | GitLab login, workspaces, and sync (webhooks auto-register here)                                              | [GitLab bundle](./production-setup#gitlab-rollout-bundle)     |
 | Slack              | Mentor in Slack, channel ingestion                                                                            | [Slack app setup](./production-setup#slack-app-configuration) |
 | Outline            | Wiki as a content source for reviews                                                                          | [Outline integration](./production-setup#outline-integration) |
-| AI practice review | Automated PR feedback from the coding agent                                                                   | [Practice review](./practice-review#deployment)               |
+| AI practice review | Automated PR feedback from the coding agent                                                                   | [Practice review](./practice-review#first-successful-review)               |
 | Email              | Optional invitations, summaries, and connection alerts. Configure `SPRING_MAIL_*` and `HEPHAESTUS_EMAIL_FROM` | [Email setup](./production-setup#email)                       |
 | An AI provider     | The model everything AI runs on — required by the row above                                                   | [Connect an AI Provider](./ai-providers)                      |
 
@@ -377,10 +377,10 @@ The procedure runs one review and lets you read its feedback before anyone else 
    **Needs you**, awaiting approval. Nothing reaches the pull or merge request before you approve it.
 5. Open the feedback.
 6. Read it.
-7. Read the observations behind it.
+7. Read the problems behind it.
 8. Approve or reject the feedback.
 
-9. Once the feedback reads as you want, widen coverage or increase practice autonomy as [Practice review](./practice-review) describes.
+9. Once the feedback reads as you want, widen coverage or increase feedback mode as [Practice review](./practice-review) describes.
 
 ## Upgrades
 

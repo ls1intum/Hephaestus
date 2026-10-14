@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsageDelta;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptCallUsage;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLlmUsageDelta;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.ProxyRouting.BilledAttempt;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
@@ -16,8 +16,8 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Adds one proxied call's token usage to the owning {@code agent_job} row, or one practice script call to its
- * {@code agent_job_practice_script_usage} row, so a job that crashes mid-run still has the calls it made on
+ * Adds one proxied call's token usage to the owning {@code review_job} row, or one practice script call to its
+ * {@code review_job_script_usage} row, so a job that crashes mid-run still has the calls it made on
  * record and can be billed for them instead of recording zero.
  * Runs in its own {@code REQUIRES_NEW} transaction — the proxy servlet thread has no ambient
  * transaction, and the accounting write must commit independently of the passthrough.
@@ -32,10 +32,10 @@ public class ProxyUsageAccumulator {
 
     private static final Logger log = LoggerFactory.getLogger(ProxyUsageAccumulator.class);
 
-    private final AgentJobRepository agentJobRepository;
+    private final ReviewJobRepository agentJobRepository;
     private final MeterRegistry meterRegistry;
 
-    ProxyUsageAccumulator(AgentJobRepository agentJobRepository, MeterRegistry meterRegistry) {
+    ProxyUsageAccumulator(ReviewJobRepository agentJobRepository, MeterRegistry meterRegistry) {
         this.agentJobRepository = agentJobRepository;
         this.meterRegistry = meterRegistry;
     }
@@ -51,7 +51,7 @@ public class ProxyUsageAccumulator {
                 () -> agentJobRepository.accumulateLlmUsage(
                         attempt.sourceId(),
                         attempt.number(),
-                        new AgentJobLlmUsageDelta(
+                        new ReviewJobLlmUsageDelta(
                                 usage.billableInputTokens(),
                                 usage.outputTokens(),
                                 usage.reasoningTokens(),
@@ -60,7 +60,7 @@ public class ProxyUsageAccumulator {
     }
 
     /**
-     * Adds one proxied practice script call to the {@code agent_job_practice_script_usage} row of its kind and
+     * Adds one proxied practice script call to the {@code review_job_script_usage} row of its kind and
      * practice. Never throws.
      *
      * @param usage {@code null} when the provider reported no tokens; the call still counts

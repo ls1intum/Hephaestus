@@ -1,0 +1,35 @@
+package de.tum.cit.aet.hephaestus.practices.spi;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+
+public interface FeedbackStore {
+    FeedbackCompositionContext compositionContext(long workspaceId, UUID reviewId, List<UUID> admittedResultIds);
+
+    PreparedPackage prepareAll(long workspaceId, UUID reviewId, List<FeedbackDraft> drafts);
+
+    Optional<CopyWriteFence> claimConversationCopy(long workspaceId, UUID feedbackId, UUID chatMessageId);
+
+    void recordConversationReceipt(long workspaceId, CopyWriteFence fence, ConversationCopyReceipt receipt);
+
+    void decide(
+            long workspaceId,
+            UUID feedbackId,
+            long actorId,
+            FeedbackDecisionAction action,
+            @Nullable FeedbackDecisionReason reason,
+            @Nullable String note,
+            @Nullable String contentDigest);
+
+    boolean retry(long workspaceId, UUID feedbackId, long actorId);
+
+    void respond(
+            long workspaceId,
+            UUID feedbackId,
+            long developerId,
+            @Nullable FeedbackResolution resolution,
+            @Nullable FeedbackUsefulness usefulness,
+            @Nullable String comment);
+}

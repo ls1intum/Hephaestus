@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.MentorBusyException;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionCommand;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.MentorSessionEvent;
 import jakarta.annotation.PreDestroy;

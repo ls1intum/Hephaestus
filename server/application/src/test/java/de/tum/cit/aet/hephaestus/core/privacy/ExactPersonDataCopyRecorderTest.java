@@ -16,7 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 @Tag("unit")
 class ExactPersonDataCopyRecorderTest {
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final ExactPersonDataCopyRecorder recorder = new ExactPersonDataCopyRecorder(jdbc);
+    private final ExactPersonDataCopyRecorder recorder = new ExactPersonDataCopyRecorder();
     private final PersonCopyIdentity first = new PersonCopyIdentity("GITLAB", "https://git.example", "42", null);
     private final PersonCopyIdentity second = new PersonCopyIdentity("SLACK", "https://slack.com", "U42", "T1");
 
@@ -109,7 +109,7 @@ class ExactPersonDataCopyRecorderTest {
 
     @Test
     void inactiveUserRecordingDoesNotReadProfiles() {
-        recorder.recordUser(42);
+        recorder.recordIdentity(first);
         verifyNoInteractions(jdbc);
     }
 

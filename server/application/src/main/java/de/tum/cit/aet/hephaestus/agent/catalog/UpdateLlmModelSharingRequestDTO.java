@@ -20,5 +20,6 @@ public record UpdateLlmModelSharingRequestDTO(
         @Nullable
         @Schema(
                 description =
-                        "Workspace ids to share with when visibility is GRANTED; empty or omitted stages the model without workspace access")
+                        "Workspace ids to share with when visibility is GRANTED; empty or omitted stages the model"
+                                + " without workspace access")
         List<Long> workspaceIds) {}

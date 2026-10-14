@@ -8,7 +8,7 @@ import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.MAX_COUNT;
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.NEXT_STEP_CHARS;
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OMISSIONS;
-import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OMISSION_UNITS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OMISSION_ITEMS;
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OPEN_QUESTIONS;
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OPEN_QUESTION_CHARS;
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.PROBLEMS;
@@ -19,8 +19,11 @@ import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.
 import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.WARRANT_FIELD_CHARS;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.io.Serial;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -28,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -40,12 +42,6 @@ import tools.jackson.databind.node.ObjectNode;
  * failure naming the refusal. Nothing is repaired or guessed: a leads return is malformed, as it is.
  */
 public final class CandidateParser {
-
-    public static final String DIFF_SOURCE = "scm.pull-request.diff";
-    public static final String TREE_SOURCE = "scm.repository.tree";
-
-    /** {@code COMMIT} in {@code lib/contract.ts}. */
-    static final Pattern COMMIT = Pattern.compile("^(?:[0-9a-f]{40}|[0-9a-f]{64})$");
 
     private static final int MAX_LINE = Integer.MAX_VALUE;
 
@@ -62,28 +58,20 @@ public final class CandidateParser {
             "error",
             "cancelled");
 
-    private static final Set<String> SUPERSET_KEYS = Set.of(
-            "outcome",
-            "summary",
-            "explanation",
-            "citations",
-            "problems",
-            "severity",
-            "example",
-            "evidence",
-            "coverage");
+    private static final Set<String> SUPERSET_KEYS =
+            Set.of("outcome", "summary", "explanation", "citations", "problems", "example", "evidence", "coverage");
     private static final Set<String> CITATION_KEYS =
-            Set.of("sourceKind", "artifactPath", "path", "side", "revision", "startLine", "endLine", "quote");
+            Set.of("sourceKind", "sourcePath", "path", "side", "revision", "startLine", "endLine", "quote");
     private static final Set<String> PROBLEM_KEYS =
             Set.of("key", "severity", "summary", "explanation", "citations", "basis", "nextStep");
-    private static final Set<String> EVIDENCE_KEYS = Set.of("search", "inapplicability", "undecidability");
+    private static final Set<String> EVIDENCE_KEYS = Set.of("search", "inapplicability", "openQuestions");
     private static final Map<String, Set<String>> BASIS_KEYS = Map.of(
             "introduced", Set.of("type", "head", "explanation"),
             "worsened", Set.of("type", "base", "head", "explanation"),
             "duty", Set.of("type", "criterionQuote", "event", "explanation"),
             "state", Set.of("type", "explanation"));
     private static final Map<String, Set<String>> COVERAGE_KEYS = Map.of(
-            "host", Set.of("source", "reads", "truncatedReads", "failedReads", "complete", "omitted"),
+            "host", Set.of("source", "reads", "truncatedReads", "failedReads", "receipts", "complete", "omitted"),
             "claimed", Set.of("source", "selected", "checked", "total", "complete", "omitted"));
 
     private CandidateParser() {}
@@ -176,24 +164,15 @@ public final class CandidateParser {
     }
 
     private static Candidate rules(Superset sent) {
-        Outcome outcome = sent.outcome();
+        ResultOutcome outcome = sent.outcome();
         List<CandidateProblem> problems = sent.problems();
         boolean listsProblems = problems != null && !problems.isEmpty();
-        if ((outcome == Outcome.NOT_MET) != listsProblems || (problems != null && problems.isEmpty())) {
+        if ((outcome == ResultOutcome.NOT_MET) != listsProblems || (problems != null && problems.isEmpty())) {
             throw refuse(
                     CandidateRefusal.OUTCOME_PROBLEM_MISMATCH,
-                    outcome == Outcome.NOT_MET
+                    outcome == ResultOutcome.NOT_MET
                             ? "a NOT_MET result lists its problems"
                             : "a " + outcome + " result lists no problem");
-        }
-        if (sent.severity() != null && outcome != Outcome.NOT_MET) {
-            throw refuse(CandidateRefusal.SEVERITY_OUTCOME_MISMATCH, "a " + outcome + " result has no severity");
-        }
-        Severity worst = listsProblems ? NotMetCandidate.worst(Objects.requireNonNull(problems)) : null;
-        if (sent.severity() != null && worst != null && sent.severity().rank() > worst.rank()) {
-            throw refuse(
-                    CandidateRefusal.SEVERITY_BELOW_WORST_PROBLEM,
-                    "the result severity " + sent.severity() + " is below its worst problem, " + worst);
         }
         boolean search = sent.search() != null;
         boolean inapplicability = sent.inapplicability() != null;
@@ -202,8 +181,8 @@ public final class CandidateParser {
                 switch (outcome) {
                     case MET -> !inapplicability && !undecidability;
                     case NOT_MET -> !inapplicability;
-                    case NOT_APPLICABLE -> inapplicability && !search && !undecidability;
-                    case UNDETERMINED -> !inapplicability && undecidability;
+                    case DOES_NOT_APPLY -> inapplicability && !search && !undecidability;
+                    case COULD_NOT_DETERMINE -> !inapplicability && undecidability;
                 };
         if (!warrants) {
             throw refuse(
@@ -211,16 +190,16 @@ public final class CandidateParser {
                     switch (outcome) {
                         case MET -> "a MET result may carry a search warrant only";
                         case NOT_MET -> "a NOT_MET result may carry a search warrant and open questions only";
-                        case NOT_APPLICABLE -> "a NOT_APPLICABLE result carries its inapplicability warrant only";
-                        case UNDETERMINED ->
-                            "an UNDETERMINED result carries its open questions, and a search warrant at most";
+                        case DOES_NOT_APPLY -> "a DOES_NOT_APPLY result carries its inapplicability warrant only";
+                        case COULD_NOT_DETERMINE ->
+                            "an COULD_NOT_DETERMINE result carries its open questions, and a search warrant at most";
                     });
         }
-        if (outcome != Outcome.NOT_MET && sent.citations().isEmpty()) {
+        if (outcome != ResultOutcome.NOT_MET && sent.citations().isEmpty()) {
             throw refuse(CandidateRefusal.RESULT_CITATIONS_REQUIRED, "a " + outcome + " result cites what it rests on");
         }
         boolean complete = sent.coverage().path("complete").asBoolean();
-        if (outcome == Outcome.MET && !complete) {
+        if (outcome == ResultOutcome.MET && !complete) {
             throw refuse(CandidateRefusal.MET_COVERAGE_INCOMPLETE, "a MET result needs complete coverage");
         }
         String coverageProblem = coverageProblem(sent.coverage());
@@ -228,7 +207,7 @@ public final class CandidateParser {
             throw refuse(CandidateRefusal.COVERAGE_INCONSISTENT, coverageProblem);
         }
         ObjectNode example = sent.example();
-        if (example != null && outcome != Outcome.MET && outcome != Outcome.NOT_MET) {
+        if (example != null && outcome != ResultOutcome.MET && outcome != ResultOutcome.NOT_MET) {
             throw refuse(CandidateRefusal.EXAMPLE_OUTCOME_MISMATCH, "a " + outcome + " result has no example");
         }
         if (example != null && problems != null) {
@@ -273,19 +252,18 @@ public final class CandidateParser {
                         sent.citations(),
                         sent.coverage(),
                         Objects.requireNonNull(problems),
-                        sent.severity(),
                         example,
                         sent.search(),
                         openQuestions);
-            case NOT_APPLICABLE ->
-                new NotApplicableCandidate(
+            case DOES_NOT_APPLY ->
+                new DoesNotApplyCandidate(
                         sent.summary(),
                         sent.explanation(),
                         sent.citations(),
                         sent.coverage(),
                         Objects.requireNonNull(sent.inapplicability()));
-            case UNDETERMINED ->
-                new UndeterminedCandidate(
+            case COULD_NOT_DETERMINE ->
+                new CouldNotDetermineCandidate(
                         sent.summary(),
                         sent.explanation(),
                         sent.citations(),
@@ -310,12 +288,12 @@ public final class CandidateParser {
         long selected = coverage.path("selected").asLong();
         long checked = coverage.path("checked").asLong();
         JsonNode total = coverage.path("total");
-        if (checked > selected) return "claimed coverage checked more units than it selected";
+        if (checked > selected) return "claimed coverage checked more items than it selected";
         if (!total.isNull() && selected > total.asLong()) {
-            return "claimed coverage selected more units than the total";
+            return "claimed coverage selected more items than the total";
         }
         if (complete && (checked != selected || (!total.isNull() && selected != total.asLong()))) {
-            return "complete claimed coverage checks every selected unit of the total";
+            return "complete claimed coverage checks every selected item of the total";
         }
         return null;
     }
@@ -335,13 +313,9 @@ public final class CandidateParser {
     /** Overlap established by the submitted coordinates; admission also resolves code source aliases. */
     private static boolean overlaps(JsonNode a, JsonNode b) {
         return a.path("sourceKind").asString().equals(b.path("sourceKind").asString())
-                && a.path("artifactPath")
-                        .asString()
-                        .equals(b.path("artifactPath").asString())
+                && a.path("sourcePath").asString().equals(b.path("sourcePath").asString())
                 && Objects.equals(a.get("revision"), b.get("revision"))
-                && (!(DIFF_SOURCE.equals(a.path("sourceKind").asString())
-                                || TREE_SOURCE.equals(a.path("sourceKind").asString()))
-                        || a.path("path").asString().equals(b.path("path").asString()))
+                && a.path("path").asString().equals(b.path("path").asString())
                 && Objects.equals(sideOf(a), sideOf(b))
                 && a.path("startLine").asInt() <= b.path("endLine").asInt()
                 && b.path("startLine").asInt() <= a.path("endLine").asInt();
@@ -364,12 +338,11 @@ public final class CandidateParser {
     }
 
     private record Superset(
-            Outcome outcome,
+            ResultOutcome outcome,
             String summary,
             String explanation,
             List<ObjectNode> citations,
             @Nullable List<CandidateProblem> problems,
-            @Nullable Severity severity,
             @Nullable ObjectNode example,
             @Nullable ObjectNode search,
             @Nullable ObjectNode inapplicability,
@@ -382,7 +355,7 @@ public final class CandidateParser {
                 "",
                 SUPERSET_KEYS,
                 Set.of("outcome", "summary", "explanation", "citations", "evidence", "coverage"));
-        Outcome outcome = enumValue(root.get("outcome"), "outcome", Outcome.class);
+        ResultOutcome outcome = enumValue(root.get("outcome"), "outcome", ResultOutcome.class);
         String summary = line(root.get("summary"), "summary", SUMMARY_CHARS);
         String explanation = bounded(root.get("explanation"), "explanation", EXPLANATION_CHARS);
         List<ObjectNode> citations = new ArrayList<>();
@@ -397,22 +370,21 @@ public final class CandidateParser {
                 problems.add(problem(problem, "problems." + index++));
             }
         }
-        Severity severity = root.has("severity") ? enumValue(root.get("severity"), "severity", Severity.class) : null;
         ObjectNode example = root.has("example") ? example(root.get("example"), "example") : null;
         ObjectNode evidence = object(root.get("evidence"), "evidence", EVIDENCE_KEYS, Set.of());
         ObjectNode search = evidence.has("search")
                 ? warrant(evidence.get("search"), "evidence.search", "lookedFor", "boundary")
                 : null;
         ObjectNode inapplicability = evidence.has("inapplicability")
-                ? warrant(evidence.get("inapplicability"), "evidence.inapplicability", "subject", "ruledOutBy")
+                ? warrant(evidence.get("inapplicability"), "evidence.inapplicability", "prerequisite", "ruledOutBy")
                 : null;
         List<ObjectNode> openQuestions = null;
-        if (evidence.has("undecidability")) {
+        if (evidence.has("openQuestions")) {
             openQuestions = new ArrayList<>();
             int index = 0;
             for (JsonNode question :
-                    array(evidence.get("undecidability"), "evidence.undecidability", 1, OPEN_QUESTIONS)) {
-                openQuestions.add(openQuestion(question, "evidence.undecidability." + index++));
+                    array(evidence.get("openQuestions"), "evidence.openQuestions", 1, OPEN_QUESTIONS)) {
+                openQuestions.add(openQuestion(question, "evidence.openQuestions." + index++));
             }
         }
         ObjectNode coverage = coverage(root.get("coverage"), "coverage");
@@ -422,7 +394,6 @@ public final class CandidateParser {
                 explanation,
                 citations,
                 problems,
-                severity,
                 example,
                 search,
                 inapplicability,
@@ -435,34 +406,21 @@ public final class CandidateParser {
                 value,
                 where,
                 CITATION_KEYS,
-                Set.of("sourceKind", "artifactPath", "path", "startLine", "endLine", "quote"));
-        String sourceKind = nonEmpty(citation.get("sourceKind"), where + ".sourceKind");
-        nonEmpty(citation.get("artifactPath"), where + ".artifactPath");
-        String path = nonEmpty(citation.get("path"), where + ".path");
+                Set.of("sourceKind", "sourcePath", "path", "startLine", "endLine", "quote"));
+        sourceKind(citation.get("sourceKind"), where + ".sourceKind");
+        bounded(citation.get("sourcePath"), where + ".sourcePath", CandidateLimits.PATH_CHARS);
+        bounded(citation.get("path"), where + ".path", CandidateLimits.PATH_CHARS);
         if (citation.has("side")) {
             String side = string(citation.get("side"), where + ".side");
             if (!side.equals("OLD") && !side.equals("NEW")) throw new Malformed(where + ".side: must be OLD or NEW");
         }
-        if (citation.has("revision")
-                && !COMMIT.matcher(string(citation.get("revision"), where + ".revision"))
-                        .matches()) {
-            throw new Malformed(where + ".revision: must be a full commit id");
+        if (citation.has("revision")) {
+            bounded(citation.get("revision"), where + ".revision", CandidateLimits.VERSION_CHARS);
         }
         long start = integer(citation.get("startLine"), where + ".startLine", 1, MAX_LINE);
         long end = integer(citation.get("endLine"), where + ".endLine", 1, MAX_LINE);
         bounded(citation.get("quote"), where + ".quote", QUOTE_CHARS);
         if (end < start) throw new Malformed(where + ": endLine must be at least startLine");
-        if (citation.has("side") != DIFF_SOURCE.equals(sourceKind)) {
-            throw new Malformed(where + ": side is set exactly on a " + DIFF_SOURCE + " citation");
-        }
-        if (citation.has("revision") && !DIFF_SOURCE.equals(sourceKind) && !TREE_SOURCE.equals(sourceKind)) {
-            throw new Malformed(
-                    where + ": revision is set only on a " + TREE_SOURCE + " or " + DIFF_SOURCE + " citation");
-        }
-        if ((DIFF_SOURCE.equals(sourceKind) || TREE_SOURCE.equals(sourceKind)) && !isRepositoryPath(path)) {
-            throw new Malformed(where + ": a quote of code names a file of the repository: a relative path outside"
-                    + " .git, with no empty, . or .. part");
-        }
         return citation.deepCopy();
     }
 
@@ -553,6 +511,10 @@ public final class CandidateParser {
             integer(coverage.get("reads"), where + ".reads", 0, MAX_COUNT);
             integer(coverage.get("truncatedReads"), where + ".truncatedReads", 0, MAX_COUNT);
             integer(coverage.get("failedReads"), where + ".failedReads", 0, MAX_COUNT);
+            int receiptIndex = 0;
+            for (JsonNode receipt : array(coverage.get("receipts"), where + ".receipts", 0, CandidateLimits.RECEIPTS)) {
+                readReceipt(receipt, where + ".receipts." + receiptIndex++);
+            }
         } else {
             integer(coverage.get("selected"), where + ".selected", 0, MAX_COUNT);
             integer(coverage.get("checked"), where + ".checked", 0, MAX_COUNT);
@@ -572,17 +534,59 @@ public final class CandidateParser {
         return copy;
     }
 
+    private static void sourceKind(JsonNode value, String where) {
+        try {
+            new SourceKind(nonEmpty(value, where));
+        } catch (IllegalArgumentException invalid) {
+            throw new Malformed(where + ": invalid source kind");
+        }
+    }
+
+    private static void readReceipt(JsonNode value, String where) {
+        ObjectNode receipt = object(
+                value,
+                where,
+                Set.of(
+                        "sourceKind",
+                        "sourcePath",
+                        "path",
+                        "version",
+                        "status",
+                        "contentDigest",
+                        "startLine",
+                        "endLine"),
+                Set.of("sourceKind", "sourcePath", "path", "version", "status"));
+        sourceKind(receipt.get("sourceKind"), where + ".sourceKind");
+        for (String field : List.of("sourcePath", "path")) {
+            bounded(receipt.get(field), where + "." + field, CandidateLimits.PATH_CHARS);
+        }
+        bounded(receipt.get("version"), where + ".version", CandidateLimits.VERSION_CHARS);
+        enumValue(receipt.get("status"), where + ".status", ReadReceiptStatus.class);
+        if (receipt.has("contentDigest")
+                && !string(receipt.get("contentDigest"), where + ".contentDigest")
+                        .matches("[0-9a-f]{64}")) {
+            throw new Malformed(where + ".contentDigest: expected a SHA-256 digest");
+        }
+        if (receipt.has("startLine")) integer(receipt.get("startLine"), where + ".startLine", 1, MAX_LINE);
+        if (receipt.has("endLine")) integer(receipt.get("endLine"), where + ".endLine", 1, MAX_LINE);
+        if (receipt.has("startLine")
+                && receipt.has("endLine")
+                && receipt.path("endLine").asInt() < receipt.path("startLine").asInt()) {
+            throw new Malformed(where + ": receipt lines are reversed");
+        }
+    }
+
     private static void omission(JsonNode value, String where) {
         ObjectNode omission =
-                object(value, where, Set.of("what", "count", "reason", "units"), Set.of("what", "count", "reason"));
+                object(value, where, Set.of("what", "count", "reason", "items"), Set.of("what", "count", "reason"));
         line(omission.get("what"), where + ".what", SUMMARY_CHARS);
         integer(omission.get("count"), where + ".count", 0, MAX_COUNT);
         if (!OMISSION_REASONS.contains(string(omission.get("reason"), where + ".reason"))) {
             throw new Malformed(where + ".reason: unknown reason");
         }
-        if (omission.has("units")) {
-            for (JsonNode unit : array(omission.get("units"), where + ".units", 0, OMISSION_UNITS)) {
-                bounded(unit, where + ".units", WARRANT_FIELD_CHARS);
+        if (omission.has("items")) {
+            for (JsonNode unit : array(omission.get("items"), where + ".items", 0, OMISSION_ITEMS)) {
+                bounded(unit, where + ".items", WARRANT_FIELD_CHARS);
             }
         }
     }
@@ -655,7 +659,7 @@ public final class CandidateParser {
     }
 
     private static CandidateRefusedException refuse(CandidateRefusal refusal, @Nullable String message) {
-        return new CandidateRefusedException(refusal, message == null ? refusal.code() : message);
+        return new CandidateRefusedException(refusal, message == null ? refusal.wireValue() : message);
     }
 
     /** A shape the contract does not name; turned into {@link CandidateRefusal#MALFORMED_CANDIDATE}. */

@@ -3,61 +3,69 @@ package de.tum.cit.aet.hephaestus.integration.slack.retention;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewPracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Real-Postgres proof of the thread-grain Slack retention sweep. Once a thread goes cold (its {@code last_ts} is
- * older than the retention window), the sweep erases the derived {@code chat.conversation_thread} results/feedback
+ * older than the retention window), the sweep erases the derived {@code chat.thread} results/feedback
  * (through the practices erasure port) <b>and</b> drops the {@code slack_thread} aggregate (which holds the
- * {@code participant_member_ids} PII) — while a still-active thread's derived rows and an unrelated PR result
+ * {@code participant_account_ids} PII) — while a still-active thread's derived rows and an unrelated PR result
  * are left intact. The assertions fail if the retention erasure path is removed (the aged derived rows would
  * survive) and fail if it over-reaches (the fresh thread or the PR result would vanish). Also proves the
- * {@code participant_member_ids} {@code array_remove} prune is workspace-scoped.
+ * {@code participant_account_ids} {@code array_remove} prune is workspace-scoped.
  */
 class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
-    private static final ObjectMapper OM = new ObjectMapper();
+    @Autowired
+    private ReviewPracticeRepository assignments;
+
+    @Autowired
+    private ReviewItemRepository reviewItems;
+
+    @Autowired
+    private MembershipService memberships;
+
+    @Autowired
+    private PracticeVersionService practiceVersions;
+
+    @Autowired
+    private ReviewRepository reviews;
+
+    @Autowired
+    private ItemWriter items;
 
     @Autowired
     private SlackRetentionSweeper slackRetentionSweeper;
@@ -66,19 +74,13 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     private SlackThreadRepository slackThreadRepository;
 
     @Autowired
-    private PracticeResultRepository practiceResultRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackEvidenceRepository feedbackEvidenceRepository;
-
-    @Autowired
-    private PracticeRepository practiceRepository;
-
-    @Autowired
-    private AgentJobRepository agentJobRepository;
+    private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -94,28 +96,26 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     private Workspace workspace;
     private Practice practice;
-    private User recipient;
-    private AgentJob job;
+    private long recipientAccountId;
 
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        // Add the raw-JDBC-only participant_member_ids column — see SlackConversationTestSupport.
-        jdbcTemplate.execute(
-                "ALTER TABLE slack_thread ADD COLUMN IF NOT EXISTS participant_member_ids BIGINT[] NOT NULL DEFAULT '{}'");
         IdentityProvider provider = identityProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
                 .orElseGet(() -> identityProviderRepository.save(
                         new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("slack-retain-erase"));
         practice = savePractice(workspace);
-        recipient = userRepository.save(TestUserFactory.createUser(100L, "retain-recipient", provider));
-        job = newJob(workspace);
+        recipientAccountId = memberships.accountIdForUser(userRepository
+                .save(TestUserFactory.createUser(100L, "retain-recipient", provider))
+                .getId());
+        memberships.createMembership(workspace, recipientAccountId, Membership.WorkspaceRole.MEMBER);
     }
 
     @Test
-    @DisplayName(
-            "retention erases the aged thread's derived CONVERSATION rows + drops the aggregate; fresh thread + PR survive")
+    @DisplayName("retention erases the aged thread's derived CONVERSATION rows + drops the aggregate; fresh thread + PR"
+            + " survive")
     void retentionErasesAgedThreadDerivedDataAndDropsAggregate() {
         Instant now = Instant.now();
         // No Slack Connection → falls back to the default retention window. The aged thread is well past
@@ -129,7 +129,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         UUID freshFb = lastFeedbackId;
 
         // An unrelated PR result for the same workspace — a different artifact type, MUST survive.
-        UUID prObs = seedResult(ArtifactKinds.PULL_REQUEST, 7777L);
+        UUID prObs = seedResult(ScmItemEvents.PULL_REQUEST, 7777L);
 
         // At least one message so the workspace is enumerated by the sweep; also proves message-grain pruning.
         insertMessage("agedmsg.1", "aged-root", now.minus(Duration.ofDays(60)));
@@ -191,7 +191,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private long insertThreadWithParticipants(long workspaceId, String channelId, String threadTs, long... members) {
-        // participant_member_ids is unmapped on the entity, so seed the row natively.
+        // participant_account_ids is unmapped on the entity, so seed the row natively.
         StringBuilder arr = new StringBuilder("{");
         for (int i = 0; i < members.length; i++) {
             if (i > 0) {
@@ -201,8 +201,9 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         }
         arr.append('}');
         jdbcTemplate.update(
-                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts, message_count, participant_member_ids, created_at) "
-                        + "VALUES (?, ?, ?, ?, ?, 1, ?::bigint[], now())",
+                "INSERT INTO slack_thread (workspace_id, slack_channel_id, slack_thread_ts, first_ts, last_ts,"
+                        + " message_count, participant_account_ids, created_at) VALUES (?, ?, ?, ?, ?, 1, ?::bigint[],"
+                        + " now())",
                 workspaceId,
                 channelId,
                 threadTs,
@@ -221,7 +222,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     private List<Long> participantIds(long threadId) {
         Long[] ids = jdbcTemplate.queryForObject(
-                "SELECT participant_member_ids FROM slack_thread WHERE id = ?",
+                "SELECT participant_account_ids FROM slack_thread WHERE id = ?",
                 (rs, n) -> (Long[]) rs.getArray(1).getArray(),
                 threadId);
         return List.of(ids);
@@ -229,7 +230,8 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
     private void insertMessage(String slackTs, String slackThreadTs, Instant ingestedAt) {
         jdbcTemplate.update(
-                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts, ingested_at) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO slack_message (workspace_id, slack_team_id, slack_channel_id, slack_ts, slack_thread_ts,"
+                        + " ingested_at) VALUES (?, ?, ?, ?, ?, ?)",
                 workspace.getId(),
                 "T1",
                 "C1",
@@ -239,77 +241,37 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID seedBoundConversation(long threadId) {
-        UUID practiceResultId = seedResult(ArtifactKinds.CONVERSATION_THREAD, threadId);
-        Feedback feedback = feedbackRepository.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(workspace.getId())
-                .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
-                .artifactId(threadId)
-                .recipientUserId(recipient.getId())
-                .aboutUserId(recipient.getId())
-                .channel(FeedbackChannel.IN_CHAT)
-                .position((int) (threadId % 1000))
-                .deliveryState(FeedbackDeliveryState.PREPARED)
-                .source(FeedbackSource.AGENT)
-                .createdAt(Instant.now())
-                .build());
-        lastFeedbackId = feedback.getId();
-        feedbackEvidenceRepository.insertIfAbsent(
-                feedback.getId(), practiceResultId, null, EvidenceRole.PRIMARY.name(), 0);
-        return practiceResultId;
+        var bound = SlackConversationTestSupport.seedBoundConversation(
+                reviews,
+                assignments,
+                reviewItems,
+                items,
+                practiceResultRepository,
+                feedbackRepository,
+                feedbackEvidenceRepository,
+                workspace.getId(),
+                practice,
+                threadId,
+                recipientAccountId);
+        lastFeedbackId = bound.feedbackId();
+        return bound.resultId();
     }
 
-    private UUID seedResult(ArtifactKind artifactKind, long artifactId) {
-        UUID practiceResultId = UUID.randomUUID();
-        practiceResultRepository.insertIfAbsent(
-                practiceResultId,
-                "occ-" + practiceResultId,
-                job.getId(),
-                job.getWorkspace().getId(),
-                practice.getId(),
-                null,
-                artifactKind.value(),
-                artifactId,
-                recipient.getId(),
-                "Result title",
-                "NOT_MET",
-                "MAJOR",
-                null,
-                null,
-                "test-scope",
-                null,
-                null,
-                null,
-                Instant.now(),
-                "LIVE");
-        return practiceResultId;
+    private UUID seedResult(ItemKind kind, long sourceId) {
+        return SlackConversationTestSupport.seedResult(
+                reviews,
+                assignments,
+                reviewItems,
+                items,
+                practiceResultRepository,
+                workspace.getId(),
+                practice,
+                kind,
+                sourceId,
+                recipientAccountId);
     }
 
     private Practice savePractice(Workspace ws) {
-        Practice p = new Practice();
-        p.setSignals(PracticeTestEvidence.signals(ArtifactKinds.CONVERSATION_THREAD));
-        p.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.CONVERSATION_THREAD));
-        p.setReviewWhen(Map.of());
-        p.setSubject(ActorRole.AUTHOR);
-        p.setPrecondition(null);
-        p.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
-        p.setWorkspace(ws);
-        p.setSlug("retain-practice-" + ws.getId());
-        p.setName("Retention Practice");
-        p.setCriteria("Test description");
-        p.setSignals(PracticeTestEvidence.signals(ScmSignals.PULL_REQUEST_OPENED));
-        p.setEvidenceRequirements(PracticeTestEvidence.needsFor(ScmSignals.PULL_REQUEST_OPENED.artifactKind()));
-        p.setReviewWhen(Map.of());
-        p.setSubject(ActorRole.AUTHOR);
-        p.setPrecondition(null);
-        return practiceRepository.save(p);
-    }
-
-    private AgentJob newJob(Workspace ws) {
-        AgentJob j = new AgentJob();
-        j.setWorkspace(ws);
-        j.setJobType(AgentJobType.CONVERSATION_REVIEW);
-        j.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
-        return agentJobRepository.save(j);
+        return SlackConversationTestSupport.newPractice(practiceVersions, ws, "retain-practice");
     }
 }

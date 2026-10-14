@@ -109,7 +109,7 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             String first = commit(git, "docs: describe usage");
             Files.writeString(source.resolve("a.txt"), "a\n");
             Files.writeString(source.resolve("b.txt"), "b\n");
-            String second = commit(git, "feat: add a and b\n\nCloses #7");
+            String second = commit(git, "feat: add a and b\n\n\nCloses #7\n");
             prepare();
 
             Map<String, CommitDetails> commits = new HashMap<>();
@@ -130,6 +130,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             assertThat(Objects.requireNonNull(commits.get(second)).message()).isEqualTo("feat: add a and b");
             assertThat(Objects.requireNonNull(commits.get(second)).messageBody())
                     .isEqualTo("Closes #7");
+            assertThat(Objects.requireNonNull(commits.get(second)).rawMessage())
+                    .isEqualTo("feat: add a and b\n\n\nCloses #7\n");
             assertThat(Objects.requireNonNull(commits.get(second)).parentShas()).containsExactly(first);
         }
     }
@@ -180,6 +182,26 @@ class GitRepositoryManagerTest extends BaseUnitTest {
             assertThatThrownBy(() ->
                             manager.fetchRemoteCommit(KEY, source.toUri().toString(), "refs/heads/missing", head, null))
                     .isInstanceOf(GitRepositoryManager.GitOperationException.class);
+        }
+    }
+
+    @Test
+    void shouldCaptureScanFilesWithoutHistoryOrAuthorMetadata() throws Exception {
+        try (Git git = repository()) {
+            Files.writeString(source.resolve("scan.txt"), "first\n");
+            String pinned = commit(git, "Pinned scan");
+            Files.writeString(source.resolve("scan.txt"), "later\n");
+            commit(git, "Later changes");
+            prepare();
+            Path staged;
+            try (var snapshot = manager.readScanSnapshot(KEY, pinned)) {
+                staged = snapshot.stagingDir();
+                assertThat(Files.readString(staged.resolve("scan.txt"))).isEqualTo("first\n");
+                assertThat(staged.resolve(".git")).doesNotExist();
+                assertThat(snapshot.commitSha()).isEqualTo(pinned);
+                assertThat(snapshot.complete()).isTrue();
+            }
+            assertThat(staged).doesNotExist();
         }
     }
 
@@ -307,8 +329,9 @@ class GitRepositoryManagerTest extends BaseUnitTest {
     }
 
     /**
-     * A writer that continues a review is given the checkout its capture had: the same tree, limits and exclusions,
-     * from the original commits alone, however the branches moved since. Nothing current comes with it.
+     * A writer that continues a review is given the checkout its capture had: the same tree, limits
+     * and exclusions, from the original commits alone, however the branches moved since. Nothing
+     * current comes with it.
      */
     @Test
     void shouldRestoreTheOriginalCheckoutFromItsOwnCommitsAfterTheBranchesMoved() throws Exception {
@@ -343,7 +366,8 @@ class GitRepositoryManagerTest extends BaseUnitTest {
                 }
             }
 
-            // An original commit the mirror does not hold is refused before anything is staged, not replaced.
+            // An original commit the mirror does not hold is refused before anything is staged, not
+            // replaced.
             assertThatThrownBy(() -> manager.readOriginalSnapshot(KEY, original, List.of("d".repeat(40))))
                     .isInstanceOf(GitRepositoryManager.GitOperationException.class);
             // The original bound still applies.

@@ -7,15 +7,21 @@ import de.tum.cit.aet.hephaestus.agent.gateway.SandboxResultListener;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
-import de.tum.cit.aet.hephaestus.evidence.SourceArtifact;
+import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
+import de.tum.cit.aet.hephaestus.evidence.CitationRequirement;
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadReceipt;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -96,28 +102,28 @@ public class JobEvidenceFiles implements SandboxResultListener {
     private static final int TRACE_FILE_BUDGET = 2 * 1024 * 1024;
 
     private final FabricLayout layout;
-    private final AgentJobRepository jobs;
+    private final ReviewJobRepository jobs;
     private final Clock clock;
     private final EvidenceFolderPersonDataCatalog personCopies;
 
     public JobEvidenceFiles(
-            FabricLayout layout, AgentJobRepository jobs, Clock clock, EvidenceFolderPersonDataCatalog personCopies) {
+            FabricLayout layout, ReviewJobRepository jobs, Clock clock, EvidenceFolderPersonDataCatalog personCopies) {
         this.layout = layout;
         this.jobs = jobs;
         this.clock = clock;
         this.personCopies = personCopies;
     }
 
-    public void beginPersonCapture(AgentJob job) {
+    public void beginPersonCapture(ReviewJob job) {
         personCopies.beginCapture(job);
     }
 
-    public void abortPersonCapture(AgentJob job) {
+    public void abortPersonCapture(ReviewJob job) {
         personCopies.abortCapture(job);
     }
 
     /** Rendering scratch belongs to the fenced attempt and has the same cleanup boundary as its frozen folder. */
-    public Path renderingDirectory(AgentJob job) {
+    public Path renderingDirectory(ReviewJob job) {
         Path root = directory(job);
         try {
             Files.createDirectories(root.getParent());
@@ -128,7 +134,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     public PreparedJobInputs prepare(
-            AgentJob job, PreparedEvidence inputs, @Nullable AutomatedReviewReadinessReport report) {
+            ReviewJob job, PreparedEvidence inputs, @Nullable AutomatedReviewReadinessReport report) {
         try {
             requireBudget(inputs);
         } catch (RuntimeException exception) {
@@ -284,7 +290,71 @@ public class JobEvidenceFiles implements SandboxResultListener {
         T inspect(Reader reader) throws IOException;
     }
 
-    public <T> Optional<T> inspect(AgentJob job, String artifactPath, String sha, TextInspection<T> inspection) {
+    public EvidenceDirectory verificationDirectory(ReviewJob job) {
+        return new EvidenceDirectory("inputs/", directory(job));
+    }
+
+    /** Adds host reads only when both their source witness and staged content digest still match. */
+    public JobFolderIndex registerReadReceipts(
+            ReviewJob job, JobFolderIndex manifest, List<ReadReceipt> receipts, SourceCatalogRegistry catalogs) {
+        var texts = new ArrayList<>(manifest.citableTexts());
+        for (var receipt : receipts) {
+            String digest = receipt.contentDigest();
+            if (digest == null || !digest.matches("[0-9a-f]{64}")) continue;
+            var witness = manifest.files().stream()
+                    .filter(file -> file.kind().equals(receipt.sourceKind())
+                            && file.file().path().equals(receipt.sourcePath()))
+                    .toList();
+            if (witness.size() != 1
+                    || !existsWithDigest(
+                            job, receipt.sourcePath(), witness.getFirst().file().sha256())) {
+                throw new IllegalArgumentException("The host read has no authenticated source witness");
+            }
+            var contract = catalogs.requireSource(manifest.contractVersion(), receipt.sourceKind());
+            String revision =
+                    contract.citation().revision() == CitationRequirement.FORBIDDEN ? null : receipt.version();
+            var existing = texts.stream()
+                    .filter(text -> text.source().equals(receipt.sourceKind().value())
+                            && text.path().equals(receipt.path())
+                            && text.side() == CitationSide.NEW
+                            && Objects.equals(text.revision(), revision))
+                    .toList();
+            String stagedPath;
+            if (existing.size() == 1) stagedPath = existing.getFirst().stagedPath();
+            else if (existing.size() > 1) throw new IllegalArgumentException("Ambiguous host read text");
+            else if (receipt.path().equals(receipt.sourcePath())) stagedPath = receipt.path();
+            else {
+                JsonNode capture = job.getCapture();
+                var roots = new ArrayList<String>();
+                if (capture != null)
+                    for (JsonNode directory : capture.path("directories")) {
+                        String root = directory.asString();
+                        if (root.endsWith("/") && receipt.sourcePath().startsWith(root)) roots.add(root);
+                    }
+                if (roots.size() != 1)
+                    throw new IllegalArgumentException("The host read has no unique captured directory");
+                stagedPath = roots.getFirst() + receipt.path();
+            }
+            if (!existsWithDigest(job, stagedPath, digest))
+                throw new IllegalArgumentException("The host read content is unavailable");
+            if (existing.isEmpty())
+                texts.add(new CitableText(
+                        receipt.sourceKind().value(), receipt.path(), CitationSide.NEW, revision, stagedPath, digest));
+            else if (!existing.getFirst().sha256().equals(digest))
+                throw new IllegalArgumentException("The host read digest differs from its captured text");
+        }
+        return new JobFolderIndex(
+                manifest.contractVersion(),
+                manifest.catalogDigest(),
+                manifest.itemKind(),
+                manifest.capturedAt(),
+                manifest.sources(),
+                manifest.refusals(),
+                manifest.files(),
+                texts);
+    }
+
+    public <T> Optional<T> inspect(ReviewJob job, String artifactPath, String sha, TextInspection<T> inspection) {
         try {
             MessageDigest digest = ProvenanceDigest.sha256();
             T result;
@@ -303,7 +373,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     public Optional<Boolean> containsUtf8AtLines(
-            AgentJob job, String artifactPath, String sha, String text, int startLine, int endLine) {
+            ReviewJob job, String artifactPath, String sha, String text, int startLine, int endLine) {
         try {
             QuoteMatch match = verifyUtf8AtLines(artifact(job, artifactPath), text, startLine, endLine);
             requireDigest(sha, Objects.requireNonNull(match.artifactSha256()));
@@ -315,24 +385,8 @@ public class JobEvidenceFiles implements SandboxResultListener {
         }
     }
 
-    public Path repositoryForVerification(AgentJob job, String headSha256, String refsSha256) {
-        return repositoryForVerification(job, SandboxLayout.REPO_MOUNT_RELATIVE, headSha256, refsSha256);
-    }
-
-    public Path repositoryForVerification(AgentJob job, String root, String headSha256, String refsSha256) {
-        if (!root.matches("repos/[a-zA-Z0-9_-]+/")) throw new IllegalArgumentException("Invalid repository root");
-        String headPath = root + ".git/HEAD";
-        if (!existsWithDigest(job, headPath, headSha256)) {
-            throw new IllegalStateException("Captured repository is unavailable");
-        }
-        if (!existsWithDigest(job, root + ".git/hephaestus-captured-refs", refsSha256)) {
-            throw new IllegalStateException("Captured repository refs are unavailable");
-        }
-        return directory(job).resolve(root);
-    }
-
     /** False when the artifact is absent; a present artifact whose bytes differ from {@code sha} throws. */
-    private boolean existsWithDigest(AgentJob job, String artifactPath, String sha) {
+    private boolean existsWithDigest(ReviewJob job, String artifactPath, String sha) {
         return inspect(job, artifactPath, sha, reader -> Boolean.TRUE).isPresent();
     }
 
@@ -376,8 +430,8 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     /** Under the runtime's own lease, one removal at a time with admission; an exclusive owner otherwise retires it. */
-    private void retire(AgentJob owner, Path root) throws IOException {
-        EvidenceFolderLease.removeAsOwner(layout.root(), owner.getWorkspace().getId(), owner.getId(), () -> {
+    private void retire(ReviewJob owner, Path root) throws IOException {
+        EvidenceFolderLease.removeAsOwner(layout.root(), owner.getWorkspaceId(), owner.getId(), () -> {
             if (!Files.exists(root)) return;
             var job = recordedJob(root);
             if (job.isPresent() && admitted(job.get()) && matches(root, job.get())) {
@@ -393,9 +447,9 @@ public class JobEvidenceFiles implements SandboxResultListener {
         try {
             var recorded = jobs.findByIdAndWorkspaceId(identity.jobId(), identity.workspaceId());
             if (recorded.isEmpty()) return;
-            AgentJob job = recorded.get();
+            ReviewJob job = recorded.get();
             if (!ResultAdmissionService.isAdmitted(job)
-                    || job.getRetryCount() != identity.attempt()
+                    || job.getAttempt() != identity.attempt()
                     || !identity.workerId().equals(job.getWorkerId())) return;
             // Removed now under the runtime's shared lease, or a new exclusive one. A sweep or an erasure that
             // holds the job exclusively removes admitted bytes itself.
@@ -425,7 +479,11 @@ public class JobEvidenceFiles implements SandboxResultListener {
             var files = new TreeMap<String, byte[]>();
             byte[] index = Files.readAllBytes(regularFile(root, SandboxLayout.MANIFEST_PATH));
             files.put(SandboxLayout.MANIFEST_PATH, index);
-            var manifest = new JsonMapper().readValue(index, JobFolderIndex.class);
+            var recordedJob = jobs.findByIdAndWorkspaceId(identity.jobId(), identity.workspaceId())
+                    .orElseThrow();
+            var capture = Objects.requireNonNull(recordedJob.getCapture());
+            var manifest = new JsonMapper().treeToValue(capture.path("manifest"), JobFolderIndex.class);
+            files.put(SandboxLayout.MANIFEST_PATH, new JsonMapper().writeValueAsBytes(manifest));
             // The rendered index beside the manifest, and the request; each only as this attempt was staged with it.
             for (String path : List.of(INDEX_MARKDOWN_PATH, SandboxLayout.FEEDBACK_COMPOSITION_PATH)) {
                 Path staged = root.resolve(path);
@@ -441,19 +499,22 @@ public class JobEvidenceFiles implements SandboxResultListener {
                     }
                 }
             }
-            var listed = new HashMap<String, SourceArtifact>();
-            manifest.artifacts()
-                    .forEach(artifact -> listed.put(artifact.artifact().path(), artifact.artifact()));
-            // The checkout's own record of what it held; the objects come back from the mirror, these bytes do not.
-            for (String path : listed.keySet()) {
-                if (path.startsWith(SandboxLayout.REPO_MOUNT_RELATIVE + ".git/"))
-                    files.put(path, Files.readAllBytes(regularFile(root, path)));
+            var listed = new HashMap<String, CapturedSource>();
+            manifest.files().forEach(artifact -> listed.put(artifact.file().path(), artifact.file()));
+            for (var text : manifest.citableTexts()) {
+                byte[] bytes = Files.readAllBytes(regularFile(root, text.stagedPath()));
+                requireDigest(text.sha256(), ProvenanceDigest.sha256Hex(bytes));
+                files.put(text.stagedPath(), bytes);
             }
             for (var file : files.entrySet()) {
                 boolean recorded = file.getKey().startsWith(SandboxLayout.CONTEXT_PREFIX)
                         || file.getKey().startsWith(SandboxLayout.REPO_MOUNT_RELATIVE);
                 if (!recorded) continue;
-                SourceArtifact artifact = listed.get(file.getKey());
+                CapturedSource artifact = listed.get(file.getKey());
+                if (artifact == null
+                        && manifest.citableTexts().stream()
+                                .anyMatch(text -> text.stagedPath().equals(file.getKey())
+                                        && text.sha256().equals(ProvenanceDigest.sha256Hex(file.getValue())))) continue;
                 if (artifact == null
                         || artifact.bytes() != file.getValue().length
                         || !artifact.sha256().equals(ProvenanceDigest.sha256Hex(file.getValue()))) {
@@ -505,12 +566,16 @@ public class JobEvidenceFiles implements SandboxResultListener {
     }
 
     /** See {@link EvidenceFolderPersonDataCatalog#inheritReceipt}. */
-    public void inheritPersonCapture(AgentJob job, UUID originalCopyId, int originalAttempt) {
+    public void inheritPersonCapture(ReviewJob job, UUID originalCopyId, int originalAttempt) {
         personCopies.inheritReceipt(job, originalCopyId, originalAttempt);
     }
 
     /** The exact rows a read during runtime returned, by the tables that own them. */
-    public record LateCopies(Set<UUID> practiceResultIds, Set<UUID> feedbackIds) {}
+    public record LateCopies(List<HistoryCopy> records) {
+        public LateCopies {
+            records = List.copyOf(records);
+        }
+    }
 
     /** See {@link EvidenceFolderPersonDataCatalog#indexLateRead}. */
     public <T> T indexLateRead(
@@ -520,8 +585,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                 identity.workspaceId(),
                 identity.attempt(),
                 read,
-                result -> copies.apply(result).practiceResultIds(),
-                result -> copies.apply(result).feedbackIds());
+                result -> copies.apply(result).records());
     }
 
     /** What a review attempt was launched as, captured before its sandbox existed. */
@@ -541,12 +605,12 @@ public class JobEvidenceFiles implements SandboxResultListener {
      */
     @Override
     public Consumer<Map<String, byte[]>> bind(UUID jobId, int attempt, String image) {
-        var launched = jobs.findByIdWithWorkspace(jobId)
-                .filter(job -> job.getStatus() == AgentJobStatus.RUNNING
-                        && job.getRetryCount() == attempt
+        var launched = jobs.findById(jobId)
+                .filter(job -> job.getStatus() == ReviewJobStatus.RUNNING
+                        && job.getAttempt() == attempt
                         && job.getWorkerId() != null)
                 .map(job -> new LaunchedAttempt(
-                        job.getWorkspace().getId(),
+                        job.getWorkspaceId(),
                         jobId,
                         attempt,
                         Objects.requireNonNull(job.getWorkerId()),
@@ -556,8 +620,12 @@ public class JobEvidenceFiles implements SandboxResultListener {
                                 : job.getConfigSnapshot()
                                         .path("upstreamModelId")
                                         .asString(null),
-                        job.getPromptDigest(),
-                        job.getInputsDigest()));
+                        job.getCapture() == null
+                                ? null
+                                : job.getCapture().path("promptDigest").asString(null),
+                        job.getCapture() == null
+                                ? null
+                                : job.getCapture().path("inputsDigest").asString(null)));
         if (launched.isEmpty()) return files -> {};
         var bound = launched.get();
         return files -> keepTranscript(bound, files);
@@ -579,7 +647,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
         try {
             // A delayed upload of an earlier attempt finds the job requeued under another attempt or owner.
             boolean owned = jobs.findByIdAndWorkspaceId(launched.jobId(), launched.workspaceId())
-                    .filter(job -> job.getRetryCount() == launched.attempt()
+                    .filter(job -> job.getAttempt() == launched.attempt()
                             && launched.workerId().equals(job.getWorkerId()))
                     .isPresent();
             if (!owned) return;
@@ -701,7 +769,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
                             deleteAttempt(root);
                             continue;
                         }
-                        if (job.get().getStatus() == AgentJobStatus.RUNNING) continue;
+                        if (job.get().getStatus() == ReviewJobStatus.RUNNING) continue;
                     }
                     if (restarting) {
                         deleteAttempt(root);
@@ -778,14 +846,11 @@ public class JobEvidenceFiles implements SandboxResultListener {
         }
     }
 
-    private void discardRetiredInventory(Path root, Optional<AgentJob> recorded) {
+    private void discardRetiredInventory(Path root, Optional<ReviewJob> recorded) {
         if (recorded.isEmpty() || !matches(root, recorded.get())) return;
-        AgentJob job = recorded.get();
-        jobs.discardRetiredArtifactInventory(
-                job.getId(),
-                job.getWorkspace().getId(),
-                job.getRetryCount(),
-                Objects.requireNonNull(job.getWorkerId()));
+        ReviewJob job = recorded.get();
+        jobs.expireCaptureInventory(
+                job.getId(), job.getWorkspaceId(), job.getAttempt(), Objects.requireNonNull(job.getWorkerId()));
     }
 
     private void cleanStaleGitSpool() {
@@ -816,7 +881,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
         }
     }
 
-    private Optional<AgentJob> recordedJob(Path root) {
+    private Optional<ReviewJob> recordedJob(Path root) {
         Path jobDirectory = Objects.requireNonNull(root.getParent());
         Path workspaceDirectory = Objects.requireNonNull(jobDirectory.getParent());
         return jobs.findByIdAndWorkspaceId(
@@ -826,11 +891,11 @@ public class JobEvidenceFiles implements SandboxResultListener {
                         Objects.requireNonNull(workspaceDirectory.getFileName()).toString()));
     }
 
-    private boolean matches(Path root, AgentJob job) {
+    private boolean matches(Path root, ReviewJob job) {
         return job.getWorkerId() != null && directory(job).equals(root);
     }
 
-    private static boolean admitted(AgentJob job) {
+    private static boolean admitted(ReviewJob job) {
         return ResultAdmissionService.isAdmitted(job);
     }
 
@@ -855,7 +920,7 @@ public class JobEvidenceFiles implements SandboxResultListener {
         Files.deleteIfExists(root.resolveSibling(root.getFileName() + ".ended"));
     }
 
-    private Path artifact(AgentJob job, String artifactPath) throws IOException {
+    private Path artifact(ReviewJob job, String artifactPath) throws IOException {
         Path root = directory(job);
         Path artifact = safePath(root, artifactPath);
         if (!artifact.toRealPath().startsWith(root.toRealPath())
@@ -865,9 +930,9 @@ public class JobEvidenceFiles implements SandboxResultListener {
         return artifact;
     }
 
-    private Path directory(AgentJob job) {
+    private Path directory(ReviewJob job) {
         String worker = Objects.requireNonNull(job.getWorkerId(), "Attempt has no owning worker");
-        return directory(job.getWorkspace().getId(), job.getId(), job.getRetryCount(), worker);
+        return directory(job.getWorkspaceId(), job.getId(), job.getAttempt(), worker);
     }
 
     private Path directory(long workspaceId, UUID jobId, int attempt, String worker) {

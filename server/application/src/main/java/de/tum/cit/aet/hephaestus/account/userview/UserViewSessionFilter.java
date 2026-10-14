@@ -35,9 +35,10 @@ import org.springframework.web.util.pattern.PathPatternParser;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Binds a read-only user view to the normal app. Runs after Spring Security, which admits only an instance
- * administrator's {@code GET} in view mode, and before {@link WorkspaceContextFilter}, which reads
- * the view. A route outside {@link #READ_PATHS} is refused before a {@code USER_VIEW} row is written.
+ * Binds a read-only user view to the normal app. Runs after Spring Security, which admits only an
+ * instance administrator's {@code GET} in view mode, and before {@link WorkspaceContextFilter},
+ * which reads the view. A route outside {@link #READ_PATHS} is refused before a {@code USER_VIEW}
+ * row is written.
  */
 @Component
 @ConditionalOnServerRole
@@ -61,19 +62,19 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
                     "/workspaces/{workspaceSlug}/activity/work",
                     "/workspaces/{workspaceSlug}/practice-groups",
                     "/workspaces/{workspaceSlug}/practice-groups/standings",
-                    "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/review-runs",
+                    "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/reviews",
                     "/workspaces/{workspaceSlug}/practice-groups/{groupSlug}/trend",
                     "/workspaces/{workspaceSlug}/practice-profile/overview",
-                    "/workspaces/{workspaceSlug}/practice-profile/review-runs",
-                    "/workspaces/{workspaceSlug}/practice-profile/review-runs/{reviewId}",
+                    "/workspaces/{workspaceSlug}/practice-profile/reviews",
+                    "/workspaces/{workspaceSlug}/practice-profile/reviews/{reviewId}",
                     "/workspaces/{workspaceSlug}/practices/reviewed",
-                    "/workspaces/{workspaceSlug}/practices/feedback/in-app",
+                    "/workspaces/{workspaceSlug}/practices/feedback/practice-page",
                     "/workspaces/{workspaceSlug}/practices/standings",
                     "/workspaces/{workspaceSlug}/practices/{practiceSlug}/guidance",
                     "/workspaces/{workspaceSlug}/practices/workspace-overview",
                     "/workspaces/{workspaceSlug}/practices/workspace-overview/tiles",
-                    "/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}",
-                    "/workspaces/{workspaceSlug}/practices/results/{practiceResultId}",
+                    "/workspaces/{workspaceSlug}/practices/trace/{itemId}",
+                    "/workspaces/{workspaceSlug}/practices/results/{resultId}",
                     "/workspaces/{workspaceSlug}/mentor/threads",
                     "/workspaces/{workspaceSlug}/mentor/threads/{threadId}")
             .stream()
@@ -81,7 +82,7 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
             .toList();
 
     private final WorkspaceRepository workspaces;
-    private final ViewedUserService users;
+    private final ViewedAccountService users;
     private final UserViewAccess access;
     private final ObjectMapper mapper;
 
@@ -93,11 +94,11 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
             return;
         }
         String workspaceSlug = request.getHeader(UserViewContextHolder.WORKSPACE_HEADER);
-        String userHeader = request.getHeader(UserViewContextHolder.USER_HEADER);
+        String accountHeader = request.getHeader(UserViewContextHolder.ACCOUNT_HEADER);
         String reason = request.getHeader(UserViewContextHolder.REASON_HEADER);
 
         try {
-            if (workspaceSlug == null || userHeader == null || reason == null) {
+            if (workspaceSlug == null || accountHeader == null || reason == null) {
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "The request does not include the full user view context.");
             }
@@ -113,24 +114,29 @@ public class UserViewSessionFilter extends OncePerRequestFilter {
             long accountId = SecurityUtils.getCurrentAccountId()
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
             access.requireRecentSignIn(SecurityContextHolder.getContext().getAuthentication(), accountId);
-            long userId;
+            long viewedAccountId;
             try {
-                userId = Long.parseLong(userHeader);
-                if (userId <= 0) throw new NumberFormatException();
+                if (!accountHeader.matches("[1-9][0-9]*")) throw new NumberFormatException();
+                viewedAccountId = Long.parseLong(accountHeader);
+                if (viewedAccountId <= 0) throw new NumberFormatException();
             } catch (NumberFormatException invalidId) {
                 throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST, "The viewed user ID is not valid.", invalidId);
+                        HttpStatus.BAD_REQUEST, "The viewed account ID is not valid.", invalidId);
             }
             Workspace workspace = workspaces
                     .findByWorkspaceSlug(workspaceSlug)
                     .filter(candidate -> candidate.getStatus() == Workspace.WorkspaceStatus.ACTIVE)
                     .orElseThrow(
                             () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "The workspace was not found."));
-            var user = users.requireUser(workspace.getId(), userId);
+            var user = users.requireAccount(workspace.getId(), viewedAccountId);
             String query = request.getQueryString();
             access.record(
-                    workspace.getId(), userId, user.accountId(), reason, query == null ? path : path + "?" + query);
-            UserViewContextHolder.set(new UserViewContextHolder.View(workspace.getId(), userId));
+                    workspace.getId(),
+                    null,
+                    Long.parseLong(user.accountId()),
+                    reason,
+                    query == null ? path : path + "?" + query);
+            UserViewContextHolder.set(new UserViewContextHolder.View(workspace.getId(), viewedAccountId));
             response.setHeader("Cache-Control", "no-store");
         } catch (RuntimeException error) {
             writeFailure(response, error);

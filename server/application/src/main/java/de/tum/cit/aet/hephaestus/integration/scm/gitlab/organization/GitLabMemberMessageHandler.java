@@ -5,10 +5,10 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembershipRepository;
@@ -41,13 +41,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab member webhook events for real-time group membership updates.
- * <p>
- * Processes {@code user_add_to_group}, {@code user_remove_from_group}, and
- * {@code user_update_for_group} events that are normalized to the "member"
- * event key by the webhook receiver.
- * <p>
- * This closes the gap where membership changes between scheduled syncs were
- * invisible, allowing removed users to retain access until the next restart.
+ *
+ * <p>Processes {@code user_add_to_group}, {@code user_remove_from_group}, and {@code
+ * user_update_for_group} events that are normalized to the "member" event key by the webhook
+ * receiver.
+ *
+ * <p>This closes the gap where membership changes between scheduled syncs were invisible, allowing
+ * removed users to retain access until the next restart.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -116,7 +116,8 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
                 safeUsername,
                 event.groupAccess());
 
-        // On a connection route the event only says that a membership changed: the membership stored is the one GitLab
+        // On a connection route the event only says that a membership changed: the membership
+        // stored is the one GitLab
         // reports now, so a forged or stale event can neither grant, change nor remove access.
         Optional<GitLabRouteAdmission.AdmittedRoute> route = GitLabRouteAdmission.current();
         if (route.isPresent()) {
@@ -129,8 +130,9 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
 
         Long providerId = Objects.requireNonNull(gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-                .orElseThrow(() -> new IllegalStateException(
-                        "IdentityProvider not found for type=GITLAB, serverUrl=" + gitLabProperties.defaultServerUrl()))
+                .orElseThrow(() -> new IllegalStateException("IdentityProvider not found for"
+                        + " type=GITLAB, serverUrl="
+                        + gitLabProperties.defaultServerUrl()))
                 .getId());
 
         // Look up the organization by the group's native ID
@@ -156,10 +158,11 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
     }
 
     /**
-     * Stores the membership GitLab reported for {@code userId}: in the connected group as an organization membership
-     * at the highest effective access; in a subgroup as a team membership at the highest access the team sync also
-     * reads (see {@link GitLabGroupMemberResponse}). No reported access removes the membership. Either way the person's workspace
-     * membership then follows what the connected group's roster and teams still grant them.
+     * Stores the membership GitLab reported for {@code userId}: in the connected group as an
+     * organization membership at the highest effective access; in a subgroup as a team membership
+     * at the highest access the team sync also reads (see {@link GitLabGroupMemberResponse}). No
+     * reported access removes the membership. Either way the person's workspace membership then
+     * follows what the connected group's roster and teams still grant them.
      */
     void applyReportedMembership(
             long userId, GitLabRouteAdmission.AdmittedRoute route, GitLabRouteAdmission.ReportedMembership membership) {
@@ -177,8 +180,10 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
             }
             if (highest == null) {
                 userRepository.findByNativeIdAndProviderId(userId, providerId).ifPresent(user -> {
-                    // No effective access to the group is no direct grant in it either, so the group's own team,
-                    // which would otherwise keep them in the workspace until the next team sync, drops them too.
+                    // No effective access to the group is no direct grant in it
+                    // either, so the group's own team,
+                    // which would otherwise keep them in the workspace until the
+                    // next team sync, drops them too.
                     teamRepository
                             .findByNativeIdAndProviderId(membership.groupId(), providerId)
                             .ifPresent(team ->
@@ -287,7 +292,8 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
                     name,
                     avatarUrl,
                     "", // htmlUrl not available in member webhook payload
-                    // The hook carries no bot flag: a stored type stays, and only a new user's is guessed.
+                    // The hook carries no bot flag: a stored type stays, and only a new
+                    // user's is guessed.
                     null,
                     GitLabUserClassifier.insertionType(login, null),
                     null,
@@ -303,7 +309,8 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
             return;
         }
 
-        // The event names one direct grant; an inherited one may be higher, so it never lowers the stored role.
+        // The event names one direct grant; an inherited one may be higher, so it never lowers the
+        // stored role.
         OrganizationMemberRole role = mapGroupAccess(event.groupAccess());
         boolean storedAdmin = membershipRepository
                 .findByOrganizationIdAndUserId(org.getId(), user.getId())
@@ -328,20 +335,21 @@ public class GitLabMemberMessageHandler extends AbstractIntegrationMessageHandle
     }
 
     /**
-     * A removal off a connection route names one direct grant. The person may still hold the group through a parent
-     * or an invited group, so it removes nothing; the next complete roster listing does, if GitLab no longer lists
-     * them.
+     * A removal off a connection route names one direct grant. The person may still hold the group
+     * through a parent or an invited group, so it removes nothing; the next complete roster listing
+     * does, if GitLab no longer lists them.
      */
     private void handleMemberRemoval(GitLabMemberEventDTO event, Organization org) {
         log.info(
-                "Deferred group member removal to the next roster listing: reason=directGrantOnly, orgId={}, userLogin={}",
+                "Deferred group member removal to the next roster listing: reason=directGrantOnly,"
+                        + " orgId={}, userLogin={}",
                 org.getId(),
                 sanitizeForLog(event.userUsername()));
     }
 
     /**
-     * Maps GitLab group_access string to OrganizationMemberRole.
-     * Owner and Maintainer → ADMIN; all others → MEMBER.
+     * Maps GitLab group_access string to OrganizationMemberRole. Owner and Maintainer → ADMIN; all
+     * others → MEMBER.
      */
     private static OrganizationMemberRole mapGroupAccess(@Nullable String groupAccess) {
         if (groupAccess == null) {

@@ -6,15 +6,15 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSync
 import static de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubSyncConstants.TRANSPORT_MAX_RETRIES;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.common.ScmTransportErrors;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitAuthorResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.util.CommitUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubExceptionClassifier.ClassificationResult;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -44,28 +44,29 @@ import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
 /**
- * Enriches commits with unresolved author/committer by querying the database
- * for stored email addresses and, if needed, the GitHub GraphQL API.
- * <p>
- * <b>Algorithm (email-based negative caching):</b>
+ * Enriches commits with unresolved author/committer by querying the database for stored email
+ * addresses and, if needed, the GitHub GraphQL API.
+ *
+ * <p><b>Algorithm (email-based negative caching):</b>
+ *
  * <ol>
- *   <li>Query distinct unresolved author/committer emails from {@code git_commit}
- *       where {@code author_id IS NULL AND author_email IS NOT NULL}</li>
- *   <li>First pass: resolve each email against existing DB users via
- *       {@link CommitAuthorResolver#resolveByEmail} (direct match + noreply parsing)</li>
- *   <li>Bulk update all commits sharing the resolved email in one statement</li>
- *   <li>For still-unresolved emails: pick one representative SHA per email,
- *       batch up to 50 per GraphQL query to get the login from GitHub</li>
- *   <li>Resolve login &rarr; user_id, then bulk update by email</li>
+ *   <li>Query distinct unresolved author/committer emails from {@code git_commit} where {@code
+ *       author_id IS NULL AND author_email IS NOT NULL}
+ *   <li>First pass: resolve each email against existing DB users via {@link
+ *       CommitAuthorResolver#resolveByEmail} (direct match + noreply parsing)
+ *   <li>Bulk update all commits sharing the resolved email in one statement
+ *   <li>For still-unresolved emails: pick one representative SHA per email, batch up to 50 per
+ *       GraphQL query to get the login from GitHub
+ *   <li>Resolve login &rarr; user_id, then bulk update by email
  * </ol>
- * <p>
- * <b>Negative caching:</b> Emails that cannot be resolved remain in the database
- * with {@code author_id IS NULL}. Each enrichment cycle re-attempts resolution
- * cheaply (two indexed DB lookups per email). When new users are synced to the
- * database, their emails will match on the next cycle — no TTL needed.
- * <p>
- * Emails are captured at commit ingestion (webhook or backfill) and stored on the
- * {@code git_commit} table, so enrichment never opens a repository clone.
+ *
+ * <p><b>Negative caching:</b> Emails that cannot be resolved remain in the database with {@code
+ * author_id IS NULL}. Each enrichment cycle re-attempts resolution cheaply (two indexed DB lookups
+ * per email). When new users are synced to the database, their emails will match on the next cycle
+ * — no TTL needed.
+ *
+ * <p>Emails are captured at commit ingestion (webhook or backfill) and stored on the {@code
+ * git_commit} table, so enrichment never opens a repository clone.
  */
 @Service
 @Slf4j
@@ -76,8 +77,8 @@ public class CommitAuthorEnrichmentService {
     private static final Duration GRAPHQL_TIMEOUT = Duration.ofSeconds(60);
 
     /**
-     * Maximum number of commit SHAs to batch in a single GraphQL query.
-     * Each SHA becomes an aliased field; cost is ~1 point regardless of alias count.
+     * Maximum number of commit SHAs to batch in a single GraphQL query. Each SHA becomes an aliased
+     * field; cost is ~1 point regardless of alias count.
      */
     private static final int BATCH_SIZE = 50;
 
@@ -88,14 +89,17 @@ public class CommitAuthorEnrichmentService {
     private static final Pattern SHA_PATTERN = Pattern.compile("^[0-9a-f]{40}$");
 
     /**
-     * Emails that should never be resolved to a user. GitHub's web-flow bot uses
-     * {@code noreply@github.com} as the committer email for squash merges done via
-     * the web UI. This always resolves to {@code user: null} in GraphQL, wasting API
-     * calls. Filtering these out avoids unnecessary resolution attempts.
+     * Emails that should never be resolved to a user. GitHub's web-flow bot uses {@code
+     * noreply@github.com} as the committer email for squash merges done via the web UI. This always
+     * resolves to {@code user: null} in GraphQL, wasting API calls. Filtering these out avoids
+     * unnecessary resolution attempts.
      */
     private static final Set<String> UNRESOLVABLE_EMAILS = Set.of("noreply@github.com");
 
-    /** Type reference for deserializing GraphQL fields as {@code Map<String, Object>} without unchecked casts. */
+    /**
+     * Type reference for deserializing GraphQL fields as {@code Map<String, Object>} without
+     * unchecked casts.
+     */
     private static final ParameterizedTypeReference<Map<String, Object>> MAP_TYPE_REF =
             new ParameterizedTypeReference<>() {};
 
@@ -109,17 +113,17 @@ public class CommitAuthorEnrichmentService {
 
     /**
      * Enriches unresolved commit authors/committers for a repository.
-     * <p>
-     * This method is safe to call repeatedly &mdash; it only processes commits where
-     * {@code author_id} or {@code committer_id} is NULL and the corresponding email is stored.
      *
-     * @param repositoryId     the repository database ID
-     * @param nameWithOwner    the repository name with owner (e.g. "owner/repo")
-     * @param scopeId          the scope ID for GraphQL client authentication
-     * @param providerId       the provider ID for scoping user lookups
-     * @param repository       the repository entity used to populate the {@link RepositoryRef}
-     *                         on the published {@link ScmDomainEvent.CommitAuthorsReconciled} event;
-     *                         may be {@code null} when a reference cannot be materialised.
+     * <p>This method is safe to call repeatedly &mdash; it only processes commits where {@code
+     * author_id} or {@code committer_id} is NULL and the corresponding email is stored.
+     *
+     * @param repositoryId the repository database ID
+     * @param nameWithOwner the repository name with owner (e.g. "owner/repo")
+     * @param scopeId the scope ID for GraphQL client authentication
+     * @param providerId the provider ID for scoping user lookups
+     * @param repository the repository entity used to populate the {@link RepositoryRef} on the
+     *     published {@link ScmDomainEvent.CommitAuthorsReconciled} event; may be {@code null} when
+     *     a reference cannot be materialised.
      * @return the number of commits enriched
      */
     public int enrichCommitAuthors(
@@ -187,7 +191,8 @@ public class CommitAuthorEnrichmentService {
 
         int total = enrichedByEmail + enrichedByApi;
 
-        // Signal downstream consumers (the activity ledger) that commit author identities
+        // ItemEventDefinition downstream consumers (the activity ledger) that commit author
+        // identities
         // for this repository have been reconciled. The activity module listens for this
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         // Must publish regardless of which phase did the work — a Phase-2-only enrichment
@@ -202,7 +207,7 @@ public class CommitAuthorEnrichmentService {
         }
 
         log.info(
-                "Completed commit author enrichment: repoId={}, enrichedByEmail={}, enrichedByApi={}, total={}",
+                "Completed commit author enrichment: repoId={}, enrichedByEmail={}," + " enrichedByApi={}, total={}",
                 repositoryId,
                 enrichedByEmail,
                 enrichedByApi,
@@ -211,9 +216,9 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * First pass: resolve authors by email using {@link CommitAuthorResolver#resolveByEmail}.
-     * This resolves noreply emails and direct email matches without any API call.
-     * Uses bulk update by email — one UPDATE per distinct email.
+     * First pass: resolve authors by email using {@link CommitAuthorResolver#resolveByEmail}. This
+     * resolves noreply emails and direct email matches without any API call. Uses bulk update by
+     * email — one UPDATE per distinct email.
      */
     private int enrichByEmail(
             Long repositoryId,
@@ -244,9 +249,9 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * Second pass: for each still-unresolved email, find ONE representative commit SHA,
-     * fetch from GitHub GraphQL API (batched up to 50 per query) to get the login,
-     * then bulk update all commits sharing that email.
+     * Second pass: for each still-unresolved email, find ONE representative commit SHA, fetch from
+     * GitHub GraphQL API (batched up to 50 per query) to get the login, then bulk update all
+     * commits sharing that email.
      */
     private int enrichByGitHubGraphQl(
             Long repositoryId,
@@ -349,11 +354,11 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * Fetches commit author/committer logins via GitHub GraphQL API using
-     * alias-based batching. Batches up to {@link #BATCH_SIZE} SHAs per query.
-     * <p>
-     * Each query uses dynamic aliases to fetch multiple commits in a single
-     * GraphQL request:
+     * Fetches commit author/committer logins via GitHub GraphQL API using alias-based batching.
+     * Batches up to {@link #BATCH_SIZE} SHAs per query.
+     *
+     * <p>Each query uses dynamic aliases to fetch multiple commits in a single GraphQL request:
+     *
      * <pre>{@code
      * query {
      *   rateLimit { cost limit remaining resetAt }
@@ -388,7 +393,7 @@ public class CommitAuthorEnrichmentService {
                 if (!graphQlSyncCoordinator.waitForRateLimitIfNeeded(
                         scopeId, "commit author enrichment", "repo", nameWithOwner, log)) {
                     log.warn(
-                            "Aborting commit author enrichment due to rate limit: repo={}, processed={}/{}",
+                            "Aborting commit author enrichment due to rate limit: repo={}," + " processed={}/{}",
                             nameWithOwner,
                             batchStart,
                             shas.size());
@@ -407,9 +412,9 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * Fetches a single batch of commit SHAs via GraphQL with full error handling.
-     * Follows the gold standard pattern: transport retry, GraphQL error classification,
-     * rate limit tracking, and exception classification.
+     * Fetches a single batch of commit SHAs via GraphQL with full error handling. Follows the gold
+     * standard pattern: transport retry, GraphQL error classification, rate limit tracking, and
+     * exception classification.
      *
      * @return map from email to GitHub login for commits in this batch
      */
@@ -441,7 +446,11 @@ public class CommitAuthorEnrichmentService {
                                 .jitter(JITTER_FACTOR)
                                 .filter(ScmTransportErrors::isTransportError)
                                 .doBeforeRetry(signal -> log.warn(
-                                        "Retrying commit enrichment after transport error: repo={}, attempt={}, error={}",
+                                        "Retrying commit enrichment"
+                                                + " after transport"
+                                                + " error: repo={},"
+                                                + " attempt={},"
+                                                + " error={}",
                                         nameWithOwner,
                                         signal.totalRetries() + 1,
                                         signal.failure().getMessage())))
@@ -513,10 +522,10 @@ public class CommitAuthorEnrichmentService {
 
     /**
      * Builds a dynamic GraphQL query with alias-based batching for commit lookups.
-     * <p>
-     * SHAs are baked directly into the query string because GraphQL aliases are
-     * syntactic (cannot use variables for alias names). SHA validation is performed
-     * before calling this method to prevent injection.
+     *
+     * <p>SHAs are baked directly into the query string because GraphQL aliases are syntactic
+     * (cannot use variables for alias names). SHA validation is performed before calling this
+     * method to prevent injection.
      */
     private String buildBatchQuery(String owner, String repoName, List<String> shas) {
         StringBuilder sb = new StringBuilder();
@@ -536,8 +545,10 @@ public class CommitAuthorEnrichmentService {
                     .append("\") {\n");
             sb.append("      ... on Commit {\n");
             sb.append("        oid\n");
-            sb.append("        author { user { login databaseId name email avatarUrl url createdAt updatedAt } }\n");
-            sb.append("        committer { user { login databaseId name email avatarUrl url createdAt updatedAt } }\n");
+            sb.append(
+                    "        author { user { login databaseId name email avatarUrl url createdAt" + " updatedAt } }\n");
+            sb.append("        committer { user { login databaseId name email avatarUrl url createdAt"
+                    + " updatedAt } }\n");
             sb.append("      }\n");
             sb.append("    }\n");
         }
@@ -549,11 +560,10 @@ public class CommitAuthorEnrichmentService {
 
     /**
      * Extracts author/committer logins from a batched GraphQL response.
-     * <p>
-     * Each aliased field ({@code commit0}, {@code commit1}, ...) maps to a commit
-     * object with optional {@code author.user.login} and {@code committer.user.login}.
-     * The {@code user} field is nullable — null when GitHub can't match the commit
-     * email to a GitHub account.
+     *
+     * <p>Each aliased field ({@code commit0}, {@code commit1}, ...) maps to a commit object with
+     * optional {@code author.user.login} and {@code committer.user.login}. The {@code user} field
+     * is nullable — null when GitHub can't match the commit email to a GitHub account.
      */
     private void extractLoginsFromResponse(
             ClientGraphQlResponse response,
@@ -600,11 +610,11 @@ public class CommitAuthorEnrichmentService {
     }
 
     /**
-     * Extracts user info from a nested path like {@code author.user} or
-     * {@code committer.user} in the GraphQL commit data.
+     * Extracts user info from a nested path like {@code author.user} or {@code committer.user} in
+     * the GraphQL commit data.
      *
      * @param commitData the deserialized commit map from GraphQL
-     * @param role       "author" or "committer"
+     * @param role "author" or "committer"
      * @return the user snapshot, or null if not present
      */
     @Nullable

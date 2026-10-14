@@ -95,7 +95,7 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
         UUID threadId = mentorSlackThreadService.ensureSlackThread(workspaceId, null, actorId);
         assertThat(chatThreadRepository.findById(threadId))
                 .get()
-                .extracting(thread -> thread.getUser().getId())
+                .extracting(thread -> thread.getAccountId())
                 .isEqualTo(actorId);
 
         CurrentScmIdentityHolder.set(actorId, verifiedActor.getLogin(), Set.of(actorId));
@@ -125,7 +125,7 @@ class DefaultMentorSlackThreadServiceIntegrationTest extends BaseIntegrationTest
         ChatThread thread = new ChatThread();
         thread.setId(UUID.randomUUID());
         thread.setTitle(surface + " thread");
-        thread.setUser(user);
+        thread.setAccountId(user.getId());
         thread.setWorkspace(workspace);
         thread.setSurface(surface);
         return chatThreadRepository.save(thread).getId();

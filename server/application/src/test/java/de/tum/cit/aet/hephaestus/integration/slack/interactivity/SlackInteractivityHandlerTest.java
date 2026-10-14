@@ -97,7 +97,7 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
 
     @Test
     void appHomeChannelMessageOptOut_recordsIngestion_erasesMemberData_republishesHome() {
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of(RATER_ID));
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of(RATER_ID));
 
         handler.handleBlockActions(blockActions(SlackAppHomeService.ACTION_CHANNEL_MESSAGES_OPT_OUT, "false"));
 
@@ -120,7 +120,7 @@ class SlackInteractivityHandlerTest extends BaseUnitTest {
 
     @Test
     void inMessageOptOut_recordsChannelMessageOptOut_erasesData_andConfirmsEphemerally() {
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of(RATER_ID));
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, TEAM, USER)).thenReturn(Optional.of(RATER_ID));
 
         handler.handleBlockActions(blockActions(SlackConsentBlocks.ACTION_PARTICIPANT_OPT_OUT, ""));
 

@@ -15,9 +15,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -858,7 +858,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     "job:stream",
                     "openai-completions",
                     upstream.url("/v1").toString(),
-                    FundingSource.INSTANCE,
+                    UsageFundingSource.INSTANCE,
                     7L,
                     8L,
                     9L,
@@ -1025,7 +1025,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                     "job:stream",
                     "openai-responses",
                     upstream.url("/v1").toString(),
-                    FundingSource.INSTANCE,
+                    UsageFundingSource.INSTANCE,
                     7L,
                     8L,
                     9L,
@@ -1138,7 +1138,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
     }
 
     private static final ProxyRouting.BilledAttempt ATTEMPT = new ProxyRouting.BilledAttempt(
-            LlmUsageSourceType.AGENT_JOB,
+            UsageSourceType.REVIEW_JOB,
             UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
             0,
             BigDecimal.ZERO,
@@ -1149,7 +1149,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 "job:test",
                 protocol,
                 "https://frozen.example.com/v1",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 7L,
                 8L,
                 9L,
@@ -1163,7 +1163,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 "job:test:practice-script",
                 protocol,
                 "https://frozen.example.com/v1",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 7L,
                 8L,
                 9L,
@@ -1177,7 +1177,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 "job:test",
                 "openai-completions",
                 "https://frozen.example.com/v1",
-                FundingSource.WORKSPACE,
+                UsageFundingSource.WORKSPACE,
                 7L,
                 8L,
                 9L,
@@ -1191,7 +1191,7 @@ class LlmProxyServiceTest extends BaseUnitTest {
                 "mentor-session",
                 "openai-completions",
                 "https://frozen.example.com/v1",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 7L,
                 8L,
                 9L,

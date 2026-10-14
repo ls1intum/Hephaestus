@@ -15,18 +15,19 @@ import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderLease;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewaySessions;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
-import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService.AdmissionIdentity;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.core.runtime.ServerSchedulingConfig;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryLockManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.GitTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -82,10 +83,10 @@ class JobEvidenceFilesTest extends BaseUnitTest {
     @TempDir
     Path root;
 
-    private final AgentJobRepository jobs = mock(AgentJobRepository.class);
+    private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-11T12:00:00Z"), ZoneOffset.UTC);
 
-    private static Optional<byte[]> read(JobEvidenceFiles files, AgentJob job, String path, String sha) {
+    private static Optional<byte[]> read(JobEvidenceFiles files, ReviewJob job, String path, String sha) {
         return files.inspect(job, path, sha, reader -> {
             var output = new StringWriter();
             reader.transferTo(output);
@@ -115,7 +116,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
     void shouldDeleteCommittedAdmissionWhileTheRuntimeIsStillRunning() {
         var files = new JobEvidenceFiles(new FabricLayout(root.toString()), jobs, clock, personCopies());
         var job = job();
-        job.setStatus(AgentJobStatus.RUNNING);
+        job.setStatus(ReviewJobStatus.RUNNING);
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         byte[] bytes = "verified quote".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
@@ -125,8 +126,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
             assertThat(PreparedJobInputsFixtures.files(prepared)).containsKey("context/quote");
             files.discardAdmittedAttempt(identity);
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
-            job.setMetadata(
-                    new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "verified"));
+
             files.discardAdmittedAttempt(new AdmissionIdentity(job.getId(), 1L, 1, "worker"));
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
             files.discardAdmittedAttempt(identity);
@@ -140,9 +140,9 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         byte[] bytes = "evidence".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
         var running = job();
-        running.setStatus(AgentJobStatus.RUNNING);
+        running.setStatus(ReviewJobStatus.RUNNING);
         var finished = job();
-        finished.setStatus(AgentJobStatus.FAILED);
+        finished.setStatus(ReviewJobStatus.FAILED);
         var unknown = job();
         when(jobs.findByIdAndWorkspaceId(running.getId(), 1L)).thenReturn(Optional.of(running));
         when(jobs.findByIdAndWorkspaceId(finished.getId(), 1L)).thenReturn(Optional.of(finished));
@@ -227,9 +227,9 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                     .contains(true);
             assertThatThrownBy(() -> PreparedJobInputsFixtures.prepare(files, job, raw))
                     .isInstanceOf(IllegalStateException.class);
-            job.setRetryCount(1);
+            job.setAttempt(1);
             assertThat(read(files, job, "context/source.txt", sha)).isEmpty();
-            job.setRetryCount(0);
+            job.setAttempt(0);
             assertThat(prepared.filesOnDisk().get("context/source.txt")).hasContent(content);
         }
         assertThat(read(files, job, "context/source.txt", sha)).isPresent();
@@ -287,7 +287,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
     void shouldPreserveAnotherActiveWorkersFolderAndCleanLostAttemptsAfterGracePeriod() {
         var files = new JobEvidenceFiles(new FabricLayout(root.toString()), jobs, clock, personCopies());
         var job = job();
-        job.setStatus(AgentJobStatus.RUNNING);
+        job.setStatus(ReviewJobStatus.RUNNING);
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         byte[] bytes = "source".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
@@ -299,7 +299,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                     new FabricLayout(root.toString()), jobs, Clock.offset(clock, Duration.ofHours(2)), personCopies());
             later.cleanEndedAttempts();
             assertThat(read(files, job, "inputs/source", sha)).contains(bytes);
-            job.setStatus(AgentJobStatus.CANCELLED);
+            job.setStatus(ReviewJobStatus.CANCELLED);
             later.cleanEndedAttempts();
             assertThat(read(files, job, "inputs/source", sha)).contains(bytes);
             new JobEvidenceFiles(
@@ -310,8 +310,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                     .cleanEndedAttempts();
             assertThat(read(files, job, "inputs/source", sha)).isEmpty();
             verify(jobs)
-                    .discardRetiredArtifactInventory(
-                            job.getId(), 1L, job.getRetryCount(), Objects.requireNonNull(job.getWorkerId()));
+                    .expireCaptureInventory(
+                            job.getId(), 1L, job.getAttempt(), Objects.requireNonNull(job.getWorkerId()));
         } finally {
             prepared.close();
         }
@@ -321,9 +321,8 @@ class JobEvidenceFilesTest extends BaseUnitTest {
     void shouldDeleteAdmittedFinalEvidenceImmediatelyWithoutDeletingAReplacementHandle() {
         var files = new JobEvidenceFiles(new FabricLayout(root.toString()), jobs, clock, personCopies());
         var job = job();
-        job.setStatus(AgentJobStatus.COMPLETED);
-        job.setMetadata(
-                new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "admitted"));
+        job.setStatus(ReviewJobStatus.COMPLETED);
+
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         byte[] bytes = "source".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
@@ -457,7 +456,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         String sha = ProvenanceDigest.sha256Hex(bytes);
         var ended = endedAttempt(preparing, bytes);
         var running = job();
-        running.setStatus(AgentJobStatus.RUNNING);
+        running.setStatus(ReviewJobStatus.RUNNING);
         when(jobs.findByIdAndWorkspaceId(running.getId(), 1L)).thenReturn(Optional.of(running));
         var later = new JobEvidenceFiles(layout, jobs, Clock.offset(clock, Duration.ofHours(1)), personCopies());
         try (var active = PreparedJobInputsFixtures.prepare(
@@ -523,9 +522,9 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                         "hephaestus.runtime.worker.enabled=true", "hephaestus.runtime.server.enabled=false");
     }
 
-    private AgentJob endedAttempt(JobEvidenceFiles files, byte[] bytes) {
+    private ReviewJob endedAttempt(JobEvidenceFiles files, byte[] bytes) {
         var ended = job();
-        ended.setStatus(AgentJobStatus.FAILED);
+        ended.setStatus(ReviewJobStatus.FAILED);
         when(jobs.findByIdAndWorkspaceId(ended.getId(), 1L)).thenReturn(Optional.of(ended));
         PreparedJobInputsFixtures.prepare(
                         files, ended, PreparedJobInputsFixtures.filesOnly(Map.of("context/quote", bytes)))
@@ -549,11 +548,11 @@ class JobEvidenceFilesTest extends BaseUnitTest {
             later.cleanAfterRestart();
             later.cleanEndedAttempts();
             assertThat(read(files, ended, "context/quote", sha)).contains(bytes);
-            verify(jobs, never()).discardRetiredArtifactInventory(ended.getId(), 1L, 0, "worker");
+            verify(jobs, never()).expireCaptureInventory(ended.getId(), 1L, 0, "worker");
         }
         later.cleanEndedAttempts();
         assertThat(read(files, ended, "context/quote", sha)).isEmpty();
-        verify(jobs).discardRetiredArtifactInventory(ended.getId(), 1L, 0, "worker");
+        verify(jobs).expireCaptureInventory(ended.getId(), 1L, 0, "worker");
     }
 
     @Test
@@ -583,13 +582,13 @@ class JobEvidenceFilesTest extends BaseUnitTest {
             assertThat(entered.await(10, TimeUnit.SECONDS)).isTrue();
             periodic.cleanEndedAttempts();
             assertThat(read(files, ended, "context/quote", sha)).contains(bytes);
-            verify(jobs, never()).discardRetiredArtifactInventory(ended.getId(), 1L, 0, "worker");
+            verify(jobs, never()).expireCaptureInventory(ended.getId(), 1L, 0, "worker");
             proceed.countDown();
             startup.get(10, TimeUnit.SECONDS);
         }
         assertThat(read(files, ended, "context/quote", sha)).isEmpty();
         periodic.cleanEndedAttempts();
-        verify(jobs, times(1)).discardRetiredArtifactInventory(ended.getId(), 1L, 0, "worker");
+        verify(jobs, times(1)).expireCaptureInventory(ended.getId(), 1L, 0, "worker");
     }
 
     @Test
@@ -597,7 +596,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var layout = new FabricLayout(root.toString());
         var files = new JobEvidenceFiles(layout, jobs, clock, personCopies());
         var job = job();
-        job.setStatus(AgentJobStatus.RUNNING);
+        job.setStatus(ReviewJobStatus.RUNNING);
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         byte[] bytes = "verified quote".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
@@ -609,8 +608,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var runtime =
                 EvidenceFolderLease.tryAcquire(layout.root(), 1L, job.getId()).orElseThrow();
         try (runtime) {
-            job.setMetadata(
-                    new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "verified"));
+
             // Before the capture shares its lease, admission cannot remove through it.
             files.discardAdmittedAttempt(identity);
             assertThat(read(files, job, "context/quote", sha)).contains(bytes);
@@ -629,7 +627,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         later.cleanEndedAttempts();
         files.discardAdmittedAttempt(identity);
         assertThat(read(files, job, "context/quote", sha)).isEmpty();
-        verify(jobs, never()).discardRetiredArtifactInventory(job.getId(), 1L, 0, "worker");
+        verify(jobs, never()).expireCaptureInventory(job.getId(), 1L, 0, "worker");
     }
 
     @Test
@@ -637,13 +635,12 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var layout = new FabricLayout(root.toString());
         var files = new JobEvidenceFiles(layout, jobs, clock, personCopies());
         var job = job();
-        job.setStatus(AgentJobStatus.RUNNING);
+        job.setStatus(ReviewJobStatus.RUNNING);
         byte[] bytes = "verified quote".getBytes(StandardCharsets.UTF_8);
         String sha = ProvenanceDigest.sha256Hex(bytes);
         var prepared = PreparedJobInputsFixtures.prepare(
                 files, job, PreparedJobInputsFixtures.filesOnly(Map.of("context/quote", bytes)));
-        job.setMetadata(
-                new JsonMapper().createObjectNode().put(ResultAdmissionService.DIGEST_METADATA_KEY, "verified"));
+
         var entered = new CountDownLatch(1);
         var proceed = new CountDownLatch(1);
         var first = new AtomicBoolean(true);
@@ -685,29 +682,29 @@ class JobEvidenceFilesTest extends BaseUnitTest {
      * unowned enums, and numbers that are fractional, negative or past any bound.
      */
     private static final String FORGED_MANIFEST = """
-            {"schemaVersion":1,"budgetBytes":1,"model":"Jane Roe","sessions":[
-              {"file":"people/jane-roe.jsonl","bytes":120,"redacted":"Jane Roe","partialLineDropped":false,
-               "omitted":"Jane Roe","error":"Jane Roe <jane@example.com>",
-               "summary":{"phase":"practice","practiceRevisionId":12,"practiceSlug":"jane-roe","entries":6,
-                 "assistantCalls":1e30,"toolErrors":-1,"compactions":1.5,
-                 "usage":{"input":100,"output":"Jane Roe","cacheRead":9007199254740993,"cacheWrite":5,"note":"Jane Roe"},
-                 "stopReasons":{"toolUse":1,"Jane Roe":2},
-                 "toolCalls":{"read":2,"jane_roe_tool":1,"other":1},
-                 "modelFailures":{"HTTP_ERROR":1,"RESPONSE_FAILED":2,"Jane Roe":3,"UNKNOWN":-1},
-                 "lastModelFailureAt":1760000000000,
-                 "finalModelFailure":{"kind":"HTTP_ERROR","source":"ADAPTER","phase":"Jane Roe","status":503,"at":1.5,
-                   "error":"Jane Roe <jane@example.com>"},
-                 "unattributedModelFailures":2,
-                 "modelCallTiming":{"timedCalls":2,"elapsedMs":1200,"responseMs":-5,"failedElapsedMs":"Jane Roe",
-                   "note":"Jane Roe"},
-                 "arguments":{"path":"/workspace/inputs/people/7/person.json"}}},
-              {"summary":{"phase":"Jane Roe","finalModelFailure":{"kind":"ABORTED","source":"Jane Roe","phase":"request",
-                "status":503},"modelCallTiming":"Jane Roe"}},
-              {"summary":{"finalModelFailure":{"kind":"Jane Roe","status":503}}},
-              {"summary":{"finalModelFailure":{"kind":"FINISH_REASON_ERROR","phase":"response_body","at":1760000000000,
-                "status":503,"error":"Jane Roe"}}}
-            ]}
-            """;
+        {"schemaVersion":1,"budgetBytes":1,"model":"Jane Roe","sessions":[
+          {"file":"people/jane-roe.jsonl","bytes":120,"redacted":"Jane Roe","partialLineDropped":false,
+           "omitted":"Jane Roe","error":"Jane Roe <jane@example.com>",
+           "summary":{"phase":"practice","practiceRevisionId":12,"practiceSlug":"jane-roe","entries":6,
+             "assistantCalls":1e30,"toolErrors":-1,"compactions":1.5,
+             "usage":{"input":100,"output":"Jane Roe","cacheRead":9007199254740993,"cacheWrite":5,"note":"Jane Roe"},
+             "stopReasons":{"toolUse":1,"Jane Roe":2},
+             "toolCalls":{"read":2,"jane_roe_tool":1,"other":1},
+             "modelFailures":{"HTTP_ERROR":1,"RESPONSE_FAILED":2,"Jane Roe":3,"UNKNOWN":-1},
+             "lastModelFailureAt":1760000000000,
+             "finalModelFailure":{"kind":"HTTP_ERROR","source":"ADAPTER","phase":"Jane Roe","status":503,"at":1.5,
+               "error":"Jane Roe <jane@example.com>"},
+             "unattributedModelFailures":2,
+             "modelCallTiming":{"timedCalls":2,"elapsedMs":1200,"responseMs":-5,"failedElapsedMs":"Jane Roe",
+               "note":"Jane Roe"},
+             "arguments":{"path":"/workspace/inputs/people/7/person.json"}}},
+          {"summary":{"phase":"Jane Roe","finalModelFailure":{"kind":"ABORTED","source":"Jane Roe","phase":"request",
+            "status":503},"modelCallTiming":"Jane Roe"}},
+          {"summary":{"finalModelFailure":{"kind":"Jane Roe","status":503}}},
+          {"summary":{"finalModelFailure":{"kind":"FINISH_REASON_ERROR","phase":"response_body","at":1760000000000,
+            "status":503,"error":"Jane Roe"}}}
+        ]}
+        """;
 
     /** An upload as the gateway runner sends it: the result, a native session copy and its manifest. */
     private static final Map<String, byte[]> TRACED_UPLOAD = Map.of(
@@ -715,7 +712,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
             "traces/0001.jsonl", "{\"type\":\"session\",\"cwd\":\"Jane Roe\"}\n".getBytes(StandardCharsets.UTF_8),
             "traces/manifest.json", FORGED_MANIFEST.getBytes(StandardCharsets.UTF_8));
 
-    private static Path traceOf(FabricLayout layout, AgentJob job, int attempt) {
+    private static Path traceOf(FabricLayout layout, ReviewJob job, int attempt) {
         return layout.jobsRoot()
                 .resolve("1")
                 .resolve(job.getId().toString())
@@ -724,16 +721,16 @@ class JobEvidenceFilesTest extends BaseUnitTest {
     }
 
     /** A job as the executor launches it: RUNNING as attempt 0 of this worker; later changes show in both reads. */
-    private AgentJob launched() {
+    private ReviewJob launched() {
         var job = job();
-        job.setStatus(AgentJobStatus.RUNNING);
-        when(jobs.findByIdWithWorkspace(job.getId())).thenReturn(Optional.of(job));
+        job.setStatus(ReviewJobStatus.RUNNING);
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
         when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         return job;
     }
 
     /** The lease a running attempt holds once its capture published the folder. */
-    private static EvidenceFolderLease runtimeLease(FabricLayout layout, AgentJob job) {
+    private static EvidenceFolderLease runtimeLease(FabricLayout layout, ReviewJob job) {
         var lease =
                 EvidenceFolderLease.tryAcquire(layout.root(), 1L, job.getId()).orElseThrow();
         lease.shareWithRemovals();
@@ -751,7 +748,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var files = new JobEvidenceFiles(layout, jobs, clock, copies);
         var upload = files.bind(job.getId(), 0, IMAGE);
         // Cancelled while it ran: the upload that still arrived is the attempt's.
-        job.setStatus(AgentJobStatus.CANCELLED);
+        job.setStatus(ReviewJobStatus.CANCELLED);
 
         var lease = runtimeLease(layout, job);
         try (lease) {
@@ -786,30 +783,30 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                 assertThat(record.path("sessions"))
                         .as("rebuilt from owned enums, flags and bounded integers only")
                         .isEqualTo(new JsonMapper().readTree("""
-                                [{"copied":true,"bytes":120,"partialLineDropped":false,
-                                  "summary":{"phase":"practice","practiceRevisionId":12,"entries":6,
-                                    "usage":{"input":100,"cacheWrite":5},
-                                    "stopReasons":{"toolUse":1},
-                                    "toolCalls":{"read":2,"other":1},
-                                    "modelFailures":{"HTTP_ERROR":1,"RESPONSE_FAILED":2},
-                                    "lastModelFailureAt":1760000000000,
-                                    "finalModelFailure":{"kind":"HTTP_ERROR","source":"ADAPTER","status":503},
-                                    "unattributedModelFailures":2,
-                                    "modelCallTiming":{"timedCalls":2,"elapsedMs":1200}}},
-                                 {"copied":false,"summary":{"usage":{},"stopReasons":{},"toolCalls":{},
-                                    "modelFailures":{},"finalModelFailure":{"kind":"ABORTED","phase":"request"}}},
-                                 {"copied":false,"summary":{"usage":{},"stopReasons":{},"toolCalls":{},
-                                    "modelFailures":{}}},
-                                 {"copied":false,"summary":{"usage":{},"stopReasons":{},"toolCalls":{},"modelFailures":{},
-                                   "finalModelFailure":{"kind":"FINISH_REASON_ERROR","phase":"response_body","at":1760000000000}}}]
-                                """));
+                            [{"copied":true,"bytes":120,"partialLineDropped":false,
+                              "summary":{"phase":"practice","practiceRevisionId":12,"entries":6,
+                                "usage":{"input":100,"cacheWrite":5},
+                                "stopReasons":{"toolUse":1},
+                                "toolCalls":{"read":2,"other":1},
+                                "modelFailures":{"HTTP_ERROR":1,"RESPONSE_FAILED":2},
+                                "lastModelFailureAt":1760000000000,
+                                "finalModelFailure":{"kind":"HTTP_ERROR","source":"ADAPTER","status":503},
+                                "unattributedModelFailures":2,
+                                "modelCallTiming":{"timedCalls":2,"elapsedMs":1200}}},
+                             {"copied":false,"summary":{"usage":{},"stopReasons":{},"toolCalls":{},
+                                "modelFailures":{},"finalModelFailure":{"kind":"ABORTED","phase":"request"}}},
+                             {"copied":false,"summary":{"usage":{},"stopReasons":{},"toolCalls":{},
+                                "modelFailures":{}}},
+                             {"copied":false,"summary":{"usage":{},"stopReasons":{},"toolCalls":{},"modelFailures":{},
+                               "finalModelFailure":{"kind":"FINISH_REASON_ERROR","phase":"response_body","at":1760000000000}}}]
+                            """));
             }
             case NOT_HELD ->
                 assertThat(trace.getParent())
                         .as("an erased or requested receipt gets nothing, not even a record")
                         .doesNotExist();
         }
-        assertThat(job.getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
+        assertThat(job.getStatus()).isEqualTo(ReviewJobStatus.CANCELLED);
     }
 
     @Test
@@ -843,7 +840,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         var files = new JobEvidenceFiles(layout, jobs, clock, copies);
         var earlier = files.bind(job.getId(), 0, IMAGE);
         // Requeued: the successor attempt runs on this worker and holds the job's lease.
-        job.setRetryCount(1);
+        job.setAttempt(1);
         var successor = files.bind(job.getId(), 1, IMAGE);
         var notLaunched = files.bind(job.getId(), 5, IMAGE);
 
@@ -895,7 +892,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
                     .bind(job.getId(), 0, IMAGE)
                     .accept(TRACED_UPLOAD);
         }
-        job.setStatus(AgentJobStatus.COMPLETED);
+        job.setStatus(ReviewJobStatus.COMPLETED);
         Path trace = traceOf(layout, job, 0);
 
         new JobEvidenceFiles(layout, jobs, Clock.offset(clock, Duration.ofHours(23)), copies).cleanAfterRestart();
@@ -905,12 +902,12 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         assertThat(trace).doesNotExist();
     }
 
-    private static AgentJob job() {
+    private static ReviewJob job() {
         var workspace = new Workspace();
         workspace.setId(1L);
-        var job = new AgentJob();
+        var job = new ReviewJob();
         job.setId(UUID.randomUUID());
-        job.setWorkspace(workspace);
+        RuntimeJobTestData.initialize(job, (workspace).getId());
         job.setWorkerId("worker");
         return job;
     }

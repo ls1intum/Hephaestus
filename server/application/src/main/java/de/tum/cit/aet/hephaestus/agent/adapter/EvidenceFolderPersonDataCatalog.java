@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.agent.adapter;
 
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ReviewSourceNotReadyException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobLifecycleService;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.JdbcPersonDataStore;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataStores;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonEvidenceErasure;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspacePurgeContributor;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -48,7 +50,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowCallbackHandler;
-import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Component;
@@ -73,8 +74,8 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     private final ObjectMapper mapper;
     private final PersonDataCopyRecorder recorder;
     private final PersonDataCopyFence fence;
-    private final ObjectProvider<AgentJobExecutor> executor;
-    private final ObjectProvider<AgentJobLifecycleService> lifecycles;
+    private final ObjectProvider<ReviewJobExecutor> executor;
+    private final ObjectProvider<ReviewJobLifecycleService> lifecycles;
     private static final ThreadLocal<ActiveCapture> ACTIVE = new ThreadLocal<>();
     /** Whether a receipt indexes the receipts of every job whose rows its capture copied. */
     private static final String DEPENDENCIES = "dependencies";
@@ -86,8 +87,6 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     private static final String INHERITED_REPOSITORIES = "inheritedRepositories";
     private static final String UNKNOWN = "UNKNOWN";
     private static final String INCOMPLETE_ASSESSMENT = "Copied evidence dependency assessment is incomplete";
-    private static final RowMapper<CopiedRow> COPIED_ROW_MAPPER = (rs, row) ->
-            new CopiedRow(Objects.requireNonNull(rs.getObject(1, UUID.class)), rs.getLong(2), rs.getLong(3));
     private @Nullable UUID localStoreId;
 
     public EvidenceFolderPersonDataCatalog(
@@ -97,8 +96,8 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             ObjectMapper mapper,
             PersonDataCopyRecorder recorder,
             PersonDataCopyFence fence,
-            ObjectProvider<AgentJobExecutor> executor,
-            ObjectProvider<AgentJobLifecycleService> lifecycles) {
+            ObjectProvider<ReviewJobExecutor> executor,
+            ObjectProvider<ReviewJobLifecycleService> lifecycles) {
         this.layout = layout;
         this.jdbc = jdbc;
         this.namedJdbc = namedJdbc;
@@ -109,7 +108,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         this.lifecycles = lifecycles;
     }
 
-    public void beginCapture(AgentJob job) {
+    public void beginCapture(ReviewJob job) {
         if (ACTIVE.get() != null) throw new IllegalStateException("An evidence capture is already active");
         var admission = fence.capture();
         EvidenceFolderLease lease = null;
@@ -117,21 +116,21 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         try {
             UUID storeId = storeId();
             UUID copyId = UUID.randomUUID();
-            long workspace = job.getWorkspace().getId();
+            long workspace = job.getWorkspaceId();
             lease = EvidenceFolderLease.tryAcquire(layout.root(), workspace, job.getId())
                     .orElseThrow(() ->
                             new ReviewSourceNotReadyException("Another attempt still holds this evidence folder"));
             provenance = recorder.begin();
             ObjectNode receipt = mapper.createObjectNode();
-            receipt.put("attempt", job.getRetryCount());
+            receipt.put("attempt", job.getAttempt());
             receipt.putArray("identities");
             receipt.putArray("repositories");
             int changed = jdbc.update(
                     """
-                INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload)
-                SELECT CAST(? AS uuid),workspace_id,id,CAST(? AS uuid),'CAPTURING',CAST(? AS jsonb) FROM agent_job
-                WHERE id=? AND workspace_id=? AND status='RUNNING'
-                """,
+                    INSERT INTO person_evidence_copy(id,workspace_id,job_id,store_id,state,payload)
+                    SELECT CAST(? AS uuid),workspace_id,id,CAST(? AS uuid),'CAPTURING',CAST(? AS jsonb) FROM review_job
+                    WHERE id=? AND workspace_id=? AND status='RUNNING'
+                    """,
                     copyId.toString(),
                     storeId.toString(),
                     mapper.writeValueAsString(receipt),
@@ -155,7 +154,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     }
 
     /** Called only after the frozen folder exists; the returned lease belongs to PreparedJobInputs. */
-    public AutoCloseable finishCapture(AgentJob job) {
+    public AutoCloseable finishCapture(ReviewJob job) {
         ActiveCapture capture = requireCapture(job);
         var admission = capture.admission();
         var provenance = capture.provenance();
@@ -181,9 +180,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                     int discarded = capture.admission()
                             .jdbc()
                             .update("""
-                        UPDATE person_evidence_copy SET state='ERASED',payload='{}'::jsonb
-                        WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING'
-                        """, capture.copyId(), capture.jobId(), capture.workspaceId());
+                                UPDATE person_evidence_copy SET state='ERASED',payload='{}'::jsonb
+                                WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING'
+                                """, capture.copyId(), capture.jobId(), capture.workspaceId());
                     if (discarded != 1) throw new IllegalStateException("Evidence capture ownership changed");
                     throw new IllegalStateException("Copied evidence contains an erased native identity");
                 }
@@ -202,7 +201,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         }
     }
 
-    public void abortCapture(AgentJob job) {
+    public void abortCapture(ReviewJob job) {
         ActiveCapture capture = ACTIVE.get();
         if (capture == null) return;
         if (!capture.jobId().equals(job.getId())) throw new IllegalStateException("Wrong evidence capture owner");
@@ -287,9 +286,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (sources.isEmpty()) return new Dependencies(true, List.of(), List.of(), new DependencyCounts(0, 0, 0, 0, 0));
         var receipts = controls.query(
                 """
-            SELECT job_id,state,payload::text FROM person_evidence_copy
-            WHERE workspace_id=? AND job_id=ANY(?)
-            """,
+                SELECT job_id,state,payload::text FROM person_evidence_copy
+                WHERE workspace_id=? AND job_id=ANY(?)
+                """,
                 (rs, row) -> new SourceReceipt(
                         Objects.requireNonNull(rs.getObject(1, UUID.class)),
                         Objects.requireNonNull(rs.getString(2)),
@@ -324,6 +323,28 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                 notReady,
                 unvouched);
         return new Dependencies(complete, identities, repositories, counts);
+    }
+
+    /** Reads complete retained copy authority under the same privacy fence as capture. */
+    public HistoryCustody custody(long workspaceId, List<UUID> producingJobs) {
+        if (producingJobs.isEmpty()) return new HistoryCustody(false, List.of(), List.of(), List.of());
+        try (var admission = fence.capture()) {
+            var retained = dependencies(admission.jdbc(), workspaceId, producingJobs);
+            if (!retained.complete()) return new HistoryCustody(false, List.of(), List.of(), List.of());
+            var identities = retained.identities().stream()
+                    .map(identity -> mapper.convertValue(identity, PersonCopyIdentity.class))
+                    .toList();
+            if (isSuppressed(identities, admission.jdbc()))
+                return new HistoryCustody(false, List.of(), List.of(), List.of());
+            return new HistoryCustody(
+                    true,
+                    identities,
+                    retained.repositories().stream()
+                            .map(JsonNode::longValue)
+                            .distinct()
+                            .toList(),
+                    producingJobs.stream().distinct().toList());
+        }
     }
 
     /**
@@ -393,8 +414,6 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
 
     private record SourceReceipt(UUID jobId, String state, JsonNode payload) {}
 
-    private record CopiedRow(UUID sourceJob, long recipient, long about) {}
-
     /**
      * A read that the runtime receives after its capture was frozen. Copy admission is held from before the read
      * selects its rows until their people and source receipts are unioned into the attempt's READY receipt, so an
@@ -402,12 +421,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
      * without complete, unsuppressed provenance are refused before the result returns; no receipt is revived.
      */
     public <T> T indexLateRead(
-            UUID jobId,
-            long workspaceId,
-            int attempt,
-            Supplier<T> read,
-            Function<T, Set<UUID>> practiceResultIds,
-            Function<T, Set<UUID>> feedbackIds) {
+            UUID jobId, long workspaceId, int attempt, Supplier<T> read, Function<T, List<HistoryCopy>> copiedRecords) {
         try (var admission = fence.capture()) {
             JdbcOperations previous = LATE_READ_CONTROLS.get();
             LATE_READ_CONTROLS.set(admission.jdbc());
@@ -415,73 +429,44 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                 T result = read.get();
                 if (!vouchesForLiveAttempt(jobId, workspaceId, attempt))
                     throw new CopyUnavailableException("This review's copy authority is unavailable");
-                var practiceResults = practiceResultIds.apply(result);
-                var feedback = feedbackIds.apply(result);
+                var records = copiedRecords.apply(result);
+                if (records.stream().anyMatch(copy -> !copy.complete()))
+                    throw new CopyUnavailableException("Historical words have no complete copy authority");
                 var controls = admission.jdbc();
-                var rows = new ArrayList<CopiedRow>();
-                if (!practiceResults.isEmpty())
-                    rows.addAll(controls.query(
-                            "SELECT agent_job_id,about_user_id,about_user_id FROM practice_result WHERE workspace_id=? AND id=ANY(?)",
-                            COPIED_ROW_MAPPER,
-                            workspaceId,
-                            new SqlArrayValue("uuid", practiceResults.toArray())));
-                if (!feedback.isEmpty())
-                    rows.addAll(controls.query(
-                            "SELECT agent_job_id,recipient_user_id,about_user_id FROM feedback WHERE workspace_id=? AND id=ANY(?)",
-                            COPIED_ROW_MAPPER,
-                            workspaceId,
-                            new SqlArrayValue("uuid", feedback.toArray())));
-                int found = rows.size();
-                var sources = new HashSet<UUID>();
-                var users = new HashSet<Long>();
-                for (var row : rows) {
-                    sources.add(row.sourceJob());
-                    users.add(row.recipient());
-                    users.add(row.about());
-                }
+                var sources = records.stream()
+                        .flatMap(copy -> copy.sourceJobs().stream())
+                        .collect(Collectors.toSet());
                 sources.remove(jobId);
-                var dependencies = dependencies(controls, workspaceId, sources);
-                List<PersonCopyIdentity> direct;
-                try (var frame = recorder.begin()) {
-                    users.forEach(recorder::recordUser);
-                    direct = frame.identities();
-                }
-                var identities = new ArrayList<JsonNode>(dependencies.identities());
-                direct.forEach(identity -> identities.add(mapper.valueToTree(identity)));
-                if (!dependencies.complete() || found != practiceResults.size() + feedback.size()) {
-                    incomplete(Assessment.LATE_READ, dependencies.counts())
-                            .addKeyValue("evidence.missingRows", practiceResults.size() + feedback.size() - found)
-                            .log(INCOMPLETE_ASSESSMENT);
-                    throw new CopyUnavailableException("Historical review words have no complete copy authority");
-                }
-                List<PersonCopyIdentity> copiedIdentities;
-                try {
-                    copiedIdentities = identities.stream()
-                            .map(identity -> mapper.convertValue(identity, PersonCopyIdentity.class))
-                            .toList();
-                } catch (RuntimeException malformed) {
-                    throw new CopyUnavailableException("Historical review copy authority is unavailable", malformed);
-                }
+                var copiedIdentities = records.stream()
+                        .flatMap(copy -> copy.identities().stream())
+                        .distinct()
+                        .toList();
+                var identities =
+                        copiedIdentities.stream().map(mapper::valueToTree).toList();
+                var copiedRepositories = records.stream()
+                        .flatMap(copy -> copy.repositories().stream())
+                        .distinct()
+                        .toList();
                 if (isSuppressed(copiedIdentities, controls))
                     throw new CopyUnavailableException("Historical review copy authority is unavailable");
                 // This read is complete; the update still preserves an earlier UNKNOWN capture.
                 // One statement: concurrent unions serialize on the row, and a receipt only ever gains people.
                 controls.update(
                         """
-                UPDATE person_evidence_copy SET payload=jsonb_set(jsonb_set(jsonb_set(jsonb_set(payload,
-                    '{identities}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
-                        COALESCE(payload->'identities','[]'::jsonb) || CAST(? AS jsonb)) e)),
-                    '{repositories}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
-                        COALESCE(payload->'repositories','[]'::jsonb) || CAST(? AS jsonb)) e)),
-                    '{copiedJobs}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
-                        COALESCE(payload->'copiedJobs','[]'::jsonb) || CAST(? AS jsonb)) e)),
-                    '{dependencies}',CASE WHEN ? AND payload->>'dependencies'='COMPLETE'
-                        THEN '"COMPLETE"'::jsonb ELSE '"UNKNOWN"'::jsonb END)
-                WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
-                  AND payload->>'attempt'=?
-                """,
+                        UPDATE person_evidence_copy SET payload=jsonb_set(jsonb_set(jsonb_set(jsonb_set(payload,
+                            '{identities}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
+                                COALESCE(payload->'identities','[]'::jsonb) || CAST(? AS jsonb)) e)),
+                            '{repositories}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
+                                COALESCE(payload->'repositories','[]'::jsonb) || CAST(? AS jsonb)) e)),
+                            '{copiedJobs}',(SELECT COALESCE(jsonb_agg(DISTINCT e),'[]'::jsonb) FROM jsonb_array_elements(
+                                COALESCE(payload->'copiedJobs','[]'::jsonb) || CAST(? AS jsonb)) e)),
+                            '{dependencies}',CASE WHEN ? AND payload->>'dependencies'='COMPLETE'
+                                THEN '"COMPLETE"'::jsonb ELSE '"UNKNOWN"'::jsonb END)
+                        WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
+                          AND payload->>'attempt'=?
+                        """,
                         mapper.writeValueAsString(identities),
-                        mapper.writeValueAsString(dependencies.repositories()),
+                        mapper.writeValueAsString(copiedRepositories),
                         mapper.writeValueAsString(sources.stream().sorted().toList()),
                         true,
                         jobId,
@@ -523,9 +508,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (!Files.exists(layout.root().resolve(".person-evidence-store-id"))) return TraceCustody.NOT_HELD;
         var dependencies = jdbc.queryForList(
                 """
-            SELECT COALESCE(payload->>'dependencies','') FROM person_evidence_copy
-            WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY' AND payload->>'attempt'=?
-            """, String.class, jobId, workspaceId, storeId().toString(), Integer.toString(attempt));
+                SELECT COALESCE(payload->>'dependencies','') FROM person_evidence_copy
+                WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY' AND payload->>'attempt'=?
+                """, String.class, jobId, workspaceId, storeId().toString(), Integer.toString(attempt));
         if (dependencies.size() != 1) return TraceCustody.NOT_HELD;
         return COMPLETE.equals(dependencies.getFirst()) ? TraceCustody.INDEXED : TraceCustody.UNINDEXED_DEPENDENCY;
     }
@@ -539,10 +524,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         return jdbc
                 .query(
                         """
-            SELECT id FROM person_evidence_copy
-            WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
-              AND payload->>'attempt'=? AND payload->>'dependencies'=?
-            """,
+                        SELECT id FROM person_evidence_copy
+                        WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
+                          AND payload->>'attempt'=? AND payload->>'dependencies'=?
+                        """,
                         (rs, row) -> Objects.requireNonNull(rs.getObject(1, UUID.class)),
                         jobId,
                         workspaceId,
@@ -579,10 +564,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (!Files.exists(layout.root().resolve(".person-evidence-store-id"))) return false;
         var payloads = jdbc.query(
                 """
-            SELECT payload::text FROM person_evidence_copy
-            WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
-              AND payload->>'attempt'=?
-            """,
+                SELECT payload::text FROM person_evidence_copy
+                WHERE job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state='READY'
+                  AND payload->>'attempt'=?
+                """,
                 (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1))),
                 jobId,
                 workspaceId,
@@ -610,10 +595,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (local && !Files.exists(layout.root().resolve(".person-evidence-store-id"))) return null;
         var payloads = controls.query(
                 """
-            SELECT payload::text FROM person_evidence_copy
-            WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND (CAST(? AS uuid) IS NULL OR store_id=CAST(? AS uuid)) AND state='READY'
-              AND payload->>'attempt'=? AND payload->>'dependencies'=?
-            """,
+                SELECT payload::text FROM person_evidence_copy
+                WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND (CAST(? AS uuid) IS NULL OR store_id=CAST(? AS uuid)) AND state='READY'
+                  AND payload->>'attempt'=? AND payload->>'dependencies'=?
+                """,
                 (rs, row) -> mapper.readTree(Objects.requireNonNull(rs.getString(1))),
                 copyId.toString(),
                 jobId,
@@ -633,7 +618,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
      * the capture's erasure fence, so a person erased meanwhile refuses the attempt before any runtime receives them;
      * a receipt erased, purged, no longer complete or not the admitting attempt's refuses it too.
      */
-    public void inheritReceipt(AgentJob job, UUID originalCopyId, int originalAttempt) {
+    public void inheritReceipt(ReviewJob job, UUID originalCopyId, int originalAttempt) {
         ActiveCapture capture = requireCapture(job);
         JsonNode original = vouchingReceipt(
                 capture.admission().jdbc(),
@@ -649,7 +634,7 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         capture.receipt().put("inheritedCopy", originalCopyId.toString());
     }
 
-    private ActiveCapture requireCapture(AgentJob job) {
+    private ActiveCapture requireCapture(ReviewJob job) {
         ActiveCapture capture = ACTIVE.get();
         if (capture == null || !capture.jobId().equals(job.getId()))
             throw new IllegalStateException("Evidence capture has no exact provenance owner");
@@ -672,9 +657,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (changed == 0
                 && Boolean.TRUE.equals(controls.queryForObject(
                         """
-            SELECT EXISTS(SELECT 1 FROM person_evidence_copy
-                WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING')
-            """, Boolean.class, capture.copyId(), capture.jobId(), capture.workspaceId()))) return;
+                        SELECT EXISTS(SELECT 1 FROM person_evidence_copy
+                            WHERE id=? AND job_id=? AND workspace_id=? AND state='CAPTURING')
+                        """, Boolean.class, capture.copyId(), capture.jobId(), capture.workspaceId()))) return;
         if (changed != 1) throw new IllegalStateException("Evidence capture ownership changed");
     }
 
@@ -683,9 +668,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                 .jdbc()
                 .update(
                         """
-            UPDATE person_evidence_copy SET payload=CAST(? AS jsonb),state='READY'
-            WHERE job_id=? AND workspace_id=? AND id=CAST(? AS uuid) AND state='CAPTURING'
-            """,
+                        UPDATE person_evidence_copy SET payload=CAST(? AS jsonb),state='READY'
+                        WHERE job_id=? AND workspace_id=? AND id=CAST(? AS uuid) AND state='CAPTURING'
+                        """,
                         mapper.writeValueAsString(capture.receipt()),
                         capture.jobId(),
                         capture.workspaceId(),
@@ -702,10 +687,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         if (identities.isEmpty()) return List.of();
         return controls.query(
                 """
-            SELECT DISTINCT p.type,p.server_url,s.subject,NULLIF(s.team_key,'')
-            FROM person_suppression s JOIN identity_provider p ON p.id=s.provider_id
-            WHERE s.subject=ANY(?)
-            """,
+                SELECT DISTINCT p.type,p.server_url,s.subject,NULLIF(s.team_key,'')
+                FROM person_suppression s JOIN identity_provider p ON p.id=s.provider_id
+                WHERE s.subject=ANY(?)
+                """,
                 (rs, row) -> new PersonCopyIdentity(
                         Objects.requireNonNull(rs.getString(1)), Objects.requireNonNull(rs.getString(2)),
                         Objects.requireNonNull(rs.getString(3)), rs.getString(4)),
@@ -797,10 +782,10 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         parameters.put("includeUnknown", includeUnknown);
         var identities = jdbc.query(
                 """
-            SELECT p.type,p.server_url,i.subject,i."teamId"
-            FROM jsonb_to_recordset(CAST(? AS jsonb)) AS i("providerId" bigint,subject text,"teamId" text)
-            JOIN identity_provider p ON p.id=i."providerId"
-            """,
+                SELECT p.type,p.server_url,i.subject,i."teamId"
+                FROM jsonb_to_recordset(CAST(? AS jsonb)) AS i("providerId" bigint,subject text,"teamId" text)
+                JOIN identity_provider p ON p.id=i."providerId"
+                """,
                 (rs, row) -> new PersonCopyIdentity(
                         Objects.requireNonNull(rs.getString(1)), Objects.requireNonNull(rs.getString(2)),
                         Objects.requireNonNull(rs.getString(3)), rs.getString(4)),
@@ -808,21 +793,21 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         parameters.put("copyIdentities", mapper.writeValueAsString(identities));
         return new PersonDataSelection(namedJdbc.query(
                 """
-            SELECT c.job_id,c.id,c.workspace_id FROM person_evidence_copy c
-            WHERE c.payload<>'{}'::jsonb AND
-              (EXISTS(
-                SELECT 1 FROM jsonb_to_recordset(COALESCE(c.payload->'identities','[]'::jsonb))
-                  AS k("providerType" text,"providerOrigin" text,subject text,"teamId" text)
-                JOIN jsonb_to_recordset(CAST(:copyIdentities AS jsonb))
-                  AS i("providerType" text,"providerOrigin" text,subject text,"teamId" text)
-                  ON i.subject=k.subject AND i."providerType"=k."providerType" AND i."providerOrigin"=k."providerOrigin"
-                WHERE COALESCE(k."teamId",'')=COALESCE(i."teamId",'') OR (i."providerType"='OUTLINE' AND i."teamId" IS NULL))
-                OR (:includeUnknown AND EXISTS(SELECT 1 FROM jsonb_array_elements_text(COALESCE(c.payload->'repositories','[]'::jsonb)) repository_id
-                  JOIN git_commit gc ON gc.repository_id=repository_id.value::bigint
-                  WHERE gc.author_id=ANY(:users) OR gc.committer_id=ANY(:users)
-                    OR EXISTS(SELECT 1 FROM commit_contributor contributor WHERE contributor.commit_id=gc.id AND contributor.user_id=ANY(:users)))))
-            ORDER BY c.job_id,c.id
-            """,
+                SELECT c.job_id,c.id,c.workspace_id FROM person_evidence_copy c
+                WHERE c.payload<>'{}'::jsonb AND
+                  (EXISTS(
+                    SELECT 1 FROM jsonb_to_recordset(COALESCE(c.payload->'identities','[]'::jsonb))
+                      AS k("providerType" text,"providerOrigin" text,subject text,"teamId" text)
+                    JOIN jsonb_to_recordset(CAST(:copyIdentities AS jsonb))
+                      AS i("providerType" text,"providerOrigin" text,subject text,"teamId" text)
+                      ON i.subject=k.subject AND i."providerType"=k."providerType" AND i."providerOrigin"=k."providerOrigin"
+                    WHERE COALESCE(k."teamId",'')=COALESCE(i."teamId",'') OR (i."providerType"='OUTLINE' AND i."teamId" IS NULL))
+                    OR (:includeUnknown AND EXISTS(SELECT 1 FROM jsonb_array_elements_text(COALESCE(c.payload->'repositories','[]'::jsonb)) repository_id
+                      JOIN git_commit gc ON gc.repository_id=repository_id.value::bigint
+                      WHERE gc.author_id=ANY(:users) OR gc.committer_id=ANY(:users)
+                        OR EXISTS(SELECT 1 FROM commit_contributor contributor WHERE contributor.commit_id=gc.id AND contributor.user_id=ANY(:users)))))
+                ORDER BY c.job_id,c.id
+                """,
                 parameters,
                 (rs, row) -> new PersonDataSelection.RowKey(Map.of(
                         "job_id", rs.getString(1), "copy_id", rs.getString(2), "workspace_id", rs.getString(3)))));
@@ -855,9 +840,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
     public void eraseJobEvidence(Set<UUID> jobIds) {
         var selection = new PersonDataSelection(jdbc.query(
                 """
-            SELECT c.job_id,c.id,c.workspace_id FROM person_evidence_copy c
-            WHERE c.job_id=ANY(?) ORDER BY c.job_id,c.id
-            """,
+                SELECT c.job_id,c.id,c.workspace_id FROM person_evidence_copy c
+                WHERE c.job_id=ANY(?) ORDER BY c.job_id,c.id
+                """,
                 (rs, row) -> new PersonDataSelection.RowKey(
                         Map.of("job_id", rs.getString(1), "copy_id", rs.getString(2), "workspace_id", rs.getString(3))),
                 new SqlArrayValue("uuid", jobIds.toArray())));
@@ -872,16 +857,18 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
             long workspaceId = Long.parseLong(key.columns().get("workspace_id"));
             if (!cancelled.add(jobId)) continue;
             Boolean running = jdbc.queryForObject(
-                    "SELECT EXISTS(SELECT 1 FROM agent_job WHERE id=? AND workspace_id=? AND status IN ('QUEUED','RUNNING'))",
+                    "SELECT EXISTS(SELECT 1 FROM review_job WHERE id=? AND workspace_id=? AND status IN"
+                            + " ('QUEUED','RUNNING'))",
                     Boolean.class,
                     jobId,
                     workspaceId);
             if (Boolean.TRUE.equals(running)) {
                 try {
                     lifecycles.getObject().cancel(workspaceId, jobId);
-                } catch (AgentJobStateConflictException raced) {
+                } catch (ReviewJobStateConflictException raced) {
                     if (Boolean.TRUE.equals(jdbc.queryForObject(
-                            "SELECT EXISTS(SELECT 1 FROM agent_job WHERE id=? AND workspace_id=? AND status IN ('QUEUED','RUNNING'))",
+                            "SELECT EXISTS(SELECT 1 FROM review_job WHERE id=? AND workspace_id=? AND status IN"
+                                    + " ('QUEUED','RUNNING'))",
                             Boolean.class,
                             jobId,
                             workspaceId))) throw raced;
@@ -891,9 +878,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         for (var key : selection.rows())
             jdbc.update(
                     """
-            UPDATE person_evidence_copy SET state=CASE WHEN state='PURGE_REQUESTED' THEN state ELSE 'ERASE_REQUESTED' END
-            WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND state<>'ERASED'
-            """,
+                    UPDATE person_evidence_copy SET state=CASE WHEN state='PURGE_REQUESTED' THEN state ELSE 'ERASE_REQUESTED' END
+                    WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND state<>'ERASED'
+                    """,
                     key.columns().get("copy_id"),
                     UUID.fromString(key.columns().get("job_id")),
                     Long.parseLong(key.columns().get("workspace_id")));
@@ -903,9 +890,9 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         for (var key : selection.rows()) {
             Boolean remains = jdbc.queryForObject(
                     """
-                SELECT NOT EXISTS(SELECT 1 FROM person_evidence_copy WHERE job_id=? AND workspace_id=?
-                  AND id=CAST(? AS uuid) AND state='ERASED')
-                """,
+                    SELECT NOT EXISTS(SELECT 1 FROM person_evidence_copy WHERE job_id=? AND workspace_id=?
+                      AND id=CAST(? AS uuid) AND state='ERASED')
+                    """,
                     Boolean.class,
                     UUID.fromString(key.columns().get("job_id")),
                     Long.parseLong(key.columns().get("workspace_id")),
@@ -936,14 +923,14 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
         String owner = storeId().toString();
         jdbc.query(
                 """
-            SELECT c.job_id,c.workspace_id,c.id FROM person_evidence_copy c
-            WHERE c.store_id=CAST(? AS uuid) AND c.state IN ('ERASE_REQUESTED','PURGE_REQUESTED') ORDER BY c.job_id,c.id
-            """,
+                SELECT c.job_id,c.workspace_id,c.id FROM person_evidence_copy c
+                WHERE c.store_id=CAST(? AS uuid) AND c.state IN ('ERASE_REQUESTED','PURGE_REQUESTED') ORDER BY c.job_id,c.id
+                """,
                 (RowCallbackHandler) rs -> {
                     UUID jobId = Objects.requireNonNull(rs.getObject(1, UUID.class));
                     long workspaceId = rs.getLong(2);
                     String copyId = Objects.requireNonNull(rs.getString(3));
-                    AgentJobExecutor localExecutor = executor.getIfAvailable();
+                    ReviewJobExecutor localExecutor = executor.getIfAvailable();
                     if (localExecutor != null) localExecutor.cancelLocalJob(jobId, "Person data erasure");
                     var acquired = EvidenceFolderLease.tryAcquire(layout.root(), workspaceId, jobId);
                     if (acquired.isEmpty()) return;
@@ -951,11 +938,11 @@ public class EvidenceFolderPersonDataCatalog implements PersonEvidenceErasure, W
                     try (lease) {
                         deleteFolder(workspaceId, jobId);
                         jdbc.update("""
-                    UPDATE person_evidence_copy SET state='ERASED',
-                        payload=CASE WHEN state='PURGE_REQUESTED'
-                            THEN '{}'::jsonb ELSE payload END
-                    WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state IN ('ERASE_REQUESTED','PURGE_REQUESTED')
-                    """, copyId, jobId, workspaceId, owner);
+                            UPDATE person_evidence_copy SET state='ERASED',
+                                payload=CASE WHEN state='PURGE_REQUESTED'
+                                    THEN '{}'::jsonb ELSE payload END
+                            WHERE id=CAST(? AS uuid) AND job_id=? AND workspace_id=? AND store_id=CAST(? AS uuid) AND state IN ('ERASE_REQUESTED','PURGE_REQUESTED')
+                            """, copyId, jobId, workspaceId, owner);
                     } catch (IOException exception) {
                         throw new UncheckedIOException(exception);
                     }

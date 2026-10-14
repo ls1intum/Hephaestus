@@ -142,11 +142,11 @@ class MetricOwnershipArchTest {
     @Test
     void shouldRejectDuplicateNamesWithinAndAcrossCatalogs() throws IOException {
         var unit = parse("""
-                class Metrics {
-                    static final String FIRST = "same.name";
-                    static final String SECOND = "same.name";
-                }
-                """);
+            class Metrics {
+                static final String FIRST = "same.name";
+                static final String SECOND = "same.name";
+            }
+            """);
         Map<String, String> owners = new HashMap<>();
         List<String> violations = new ArrayList<>();
         recordCatalogNames(unit, "first.metrics.FirstMetrics", owners, violations);
@@ -187,7 +187,7 @@ class MetricOwnershipArchTest {
                             parse("package de.tum.cit.aet.hephaestus.agent; " + reference), Set.of(catalog)))
                     .hasSize(1);
             assertThat(ownershipViolations(
-                            parse("package de.tum.cit.aet.hephaestus.integration.core.signal; " + reference),
+                            parse("package de.tum.cit.aet.hephaestus.integration.core.spi; " + reference),
                             Set.of(catalog)))
                     .isEmpty();
         }
@@ -648,36 +648,36 @@ class MetricOwnershipArchTest {
             })
     void shouldRejectStaticImportsAndInlineNameExpressions(String call) throws IOException {
         assertThat(literalViolations(parse("""
-                import static io.micrometer.core.instrument.Counter.builder;
-                import static io.micrometer.core.instrument.Metrics.counter;
-                class Fixture {
-                    void register() { %s; }
-                }
-                """.formatted(call)), FIXTURE_CATALOGS))
+            import static io.micrometer.core.instrument.Counter.builder;
+            import static io.micrometer.core.instrument.Metrics.counter;
+            class Fixture {
+                void register() { %s; }
+            }
+            """.formatted(call)), FIXTURE_CATALOGS))
                 .isNotEmpty();
     }
 
     @Test
     void shouldRejectLiteralNamesInImportedCustomMeterIds() throws IOException {
         assertThat(literalViolations(parse("""
-                import io.micrometer.core.instrument.Meter.Id;
-                class Fixture { Object id = new Id("custom.meter"); }
-                """), FIXTURE_CATALOGS)).hasSize(1);
+            import io.micrometer.core.instrument.Meter.Id;
+            class Fixture { Object id = new Id("custom.meter"); }
+            """), FIXTURE_CATALOGS)).hasSize(1);
     }
 
     @Test
     void shouldRejectNamesTheGuardCannotTraceToACatalog() throws IOException {
         assertThat(literalViolations(parse("""
-                import io.micrometer.core.instrument.Gauge;
-                import io.micrometer.core.instrument.MeterRegistry;
-                class Fixture {
-                    record Named(String name) {}
-                    void register(MeterRegistry registry, Object state) {
-                        java.util.List.of(new Named("indirect.name"))
-                                .forEach(g -> Gauge.builder(g.name(), state, s -> 1.0).register(registry));
-                    }
+            import io.micrometer.core.instrument.Gauge;
+            import io.micrometer.core.instrument.MeterRegistry;
+            class Fixture {
+                record Named(String name) {}
+                void register(MeterRegistry registry, Object state) {
+                    java.util.List.of(new Named("indirect.name"))
+                            .forEach(g -> Gauge.builder(g.name(), state, s -> 1.0).register(registry));
                 }
-                """), FIXTURE_CATALOGS))
+            }
+            """), FIXTURE_CATALOGS))
                 .singleElement(as(STRING))
                 .contains("reaches no module catalog");
     }
@@ -685,13 +685,13 @@ class MetricOwnershipArchTest {
     @Test
     void shouldFollowNamesThroughAMethodThatForwardsThemToMicrometer() throws IOException {
         String fixture = """
-                import io.micrometer.core.instrument.MeterRegistry;
-                class Fixture {
-                    void register(MeterRegistry registry) { %s }
-                    private static void gauge(MeterRegistry registry, String name) { registry.gauge(name, 1.0); }
-                    private static void relay(MeterRegistry registry, String name) { gauge(registry, name); }
-                }
-                """;
+            import io.micrometer.core.instrument.MeterRegistry;
+            class Fixture {
+                void register(MeterRegistry registry) { %s }
+                private static void gauge(MeterRegistry registry, String name) { registry.gauge(name, 1.0); }
+                private static void relay(MeterRegistry registry, String name) { gauge(registry, name); }
+            }
+            """;
         assertThat(literalViolations(
                         parse(fixture.formatted("gauge(registry, AgentMetrics.COUNT);")), FIXTURE_CATALOGS))
                 .as("a catalog constant handed to a forwarding method")
@@ -709,56 +709,56 @@ class MetricOwnershipArchTest {
     @Test
     void shouldIgnoreCommentsTagLiteralsAndUnrelatedBuilders() throws IOException {
         assertThat(literalViolations(parse("""
-                import io.micrometer.core.instrument.Counter;
-                import io.micrometer.core.instrument.MeterRegistry;
-                class Fixture {
-                    MeterRegistry registry;
-                    // registry.counter("comment");
-                    String example = "Counter.builder(\\"documentation\\")";
-                    void register() {
-                        Counter.builder(AgentMetrics.COUNT).tag("outcome", "success");
-                        registry.counter(AgentMetrics.COUNT, "outcome", "success");
-                        registry.find("lookup.only").counter();
-                        Something.builder("not.a.meter");
-                        registry.counter(flag.equals("on") ? AgentMetrics.COUNT : AgentMetrics.OTHER);
-                        registry.counter(Objects.requireNonNull(AgentMetrics.COUNT, "metric name"));
-                    }
+            import io.micrometer.core.instrument.Counter;
+            import io.micrometer.core.instrument.MeterRegistry;
+            class Fixture {
+                MeterRegistry registry;
+                // registry.counter("comment");
+                String example = "Counter.builder(\\"documentation\\")";
+                void register() {
+                    Counter.builder(AgentMetrics.COUNT).tag("outcome", "success");
+                    registry.counter(AgentMetrics.COUNT, "outcome", "success");
+                    registry.find("lookup.only").counter();
+                    Something.builder("not.a.meter");
+                    registry.counter(flag.equals("on") ? AgentMetrics.COUNT : AgentMetrics.OTHER);
+                    registry.counter(Objects.requireNonNull(AgentMetrics.COUNT, "metric name"));
                 }
-                """), FIXTURE_CATALOGS)).isEmpty();
+            }
+            """), FIXTURE_CATALOGS)).isEmpty();
     }
 
     @Test
     void shouldIgnoreANonMicrometerFactoryNamedLikeARegistrationAndTheMethodsThatCallIt() throws IOException {
         assertThat(literalViolations(parse("""
-                import io.micrometer.core.instrument.MeterRegistry;
-                class Fixture {
-                    record Placement(String body) {
-                        static Placement summary(String body) { return new Placement(body); }
-                    }
-                    MeterRegistry registry;
-                    Placement placements(String summary) { return Placement.summary(summary); }
-                    void compose() {
-                        Placement.summary("The complete review.");
-                        placements("The complete review.");
-                    }
+            import io.micrometer.core.instrument.MeterRegistry;
+            class Fixture {
+                record Placement(String body) {
+                    static Placement summary(String body) { return new Placement(body); }
                 }
-                """), FIXTURE_CATALOGS)).isEmpty();
+                MeterRegistry registry;
+                Placement placements(String summary) { return Placement.summary(summary); }
+                void compose() {
+                    Placement.summary("The complete review.");
+                    placements("The complete review.");
+                }
+            }
+            """), FIXTURE_CATALOGS)).isEmpty();
     }
 
     @Test
     void shouldStillRejectALiteralRegistrySummaryAndTheMethodThatForwardsToIt() throws IOException {
         assertThat(literalViolations(parse("""
-                import io.micrometer.core.instrument.MeterRegistry;
-                class Fixture {
-                    private final MeterRegistry registry;
-                    Fixture(MeterRegistry registry) { this.registry = registry; }
-                    void observe(String name) { this.registry.summary(name); }
-                    void record() {
-                        registry.summary("inline.summary");
-                        observe("inline.forwarded");
-                    }
+            import io.micrometer.core.instrument.MeterRegistry;
+            class Fixture {
+                private final MeterRegistry registry;
+                Fixture(MeterRegistry registry) { this.registry = registry; }
+                void observe(String name) { this.registry.summary(name); }
+                void record() {
+                    registry.summary("inline.summary");
+                    observe("inline.forwarded");
                 }
-                """), FIXTURE_CATALOGS))
+            }
+            """), FIXTURE_CATALOGS))
                 .hasSize(2)
                 .allSatisfy(violation -> assertThat(violation).contains("passes a string literal to"));
     }
@@ -766,12 +766,12 @@ class MetricOwnershipArchTest {
     @Test
     void shouldAllowCatalogAliasesWithUnrelatedLocalLiterals() throws IOException {
         assertThat(literalViolations(parse("""
-                import io.micrometer.core.instrument.MeterRegistry;
-                class Fixture {
-                    static final String NAME = AgentMetrics.COUNT;
-                    void register(MeterRegistry registry) { registry.counter(NAME); }
-                    void unrelated() { final String NAME = "not a metric name"; }
-                }
-                """), FIXTURE_CATALOGS)).isEmpty();
+            import io.micrometer.core.instrument.MeterRegistry;
+            class Fixture {
+                static final String NAME = AgentMetrics.COUNT;
+                void register(MeterRegistry registry) { registry.counter(NAME); }
+                void unrelated() { final String NAME = "not a metric name"; }
+            }
+            """), FIXTURE_CATALOGS)).isEmpty();
     }
 }

@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.exception.ClientDisconnectedException;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
+import java.util.Optional;
 import org.springframework.modulith.NamedInterface;
 
 /**
@@ -33,7 +33,10 @@ public interface MentorChannel extends AutoCloseable {
         DELIVERED,
         INSTANCE_SILENCED,
         NOT_DELIVERED,
+        UNCONFIRMED,
     }
+
+    Optional<MentorTurnReceipt> receipt();
 
     /**
      * Register the "the far side went away" hook, fired <em>exactly once</em> on the first transition

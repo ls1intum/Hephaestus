@@ -11,5 +11,7 @@
  * self-invocations from {@code contribute}, which bypass the proxy. Pinned by
  * {@code MentorContentSourceArchitectureTest}.
  */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
+
+import org.jspecify.annotations.NullMarked;

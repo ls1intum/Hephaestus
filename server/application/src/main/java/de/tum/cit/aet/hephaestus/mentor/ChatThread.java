@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -77,11 +76,10 @@ public class ChatThread {
     @JsonIgnore
     private List<ChatMessage> allMessages = new ArrayList<>();
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id")
+    @Column(name = "account_id")
     @ToString.Exclude
     @JsonIgnore
-    private User user;
+    private Long accountId;
 
     @NonNull
     @ManyToOne(fetch = FetchType.LAZY)

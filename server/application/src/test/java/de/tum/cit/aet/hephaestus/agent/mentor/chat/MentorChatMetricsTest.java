@@ -12,7 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins the contract reviewers care about: every {@link MentorChatMetrics.Outcome} ends up on a
+ * Pins the contract reviewers care about: every {@link MentorChatMetrics.ResultOutcome} ends up on a
  * pre-registered Counter (no per-call builder allocation), the duration timer brackets correctly,
  * and the cost summary swallows negative / non-finite inputs instead of polluting dashboards.
  */
@@ -33,10 +33,10 @@ class MentorChatMetricsTest extends BaseUnitTest {
 
     @Test
     void everyOutcomeRoutesToPreRegisteredCounter() {
-        for (MentorChatMetrics.Outcome o : MentorChatMetrics.Outcome.values()) {
+        for (MentorChatMetrics.ResultOutcome o : MentorChatMetrics.ResultOutcome.values()) {
             metrics.recordCompleted(o);
         }
-        for (MentorChatMetrics.Outcome o : MentorChatMetrics.Outcome.values()) {
+        for (MentorChatMetrics.ResultOutcome o : MentorChatMetrics.ResultOutcome.values()) {
             assertThat(registry.get("mentor.turn.completed")
                             .tag("outcome", o.tag())
                             .counter()
@@ -48,7 +48,7 @@ class MentorChatMetricsTest extends BaseUnitTest {
         long total = registry.find("mentor.turn.completed").meters().stream()
                 .mapToLong(m -> Math.round(((Counter) m).count()))
                 .sum();
-        assertThat(total).isEqualTo(MentorChatMetrics.Outcome.values().length);
+        assertThat(total).isEqualTo(MentorChatMetrics.ResultOutcome.values().length);
     }
 
     @Test

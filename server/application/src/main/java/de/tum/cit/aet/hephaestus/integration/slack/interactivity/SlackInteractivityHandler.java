@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.interactivity;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackConsentBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
@@ -28,6 +29,7 @@ import tools.jackson.databind.JsonNode;
  * latency.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackInteractivityHandler {
 
@@ -105,7 +107,7 @@ public class SlackInteractivityHandler {
             long workspaceId, String teamId, String slackUserId, String channelId, boolean refreshHome) {
         participantConsentService.recordChannelMessageOptOut(workspaceId, slackUserId);
         Long memberId = identityResolver
-                .resolveMemberId(workspaceId, teamId, slackUserId)
+                .resolveAccountId(workspaceId, teamId, slackUserId)
                 .orElse(null);
         personErasureService.erasePerson(workspaceId, memberId, slackUserId);
         followUpExecutor.execute(() -> {

@@ -1,3 +1,10 @@
+import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index.ts";
+import {
+	countLabel,
+	sampleNote,
+	scanAddedLines,
+	type SourcePattern,
+} from "../kits/scm/source-scan.ts";
 // Finds the permission-related references and the authorization requests that the change adds in Swift
 // files, and the usage-description keys in the change or in the first plist and project files of the
 // checkout, each with its path. A reference names a type or call to inspect. It does not show that the
@@ -10,15 +17,8 @@ import {
 	listWithin,
 	noMatchDirections,
 	oneLine,
-} from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type FileTree,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
+} from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 // reference kind -> [a permission-related type or call to inspect, usage keys that may declare its access].
 // A match is a place to look, not access: a type named in a signature or conformance requests nothing,
@@ -167,9 +167,10 @@ async function usageKeysInCheckout(tree: FileTree | null): Promise<CheckoutKeys>
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
-		const tree = ctx.files?.head ?? null;
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
+		const tree = domain.files?.head ?? null;
 		const scan = await scanAddedLines(tree, change, {
 			languages: ["swift"],
 			patterns: REQUEST,

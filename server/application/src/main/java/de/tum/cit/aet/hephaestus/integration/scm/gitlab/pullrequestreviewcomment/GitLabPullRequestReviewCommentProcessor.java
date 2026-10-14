@@ -2,10 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcommen
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.PostgresStringUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -15,6 +11,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
 import java.time.Instant;
@@ -32,9 +32,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitLab merge request diff notes mapped to {@link PullRequestReviewComment}.
- * <p>
- * GitLab diff notes (notes with a {@code position}) are the equivalent of GitHub's
- * pull request review comments. Each diff note belongs to a discussion (thread).
+ *
+ * <p>GitLab diff notes (notes with a {@code position}) are the equivalent of GitHub's pull request
+ * review comments. Each diff note belongs to a discussion (thread).
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -60,8 +60,8 @@ public class GitLabPullRequestReviewCommentProcessor {
 
     /**
      * Data record for a GitLab diff note extracted from GraphQL or webhook data.
-     * <p>
-     * Position fields map to GitLab's {@code DiffPosition}: {@code new_path}/{@code old_path}
+     *
+     * <p>Position fields map to GitLab's {@code DiffPosition}: {@code new_path}/{@code old_path}
      * for file path (deletion falls back to {@code old_path}), {@code new_line}/{@code old_line}
      * for diff lines, and {@code head_sha}/{@code base_sha}/{@code start_sha} for diff refs.
      */
@@ -80,8 +80,8 @@ public class GitLabPullRequestReviewCommentProcessor {
             @Nullable Instant createdAt,
             @Nullable Instant updatedAt) {
         /**
-         * Backward-compatible constructor for callers that don't carry {@code startSha}
-         * (e.g., older webhook paths). Passes {@code null} for the new field.
+         * Backward-compatible constructor for callers that don't carry {@code startSha} (e.g.,
+         * older webhook paths). Passes {@code null} for the new field.
          */
         public DiffNoteData(
                 String noteGlobalId,
@@ -113,9 +113,7 @@ public class GitLabPullRequestReviewCommentProcessor {
         }
     }
 
-    /**
-     * Groups the contextual parameters needed to find or create a review comment.
-     */
+    /** Groups the contextual parameters needed to find or create a review comment. */
     public record CommentContext(
             PullRequestReviewThread thread,
             PullRequest pr,
@@ -149,7 +147,8 @@ public class GitLabPullRequestReviewCommentProcessor {
 
         Optional<PullRequestReviewComment> existing =
                 commentRepository.findByNativeIdAndProviderId(nativeId, providerId);
-        // A note id is unique on the instance: a diff note stored under another merge request is never moved here.
+        // A note id is unique on the instance: a diff note stored under another merge request is
+        // never moved here.
         if (existing.map(PullRequestReviewComment::getPullRequest)
                 .filter(parent -> !parent.getId().equals(context.pr().getId()))
                 .isPresent()) {
@@ -161,7 +160,10 @@ public class GitLabPullRequestReviewCommentProcessor {
                 .orElseGet(() -> createComment(nativeId, data, managed));
     }
 
-    /** Sync hands over detached parents and reviews; collections and event references belong to this write. */
+    /**
+     * Sync hands over detached parents and reviews; collections and event references belong to this
+     * write.
+     */
     private CommentContext managedContext(CommentContext context) {
         PullRequest parent = pullRequestRepository
                 .findById(Objects.requireNonNull(context.pr().getId()))
@@ -237,17 +239,20 @@ public class GitLabPullRequestReviewCommentProcessor {
         comment.setBody(sanitizedBody != null ? sanitizedBody : "");
 
         // Path from position data: prefer new_path, fall back to old_path on deletion.
-        // filePath is GitLab's resolved path (equals new_path for additions/modifications, old_path for deletions).
+        // filePath is GitLab's resolved path (equals new_path for additions/modifications, old_path
+        // for deletions).
         String path = resolvePath(data);
         comment.setPath(path);
 
-        // Line numbers — preserve nullability semantics on the int/int columns (0 == "not present").
+        // Line numbers — preserve nullability semantics on the int/int columns (0 == "not
+        // present").
         // A note on a removed line has only old_line; that is its line, on the LEFT side below.
         Integer line = GitLabPullRequestReviewThreadProcessor.anchoredLine(data.newLine(), data.oldLine());
         comment.setLine(line != null ? line : 0);
         comment.setOriginalLine(data.oldLine() != null ? data.oldLine() : 0);
 
-        // Side: RIGHT if comment anchored on new side (new_line set), LEFT if only old_line present.
+        // Side: RIGHT if comment anchored on new side (new_line set), LEFT if only old_line
+        // present.
         comment.setSide(deriveSide(data.newLine(), data.oldLine()));
         // GraphQL DiffPosition doesn't expose a per-note multi-line range; start_side mirrors side.
         comment.setStartSide(comment.getSide());
@@ -304,10 +309,9 @@ public class GitLabPullRequestReviewCommentProcessor {
     }
 
     /**
-     * Resolves the file path a diff note anchors to. Precedence: {@code new_path}
-     * (the file's current-side path, populated for additions/modifications), then
-     * {@code old_path} (populated for deletions), then GitLab's pre-resolved
-     * {@code filePath}, then empty string.
+     * Resolves the file path a diff note anchors to. Precedence: {@code new_path} (the file's
+     * current-side path, populated for additions/modifications), then {@code old_path} (populated
+     * for deletions), then GitLab's pre-resolved {@code filePath}, then empty string.
      */
     static String resolvePath(DiffNoteData data) {
         if (data.newPath() != null && !data.newPath().isBlank()) {
@@ -324,10 +328,13 @@ public class GitLabPullRequestReviewCommentProcessor {
 
     /**
      * Derives the diff side a note anchors on:
+     *
      * <ul>
-     *   <li>{@code RIGHT} when {@code new_line} is set (note on the current/head side)</li>
-     *   <li>{@code LEFT} when only {@code old_line} is set (note on the base side — typically a deletion)</li>
-     *   <li>{@code RIGHT} as a safe default when neither line is provided (matches GitHub mapper fallback)</li>
+     *   <li>{@code RIGHT} when {@code new_line} is set (note on the current/head side)
+     *   <li>{@code LEFT} when only {@code old_line} is set (note on the base side — typically a
+     *       deletion)
+     *   <li>{@code RIGHT} as a safe default when neither line is provided (matches GitHub mapper
+     *       fallback)
      * </ul>
      */
     static PullRequestReviewComment.@Nullable Side deriveSide(@Nullable Integer newLine, @Nullable Integer oldLine) {
@@ -341,10 +348,10 @@ public class GitLabPullRequestReviewCommentProcessor {
     }
 
     /**
-     * Builds a minimal unified-diff header stub (single-line range) so consumers that
-     * parse {@code diff_hunk} don't choke on a null value. GitLab's GraphQL
-     * {@code DiffPosition} does not expose a multi-line range, so this stub intentionally
-     * covers only the anchored line. Returns {@code null} when neither line is provided.
+     * Builds a minimal unified-diff header stub (single-line range) so consumers that parse {@code
+     * diff_hunk} don't choke on a null value. GitLab's GraphQL {@code DiffPosition} does not expose
+     * a multi-line range, so this stub intentionally covers only the anchored line. Returns {@code
+     * null} when neither line is provided.
      */
     @Nullable
     static String buildDiffHunkStub(@Nullable Integer oldLine, @Nullable Integer newLine) {

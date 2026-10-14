@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.result.trend;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import org.assertj.core.data.Offset;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;

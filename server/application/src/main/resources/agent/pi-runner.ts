@@ -1,8 +1,10 @@
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import nodePath from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { isDeepStrictEqual } from "node:util";
+import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 
 import {
 	type AgentSession,
@@ -35,7 +37,12 @@ import {
 	writeChangeView,
 } from "./pi-change.ts";
 import { errorText } from "./pi-error-text.ts";
-import { folderCitationIndex } from "./pi-folder-index.ts";
+import {
+	prepareFeedback,
+	type FeedbackComposition,
+	type FeedbackPreparationReceipt,
+} from "./pi-feedback-preparation.ts";
+import { folderCitationIndex, citableTextIndex } from "./pi-folder-index.ts";
 import {
 	addModelCall,
 	type ModelCallTiming,
@@ -47,7 +54,6 @@ import {
 import { PracticeCoverageLedger } from "./pi-practice-coverage.ts";
 import { executionReport } from "./pi-practice-scripts-report.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
-import { completePublicReview } from "./pi-public-completion.ts";
 import {
 	CONVERSATION_THREAD,
 	MAX_SUMMARY_CHARS,
@@ -59,6 +65,7 @@ import {
 	normalizePracticeSlug,
 	normalizeSubmission,
 	resolveQuote,
+	resolveCapturedText,
 	submissionCitations,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
@@ -83,15 +90,15 @@ import {
 } from "./pi-review-turns.ts";
 import {
 	ACTIONS,
-	CHANNELS,
+	DESTINATIONS,
 	type ComposedFeedbackEnvelope,
-	type ComposedFeedbackUnit,
+	type ComposedFeedbackPiece,
 	type ComposedReview,
 	type EvidenceRef,
-	type InAppSupport,
-	type InChatEligibility,
+	type PracticePageSupport,
+	type ConversationEligibility,
 	PRIOR_ADVICE_REASONS,
-	PRIVATE_CHANNELS,
+	PRIVATE_DESTINATIONS,
 	type PreparedFeedbackTarget,
 	type ReviewPractice,
 	REVIEW_CONTRACT_VERSION,
@@ -108,12 +115,12 @@ import {
 	publicResults,
 	publicQualifications,
 	qualificationEvidence,
-	readInAppSupport,
-	readInChatEligibility,
+	readPracticePageSupport,
+	readConversationEligibility,
 	readReview,
 	prepareReviewArguments,
 	reviewToolParameters,
-	undeliverableUnits,
+	undeliverableFeedback,
 	validateFeedbackEvidence,
 	workIdentity,
 } from "./pi-runner-composition.ts";
@@ -136,43 +143,48 @@ import { SUPPORTED_SCHEMA_VERSION, taskPaths, resolveTaskPaths } from "./pi-task
 import { hasText, isBlank } from "./pi-text.ts";
 import { prepareResultArguments } from "./pi-tool-arguments.ts";
 import { prepareTurnText } from "./pi-turn-context.ts";
-import { MODEL_CONCURRENCY } from "./work/practice-scripts/lib/concurrency.ts";
+import { parseDiff } from "./work/practice-scripts/kits/scm/diff-parser.ts";
+import type { DiffFile } from "./work/practice-scripts/kits/scm/types.ts";
+import { MODEL_CONCURRENCY } from "./work/practice-scripts/lib/core/concurrency.ts";
 import {
 	boundModelsSchema,
 	CANDIDATE_LIMITS,
-	DIFF_SOURCE,
 	OUTCOMES,
 	parseCandidate,
 	SEVERITIES,
-	TREE_SOURCE,
 	type BoundModels,
 	type Candidate,
-	type CodeCitationIdentity,
+	type CitationIdentity,
 	type Coverage,
 	type Omission,
 	type Outcome,
+	type PracticeInputs,
+	isDecimalId,
+	type ReadReceipt,
+	validateCitationCapabilities,
 	type ReviewOptions,
-} from "./work/practice-scripts/lib/contract.ts";
-import { parseDiff } from "./work/practice-scripts/lib/diff-parser.ts";
+} from "./work/practice-scripts/lib/core/contract.ts";
 import {
 	EvidenceReader,
 	noReceipts,
 	type EvidenceSources,
 	type Receipts,
-} from "./work/practice-scripts/lib/evidence-reader.ts";
-import type { JobFiles } from "./work/practice-scripts/lib/ipc.ts";
-import { renderReviewInput, resolveLeads } from "./work/practice-scripts/lib/leads.ts";
-import { hostModels, ModelBudget } from "./work/practice-scripts/lib/models-host.ts";
-import { UnratedError, type UnratedReason } from "./work/practice-scripts/lib/practice-script.ts";
+} from "./work/practice-scripts/lib/core/evidence-reader.ts";
+import type { JobFiles } from "./work/practice-scripts/lib/core/ipc.ts";
+import { renderReviewInput, resolveLeads } from "./work/practice-scripts/lib/core/leads.ts";
+import { hostModels, ModelBudget } from "./work/practice-scripts/lib/core/models-host.ts";
+import {
+	UnratedError,
+	type UnratedReason,
+} from "./work/practice-scripts/lib/core/practice-script.ts";
 import {
 	notReached as notReachedOutcome,
 	runPracticeProgram,
 	type PracticeProgram,
 	type ProgramOutcome,
-} from "./work/practice-scripts/lib/program-host.ts";
-import { InputReader } from "./work/practice-scripts/lib/script-inputs.ts";
-import { abortReasonOf, RETURN_MS } from "./work/practice-scripts/lib/script-run.ts";
-import type { DiffFile } from "./work/practice-scripts/lib/types.ts";
+} from "./work/practice-scripts/lib/core/program-host.ts";
+import { InputReader } from "./work/practice-scripts/lib/core/script-inputs.ts";
+import { abortReasonOf, RETURN_MS } from "./work/practice-scripts/lib/core/script-run.ts";
 
 // Staged work notes survive isolated sessions and context compaction.
 
@@ -229,9 +241,9 @@ function submittedList(
 	return { items: listOrItem(value), repaired: false };
 }
 
-/** The keys of a feedback unit that never belong to an object inside it. */
-const UNIT_ITEM_KEYS: ReadonlySet<string> = new Set([
-	"channel",
+/** The keys of a feedback piece that never belong to an object inside it. */
+const FEEDBACK_ITEM_KEYS: ReadonlySet<string> = new Set([
+	"destination",
 	"practiceSlug",
 	"action",
 	"basedOn",
@@ -368,18 +380,21 @@ interface PracticeIndexEntry {
 	group?: string;
 	readsSources: string[];
 	exhaustiveSources: string[];
-	/** What the practice revision is about, shown to the review on the work as explanatory context. */
+	/** What the practice version is about, shown to the review on the work as explanatory context. */
 	name: string;
 	whyItMatters?: string;
 	knownLimitations: string[];
-	revisionId?: number;
+	versionId?: string;
+	contextPaths?: readonly string[];
 }
 
 /** The task this runner was started for. */
 interface TaskEnvelope {
 	schemaVersion: number;
-	jobId: unknown;
-	workspaceId: unknown;
+	reviewId: string;
+	jobId: string;
+	attempt: number;
+	workspaceId: string;
 	paths: ReturnType<typeof taskPaths>;
 	prompt: string;
 	repositoryFullName: unknown;
@@ -387,19 +402,19 @@ interface TaskEnvelope {
 }
 
 /** How much feedback this run may compose, per lane. */
-interface ChannelBounds {
+interface DestinationBounds {
 	enabled: boolean;
-	maxUnits: number;
+	maxPieces: number;
 }
 
-/** Where an IN_CONTEXT note may be placed on this artifact. */
-type PlacementKind = "DIFF" | "ARTIFACT";
+/** Where an ON_WORK note may be placed on this item. */
+type CopyForm = "LINE_NOTE" | "FILE_NOTE";
 
 /** The task-declared composition request, once its bounds have been clamped to what this run may do. */
 interface CompositionRequest {
-	channels: Record<Channel, ChannelBounds>;
-	inContextPlacementKinds: PlacementKind[];
-	minDistinctArtifacts: number;
+	destinations: Record<Destination, DestinationBounds>;
+	onWorkCopyForms: CopyForm[];
+	minDistinctSourceFiles: number;
 }
 
 /** One citation as admission projected it: its index, its coordinates and whether a note may sit on it. */
@@ -408,24 +423,24 @@ interface AdmittedCitation {
 	[key: string]: unknown;
 }
 
-/** One admitted observation: a problem of a NOT_MET result, under its own id, with its own citations. */
+/** One admitted problem: a problem of a NOT_MET result, under its own id, with its own citations. */
 interface AdmittedChild {
-	observationId: string;
+	problemId: string;
 	citations: AdmittedCitation[];
 	[key: string]: unknown;
 }
 
 /**
- * One admitted result as admission projected it: one practice's verdict and its observations. Composition rests on a
- * result by its practiceResultId and on one observation by its observationId. A result's own citations never anchor a
- * note; an observation's may. Validate consumed fields; preserve other server fields for the composer.
+ * One admitted result as admission projected it: one practice's verdict and its problems. Composition rests on a
+ * result by its resultId and on one problem by its problemId. A result's own citations never anchor a
+ * note; a problem's may. Validate consumed fields; preserve other server fields for the composer.
  */
 interface AdmittedResult {
-	practiceResultId: string;
+	resultId: string;
 	practiceSlug: string;
 	outcome: Outcome;
 	citations: AdmittedCitation[];
-	observations: AdmittedChild[];
+	problems: AdmittedChild[];
 	[key: string]: unknown;
 }
 
@@ -436,26 +451,60 @@ function isAdmittedCitation(value: unknown): value is AdmittedCitation {
 function isAdmittedChild(value: unknown): value is AdmittedChild {
 	return (
 		isRecord(value) &&
-		typeof value.observationId === "string" &&
-		value.observationId !== "" &&
+		typeof value.problemId === "string" &&
+		value.problemId !== "" &&
 		Array.isArray(value.citations) &&
 		value.citations.every(isAdmittedCitation)
 	);
 }
 
+/** Project the canonical admission DTO to the composer's evidence references. */
+function admittedResultOf(value: unknown): AdmittedResult {
+	if (
+		!isRecord(value) ||
+		!isRecord(value.evidence) ||
+		!Array.isArray(value.evidence.citations) ||
+		!Array.isArray(value.problems)
+	) {
+		throw new Error("invalid admitted result DTO");
+	}
+	const { evidence, problems, ...fields } = value;
+	const projected = {
+		...fields,
+		evidence,
+		citations: value.evidence.citations.map((citation, index) => {
+			if (!isRecord(citation)) {
+				throw new Error("invalid result citation DTO");
+			}
+			return { ...citation, index };
+		}),
+		problems: problems.map((problem) => {
+			if (!isRecord(problem) || typeof problem.id !== "string" || problem.id === "") {
+				throw new Error("invalid admitted problem DTO");
+			}
+			const { id, ...rest } = problem;
+			return { ...rest, problemId: id };
+		}),
+	};
+	if (!isAdmittedResult(projected)) {
+		throw new Error("result admission returned an invalid contract");
+	}
+	return projected;
+}
+
 function isAdmittedResult(value: unknown): value is AdmittedResult {
 	return (
 		isRecord(value) &&
-		typeof value.practiceResultId === "string" &&
-		value.practiceResultId !== "" &&
+		typeof value.resultId === "string" &&
+		value.resultId !== "" &&
 		typeof value.practiceSlug === "string" &&
 		OUTCOMES.some((outcome) => outcome === value.outcome) &&
 		Array.isArray(value.citations) &&
 		value.citations.every(isAdmittedCitation) &&
-		Array.isArray(value.observations) &&
-		value.observations.every(isAdmittedChild) &&
-		// Observations are the problems of a NOT_MET result, and only of one.
-		(value.outcome === "NOT_MET") === value.observations.length > 0
+		Array.isArray(value.problems) &&
+		value.problems.every(isAdmittedChild) &&
+		// Problems are the problems of a NOT_MET result, and only of one.
+		(value.outcome === "NOT_MET") === value.problems.length > 0
 	);
 }
 
@@ -579,7 +628,20 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 		if (!isRecord(practice) || typeof practice.slug !== "string") {
 			throw new Error("the task-declared practice index: every practice needs a string slug");
 		}
+		if (
+			practice.contextPaths !== undefined &&
+			(!Array.isArray(practice.contextPaths) ||
+				!practice.contextPaths.every((path: unknown) => typeof path === "string"))
+		) {
+			throw new Error("the practice index has invalid captured context paths");
+		}
 		return {
+			contextPaths:
+				practice.contextPaths === undefined
+					? undefined
+					: jsonArray(practice.contextPaths).filter(
+							(path): path is string => typeof path === "string",
+						),
 			slug: practice.slug,
 			group:
 				typeof practice.group === "string" && practice.group !== "" ? practice.group : undefined,
@@ -597,18 +659,15 @@ function readPracticeIndex(): PracticeIndexEntry[] {
 			knownLimitations: jsonArray(practice.knownLimitations).filter(
 				(limitation): limitation is string => typeof limitation === "string",
 			),
-			revisionId:
-				typeof practice.revisionId === "number" &&
-				Number.isSafeInteger(practice.revisionId) &&
-				practice.revisionId > 0
-					? practice.revisionId
-					: undefined,
+			versionId: isDecimalId(practice.versionId) ? practice.versionId : undefined,
 		};
 	});
 }
 
 const folderIndex = parseJson(readFileSync(INPUT_PATHS.manifest, "utf8"));
-const { availableSourceKinds, artifactSources } = folderCitationIndex(folderIndex);
+const { availableSourceKinds, sourceFileSources, citationCapabilities } =
+	folderCitationIndex(folderIndex);
+const capturedTexts = citableTextIndex(folderIndex);
 const availableSourceKindValues = [...availableSourceKinds].toSorted();
 const practiceIndex = readPracticeIndex();
 const admittedPractices = new Set(practiceIndex.map((practice) => practice.slug));
@@ -735,7 +794,7 @@ const executions = new Map<string, ProgramOutcome>();
 /** Why a practice that no program reached was not reached, when the run ends before it. */
 let unreachedReason: "deadline" | "budget" | "error" = "deadline";
 
-/** Slugs in the order the server sorts them: by UTF-16 code unit, as Java compares strings. */
+/** Slugs in the order the server sorts them: by UTF-16 code piece, as Java compares strings. */
 function compareSlugs(a: string, b: string): number {
 	if (a === b) {
 		return 0;
@@ -744,12 +803,29 @@ function compareSlugs(a: string, b: string): number {
 }
 
 /** The admission request: one entry for each practice with a final result, sorted by slug. */
+const assignedInputs = new Map<string, PracticeInputs>();
+const assignmentReceipts = new Map<string, readonly ReadReceipt[]>();
 function admissionRequest() {
 	return {
-		schemaVersion: 2,
+		contractVersion: 3,
+		reviewId: taskEnvelope.reviewId,
+		jobId: taskEnvelope.jobId,
+		attempt: taskEnvelope.attempt,
 		results: [...reviewState]
 			.toSorted(([a], [b]) => compareSlugs(a, b))
-			.map(([practiceSlug, candidate]) => ({ practiceSlug, candidate })),
+			.map(([practiceSlug, candidate]) => {
+				const assigned = assignedInputs.get(practiceSlug);
+				if (assigned === undefined) {
+					throw new Error(`no frozen assignment for ${practiceSlug}`);
+				}
+				return {
+					practiceSlug,
+					itemId: assigned.scope.item.id,
+					itemVersion: assigned.scope.version,
+					candidate,
+					readReceipts: assignmentReceipts.get(practiceSlug) ?? [],
+				};
+			}),
 	};
 }
 
@@ -781,7 +857,7 @@ const searchSchema = {
 const inapplicabilitySchema = {
 	type: "object",
 	additionalProperties: false,
-	required: ["consulted", "subject", "ruledOutBy"],
+	required: ["consulted", "prerequisite", "ruledOutBy"],
 	properties: {
 		consulted: {
 			type: "array",
@@ -790,7 +866,7 @@ const inapplicabilitySchema = {
 			description:
 				"Evidence source kinds you read to reach this conclusion, e.g. scm.pull-request.diff.",
 		},
-		subject: {
+		prerequisite: {
 			type: "string",
 			minLength: 1,
 			description: "The subject this practice's criteria judge.",
@@ -805,36 +881,37 @@ const inapplicabilitySchema = {
 const citationSchema = {
 	type: "object",
 	additionalProperties: false,
-	required: ["sourceKind", "artifactPath", "path", "startLine"],
+	required: ["sourceKind", "sourcePath", "path", "startLine"],
 	properties: {
 		sourceKind: { type: "string", enum: availableSourceKindValues },
 		// Membership is checked when the result is submitted (validateEvidenceSources): a large capture
 		// enumerated here produces a declaration the SDK's schema compiler cannot compile.
-		artifactPath: {
+		sourcePath: {
 			type: "string",
 			minLength: 1,
 			description:
-				"The captured artifact the citation reads, exactly as the capture manifest names it.",
+				"The captured sourceFile the citation reads, exactly as the capture manifest names it.",
 		},
 		path: { type: "string", minLength: 1 },
 		side: {
 			type: ["string", "null"],
 			enum: ["OLD", "NEW", null],
 			description:
-				"For a quote of the change: artifactPath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch.",
+				"For a quote of the change: sourcePath names the pinned change (change.json), path is the file as named on that side, and the lines are the [L<n>] coordinates of work/change/diff.patch.",
 		},
 		revision: {
 			type: ["string", "null"],
-			pattern: "^(?:[0-9a-f]{40}|[0-9a-f]{64})$",
+			minLength: 1,
+			maxLength: 1024,
 			description:
-				"For repository text: artifactPath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD.",
+				"For repository text: sourcePath names the captured .git/HEAD, path is repository-relative, and revision optionally selects a full commit SHA; omission means the captured HEAD.",
 		},
 		startLine: {
 			type: "integer",
 			minimum: 1,
 			maximum: 2_147_483_647,
 			description:
-				"The 1-based line of the quoted text in the artifact; for a quote of the change, the [L<n>] coordinate of work/change/diff.patch.",
+				"The 1-based line of the quoted text in the sourceFile; for a quote of the change, the [L<n>] coordinate of work/change/diff.patch.",
 		},
 		endLine: {
 			type: ["integer", "null"],
@@ -955,7 +1032,7 @@ const resultSchema: ToolDefinition["parameters"] = {
 			maxLength: CANDIDATE_LIMITS.explanationChars,
 			description:
 				"A concise explanation a developer can read: the source facts that decide whether this work holds " +
-				"this criterion's subject and occasion, then, when it does, how the cited evidence meets or falls " +
+				"this criterion's subject and applicability, then, when it does, how the cited evidence meets or falls " +
 				"short of what this criterion judges, leaving to other practices what it assigns to them. Describe " +
 				"evidence, not advice, intent, confidence, or hidden chain-of-thought.",
 		},
@@ -963,18 +1040,12 @@ const resultSchema: ToolDefinition["parameters"] = {
 			type: "array",
 			items: citationSchema,
 			description:
-				"The lines that decide the outcome. Required for MET, NOT_APPLICABLE and UNDETERMINED; a NOT_MET result may leave it empty, since each problem cites its own lines.",
+				"The lines that decide the outcome. Required for MET, DOES_NOT_APPLY and COULD_NOT_DETERMINE; a NOT_MET result may leave it empty, since each problem cites its own lines.",
 		},
 		problems: {
 			anyOf: [{ type: "array", minItems: 1, items: problemSchema }, { type: "null" }],
 			description:
 				"NOT_MET only, and required there: each problem the evidence shows, each with its own severity, citations and basis. null for every other outcome.",
-		},
-		severity: {
-			type: ["string", "null"],
-			enum: [...SEVERITIES, null],
-			description:
-				"NOT_MET only, and optional: the result's severity when the pattern of problems is worse than the worst one alone. null takes the worst problem's severity.",
 		},
 		example: {
 			anyOf: [
@@ -996,14 +1067,14 @@ const resultSchema: ToolDefinition["parameters"] = {
 			type: "object",
 			additionalProperties: false,
 			description:
-				"The warrant the outcome owes, and nothing else: search for a MET or NOT_MET or UNDETERMINED that rests on something " +
-				"missing — what you looked for, where, and what the search did not cover; inapplicability for NOT_APPLICABLE; " +
-				"undecidability, a list of open questions, for UNDETERMINED and, beside its problems, for a NOT_MET. Use null for " +
+				"The warrant the outcome owes, and nothing else: search for a MET or NOT_MET or COULD_NOT_DETERMINE that rests on something " +
+				"missing — what you looked for, where, and what the search did not cover; inapplicability for DOES_NOT_APPLY; " +
+				"openQuestions, a list of open questions, for COULD_NOT_DETERMINE and, beside its problems, for a NOT_MET. Use null for " +
 				"branches that do not apply.",
 			properties: {
 				search: { anyOf: [searchSchema, { type: "null" }] },
 				inapplicability: { anyOf: [inapplicabilitySchema, { type: "null" }] },
-				undecidability: {
+				openQuestions: {
 					anyOf: [{ type: "array", minItems: 1, items: openQuestionSchema }, { type: "null" }],
 				},
 			},
@@ -1123,62 +1194,116 @@ function incompleteCoverageText(coverage: Coverage): string {
 		? []
 		: coverage.omitted.map(
 				(omission) =>
-					`${omission.count} ${omission.what}${omission.units === undefined ? "" : ` (${omission.units.join(", ")})`}`,
+					`${omission.count} ${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`,
 			);
 	return (
 		`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
 		"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
-		"evidence supports: NOT_MET for a problem it proves, or UNDETERMINED with the open question"
+		"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question"
 	);
 }
 
 /**
  * Check a submitted result for the session's one practice the way admission will: its shape, its sources, its
- * search and inapplicability scope, its quotes against the artifacts, and its rules with the coverage the host
+ * search and inapplicability scope, its quotes against the sourceFiles, and its rules with the coverage the host
  * measured. Each repair is noted.
  */
+function validateDomainBasis(
+	submission: NormalizedSubmission,
+	assignment: PracticeInputs | undefined,
+): void {
+	const scan = assignment?.scope.kind === "SCAN";
+
+	for (const problem of submission.problems ?? []) {
+		if (scan && problem.basis.type !== "state") {
+			throw new Error("basis_not_allowed: a scan needs state basis");
+		}
+		if (!scan && assignment?.kind === "scm.pull_request" && problem.basis.type === "state") {
+			throw new Error(
+				"state_basis_not_allowed: an ITEM change needs introduced, worsened or duty basis",
+			);
+		}
+	}
+}
+
+function validateConversationAttribution(
+	submission: NormalizedSubmission,
+	assignment: PracticeInputs | undefined,
+): void {
+	// The frozen attribution selects a person; a problem cannot name another participant's words as theirs.
+	const thread = `${CWD}/${CONVERSATION_THREAD}`;
+	if (
+		submission.outcome === "NOT_MET" &&
+		assignment?.kind === "chat.thread" &&
+		assignment.about !== null &&
+		existsSync(thread)
+	) {
+		const turns = readFileSync(thread, "utf8");
+		const { developerId } = assignment.about;
+		if (
+			(submission.problems ?? []).some(
+				(problem) => !citesReviewedTurn(problem.citations, turns, developerId),
+			)
+		) {
+			throw new Error(
+				`each problem of a NOT_MET of this conversation review must cite a turn of the participant under review: quote a ` +
+					`line inside a turn of ${CONVERSATION_THREAD} whose accountId equals about.developerId. The other turns are ` +
+					"context, and a lapse that only they show is not this participant's",
+			);
+		}
+	}
+}
+
 function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Validated {
 	const notes: string[] = [];
-	const submission = normalizeSubmission(raw, notes, (artifact) => artifactSources.get(artifact));
+	const submission = normalizeSubmission(raw, notes, (sourceFile) =>
+		sourceFileSources.get(sourceFile),
+	);
 	const citations = submissionCitations(submission);
-	// The manifest says which source staged an artifact; a citation that names the artifact under
+	// The manifest says which source staged a source file; a citation that names the sourceFile under
 	// another source kind is read as the manifest reads it, and the correction is echoed back.
+	const assignmentScope = assignedInputs.get(slug)?.scope;
+	if (assignmentScope?.kind === "SCAN") {
+		const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
+		const allowed = new Set([assignmentScope.item.path, ...(contextPaths ?? [])]);
+		if (citations.some((citation) => !allowed.has(citation.path))) {
+			throw new Error("a scan citation is outside its frozen context");
+		}
+	}
+
 	for (const citation of citations) {
 		// A quote of a staged record (description.md, comments.json) named as its path under the pinned
-		// change is a quote of that record: the artifact is the path.
-		const stagedAtPath = artifactSources.get(citation.path);
-		if (stagedAtPath !== undefined && citation.artifactPath !== citation.path) {
+		// change is a quote of that record: the sourceFile is the path.
+		const stagedAtPath = sourceFileSources.get(citation.path);
+		if (stagedAtPath !== undefined && citation.sourcePath !== citation.path) {
 			notes.push(
-				`${citation.path} is an artifact of its own, staged by ${stagedAtPath}; recorded against it, not ${citation.artifactPath}`,
+				`${citation.path} is a source file of its own, staged by ${stagedAtPath}; recorded against it, not ${citation.sourcePath}`,
 			);
-			citation.artifactPath = citation.path;
+			citation.sourcePath = citation.path;
 			citation.sourceKind = stagedAtPath;
 		}
-		const staged = artifactSources.get(citation.artifactPath);
+		const staged = sourceFileSources.get(citation.sourcePath);
 		if (staged !== undefined && staged !== citation.sourceKind) {
 			notes.push(
-				`${citation.artifactPath} is staged by ${staged}, not ${citation.sourceKind}; recorded as ${staged}`,
+				`${citation.sourcePath} is staged by ${staged}, not ${citation.sourceKind}; recorded as ${staged}`,
 			);
 			citation.sourceKind = staged;
 		}
-		// Once the source is settled: a side selects a line of the change and a revision a commit of the
-		// checkout, and neither says anything of another source. Admission refuses either one elsewhere, and
-		// with it the whole result, so neither leaves the runner on any other source.
-		if (citation.sourceKind !== DIFF_SOURCE && citation.side !== undefined) {
-			notes.push(`${citation.path}: side dropped — only a line of the change has a side`);
-			delete citation.side;
-		}
-		if (citation.sourceKind !== TREE_SOURCE && citation.revision !== undefined) {
-			notes.push(
-				`${citation.path}: revision dropped — only a repository file is read at a revision`,
+		const flags = citationCapabilities.get(citation.sourceKind);
+		if (flags === undefined) {
+			throw new Error(
+				`the source catalog declares no citation capabilities for ${citation.sourceKind}`,
 			);
-			delete citation.revision;
+		}
+		const capabilityError = validateCitationCapabilities(citation, flags);
+		if (capabilityError !== undefined) {
+			throw new Error(capabilityError);
 		}
 	}
 	validateEvidenceSources(
 		submission,
 		availableSourceKinds,
-		artifactSources,
+		sourceFileSources,
 		`${taskEnvelope.paths.repositoryRoot.replace(/\/+$/u, "")}/`,
 	);
 	validateSearchScope(
@@ -1187,15 +1312,15 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 		availableSourceKinds,
 	);
 	validateInapplicabilityScope(submission, availableSourceKinds);
-	if ((submission.problems ?? []).some((problem) => problem.basis.type === "state")) {
-		throw new Error(
-			"a problem's basis is introduced, worsened or duty in a review of a change: a state basis is for a review of the whole work",
-		);
-	}
+	const assignment = assignedInputs.get(slug);
+	const scan = assignment?.scope.kind === "SCAN";
+	validateDomainBasis(submission, assignment);
+
 	// A practice that reads the change grounds a decision of nothing in it, unless another practice's
 	// result already consulted it; a practice judging comments or history alone owes the change nothing.
 	if (
-		(submission.outcome === "NOT_APPLICABLE" || submission.outcome === "UNDETERMINED") &&
+		(submission.outcome === "DOES_NOT_APPLY" || submission.outcome === "COULD_NOT_DETERMINE") &&
+		!scan &&
 		availableSourceKinds.has(DIFF_SOURCE) &&
 		practiceIndex.find((practice) => practice.slug === slug)?.readsSources.includes(DIFF_SOURCE) ===
 			true &&
@@ -1212,13 +1337,16 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 	}
 	for (const citation of citations) {
 		// Match admission: repository quotes use Git blobs; change quotes use the derived diff.
-		const content = citedContent(citation);
-		const resolved = resolveCited(citation, content);
+		const registered = capturedText(citation);
+		const resolved =
+			registered === null
+				? resolveCited(citation, citedContent(citation))
+				: resolveCapturedText(citation, registered);
 		if ("mismatch" in resolved) {
 			throw new Error(
 				`citation does not match ${citation.path}:${citation.startLine}-${citation.endLine} ` +
-					`(${citation.side ?? "text"}) in '${citation.artifactPath}': ${resolved.mismatch}. Copy the exact ` +
-					`artifact text and, for the change, the [L<n>] coordinates and OLD/NEW side of ${CHANGE_ROOT}/diff.patch ` +
+					`(${citation.side ?? "text"}) in '${citation.sourcePath}': ${resolved.mismatch}. Copy the exact ` +
+					`sourceFile text and, for the change, the [L<n>] coordinates and OLD/NEW side of ${CHANGE_ROOT}/diff.patch ` +
 					"(the numbers sed -n or grep -n print are lines of diff.patch, not these coordinates)",
 			);
 		}
@@ -1239,33 +1367,22 @@ function validateSubmission(raw: unknown, slug: string, coverage: Coverage): Val
 		}
 		citation.quote = resolved.quote;
 	}
-	// A conversation is reviewed once for each participant; each lapse must be that participant's own.
-	const thread = `${CWD}/${CONVERSATION_THREAD}`;
-	if (submission.outcome === "NOT_MET" && existsSync(thread)) {
-		const turns = readFileSync(thread, "utf8");
-		if (
-			(submission.problems ?? []).some((problem) => !citesReviewedTurn(problem.citations, turns))
-		) {
-			throw new Error(
-				`each problem of a NOT_MET of this conversation review must cite a turn of the participant under review: quote a ` +
-					`line inside a turn of ${CONVERSATION_THREAD} marked "underReview": true. The other turns are ` +
-					"context, and a lapse that only they show is not this participant's",
-			);
-		}
-	}
+	validateConversationAttribution(submission, assignment);
 	const change = capturedChange();
 	const parsed = parseCandidate(
 		{ ...submission, coverage },
-		(citation): CodeCitationIdentity | undefined => {
+		(citation): CitationIdentity | undefined => {
 			if (citation.sourceKind === TREE_SOURCE) {
 				const repository = citationRepository(citation);
 				const revision = citation.revision ?? checkedOutCommit(repository);
-				return revision === null ? undefined : { repository, revision };
+				return revision === null
+					? undefined
+					: { source: `${repository}:${citation.path}`, version: revision };
 			}
 			if (citation.sourceKind === DIFF_SOURCE && change !== null) {
 				return {
-					repository: INPUT_PATHS.repositoryRoot,
-					revision: citation.side === "OLD" ? change.base : change.head,
+					source: `${INPUT_PATHS.repositoryRoot}:${citation.path}`,
+					version: citation.side === "OLD" ? change.base : change.head,
 				};
 			}
 			return undefined;
@@ -1339,6 +1456,32 @@ function candidateReadTheChange(candidate: Candidate): boolean {
 /** What a repository read returns for a file that is not text: git's own rule, a NUL in the opening bytes. */
 const BINARY = Symbol("binary");
 
+/** Select the capture's logical text, not a serialized metadata record that mentions it. */
+function capturedText(citation: NormalizedCitation): string | null {
+	const matches = capturedTexts.filter(
+		(entry) =>
+			entry.source === citation.sourceKind &&
+			entry.path === citation.path &&
+			entry.side === (citation.side ?? "NEW") &&
+			(citation.revision === undefined || entry.revision === citation.revision),
+	);
+	if (matches.length === 0) {
+		return null;
+	}
+	if (matches.length !== 1) {
+		throw new Error("citation names ambiguous captured text; specify its revision");
+	}
+	const proof = matches[0];
+	if (proof === undefined) {
+		throw new Error("the captured text proof is absent");
+	}
+	const bytes = readFileSync(nodePath.resolve(CWD, proof.stagedPath));
+	if (createHash("sha256").update(bytes).digest("hex") !== proof.sha256) {
+		throw new Error("the captured text digest changed");
+	}
+	return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+}
+
 /** What a citation quotes: the checkout at HEAD or at the named revision, or the derived change view. */
 function citedContent(citation: NormalizedCitation): string | typeof BINARY | null {
 	if (citation.sourceKind === TREE_SOURCE) {
@@ -1349,7 +1492,7 @@ function citedContent(citation: NormalizedCitation): string | typeof BINARY | nu
 	if (citation.sourceKind === DIFF_SOURCE) {
 		return readFileSync(`${CWD}/${CHANGE_ROOT}/diff.patch`, "utf8");
 	}
-	return readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
+	return readFileSync(`${CWD}/${citation.sourcePath}`, "utf8");
 }
 
 /** The citation resolved against what it quotes, or the mismatch that says why it cannot be. */
@@ -1380,9 +1523,9 @@ function asText(bytes: Buffer): string | typeof BINARY {
 	return bytes.subarray(0, 8000).includes(0) ? BINARY : bytes.toString("utf8");
 }
 
-/** The artifact index, not the task's primary checkout, determines which repository a citation reads. */
+/** The sourceFile index, not the task's primary checkout, determines which repository a citation reads. */
 function citationRepository(citation: NormalizedCitation): string {
-	const match = /^repos\/(?<repository>[A-Za-z0-9_-]+)\/\.git\/HEAD$/u.exec(citation.artifactPath);
+	const match = /^repos\/(?<repository>[A-Za-z0-9_-]+)\/\.git\/HEAD$/u.exec(citation.sourcePath);
 	if (!match?.groups || typeof match.groups.repository !== "string") {
 		throw new Error("Repository citation requires a captured repository HEAD");
 	}
@@ -1501,14 +1644,14 @@ let turnDemand: TurnDemand | null = null;
  * turn must keep back to submit what it owes. The prior is a slow open model's pace until the session
  * has submitted once.
  */
-let tokensPerObservation = 1500;
+let tokensPerProblem = 1500;
 /** Output tokens of the last assistant message, when that message carries a recording call. */
 let recordingMessageTokens = 0;
 /** When the session last showed any sign of life; what the stall watchdog reads. */
 let lastEventAt = Date.now();
 
 /** How many results a submit_result call carried, stored, duplicate or refused alike. */
-function observationsIn(result: unknown): number {
+function problemsIn(result: unknown): number {
 	const details = isRecord(result) ? result.details : undefined;
 	if (!isRecord(details)) {
 		return 0;
@@ -1543,7 +1686,7 @@ function chargeWork(event: AgentSessionEvent): void {
 		if (
 			!turn.askedToRecord &&
 			turn.stoppedBy === null &&
-			shouldRecordNow(used, turn.budget, turnDemand.owed(), tokensPerObservation)
+			shouldRecordNow(used, turn.budget, turnDemand.owed(), tokensPerProblem)
 		) {
 			turn.askedToRecord = true;
 			console.error(
@@ -1557,11 +1700,9 @@ function chargeWork(event: AgentSessionEvent): void {
 		return;
 	}
 	if (event.type === "tool_execution_end" && event.toolName === "submit_result") {
-		const written = observationsIn(event.result);
+		const written = problemsIn(event.result);
 		if (written > 0 && recordingMessageTokens > 0) {
-			tokensPerObservation = Math.round(
-				(tokensPerObservation + recordingMessageTokens / written) / 2,
-			);
+			tokensPerProblem = Math.round((tokensPerProblem + recordingMessageTokens / written) / 2);
 		}
 		recordingMessageTokens = 0;
 		return;
@@ -1651,8 +1792,8 @@ const IDENTICAL_REFUSAL_ABORT = 2;
 
 /** The session tools whose answers are evidence reads the host keeps receipts of. */
 const READ_TOOLS: ReadonlySet<string> = new Set(["read", "grep", "find", "ls"]);
-/** The most units an omission names; the count says how many there are. */
-const OMISSION_UNITS = CANDIDATE_LIMITS.omissionUnits;
+/** The most feedback an omission names; the count says how many there are. */
+const OMISSION_ITEMS = CANDIDATE_LIMITS.omissionItems;
 /** A tool error that says the source could not be read, not that the session asked for something absent. */
 const READ_FAILURE =
 	/EACCES|EPERM|EIO|ETIMEDOUT|permission denied|operation not permitted|timed out/iu;
@@ -1730,8 +1871,17 @@ function sessionReceipts(reads: SessionReads): Receipts {
 }
 
 /** What a session's reads covered: complete only when no read was cut short or failed. */
-function sessionCoverage(reads: SessionReads): Coverage {
-	const receipts = sessionReceipts(reads);
+function sessionCoverage(
+	reads: SessionReads,
+	reader?: EvidenceReader,
+	domainReads: Receipts = noReceipts(),
+): Coverage {
+	const native = sessionReceipts(reads);
+	const receipts = {
+		reads: native.reads + domainReads.reads,
+		truncatedReads: native.truncatedReads + domainReads.truncatedReads,
+		failedReads: native.failedReads + domainReads.failedReads,
+	};
 	const cut = [...reads.cutFiles, ...reads.cutSearches];
 	const omitted: Omission[] = [
 		...(cut.length > 0
@@ -1740,9 +1890,9 @@ function sessionCoverage(reads: SessionReads): Coverage {
 						what: "reads cut short at the tool's output limit",
 						count: cut.length,
 						reason: "truncated" as const,
-						units: cut
-							.slice(0, OMISSION_UNITS)
-							.map((unit) => unit.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
+						items: cut
+							.slice(0, OMISSION_ITEMS)
+							.map((piece) => piece.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
 					},
 				]
 			: []),
@@ -1752,17 +1902,37 @@ function sessionCoverage(reads: SessionReads): Coverage {
 						what: "reads that failed",
 						count: reads.failed.length,
 						reason: "unavailable" as const,
-						units: reads.failed
-							.slice(0, OMISSION_UNITS)
-							.map((unit) => unit.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
+						items: reads.failed
+							.slice(0, OMISSION_ITEMS)
+							.map((piece) => piece.slice(0, CANDIDATE_LIMITS.warrantFieldChars)),
 					},
 				]
 			: []),
 	];
+	if (domainReads.truncatedReads > 0) {
+		omitted.push({
+			what: "governed file reads cut short",
+			count: domainReads.truncatedReads,
+			reason: "truncated",
+		});
+	}
+	if (domainReads.failedReads > 0) {
+		omitted.push({
+			what: "governed file reads that failed",
+			count: domainReads.failedReads,
+			reason: "unavailable",
+		});
+	}
 	const [first, ...rest] = omitted;
 	return first === undefined
-		? { source: "host", ...receipts, complete: true }
-		: { source: "host", ...receipts, complete: false, omitted: [first, ...rest] };
+		? { source: "host", ...receipts, receipts: reader?.readReceipts ?? [], complete: true }
+		: {
+				source: "host",
+				...receipts,
+				receipts: reader?.readReceipts ?? [],
+				complete: false,
+				omitted: [first, ...rest],
+			};
 }
 
 /**
@@ -1774,6 +1944,8 @@ interface ActiveReview {
 	slug: string;
 	draft: Candidate | null;
 	reads: SessionReads;
+	reader?: EvidenceReader;
+	domainReads: Receipts;
 }
 let activeReview: ActiveReview | null = null;
 
@@ -1817,7 +1989,11 @@ function record(raw: unknown): Recorded {
 	}
 	let validated: Validated;
 	try {
-		validated = validateSubmission(raw, slug, sessionCoverage(review.reads));
+		validated = validateSubmission(
+			raw,
+			slug,
+			sessionCoverage(review.reads, review.reader, review.domainReads),
+		);
 	} catch (error) {
 		countRefusal(slug);
 		const reason = errorText(error);
@@ -1914,7 +2090,7 @@ function owedPractices(slugs: readonly string[] = currentTurnSlugs): string[] {
 		: slugs.filter((slug) => slug === review.slug);
 }
 
-/** JSON Schema keywords that refuse; what they say is applied per unit instead. */
+/** JSON Schema keywords that refuse; what they say is applied per piece instead. */
 const RULE_KEYWORDS = new Set([
 	"required",
 	"additionalProperties",
@@ -1928,8 +2104,8 @@ const RULE_KEYWORDS = new Set([
 ]);
 
 /**
- * Pi validates a whole tool call before execution. For a tool that takes a batch of independent units, keep shape
- * hints here and let the tool validate each unit, so one invalid unit does not discard the rest of the batch.
+ * Pi validates a whole tool call before execution. For a tool that takes a batch of independent feedback, keep shape
+ * hints here and let the tool validate each piece, so one invalid piece does not discard the rest of the batch.
  */
 function documentedShape(schema: unknown): unknown {
 	if (Array.isArray(schema)) {
@@ -1939,7 +2115,7 @@ function documentedShape(schema: unknown): unknown {
 		return schema;
 	}
 	const out: Record<string, unknown> = {};
-	// Container types go, so a list may arrive serialized and each unit is answered on its own; scalar
+	// Container types go, so a list may arrive serialized and each piece is answered on its own; scalar
 	// types stay, because they tell the model what a value is.
 	const structural = schema.type === "object" || schema.type === "array";
 	const noted = (note: string) => {
@@ -1973,6 +2149,49 @@ function documentedShape(schema: unknown): unknown {
 		out[key] = documentedShape(value);
 	}
 	return out;
+}
+
+function governedScanRead(reader: EvidenceReader) {
+	return defineTool({
+		name: "read",
+		label: "Read pinned file",
+		description:
+			"Read a captured repository file at the pinned commit. Files are context for the assigned file only.",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["path"],
+			properties: {
+				path: { type: "string" },
+				offset: { type: "integer", minimum: 1 },
+				limit: { type: "integer", minimum: 1 },
+			},
+		},
+		execute: async (_id, params: { path: string; offset?: number; limit?: number }, signal) => {
+			const read = await reader.answer(
+				{
+					op: "read",
+					tree: "head",
+					path: params.path,
+					...(params.offset === undefined ? {} : { offsetLine: params.offset }),
+					...(params.limit === undefined ? {} : { maxLines: params.limit }),
+				},
+				signal,
+			);
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: read.status === "FOUND" ? read.text : `${params.path}: ${read.status}`,
+					},
+				],
+				details: {
+					status: read.status,
+					...(read.status === "FOUND" ? { truncated: read.truncated } : {}),
+				},
+			};
+		},
+	});
 }
 
 function buildSubmitResultTool() {
@@ -2091,12 +2310,25 @@ function captureSources(): EvidenceSources {
 	return {
 		repo: checkout,
 		headRevision: change?.head ?? (checkout === null ? null : checkedOutCommit(checkout)),
-		treeArtifact: `${taskEnvelope.paths.repositoryRoot}/.git/HEAD`,
+		treeSourceFile: `${taskEnvelope.paths.repositoryRoot}/.git/HEAD`,
 		contextDir: existsSync(INPUT_PATHS.contextRoot) ? INPUT_PATHS.contextRoot : null,
 		contextReference: taskEnvelope.paths.contextRoot,
 		change,
-		sourceKindOf: (artifactPath) => artifactSources.get(artifactPath),
+		sourceKindOf: (sourcePath) => sourceFileSources.get(sourcePath),
 	};
+}
+
+function sourcesForPractice(slug: string, sources: EvidenceSources): EvidenceSources {
+	const inputs = assignedInputs.get(slug);
+	if (inputs?.scope.kind !== "SCAN") {
+		return sources;
+	}
+	const contextPaths = practiceIndex.find((practice) => practice.slug === slug)?.contextPaths;
+	const assigned = inputs.scope.item.path;
+	if (contextPaths === undefined || assigned === undefined) {
+		throw new UnratedError("unavailable", "scan context grants were not captured");
+	}
+	return { ...sources, permittedPaths: new Set([assigned, ...contextPaths]) };
 }
 
 /** The files a program of `kind` reads: the pinned tree and the change of a pull request, and none otherwise. */
@@ -2105,7 +2337,10 @@ function jobFiles(kind: string): JobFiles | null {
 	const repository = INPUT_PATHS.repositoryRoot;
 	const head =
 		sources?.head ?? (existsSync(`${repository}/.git`) ? checkedOutCommit(repository) : null);
-	if (kind !== "scm.pull_request" || head === null) {
+	if (
+		!["scm.pull_request", "scm.pull_request_review", "scm.file"].includes(kind) ||
+		head === null
+	) {
 		return null;
 	}
 	return { head: { revision: head }, change: sources };
@@ -2150,8 +2385,8 @@ function logPracticeCoverage() {
 
 /** What a private composer that reads instead of writing is told, at the exploration bound and near the budget's end. */
 const COMPOSITION_NUDGE =
-	`Stop reading: the admitted results with their observations and the history are in this turn's prompt and in ` +
-	`work/composition/results.json, and nothing else decides a unit. Persist the units you have ` +
+	`Stop reading: the admitted results with their problems and the history are in this turn's prompt and in ` +
+	`work/composition/results.json, and nothing else decides a piece. Persist the feedback you have ` +
 	`with report_feedback now — and a WITHHOLD with its reason for each NOT_MET practice you decided ` +
 	`to stay quiet about. Use tools only from this point onward; no planning prose.`;
 
@@ -2159,14 +2394,14 @@ const COMPOSITION_NUDGE =
 const REVIEW_NUDGE =
 	`Everything this review may rest on is in this session. Store the final review now with one report_review call: ` +
 	`first one decision for each NOT_MET result, RAISE or a withholding reason, then the complete summary and ` +
-	`any line notes, which speak about each raised result, itself or through its observations, and no withheld one. ` +
+	`any line notes, which speak about each raised result, itself or through its problems, and no withheld one. ` +
 	`No prose outside the calls.`;
 
 /** Calls a composition may make before its first recording call; at this one it is nudged to persist. */
 const COMPOSITION_EXPLORATION_NUDGE = 12;
 
 const PERSIST_DISCIPLINE =
-	`Submit the outcome the evidence supports, MET, NOT_MET, NOT_APPLICABLE, or UNDETERMINED; there is no quota. ` +
+	`Submit the outcome the evidence supports, MET, NOT_MET, DOES_NOT_APPLY, or COULD_NOT_DETERMINE; there is no quota. ` +
 	`Use tools only from this point onward; no planning prose.`;
 
 /** What a turn is told once its remaining work only pays for submitting what it owes. */
@@ -2213,6 +2448,26 @@ function readTaskEnvelope(): TaskEnvelope {
 		);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
 	}
+	if (
+		typeof envelope.reviewId !== "string" ||
+		typeof envelope.jobId !== "string" ||
+		!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+			envelope.reviewId,
+		) ||
+		!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+			envelope.jobId,
+		) ||
+		typeof envelope.attempt !== "number" ||
+		!Number.isSafeInteger(envelope.attempt) ||
+		envelope.attempt < 0 ||
+		!isDecimalId(envelope.workspaceId)
+	) {
+		console.error(
+			"[pi-runner] task requires reviewId/jobId UUIDs, a nonnegative attempt and a decimal workspaceId",
+		);
+		process.exit(ENVELOPE_MISMATCH_EXIT);
+	}
+
 	if (typeof envelope.prompt !== "string" || envelope.prompt.trim() === "") {
 		console.error(`[pi-runner] prompt is missing or blank in ${TASK_PATH}`);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
@@ -2227,7 +2482,9 @@ function readTaskEnvelope(): TaskEnvelope {
 	return {
 		paths,
 		schemaVersion: SUPPORTED_SCHEMA_VERSION,
+		reviewId: envelope.reviewId,
 		jobId: envelope.jobId,
+		attempt: envelope.attempt,
 		workspaceId: envelope.workspaceId,
 		prompt: envelope.prompt,
 		repositoryFullName: envelope.repositoryFullName,
@@ -2251,46 +2508,46 @@ const REVIEW_COMPOSER_PROMPT_PATH = `${CWD}/review-composer.md`;
 const FEEDBACK_STYLE_PATH = `${CWD}/feedback-style.md`;
 const PREPARED_FEEDBACK_PATH = INPUT_PATHS.preparedFeedback;
 const COMPOSITION_RESULTS_PATH = `${CWD}/work/composition/results.json`;
-const IN_APP_SUPPORT_PATH = `${CWD}/work/composition/in-app-support.json`;
+const PRACTICE_PAGE_SUPPORT_PATH = `${CWD}/work/composition/in-app-support.json`;
 
-let inAppSupport: InAppSupport | null = null;
-let inChatEligibility: InChatEligibility | null = null;
+let practicePageSupport: PracticePageSupport | null = null;
+let conversationEligibility: ConversationEligibility | null = null;
 
 /** The open private lanes each NOT_MET practice is routed to; null until admission routed them. */
-let routedLanes: ReadonlyMap<string, readonly PrivateChannel[]> | null = null;
+let routedLanes: ReadonlyMap<string, readonly PrivateDestination[]> | null = null;
 
 /** Whether the server's read after admission routes the practice's NOT_MET result to the lane. */
-function routedTo(channel: PrivateChannel, practiceSlug: string): boolean {
-	if (channel === "IN_APP") {
+function routedTo(destination: PrivateDestination, practiceSlug: string): boolean {
+	if (destination === "PRACTICE_PAGE") {
 		return (
-			inAppSupport?.state === "COMPLETE" &&
-			inAppSupport.practices.some(
+			practicePageSupport?.state === "COMPLETE" &&
+			practicePageSupport.practices.some(
 				(practice) => practice.practiceSlug === practiceSlug && practice.decision === "ADMIT",
 			)
 		);
 	}
-	if (inChatEligibility?.state !== "COMPLETE") {
+	if (conversationEligibility?.state !== "COMPLETE") {
 		return false;
 	}
 	const admitted = new Set(
-		inChatEligibility.results
+		conversationEligibility.results
 			.filter((route) => route.decision === "ADMIT")
-			.map((route) => route.practiceResultId),
+			.map((route) => route.resultId),
 	);
 	return admittedResults.some(
 		(result) =>
 			result.practiceSlug === practiceSlug &&
 			result.outcome === "NOT_MET" &&
-			admitted.has(result.practiceResultId),
+			admitted.has(result.resultId),
 	);
 }
 
 /** Why the server routes none of the practice's NOT_MET results to the lane, in its own words. */
-function laneRefusal(channel: PrivateChannel, practiceSlug: string): string {
-	if (channel === "IN_APP") {
+function laneRefusal(destination: PrivateDestination, practiceSlug: string): string {
+	if (destination === "PRACTICE_PAGE") {
 		const decision =
-			inAppSupport?.state === "COMPLETE"
-				? inAppSupport.practices.find((practice) => practice.practiceSlug === practiceSlug)
+			practicePageSupport?.state === "COMPLETE"
+				? practicePageSupport.practices.find((practice) => practice.practiceSlug === practiceSlug)
 						?.decision
 				: undefined;
 		return decision ?? "not routed";
@@ -2298,12 +2555,12 @@ function laneRefusal(channel: PrivateChannel, practiceSlug: string): string {
 	const ids = new Set(
 		admittedResults
 			.filter((result) => result.practiceSlug === practiceSlug)
-			.map((result) => result.practiceResultId),
+			.map((result) => result.resultId),
 	);
 	const decisions =
-		inChatEligibility?.state === "COMPLETE"
-			? inChatEligibility.results
-					.filter((route) => ids.has(route.practiceResultId))
+		conversationEligibility?.state === "COMPLETE"
+			? conversationEligibility.results
+					.filter((route) => ids.has(route.resultId))
 					.map((route) => route.decision)
 			: [];
 	return decisions.length > 0 ? [...new Set(decisions)].join(", ") : "not routed";
@@ -2312,38 +2569,38 @@ const PUBLIC_FEEDBACK_HISTORY_PATH = `${CWD}/work/composition/public-feedback-hi
 let compositionAdmitted = false;
 let admissionDigest: string | null = null;
 
-type Channel = (typeof CHANNELS)[number];
-type PrivateChannel = (typeof PRIVATE_CHANNELS)[number];
+type Destination = (typeof DESTINATIONS)[number];
+type PrivateDestination = (typeof PRIVATE_DESTINATIONS)[number];
 type FeedbackAction = (typeof ACTIONS)[number];
 
-function isChannel(value: unknown): value is Channel {
-	return CHANNELS.some((channel) => channel === value);
+function isDestination(value: unknown): value is Destination {
+	return DESTINATIONS.some((destination) => destination === value);
 }
 
 function isFeedbackAction(value: unknown): value is FeedbackAction {
 	return ACTIONS.some((action) => action === value);
 }
 
-/** A string the model sent, or nothing — used for every optional free-text field on a feedback unit. */
+/** A string the model sent, or nothing — used for every optional free-text field on a feedback piece. */
 function optionalString(value: unknown): string | undefined {
 	return typeof value === "string" ? value : undefined;
 }
 
-/** The notes an IN_CHAT unit carries TO the mentor. Kept in step with ConversationBrief by Java. */
+/** The notes an CONVERSATION piece carries TO the mentor. Kept in step with ConversationBrief by Java. */
 interface ConversationNotes {
 	situation?: string;
 	capability?: string;
 	evidenceSummary?: string;
-	inConversationSignal?: string;
+	inConversationLearning?: string;
 	alreadySaid?: string;
 }
 
 /**
- * A private-lane unit; per-unit validation in readFeedbackUnit/validateUnit. As read, basedOn holds the ids the
+ * A private-lane piece; per-piece validation in readFeedbackPiece/validateFeedback. As read, basedOn holds the ids the
  * composer named; as stored, the references they resolve to.
  */
-interface FeedbackUnitOf<Basis> extends ComposedFeedbackUnit {
-	channel: PrivateChannel;
+interface FeedbackPieceOf<Basis> extends ComposedFeedbackPiece {
+	destination: PrivateDestination;
 	practiceSlug: string;
 	basedOn: Basis;
 	action: FeedbackAction;
@@ -2354,8 +2611,26 @@ interface FeedbackUnitOf<Basis> extends ComposedFeedbackUnit {
 	nextStep?: string;
 	notes?: ConversationNotes;
 }
-type ReadFeedbackUnit = FeedbackUnitOf<string[]>;
-type FeedbackUnit = FeedbackUnitOf<EvidenceRef[]>;
+type ReadFeedbackPiece = FeedbackPieceOf<string[]>;
+type FeedbackPiece = FeedbackPieceOf<EvidenceRef[]>;
+
+/** The prepared text preserves the guidance fields within the worker DTO's text bound. */
+function feedbackBody(piece: Pick<FeedbackPiece, "title" | "body" | "nextStep" | "notes">): string {
+	const sections = [piece.title, piece.body, piece.nextStep];
+	for (const [field, label] of [
+		["situation", "Situation"],
+		["capability", "Capability"],
+		["evidenceSummary", "Evidence"],
+		["inConversationLearning", "In conversation"],
+		["alreadySaid", "Earlier feedback"],
+	] as const) {
+		const text = piece.notes?.[field];
+		if (hasText(text)) {
+			sections.push(`${label}: ${text}`);
+		}
+	}
+	return sections.filter(hasText).join("\n\n");
+}
 
 /** The admitted fields the server resolves references against: enough to reference one, never enough to author one. */
 interface LeanCitation {
@@ -2369,13 +2644,12 @@ interface LeanCitation {
 }
 
 interface LeanResult {
-	practiceResultId: string;
+	resultId: string;
 	practiceSlug: string;
 	outcome: Outcome;
-	severity: unknown;
 	citations: LeanCitation[];
-	observations: {
-		observationId: string;
+	problems: {
+		problemId: string;
 		severity: unknown;
 		anchorable: unknown;
 		citations: LeanCitation[];
@@ -2405,8 +2679,9 @@ interface ComposedFeedback extends ComposedFeedbackEnvelope {
 	admissionDigest: string | null;
 	results: LeanResult[];
 	preparedTargets: PreparedFeedbackTarget[];
-	units: FeedbackUnit[];
+	feedback: FeedbackPiece[];
 	review: ComposedReview | null;
+	preparation: FeedbackPreparationReceipt | null;
 }
 
 // Echo the exact composition inputs so Java validates references against the same snapshot.
@@ -2416,18 +2691,19 @@ const composedFeedback: ComposedFeedback = {
 	admissionDigest: null,
 	results: [],
 	preparedTargets: [],
-	units: [],
+	feedback: [],
 	review: null,
+	preparation: null,
 };
 
 /**
- * Admission assigns result and observation IDs and anchor eligibility. Populate this captured array in place
+ * Admission assigns result and problem IDs and anchor eligibility. Populate this captured array in place
  * because the composer tool is created before admission.
  */
 const admittedResults: AdmittedResult[] = [];
 
-function isPlacementKind(value: unknown): value is PlacementKind {
-	return value === "DIFF" || value === "ARTIFACT";
+function isCopyForm(value: unknown): value is CopyForm {
+	return value === "LINE_NOTE" || value === "FILE_NOTE";
 }
 
 function loadCompositionRequest(): CompositionRequest | null {
@@ -2439,34 +2715,41 @@ function loadCompositionRequest(): CompositionRequest | null {
 		if (!isRecord(parsed) || parsed.enabled !== true) {
 			return null;
 		}
-		const declared: Record<string, unknown> = isRecord(parsed.channels) ? parsed.channels : {};
-		const boundsFor = (channel: Channel): ChannelBounds => {
-			const bounds: Record<string, unknown> = isRecord(declared[channel]) ? declared[channel] : {};
+		const declared: Record<string, unknown> = isRecord(parsed.destinations)
+			? parsed.destinations
+			: {};
+		const boundsFor = (destination: Destination): DestinationBounds => {
+			const bounds: Record<string, unknown> = isRecord(declared[destination])
+				? declared[destination]
+				: {};
 			return {
 				enabled: bounds.enabled === true,
-				maxUnits: Math.max(0, Math.min(Number(bounds.maxUnits) || 0, 10)),
+				maxPieces: Math.max(0, Math.min(Number(bounds.maxPieces) || 0, 10)),
 			};
 		};
-		// Spelled out rather than folded into the CHANNELS loop, so that Record<Channel, …> is what makes
-		// every lane present: adding a channel to CHANNELS then fails to compile until it is bounded here.
-		const channels: Record<Channel, ChannelBounds> = {
-			IN_CONTEXT: boundsFor("IN_CONTEXT"),
-			IN_APP: boundsFor("IN_APP"),
-			IN_CHAT: boundsFor("IN_CHAT"),
+		// Spelled out rather than folded into the DESTINATIONS loop, so that Record<Destination, …> is what makes
+		// every lane present: adding a destination to DESTINATIONS then fails to compile until it is bounded here.
+		const destinations: Record<Destination, DestinationBounds> = {
+			ON_WORK: boundsFor("ON_WORK"),
+			PRACTICE_PAGE: boundsFor("PRACTICE_PAGE"),
+			CONVERSATION: boundsFor("CONVERSATION"),
 		};
-		if (!CHANNELS.some((channel) => channels[channel].enabled && channels[channel].maxUnits > 0)) {
+		if (
+			!DESTINATIONS.some(
+				(destination) =>
+					destinations[destination].enabled && destinations[destination].maxPieces > 0,
+			)
+		) {
 			return null;
 		}
-		const inContextPlacementKinds = jsonArray(parsed.inContextPlacementKinds).filter(
-			isPlacementKind,
-		);
-		if (channels.IN_CONTEXT.enabled && inContextPlacementKinds.length === 0) {
+		const onWorkCopyForms = jsonArray(parsed.onWorkCopyForms).filter(isCopyForm);
+		if (destinations.ON_WORK.enabled && onWorkCopyForms.length === 0) {
 			return null;
 		}
 		return {
-			channels,
-			inContextPlacementKinds,
-			minDistinctArtifacts: Math.max(2, Number(parsed.minDistinctArtifacts) || 2),
+			destinations,
+			onWorkCopyForms,
+			minDistinctSourceFiles: Math.max(2, Number(parsed.minDistinctSourceFiles) || 2),
 		};
 	} catch (error) {
 		console.error(`[pi-runner] composition request unreadable: ${errorText(error)}`);
@@ -2490,13 +2773,13 @@ function stagedPreparedTargets(): PreparedFeedbackTarget[] {
 			if (!isRecord(entry)) {
 				return [];
 			}
-			const { threadKey, channel, practiceSlug } = entry;
+			const { threadKey, destination, practiceSlug } = entry;
 			return typeof threadKey === "string" &&
 				threadKey.trim() &&
-				isChannel(channel) &&
+				isDestination(destination) &&
 				typeof practiceSlug === "string" &&
 				practiceSlug.trim()
-				? [{ threadKey, channel, practiceSlug }]
+				? [{ threadKey, destination, practiceSlug }]
 				: [];
 		});
 	} catch (error) {
@@ -2506,9 +2789,9 @@ function stagedPreparedTargets(): PreparedFeedbackTarget[] {
 }
 
 /**
- * The `channel:practice` pairs the staged delivered feedback can show as already said. The server chose the person
+ * The `destination:practice` pairs the staged delivered feedback can show as already said. The server chose the person
  * and the records this review may read; a record counts only when it is current, not withdrawn, carries its staged
- * words and a delivery time, and rests on a NOT_MET observation of the practice. Prepared feedback reached no one, and
+ * words and a delivery time, and rests on a NOT_MET problem of the practice. Prepared feedback reached no one, and
  * a history that cannot be read does not establish prior communication.
  */
 function stagedDeliveredPractices(): Set<string> {
@@ -2530,9 +2813,9 @@ function stagedDeliveredPractices(): Set<string> {
 				if (!isRecord(entry)) {
 					return [];
 				}
-				const { channel, recordedClaimCurrentness, withdrawn, body, deliveredAt } = entry;
+				const { destination, recordedClaimCurrentness, withdrawn, body, deliveredAt } = entry;
 				if (
-					(channel !== "IN_APP" && channel !== "IN_CHAT") ||
+					(destination !== "PRACTICE_PAGE" && destination !== "CONVERSATION") ||
 					recordedClaimCurrentness !== "CURRENT" ||
 					(withdrawn !== undefined && withdrawn !== false) ||
 					typeof body !== "string" ||
@@ -2544,7 +2827,7 @@ function stagedDeliveredPractices(): Set<string> {
 				}
 				return jsonArray(entry.basedOn).flatMap((support) =>
 					isRecord(support) && support.outcome === "NOT_MET"
-						? [`${channel}:${normalizePracticeSlug(support.practiceSlug)}`]
+						? [`${destination}:${normalizePracticeSlug(support.practiceSlug)}`]
 						: [],
 				);
 			}),
@@ -2567,56 +2850,55 @@ function leanCitation(citation: AdmittedCitation): LeanCitation {
 	};
 }
 
-// Inline placement requires an observation's citation inside the current diff.
+// Inline location requires a problem's citation inside the current diff.
 function leanResults(results: readonly AdmittedResult[]): LeanResult[] {
 	return results.map((result) => ({
-		practiceResultId: result.practiceResultId,
+		resultId: result.resultId,
 		practiceSlug: result.practiceSlug,
 		outcome: result.outcome,
-		severity: result.severity,
 		citations: result.citations.map(leanCitation),
-		observations: result.observations.map((observation) => ({
-			observationId: observation.observationId,
-			severity: observation.severity,
-			// The server places a line note only on an observation that admission marked anchorable.
-			anchorable: observation.anchorable,
-			citations: observation.citations.map(leanCitation),
+		problems: result.problems.map((problem) => ({
+			problemId: problem.problemId,
+			severity: problem.severity,
+			// The server places a line note only on a problem that admission marked anchorable.
+			anchorable: problem.anchorable,
+			citations: problem.citations.map(leanCitation),
 		})),
 	}));
 }
 
-/** The admitted results by practiceResultId: what an id the composer names is resolved against. */
+/** The admitted results by resultId: what an id the composer names is resolved against. */
 function resultsById(results: readonly AdmittedResult[]): Map<string, AdmittedResult> {
-	return new Map(results.map((result) => [result.practiceResultId, result]));
+	return new Map(results.map((result) => [result.resultId, result]));
 }
 
 function persistComposedFeedback(): void {
-	for (const unit of undeliverableUnits(composedFeedback)) {
-		const { channel, practiceSlug, supersedesThreadKey } = unit;
+	for (const piece of undeliverableFeedback(composedFeedback)) {
+		const { destination, practiceSlug, supersedesThreadKey } = piece;
 		console.error(
-			channel === undefined || practiceSlug === undefined || supersedesThreadKey === undefined
-				? `[pi-runner] composed feedback the server cannot deliver: a SUPERSEDE unit lacks the channel, ` +
-						`practice or thread it replaces: ${JSON.stringify({ channel, practiceSlug, supersedesThreadKey })}`
-				: `[pi-runner] composed feedback the server cannot deliver: ${channel}/${practiceSlug} ` +
+			destination === undefined || practiceSlug === undefined || supersedesThreadKey === undefined
+				? `[pi-runner] composed feedback the server cannot deliver: a SUPERSEDE piece lacks the destination, ` +
+						`practice or thread it replaces: ${JSON.stringify({ destination, practiceSlug, supersedesThreadKey })}`
+				: `[pi-runner] composed feedback the server cannot deliver: ${destination}/${practiceSlug} ` +
 						`supersedes '${supersedesThreadKey}', which this envelope does not list as staged`,
 		);
 	}
-	// The server reads at most 30 units. Keep deliverable feedback ahead of WITHHOLD records.
-	const units = composedFeedback.units.toSorted(
+	// The server reads at most 30 feedback. Keep deliverable feedback ahead of WITHHOLD records.
+	const feedback = composedFeedback.feedback.toSorted(
 		(a, b) => Number(a.action === "WITHHOLD") - Number(b.action === "WITHHOLD"),
 	);
-	writeFileSync(FEEDBACK_PATH, JSON.stringify({ ...composedFeedback, units }, null, 2));
+	writeFileSync(FEEDBACK_PATH, JSON.stringify({ ...composedFeedback, feedback }, null, 2));
 }
 
-// The composer references admitted results and observations; it cannot author verdicts, citations, or locations.
+// The composer references admitted results and problems; it cannot author verdicts, citations, or locations.
 /** What report_feedback reports back: a refusal stores nothing and names no lane. */
 interface ReportFeedbackDetails {
 	stored: number;
-	channel?: Channel;
+	destination?: Destination;
 	total?: number;
 }
 
-/** A unit the tool did not store, with the reason the session is told. */
+/** A piece the tool did not store, with the reason the session is told. */
 function skipped(text: string): { stored: boolean; text: string } {
 	return { stored: false, text };
 }
@@ -2628,74 +2910,79 @@ function buildFeedbackTool(
 	preparedTargets: PreparedFeedbackTarget[],
 	deliveredPractices: ReadonlySet<string>,
 ) {
-	// The reader resolves supersession against the envelope's copy of this list and drops any unit
+	// The reader resolves supersession against the envelope's copy of this list and drops any piece
 	// naming a thread outside it, so the vocabulary is recorded here, where it is decided.
 	composedFeedback.preparedTargets = preparedTargets;
-	const enabledChannels = PRIVATE_CHANNELS.filter((channel) => request.channels[channel].enabled);
-	const usedPerChannel: Record<PrivateChannel, number> = { IN_APP: 0, IN_CHAT: 0 };
+	const enabledDestinations = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination].enabled,
+	);
+	const usedPerDestination: Record<PrivateDestination, number> = {
+		PRACTICE_PAGE: 0,
+		CONVERSATION: 0,
+	};
 	const seen = new Set<string>();
 
-	/** One unit stored, or the reason it was not. */
+	/** One piece stored, or the reason it was not. */
 	const store = (value: unknown): { stored: boolean; text: string } => {
 		const repairs: string[] = [];
-		const read = readFeedbackUnit(withholdBasis(value, results, repairs), practiceSlugs);
+		const read = readFeedbackPiece(withholdBasis(value, results, repairs), practiceSlugs);
 		if (typeof read === "string") {
 			return { stored: false, text: read };
 		}
-		const unit = read;
+		const piece = read;
 		// Built per call: the tool is defined before admission fills the results it reads.
 		const admitted = resultsById(results);
-		const bounds = request.channels[unit.channel];
+		const bounds = request.destinations[piece.destination];
 		if (!bounds.enabled) {
 			return skipped(
-				`${unit.channel} is not a lane this run may write for (open: ${enabledChannels.join(", ")}); skipped.`,
+				`${piece.destination} is not a lane this run may write for (open: ${enabledDestinations.join(", ")}); skipped.`,
 			);
 		}
-		const key = `${unit.channel}:${unit.practiceSlug}`;
+		const key = `${piece.destination}:${piece.practiceSlug}`;
 		if (seen.has(key)) {
 			return skipped(
-				`already have a ${unit.channel} unit for ${unit.practiceSlug}, and the first one stands; nothing to resend for it. Skipped.`,
+				`already have a ${piece.destination} piece for ${piece.practiceSlug}, and the first one stands; nothing to resend for it. Skipped.`,
 			);
 		}
-		const delivers = unit.action !== "WITHHOLD";
-		if (delivers && usedPerChannel[unit.channel] >= bounds.maxUnits) {
+		const delivers = piece.action !== "WITHHOLD";
+		if (delivers && usedPerDestination[piece.destination] >= bounds.maxPieces) {
 			return skipped(
-				`${unit.channel} holds at most ${bounds.maxUnits} unit(s) and is full: this one does not fit — WITHHOLD it with BELOW_BAR or leave it out. Skipped.`,
+				`${piece.destination} holds at most ${bounds.maxPieces} piece(s) and is full: this one does not fit — WITHHOLD it with BELOW_BAR or leave it out. Skipped.`,
 			);
 		}
-		const rejection = validateUnit(unit, admitted, preparedTargets, deliveredPractices);
+		const rejection = validateFeedback(piece, admitted, preparedTargets, deliveredPractices);
 		if (rejection !== null) {
 			return skipped(rejection);
 		}
 		// The server's routing decides the lanes a practice may reach; a withholding elsewhere decides nothing.
-		if (!(routedLanes?.get(unit.practiceSlug) ?? []).includes(unit.channel)) {
+		if (!(routedLanes?.get(piece.practiceSlug) ?? []).includes(piece.destination)) {
 			return skipped(
-				`${unit.channel} cannot carry feedback about ${unit.practiceSlug} this run ` +
-					`(${laneRefusal(unit.channel, unit.practiceSlug)}); write no unit for it there, not even a WITHHOLD. Skipped.`,
+				`${piece.destination} cannot carry feedback about ${piece.practiceSlug} this run ` +
+					`(${laneRefusal(piece.destination, piece.practiceSlug)}); write no piece for it there, not even a WITHHOLD. Skipped.`,
 			);
 		}
-		// IN_APP pattern feedback requires NOT_MET results on distinct pieces of work.
-		if (unit.channel === "IN_APP" && delivers) {
-			const pieces = negativePiecesOfWork(unit.practiceSlug);
-			if (pieces < request.minDistinctArtifacts) {
+		// PRACTICE_PAGE pattern feedback requires NOT_MET results on distinct pieces of work.
+		if (piece.destination === "PRACTICE_PAGE" && delivers) {
+			const pieces = negativePiecesOfWork(piece.practiceSlug);
+			if (pieces < request.minDistinctSourceFiles) {
 				return skipped(
-					`IN_APP needs a pattern across at least ${request.minDistinctArtifacts} pieces of work, and ` +
-						`${unit.practiceSlug} has support on ${pieces} (the IN_APP support read); WITHHOLD it ` +
+					`PRACTICE_PAGE needs a pattern across at least ${request.minDistinctSourceFiles} pieces of work, and ` +
+						`${piece.practiceSlug} has support on ${pieces} (the PRACTICE_PAGE support read); WITHHOLD it ` +
 						`with BELOW_BAR. Skipped.`,
 				);
 			}
 		}
 		seen.add(key);
 		if (delivers) {
-			usedPerChannel[unit.channel] += 1;
+			usedPerDestination[piece.destination] += 1;
 		}
-		composedFeedback.units.push({
-			...unit,
-			basedOn: evidenceRefs(unit.basedOn, namedEvidence(admitted)),
+		composedFeedback.feedback.push({
+			...piece,
+			basedOn: evidenceRefs(piece.basedOn, namedEvidence(admitted)),
 		});
 		return {
 			stored: true,
-			text: `stored a ${unit.channel} unit for ${unit.practiceSlug} (${unit.action}); ${usedPerChannel[unit.channel]}/${bounds.maxUnits} used on that lane.${repairs.map((repair) => ` ${repair}.`).join("")}`,
+			text: `stored a ${piece.destination} piece for ${piece.practiceSlug} (${piece.action}); ${usedPerDestination[piece.destination]}/${bounds.maxPieces} used on that lane.${repairs.map((repair) => ` ${repair}.`).join("")}`,
 		};
 	};
 
@@ -2704,40 +2991,40 @@ function buildFeedbackTool(
 		exposure: "model-only",
 		label: "Report Feedback",
 		description:
-			"Persist feedback units for the developer's practice pages and the mentor conversation, one per " +
-			"channel and practice. Send every unit you have ready in one call; each is stored or skipped on " +
-			"its own, with the reason, and a skipped unit can be sent again corrected without re-sending the " +
+			"Persist feedback feedback for the developer's practice pages and the mentor conversation, one per " +
+			"destination and practice. Send every piece you have ready in one call; each is stored or skipped on " +
+			"its own, with the reason, and a skipped piece can be sent again corrected without re-sending the " +
 			"stored ones. This is an intervention, not a measurement: it takes no outcome, severity or " +
 			"confidence, and no citation you typed yourself.",
-		// See documentedShape: validate feedback per unit, not per tool call.
+		// See documentedShape: validate feedback per piece, not per tool call.
 		parameters: {
 			type: "object",
-			required: ["units"],
+			required: ["feedback"],
 			properties: {
-				units: documentedShape(
+				feedback: documentedShape(
 					listSchema(
 						{
 							type: "object",
-							required: ["channel", "practiceSlug", "basedOn", "action"],
+							required: ["destination", "practiceSlug", "basedOn", "action"],
 							properties: {
-								channel: {
+								destination: {
 									type: "string",
-									enum: enabledChannels,
+									enum: enabledDestinations,
 									description:
-										"Which surface this unit is for. Each has its own level and its own rules.",
+										"Which surface this piece is for. Each has its own level and its own rules.",
 								},
 								practiceSlug: {
 									type: "string",
 									enum: practiceSlugs,
 									description:
-										"The primary practice whose intervention this unit advances. Related results may support it.",
+										"The primary practice whose intervention this piece advances. Related results may support it.",
 								},
 								basedOn: {
 									type: "array",
 									minItems: 1,
 									items: { type: "string", minLength: 1 },
 									description:
-										"What this rests on: admitted ids from this run, a result's practiceResultId or, for one located problem, an observation's observationId. Include related practices only when they describe the same underlying event.",
+										"What this rests on: admitted ids from this run, a result's resultId or, for one located problem, a problem's problemId. Include related practices only when they describe the same underlying event.",
 								},
 								action: {
 									type: "string",
@@ -2763,20 +3050,25 @@ function buildFeedbackTool(
 									type: "string",
 									maxLength: FEEDBACK_TEXT_BOUNDS.body,
 									description:
-										"IN_APP only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their observations; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
+										"PRACTICE_PAGE only: the evidenced pattern across the work and why it matters; the future way of working belongs to nextStep. Grounded in current results and their problems; never quote a line or claim change over time from the pre-run history. Markdown, read verbatim.",
 								},
 								nextStep: {
 									type: "string",
 									maxLength: FEEDBACK_TEXT_BOUNDS.nextStep,
 									description:
-										"IN_APP only: the one repeatable way of working for the next piece of work; the body does not state it. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
+										"PRACTICE_PAGE only: the one repeatable way of working for the next piece of work; the body does not state it. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
 								},
 								notes: {
 									type: "object",
 									additionalProperties: false,
-									required: ["situation", "capability", "evidenceSummary", "inConversationSignal"],
+									required: [
+										"situation",
+										"capability",
+										"evidenceSummary",
+										"inConversationLearning",
+									],
 									description:
-										"IN_CHAT only. Notes TO the mentor, which composes the whole turn itself, later, " +
+										"CONVERSATION only. Notes TO the mentor, which composes the whole turn itself, later, " +
 										"with the live conversation in front of it. Write what it needs to know, never a " +
 										"sentence for it to say: anything phrased as a line of dialogue will be spoken, and " +
 										"will sound like a script.",
@@ -2785,8 +3077,8 @@ function buildFeedbackTool(
 											type: "string",
 											maxLength: FEEDBACK_TEXT_BOUNDS.situation,
 											description:
-												"The concern the observations have in common, as it can be observed, stated once rather than " +
-												"listing each artifact again. Your words about it, not words for it - third person, never " +
+												"The concern the problems have in common, as it can be observed, stated once rather than " +
+												"listing each item again. Your words about it, not words for it - third person, never " +
 												"addressed to the developer as 'you', and never a judgement of the person.",
 										},
 										capability: {
@@ -2799,15 +3091,15 @@ function buildFeedbackTool(
 											type: "string",
 											maxLength: FEEDBACK_TEXT_BOUNDS.evidenceSummary,
 											description:
-												"Where the concern occurred, compactly: each supporting work and observation located once. " +
+												"Where the concern occurred, compactly: each supporting work and problem located once. " +
 												"Summarise rather than inventing a quote; the original result evidence is " +
 												"staged separately for the mentor to inspect.",
 										},
-										inConversationSignal: {
+										inConversationLearning: {
 											type: "string",
-											maxLength: FEEDBACK_TEXT_BOUNDS.inConversationSignal,
+											maxLength: FEEDBACK_TEXT_BOUNDS.inConversationLearning,
 											description:
-												"Understanding the developer articulates in a way that can be observed before the conversation ends: a distinction, decision, question, or self-check they say. Not a promise, future artifact, message text, or compliance target.",
+												"Understanding the developer articulates in a way that can be observed before the conversation ends: a distinction, decision, question, or self-check they say. Not a promise, future output, message text, or compliance target.",
 										},
 										alreadySaid: {
 											type: "string",
@@ -2819,7 +3111,7 @@ function buildFeedbackTool(
 								},
 							},
 						},
-						"units",
+						"feedback",
 					),
 				),
 			},
@@ -2836,14 +3128,17 @@ function buildFeedbackTool(
 					details: { stored: 0 },
 				};
 			}
-			const submitted = submittedList(isRecord(params) ? params.units : null, UNIT_ITEM_KEYS);
+			const submitted = submittedList(
+				isRecord(params) ? params.feedback : null,
+				FEEDBACK_ITEM_KEYS,
+			);
 			if ("error" in submitted) {
-				return refusal(toolCallId, `units refused — ${submitted.error}`);
+				return refusal(toolCallId, `feedback refused — ${submitted.error}`);
 			}
 			if (submitted.items.length === 0) {
 				return refusal(
 					toolCallId,
-					"units refused — the list is empty; send every unit you have ready in it",
+					"feedback refused — the list is empty; send every piece you have ready in it",
 				);
 			}
 			const outcomes = submitted.items.map(store);
@@ -2857,13 +3152,13 @@ function buildFeedbackTool(
 			}
 			const text = outcomes.map((outcome, index) => `#${index + 1}: ${outcome.text}`).join("\n");
 			// A call that stored nothing is an error the session must correct — the reasons are in it;
-			// one that stored some of what it sent is an answer, with the skips named per unit.
+			// one that stored some of what it sent is an answer, with the skips named per piece.
 			if (stored === 0) {
 				return refusal(toolCallId, text);
 			}
 			return {
 				content: [{ type: "text", text }],
-				details: { stored, total: composedFeedback.units.length },
+				details: { stored, total: composedFeedback.feedback.length },
 				terminate: turnDemand?.endsWhenPaid === true && turnDemand.owed() === 0,
 			};
 		},
@@ -2883,22 +3178,22 @@ interface PublicReviewState {
 	reviewContext: "LOST" | "RESTORING" | "HELD";
 }
 
-/** The public results the review may rest on, by practiceResultId, each with its observations' citations. */
+/** The public results the review may rest on, by resultId, each with its problems' citations. */
 function reviewableById(
 	reviewable: readonly Record<string, unknown>[],
 ): Map<string, ReviewedResult> {
 	return new Map(
 		reviewable.map((result) => [
-			String(result.practiceResultId),
+			String(result.resultId),
 			{
 				practiceSlug: String(result.practiceSlug),
 				summaryOnly: result.summaryOnly === true,
 				outcome: result.outcome,
-				observations: jsonArray(result.observations)
+				problems: jsonArray(result.problems)
 					.filter(isRecord)
-					.map((observation) => ({
-						observationId: String(observation.observationId),
-						citations: jsonArray(observation.citations).filter(isRecord),
+					.map((problem) => ({
+						problemId: String(problem.problemId),
+						citations: jsonArray(problem.citations).filter(isRecord),
 					})),
 			},
 		]),
@@ -2908,7 +3203,7 @@ function reviewableById(
 const REVIEW_FINAL = "The review on this work is final; this composition accepts nothing more.";
 
 /**
- * Reads the review against only the NOT_MET results admission marked publicEligible and their observations, and the
+ * Reads the review against only the NOT_MET results admission marked publicEligible and their problems, and the
  * statements shown as already said.
  */
 function buildReviewTool(
@@ -2972,7 +3267,7 @@ function buildReviewTool(
 			}
 			const { summary, inline, withheld } = read.review;
 			const said = summary
-				? `a summary resting on ${summary.basedOn.length} result(s) and observation(s)`
+				? `a summary resting on ${summary.basedOn.length} result(s) and problem(s)`
 				: "no summary";
 			return {
 				content: [
@@ -2993,7 +3288,7 @@ function undecidedByReview(reviewable: readonly Record<string, unknown>[]): stri
 	const decided = decidedByReview(composedFeedback.review);
 	return reviewable
 		.filter((result) => result.outcome === "NOT_MET")
-		.map((result) => String(result.practiceResultId))
+		.map((result) => String(result.resultId))
 		.filter((id) => !decided.has(id));
 }
 
@@ -3015,11 +3310,11 @@ function practiceContext(results: readonly Record<string, unknown>[]): ReviewPra
 			name: practice.name,
 			...(practice.whyItMatters === undefined ? {} : { whyItMatters: practice.whyItMatters }),
 			knownLimitations: practice.knownLimitations,
-			...(practice.revisionId === undefined ? {} : { revisionId: practice.revisionId }),
+			...(practice.versionId === undefined ? {} : { versionId: practice.versionId }),
 		}));
 }
 
-/** Match ComposedFeedbackUnit bounds so the model can correct a unit before server admission. */
+/** Match ComposedFeedbackPiece bounds so the model can correct a piece before server admission. */
 const FEEDBACK_TEXT_BOUNDS = {
 	title: 255,
 	body: 8000,
@@ -3028,12 +3323,12 @@ const FEEDBACK_TEXT_BOUNDS = {
 	situation: 4000,
 	capability: 2000,
 	evidenceSummary: 4000,
-	inConversationSignal: 2000,
+	inConversationLearning: 2000,
 	alreadySaid: 2000,
 } as const;
 
-const UNIT_FIELDS = [
-	"channel",
+const PIECE_FIELDS = [
+	"destination",
 	"practiceSlug",
 	"basedOn",
 	"action",
@@ -3049,7 +3344,7 @@ const NOTE_FIELDS = [
 	"situation",
 	"capability",
 	"evidenceSummary",
-	"inConversationSignal",
+	"inConversationLearning",
 	"alreadySaid",
 ] as const;
 
@@ -3067,7 +3362,7 @@ function vocabularyWord<T extends string>(
 	return match ?? `${field} must be one of ${vocabulary.join(", ")} (received '${value}')`;
 }
 
-/** Enforce text length here; validateUnit handles lane-specific required fields. */
+/** Enforce text length here; validateFeedback handles lane-specific required fields. */
 function boundedText(
 	value: unknown,
 	field: keyof typeof FEEDBACK_TEXT_BOUNDS,
@@ -3085,7 +3380,7 @@ function boundedText(
 	const bound = FEEDBACK_TEXT_BOUNDS[field];
 	if (text.length > bound) {
 		return {
-			error: `${field} must be at most ${bound} characters; this one is ${text.length}. Shorten it and send the unit again`,
+			error: `${field} must be at most ${bound} characters; this one is ${text.length}. Shorten it and send the piece again`,
 		};
 	}
 	return { text };
@@ -3111,7 +3406,7 @@ function withholdBasis(
 	const slug = normalizePracticeSlug(value.practiceSlug);
 	const ids = results
 		.filter((result) => result.practiceSlug === slug && result.outcome === "NOT_MET")
-		.map((result) => result.practiceResultId);
+		.map((result) => result.resultId);
 	if (ids.length === 0) {
 		return value;
 	}
@@ -3119,25 +3414,25 @@ function withholdBasis(
 	return { ...value, basedOn: ids };
 }
 
-function readFeedbackUnit(
+function readFeedbackPiece(
 	value: unknown,
 	practiceSlugs: readonly string[],
-): ReadFeedbackUnit | string {
+): ReadFeedbackPiece | string {
 	if (!isRecord(value)) {
-		return `each item of units is one unit object with channel, practiceSlug, basedOn and action (received ${typeof value}); skipped.`;
+		return `each item of feedback is one piece object with destination, practiceSlug, basedOn and action (received ${typeof value}); skipped.`;
 	}
 	const unknownFields = Object.keys(value).filter(
-		(key) => !UNIT_FIELDS.some((field) => field === key),
+		(key) => !PIECE_FIELDS.some((field) => field === key),
 	);
 	if (unknownFields.length > 0) {
-		return `unknown unit field(s): ${unknownFields.join(", ")} — a unit takes ${UNIT_FIELDS.join(", ")}; skipped.`;
+		return `unknown piece field(s): ${unknownFields.join(", ")} — a piece takes ${PIECE_FIELDS.join(", ")}; skipped.`;
 	}
-	const channel = vocabularyWord(value.channel, CHANNELS, "channel");
-	if (!isChannel(channel)) {
-		return `${channel}; skipped.`;
+	const destination = vocabularyWord(value.destination, DESTINATIONS, "destination");
+	if (!isDestination(destination)) {
+		return `${destination}; skipped.`;
 	}
-	if (channel === "IN_CONTEXT") {
-		return "the review on the work is written in its own turn, not as a unit here; skipped.";
+	if (destination === "ON_WORK") {
+		return "the review on the work is written in its own turn, not as a piece here; skipped.";
 	}
 	const action = vocabularyWord(value.action, ACTIONS, "action");
 	if (!isFeedbackAction(action)) {
@@ -3153,13 +3448,33 @@ function readFeedbackUnit(
 	if (!practiceSlugs.includes(practiceSlug)) {
 		return `practiceSlug '${practiceSlug}' is not a practice with an admitted result in this run (those are: ${practiceSlugs.join(", ")}); skipped.`;
 	}
-	// One id sent bare is the list of one; the reader drops a unit that cites nothing, so admitting an
+	if (
+		action === "NEW" &&
+		feedbackBody({
+			title: optionalString(value.title),
+			body: optionalString(value.body),
+			nextStep: optionalString(value.nextStep),
+			notes: isRecord(value.notes)
+				? {
+						situation: optionalString(value.notes.situation),
+						capability: optionalString(value.notes.capability),
+						evidenceSummary: optionalString(value.notes.evidenceSummary),
+						inConversationLearning: optionalString(value.notes.inConversationLearning),
+						alreadySaid: optionalString(value.notes.alreadySaid),
+					}
+				: undefined,
+		}).length > 8000
+	) {
+		return "the complete feedback text must be at most 8000 characters; shorten it and send it again";
+	}
+
+	// One id sent bare is the list of one; the reader drops a piece that cites nothing, so admitting an
 	// empty list here would tell the session it succeeded and then deliver nothing.
 	const basedOn = listOrSingle(value.basedOn).filter(
 		(reference): reference is string => typeof reference === "string" && reference.trim() !== "",
 	);
 	if (basedOn.length === 0) {
-		return "basedOn is required: the admitted result or observation id(s) this unit rests on; skipped.";
+		return "basedOn is required: the admitted result or problem id(s) this piece rests on; skipped.";
 	}
 	let withholdReason: string | undefined;
 	if (value.withholdReason !== undefined && value.withholdReason !== null) {
@@ -3198,7 +3513,7 @@ function readFeedbackUnit(
 		}
 	}
 	return {
-		channel,
+		destination,
 		practiceSlug,
 		action,
 		basedOn: basedOn.map((reference) => reference.trim()),
@@ -3228,7 +3543,7 @@ const THIS_WORK = ((): string | undefined => {
 	if (!isRecord(metadata)) {
 		return undefined;
 	}
-	const kind = folderIndex.artifactKind;
+	const kind = folderIndex.itemKind;
 	if (kind !== "scm.pull_request" && kind !== "scm.issue") {
 		return undefined;
 	}
@@ -3237,127 +3552,127 @@ const THIS_WORK = ((): string | undefined => {
 
 // Enforce snapshot-dependent constraints here for fast model correction; Java rechecks them.
 /**
- * Count the distinct pieces of work the server's IN_APP support read selected for the practice. Two occurrences on
- * one piece of work are one piece, as the server counts it (InAppFeedbackRouter.distinctArtifacts).
+ * Count the distinct pieces of work the server's PRACTICE_PAGE support read selected for the practice. Two occurrences on
+ * one piece of work are one piece, as the server counts it (PracticePageFeedbackRouter.supportsPattern).
  */
 function negativePiecesOfWork(practiceSlug: string): number {
-	if (inAppSupport?.state !== "COMPLETE") {
+	if (practicePageSupport?.state !== "COMPLETE") {
 		return 0;
 	}
-	const support = inAppSupport.practices.find((practice) => practice.practiceSlug === practiceSlug);
+	const support = practicePageSupport.practices.find(
+		(practice) => practice.practiceSlug === practiceSlug,
+	);
 	return new Set(
-		(support?.occurrences ?? []).map(
-			(occurrence) => `${occurrence.artifactKind}:${occurrence.artifactId}`,
-		),
+		(support?.occurrences ?? []).map((occurrence) => `${occurrence.itemKind}:${occurrence.itemId}`),
 	).size;
 }
 
-/** The IN_CHAT lane: notes to the mentor, and nothing that would be read out. */
-function validateChatUnit(unit: ReadFeedbackUnit): string | null {
-	if (hasText(unit.body) || hasText(unit.nextStep)) {
-		return "IN_CHAT takes notes{situation,capability,evidenceSummary,inConversationSignal}, not body/nextStep - nothing on this lane is read out; skipped.";
+/** The CONVERSATION lane: notes to the mentor, and nothing that would be read out. */
+function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
+	if (hasText(piece.body) || hasText(piece.nextStep)) {
+		return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing on this lane is read out; skipped.";
 	}
-	const { notes } = unit;
+	const { notes } = piece;
 	for (const field of [
 		"situation",
 		"capability",
 		"evidenceSummary",
-		"inConversationSignal",
+		"inConversationLearning",
 	] as const) {
 		if (isBlank(notes?.[field])) {
-			return `IN_CHAT needs notes.${field}; skipped.`;
+			return `CONVERSATION needs notes.${field}; skipped.`;
 		}
 	}
 	return null;
 }
 
 /**
- * The IN_APP lane: a body about a pattern across work, never a quote of this work. Every quote of a result the unit
- * rests on counts, its own and its observations', whichever of its ids the unit names.
+ * The PRACTICE_PAGE lane: a body about a pattern across work, never a quote of this work. Every quote of a result the piece
+ * rests on counts, its own and its problems', whichever of its ids the piece names.
  */
-function validateAppUnit(
-	unit: ReadFeedbackUnit,
+function validatePracticePagePiece(
+	piece: ReadFeedbackPiece,
 	named: ReadonlyMap<string, { result: AdmittedResult }>,
 ): string | null {
-	const { body } = unit;
+	const { body } = piece;
 	if (!hasText(body?.trim())) {
-		return "IN_APP needs a body; skipped.";
+		return "PRACTICE_PAGE needs a body; skipped.";
 	}
 	const normalizedBody = normalizeQuotedText(body);
-	const repeatsCurrentEvidence = unit.basedOn.some((id) => {
+	const repeatsCurrentEvidence = piece.basedOn.some((id) => {
 		const result = named.get(id)?.result;
 		return [
 			...(result?.citations ?? []),
-			...(result?.observations ?? []).flatMap((observation) => observation.citations),
+			...(result?.problems ?? []).flatMap((problem) => problem.citations),
 		].some((citation) => {
 			const quote = normalizeQuotedText(optionalString(citation.quote) ?? "");
 			return quote.length >= 12 && normalizedBody.includes(quote);
 		});
 	});
 	if (repeatsCurrentEvidence) {
-		return "IN_APP describes a cross-artifact pattern; do not copy a current artifact quote into it. Skipped.";
+		return "PRACTICE_PAGE describes a pattern across items; do not copy a current item quote into it. Skipped.";
 	}
 	return null;
 }
 
-function validateUnit(
-	unit: ReadFeedbackUnit,
+function validateFeedback(
+	piece: ReadFeedbackPiece,
 	results: ReadonlyMap<string, AdmittedResult>,
 	preparedTargets: readonly PreparedFeedbackTarget[],
 	deliveredPractices: ReadonlySet<string>,
 ): string | null {
-	const evidenceError = validateFeedbackEvidence(unit.practiceSlug, unit.basedOn, results);
+	const evidenceError = validateFeedbackEvidence(piece.practiceSlug, piece.basedOn, results);
 	if (evidenceError !== null) {
 		return evidenceError;
 	}
 	const named = namedEvidence(results);
-	if (unit.action === "WITHHOLD") {
-		const reason = unit.withholdReason;
+	if (piece.action === "WITHHOLD") {
+		const reason = piece.withholdReason;
 		if (!hasText(reason)) {
 			return "WITHHOLD needs a withholdReason; skipped.";
 		}
 		// The withholding settles each NOT_MET practice in basedOn (undecidedPrivatePractices), so each needs a record here.
 		const unrecorded = notMetPractices(
-			unit.basedOn.flatMap((id) => named.get(id)?.result ?? []),
-		).filter((slug) => !deliveredPractices.has(`${unit.channel}:${slug}`));
+			piece.basedOn.flatMap((id) => named.get(id)?.result ?? []),
+		).filter((slug) => !deliveredPractices.has(`${piece.destination}:${slug}`));
 		if ([...PRIOR_ADVICE_REASONS].some((prior) => prior === reason) && unrecorded.length > 0) {
 			return (
-				`${reason} rests on feedback recorded as delivered on ${unit.channel} for ${unrecorded.join(", ")} in the ` +
+				`${reason} rests on feedback recorded as delivered on ${piece.destination} for ${unrecorded.join(", ")} in the ` +
 				`delivered-feedback history: current, not withdrawn, with its words, for each NOT_MET practice in basedOn. The captured history does not establish that prerequisite; prepared ` +
-				`feedback and other channels do not count. Decide this lane on its own evidence: the unit it supports, ` +
+				`feedback and other destinations do not count. Decide this lane on its own evidence: the piece it supports, ` +
 				`or WITHHOLD with BELOW_BAR. Skipped.`
 			);
 		}
 		return null;
 	}
-	if (isBlank(unit.title)) {
-		return "A unit that is not a WITHHOLD needs a title; skipped.";
+	if (isBlank(piece.title)) {
+		return "A piece that is not a WITHHOLD needs a title; skipped.";
 	}
-	if (unit.action === "SUPERSEDE") {
-		if (!hasText(unit.supersedesThreadKey)) {
+	if (piece.action === "SUPERSEDE") {
+		if (!hasText(piece.supersedesThreadKey)) {
 			return "SUPERSEDE needs a supersedesThreadKey; skipped.";
 		}
 		if (
 			!preparedTargets.some(
 				(target) =>
-					target.threadKey === unit.supersedesThreadKey &&
-					target.channel === unit.channel &&
-					target.practiceSlug === unit.practiceSlug,
+					target.threadKey === piece.supersedesThreadKey &&
+					target.destination === piece.destination &&
+					target.practiceSlug === piece.practiceSlug,
 			)
 		) {
-			return `No queued message has threadKey '${unit.supersedesThreadKey}'; it must come from the task-declared prepared-feedback file. Skipped.`;
+			return `No queued message has threadKey '${piece.supersedesThreadKey}'; it must come from the task-declared prepared-feedback file. Skipped.`;
 		}
 	}
-	if (unit.channel === "IN_CHAT") {
-		return validateChatUnit(unit);
+	if (piece.destination === "CONVERSATION") {
+		return validateConversationPiece(piece);
 	}
-	if (unit.notes) {
-		return "Only IN_CHAT units may carry a notes block; skipped.";
+	if (piece.notes) {
+		return "Only CONVERSATION feedback may carry a notes block; skipped.";
 	}
-	if (isBlank(unit.nextStep)) {
-		return `${unit.channel} needs a nextStep; skipped.`;
+	if (isBlank(piece.nextStep)) {
+		return `${piece.destination} needs a nextStep; skipped.`;
 	}
-	return validateAppUnit(unit, named);
+	return validatePracticePagePiece(piece, named);
 }
 
 function normalizeQuotedText(value: string): string {
@@ -3380,16 +3695,16 @@ function coordinatesOf(citation: unknown): unknown {
 }
 
 /**
- * One admitted result as the private composer sees it, with its observations nested: every citation by its
+ * One admitted result as the private composer sees it, with its problems nested: every citation by its
  * coordinates only. An abstention keeps the limit it recorded and its id; its summary and rationale may assert more
  * than it decided.
  */
 function composerView(result: AdmittedResult): Record<string, unknown> {
 	const citations = result.citations.map(coordinatesOf);
 	if (result.outcome !== "NOT_MET" && result.outcome !== "MET") {
-		const { practiceResultId, practiceSlug, outcome } = result;
+		const { resultId, practiceSlug, outcome } = result;
 		return {
-			practiceResultId,
+			resultId,
 			practiceSlug,
 			outcome,
 			evidence: qualificationEvidence(result),
@@ -3397,16 +3712,17 @@ function composerView(result: AdmittedResult): Record<string, unknown> {
 		};
 	}
 	// MET counterevidence keeps the same qualifications as NOT_MET.
-	const { citations: _admitted, example, observations, ...rest } = result;
+	const { citations: _admitted, example, problems, ...rest } = result;
 	return {
 		...rest,
+		evidence: isRecord(result.evidence) ? { ...result.evidence, citations } : result.evidence,
 		...(isRecord(example)
 			? { example: { ...example, citation: coordinatesOf(example.citation) } }
 			: {}),
 		citations,
-		observations: observations.map((observation) => ({
-			...observation,
-			citations: observation.citations.map(coordinatesOf),
+		problems: problems.map((problem) => ({
+			...problem,
+			citations: problem.citations.map(coordinatesOf),
 		})),
 	};
 }
@@ -3519,7 +3835,7 @@ function plannedReviewFacts(): string {
 		})),
 		withheld: review.withheld,
 	};
-	return `### The review composed for this work\nThis decision is not a receipt of provider delivery. It may have entered public handling, whose final gates can still withhold it. Only delivered-history records establish prior communication. Private channels remain independently useful and may make the same supported point. ${stored ? "Read the located bodies if their wording matters." : "Its wording is not available as a staged file here."}\n\`\`\`json\n${JSON.stringify(facts, null, 1)}\n\`\`\`\n`;
+	return `### The review composed for this work\nThis decision is not a receipt of provider delivery. It may have entered public handling, whose final gates can still withhold it. Only delivered-history records establish prior communication. Private destinations remain independently useful and may make the same supported point. ${stored ? "Read the located bodies if their wording matters." : "Its wording is not available as a staged file here."}\n\`\`\`json\n${JSON.stringify(facts, null, 1)}\n\`\`\`\n`;
 }
 
 function buildCompositionTurn(
@@ -3527,18 +3843,24 @@ function buildCompositionTurn(
 	results: readonly AdmittedResult[],
 	notReached: readonly string[] = [],
 ): string {
-	const lanes = PRIVATE_CHANNELS.filter((channel) => request.channels[channel].enabled)
-		.map((channel) => `${channel} (at most ${request.channels[channel].maxUnits})`)
+	const lanes = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination].enabled,
+	)
+		.map((destination) => `${destination} (at most ${request.destinations[destination].maxPieces})`)
 		.join(", ");
-	const closed = PRIVATE_CHANNELS.filter((channel) => !request.channels[channel].enabled);
+	const closed = PRIVATE_DESTINATIONS.filter(
+		(destination) => !request.destinations[destination].enabled,
+	);
 	const closedNote =
 		closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "";
 	const coverageNote = notReachedNote(notReached);
-	const routing = PRIVATE_CHANNELS.filter((channel) => request.channels[channel].enabled)
+	const routing = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination].enabled,
+	)
 		.map(
-			(channel) =>
-				`${channel}: ${privatelyComposable()
-					.filter((slug) => routedLanes?.get(slug)?.includes(channel) === true)
+			(destination) =>
+				`${destination}: ${privatelyComposable()
+					.filter((slug) => routedLanes?.get(slug)?.includes(destination) === true)
 					.join(", ")}`,
 		)
 		.join("; ");
@@ -3547,14 +3869,11 @@ function buildCompositionTurn(
 	const historyRoot = nodePath.dirname(PREPARED_FEEDBACK_PATH);
 	const context = [
 		stagedBlock("The composition request (lanes, caps, placements)", COMPOSITION_REQUEST_PATH),
-		stagedBlock(
-			"What earlier reviews recorded about this person",
-			`${historyRoot}/observations.json`,
-		),
-		request.channels.IN_APP.enabled
+		stagedBlock("What earlier reviews recorded about this person", `${historyRoot}/problems.json`),
+		request.destinations.PRACTICE_PAGE.enabled
 			? stagedBlock(
-					"IN_APP support: occurrences a new card may cite at this read",
-					IN_APP_SUPPORT_PATH,
+					"PRACTICE_PAGE support: occurrences a new card may cite at this read",
+					PRACTICE_PAGE_SUPPORT_PATH,
 				)
 			: "",
 		priorFeedbackFacts("Recorded delivered feedback", `${historyRoot}/feedback.json`, "feedback"),
@@ -3567,7 +3886,7 @@ function buildCompositionTurn(
 		.filter((block) => block !== "")
 		.join("\n");
 	return `## This turn
-The review just finished. The criteria its NOT_MET practices were assessed against come first, as staged; its ${results.length} admitted result(s) follow them, one per practice. The MET and NOT_MET ones carry their rationale and their citations by coordinates; each NOT_MET one also carries its observations, the located problems it found, each with its own citations. The abstentions carry the limit they recorded, an open question or why the practice did not apply, and their citations by coordinates. The full record, quoted lines included, is \`work/composition/results.json\`. The history follows them.
+The review just finished. The criteria its NOT_MET practices were assessed against come first, as staged; its ${results.length} admitted result(s) follow them, one per practice. The MET and NOT_MET ones carry their rationale and their citations by coordinates; each NOT_MET one also carries its problems, the located problems it found, each with its own citations. The abstentions carry the limit they recorded, an open question or why the practice did not apply, and their citations by coordinates. The full record, quoted lines included, is \`work/composition/results.json\`. The history follows them.
 
 ${notMetCriteria(results)}
 \`\`\`json
@@ -3577,10 +3896,10 @@ ${admitted}
 ${context}
 ${onTheWork}
 Lanes open this turn: ${lanes}.${closedNote}
-The practices each open lane may carry: ${routing}. Write no unit, not even a WITHHOLD, for a practice on a lane that does not list it.
-A pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.
+The practices each open lane may carry: ${routing}. Write no piece, not even a WITHHOLD, for a practice on a lane that does not list it.
+A pattern claim needs at least ${request.minDistinctSourceFiles} distinct pieces of work.
 
-${coverageNote}Persist the units with report_feedback — every unit you have in one call. Writing nothing on a lane is a correct and common outcome; say in one line why, and stop.`;
+${coverageNote}Persist the feedback with report_feedback — every piece you have in one call. Writing nothing on a lane is a correct and common outcome; say in one line why, and stop.`;
 }
 
 /** A transport failure or a server that is not answering yet; a refusal is a decision, not a blip. */
@@ -3673,23 +3992,65 @@ async function admitResults() {
 	);
 	const answer = acceptAdmission(admitted);
 	// The support read is checked only after the admission it accompanies; it never changes what was admitted.
-	inAppSupport = readInAppSupport(answer.inAppSupport, admittedResults);
-	if (inAppSupport?.state === "COMPLETE") {
-		writeFileSync(IN_APP_SUPPORT_PATH, JSON.stringify(inAppSupport, null, 2));
+	practicePageSupport = readPracticePageSupport(answer.practicePageSupport, admittedResults);
+	if (practicePageSupport?.state === "COMPLETE") {
+		writeFileSync(PRACTICE_PAGE_SUPPORT_PATH, JSON.stringify(practicePageSupport, null, 2));
 	}
-	inChatEligibility = readInChatEligibility(answer.inChatEligibility, admittedResults);
+	conversationEligibility = readConversationEligibility(
+		answer.conversationEligibility,
+		admittedResults,
+	);
 }
 
-/** Hand the complete public decision to its server owner without settling the review or its usage. */
-async function completeReviewOnWork(safety: ReturnType<typeof scheduleDeadline>): Promise<void> {
-	if (composedFeedback.review === null || admissionDigest === null || safety.expired()) {
+/** Submit the complete feedback proposal under the owned review attempt. */
+async function prepareComposedFeedback(safety: ReturnType<typeof scheduleDeadline>): Promise<void> {
+	if (admissionDigest === null || safety.expired()) {
 		return;
 	}
-	const result = await completePublicReview({
-		url: `${LLM_PROXY_URL}/complete-public-review`,
+	const composition: FeedbackComposition[] = [];
+	const { review } = composedFeedback;
+	if (review !== null) {
+		const refs = [
+			...(review.summary?.basedOn ?? []),
+			...review.inline.flatMap((note) => note.basedOn),
+		];
+		const resultIds = [...new Set(refs.map((ref) => ref.resultId))];
+		const quiet = resultIds.length === 0;
+		const selected = quiet
+			? [...new Set(review.withheld.flatMap((piece) => piece.basedOn.map((ref) => ref.resultId)))]
+			: resultIds;
+		if (selected.length > 0) {
+			composition.push({
+				destination: "ON_WORK",
+				resultIds: selected,
+				summary: review.summary?.body ?? null,
+				notes: review.inline.map((note) => ({ problemId: note.anchor.problemId, body: note.body })),
+				withheldReason: quiet ? "COMPOSER_WITHHELD" : null,
+			});
+		}
+	}
+	for (const piece of composedFeedback.feedback) {
+		composition.push({
+			destination: piece.destination,
+			resultIds: [...new Set(piece.basedOn.map((ref) => ref.resultId))],
+			summary: piece.action === "WITHHOLD" ? null : feedbackBody(piece),
+			notes: [],
+			withheldReason: piece.action === "WITHHOLD" ? "COMPOSER_WITHHELD" : null,
+		});
+	}
+	if (composition.length === 0) {
+		return;
+	}
+	const result = await prepareFeedback({
+		url: `${LLM_PROXY_URL}/prepare-feedback`,
 		token: LLM_PROXY_TOKEN,
-		admissionDigest,
-		review: composedFeedback.review,
+		payload: {
+			reviewId: taskEnvelope.reviewId,
+			jobId: taskEnvelope.jobId,
+			attempt: taskEnvelope.attempt,
+			basisResultIds: [...new Set(composition.flatMap((piece) => piece.resultIds))],
+			composition,
+		},
 		timeoutMs: Math.min(
 			ADMISSION_ATTEMPT_TIMEOUT_MS,
 			AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS),
@@ -3698,12 +4059,22 @@ async function completeReviewOnWork(safety: ReturnType<typeof scheduleDeadline>)
 	if (result.state === "REFUSED") {
 		// The server made a final decision: returning this package at terminal must not bypass it.
 		composedFeedback.review = null;
-		recordCompositionFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
+		composedFeedback.feedback = [];
+		if (composition.some((piece) => piece.destination === "ON_WORK")) {
+			recordCompositionFailure("PUBLIC_REVIEW", "SERVER_REFUSED");
+		}
+		if (composition.some((piece) => piece.destination !== "ON_WORK")) {
+			recordCompositionFailure("PRIVATE_FEEDBACK", "SERVER_REFUSED");
+		}
 		persistComposedFeedback();
 	}
-	// An unavailable acknowledgement may follow a committed acceptance. The server reconciles the
-	// unchanged terminal package against that immutable completion; it never authorizes another writer.
-	console.error(`[pi-runner] public completion: ${result.state}`);
+	if (result.state === "PREPARED") {
+		composedFeedback.preparation = result.receipt;
+		persistComposedFeedback();
+	}
+	// An unavailable acknowledgement may follow a committed preparation. The server reconciles the
+	// unchanged terminal package against that immutable preparation; it never authorizes another writer.
+	console.error(`[pi-runner] feedback preparation: ${result.state}`);
 }
 
 /**
@@ -3713,21 +4084,20 @@ async function completeReviewOnWork(safety: ReturnType<typeof scheduleDeadline>)
 function acceptAdmission(admitted: unknown): Record<string, unknown> {
 	if (
 		!isRecord(admitted) ||
-		admitted.schemaVersion !== 2 ||
+		admitted.contractVersion !== 3 ||
 		typeof admitted.admissionDigest !== "string" ||
-		!Array.isArray(admitted.results) ||
-		!admitted.results.every(isAdmittedResult)
+		!Array.isArray(admitted.admitted)
 	) {
 		throw new Error("result admission returned an invalid contract");
 	}
 	for (const withheld of jsonArray(admitted.withheld)) {
 		if (isRecord(withheld)) {
 			console.error(
-				`[pi-runner] admission withheld ${logValue(withheld.practiceSlug)}: ${logValue(withheld.reasonCode)}`,
+				`[pi-runner] admission withheld ${logValue(withheld.practiceSlug)}: ${logValue(withheld.reason)}`,
 			);
 		}
 	}
-	admittedResults.splice(0, admittedResults.length, ...admitted.results);
+	admittedResults.splice(0, admittedResults.length, ...admitted.admitted.map(admittedResultOf));
 	admissionDigest = admitted.admissionDigest;
 	compositionAdmitted = true;
 	composedFeedback.admissionDigest = admissionDigest;
@@ -3744,29 +4114,29 @@ function acceptAdmission(admitted: unknown): Record<string, unknown> {
  */
 function closeUnroutedPrivateLanes(request: CompositionRequest): void {
 	const notMet = notMetPractices(admittedResults);
-	for (const channel of PRIVATE_CHANNELS) {
-		if (!request.channels[channel].enabled || notMet.length === 0) {
+	for (const destination of PRIVATE_DESTINATIONS) {
+		if (!request.destinations[destination].enabled || notMet.length === 0) {
 			continue;
 		}
-		const read = channel === "IN_APP" ? inAppSupport : inChatEligibility;
+		const read = destination === "PRACTICE_PAGE" ? practicePageSupport : conversationEligibility;
 		if (read?.state !== "COMPLETE") {
-			request.channels[channel].enabled = false;
+			request.destinations[destination].enabled = false;
 			console.error(
-				`[pi-runner] ${channel} closed for this run: ${channel === "IN_APP" ? "support context" : "routing"} ${read === null ? "missing or malformed" : read.state}`,
+				`[pi-runner] ${destination} closed for this run: ${destination === "PRACTICE_PAGE" ? "support context" : "routing"} ${read === null ? "missing or malformed" : read.state}`,
 			);
 			if (read?.state !== "REFUSED") {
 				recordCompositionFailure("PRIVATE_FEEDBACK", "RUNTIME_ERROR");
 			}
-		} else if (!notMet.some((slug) => routedTo(channel, slug))) {
-			request.channels[channel].enabled = false;
-			console.error(`[pi-runner] ${channel} closed for this run: no practice is routed to it`);
+		} else if (!notMet.some((slug) => routedTo(destination, slug))) {
+			request.destinations[destination].enabled = false;
+			console.error(`[pi-runner] ${destination} closed for this run: no practice is routed to it`);
 		}
 	}
 	routedLanes = new Map(
 		notMet.map((slug) => [
 			slug,
-			PRIVATE_CHANNELS.filter(
-				(channel) => request.channels[channel].enabled && routedTo(channel, slug),
+			PRIVATE_DESTINATIONS.filter(
+				(destination) => request.destinations[destination].enabled && routedTo(destination, slug),
 			),
 		]),
 	);
@@ -3839,34 +4209,46 @@ async function readPublicFeedbackHistory(): Promise<{
 	const history = isRecord(answer) && isRecord(answer.history) ? answer.history : null;
 	if (
 		!isRecord(answer) ||
-		answer.schemaVersion !== 1 ||
+		answer.contractVersion !== 3 ||
 		typeof answer.readAt !== "string" ||
 		!Number.isFinite(Date.parse(answer.readAt)) ||
 		history === null ||
-		!Array.isArray(history.feedback) ||
-		!history.feedback.every(
-			(entry: unknown) =>
-				isRecord(entry) &&
-				typeof entry.id === "string" &&
-				entry.channel === "IN_CONTEXT" &&
-				entry.publicEligible === true &&
-				(entry.deliveredAt === null ||
-					(typeof entry.deliveredAt === "string" &&
-						Number.isFinite(Date.parse(entry.deliveredAt)))) &&
-				isRecord(entry.artifact) &&
-				typeof entry.artifact.kind === "string" &&
-				(entry.artifact.url === undefined ||
-					entry.artifact.url === null ||
-					typeof entry.artifact.url === "string") &&
-				(entry.recordedClaimCurrentness === "CURRENT" ||
-					entry.recordedClaimCurrentness === "STALE") &&
-				(entry.body === undefined || entry.body === null || typeof entry.body === "string") &&
-				(entry.withdrawn === undefined || typeof entry.withdrawn === "boolean"),
-		)
+		!isRecord(history.item) ||
+		!isDecimalId(history.item.id) ||
+		typeof history.item.kind !== "string" ||
+		(history.item.url !== null &&
+			history.item.url !== undefined &&
+			typeof history.item.url !== "string") ||
+		!Array.isArray(history.feedback)
 	) {
 		throw new Error("public feedback history read returned an invalid contract");
 	}
-	const read = { readAt: answer.readAt, history: { ...history, feedback: history.feedback } };
+	const { item } = history;
+	const feedback = history.feedback.map((entry: unknown) => {
+		if (
+			!isRecord(entry) ||
+			typeof entry.id !== "string" ||
+			entry.destination !== "ON_WORK" ||
+			typeof entry.deliveredAt !== "string" ||
+			!Number.isFinite(Date.parse(entry.deliveredAt)) ||
+			!["CURRENT", "STALE", "UNVERIFIABLE"].includes(String(entry.currentness)) ||
+			(entry.body !== null && typeof entry.body !== "string") ||
+			typeof entry.bodyUnavailable !== "boolean" ||
+			typeof entry.withdrawn !== "boolean" ||
+			!Array.isArray(entry.basedOn) ||
+			!Array.isArray(entry.copies)
+		) {
+			throw new Error("public feedback history read returned an invalid contract");
+		}
+		return {
+			...entry,
+			item,
+			publicEligible: true,
+			recordedClaimCurrentness: entry.currentness,
+			...(entry.bodyUnavailable ? { wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE" } : {}),
+		};
+	});
+	const read = { readAt: answer.readAt, history: { ...history, feedback } };
 	writeFileSync(PUBLIC_FEEDBACK_HISTORY_PATH, JSON.stringify(read, null, 2));
 	return read;
 }
@@ -4125,7 +4507,7 @@ function assessmentOpening(brief: string): string {
 
 /**
  * The task and the brief, when the context no longer holds them; nothing otherwise. A measuring session sees only
- * its own practice's draft: other practices' results are not its context. The composer records no observation, so
+ * its own practice's draft: other practices' results are not its context. The composer records no problem, so
  * it gets the task and the brief alone.
  */
 function openingIfNeeded(brief: string, composing = false): string {
@@ -4141,7 +4523,7 @@ function openingIfNeeded(brief: string, composing = false): string {
 }
 
 /**
- * Separate single-result examples with this review's artifact paths. Alternative outcomes keep the call
+ * Separate single-result examples with this review's sourceFile paths. Alternative outcomes keep the call
  * shape consistent with one practice per session without making an outcome the expected one.
  */
 const RESULT_EXAMPLE = (() => {
@@ -4155,7 +4537,7 @@ const RESULT_EXAMPLE = (() => {
 			citations: [
 				{
 					sourceKind: "scm.pull-request.diff",
-					artifactPath: `${context}/change.json`,
+					sourcePath: `${context}/change.json`,
 					path: "Tests/DateParserTests.swift",
 					side: "NEW",
 					startLine: 12,
@@ -4180,7 +4562,7 @@ const RESULT_EXAMPLE = (() => {
 					citations: [
 						{
 							sourceKind: "scm.pull-request.diff",
-							artifactPath: `${context}/change.json`,
+							sourcePath: `${context}/change.json`,
 							path: "App/DateParser.swift",
 							side: "NEW",
 							startLine: 30,
@@ -4204,13 +4586,13 @@ const RESULT_EXAMPLE = (() => {
 			},
 		},
 		{
-			outcome: "NOT_APPLICABLE",
+			outcome: "DOES_NOT_APPLY",
 			summary: "No completed merge is recorded",
 			explanation: "The captured provider record states that this work has not merged.",
 			citations: [
 				{
 					sourceKind: "scm.pull-request.core",
-					artifactPath: `${context}/metadata.json`,
+					sourcePath: `${context}/metadata.json`,
 					path: `${context}/metadata.json`,
 					startLine: 3,
 					endLine: 3,
@@ -4220,7 +4602,7 @@ const RESULT_EXAMPLE = (() => {
 			evidence: {
 				inapplicability: {
 					consulted: ["scm.pull-request.core"],
-					subject: "work that has merged",
+					prerequisite: "work that has merged",
 					ruledOutBy: "the provider records is_merged as false",
 				},
 			},
@@ -4242,7 +4624,7 @@ function practiceTurnText(heading: string, slug: string, brief: string, prepared
 
 ${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
 
-Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its Occasion, Judge and Defer, as the evidence supports it, NOT_APPLICABLE and UNDETERMINED included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.`;
+Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.`;
 }
 
 /** The practices with an admitted NOT_MET result: what the composer has a decision to record on. */
@@ -4255,22 +4637,22 @@ function notMetPractices(results: readonly { practiceSlug: string; outcome: Outc
 }
 
 /**
- * Composition's budget: a unit per NOT_MET practice, but never more than a full turn's worth — the
+ * Composition's budget: a piece per NOT_MET practice, but never more than a full turn's worth — the
  * lanes cap what it can write, so work beyond that is a loop, not more feedback.
  */
 function compositionBudget(notMet: number): Work {
 	return turnBudget(Math.min(Math.max(1, notMet), PRACTICES_PER_TURN), PER_PRACTICE_WORK);
 }
 
-/** Private decision obligation: a stored unit or withholding may fold several practices in. */
+/** Private decision obligation: a stored piece or withholding may fold several practices in. */
 function undecidedPrivatePractices(): string[] {
 	const practiceOf = new Map(
-		admittedResults.map((result) => [result.practiceResultId, result.practiceSlug]),
+		admittedResults.map((result) => [result.resultId, result.practiceSlug]),
 	);
 	const decided = new Set(
-		composedFeedback.units.flatMap((unit) => [
-			unit.practiceSlug,
-			...unit.basedOn.flatMap((ref) => practiceOf.get(ref.practiceResultId) ?? []),
+		composedFeedback.feedback.flatMap((piece) => [
+			piece.practiceSlug,
+			...piece.basedOn.flatMap((ref) => practiceOf.get(ref.resultId) ?? []),
 		]),
 	);
 	return privatelyComposable().filter((slug) => !decided.has(slug));
@@ -4362,22 +4744,24 @@ ${finishCompositionText(notMet, request)}`,
 }
 
 function finishCompositionText(notMet: readonly string[], request: CompositionRequest): string {
-	// The lanes as they stand: a retry that does not know a lane is full writes units that are skipped.
-	const room = PRIVATE_CHANNELS.filter((channel) => request.channels[channel].enabled)
-		.map((channel) => {
-			const { maxUnits } = request.channels[channel];
-			const used = composedFeedback.units.filter(
-				(unit) => unit.channel === channel && unit.action !== "WITHHOLD",
+	// The lanes as they stand: a retry that does not know a lane is full writes feedback that are skipped.
+	const room = PRIVATE_DESTINATIONS.filter(
+		(destination) => request.destinations[destination].enabled,
+	)
+		.map((destination) => {
+			const { maxPieces } = request.destinations[destination];
+			const used = composedFeedback.feedback.filter(
+				(piece) => piece.destination === destination && piece.action !== "WITHHOLD",
 			).length;
-			return `${channel} ${Math.max(0, maxUnits - used)} of ${maxUnits}`;
+			return `${destination} ${Math.max(0, maxPieces - used)} of ${maxPieces}`;
 		})
 		.join(", ");
 	return (
-		`## Undecided\nThe turn ended with no unit and no WITHHOLD for these practices, each with a ` +
-		`NOT_MET result: ${notMet.join(", ")}. For each, persist the unit you decided on, or a ` +
+		`## Undecided\nThe turn ended with no piece and no WITHHOLD for these practices, each with a ` +
+		`NOT_MET result: ${notMet.join(", ")}. For each, persist the piece you decided on, or a ` +
 		`WITHHOLD with its reason (NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR), in one report_feedback ` +
-		`call. Room left for new units: ${room}; a lane with none left takes only a WITHHOLD. The ` +
-		`admitted results and their observations are in \`work/composition/results.json\`. Use tools only from this ` +
+		`call. Room left for new items: ${room}; a lane with none left takes only a WITHHOLD. The ` +
+		`admitted results and their problems are in \`work/composition/results.json\`. Use tools only from this ` +
 		`point onward; no prose.`
 	);
 }
@@ -4431,11 +4815,11 @@ async function main() {
 		const binding: ReviewSessionBinding = {
 			phase,
 			practiceSlug,
-			practiceRevisionId:
-				practiceIndex.find((practice) => practice.slug === practiceSlug)?.revisionId ?? null,
+			practiceVersionId:
+				practiceIndex.find((practice) => practice.slug === practiceSlug)?.versionId ?? null,
 			model: model.id,
 			jobId: typeof taskEnvelope.jobId === "string" ? taskEnvelope.jobId : null,
-			workspaceId: typeof taskEnvelope.workspaceId === "number" ? taskEnvelope.workspaceId : null,
+			workspaceId: isDecimalId(taskEnvelope.workspaceId) ? taskEnvelope.workspaceId : null,
 			openedAt: new Date().toISOString(),
 		};
 		manager.appendCustomEntry(REVIEW_SESSION_ENTRY, binding);
@@ -4692,14 +5076,7 @@ async function main() {
 	stallWatch.unref();
 
 	const evidenceSources = captureSources();
-	/** The change since each practice's previous review, as its inputs established it. */
-	const changeSinceOf = new Map<string, ReadonlyMap<string, DiffFile>>();
-	const inputReader = new InputReader({
-		practicesDir: INPUT_PATHS.practiceScripts,
-		contextDir: INPUT_PATHS.contextRoot,
-		repo: INPUT_PATHS.repositoryRoot,
-		log: (line) => console.error(`[pi-runner]${line}`),
-	});
+	const inputReader = new InputReader({ practicesDir: INPUT_PATHS.practiceScripts });
 	const boundModels = readBoundModels();
 	const directBudget = new ModelBudget(DIRECT_MODEL_TOKENS, MODEL_CONCURRENCY);
 	/** A review session that did not stop: the run ends with it, and no later session starts. */
@@ -4727,7 +5104,7 @@ async function main() {
 		}
 		const budget = turnBudget(slugs.length, PER_PRACTICE_WORK);
 		console.error(
-			`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerObservation} tokens per result so far)`,
+			`[pi-runner] ${label}: ${slugs.length} practice(s), up to ${budget.modelCalls} calls and ${budget.outputTokens} output tokens (${tokensPerProblem} tokens per result so far)`,
 		);
 		const trace = openTurnTrace(label, budget, {
 			owed: () => owedPractices(slugs).length,
@@ -4838,12 +5215,7 @@ async function main() {
 			if (stoppedBy() !== null || pastSafety() || signal.aborted) {
 				throw new UnratedError(noResultReason(slug, signal), "the scope ended before the review");
 			}
-			const leads = await resolveLeads(
-				options.leads ?? [],
-				evidenceSources,
-				changeSinceOf.get(slug),
-				signal,
-			);
+			const leads = await resolveLeads(options.leads ?? [], evidenceSources, undefined, signal);
 			signal.throwIfAborted();
 			const fullInput = `${REVIEW_INPUT_ROOT}/${slug}.json`;
 			const preparing =
@@ -4857,15 +5229,36 @@ async function main() {
 				writeFileSync(`${CWD}/${fullInput}`, JSON.stringify({ ...options, leads }, null, 2));
 			}
 			const prepared = preparing
-				? renderReviewInput(
-						options,
-						leads,
-						taskEnvelope.paths.contextRoot,
-						`\`${fullInput}\``,
-						changeSinceOf.get(slug) !== undefined,
-					)
+				? renderReviewInput(options, leads, taskEnvelope.paths.contextRoot, `\`${fullInput}\``)
 				: "";
-			const review: ActiveReview = { slug, draft: null, reads: newSessionReads() };
+			const domainReads = noReceipts();
+			const assignment = assignedInputs.get(slug);
+			const isScan = assignment?.scope.kind === "SCAN";
+			const reader = isScan
+				? new EvidenceReader(sourcesForPractice(slug, evidenceSources), domainReads)
+				: undefined;
+			let assignedText = "";
+			if (isScan && reader !== undefined) {
+				const { path } = assignment.scope.item;
+				if (path === undefined) {
+					throw new UnratedError("unavailable", "the scan has no assigned file");
+				}
+				const file = await reader.answer({ op: "read", tree: "head", path }, signal);
+				if (file.status !== "FOUND" || file.truncated) {
+					throw new UnratedError(
+						file.status === "FOUND" ? "too-large" : "unavailable",
+						"the assigned file cannot be read completely",
+					);
+				}
+				assignedText = `\n## Assigned scan file\nPath: ${path}\nCommit: ${evidenceSources.headRevision ?? "unavailable"}\nSource: ${TREE_SOURCE}\nSource path: ${evidenceSources.treeSourceFile}\n${file.text}\n`;
+			}
+			const review: ActiveReview = {
+				slug,
+				draft: null,
+				reads: newSessionReads(),
+				reader,
+				domainReads,
+			};
 			activeReview = review;
 			activePractice = slug;
 			currentTurnSlugs = [slug];
@@ -4875,8 +5268,8 @@ async function main() {
 			try {
 				opened = await openSession(
 					"practice",
-					[...PRACTICE_TOOLS, "submit_result"],
-					[submitResultTool],
+					isScan ? ["read", "submit_result"] : [...PRACTICE_TOOLS, "submit_result"],
+					reader === undefined ? [submitResultTool] : [submitResultTool, governedScanRead(reader)],
 				);
 			} catch (error) {
 				activeReview = null;
@@ -4884,7 +5277,9 @@ async function main() {
 				throw error;
 			}
 			const unsubscribeReads = opened.session.subscribe((event) => {
-				noteSessionRead(review.reads, event);
+				if (!isScan) {
+					noteSessionRead(review.reads, event);
+				}
 			});
 			// A mixed batch can keep Pi running after this practice submits. Finish its tools and native
 			// boundary first; a refused correction still gets its answer before the draft is final here.
@@ -4907,7 +5302,8 @@ async function main() {
 				void abortSession(opened.session);
 			};
 			signal.addEventListener("abort", stop, { once: true });
-			const text = () => practiceTurnText(practiceHeading, slug, brief, prepared);
+			const text = () =>
+				`${practiceTurnText(practiceHeading, slug, brief, prepared)}${assignedText}`;
 			try {
 				signal.throwIfAborted();
 				await Promise.race([promptPractice(opened.session, text, slug), safety.elapsed]);
@@ -4922,9 +5318,9 @@ async function main() {
 				);
 				unsubscribeReads();
 				const receipts = sessionReceipts(review.reads);
-				reads.reads += receipts.reads;
-				reads.truncatedReads += receipts.truncatedReads;
-				reads.failedReads += receipts.failedReads;
+				reads.reads += receipts.reads + domainReads.reads;
+				reads.truncatedReads += receipts.truncatedReads + domainReads.truncatedReads;
+				reads.failedReads += receipts.failedReads + domainReads.failedReads;
 				activeReview = null;
 				activePractice = null;
 				// A session that does not stop leaves nothing safe to start after it: the run ends.
@@ -4958,8 +5354,17 @@ async function main() {
 				});
 				return;
 			}
-			if (read.changeSince !== undefined) {
-				changeSinceOf.set(slug, read.changeSince);
+			assignedInputs.set(slug, read.inputs);
+			if (
+				read.inputs.scope.kind === "SCAN" &&
+				practiceIndex.find((practice) => practice.slug === slug)?.contextPaths === undefined
+			) {
+				executions.set(slug, {
+					...notReachedOutcome(program, "unavailable"),
+					status: "withheld",
+					durationMs: 0,
+				});
+				return;
 			}
 			const programReads = noReceipts();
 			const sessionReads = noReceipts();
@@ -4977,13 +5382,12 @@ async function main() {
 					slug,
 					inputs: read.inputs,
 					criteria: criteriaFileOf(slug) ?? "",
-					...(read.changeSince === undefined ? {} : { changeSince: read.changeSince }),
 					files: jobFiles(read.inputs.kind),
 					now: new Date(PROCESS_START_MS).toISOString(),
 					deadline: measureEnd - RETURN_MS,
 				},
 				{
-					reader: new EvidenceReader(evidenceSources, programReads),
+					reader: new EvidenceReader(sourcesForPractice(slug, evidenceSources), programReads),
 					models: hostModels(boundModels, LLM_PROXY_URL, LLM_PROXY_TOKEN, slug),
 					budget: directBudget,
 					review: async (options, signal) =>
@@ -5010,6 +5414,7 @@ async function main() {
 					`${outcome.stopReason === null ? "" : ` (${outcome.stopReason})`}${outcome.error === undefined ? "" : `: ${firstLine(outcome.error)}`}`,
 			);
 			if (outcome.candidate !== undefined) {
+				assignmentReceipts.set(slug, outcome.readReceipts ?? []);
 				reviewState.set(slug, outcome.candidate);
 				persistReviewState();
 				maybeWriteResultFile();
@@ -5136,17 +5541,23 @@ async function main() {
 	}
 	persistComposedFeedback();
 	maybeWriteResultFile();
-	if (compositionRequest && admittedResults.length > 0) {
+	if (
+		compositionRequest &&
+		admittedResults.length > 0 &&
+		![...assignedInputs.values()].some((inputs) => inputs.scope.kind === "SCAN")
+	) {
 		const markRemaining = (reason: CompositionFailureReason) => {
 			if (
-				compositionRequest.channels.IN_CONTEXT.enabled &&
+				compositionRequest.destinations.ON_WORK.enabled &&
 				publicResults(admittedResults).length > 0 &&
 				composedFeedback.review === null
 			) {
 				recordCompositionFailure("PUBLIC_REVIEW", reason);
 			}
 			if (
-				PRIVATE_CHANNELS.some((channel) => compositionRequest.channels[channel].enabled) &&
+				PRIVATE_DESTINATIONS.some(
+					(destination) => compositionRequest.destinations[destination].enabled,
+				) &&
 				undecidedPrivatePractices().length > 0
 			) {
 				recordCompositionFailure("PRIVATE_FEEDBACK", reason);
@@ -5169,13 +5580,13 @@ async function main() {
 				// A review on the work is owed only for a public NOT_MET result. MET results and
 				// abstentions alone have nothing to say there, and open no session.
 				const reviewable = publicResults(admittedResults);
-				if (compositionRequest.channels.IN_CONTEXT.enabled && reviewable.length > 0) {
+				if (compositionRequest.destinations.ON_WORK.enabled && reviewable.length > 0) {
 					await composeReview(compositionRequest, reviewable, notReached, safety);
-					await completeReviewOnWork(safety);
 				}
 				if (privatelyComposable().length > 0 && !safety.expired()) {
 					await composePrivately(compositionRequest, safety);
 				}
+				await prepareComposedFeedback(safety);
 			} catch (error) {
 				markRemaining(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
 				throw error;
@@ -5216,14 +5627,16 @@ async function main() {
 		);
 		if (
 			compositionRequest &&
-			PRIVATE_CHANNELS.some((channel) => compositionRequest.channels[channel].enabled) &&
+			PRIVATE_DESTINATIONS.some(
+				(destination) => compositionRequest.destinations[destination].enabled,
+			) &&
 			undecidedPrivatePractices().length > 0
 		) {
 			recordCompositionFailure("PRIVATE_FEEDBACK", "PRIVATE_NOT_RECOVERED");
 		}
 		persistComposedFeedback();
 		const reviewable = publicResults(admittedResults);
-		if (compositionRequest?.channels.IN_CONTEXT.enabled === true && reviewable.length > 0) {
+		if (compositionRequest?.destinations.ON_WORK.enabled === true && reviewable.length > 0) {
 			const safetyMs = AGENT_BUDGET_MS - (Date.now() - PROCESS_START_MS);
 			if (safetyMs <= 0) {
 				recordCompositionFailure("PUBLIC_REVIEW", "SAFETY");
@@ -5241,7 +5654,7 @@ async function main() {
 				};
 				try {
 					await composeReview(compositionRequest, reviewable, unreachedSlugs, safety);
-					await completeReviewOnWork(safety);
+					await prepareComposedFeedback(safety);
 				} catch (error) {
 					unfinished(safety.expired() ? "SAFETY" : "RUNTIME_ERROR");
 					throw error;
@@ -5273,7 +5686,7 @@ async function main() {
 		notReachedSlugs: readonly string[],
 		safety: ReturnType<typeof scheduleDeadline>,
 	): Promise<void> {
-		const lineNotes = request.inContextPlacementKinds.includes("DIFF");
+		const lineNotes = request.onWorkCopyForms.includes("LINE_NOTE");
 		const reviewLoader = new DefaultResourceLoader({
 			cwd: CWD,
 			agentDir: AGENT_DIR,
@@ -5528,14 +5941,14 @@ async function main() {
 
 	/**
 	 * The private lanes, in a fresh session opened after measurement ended: it receives the task, the brief, the
-	 * admitted results with their observations and the person's authorized history, reads with the evidence tools, and records only
+	 * admitted results with their problems and the person's authorized history, reads with the evidence tools, and records only
 	 * with report_feedback. No measuring transcript is in its context.
 	 */
 	async function composePrivately(
 		request: CompositionRequest,
 		safety: ReturnType<typeof scheduleDeadline>,
 	): Promise<void> {
-		if (!PRIVATE_CHANNELS.some((channel) => request.channels[channel].enabled)) {
+		if (!PRIVATE_DESTINATIONS.some((destination) => request.destinations[destination].enabled)) {
 			return;
 		}
 		const feedbackTool = buildFeedbackTool(

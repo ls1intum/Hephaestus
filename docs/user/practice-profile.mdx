@@ -61,8 +61,8 @@ If you think that the feedback is wrong, select **Disagree** beside **Not helpfu
 Write one or two sentences on what is wrong, then select **Send**.
 Workspace admins read your sentence and can correct the results or withdraw the card.
 The card stays open until then.
-**Disagree** is the only dispute control on a card.
-To take the dispute back, select **Disagree** again.
+**Disagree** saves a disagreement on the feedback.
+To take the disagreement back, select **Disagree** again.
 
 If your workspace changes a practice after a review wrote its card, the card closes without resolution.
 It reads *Closed*, gives the date and reason, and stops counting work that shows no problem on the practice.
@@ -86,13 +86,13 @@ To rate a card:
 2. Add a note about why. The note is optional.
 
 A rating says whether the feedback helped you.
-It does not dispute the card.
-While a dispute stands, its sentence is the one note on the card, so a rating adds no note.
-If you take back your rating, the dispute stays.
+It does not disagreement the card.
+While a disagreement stands, its sentence is the one note on the card, so a rating adds no note.
+If you take back your rating, the disagreement stays.
 
 Workspace admins can see that you have a current answer to feedback and when that record was made.
 A rating without an answer, including its time, stays private.
-Workspace admins read the sentence of a current dispute on the results behind it.
+Workspace admins read the sentence of a current disagreement on the results behind it.
 They can mark a result incorrect or withdraw the card.
 The card text stays private to you.
 Nobody else sees your other notes.
@@ -142,7 +142,7 @@ A ring counts your practices by standing:
 - **Mixed feedback**
 - **Needs attention**
 - **Nothing to report yet**
-- **Not observed yet**
+- **Not reviewed**
 
 **See all practice groups** opens the table of practice groups.
 [Your feedback](#your-feedback) follows directly under the header.
@@ -156,13 +156,11 @@ A review that still runs may not appear yet, because a review appears only after
 The newest review has the **Latest** tag.
 
 A review that someone requested has the **Requested** tag.
-Its results stay visible here, but they do not move a trend, resolve a card, or start a card.
-Your standing and trend keep the result of the earlier review of the same work.
-If only requested reviews judged a practice, its standing comes from them and says so.
-If a requested review finds no problem on a practice, new feedback does not quote the earlier problem with it on that work.
-
-Your standing can read **Needs attention** while your newest review of the practice is a requested review and it found no problem.
-The **Results** tab of that practice then says that a requested review is evidence only and does not change your standing.
+It is a real review and retains earlier results in history.
+The newest eligible result follows recorded order, regardless of who started it.
+An older review cannot replace newer proof.
+A marked current result does not make an earlier result current again.
+Repository scans have no developer and do not move your personal standing.
 
 Each row names the work and links to the original.
 It starts with the practices to improve: the first two by name, then a count of the rest.
@@ -194,7 +192,7 @@ Two tabs follow:
 In **Every practice**, these filters apply:
 
 - **Group** selects one practice group.
-- **Reviews when** selects a review occasion, such as new commits pushed.
+- **Review on** selects an event, such as new commits pushed.
 - **Practice** filters names by the text you enter.
 
 ## The practice group table
@@ -211,8 +209,8 @@ Some practices and groups have nothing to report yet.
 They fold into lines at the end of their table, so that they do not read as a gap:
 
 - **Does not apply to your work yet**: every review in the last 90 days found that they do not apply.
-- **Practices not observed yet** and **Practice groups not observed yet**: no review in the last 90 days has observed them.
-  A group also folds here when none of its practices applies or was observed.
+- **Practices not reviewed** and **Practice groups not reviewed**: no review in the last 90 days has reviewed them.
+  A group also folds here when none of its practices applies or was reviewed.
   A group with no practice to review also folds here.
   That is a group with no practices, or with all of them switched off.
 
@@ -270,8 +268,8 @@ It also tells you how much of your work was reviewed for the practice or the gro
 For example: "Read from your last 4 reviewed pull requests. In the last 90 days, 11 pull requests were reviewed for this practice."
 
 A piece of work counts when a review could judge the practice on it.
-Only the reviews that Hephaestus started on its own count, not the reviews that you asked for.
-If only reviews that you asked for back a standing, the sentence gives no count.
+Eligible decided results provide the evidence for these counts.
+A request is not a separate evidence-only class.
 A group counts each piece of work once, even when several of its practices judged it.
 
 If fewer than three pieces of work back a standing, its sentence calls it an early read.
@@ -348,7 +346,7 @@ At the end of the page, **See your own standing** opens **All practice groups** 
 
 ## When nothing has been reviewed yet
 
-Before the first review, each practice counts as **Not observed yet**.
+Before the first review, each practice counts as **Not reviewed**.
 The chip reads **No review yet** and no feedback appears.
 The first review with a recorded result fills the page.
 To request a review of eligible work, use **Request review** on [Activity](./activity.mdx#request-a-review).

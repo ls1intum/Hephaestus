@@ -19,10 +19,13 @@ public final class CandidateLimits {
     public static final int PROBLEMS = 50;
     public static final int OPEN_QUESTIONS = 20;
     public static final int OMISSIONS = 20;
-    public static final int OMISSION_UNITS = 50;
+    public static final int OMISSION_ITEMS = 50;
     public static final int CONSULTED_SOURCES = 20;
     public static final int CANDIDATE_BYTES = 131_072;
     public static final int MAX_COUNT = 1_000_000;
+    public static final int RECEIPTS = 200;
+    public static final int PATH_CHARS = 4096;
+    public static final int VERSION_CHARS = 1024;
 
     private CandidateLimits() {}
 }

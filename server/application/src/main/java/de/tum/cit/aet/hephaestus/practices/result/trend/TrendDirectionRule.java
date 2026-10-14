@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
+
 /**
  * Applies a practical-equivalence band to posterior change probabilities.
  *

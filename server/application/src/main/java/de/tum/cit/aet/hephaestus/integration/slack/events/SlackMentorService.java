@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSandboxPreparer;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackStreamingMentorChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 /** Routes eligible Slack DMs into mentor turns. */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackMentorService {
 
@@ -80,14 +82,15 @@ public class SlackMentorService {
             log.info("Slack DM diverted by input guard: workspace={} action={}", workspaceId, verdict.action());
             return;
         }
-        Optional<Long> devOpt = identityResolver.resolveActiveMemberId(workspaceId, teamId, slackUserId);
+        Optional<Long> devOpt = identityResolver.resolveActiveAccountId(workspaceId, teamId, slackUserId);
         if (devOpt.isEmpty()) {
             slackMessageService.sendForWorkspace(
                     workspaceId,
                     channelId,
                     threadTs,
                     onboardingService.linkCtaBlocks(),
-                    "Heph cannot reply yet. Check that your Hephaestus account is active, linked to Slack, and a member of this workspace.");
+                    "Heph cannot reply yet. Check that your Hephaestus account is active, linked to Slack, and a"
+                            + " member of this workspace.");
             return;
         }
         long developerId = devOpt.get();
@@ -119,7 +122,7 @@ public class SlackMentorService {
                 return;
             }
             identityResolver
-                    .resolveActiveMemberId(workspace.get(), teamId, slackUserId)
+                    .resolveActiveAccountId(workspace.get(), teamId, slackUserId)
                     .ifPresent(developerId -> sandboxPreparer.prepare(workspace.get(), developerId));
         } catch (RuntimeException e) {
             // Advisory: the event it rides on must not fail, and the next message starts the sandbox anyway.

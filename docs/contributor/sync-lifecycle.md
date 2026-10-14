@@ -294,8 +294,8 @@ The same identity and head fence applies, and it never replaces a recorded merge
 These completed merge facts do not replace mutable content.
 They do not require GraphQL's second-precision version to equal the webhook's millisecond version.
 
-The same short transaction offers the merge occasion only after the read, even if the read failed.
-A merge missed by the hook but found by sync becomes a sync-discovered occasion.
+The same short transaction offers the merge event only after the read, even if the read failed.
+A merge missed by the hook but found by sync becomes a sync-discovered event.
 A later hook delivery can still claim it.
 
 For a merged merge request, the native approvals route can supply each standing row's creation time as `approved_at`

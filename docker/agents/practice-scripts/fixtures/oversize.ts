@@ -1,13 +1,13 @@
 // Calls that hold more items than one call to their model may: the host refuses them before the
 // proxy. A rerank at the cap reaches the proxy, and `embedMany` splits its values into calls that fit.
-import { MODEL_SLOT_CAPS } from "../lib/contract.ts";
+import { MODEL_SLOT_CAPS } from "../lib/core/contract.ts";
 import {
 	definePracticeScript,
 	embedMany,
 	rerank,
 	step,
 	type UnratedReason,
-} from "../lib/practice-script.ts";
+} from "../lib/core/practice-script.ts";
 
 const items = (count: number) => Array.from({ length: count }, (_, i) => `item ${i}`);
 

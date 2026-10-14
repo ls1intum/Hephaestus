@@ -22,7 +22,7 @@ class AgentRoleGatingTest extends BaseUnitTest {
     private static final String AGENT_ON = RuntimeRole.AGENT_ENABLED_PROPERTY + "=true";
 
     @ParameterizedTest
-    @ValueSource(classes = {AgentJobExecutor.class, WorkerLivenessReporter.class})
+    @ValueSource(classes = {ReviewJobExecutor.class, WorkerLivenessReporter.class})
     void shouldPollJobsOnlyWhenAgentJobsAndTheWorkerRoleAreOn(Class<?> poller) {
         assertThat(registers(poller)).isFalse();
         assertThat(registers(poller, AGENT_ON)).isTrue();
@@ -33,7 +33,7 @@ class AgentRoleGatingTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(classes = {AgentJobEventListener.class, IssueAgentJobEventListener.class, BotCommandProcessor.class})
+    @ValueSource(classes = {ReviewJobEventListener.class, IssueReviewJobEventListener.class, BotCommandProcessor.class})
     void shouldSubmitJobsOnlyWhenAgentJobsAreOn(Class<?> submitter) {
         assertThat(registers(submitter)).isFalse();
         assertThat(registers(submitter, AGENT_ON)).isTrue();
@@ -41,9 +41,9 @@ class AgentRoleGatingTest extends BaseUnitTest {
 
     @Test
     void shouldRecoverJobsOnlyWhenAgentJobsAndTheServerRoleAreOn() {
-        assertThat(registers(AgentJobZombieSweeper.class)).isFalse();
-        assertThat(registers(AgentJobZombieSweeper.class, AGENT_ON)).isTrue();
-        assertThat(registers(AgentJobZombieSweeper.class, AGENT_ON, RuntimeRole.SERVER_PROPERTY + "=false"))
+        assertThat(registers(ReviewJobZombieSweeper.class)).isFalse();
+        assertThat(registers(ReviewJobZombieSweeper.class, AGENT_ON)).isTrue();
+        assertThat(registers(ReviewJobZombieSweeper.class, AGENT_ON, RuntimeRole.SERVER_PROPERTY + "=false"))
                 .isFalse();
     }
 

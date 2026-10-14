@@ -3,15 +3,15 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResult;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitContributorRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -42,17 +42,15 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Links GitLab commits to their merge requests via GraphQL.
- * <p>
- * GitHub derives this mapping from GraphQL {@code Commit.associatedPullRequests}
- * inside {@code CommitMetadataEnrichmentService}. GitLab has no equivalent field
- * on the commit payload, so we invert the relation and query
- * {@code Project.mergeRequests { commitsWithoutMergeCommits { sha } }} —
- * collapsing {@code N} per-commit round trips into
- * {@code ceil(M_updated / LINK_COMMITS_PAGE_SIZE)} batched GraphQL calls.
- * <p>
- * Uses {@code updatedAfter} for incremental runs so only MRs touched since the
- * last sync are inspected; a null argument performs a full sweep (used by initial
- * workspace bootstrap).
+ *
+ * <p>GitHub derives this mapping from GraphQL {@code Commit.associatedPullRequests} inside {@code
+ * CommitMetadataEnrichmentService}. GitLab has no equivalent field on the commit payload, so we
+ * invert the relation and query {@code Project.mergeRequests { commitsWithoutMergeCommits { sha }
+ * }} — collapsing {@code N} per-commit round trips into {@code ceil(M_updated /
+ * LINK_COMMITS_PAGE_SIZE)} batched GraphQL calls.
+ *
+ * <p>Uses {@code updatedAfter} for incremental runs so only MRs touched since the last sync are
+ * inspected; a null argument performs a full sweep (used by initial workspace bootstrap).
  */
 @Service
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -96,8 +94,9 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Runs {@code write}; for a delivery on a connection route only while the connection is still active, held so for
-     * the write's transaction. The GitLab reads before it stay outside that transaction.
+     * Runs {@code write}; for a delivery on a connection route only while the connection is still
+     * active, held so for the write's transaction. The GitLab reads before it stay outside that
+     * transaction.
      */
     private int whileActive(IntSupplier write) {
         Optional<GitLabRouteAdmission.AdmittedRoute> route = GitLabRouteAdmission.current();
@@ -109,12 +108,12 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Links commits to their merge requests for every MR updated after
-     * {@code updatedAfter} (or all MRs if {@code null}).
+     * Links commits to their merge requests for every MR updated after {@code updatedAfter} (or all
+     * MRs if {@code null}).
      *
-     * @param scopeId       workspace scope whose access token is used
-     * @param repository    repository to link commits in
-     * @param updatedAfter  only consider MRs updated after this instant; null for a full sweep
+     * @param scopeId workspace scope whose access token is used
+     * @param repository repository to link commits in
+     * @param updatedAfter only consider MRs updated after this instant; null for a full sweep
      * @return sync result with the number of (commit, MR) pairs inserted
      */
     public SyncResult linkCommits(Long scopeId, Repository repository, @Nullable OffsetDateTime updatedAfter) {
@@ -212,7 +211,8 @@ public class GitLabCommitMergeRequestLinker {
                                     extractNestedEndCursor(mrNode),
                                     safeProjectPath + "!" + iid);
                             if (tail == null) {
-                                // Incomplete follow-up pagination: skip the MR to avoid partial links.
+                                // Incomplete follow-up pagination: skip the MR to avoid partial
+                                // links.
                                 continue;
                             }
                             commitNodes.addAll(tail);
@@ -248,8 +248,9 @@ public class GitLabCommitMergeRequestLinker {
                                 totalLinks += fallbackInserted;
                                 if (fallbackInserted == 0) {
                                     log.debug(
-                                            "Fallback produced no link rows; referenced SHAs not yet in git_commit: "
-                                                    + "projectPath={}, iid={}, shaCount={}",
+                                            "Fallback produced no link rows; referenced SHAs not"
+                                                    + " yet in git_commit: projectPath={}, iid={},"
+                                                    + " shaCount={}",
                                             safeProjectPath,
                                             iid,
                                             fallbackShas.size());
@@ -277,7 +278,7 @@ public class GitLabCommitMergeRequestLinker {
                 cursor = pageInfo.endCursor();
                 if (cursor == null) {
                     log.warn(
-                            "Pagination cursor is null despite hasNextPage=true: projectPath={}, page={}",
+                            "Pagination cursor is null despite hasNextPage=true: projectPath={}," + " page={}",
                             safeProjectPath,
                             page);
                     break;
@@ -317,7 +318,8 @@ public class GitLabCommitMergeRequestLinker {
         }
 
         log.info(
-                "Completed commit→MR linking: scopeId={}, projectPath={}, status={}, mrsProcessed={}, linksInserted={}, attributedContributorRows={}",
+                "Completed commit→MR linking: scopeId={}, projectPath={}, status={},"
+                        + " mrsProcessed={}, linksInserted={}, attributedContributorRows={}",
                 scopeId,
                 safeProjectPath,
                 result.status(),
@@ -391,10 +393,10 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Returns {@code true} when the MR node's GitLab state is a terminal state —
-     * {@code merged} or {@code closed}. Only terminal MRs are eligible for the
-     * unfiltered commits fallback: open MRs routinely appear with zero commits
-     * during the push → sync race window and must not trigger a fallback round trip.
+     * Returns {@code true} when the MR node's GitLab state is a terminal state — {@code merged} or
+     * {@code closed}. Only terminal MRs are eligible for the unfiltered commits fallback: open MRs
+     * routinely appear with zero commits during the push → sync race window and must not trigger a
+     * fallback round trip.
      */
     private static boolean isTerminalState(Map<String, Object> mrNode) {
         Object state = mrNode.get("state");
@@ -404,15 +406,13 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Fetches commits for a merge request via the unfiltered
-     * {@code MergeRequest.commits} connection (including merge commits).
-     * <p>
-     * Used as a fallback when the primary
-     * {@code commitsWithoutMergeCommits} path produced no link rows for a
-     * terminal-state MR — typical for squash-merged MRs whose only association
-     * is the squash commit itself. Returns an empty list when the MR has no
-     * commits; returns {@code null} only if the query failed such that the
-     * fallback must be skipped.
+     * Fetches commits for a merge request via the unfiltered {@code MergeRequest.commits}
+     * connection (including merge commits).
+     *
+     * <p>Used as a fallback when the primary {@code commitsWithoutMergeCommits} path produced no
+     * link rows for a terminal-state MR — typical for squash-merged MRs whose only association is
+     * the squash commit itself. Returns an empty list when the MR has no commits; returns {@code
+     * null} only if the query failed such that the fallback must be skipped.
      */
     @SuppressWarnings("unchecked")
     @Nullable
@@ -490,9 +490,9 @@ public class GitLabCommitMergeRequestLinker {
     // Follow-up pagination for MRs with >100 commits
 
     /**
-     * Fetches commit SHAs beyond the first nested page (100 commits) for a single MR.
-     * Returns {@code null} if pagination could not complete — caller must then skip
-     * the MR rather than persist a partial link set.
+     * Fetches commit SHAs beyond the first nested page (100 commits) for a single MR. Returns
+     * {@code null} if pagination could not complete — caller must then skip the MR rather than
+     * persist a partial link set.
      */
     @SuppressWarnings("unchecked")
     @Nullable
@@ -579,19 +579,18 @@ public class GitLabCommitMergeRequestLinker {
     // Author attribution harvest + backfill
 
     /**
-     * Adds harvested (login → email) pairs from a single MR's commit list into
-     * {@code sink}.
+     * Adds harvested (login → email) pairs from a single MR's commit list into {@code sink}.
      *
      * <p>Two sources contribute:
+     *
      * <ol>
-     *   <li><b>Direct</b> — any commit whose GraphQL {@code author} field is non-null
-     *       gives us an authoritative pair.</li>
-     *   <li><b>Dominant-login fallback</b> — when exactly one login is named across
-     *       resolved commits in the MR, we attribute the MR's remaining (unresolved)
-     *       emails to that login. GitLab often fails to resolve
-     *       {@code firstname.lastname@tum.de} even though its sibling
-     *       {@code {login}@mytum.de} is registered on the same account. Within a
-     *       single MR, a uniform dominant author is a strong, low-risk signal.</li>
+     *   <li><b>Direct</b> — any commit whose GraphQL {@code author} field is non-null gives us an
+     *       authoritative pair.
+     *   <li><b>Dominant-login fallback</b> — when exactly one login is named across resolved
+     *       commits in the MR, we attribute the MR's remaining (unresolved) emails to that login.
+     *       GitLab often fails to resolve {@code firstname.lastname@tum.de} even though its sibling
+     *       {@code {login}@mytum.de} is registered on the same account. Within a single MR, a
+     *       uniform dominant author is a strong, low-risk signal.
      * </ol>
      */
     private static void harvestEmailLoginPairs(List<CommitNode> commitNodes, Map<String, Set<String>> sink) {
@@ -619,11 +618,11 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Resolves each harvested {@code (login → email)} pair to a local {@code User}
-     * row and backfills {@code commit_contributor.user_id} for every contributor
-     * row carrying that email, as well as the denormalized {@code git_commit.author_id}
-     * and {@code git_commit.committer_id} columns scoped to this repository so that
-     * commit-centric queries (activity feeds) see the attributed user.
+     * Resolves each harvested {@code (login → email)} pair to a local {@code User} row and
+     * backfills {@code commit_contributor.user_id} for every contributor row carrying that email,
+     * as well as the denormalized {@code git_commit.author_id} and {@code git_commit.committer_id}
+     * columns scoped to this repository so that commit-centric queries (activity feeds) see the
+     * attributed user.
      */
     private int reconcileCommitContributorUsers(
             Map<String, Set<String>> loginToEmails,
@@ -671,7 +670,8 @@ public class GitLabCommitMergeRequestLinker {
             }
         }
 
-        // Signal downstream consumers (the activity ledger) that commit author identities
+        // ItemEventDefinition downstream consumers (the activity ledger) that commit author
+        // identities
         // for this repository have been reconciled. The activity module listens for this
         // event and backfills COMMIT_CREATED rows whose actor_id was NULL at ingest time.
         if (commitAuthorRowsUpdated > 0) {
@@ -688,7 +688,9 @@ public class GitLabCommitMergeRequestLinker {
                 || commitCommitterRowsUpdated > 0
                 || userEmailsBackfilled > 0) {
             log.info(
-                    "Backfilled attribution via GitLab author resolution: projectPath={}, contributorRows={}, commitAuthorRows={}, commitCommitterRows={}, userEmailRows={}, logins={}",
+                    "Backfilled attribution via GitLab author resolution: projectPath={},"
+                            + " contributorRows={}, commitAuthorRows={}, commitCommitterRows={},"
+                            + " userEmailRows={}, logins={}",
                     safeProjectPath,
                     contributorRowsUpdated,
                     commitAuthorRowsUpdated,
@@ -701,10 +703,10 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Picks a stable, human-readable email from the harvested set. Autogenerated
-     * GitLab/GitHub {@code *.noreply.*} addresses are deprioritised because they
-     * defeat downstream identity matching; everything else is sorted alphabetically
-     * so repeated sync runs pick the same winner.
+     * Picks a stable, human-readable email from the harvested set. Autogenerated GitLab/GitHub
+     * {@code *.noreply.*} addresses are deprioritised because they defeat downstream identity
+     * matching; everything else is sorted alphabetically so repeated sync runs pick the same
+     * winner.
      */
     @Nullable
     private static String selectBestEmail(Set<String> emails) {
@@ -728,8 +730,8 @@ public class GitLabCommitMergeRequestLinker {
     }
 
     /**
-     * Minimal view over a {@code commitsWithoutMergeCommits} node: the SHA used
-     * for MR linking plus the author fields that feed the attribution harvest.
+     * Minimal view over a {@code commitsWithoutMergeCommits} node: the SHA used for MR linking plus
+     * the author fields that feed the attribution harvest.
      */
     private record CommitNode(
             String sha,

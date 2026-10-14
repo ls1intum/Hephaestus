@@ -1,93 +1,53 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogService;
-import de.tum.cit.aet.hephaestus.practices.curated.EffectiveCatalog;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
+import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntryState;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.review.AutomatedReviewFence;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackModeSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CatalogOriginPresentationTest extends BaseUnitTest {
-
-    private static final long WORKSPACE_ID = 1L;
-
     @Test
-    void practiceBatchReadsTheCatalogOnce() {
-        CuratedCatalogService service = mock(CuratedCatalogService.class);
-        when(service.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
-        CatalogOriginPresenter presenter =
-                new CatalogOriginPresenter(service, workspaceDefaults(), new AutomatedReviewFence(Map.of()));
-        Practice first = mock(Practice.class);
-        Practice second = mock(Practice.class);
-        stubDefinition(first, "first");
-        stubDefinition(second, "second");
-
-        presenter.presentPractices(WORKSPACE_ID, List.of(first, second));
-
-        verify(service).catalog();
-    }
-
-    /**
-     * The autonomy in force is the bottom of a chain that ends at the workspace, so a hundred-row response
-     * must not ask the workspace a hundred times either.
-     */
-    @Test
-    void practiceBatchResolvesTheWorkspaceDefaultOnce() {
-        CuratedCatalogService service = mock(CuratedCatalogService.class);
-        when(service.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
-        WorkspaceReviewDefaultsProvider defaults = workspaceDefaults();
-        CatalogOriginPresenter presenter =
-                new CatalogOriginPresenter(service, defaults, new AutomatedReviewFence(Map.of()));
-        Practice first = mock(Practice.class);
-        Practice second = mock(Practice.class);
-        stubDefinition(first, "first");
-        stubDefinition(second, "second");
-
-        presenter.presentPractices(WORKSPACE_ID, List.of(first, second));
-
-        verify(defaults).forWorkspace(WORKSPACE_ID);
-    }
-
-    private static void stubDefinition(Practice practice, String slug) {
-        when(practice.getSlug()).thenReturn(slug);
-        when(practice.getName()).thenReturn(slug);
-        when(practice.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
-        when(practice.getSignals()).thenReturn(PracticeTestEvidence.signals(ScmSignals.PULL_REQUEST_OPENED));
-        when(practice.getEvidenceRequirements())
-                .thenReturn(PracticeTestEvidence.needsFor(ScmSignals.PULL_REQUEST_OPENED.artifactKind()));
-        when(practice.getSubject()).thenReturn(ActorRole.AUTHOR);
-        when(practice.getCriteria()).thenReturn("Review the change");
-        when(practice.getAutomatedReviewPolicy()).thenReturn(PracticeTestEvidence.pullRequest());
-    }
-
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider defaults = mock(WorkspaceReviewDefaultsProvider.class);
-        when(defaults.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return defaults;
-    }
-
-    @Test
-    void groupBatchReadsTheCatalogOnce() {
-        CuratedCatalogService service = mock(CuratedCatalogService.class);
-        when(service.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
-        CatalogOriginPresenter presenter =
-                new CatalogOriginPresenter(service, workspaceDefaults(), new AutomatedReviewFence(Map.of()));
-
-        presenter.presentGroups(WORKSPACE_ID, List.of(mock(PracticeGroup.class), mock(PracticeGroup.class)));
-
-        verify(service).catalog();
+    void shouldPresentAnUnlinkedPracticeAsLocalWithInstanceInheritance() {
+        var versions = mock(PracticeVersionService.class);
+        var defaults = mock(WorkspaceReviewDefaultsProvider.class);
+        var version = mock(PracticeVersion.class);
+        var practice = new Practice();
+        practice.setId(9007199254740993L);
+        practice.setSlug("local");
+        practice.setKind(new ItemKind("scm.pull_request"));
+        practice.setCurrentVersion(version);
+        practice.setCreatedAt(Instant.EPOCH);
+        var current = new PracticeVersionDTO(
+                "12",
+                1,
+                "Local practice",
+                DefinitionTestFixtures.definition(),
+                true,
+                null,
+                "v6:" + "a".repeat(64),
+                Instant.EPOCH,
+                null,
+                List.of(),
+                false);
+        when(versions.viewCurrent(practice)).thenReturn(current);
+        var dto = new CatalogOriginPresenter(mock(CatalogService.class), versions, defaults).present(10L, practice);
+        assertThat(dto.id()).isEqualTo("9007199254740993");
+        assertThat(dto.currentVersion()).isEqualTo(current);
+        assertThat(dto.catalogOrigin().state()).isEqualTo(CatalogEntryState.YOURS);
+        assertThat(dto.feedbackMode().effective()).isEqualTo(FeedbackMode.APPROVE_FIRST);
+        assertThat(dto.feedbackMode().source()).isEqualTo(FeedbackModeSource.INSTANCE);
     }
 }

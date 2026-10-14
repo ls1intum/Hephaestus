@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -34,7 +33,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code inputs/context/workspace.json} for {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/workspace.json} for {@link MentorContextRequest}.
  *
  * <p>Port of {@code session.tool.ts} (recent threads + first message preview) plus
  * {@code assigned-work.tool.ts} (open assigned issues + pending review requests with
@@ -62,8 +61,8 @@ public class WorkspaceContentSource implements ContentSource {
     private final ObjectMapper objectMapper;
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
     @Override
@@ -74,8 +73,8 @@ public class WorkspaceContentSource implements ContentSource {
     /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorContextKeys}. */
     @Override
     @Transactional(readOnly = true)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        MentorContextRequest req = request;
         ObjectNode payload = buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));

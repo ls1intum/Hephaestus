@@ -12,9 +12,9 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectIntegrityService;
@@ -29,12 +29,12 @@ import org.mockito.Mock;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * A {@code repository.renamed} / {@code repository.transferred} webhook must re-key BOTH the mirrored
- * domain row and every workspace's {@code RepositoryToMonitor} — by the provider-stable
+ * A {@code repository.renamed} / {@code repository.transferred} webhook must re-key BOTH the
+ * mirrored domain row and every workspace's {@code RepositoryToMonitor} — by the provider-stable
  * {@code repository.id}, never by the name that just moved — and rebuild the NATS consumer filters.
  * Skipping the monitor half leaves the repo-scoped subject filter pinned to the old name, so every
- * later issue/PR/review/push event for the repository is silently ACK-dropped until the next reconcile
- * cycle.
+ * later issue/PR/review/push event for the repository is silently ACK-dropped until the next
+ * reconcile cycle.
  */
 class GitHubRepositoryMessageHandlerRenameTest extends BaseUnitTest {
 

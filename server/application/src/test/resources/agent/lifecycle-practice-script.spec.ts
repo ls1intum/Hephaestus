@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { REVIEW_LEAD_LIMIT } from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
-import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/json.ts";
-import { UnratedError } from "../../../../../../docker/agents/practice-scripts/lib/practice-script.ts";
-import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
+import { REVIEW_LEAD_LIMIT } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
+import { isJsonObject } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
+import { UnratedError } from "../../../../../../docker/agents/practice-scripts/lib/core/practice-script.ts";
 import {
 	leadKeys,
-	moment,
+	event,
 	requested,
 	runBundled,
 	runBundledProgram,
@@ -68,15 +68,15 @@ function commitsRecord(commits: CapturedCommit[]) {
 
 /**
  * The records that the server stages beside the given ones and that the leads cite: the record of the
- * work, its description, and one file for each linked work item.
+ * item, its description, and one file for each linked item item.
  */
-function stagedRecords(work: Record<string, unknown>, given: Files): Files {
+function stagedRecords(itemRecord: Record<string, unknown>, given: Files): Files {
 	const linked = given["linked_work_items.json"];
 	const items: unknown[] =
 		isJsonObject(linked) && Array.isArray(linked.workItems) ? linked.workItems : [];
 	const files: Files = {
-		"metadata.json": work,
-		"description.md": typeof work.body === "string" ? work.body : "",
+		"metadata.json": itemRecord,
+		"description.md": typeof itemRecord.body === "string" ? itemRecord.body : "",
 	};
 	for (const item of items) {
 		if (isJsonObject(item) && typeof item.number === "number") {
@@ -90,16 +90,16 @@ function stagedRecords(work: Record<string, unknown>, given: Files): Files {
 async function review(slug: string, inputs: RunInputs) {
 	const given = inputs.context ?? {};
 	const result = await runBundled(slug, {
-		contextReference: "areas/changed-work",
+		contextReference: "areas/changed-item",
 		...inputs,
 		context:
-			typeof given === "string" ? given : { ...stagedRecords(inputs.work ?? {}, given), ...given },
+			typeof given === "string" ? given : { ...stagedRecords(inputs.item ?? {}, given), ...given },
 	});
 	return { ...result, leads: result.leads ?? [] };
 }
 
 /** A review at the merge, the only moment of the merge practices. */
-const atMerge = moment("scm.pull_request.merged");
+const atMerge = event("scm.pull_request.merged");
 
 /** A review that a person requested, of an open pull request. */
 const requestedOpen = requested("scm.pull_request", { state: "OPEN" });
@@ -109,8 +109,8 @@ const requestedMerged = requested("scm.pull_request", { state: "MERGED" });
 
 void test("malformed review comments stop the bundled program before it can claim no asks", async () => {
 	const result = await runBundledProgram("defers-review-asks-into-tracked-work", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context: {
 			"comments.json": [{ path: "src/cart.ts", body: null }],
 			"general_comments.json": { comments: [] },
@@ -131,8 +131,8 @@ for (const slug of [
 	for (const count of [199, 200, 201]) {
 		void test(`${slug} retains totals and bounds the leads for ${count} linked issues`, async () => {
 			const result = await review(slug, {
-				work: metadata,
-				cause: atMerge,
+				item: metadata,
+				inputs: atMerge,
 				context: {
 					"linked_work_items.json": {
 						workItems: Array.from({ length: count }, (_, i) => ({
@@ -174,8 +174,8 @@ for (const slug of [
 for (const count of [99, 100, 201]) {
 	void test(`approval preparation retains totals and bounds the leads for ${count} decisions`, async () => {
 		const result = await review("merges-only-after-approval", {
-			work: metadata,
-			cause: atMerge,
+			item: metadata,
+			inputs: atMerge,
 			context: {
 				"review_threads.json": {
 					threads: [],
@@ -205,8 +205,8 @@ for (const count of [99, 100, 201]) {
 for (const count of [199, 200, 250]) {
 	void test(`thread preparation retains totals and bounds the leads for ${count} threads`, async () => {
 		const result = await review("merged-past-unresolved-review-threads", {
-			work: metadata,
-			cause: atMerge,
+			item: metadata,
+			inputs: atMerge,
 			context: {
 				"review_threads.json": {
 					reviewDecisions: [],
@@ -238,11 +238,11 @@ for (const count of [199, 200, 250]) {
 	});
 }
 
-void test("malformed linked work JSON stops preparation instead of reporting an absent capture", async () => {
+void test("malformed linked item JSON stops preparation instead of reporting an absent capture", async () => {
 	await assert.rejects(
 		review("honours-linked-issue-acceptance-criteria", {
-			work: metadata,
-			cause: requestedMerged,
+			item: metadata,
+			inputs: requestedMerged,
 			context: { "linked_work_items.json": "{" },
 		}),
 		{
@@ -255,7 +255,7 @@ void test("malformed linked work JSON stops preparation instead of reporting an 
 
 void test("plans-first puts the issue's opening beside the earliest commit, never beside the pull request", async () => {
 	const result = await review("plans-the-work-in-an-issue-first", {
-		work: metadata,
+		item: metadata,
 		context: {
 			"linked_work_items.json": {
 				workItems: [
@@ -297,7 +297,7 @@ void test("plans-first preserves the exact recorded order before, at, and after 
 		["2026-04-12T18:30:00Z", "-0.5"],
 	]) {
 		const result = await review("plans-the-work-in-an-issue-first", {
-			work: metadata,
+			item: metadata,
 			context: {
 				"linked_work_items.json": {
 					workItems: [{ number: 18, title: "Add ingredients", body: "", createdAt: openedAt }],
@@ -325,7 +325,7 @@ void test("plans-first cannot replace unknown authored dates with a later handof
 		],
 	]) {
 		const result = await review("plans-the-work-in-an-issue-first", {
-			work: metadata,
+			item: metadata,
 			context: {
 				"linked_work_items.json": {
 					workItems: [
@@ -353,7 +353,7 @@ void test("plans-first cannot replace unknown authored dates with a later handof
 void test("plans-first keeps missing commit capture separate from unknown authored dates", async () => {
 	for (const malformed of [undefined, "{", '{"commits":[null]}']) {
 		const result = await review("plans-the-work-in-an-issue-first", {
-			work: metadata,
+			item: metadata,
 			context: {
 				"linked_work_items.json": {
 					workItems: [
@@ -365,7 +365,7 @@ void test("plans-first keeps missing commit capture separate from unknown author
 		});
 		assert.match(
 			(result.directions ?? []).join("\n"),
-			/report a collection gap and record no observation\./u,
+			/report a collection gap and record no problem\./u,
 		);
 		const facts = result.leads[0]?.facts;
 		assert.match(String(facts?.relation), /commit record is missing or malformed/u);
@@ -390,13 +390,13 @@ function linkedIssue(number: number, createdAt: string, how: "closesOnMerge" | "
 	return { number, title: `Issue ${String(number)}`, state: "OPEN", how, createdAt, body: "" };
 }
 
-void test("plans-first dates an issue named only by Related to as a mention, before or after the work began", async () => {
+void test("plans-first dates an issue named only by Related to as a mention, before or after the item began", async () => {
 	for (const [openedAt, relation] of [
 		["2026-09-27T02:01:31Z", /the earliest commit was authored 0\.3 h after the issue was opened/u],
 		["2026-09-27T05:18:53Z", /the issue was opened 3\.0 h after the earliest commit was authored/u],
 	] as const) {
 		const result = await review("plans-the-work-in-an-issue-first", {
-			work: { ...partial, body: "Related to #5\n\nFirst slice only; #5 stays open." },
+			item: { ...partial, body: "Related to #5\n\nFirst slice only; #5 stays open." },
 			context: {
 				"linked_work_items.json": { workItems: [linkedIssue(5, openedAt, "mentions")] },
 				"commits.json": partialCommits,
@@ -413,14 +413,14 @@ void test("plans-first dates an issue named only by Related to as a mention, bef
 
 void test("plans-first names no candidate for a bare, quoted or fenced number, nor without the capture", async () => {
 	for (const body of [
-		"See also #5 for the sharing work.",
+		"See also #5 for the sharing item.",
 		"> Related to #5",
 		"```\nRelated to #5\n```",
 		"```\nCloses #5\n```",
 		"> Fixes #5",
 	]) {
 		const result = await review("plans-the-work-in-an-issue-first", {
-			work: { ...partial, body },
+			item: { ...partial, body },
 			context: {
 				"linked_work_items.json": {
 					workItems: [linkedIssue(5, "2026-09-27T02:01:31Z", "mentions")],
@@ -432,7 +432,7 @@ void test("plans-first names no candidate for a bare, quoted or fenced number, n
 		assert.equal(result.facts?.namedIssues, 0, body);
 	}
 	const uncaptured = await review("plans-the-work-in-an-issue-first", {
-		work: { ...partial, body: "Related to #5" },
+		item: { ...partial, body: "Related to #5" },
 		context: { "commits.json": partialCommits },
 	});
 	assert.deepEqual(uncaptured.leads, []);
@@ -441,7 +441,7 @@ void test("plans-first names no candidate for a bare, quoted or fenced number, n
 
 void test("plans-first dates a provider closing link no text names, and lists it apart from a related issue", async () => {
 	const result = await review("plans-the-work-in-an-issue-first", {
-		work: { ...partial, body: "Related to #5" },
+		item: { ...partial, body: "Related to #5" },
 		context: {
 			"linked_work_items.json": {
 				workItems: [
@@ -465,7 +465,7 @@ void test("plans-first dates a provider closing link no text names, and lists it
 void test("plans-first leaves an unresolved or undated named issue open to the description, and still dates the rest", async () => {
 	const closing = linkedIssue(4, "2026-09-27T01:00:00Z", "closesOnMerge");
 	const result = await review("plans-the-work-in-an-issue-first", {
-		work: { ...partial, body: "Related to #5" },
+		item: { ...partial, body: "Related to #5" },
 		context: {
 			"linked_work_items.json": { workItems: [closing], unresolvedReferences: [5] },
 			"commits.json": partialCommits,
@@ -478,11 +478,11 @@ void test("plans-first leaves an unresolved or undated named issue open to the d
 	);
 	assert.match(
 		(result.directions ?? []).join(" "),
-		/#5 are among the capture's unresolved references.*if it is, the record cannot settle the order, so name that issue.*if the description rules it out, it is no occasion/u,
+		/#5 are among the capture's unresolved references.*if it is, the record cannot settle the order, so name that issue.*if the description rules it out, it is no applicability/u,
 	);
 	const { createdAt: _openedAt, ...undated } = linkedIssue(5, "", "mentions");
 	const undatedResult = await review("plans-the-work-in-an-issue-first", {
-		work: { ...partial, body: "Related to #5" },
+		item: { ...partial, body: "Related to #5" },
 		context: {
 			"linked_work_items.json": { workItems: [undated] },
 			"commits.json": partialCommits,
@@ -492,7 +492,7 @@ void test("plans-first leaves an unresolved or undated named issue open to the d
 	assert.match(String(lead?.facts?.relation), /its opening time is not captured/u);
 	for (const envelope of [{ unresolvedReferences: [9] }, { truncated: true }]) {
 		const unaffected = await review("plans-the-work-in-an-issue-first", {
-			work: { ...partial, body: "Related to #5" },
+			item: { ...partial, body: "Related to #5" },
 			context: {
 				"linked_work_items.json": {
 					workItems: [closing, linkedIssue(5, "2026-09-27T02:01:31Z", "mentions")],
@@ -556,8 +556,8 @@ void test("deferred asks are one lead each, with the record's facts and none of 
 		},
 	};
 	const result = await review("defers-review-asks-into-tracked-work", {
-		work: { ...metadata, is_merged: true },
-		cause: atMerge,
+		item: { ...metadata, is_merged: true },
+		inputs: atMerge,
 		change: new Map([diffFile("App/AddIngredientView.swift", [12, 13])]),
 		context,
 	});
@@ -602,8 +602,8 @@ void test("an ask cites the line of its body in the record that the server write
 		{ path: "App/B.swift", line: 9, body: "Split this", author: "jennifer" },
 	];
 	const result = await review("defers-review-asks-into-tracked-work", {
-		work: { ...metadata, is_merged: true },
-		cause: atMerge,
+		item: { ...metadata, is_merged: true },
+		inputs: atMerge,
 		context: {
 			"general_comments.json": { comments: [] },
 			// The server writes each key of a comment on its own line.
@@ -625,15 +625,15 @@ void test("a requested review of unmerged work lists no ask, and says that the w
 		"general_comments.json": { comments: [] },
 	};
 	const open = await review("defers-review-asks-into-tracked-work", {
-		work: { ...unmerged, state: "OPEN" },
-		cause: requestedOpen,
+		item: { ...unmerged, state: "OPEN" },
+		inputs: requestedOpen,
 		context,
 	});
 	assert.deepEqual(open.leads, []);
 	assert.match((open.directions ?? []).join(" "), /^The work is not merged\./u);
 	const merged = await review("defers-review-asks-into-tracked-work", {
-		work: { ...metadata, is_merged: true },
-		cause: requestedMerged,
+		item: { ...metadata, is_merged: true },
+		inputs: requestedMerged,
 		context,
 	});
 	assert.equal(merged.leads.length, 1);
@@ -713,8 +713,8 @@ void test("every captured linked issue is a row, and those with a checkable outc
 		},
 	};
 	const result = await review("merge-confirms-the-linked-issue-outcome", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context,
 	});
 	const keyOf = await leadKeys("merge-confirms-the-linked-issue-outcome");
@@ -776,7 +776,7 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	assert.equal(emptyMirror.facts?.subIssuesTotal, 0);
 	const said = (result.directions ?? []).join("\n");
 	assert.match(result.directions?.[0] ?? "", /Each is a candidate: the criteria decide which/u);
-	assert.doesNotMatch(said, /every one is an occasion/u);
+	assert.doesNotMatch(said, /every one is an applicability/u);
 	// All of them closed establishes only that mirror, not the whole hierarchy.
 	assert.match(
 		said,
@@ -784,16 +784,16 @@ void test("every captured linked issue is a row, and those with a checkable outc
 	);
 	// A review that a person requested of an open pull request has no merge to review.
 	const open = await review("merge-confirms-the-linked-issue-outcome", {
-		work: { ...unmerged, state: "OPEN" },
-		cause: requestedOpen,
+		item: { ...unmerged, state: "OPEN" },
+		inputs: requestedOpen,
 		context,
 	});
 	assert.deepEqual(open.leads, []);
 	assert.match(open.directions?.[0] ?? "", /not merged/u);
 	for (const source of ["provider", "children"]) {
 		const zero = await review("merge-confirms-the-linked-issue-outcome", {
-			work: metadata,
-			cause: atMerge,
+			item: metadata,
+			inputs: atMerge,
 			context: {
 				"linked_work_items.json": {
 					workItems: [
@@ -840,7 +840,7 @@ const openMergeRequest = {
 
 void test("an open issue that an open merge request may close stays open, its closing link a candidate", async () => {
 	const result = await review("links-the-change-to-its-issue", {
-		work: openMergeRequest,
+		item: openMergeRequest,
 		context: closingLink,
 	});
 	const keyOf = await leadKeys("links-the-change-to-its-issue");
@@ -863,8 +863,8 @@ void test("an open issue that an open merge request may close stays open, its cl
 	assert.doesNotMatch(evidence, /\bclosed\b/u);
 	// The merge practice has no merge to review before the merge.
 	const unmergedOutcome = await review("merge-confirms-the-linked-issue-outcome", {
-		work: openMergeRequest,
-		cause: requestedOpen,
+		item: openMergeRequest,
+		inputs: requestedOpen,
 		context: closingLink,
 	});
 	assert.deepEqual(unmergedOutcome.leads, []);
@@ -874,8 +874,8 @@ void test("an open issue that an open merge request may close stays open, its cl
 void test("a merge request stored closed by its merge is merged, while its linked issue stays as last synced", async () => {
 	const mergedRequest = { ...openMergeRequest, state: "CLOSED", is_merged: true };
 	const result = await review("merge-confirms-the-linked-issue-outcome", {
-		work: mergedRequest,
-		cause: atMerge,
+		item: mergedRequest,
+		inputs: atMerge,
 		context: closingLink,
 	});
 	const keyOf = await leadKeys("merge-confirms-the-linked-issue-outcome");
@@ -888,27 +888,27 @@ void test("a merge request stored closed by its merge is merged, while its linke
 		result.directions?.[0] ?? "",
 		/1 captured linked issue\(s\) state a checkable outcome/u,
 	);
-	// A person who asks for a review of the merged work gets the same leads as the merge.
+	// A person who asks for a review of the merged item gets the same leads as the merge.
 	assert.deepEqual(
 		await review("merge-confirms-the-linked-issue-outcome", {
-			work: mergedRequest,
-			cause: requestedMerged,
+			item: mergedRequest,
+			inputs: requestedMerged,
 			context: closingLink,
 		}),
 		result,
 	);
 });
 
-void test("an uncaptured linked-work file is a collection gap, apart from a capture that holds no issue", async () => {
+void test("an uncaptured linked-item file is a collection gap, apart from a capture that holds no issue", async () => {
 	const merged = { ...openMergeRequest, state: "CLOSED", is_merged: true };
 	const uncaptured = await review("merge-confirms-the-linked-issue-outcome", {
-		work: merged,
-		cause: atMerge,
+		item: merged,
+		inputs: atMerge,
 		context: {},
 	});
 	const capturedEmpty = await review("merge-confirms-the-linked-issue-outcome", {
-		work: merged,
-		cause: atMerge,
+		item: merged,
+		inputs: atMerge,
 		context: { "linked_work_items.json": { workItems: [] } },
 	});
 	assert.match(uncaptured.directions?.[0] ?? "", /was not captured: a collection gap/u);
@@ -927,7 +927,7 @@ void test("every authored commit is one lead, however many there are", async () 
 	}));
 	for (const slug of ["commit-subjects-explain-each-change", "commits-are-atomic-and-cohesive"]) {
 		const result = await review(slug, {
-			work: metadata,
+			item: metadata,
 			context: { "commits.json": commitsRecord(commits) },
 		});
 		const keyOf = await leadKeys(slug);
@@ -970,7 +970,7 @@ const gitlab = (repository: string, repositoryId: number) => ({
 
 void test("an issue reference is resolved against the inventory and the linked items", async () => {
 	const result = await review("links-the-change-to-its-issue", {
-		work: { ...metadata, body: "Closes #18\n\nSee also #21 and #99." },
+		item: { ...metadata, body: "Closes #18\n\nSee also #21 and #99." },
 		context: {
 			"linked_work_items.json": {
 				workItems: [
@@ -1030,7 +1030,7 @@ async function linksAgainst(
 	linked?: unknown,
 ) {
 	const result = await review("links-the-change-to-its-issue", {
-		work: { ...metadata, ...reviewed, title: "Add the view", source_branch: "add-the-view" },
+		item: { ...metadata, ...reviewed, title: "Add the view", source_branch: "add-the-view" },
 		context: {
 			"project_inventory.json": inventory,
 			...(linked === undefined ? {} : { "linked_work_items.json": linked }),
@@ -1206,7 +1206,7 @@ void test("unsafe captured repository identities cannot answer a plain or qualif
 		assert.equal(result.rows.get("#7")?.facts?.inInventory, "unknown");
 		assert.equal(result.rows.get("team/project#7")?.facts?.inInventory, "unknown");
 		assert.equal(result.facts?.inventoryIssues, -1);
-		// The record of the work refuses an identity that the server never writes.
+		// The record of the item refuses an identity that the server never writes.
 		await assert.rejects(
 			linksAgainst(
 				{ issues: [{ ...teamProject, number: 7, title: "Show the map" }] },
@@ -1343,7 +1343,7 @@ void test("an unmatched closing candidate keeps its own URL instead of an unrela
 
 void test("every reviewer comment is one lead with the reply, the thread and the later commits beside it", async () => {
 	const result = await review("engaging-with-inline-review-comments", {
-		work: metadata,
+		item: metadata,
 		change: new Map([diffFile("App/AddIngredientView.swift", [54, 56])]),
 		context: {
 			"comments.json": [
@@ -1453,7 +1453,7 @@ void test("every reviewer comment is one lead with the reply, the thread and the
 
 void test("a conversation note is a lead, with the reviewer's approval, their settling note and the hand-off beside it", async () => {
 	const result = await review("engaging-with-inline-review-comments", {
-		work: metadata,
+		item: metadata,
 		change: new Map([diffFile("App/QuizView.swift", [3])]),
 		context: {
 			"comments.json": [
@@ -1529,20 +1529,20 @@ void test("a conversation note is a lead, with the reviewer's approval, their se
 	assert.equal(result.facts?.conversationComments, 3);
 	const directions = (result.directions ?? []).join(" ");
 	assert.match(directions, /1 were posted after the work merged or closed/u);
-	assert.doesNotMatch(directions, /who clicked it|occasion did not arise/u);
+	assert.doesNotMatch(directions, /who clicked it|applicability did not arise/u);
 });
 
 void test("a comments file that was not captured is told apart from one with no comment by others", async () => {
 	const noFile = await review("defers-review-asks-into-tracked-work", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context: {},
 	});
-	assert.match(noFile.directions?.[0] ?? "", /collection gap and record no observation/u);
+	assert.match(noFile.directions?.[0] ?? "", /collection gap and record no problem/u);
 	assert.equal(noFile.facts?.commentsFileAbsent, 1);
 	const noOthers = await review("defers-review-asks-into-tracked-work", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context: {
 			"comments.json": [],
 			"general_comments.json": {
@@ -1556,14 +1556,14 @@ void test("a comments file that was not captured is told apart from one with no 
 	);
 	assert.equal(noOthers.facts?.commentsFileAbsent, 0);
 	const inlineNoFile = await review("engaging-with-inline-review-comments", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context: {},
 	});
 	assert.match(inlineNoFile.directions?.[0] ?? "", /^No comments file was captured/u);
 	const inlineNoOthers = await review("engaging-with-inline-review-comments", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context: { "comments.json": [] },
 	});
 	assert.match(
@@ -1575,20 +1575,20 @@ void test("a comments file that was not captured is told apart from one with no 
 void test("one missing comments surface cannot prove no deferred ask", async () => {
 	for (const context of [{ "comments.json": [] }, { "general_comments.json": { comments: [] } }]) {
 		const result = await review("defers-review-asks-into-tracked-work", {
-			work: metadata,
-			cause: atMerge,
+			item: metadata,
+			inputs: atMerge,
 			context,
 		});
 		const said = (result.directions ?? []).join("\n");
-		assert.match(said, /collection gap and record no observation/u);
-		assert.doesNotMatch(said, /occasion did not arise/u);
+		assert.match(said, /collection gap and record no problem/u);
+		assert.doesNotMatch(said, /applicability did not arise/u);
 	}
 });
 
 void test("current unresolved threads do not establish their state at an earlier merge", async () => {
 	const result = await review("merged-past-unresolved-review-threads", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context: {
 			"review_threads.json": {
 				threads: [
@@ -1633,8 +1633,8 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 		},
 	};
 	const result = await review("merged-past-unresolved-review-threads", {
-		work: metadata,
-		cause: atMerge,
+		item: metadata,
+		inputs: atMerge,
 		context,
 	});
 	const keyOf = await leadKeys("merged-past-unresolved-review-threads");
@@ -1660,18 +1660,18 @@ void test("a resolution the record does not date by the merge, or a merge it doe
 	// Merged without a merge time, or with one that does not parse; and a pull request still open.
 	const [missing, invalid, open] = await Promise.all([
 		review("merged-past-unresolved-review-threads", {
-			work: unmerged,
-			cause: atMerge,
+			item: unmerged,
+			inputs: atMerge,
 			context,
 		}),
 		review("merged-past-unresolved-review-threads", {
-			work: { ...metadata, merged_at: "not a time" },
-			cause: atMerge,
+			item: { ...metadata, merged_at: "not a time" },
+			inputs: atMerge,
 			context,
 		}),
 		review("merged-past-unresolved-review-threads", {
-			work: { ...unmerged, state: "OPEN" },
-			cause: requestedOpen,
+			item: { ...unmerged, state: "OPEN" },
+			inputs: requestedOpen,
 			context,
 		}),
 	]);
@@ -1749,8 +1749,8 @@ void test("the merge practices read the threads and decisions as rows against th
 	};
 	const merged = { ...metadata, is_merged: true, merged_by: "ada", review_decision: "APPROVED" };
 	const unresolved = await review("merged-past-unresolved-review-threads", {
-		work: merged,
-		cause: atMerge,
+		item: merged,
+		inputs: atMerge,
 		context: record,
 	});
 	const threadKey = await leadKeys("merged-past-unresolved-review-threads");
@@ -1785,8 +1785,8 @@ void test("the merge practices read the threads and decisions as rows against th
 	);
 
 	const decisions = await review("merges-only-after-approval", {
-		work: merged,
-		cause: atMerge,
+		item: merged,
+		inputs: atMerge,
 		context: record,
 	});
 	const decisionKey = await leadKeys("merges-only-after-approval");
@@ -1826,15 +1826,15 @@ void test("the merge practices read the threads and decisions as rows against th
 	);
 
 	const absent = await review("merges-only-after-approval", {
-		work: merged,
-		cause: atMerge,
+		item: merged,
+		inputs: atMerge,
 		context: {},
 	});
 	assert.equal(absent.facts?.threadsFileAbsent, 1);
 	assert.match(absent.directions?.[0] ?? "", /^No review threads file was captured/u);
 	const open = await review("merges-only-after-approval", {
-		work: { ...metadata, state: "OPEN", merged_at: undefined },
-		cause: requestedOpen,
+		item: { ...metadata, state: "OPEN", merged_at: undefined },
+		inputs: requestedOpen,
 		context: {},
 	});
 	assert.deepEqual(open.leads, []);
@@ -1870,8 +1870,8 @@ void test("an approval by an account marked bot is kept as a row but counted as 
 	const keyOf = await leadKeys("merges-only-after-approval");
 	for (const { name, decisions, approvals } of cases) {
 		const result = await review("merges-only-after-approval", {
-			work: merged,
-			cause: atMerge,
+			item: merged,
+			inputs: atMerge,
 			context: { "review_threads.json": { threads: [], reviewDecisions: decisions } },
 		});
 		assert.equal(result.facts?.approvalsBeforeMergeByOthers, approvals, name);
@@ -1895,8 +1895,8 @@ void test("an approval by an account marked bot is kept as a row but counted as 
 
 void test("unknown approval times establish neither before-merge absence nor a last historical decision", async () => {
 	const result = await review("merges-only-after-approval", {
-		work: { ...metadata, is_merged: true },
-		cause: atMerge,
+		item: { ...metadata, is_merged: true },
+		inputs: atMerge,
 		context: {
 			"review_threads.json": {
 				threads: [],
@@ -1931,7 +1931,7 @@ void test("unknown approval times establish neither before-merge absence nor a l
 void test("review engagement distinguishes unavailable commit evidence from a captured empty range", async () => {
 	for (const captured of [false, true]) {
 		const result = await review("engaging-with-inline-review-comments", {
-			work: metadata,
+			item: metadata,
 			context: {
 				"comments.json": [
 					{

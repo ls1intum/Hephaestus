@@ -1,17 +1,5 @@
-// Finds each ask that a reviewer made, one lead each, with what the record shows beside it: if the
-// change touches the file of the ask, if the author replied and if the reply names an issue, if the
-// reviewer had a later word on it or approved after it, and if the thread was marked resolved. The
-// review decides for each ask if it was addressed, deferred into tracked work, waived or merged past.
-// The RESOLVED mark of a thread tells who clicked it, not what happened to the ask.
-import { factsOf } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type DiffFile,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { issueNumberReferences } from "../lib/references.ts";
+import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
+import { issueNumberReferences } from "../kits/scm/references.ts";
 import {
 	type GeneralComment,
 	type ReviewComment,
@@ -21,7 +9,14 @@ import {
 	readReviewComments,
 	readReviewThreads,
 	reviewerCommentRows,
-} from "../lib/review.ts";
+} from "../kits/scm/review.ts";
+// Finds each ask that a reviewer made, one lead each, with what the record shows beside it: if the
+// change touches the file of the ask, if the author replied and if the reply names an issue, if the
+// reviewer had a later word on it or approved after it, and if the thread was marked resolved. The
+// review decides for each ask if it was addressed, deferred into tracked work, waived or merged past.
+// The RESOLVED mark of a thread tells who clicked it, not what happened to the ask.
+import { factsOf } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"inline-ask":
@@ -47,10 +42,11 @@ interface Ask {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
 		// The practice reviews the asks that the work merged with, so a requested review of unmerged
 		// work has none to decide yet.
-		if (ctx.cause.type === "requested" && !ctx.work.is_merged) {
+		if (ctx.review.origin === "REQUEST" && !domain.item.is_merged) {
 			return ctx.review({
 				leads: [],
 				directions: [
@@ -58,8 +54,8 @@ export default definePracticeScript({
 				],
 			});
 		}
-		const change = requireChange(ctx.files);
-		const author = ctx.work.author ?? "";
+		const change = requireChange(domain.files);
+		const author = domain.item.author ?? "";
 		const inline = await readReviewComments(ctx.evidence);
 		const general = await readGeneralComments(ctx.evidence);
 		const record = await readReviewThreads(ctx.evidence);
@@ -102,11 +98,11 @@ export default definePracticeScript({
 		const directions: string[] = [];
 		if (inline === null || general === null) {
 			directions.push(
-				"A required comments file is missing or malformed (comments.json or general_comments.json): report a collection gap and record no observation; an unread source does not establish that no ask exists.",
+				"A required comments file is missing or malformed (comments.json or general_comments.json): report a collection gap and record no problem; an unread source does not establish that no ask exists.",
 			);
 		} else if (asks.length === 0) {
 			directions.push(
-				`No comment by anyone other than the author in the captured record (${inline.length} inline comment(s), ${general.length} conversation comment(s)): with no ask, the occasion did not arise.`,
+				`No comment by anyone other than the author in the captured record (${inline.length} inline comment(s), ${general.length} conversation comment(s)): with no ask, the applicability did not arise.`,
 			);
 		} else {
 			directions.push(

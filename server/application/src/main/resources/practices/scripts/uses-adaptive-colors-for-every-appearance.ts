@@ -1,3 +1,10 @@
+import { scm, type FileTree } from "../kits/scm/index.ts";
+import {
+	countLabel,
+	sampleNote,
+	scanOccurrences,
+	type SourcePattern,
+} from "../kits/scm/source-scan.ts";
 // Finds each color expression that the change adds inside SwiftUI view types, under the first shape
 // that its text shows. For a named asset color, it reads from the colorset if the color has a dark
 // appearance. A shape is spelling, not a type: `.green` given to `foregroundStyle` is SwiftUI's
@@ -5,16 +12,9 @@
 // defines is what its definition says. Only the shapes whose spelling fixes the kind are counted as
 // literal or adaptive. The review classifies the rest, and reads the role of each color from the
 // modifier chain.
-import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { isJsonObject } from "../lib/json.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type FileTree,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { countLabel, sampleNote, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
+import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
+import { isJsonObject } from "../lib/core/json.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 const SWIFTUI_VIEW = /\b(?:View|App|Scene)\b/u;
 
@@ -170,31 +170,35 @@ async function assetColors(tree: FileTree | null): Promise<AssetColors> {
 
 export const LABELS = {
 	"fixed-components":
-		"An added color made from fixed components, such as RGB, white or hex values.",
-	"literal-white-or-black": "An added literal white or black color.",
-	"uikit-color": "An added UIKit color, which can be dynamic or fixed.",
+		"A selected color made from fixed components, such as RGB, white or hex values.",
+	"literal-white-or-black": "A selected literal white or black color.",
+	"uikit-color": "A selected UIKit color, which can be dynamic or fixed.",
 	"named-asset":
-		"An added color from a named asset, with the facts that tell if its colorset has a dark appearance.",
-	"color-from-a-value": "An added Color(.name) that converts another color value.",
-	"semantic-style": "An added semantic style, such as .primary or .secondary.",
-	material: "An added material, such as .regularMaterial.",
-	accent: "An added accent color or tint.",
-	"color-member": "An added Color member, such as Color.green, that SwiftUI or the app can define.",
-	"color-modifier-member": "An added member, such as .pink, that a color modifier gets.",
+		"A selected color from a named asset, with the facts that tell if its colorset has a dark appearance.",
+	"color-from-a-value": "A selected Color(.name) that converts another color value.",
+	"semantic-style": "A selected semantic style, such as .primary or .secondary.",
+	material: "A selected material, such as .regularMaterial.",
+	accent: "A selected accent color or tint.",
+	"color-member":
+		"A selected Color member, such as Color.green, that SwiftUI or the app can define.",
+	"color-modifier-member": "A selected member, such as .pink, that a color modifier gets.",
 };
 const LABEL_OF = new Map<string, string>(Object.entries(LABELS));
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const scan = await scanAddedLines(ctx.files?.head ?? null, requireChange(ctx.files), {
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
+		const scan = await scanOccurrences(ctx, domain.files, {
 			languages: ["swift"],
 			patterns: COLORS,
 			scope: SWIFTUI_VIEW,
 			onlyInScope: true,
 		});
-		const assets = await assetColors(ctx.files?.head ?? null);
+		const assets = await assetColors(domain.files?.head ?? null);
 		const colorsetsFound = [...assets.paths.values()].reduce((sum, files) => sum + files.length, 0);
 		const hints = scan.hints.map((hint) => {
 			if (hint.pattern !== "named-asset" && hint.pattern !== "color-from-a-value") {
@@ -220,7 +224,13 @@ export default definePracticeScript({
 			const label = LABEL_OF.get(hint.pattern);
 			return label === undefined
 				? []
-				: [{ at: { change: hint.file, line: hint.line }, label, facts: factsOf(hint.flags) }];
+				: [
+						{
+							at: { file: hint.file, line: hint.line, endLine: hint.endLine },
+							label,
+							facts: factsOf(hint.flags),
+						},
+					];
 		});
 		const inOtherBundles = hints.filter((hint) => hint.flags.bundle !== undefined).length;
 		const literals =
@@ -236,17 +246,17 @@ export default definePracticeScript({
 		).length;
 		const directions: string[] = [...sampleNote(scan)];
 		if (leads.length === 0) {
-			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
+			directions.push(...noMatchDirections(scan.linesSelected, scan.filesScanned));
 		}
 		if (literals > 0) {
 			directions.push(
-				`Found ${literals} literal colors, ${systemAdaptive} system-adaptive colors and ${namedAssets} named asset colors added in view types. For each literal, read the modifier chain. Text over a fill the same view sets is content.`,
+				`Found ${literals} literal colors, ${systemAdaptive} system-adaptive colors and ${namedAssets} named asset colors selected in view types. For each literal, read the modifier chain. Text over a fill the same view sets is content.`,
 				"A literal background or text on a system background can fix one appearance. A translucent scrim over an image is content, not an adaptive screen background.",
 			);
 		}
 		if (toClassify > 0) {
 			directions.push(
-				`${toClassify} added line(s) name a color whose spelling does not settle its kind — a UIKit color, \`Color(.name)\`, a \`Color\` member or a member given to a color modifier.`,
+				`${toClassify} selected line(s) name a color whose spelling does not settle its kind — a UIKit color, \`Color(.name)\`, a \`Color\` member or a member given to a color modifier.`,
 				"Read the type it resolves to and, for a name the app defines, its definition: SwiftUI's standard colors and UIKit's dynamic colors change with the appearance, UIKit's fixed constants do not.",
 			);
 		}
@@ -293,9 +303,9 @@ export default definePracticeScript({
 				colorsToClassify: toClassify,
 				assetsWithoutDarkAppearance,
 				assetColorsInCheckout: assets.listing === "complete" ? colorsetsFound : -1,
-				filesWithoutCheckout: scan.filesWithoutCheckout,
+				filesWithUnknownLocation: scan.filesWithUnknownLocation,
 				filesScanned: scan.filesScanned,
-				linesAdded: scan.linesAdded,
+				linesSelected: scan.linesSelected,
 			},
 			directions,
 		});

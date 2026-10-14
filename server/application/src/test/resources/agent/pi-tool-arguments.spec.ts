@@ -6,7 +6,7 @@ import { prepareResultArguments } from "../../../main/resources/agent/pi-tool-ar
 
 const changeCitation = {
 	sourceKind: "scm.pull-request.diff",
-	artifactPath: "context/change.json",
+	sourcePath: "context/change.json",
 	path: "src/Auth.java",
 	side: "NEW",
 	startLine: 10,
@@ -15,7 +15,7 @@ const changeCitation = {
 };
 const treeCitation = {
 	sourceKind: "scm.repository.tree",
-	artifactPath: "repos/reviewed/.git/HEAD",
+	sourcePath: "repos/reviewed/.git/HEAD",
 	path: "src/Checked.java",
 	revision: "a".repeat(40),
 	startLine: 2,
@@ -42,7 +42,7 @@ const result = {
 	citations: [treeCitation],
 	problems: [problem],
 	example: { citation: treeCitation, note: "checked() guards the token here." },
-	evidence: { undecidability: [question] },
+	evidence: { openQuestions: [question] },
 };
 
 void test("a result in its declared form is kept as it is, and preparing it again changes nothing", () => {
@@ -63,7 +63,7 @@ void test("JSON-encoded lists and objects are decoded at every level, while the 
 			},
 		]),
 		example: JSON.stringify({ ...result.example, citation: JSON.stringify(treeCitation) }),
-		evidence: JSON.stringify({ undecidability: JSON.stringify([question]) }),
+		evidence: JSON.stringify({ openQuestions: JSON.stringify([question]) }),
 	};
 	assert.deepEqual(prepareResultArguments(encoded), result);
 	assert.equal(typeof encoded.evidence, "string", "the input is not changed");
@@ -75,7 +75,7 @@ void test("one object sent for a list is a list of it", () => {
 			...result,
 			citations: treeCitation,
 			problems: { ...problem, citations: changeCitation },
-			evidence: { undecidability: question },
+			evidence: { openQuestions: question },
 		}),
 		result,
 	);
@@ -91,7 +91,7 @@ void test("line coordinates copied from a numbered view are read as numbers, in 
 				citations: [tree],
 				problems: [{ ...problem, citations: [numbered] }],
 				example: { ...result.example, citation: tree },
-				evidence: { undecidability: [{ ...question, citation: tree }] },
+				evidence: { openQuestions: [{ ...question, citation: tree }] },
 			}),
 			result,
 			startLine,
@@ -173,8 +173,8 @@ void test("citations sent under evidence are kept, repaired, for the normalizer 
 void test("an open question without a citation is kept as it is", () => {
 	const unlocated = { openQuestion: "Is login() reachable?", wouldSettleIt: "A caller." };
 	assert.deepEqual(
-		prepareResultArguments({ ...result, evidence: { undecidability: [unlocated] } }),
-		{ ...result, evidence: { undecidability: [unlocated] } },
+		prepareResultArguments({ ...result, evidence: { openQuestions: [unlocated] } }),
+		{ ...result, evidence: { openQuestions: [unlocated] } },
 	);
 });
 
@@ -191,7 +191,7 @@ void test("a side, revision or quote that is not text is refused, wherever the c
 		}),
 		"open question citation": (cited: object) => ({
 			...result,
-			evidence: { undecidability: [{ ...question, citation: cited }] },
+			evidence: { openQuestions: [{ ...question, citation: cited }] },
 		}),
 		"evidence citation": (cited: object) => ({ ...result, evidence: { citations: [cited] } }),
 	};
@@ -232,7 +232,7 @@ void test("a warrant that is not an object is refused; an absent one is not", ()
 });
 
 void test("malformed containers and invalid claims are left for validation to refuse", () => {
-	for (const evidence of ["{not json}", "null", "[]", "42", [], { undecidability: "not JSON" }]) {
+	for (const evidence of ["{not json}", "null", "[]", "42", [], { openQuestions: "not JSON" }]) {
 		const input = { ...result, outcome: "INVALID", evidence };
 		assert.deepEqual(prepareResultArguments(input), input, JSON.stringify(evidence));
 	}

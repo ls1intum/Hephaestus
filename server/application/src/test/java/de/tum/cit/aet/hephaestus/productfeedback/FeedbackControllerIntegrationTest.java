@@ -4,8 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.productfeedback.FeedbackDTOs.CreateSurveyDTO;
 import de.tum.cit.aet.hephaestus.productfeedback.FeedbackDTOs.QuestionDTO;
@@ -18,7 +17,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +55,7 @@ class FeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private AccountRepository accounts;
 
     @Autowired
-    private IdentityLinkRepository identityLinks;
+    private IdentityRepository identityLinks;
 
     /** A member account signed in the way production does: a numeric JWT subject wired to a workspace member. */
     private record Member(long accountId, Account.AppRole role, Workspace workspace) {
@@ -777,28 +776,25 @@ class FeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private Member member(String slug) {
         User actor = persistUser(slug + "-member");
         Workspace workspace = createWorkspace(slug, "Workspace " + slug, slug, AccountType.ORG, actor);
-        ensureWorkspaceMembership(workspace, actor, WorkspaceMembership.WorkspaceRole.ADMIN);
+        ensureWorkspaceMembership(workspace, actor, Membership.WorkspaceRole.ADMIN);
         return member(slug, Account.AppRole.APP_ADMIN, workspace, actor);
     }
 
     private Member plainMember(String slug, Workspace workspace) {
         User actor = persistUser(slug + "-member");
-        ensureWorkspaceMembership(workspace, actor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
         return member(slug, Account.AppRole.USER, workspace, actor);
     }
 
     private Member member(String slug, Account.AppRole role, Workspace workspace, User actor) {
-        Account account = new Account("Member " + slug);
+        var providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
+        var link = identityLinks.findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
+                .orElseThrow();
+        var account = link.getAccount();
+        account.setDisplayName("Member " + slug);
         account.setAppRole(role);
         account.setStatus(Account.Status.ACTIVE);
         account = accounts.save(account);
-        IdentityLink link = new IdentityLink();
-        link.setAccount(account);
-        link.setProviderId(Objects.requireNonNull(ensureGitHubProvider().getId()));
-        link.setSubject(String.valueOf(actor.getNativeId()));
-        link.setUsernameAtSignup(actor.getLogin());
-        link.setExternalActorId(actor.getId());
-        identityLinks.save(link);
         return new Member(Objects.requireNonNull(account.getId()), role, workspace);
     }
 }

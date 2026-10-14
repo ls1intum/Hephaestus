@@ -16,13 +16,13 @@ import org.springframework.stereotype.Component;
  *
  * <p>The naming convention follows the rest of {@code agent/} ({@code agent.job.*},
  * {@code llm.proxy.*}): dot-case Java identifiers that Micrometer's Prometheus renderer
- * transforms to {@code mentor_turn_started_total} etc. Outcome tag values are kept to a fixed
+ * transforms to {@code mentor_turn_started_total} etc. ResultOutcome tag values are kept to a fixed
  * enum so cardinality stays bounded.
  *
  * <p>Wired up in {@link MentorChatService}. {@code mentor.turn.started} fires on inbound
  * start before executor submission (so rejected submissions still increment);
  * {@code mentor.turn.completed} fires at every terminal branch with a single
- * {@link Outcome} label. {@code mentor.turn.first_token} runs from the turn being accepted to its
+ * {@link ResultOutcome} label. {@code mentor.turn.first_token} runs from the turn being accepted to its
  * first text chunk, tagged by whether the turn found its sandbox warm or had to wait for one to start.
  */
 @Component
@@ -33,7 +33,7 @@ public class MentorChatMetrics {
      * = same-JVM lock rejection; {@link #IN_FLIGHT_CONFLICT_DB} = durable partial-unique index
      * trip (cross-replica race). The split is intentional so the DB-side firing is observable.
      */
-    public enum Outcome {
+    public enum ResultOutcome {
         SUCCESS("success"),
         CLIENT_DISCONNECT("client_disconnect"),
         POISONED("poisoned"),
@@ -45,7 +45,7 @@ public class MentorChatMetrics {
 
         private final String tag;
 
-        Outcome(String tag) {
+        ResultOutcome(String tag) {
             this.tag = tag;
         }
 
@@ -56,7 +56,7 @@ public class MentorChatMetrics {
 
     private final MeterRegistry registry;
     private final Counter started;
-    private final Map<Outcome, Counter> completedByOutcome;
+    private final Map<ResultOutcome, Counter> completedByOutcome;
     private final Timer duration;
     private final Timer runtimeReady;
     private final Timer firstTokenWarm;
@@ -67,7 +67,8 @@ public class MentorChatMetrics {
         this.registry = registry;
         this.started = Counter.builder(AgentMetrics.MENTOR_TURN_STARTED)
                 .description(
-                        "Mentor chat turns observed at executor submit — increments on every dispatch, regardless of lock outcome.")
+                        "Mentor chat turns observed at executor submit — increments on every dispatch, regardless of"
+                                + " lock outcome.")
                 .register(registry);
         this.duration = Timer.builder(AgentMetrics.MENTOR_TURN_DURATION)
                 .description("Mentor chat turn wall-clock duration including sandbox attach + Pi RPC.")
@@ -86,8 +87,8 @@ public class MentorChatMetrics {
 
         // Pre-register one Counter per outcome at construction. Avoids per-call
         // Counter.builder + Tags allocation on the hot path (Micrometer perf wiki).
-        this.completedByOutcome = new EnumMap<>(Outcome.class);
-        for (Outcome o : Outcome.values()) {
+        this.completedByOutcome = new EnumMap<>(ResultOutcome.class);
+        for (ResultOutcome o : ResultOutcome.values()) {
             completedByOutcome.put(
                     o,
                     Counter.builder(AgentMetrics.MENTOR_TURN_COMPLETED)
@@ -101,7 +102,7 @@ public class MentorChatMetrics {
         started.increment();
     }
 
-    public void recordCompleted(Outcome outcome) {
+    public void recordCompleted(ResultOutcome outcome) {
         Objects.requireNonNull(completedByOutcome.get(outcome)).increment();
     }
 

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.config;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.JavaType;
 import io.swagger.v3.core.converter.AnnotatedType;
 import io.swagger.v3.core.converter.ModelConverter;
@@ -11,6 +12,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.RecordComponent;
 import java.lang.reflect.Type;
+import java.util.HashSet;
 import java.util.Iterator;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -41,7 +43,8 @@ import org.springframework.stereotype.Component;
  * and diverge from the historical spec. A primitive cannot be null, so a nullness annotation on it
  * says nothing; a primitive that must be {@code required} (e.g. {@code GitLabPreflightResponseDTO#valid})
  * declares {@code @Schema(requiredMode = REQUIRED)}, which swagger-core reads itself and this
- * converter leaves in place.
+ * converter leaves in place. Records with JsonInclude.ALWAYS publish every property as required,
+ * including nullable properties. Their nullable value types use the OpenAPI 3.1 null union.
  *
  * <p><b>Scope.</b> Matching is by member name; a {@code @JsonProperty}/{@code @Schema(name=...)}
  * rename on an <em>exposed</em> schema would need its renamed key handled here. None exist today —
@@ -75,9 +78,14 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
             return resolved;
         }
         if (raw.isRecord()) {
+            JsonInclude inclusion = raw.getAnnotation(JsonInclude.class);
+            boolean alwaysPresent = inclusion != null && inclusion.value() == JsonInclude.Include.ALWAYS;
             for (RecordComponent rc : raw.getRecordComponents()) {
-                if (isNonNull(rc.getAnnotatedType())) {
+                if (alwaysPresent || isNonNull(rc.getAnnotatedType())) {
                     markRequired(model, rc.getName());
+                }
+                if (alwaysPresent && rc.getAnnotatedType().isAnnotationPresent(Nullable.class)) {
+                    markNullable(model, rc.getName());
                 }
             }
         } else {
@@ -103,6 +111,33 @@ public class JSpecifyRequiredModelConverter implements ModelConverter {
                 && (model.getRequired() == null || !model.getRequired().contains(property))) {
             model.addRequiredItem(property);
         }
+    }
+
+    /** ALWAYS records publish every key, including null; OpenAPI 3.1 records null in the value type. */
+    private static void markNullable(Schema<?> model, String name) {
+        Schema<?> property = model.getProperties().get(name);
+        if (property == null
+                || (property.getTypes() != null && property.getTypes().contains("null"))) {
+            return;
+        }
+        if (property.get$ref() != null
+                || property.getOneOf() != null
+                || property.getAnyOf() != null
+                || property.getAllOf() != null) {
+            Schema<Object> nullable = new Schema<>();
+            nullable.setDescription(property.getDescription());
+            nullable.addAnyOfItem(property);
+            nullable.addAnyOfItem(new Schema<>().type("null"));
+            model.addProperty(name, nullable);
+            return;
+        }
+        var types = new HashSet<String>();
+        if (property.getTypes() != null) types.addAll(property.getTypes());
+        if (property.getType() != null) types.add(property.getType());
+        types.add("null");
+        property.setType(null);
+        property.setTypes(types);
+        if (property.getEnum() != null) property.addEnumItemObject(null);
     }
 
     private static @Nullable Schema<?> referencedModel(Schema<?> resolved, ModelConverterContext context) {

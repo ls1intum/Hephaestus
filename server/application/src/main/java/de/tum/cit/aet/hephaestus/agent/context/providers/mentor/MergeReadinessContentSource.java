@@ -1,9 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.context.WorkspaceScmProjection;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
@@ -15,11 +15,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewcomment.PullRequestReviewComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThread;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,7 +71,7 @@ public class MergeReadinessContentSource implements ContentSource {
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "merge_readiness.json";
 
     /** Mirrored by {@code MERGE_READINESS_ITEM} in {@code pi-mentor-protocol.ts}. */
-    private static final Pattern ITEM_KEY = Pattern.compile("inputs/context/merge_readiness/(\\d{1,18})\\.json");
+    private static final Pattern ITEM_KEY = Pattern.compile("inputs/context/merge_readiness/([1-9][0-9]{0,18})\\.json");
 
     private static final int MAX_DETAILED = 5;
     private static final int MAX_LISTED = 20;
@@ -93,24 +91,17 @@ public class MergeReadinessContentSource implements ContentSource {
 
     private static final int SCAN_PAGE = 50;
 
-    /**
-     * The refs the delivery ledger records for a stored GitLab note, whose native id is the note id. A GitHub
-     * ledger ref is a node id the mirror does not store, so a GitHub note of Hephaestus's is never matched and is
-     * shown, flagged by its marker.
-     */
-    private static final List<String> LEDGER_REFS =
-            List.of("gid://gitlab/Note/%d", "gid://gitlab/DiffNote/%d", "gid://gitlab/DiscussionNote/%d");
-
     private final WorkspaceActorSelector actorSelector;
     private final MentorContextQueryRepository queryRepository;
     private final PullRequestReviewRepository reviewRepository;
     private final IssueCommentRepository commentRepository;
     private final ObjectMapper objectMapper;
     private final IntegrationManifestRegistry manifests;
+    private final DeliveredPullRequestCommentLookup deliveredComments;
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
     @Override
@@ -120,8 +111,8 @@ public class MergeReadinessContentSource implements ContentSource {
 
     @Override
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        MentorContextRequest req = request;
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(buildPayload(req.workspaceId(), req.developerId())));
         } catch (JacksonException e) {
@@ -130,14 +121,19 @@ public class MergeReadinessContentSource implements ContentSource {
     }
 
     /** The on-demand key of one pull request's detail, published as the {@code resource} of its entries. */
-    public static String resourceOf(long artifactId) {
-        return OUTPUT_PREFIX + "merge_readiness/" + artifactId + ".json";
+    public static String resourceOf(long pullRequestId) {
+        return OUTPUT_PREFIX + "merge_readiness/" + pullRequestId + ".json";
     }
 
-    /** The artifact id an on-demand key names, if {@code key} is one. */
-    public static Optional<Long> artifactIdOf(String key) {
+    /** The pull request id an on-demand key names, if {@code key} is one. */
+    public static Optional<Long> pullRequestIdOf(String key) {
         Matcher matcher = ITEM_KEY.matcher(key);
-        return matcher.matches() ? Optional.of(Long.parseLong(matcher.group(1))) : Optional.empty();
+        if (!matcher.matches()) return Optional.empty();
+        try {
+            return Optional.of(Long.parseLong(matcher.group(1)));
+        } catch (NumberFormatException invalid) {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -145,19 +141,19 @@ public class MergeReadinessContentSource implements ContentSource {
      * from state; {@code NOT_FOUND} otherwise.
      */
     @Transactional(readOnly = true, propagation = Propagation.REQUIRES_NEW, isolation = Isolation.REPEATABLE_READ)
-    public ObjectNode inspect(long workspaceId, long developerId, long artifactId) {
+    public ObjectNode inspect(long workspaceId, long developerId, long pullRequestId) {
         return build(workspaceId, (root, providerId) -> {
             // A list: two monitor rows with one path would make a single-result query throw.
             Optional<PullRequest> pr =
                     queryRepository
-                            .findAuthoredPullRequestOnInstance(workspaceId, developerId, providerId, artifactId)
+                            .findAuthoredPullRequestOnInstance(workspaceId, developerId, providerId, pullRequestId)
                             .stream()
                             .findFirst();
             if (pr.isEmpty()) {
                 root.put("status", "NOT_FOUND");
                 root.put(
                         "reason",
-                        "No pull request by this developer has that artifactId in this workspace. Copy the resource "
+                        "No pull request by this developer has that pullRequestId in this workspace. Copy the resource "
                                 + "of an entry in recent_authored_work.json or merge_readiness.json.");
                 return;
             }
@@ -225,7 +221,7 @@ public class MergeReadinessContentSource implements ContentSource {
     private ObjectNode indexEntry(PullRequest pr) {
         return objectMapper
                 .createObjectNode()
-                .put("artifactId", pr.getId())
+                .put("pullRequestId", pr.getId())
                 .put("resource", resourceOf(pr.getId()))
                 .put("number", pr.getNumber())
                 .put("title", pr.getTitle());
@@ -234,15 +230,15 @@ public class MergeReadinessContentSource implements ContentSource {
     private ObjectNode indexEntry(JsonNode detail) {
         return objectMapper
                 .createObjectNode()
-                .put("artifactId", detail.path("artifactId").asLong())
-                .put("resource", resourceOf(detail.path("artifactId").asLong()))
+                .put("pullRequestId", detail.path("pullRequestId").asLong())
+                .put("resource", resourceOf(detail.path("pullRequestId").asLong()))
                 .put("number", detail.path("number").asInt())
                 .put("title", detail.path("title").asString());
     }
 
     private ObjectNode describe(long workspaceId, long developerId, long providerId, PullRequest pr) {
         ObjectNode node = objectMapper.createObjectNode();
-        node.put("artifactId", pr.getId());
+        node.put("pullRequestId", pr.getId());
         node.put("resource", resourceOf(pr.getId()));
         node.put("number", pr.getNumber());
         node.put("title", pr.getTitle());
@@ -328,6 +324,7 @@ public class MergeReadinessContentSource implements ContentSource {
                 pr.getId(),
                 page -> commentRepository.findRecentByIssueIdWithAuthor(pr.getId(), page),
                 IssueComment::getNativeId,
+                false,
                 (note, own) -> {
                     if (!own && !note.getBody().isBlank()) {
                         notes.add(note);
@@ -351,6 +348,7 @@ public class MergeReadinessContentSource implements ContentSource {
                 pr.getId(),
                 page -> queryRepository.findThreadCommentsUnresolvedFirst(pr.getId(), page),
                 PullRequestReviewComment::getNativeId,
+                true,
                 (comment, own) -> {
                     PullRequestReviewThread thread = comment.getThread();
                     if (thread == null) {
@@ -401,7 +399,7 @@ public class MergeReadinessContentSource implements ContentSource {
         ArrayNode closes = node.putArray("closingIssues");
         for (Issue issue : closing.subList(0, Math.min(closing.size(), MAX_CLOSING_ISSUES))) {
             ObjectNode entry = closes.addObject();
-            entry.put("artifactId", issue.getId());
+            entry.put("issueId", issue.getId());
             entry.put("number", issue.getNumber());
             entry.put("title", issue.getTitle());
             entry.put("url", issue.getHtmlUrl());
@@ -427,21 +425,12 @@ public class MergeReadinessContentSource implements ContentSource {
             long pullRequestId,
             Function<Pageable, List<T>> page,
             Function<T, Long> nativeId,
+            boolean inline,
             BiPredicate<T, Boolean> visitor) {
         for (int read = 0; read < SCAN_BUDGET; read += SCAN_PAGE) {
             List<T> rows = page.apply(PageRequest.of(read / SCAN_PAGE, SCAN_PAGE));
-            Map<String, Long> refs = new HashMap<>();
-            for (T row : rows) {
-                for (String format : LEDGER_REFS) {
-                    refs.put(format.formatted(nativeId.apply(row)), nativeId.apply(row));
-                }
-            }
-            Set<Long> posted = new HashSet<>();
-            if (!refs.isEmpty()) {
-                queryRepository
-                        .findPostedCommentRefs(workspaceId, ArtifactKinds.PULL_REQUEST, pullRequestId, refs.keySet())
-                        .forEach(ref -> posted.add(refs.get(ref)));
-            }
+            var receipts = deliveredComments.findForPullRequest(workspaceId, pullRequestId);
+            var posted = inline ? receipts.inline() : receipts.general();
             for (T row : rows) {
                 if (!visitor.test(row, posted.contains(nativeId.apply(row)))) {
                     return false;

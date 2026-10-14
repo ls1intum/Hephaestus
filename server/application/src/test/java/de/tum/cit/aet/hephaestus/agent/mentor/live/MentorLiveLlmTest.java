@@ -324,14 +324,14 @@ class MentorLiveLlmTest {
         sandbox = spawnRunner(creds, workspaceDir);
         var driver =
                 new RunnerDriver(sandbox).withContext("inputs/context/recent_authored_work.json", MAPPER.readTree("""
-                {
-                  "user": {"login": "octo", "name": "Octo Example"},
-                  "pullRequests": [
-                    {"number": 12, "title": "Proposal: Slack mentor onboarding", "url": "https://example.invalid/pr/12", "state": "OPEN", "isDraft": false, "additions": 120, "deletions": 20}
-                  ],
-                  "issues": []
-                }
-                """));
+                    {
+                      "user": {"login": "octo", "name": "Octo Example"},
+                      "pullRequests": [
+                        {"number": 12, "title": "Proposal: Slack mentor onboarding", "url": "https://example.invalid/pr/12", "state": "OPEN", "isDraft": false, "additions": 120, "deletions": 20}
+                      ],
+                      "issues": []
+                    }
+                    """));
         driver.expectRunnerReady();
         driver.helloOk();
         driver.openThread(threadId);
@@ -353,8 +353,8 @@ class MentorLiveLlmTest {
 
         driver.prompt(
                 threadId,
-                "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and title. "
-                        + "You MUST use fetch_context. Do NOT guess.");
+                "Use fetch_context with path inputs/context/recent_authored_work.json, then tell me the PR number and"
+                        + " title. You MUST use fetch_context. Do NOT guess.");
         done.get(TURN_TIMEOUT.toSeconds(), TimeUnit.SECONDS);
 
         // At least one tool was invoked.

@@ -11,13 +11,13 @@ import org.springframework.boot.convert.DurationUnit;
 import org.springframework.validation.annotation.Validated;
 
 /**
- * Configuration for the PostgreSQL-backed agent job queue: the {@code agent_job} table itself, claimed
- * by {@link AgentJobExecutor}'s poll loop with {@code FOR UPDATE SKIP LOCKED}.
+ * Configuration for the PostgreSQL-backed agent job queue: the {@code review_job} table itself, claimed
+ * by {@link ReviewJobExecutor}'s poll loop with {@code FOR UPDATE SKIP LOCKED}.
  *
  * @param pollInterval      how long the poll loop sleeps when a poll claimed nothing
  * @param claimBatchSize    max QUEUED jobs considered per poll iteration
  * @param maxRetries        orphan-requeue attempts before a job whose owning worker was lost is failed
- *                          instead; the authoritative counter is {@code agent_job.retry_count}
+ *                          instead; the authoritative counter is {@code review_job.attempt}
  * @param heartbeatInterval interval between {@code worker_registry} liveness heartbeats
  * @param payloadRetention  age from {@code completed_at} at which a TERMINAL job's {@code container_logs}
  *                          and {@code output} are stripped to NULL

@@ -1,416 +1,292 @@
 ---
 title: Practice feedback language
-description: The normative product vocabulary for results, observations, feedback, practices and groups.
+description: Product terms for practices, results, feedback and people.
 ---
 
 # Practice feedback language
 
-Use these product terms in user-facing interfaces, documentation, and release notes.
-
-This page is the project's list of technical names and technical verbs for the [writing standard](./simplified-technical-english.md).
-The tables define names.
-The verb table defines actions.
-The prose checks read the first column, so keep each term in bold.
-
-This page owns the vocabulary for **practice results, their observations, and the feedback built from them**.
-The [practice review glossary](./practice-review-glossary.mdx) owns the vocabulary for **the review operation, the evidence contract, and the exact API, Java, and persistence names**.
-This includes *practice review*, *model assignment*, *signal*, *evidence stance*, and *practice autonomy*.
-A term is defined in one of the two and cited from the other.
-When the two disagree, that is a bug in one of them, not a choice for the writer.
-
-Within a surface already titled **Practice reviews**, shorten **practice feedback** to **feedback**.
-Use the full term when the surrounding context does not establish which kind of feedback is meant.
-Within **Practice setup** or **Practice catalog**, shorten **practice group** to **group**.
-In the practice editor, shorten **practice visual** to **Visual**, **practice guide** to **Guide**, and **practice script** to **Script**.
-
-**Practice group is the canonical noun at every layer.** Use `PracticeGroup`, `groupSlug`, and `/practice-groups` in Java and HTTP contracts as well as **practice group** in product copy.
-*Practice area*, `PracticeArea`, `areaSlug`, and `/practice-areas` are retired names, not internal synonyms.
-
-| Term                                | Meaning                                                                                                                                                    | Avoid for this concept                                               |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| **Practice**                        | A defined way of working used to review work                                                                                                               | rule, detector                                                       |
-| **Practice group**                   | A named collection of related practices                                                                                                                               | category, goal, learning objective                                   |
-| **Unassigned**                      | Practices that are not in a practice group                                                                                                                  | ungrouped, unbound                                                   |
-| **Result**                          | The one verdict of one practice about one piece of reviewed work in one review. Its outcome is Met, Not met, Does not apply, or Could not determine. The full term is **practice result**. [Result outcomes](#result-outcomes) gives its parts | observation (for the verdict), finding, detection, assessment |
-| **Observation**                     | One problem that a Not met result records at a place in the work, with its own severity. Every observation is a problem. The UI counts observations as **problems**: *Not met · 3 problems* | finding, detection, violation, issue |
-| **Example**                         | An optional place in the work that a Met or Not met result cites to show the practice done well, with a short note. It teaches. It is not praise | good example, strength, praise, highlight |
-| **Open question**                   | A doubt about the work that a result records in its evidence, at a place when one applies. It is never feedback | uncertainty, question to the developer, finding |
-| **Severity**                        | How much one real gap weighs: Critical, Major, Minor, or Trivial. Each observation has one, and a Not met result has one | priority, level, impact score |
-| **Trivial**                         | The label of the severity `INFO`: a real gap with trivial impact. Fix it when it is cheap | informational, info, nit, no action expected |
-| **Marked incorrect**                | A result a workspace admin [invalidated](./practice-review-glossary.mdx#invalidated-results) because it was wrong when made. It stays in history  | deleted, retracted, superseded                                       |
-| **Withdrawn**                       | A Practice profile card a workspace admin [withdrew](./practice-review-glossary.mdx#withdrawn-feedback) because its words were wrong. Its results are unchanged | deleted, retracted, invalidated                                      |
-| **Disputed**                        | Feedback the developer answered as wrong, with an explanation workspace admins read on its results. A later review of the same work holds the same claim back while it stands ([ADR 0022](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md)) | rejected, contested, flagged                                         |
-| **Requested**                       | A practice review that someone asked for with the *Request review* button or a comment command, not one that the work started. The tag on a review and the origin of its results. Its results stay apart from live ones ([how a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned)) | manual, on demand, by hand |
-| **Practice feedback**               | Guidance written from results and their observations and addressed to a developer — both the whole and the countable unit                                  | message, AI feedback, feedback item, ledger unit                     |
-| **Delivery**                        | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced                                                                       | placement, surface                                                   |
-| **Channel**                         | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting. The destinations are the `FeedbackChannel` constants | destination, surface, reach                                          |
-| **Location**                        | Where one piece of feedback appears, by the provider that shows it. It splits a channel by provider: **On GitHub**, **On GitLab**, **With Heph in the app**, **With Heph in Slack**. **On the work**, **In conversation** and **On their practice pages** are the channel's own words. The values are the `FeedbackLocation` constants | destination, surface, provider channel                               |
-| **Practice feedback about a way of working** | Practice feedback prepared for one developer about what recurs across their work, readable by nobody else — the `IN_APP` channel                           | my feedback, private view, profile, reflection, reflection dashboard |
-| **Reviewed work**                   | A pull request, merge request, issue, conversation, or document being reviewed                                                                             | artifact, target                                                     |
-| **Developer**                       | The person a result and its observations are about                                                                                                         | learner                                                              |
-| **Contributor**                     | A repository role relevant to review eligibility                                                                                                           | user, when the role matters                                          |
-| **Heph**                            | The conversational assistant                                                                                                                               | agent, bot                                                           |
-| **Mentor**                          | The product area for conversations with Heph                                                                                                               |                                                                      |
-| **Practice profile**                | The developer's own page: how their reviewed work stands across practice groups, how it developed, and one next step from Heph. A surface, not a channel   | practice dashboard, standings page                                   |
-| **Standing**                        | Where a developer stands in one practice or practice group: Needs attention, Mixed feedback, or Going well. It is read from the newest decided pieces of work, up to four, and the latest piece counts most. [Which reviews it reads](./practice-review-glossary.mdx#how-a-review-was-occasioned) is a review rule | score, grade, rating |
-| **Early read**                      | A standing from fewer than three decided pieces of work. Its sentence says how little work it rests on, not a pattern of reviews | preliminary score, provisional grade |
-| **Chrome extension**                | The browser extension that shows what Hephaestus recorded about the work open in a GitHub or GitLab tab. A place to read context, not a channel: it delivers no feedback and never shows private feedback | plugin, add-on, Hephaestus overlay, extension channel |
-| **Practices across the workspace**  | A page beside the Practice profile that counts how the workspace's developers with a standing split and range. It never names a developer, but it has no smallest count, so a small count can tell other members a developer's standing. It is not the developer's profile. **You** marks their own place. The page links to the Practice profile for the rest ([ADR 0051](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0051-practices-across-the-workspace-counts-developers.md)). *Across the workspace* is its short form in the sidebar, under Practice profile | course comparison, course figures, cohort view, benchmark, leaderboard |
-| **Split**                           | How many developers with a standing are at Needs attention, Mixed feedback, Going well, and none yet in one practice group or practice. Each developer counts with the current standing that their Practice profile shows. Practices across the workspace shows it | distribution, breakdown, ranking |
-| **None yet**                        | The part of a split for developers with a standing elsewhere on the page and none in this practice group or practice | no data, missing, unranked |
-| **Developer with a standing**       | A developer whose reviewed work met or did not meet a practice in at least one practice group on Practices across the workspace. Results that did not apply or stayed undetermined give no standing. Every split and the three tiles with a window count this reference group. The open feedback tile counts every developer that the page counts, reviewed or not | observed developer |
-| **Typical range**                   | On a tile of Practices across the workspace, the middle half of the developers with a standing in the window, the reader included when counted. A quarter of them are below it, and a quarter are above it. On the open feedback tile, it is the middle half of every developer that the page counts, reviewed or not | percentile, quartile range, average, norm |
-| **Activity**                        | The developer's own page. It shows what needs them and what they did over a time range. It lists the pull or merge requests and issues they worked on. Counts work, never scores it | profile, stats                                                       |
-| **Workspace activity**              | The same counts and lists for everyone in a workspace or one team, one row for each person. It sorts by each count, by **Contributions** first ([ADR 0052](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0052-activity-sorts-by-contributions-and-can-be-public.md)) | leaderboard, ranking, standings                                      |
-| **Contributions**                   | Pull or merge requests a person opened, plus those they reviewed, plus issues they opened, in a range. Each reviewed one counts once, never the person's own. No weights. The default sort of Workspace activity | score, points, GitHub-style contributions, activity score |
-| **Position**                        | A person's place in Workspace activity when it sorts by a number column. Equal counts share a place, and the next place skips (1, 2, 2, 4) | rank, placing, standing |
-| **Automation**                      | Provider bot accounts and machine users that a workspace admin treats as automation. They are never people, so no count, total or position includes them | bots (for machine users), service account |
-| **Public activity page**            | A workspace's activity page that anyone can read without sign-in. It shows counts and links of work in public repositories, never practices or feedback. A person leaves it with **Show me on public activity pages** ([ADR 0052](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0052-activity-sorts-by-contributions-and-can-be-public.md)) | public leaderboard, public profile, public workspace |
-| **Workspace address**               | A workspace's own host, such as `artemis.hephaestus.build`. Sign-in stays on the instance host ([ADR 0053](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0053-workspace-addresses-are-a-presentation-origin.md)) | subdomain, vanity URL, tenant URL |
-| **Open work**                       | Pull or merge requests awaiting someone's review, their own open pull or merge requests, and open issues assigned to them                                  | backlog, inbox, to-do                                                |
-| **Needs you**                       | Open work that asks something of the developer now. It includes review requests nobody has settled. It also includes their own pull or merge requests returned to them or approved | inbox, to-do, action items                                           |
-| **Covered**                         | A review request that another reviewer's verdict settles for now. If they requested changes, the author acts first. An approval covers the request only if the provider counts the pull request as approved. The developer's own review never covers their own request. It waits with the rest of what waits on someone else. [Activity](/user/activity#needs-you) states the rule's limits | dismissed, done, resolved                                            |
-| **Reviewed by you**                 | A review request the developer already approved or requested changes on, which the provider still lists. GitLab keeps a reviewer listed after their verdict. If the author asks again, the reviewer's state resets. It waits with the rest of what waits on someone else | done, completed, handled                                             |
-| **Requested from your team**        | A GitHub review request to a team the developer is in, and not to them. It names the team and waits with the rest of what waits on someone else | team inbox, shared queue                                             |
-| **Holds as**                        | The one present-tense sentence a bundled practice reads as when its work keeps meeting it. It describes what the developer keeps doing. The Practice profile shows it beside a practice that is going well. [The catalogue rules](./practice-catalogue.md#changing-bundled-defaults) govern its text | strength summary, praise, positive feedback |
-| **Hephaestus**                      | The application, named only where the application itself is the subject — installing it, an account linked to it, a release of it                          | agent                                                                |
-| **Hephaestus default**              | A practice or group bundled with the running Hephaestus release                                                                                             | shipped entry                                                        |
-| **Instance catalog**                | The set of practices a workspace may adopt from                                                                                                                              | curated catalog                                                      |
-| **Workspace practices**             | Independent definitions used for reviews in one workspace                                                                                                  | workspace catalog                                                    |
-| **Review rules**                    | Inputs and criteria that determine review behavior                                                                                                         | detector configuration                                               |
-| **Practice script**                 | Optional code in a practice that runs in place of its built-in program and returns its one result. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute script, pre-compute script, static analysis, analyzer, detector, linter, scout, check script |
-| **Model for practice scripts**      | A decision, embedding or reranking model that practice scripts call. The [glossary](./practice-review-glossary.mdx#product-terms) defines it | precompute model, script model, helper model |
-| **Developer guidance**              | Explanatory text that does not change review behavior                                                                                                      | learner guidance                                                     |
-| **Practice visual**                 | The optional picture that introduces a practice on its panel, with a description of what it means. It is developer guidance. [Descriptions](./practice-visuals.md#descriptions) gives the rules for the description | illustration, hero image, diagram, explainer |
-| **Practice guide**                  | The optional longer explanation of a practice in the **Guide** tab of its panel: Markdown with figures. It is developer guidance | article, explainer, lesson, documentation |
-| **Lead**                            | The **Why it matters** text of a practice. The panel shows it above the practice visual | intro, summary, hero text |
-| **Caption**                         | The **What good looks like** text of a practice. The panel shows it below the practice visual | subtitle, tagline |
-| **Lapse**                           | Work that does not follow a practice. A practice visual or guide shows it beside the practice, never as "bad" | bad example, anti-pattern, violation |
-| **Figure**                          | One picture in a practice guide, with a description in the guide text | illustration, image, embedded image |
-| **Customize**                       | Change a default or catalog-based definition                                                                                                               | override                                                             |
-| **Include / exclude**               | Whether an instance entry is available for workspaces to adopt                                                                                                    | offer, retire                                                        |
-| **No Hephaestus default**           | An instance-maintained entry with no bundled definition                                                                                                    | ours, yours                                                          |
-
-Use provider-specific names such as **pull request** or **merge request** when the provider is known. Otherwise write **pull or merge request**.
-
-*Habit* is retired for what a practice describes or what recurs across someone's work: say *practice*, *way of working* or *repeated pattern*.
-A card that still shows retired words is wrong wording, and is [withdrawn](./practice-review-glossary.mdx#withdrawn-feedback).
-
-*Static analysis* and *precompute script* are retired for a practice's optional script: say **practice script** in the previews, the docs and the release notes.
-
-*Leaderboard*, *league*, *league points*, *XP*, *level*, *score*, *rank* and *streak* are retired for activity and do not describe anything in the product ([ADR 0045](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0045-activity-counts-work-and-never-ranks-people.md)).
-A sorted Workspace activity shows a **position**, never a *rank* ([ADR 0052](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0052-activity-sorts-by-contributions-and-can-be-public.md)).
-
-**Feedback is the countable unit, and there is no other word for it.** Do not reach for *message*, *item*, *note*, or *entry* to get a noun that pluralises.
-*Feedback* is uncountable.
-Phrase the count so the noun is not needed.
-Do not invent a second word for the same thing.
-
-| Instead of                   | Write                                                      |
-| ---------------------------- | ---------------------------------------------------------- |
-| 3 messages                   | 3 pieces of feedback                                       |
-| Messages                     | Feedback — a heading naming the collection needs no plural |
-| No messages yet              | No feedback yet                                            |
-| This message                 | This feedback                                              |
-| Message details              | Feedback details                                           |
-| Findings behind this message | Results behind this feedback                               |
-| Queued for conversation      | Prepared for conversation                                  |
-
-The glossary owns how feedback on the Practice profile stops being open: **resolved by the work** or **marked as addressed**.
-See [How feedback resolves](./practice-review-glossary.mdx#how-feedback-resolves).
-The card, the summary and the release notes use those two phrases and no other.
-
-A column that counts per row is headed **Feedback** and the cell holds the number alone.
-Where a sentence needs a singular subject, name what the feedback is *about* — "the feedback for this result", not "the message for this result".
-
-**Say what happens, not who does it.** On practice-review surfaces, use *practice review*, *review*, *feedback*, *result*, or *observation* as the subject.
-Use **Hephaestus** when the application itself is the subject, such as installation, account linking, or releases.
-Do not call the application or a review an *agent*.
-
-**All three channel names say where the feedback lands, and nothing else.** `IN_CONTEXT` lands on the work itself — a pull request summary or inline note, an issue comment. `IN_CHAT` lands in a turn of a conversation, wherever that conversation runs: the in-app mentor, or Slack. `IN_APP` lands on the developer's own practice pages, where nobody replies to it.
-
-The mentor also renders inside the app, so the line between the last two is *dialogic or not*: ask **is it a turn?** before **which screen?** A channel names a destination, never a cognitive level and never what the developer is supposed to do about it.
-The three match the levels of Hattie & Timperley's model ([which is which](./practice-review-glossary.mdx#the-three-channels-are-three-levels)).
-But a level is a claim about content that a destination cannot enforce.
-Do not use the level as the name.
-
-A **location** answers the same question as the channel, more exactly.
-On the work, the provider is the one the review read the work from.
-In conversation, it is where the turn that raised the feedback ran: the app or a Slack direct message.
-Conversation feedback that no turn has raised yet has no provider, so its location is **In conversation**.
-A row shows the location or the channel, never both.
-Its sentence names the work where there is one: "Comment on GitHub pull request #12", "Conversation with Heph in Slack", "Card on their practice pages".
-
-`IN_APP` is the code noun — the enum constant and the `chk_feedback_channel` value.
-Do not call it a *profile* or *reflection* channel: those words name a different surface or an outcome the system cannot observe. [ADR 0029](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md) records the naming decision.
-On an operator surface, the channel reads **On their practice pages**.
-
-**Feedback waiting for a mentor conversation is *prepared*, never *queued*.** A queue implies somebody has to work it.
-Nothing works this queue.
-`FeedbackDeliveryState.PREPARED` advances to `DELIVERED` when a completed chat turn shows the developer feedback about it.
-The mentor's `link_result` or `link_observation` call carries the words.
-The reply renders them in the app and in Slack.
-
-The label is **Prepared for conversation**.
-
-**Unconfirmed** (`UNCONFIRMED`) is conversation feedback a completed turn linked with no record that the feedback was shown.
-Its visibility is unknown, so it counts as neither delivered nor withheld, and it is never prepared again.
-
-A **delivery family** groups the ten stored delivery states in a feedback count.
-Thus, a summary answers what an admin asks at a glance.
-There are six, and every state is in exactly one:
-
-| Delivery family       | Delivery states it holds                                                      |
-| --------------------- | ----------------------------------------------------------------------------- |
-| **Awaiting approval** | Awaiting approval (`AWAITING_APPROVAL`)                                       |
-| **Prepared**          | Prepared (`PREPARED`)                                                         |
-| **Delivered**         | Delivered (`DELIVERED`), Partially delivered (`PARTIALLY_DELIVERED`)          |
-| **Unconfirmed**       | Unconfirmed (`UNCONFIRMED`)                                                   |
-| **Withheld**          | Withheld (`SUPPRESSED`), Rejected (`DISCARDED`), Replaced by newer (`SUPERSEDED`) |
-| **Failed to deliver** | Failed to deliver (`FAILED`), Partially delivered · retries exhausted (`PARTIALLY_FAILED`) |
-
-A family is a count's word and nothing else.
-Rejected and replaced feedback count as **Withheld**.
-But a row, its badge, and a list filter keep each delivery state's own word.
-A count opens its list filtered to exactly the states its family holds.
-Unconfirmed is a family of its own because counting it as prepared would promise a delivery that will not happen.
-
-**Result and observation, never finding**, for the measurement — in copy, URLs, API schema, field names, and Java.
-A result is `PracticeResult` in Java, `practice_result` in the database, and `practiceResultId` on the wire.
-An observation is `Observation` in Java, `practice_observation` in the database, and `observationId` on the wire.
-Delivery uses `FeedbackAnchor` and `InlineFeedbackChannel`.
-The mentor uses `link_result` and `link_observation`, and its stream parts are `data-result` and `data-result-observation`.
-The schema, wire protocol and web routes have no aliases for the retired vocabulary, and no address redirects from a retired word.
-
-The read APIs and the reviews UI use the same two words.
-The banned word does the most damage on the surfaces an operator actually reads.
-Those names are `ReviewResult`, `ReviewResultDetail`, `ReviewBoundResult`, `practiceResultId`, and the workspace-admin route `/workspaces/{workspaceSlug}/practices/reviews/results`.
-Developer-scoped reads live under `/workspaces/{workspaceSlug}/practices/results`.
-A *finding* in this subsystem is a bug.
-
-The [database migration guide](./database-migration.mdx#practice-result-transition-before-10) owns the conversion of retained verdict IDs.
-A saved `data-observation` part in a mentor conversation links to a result.
-Persisted values retain literal keys such as `OBSERVATION_INVALIDATED` and the `observation_admission_digest` job metadata key.
-An accepted ADR keeps the word that it used when it was accepted.
-
-**Practice autonomy** and **effective autonomy** are the glossary's ([Practice autonomy](./practice-review-glossary.mdx#practice-autonomy), [Autonomy inheritance](./practice-review-glossary.mdx#autonomy-inheritance)).
-The product labels for the three values are **Off**, **Review before sending** and **Send automatically**.
-A value set at the level being discussed is an **override**, and one a parent supplied is **inherited**.
-
-For whether an instance entry is copied into new workspaces, use **include / exclude** (see the table above).
-Do not use *shipped*, *offered*, *retired*, *ours*, *yours*, or *here* in catalog UI copy. Those terms expose implementation or depend on who is reading.
-
-## Result outcomes
-
-A result records whether the reviewed work meets one practice's criteria within the recorded evidence boundary.
-It does not establish a developer's mastery or the correctness of the entire project.
-
-| Outcome | UI label | Meaning | Severity | Observations |
-| --- | --- | --- | --- | --- |
-| `MET` | Met | The captured evidence establishes conformance to the practice standard. | None | None |
-| `NOT_MET` | Not met | The captured evidence establishes a material problem against that standard. | Required | One or more |
-| `NOT_APPLICABLE` | Does not apply | An evidenced fact rules out the occasion to apply the practice. | None | None |
-| `UNDETERMINED` | Could not determine | Adequate captured evidence was read, but a material question remains unresolved. | None | None |
-
-`outcome` is the only verdict field.
-There is no separate presence, desirability, or derived result axis.
-The criteria state the positive standard.
-An undesirable action and a required action that is missing can both establish `NOT_MET`.
-`MET` requires conformance to the standard, not merely the presence of one desirable behavior.
-
-A review records at most one result per practice.
-Its outcome applies to the complete standard within the evidence boundary.
-Do not record both `MET` and `NOT_MET` for one practice.
-
-### One verdict
-
-When the occasion applies, one priority decides the outcome:
-
-1. Any admitted problem gives `NOT_MET`.
-2. With no problem, any open question gives `UNDETERMINED`.
-3. `MET` needs complete coverage and no open question.
-
-[Admission](./practice-review-glossary.mdx#results-and-programs) can withhold a candidate result.
-A withheld `NOT_MET` result never becomes `MET`.
-
-### Observations
-
-An observation is one problem that a `NOT_MET` result records at a place in the work.
-It has these parts:
-
-- A severity of its own.
-- A one-line summary and an explanation.
-- One or more verified citations.
-- A claim basis: introduced, worsened, or duty. An observation migrated from before the contract has none.
-- An optional next step.
-- A recurrence key.
-
-Every observation is a problem, and there is no observation kind.
-The summary names the actual problem without a second taxonomy.
-Missing an optional improvement is not a problem, so Hephaestus never records one.
-
-### Severity
-
-| Severity | UI label | Description |
-| --- | --- | --- |
-| `CRITICAL` | Critical | Serious enough to hold up the work until it is addressed. |
-| `MAJOR` | Major | Worth fixing before this work is considered done. |
-| `MINOR` | Minor | Worth knowing about, but it does not block anything. |
-| `INFO` | Trivial | A small gap. Fix it when it is cheap. |
-
-Every severity is a real gap.
-`INFO` means a real gap with trivial impact.
-Do not call it *informational*, and do not say that it asks nothing of the developer.
-
-Each observation has its own severity.
-The severity of a result is at least the severity of its worst observation.
-Admission stores the worst observation's severity when the program gives none.
-A higher result severity names a pattern that the criteria rate higher, such as the same minor problem in several places.
-
-### Examples
-
-An example is one optional field on a `MET` or `NOT_MET` result.
-It has one citation and a note of no more than 280 characters.
-It shows a place in the work where the practice is done well.
-It must not cite a place that a problem of the same result cites.
-An example teaches and is not praise.
-It is never pushed alone, and it has no recurrence key, label, or dispute of its own.
-
-### Open questions
-
-An open question is a semantic doubt that a result records in `evidence.undecidability`.
-It names the question and what would settle it, and it can cite the place where the doubt arises.
-`UNDETERMINED` requires at least one open question.
-`NOT_MET` can have open questions beside its problems.
-`MET` and `NOT_APPLICABLE` have none.
-
-An open question is never feedback and is never pushed.
-An operational failure is never an open question.
-A capture failure, a timeout, a spent budget, and a program error are operational failures.
-
-### Warrants and boundaries
-
-A claim based on absence requires a complete bounded search, recorded in `evidence.search`.
-Conformance based on avoiding harm requires exhaustive coverage of the relevant corpus.
-Citations and the explanation name the reviewed boundary.
-
-`NOT_APPLICABLE` requires an inapplicability warrant identifying the fact that excludes the occasion.
-Neither `NOT_APPLICABLE` nor `UNDETERMINED` contributes to the decided-outcome denominator.
-Report both separately when measuring coverage: combining them hides the difference between no occasion and unresolved assessment.
-Missing, truncated, or failed required capture is a review readiness failure and creates no result.
-
-For a change to saved settings, complete non-destructive restart instructions can establish `MET`.
-Missing a required restart check, or instructions that erase the state under test, establishes `NOT_MET`.
-An empty change may establish `NOT_APPLICABLE`.
-Conflicting captured requirements that prevent a judgment may establish `UNDETERMINED`.
-
-A missing captured description establishes none of these outcomes: capture must succeed first.
-
-Provisional runtime submissions may be corrected before server admission.
-Admitted results and their observations are immutable.
-A met result does not require praise or delivery.
-
-The sandbox, server, and database reject invalid combinations of outcome, severity, observations, and example.
-Delivery remains an independent decision.
-See the [review pipeline](./practice-review-pipeline.mdx).
-
-## Member onboarding and AI choices
-
-**Member onboarding** is first-visit setup for a person who already belongs to a workspace.
-It is not a request for access, an approval flow, or research consent.
-A workspace *needs setup* while its page is still owed.
-The member-facing name for the account-wide answer is **your AI choice**.
-
-**Member onboarding** names the workspace owner's configuration page.
-Do not call either one a *workspace preference* or a *workspace default*.
-
-An admin declares a model's **Operated by** fact as **Your organization** or **A provider**.
-Hephaestus derives **In-house** (`IN_HOUSE`) or **Cloud** (`CLOUD`) from that declaration.
-Without it, the model is **Not declared** (`UNDECLARED`).
-The declaration does not verify a provider's location, retention, or training terms.
-
-An optional model brand is a separate display label selected by the admin, not evidence of who operates the model.
-Unknown brands have no logo.
-The [admin AI provider guide](/admin/ai-providers#data-handling-and-members-ai-choices) owns the configuration and routing details.
-
-A developer's **AI choice** is a ceiling held by the account across its workspaces:
-
-| Answer | Meaning |
-| --- | --- |
-| **In-house** (`IN_HOUSE_ONLY`) | Allow only declared In-house AI processing for practice reviews and Heph. |
-| **Cloud** (`CLOUD`) | Also allow declared Cloud processing. In-house still qualifies. |
-| **No AI** (`NO_AI`) | Stop new AI requests for this person's work in practice reviews and Heph. It does not stop source synchronization, storage, authorized reads, or requests already sent. |
-
-A choice is a boundary, not a selection of today's models.
-A workspace can add or remove models without asking the member again.
-**Not declared** sits outside both explicit AI ceilings and can serve only someone who has not chosen where a choice is optional.
-The admin label for that row is this exact interface literal:
-
-{/*<!-- vale STE.Contractions = NO -->*/}
-**Members who have not chosen**
-{/*<!-- vale STE.Contractions = YES -->*/}
-
-See `UNCHOSEN_ROW_TITLE` in [AgentBindingsPage.tsx](https://github.com/hephaestus-build/Hephaestus/blob/main/webapp/src/components/admin/workspace-llm/AgentBindingsPage.tsx).
-
-An AI answer with no ready model here is **not set up here yet**.
-A broken account integration is **unavailable right now**.
-Keep both visible without silently changing the person's answer.
-The [user privacy guide](/user/privacy#your-ai-choice) owns the member-facing data boundary.
-
-## Research use
-
-**Research use** is a member's optional consent for the instance's **research organization** to use their data for research in a stated area.
-The member-facing name is **Allow research use of my data**.
-It is separate from the terms, from your AI choice, and from using Hephaestus.
-The research organization is the organization that `HEPHAESTUS_RESEARCH_ORGANIZATION` names.
-The [admin legal pages guide](/admin/legal-pages#the-optional-research-question) owns the operator obligations.
-
-Data is **pseudonymized** when a code replaces the identifiers that name a person.
-Pseudonymized data is still personal data.
-Data is **anonymized** when nobody can identify the person from it.
-Say *anonymized* only for data that passed a re-identification test.
-Do not use *academic* or *study* for research use in UI text.
-
-## Software technical names
-
-Use these names for software concepts, not as substitutes for ordinary words.
-The review glossary owns review-specific names.
-Its link above remains their source.
+This page owns product terms for practices, results, feedback and people.
+The [review glossary](./practice-review-glossary.mdx) owns review operation and runtime terms.
+Use both pages with the [writing standard](./simplified-technical-english.md).
+Define each term on one page only.
+Keep technical names bold in the first table column.
+
+Use feedback as an uncountable noun.
+Write “three pieces of feedback.”
+Use work as a plain, uncountable word, such as “your work.”
+Name the concrete kind when known: pull request, merge request, issue, file, thread or document.
+Use item only in contributor documentation, code and API contracts.
+
+## Practices
 
 | Term | Meaning |
 | --- | --- |
-| **Workspace** | One team's tenant and its connected work. |
-| **Instance** | One deployment that hosts workspaces. |
-| **Integration** | A connection to GitHub, GitLab, Slack, or Outline. |
-| **Runtime role** | The server, worker, or webhook part of one application. |
-| **Instance admin** | A person with the admin role for the whole deployment. |
+| **Practice** | A defined way of working that Hephaestus uses to review work. |
+| **Practice group** | A named set of related practices. |
+| **Practice version** | One fixed definition of a practice. A definition change creates a new version. |
+| **Catalog** | The practices that an instance offers to its workspaces. Hephaestus supplies a catalog. |
+| **Workspace practices** | The independent practices that one workspace uses for reviews. |
+| **Unassigned** | A practice that belongs to no practice group. |
+| **Customize** | Change a practice definition copied from the catalog. |
+| **Reset** | Replace local changes with the current catalog definition. |
+| **Include / exclude** | Make a catalog entry available or unavailable for adoption by workspaces. |
+| **Practice visual** | The optional picture that introduces a practice, with a description of its meaning. |
+| **Practice guide** | The optional longer explanation of a practice in its Guide tab. |
+| **Why it matters** | The practice guidance that explains why the practice is useful. |
+| **What good looks like** | The practice guidance that describes work that meets the practice. |
+| **Going well** | The standing label for work that meets a practice. Its guidance describes what the developer keeps doing. |
+| **Lapse** | Work that does not follow a practice, shown in a practice visual or guide. |
+| **Figure** | One picture in a practice guide, with a description in the guide text. |
+
+## Results
+
+| Term | Meaning |
+| --- | --- |
+| **Result** | One practice's verdict about an item at a version, and about a developer when the practice has a role. |
+| **Outcome** | The value of a result: Met, Not met, Does not apply, or Could not determine. |
+| **Problem** | One problem that a Not met result records at a place in the work, with its own severity. |
+| **Severity** | How much a problem weighs: Critical, Major, Minor, or Trivial. |
+| **Example** | An optional place in the work that a result cites to show the practice done well. |
+| **Open question** | A question about the work that the evidence cannot answer. It is never feedback. |
+| **Not reviewed** | A selected item/practice pair that a closed review did not judge or reuse. It is not an outcome. |
+| **Withheld** | The server did not admit a candidate result or deliver feedback. It records the reason. |
+| **Mark** | An admin record that a result is incorrect or accepted. Removing the mark reverses it. |
+| **Marked incorrect** | A result that a workspace admin marked as wrong when made. It remains in history. |
+| **Accepted** | An admin record that excludes a result from open-problem lists. It does not change its outcome or cancel an incorrect mark. |
+| **Developer** | The person a result concerns. Feedback based on that result goes only to that person. |
+
+### Result outcomes
+
+A result applies only within its recorded evidence boundary.
+It does not establish a developer's mastery or the correctness of a whole repository.
+
+| Outcome | Label | Evidence requirement |
+| --- | --- | --- |
+| MET | Met | The evidence establishes that the practice standard was met, with complete relevant coverage. |
+| NOT_MET | Not met | The evidence establishes at least one problem against the standard. |
+| DOES_NOT_APPLY | Does not apply | An evidenced fact excludes the practice from this work. |
+| COULD_NOT_DETERMINE | Could not determine | Available evidence cannot answer at least one material question. |
+
+One result has one outcome.
+A Not met result has one or more problems.
+Other outcomes have no problems.
+A script gives each problem its severity.
+The server records the worst problem's severity on the result.
+Other outcomes have no severity.
+
+With a problem and an unresolved question, the outcome is Not met.
+With no problem and a material unresolved question, the outcome is Could not determine.
+Met requires complete relevant coverage and no open question.
+Does not apply requires the fact that excludes the practice.
+
+The server can withhold a candidate result at admission.
+A withheld candidate creates no result row.
+It never becomes Met because its problems were refused.
+A withheld attempt is shown separately from Not reviewed in a scan report.
+
+Missing capture, a failed read, a timeout, a spent budget and a script error are operational failures.
+They create no result.
+They are not open questions about the work.
+
+### Problems and severity
+
+A problem has a summary, an explanation, citations, a claim basis and a severity.
+It can have a stable script key and a next step.
+The next step states the change that the criteria require.
+An optional improvement is not a problem.
+
+| Severity | Meaning |
+| --- | --- |
+| Critical | Address the problem before the work can proceed. |
+| Major | Address the problem before the work is complete. |
+| Minor | The problem matters but does not block the work. |
+| Trivial | The problem has a small effect. Address it when the cost is low. |
+
+Trivial is a real gap.
+It is not advice with no problem behind it.
+
+### Examples and open questions
+
+An example has one citation and a short note.
+Only Met and Not met results can have an example.
+An example cannot cite a place that a problem of the same result cites.
+It teaches the practice and is never delivered alone as praise.
+
+An open question states what the evidence cannot answer and what would settle it.
+Only Not met and Could not determine results can have open questions.
+Could not determine requires at least one.
+Hephaestus never sends an open question as feedback.
+
+## Feedback
+
+| Term | Meaning |
+| --- | --- |
+| **Feedback** | Guidance that Hephaestus writes from results for a developer. |
+| **Practice feedback** | The full name for feedback when the surrounding text does not establish its context. |
+| **Destination** | Where feedback is intended to appear: on the work, on the practice page, or in conversation. |
+| **Delivery** | Whether feedback is awaiting approval, ready, delivered, withheld, rejected, replaced, failed or unconfirmed. |
+| **Copy** | One appearance of feedback: a summary, line note, file note or chat turn. |
+| **Decision** | An admin action on feedback: approve, reject, withdraw or restore. |
+| **Response** | The developer's answer to feedback. Resolution and usefulness are separate dimensions. |
+| **Disagreement** | A response that says the feedback is wrong and gives a reason. |
+| **Withdrawn** | Feedback that an admin removed from the developer's practice page because its words were wrong. |
+
+### Destinations
+
+| Value | Label | Purpose |
+| --- | --- | --- |
+| ON_WORK | On the work | Guidance about the current work, at the provider that holds it. |
+| PRACTICE_PAGE | On the practice page | Private guidance about a pattern in the developer's work. |
+| CONVERSATION | In conversation | Private feedback that Heph can show when it fits a conversation. |
+
+A provider is a separate fact from a destination.
+A Slack conversation and an app conversation have the same destination.
+A destination does not establish a scientific level of feedback.
+The [standard terms](./practice-review-glossary.mdx#standard-terms) explain the limits of that comparison.
+
+Feedback in conversation counts as delivered only when Heph shows it to the developer.
+A link alone does not establish delivery.
+A record of an uncertain write does not establish delivery either.
+Unconfirmed means a write began and its visibility is unknown.
+A confirmed copy can retain its delivery time while another copy stays unknown.
+Unknown visibility never permits an automatic repeat write.
+
+A decision to withdraw feedback does not change its results.
+Restore reverses the withdrawal if the feedback remains eligible.
+A disagreement does not change a result or a standing by itself.
+An admin can inspect it and mark a result incorrect.
+Removing a rating does not remove the developer's disagreement.
+
+## People and product surfaces
+
+| Term | Meaning |
+| --- | --- |
+| **Account** | One person's record on the instance. It can exist before the person signs in. |
+| **Member** | An account with membership in a workspace. |
+| **Identity** | A provider login linked to an account. |
+| **Workspace** | One team's tenant, with its connected repositories, members, practices and feedback. |
+| **Instance** | One running deployment that hosts workspaces. |
+| **Integration** | One connected provider: GitHub, GitLab, Slack or Outline. |
+| **Heph** | The conversational assistant. |
+| **Mentor** | The product area for conversations with Heph. |
+| **Hephaestus** | The application. |
+| **Practice profile** | The developer's private page for practice standing, changes and feedback. |
+| **Practice page** | The page for one practice within the developer's Practice profile. |
+| **Standing** | Needs attention, Mixed feedback or Going well, read from the newest eligible decided work. |
+| **Early read** | A standing based on fewer than three decided pieces of work. |
+| **Practices across the workspace** | The page that counts developers by standing without naming them. |
+| **Split** | The count of developers in each standing for a practice or practice group. |
+| **None yet** | Developers counted on the workspace page who have no standing for this practice or group. |
+| **Developer with a standing** | A developer with at least one eligible Met or Not met result in the workspace page's reference group. |
+| **Typical range** | The middle half of the developers' values in a selected window. |
+| **Activity** | The developer's page of work that needs them and work they did. |
+| **Workspace activity** | Counts and lists of work for workspace developers or one team. |
+| **Contributions** | Requests opened, other people's requests reviewed, and issues opened in a period. Each reviewed request counts once. |
+| **Position** | A developer's place when Workspace activity sorts a count. Equal counts share a place. |
+| **Automation** | Provider bots and machine users that a workspace admin excludes from people counts. |
+| **Public activity page** | Work counts and links from public repositories, available without sign-in. It has no practice results or feedback. |
+| **Workspace address** | A workspace's own host. Sign-in stays on the instance host. |
+| **Open work** | Open requests and assigned issues that need the developer or another person. |
+| **Needs you** | Open work that requires an action from the developer now. |
+| **Covered** | A review request settled for now by another reviewer's verdict, under the provider's approval state. |
+| **Reviewed by you** | A provider review request that the developer already approved or returned for changes. |
+| **Requested from your team** | A GitHub review request to one of the developer's teams rather than to that developer. |
+| **Chrome extension** | The browser extension that shows recorded results for work open in a GitHub or GitLab tab. |
+| **Instance admin** | A person with the admin role for the instance. |
 | **Workspace admin** | A person with the admin role in one workspace. |
-| **Instance operator** | The person or team who runs the deployment. Readers contact them for faults that no admin can fix. |
+| **Instance operator** | The person or team that runs the deployment. |
+
+The workspace page never names developers, but small counts can disclose a person's standing.
+It has no minimum count that prevents that disclosure.
+Hidden members and repositories do not contribute to those counts.
+The [Practice profile guide](/user/practice-profile) owns the user procedures and visibility details.
+
+### Member onboarding and AI choices
+
+An account's AI choice applies in every workspace.
+A connected identity does not grant membership or permission for AI processing.
+The [AI provider guide](/admin/ai-providers#privacy) owns model tiers and their enforcement.
+
+| Choice | Meaning |
+| --- | --- |
+| In-house | Allow new AI requests only to models declared In-house. |
+| Cloud | Also allow new AI requests to models declared Cloud. |
+| No AI | Refuse new AI requests and feedback delivery about the developer. |
+
+No AI does not stop source sync, storage or authorized reads.
+It does not retract a request already sent to a model.
+A required choice that is missing is a policy refusal, not missing evidence.
+The server checks the applicable choices of every person whose work it reads.
+An unanswered choice is not explicit consent.
+Where a choice is optional, the existing unchosen-model policy still applies.
+
+| Term | Meaning |
+| --- | --- |
+| **Member onboarding** | The first-visit setup for a person who already belongs to a workspace. |
+| **AI choice** | The account-wide ceiling on where new AI requests may process the person's work. |
+| **Operated by** | The admin declaration of who operates a model: Your organization or A provider. |
+| **In-house** | A model declared as operated by the member's organization. |
+| **Cloud** | A model declared as operated by a provider. |
+| **Not declared** | A model with no declaration of who operates it. |
+| **Not set up here yet** | The selected AI ceiling has no ready model in this workspace. |
+| **Unavailable right now** | The needed account integration does not work. |
+
+Member onboarding is not a request for access or research consent.
+Its workspace configuration page uses the same name.
+The first-visit page is owed while setup remains incomplete.
+A model declaration does not verify location, retention or use for model training.
+A model brand is a display choice, not evidence of its operator.
+
+A missing brand has no logo.
+Not declared models cannot serve either explicit AI ceiling.
+They can serve only someone who has not chosen, where a choice is optional.
+The admin row is Members who have not chosen.
+A workspace can change its models without changing the member's choice.
+Keep a choice visible when its model or integration is unavailable.
+
+### Research use
+
+| Term | Meaning |
+| --- | --- |
+| **Research use** | The member's optional permission for a named research organization to use data within a stated research area. |
+| **Research organization** | The organization named by the instance's research configuration. |
+| **Pseudonymized** | Personal data whose identifying names are replaced by a code. It remains personal data. |
+| **Anonymized** | Data from which nobody can identify a person, established by a re-identification test. |
+
+The member label is Allow research use of my data.
+Research consent is separate from the AI choice and from workspace membership.
+The [privacy guide](/user/privacy) owns the developer's choices and access rights.
+The [data map](/admin/dsms/personal-data-map) owns export, retention and erasure details.
+A workspace admin cannot grant another person's research consent.
+
+## Software technical names
+
+| Term | Meaning |
+| --- | --- |
+| **Runtime role** | Server, worker or webhook: the part of one application JAR that a container starts. |
 | **Server** | The service that handles application requests. |
-| **Worker** | The runtime role that executes background work. |
-| **Webhook** | A provider's HTTP event request. |
+| **Worker** | The runtime role that executes reviews and mentor sessions. |
+| **Webhook** | A provider's HTTP request that reports an event. |
 | **API** | An interface for software calls. |
 | **UI** | The interface that a person uses. |
 | **Pull request** | A GitHub request to merge a branch. |
 | **Merge request** | A GitLab request to merge a branch. |
 | **Repository** | A version-controlled project. |
 | **Changeset** | A file that supplies a release note and version change. |
-| **Writing standard** | The policy for prose in this project. |
-| **Loading state** | The UI state while data is not yet available. |
-| **Shared models**, **Own provider** | The two purses of AI spend. The [LLM cost vocabulary](./llm-cost-vocabulary.md) defines them and the words for their limits. |
+| **Writing standard** | The project policy for prose. |
+| **Loading state** | A UI state while required data is not yet available. |
+| **Shared models** | Defined in the [LLM cost vocabulary](./llm-cost-vocabulary.md). |
+| **Own provider** | Defined in the [LLM cost vocabulary](./llm-cost-vocabulary.md). |
 
 ## Technical verbs
 
-Use each verb only for the action in its definition.
-Use its normal grammatical forms when necessary.
-
 | Term | Meaning |
 | --- | --- |
-| **Assign** | Make a [model assignment](./practice-review-glossary.mdx#product-terms), which the glossary defines. An issue or pull request that is assigned to a person keeps the provider's meaning. |
+| **Assign** | Choose a model for a review purpose. Provider assignments to people keep the provider's meaning. |
 | **Authenticate** | Verify an identity before access. |
-| **Authorize** | Give an identity permission for an action. |
-| **Configure** | Set the parameters of a software system. |
+| **Authorize** | Grant permission for an action. |
+| **Configure** | Set a software system's parameters. |
 | **Deploy** | Install a software version in an environment. |
 | **Merge** | Combine a branch with another branch. |
-| **Regenerate** | Produce an artifact again from its source. |
+| **Regenerate** | Produce a generated file again from its source. |
 | **Sync** | Reconcile local data with its source. |

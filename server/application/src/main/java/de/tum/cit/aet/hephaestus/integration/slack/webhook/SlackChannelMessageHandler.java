@@ -1,8 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -12,6 +13,7 @@ import tools.jackson.databind.JsonNode;
 
 /** Durable consumer for monitored Slack channel/group message events. */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelMessageHandler extends AbstractIntegrationMessageHandler<JsonNode> {
 

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.spi;
 
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import java.time.Duration;
 import java.util.UUID;
 import java.util.function.Consumer;

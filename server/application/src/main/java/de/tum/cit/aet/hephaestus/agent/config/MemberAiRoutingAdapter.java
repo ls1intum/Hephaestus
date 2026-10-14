@@ -1,17 +1,19 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceAiAvailability;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -21,7 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The one home of the routing rule: a developer's {@link MemberAiChoice} is the loosest
+ * The one home of the routing rule: a developer's {@link AiChoice} is the loosest
  * {@link DataHandlingTier} they accept, so any ready binding at or under that ceiling may serve them
  * and the loosest of those is picked. Nothing ever routes a chosen member to a looser tier or to the
  * {@code UNDECLARED} slot, which serves only members who have not chosen where the choice is optional.
@@ -40,12 +42,43 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         return route(workspaceId, purpose, developerId);
     }
 
+    /** Selects one permitted route shared by all frozen review subjects. */
+    @Transactional(readOnly = true)
+    public Optional<WorkspaceAgentBinding> bindingForPeople(
+            long workspaceId, AgentPurpose purpose, List<@Nullable Long> people) {
+        if (people.isEmpty())
+            throw new IllegalArgumentException("A review must declare its subjects, including nobody");
+        var candidates = bindings.findByWorkspaceIdAndPurpose(workspaceId, purpose).stream()
+                .filter(models::isAvailable)
+                .filter(row ->
+                        people.stream().allMatch(person -> allows(workspaceId, person, models.connectionRef(row))));
+        if (purpose != AgentPurpose.PRACTICE_REVIEW) {
+            var review = bindingForPeople(workspaceId, AgentPurpose.PRACTICE_REVIEW, people);
+            if (review.isEmpty()) return Optional.empty();
+            var ceiling = review.get().getDataHandlingTier();
+            candidates = candidates.filter(row -> ceiling == DataHandlingTier.UNDECLARED
+                    ? row.getDataHandlingTier() == DataHandlingTier.UNDECLARED
+                    : row.getDataHandlingTier().isWithin(ceiling));
+        }
+        var ordered = candidates
+                .sorted(Comparator.comparingInt(row -> switch (row.getDataHandlingTier()) {
+                    case IN_HOUSE -> 0;
+                    case CLOUD -> 1;
+                    case UNDECLARED -> 2;
+                }))
+                .toList();
+        return ordered.isEmpty()
+                ? Optional.empty()
+                : Optional.of(people.stream().allMatch(Objects::isNull) ? ordered.getFirst() : ordered.getLast());
+    }
+
     /**
      * {@link #practiceScriptBinding} calls this instead of {@link #binding}: a call to another transactional method of
      * this bean skips its proxy.
      */
     private Optional<WorkspaceAgentBinding> route(long workspaceId, AgentPurpose purpose, @Nullable Long developerId) {
-        if (developerId != null && suppression.isUserSuppressed(developerId)) return Optional.empty();
+        if (developerId == null) return bindingForPeople(workspaceId, purpose, Collections.singletonList(null));
+        if (suppression.isAccountSuppressed(developerId)) return Optional.empty();
         var decision = preferences.forDeveloper(workspaceId, developerId);
         if (!decision.permitsAi()) return Optional.empty();
         var choice = decision.choice();
@@ -54,7 +87,7 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
                             workspaceId, purpose, DataHandlingTier.UNDECLARED)
                     .filter(this::servesUndeclared);
         }
-        return choice.ceiling()
+        return ceiling(choice)
                 .flatMap(ceiling -> loosestWithin(bindings.findByWorkspaceIdAndPurpose(workspaceId, purpose), ceiling));
     }
 
@@ -139,8 +172,8 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
     private Map<DataHandlingTier, WorkspaceAgentBinding> serving(
             List<WorkspaceAgentBinding> rows, List<WorkspaceAgentBinding> reviewRows, boolean choiceOptional) {
         var serving = new EnumMap<DataHandlingTier, WorkspaceAgentBinding>(DataHandlingTier.class);
-        for (var choice : List.of(MemberAiChoice.IN_HOUSE_ONLY, MemberAiChoice.CLOUD)) {
-            var ceiling = choice.ceiling().orElseThrow();
+        for (var choice : List.of(AiChoice.IN_HOUSE_ONLY, AiChoice.CLOUD)) {
+            var ceiling = ceiling(choice).orElseThrow();
             var effective = loosestWithin(reviewRows, ceiling)
                     .map(WorkspaceAgentBinding::getDataHandlingTier)
                     .orElse(ceiling);
@@ -158,15 +191,16 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
 
     @Transactional(readOnly = true)
     public boolean allows(long workspaceId, @Nullable Long developerId, LlmModelResolver.ConnectionRef model) {
-        if (developerId != null && suppression.isUserSuppressed(developerId)) return false;
+        if (developerId != null && suppression.isAccountSuppressed(developerId)) return false;
+        if (model.workspaceId() == null || model.workspaceId() != workspaceId) return false;
+        if (developerId == null) return models.dataHandlingTier(model).isPresent();
         var decision = preferences.forDeveloper(workspaceId, developerId);
         if (!decision.permitsAi()) return false;
-        if (model.workspaceId() == null || model.workspaceId() != workspaceId) return false;
         var tier = models.dataHandlingTier(model);
         var choice = decision.choice();
         if (choice == null)
             return tier.filter(DataHandlingTier.UNDECLARED::equals).isPresent();
-        return choice.ceiling()
+        return ceiling(choice)
                 .map(ceiling ->
                         tier.filter(current -> current.isWithin(ceiling)).isPresent())
                 .orElse(false);
@@ -183,11 +217,11 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
                 AgentPurpose.PRACTICE_REVIEW,
                 workspace.getFeatures().getPracticesEnabled());
         var mentorRows = bindings.findByWorkspaceIdAndPurpose(workspaceId, AgentPurpose.MENTOR);
-        var choices = List.of(MemberAiChoice.IN_HOUSE_ONLY, MemberAiChoice.CLOUD);
+        var choices = List.of(AiChoice.IN_HOUSE_ONLY, AiChoice.CLOUD);
         var options = new ArrayList<Option>();
         for (var choice : choices) {
-            var review = choice.ceiling().flatMap(ceiling -> loosestWithin(reviewRows, ceiling));
-            var mentor = choice.ceiling().flatMap(ceiling -> loosestWithin(mentorRows, ceiling));
+            var review = ceiling(choice).flatMap(ceiling -> loosestWithin(reviewRows, ceiling));
+            var mentor = ceiling(choice).flatMap(ceiling -> loosestWithin(mentorRows, ceiling));
             var models = Stream.concat(review.stream(), mentor.stream())
                     .map(MemberAiRoutingAdapter::model)
                     .flatMap(Optional::stream)
@@ -247,5 +281,13 @@ public class MemberAiRoutingAdapter implements WorkspaceAiAvailability {
         if (instance != null) return instance.getDataHandlingTier();
         var own = binding.getWorkspaceModel();
         return own != null ? own.getDataHandlingTier() : DataHandlingTier.UNDECLARED;
+    }
+
+    private static Optional<DataHandlingTier> ceiling(AiChoice choice) {
+        return switch (choice) {
+            case NO_AI -> Optional.empty();
+            case IN_HOUSE_ONLY -> Optional.of(DataHandlingTier.IN_HOUSE);
+            case CLOUD -> Optional.of(DataHandlingTier.CLOUD);
+        };
     }
 }

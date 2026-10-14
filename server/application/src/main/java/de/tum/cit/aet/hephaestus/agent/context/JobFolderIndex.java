@@ -5,6 +5,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
+import de.tum.cit.aet.hephaestus.evidence.capture.WorkspaceRefusal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
@@ -13,50 +15,26 @@ import java.util.Objects;
 public record JobFolderIndex(
         SourceContractVersion contractVersion,
         String catalogDigest,
-        String artifactKind,
+        String itemKind,
         Instant capturedAt,
         List<SourceCapture> sources,
         List<WorkspaceRefusal> refusals,
-        List<FolderArtifact> artifacts) {
-    public JobFolderIndex(
-            SourceContractVersion contractVersion,
-            String catalogDigest,
-            String artifactKind,
-            Instant capturedAt,
-            List<SourceCapture> sources) {
-        this(contractVersion, catalogDigest, artifactKind, capturedAt, sources, List.of(), artifactsOf(sources));
-    }
-
-    public JobFolderIndex(
-            SourceContractVersion contractVersion,
-            String catalogDigest,
-            String artifactKind,
-            Instant capturedAt,
-            List<SourceCapture> sources,
-            List<WorkspaceRefusal> refusals) {
-        this(contractVersion, catalogDigest, artifactKind, capturedAt, sources, refusals, artifactsOf(sources));
-    }
-
-    private static List<FolderArtifact> artifactsOf(List<SourceCapture> sources) {
-        return sources.stream()
-                .flatMap(source ->
-                        source.artifacts().stream().map(artifact -> new FolderArtifact(source.kind(), artifact)))
-                .toList();
-    }
-
+        List<FolderSource> files,
+        List<CitableText> citableTexts) {
     public JobFolderIndex {
+        citableTexts = List.copyOf(citableTexts);
         refusals = List.copyOf(refusals);
-        artifacts = List.copyOf(artifacts);
+        files = List.copyOf(files);
         var paths = new HashSet<String>();
-        for (FolderArtifact artifact : artifacts) {
-            if (!paths.add(artifact.artifact().path()))
+        for (FolderSource artifact : files) {
+            if (!paths.add(artifact.file().path()))
                 throw new IllegalArgumentException("Duplicate folder artifact path");
         }
         sources = List.copyOf(Objects.requireNonNull(sources, "sources"));
         requireCapture(
                 contractVersion,
                 catalogDigest,
-                artifactKind,
+                itemKind,
                 capturedAt,
                 sources.stream().map(SourceCapture::kind).toList());
     }
@@ -66,7 +44,7 @@ public record JobFolderIndex(
         return new Retained(
                 contractVersion,
                 catalogDigest,
-                artifactKind,
+                itemKind,
                 capturedAt,
                 sources.stream()
                         .map(source -> new RetainedSource(source.kind(), source.state()))
@@ -79,11 +57,11 @@ public record JobFolderIndex(
      * each source's artifact and refusal inventories are not part of it, so their retirement leaves it intact; a
      * reader that needs a file's digest reads the whole manifest instead.
      */
-    @JsonIgnoreProperties({"refusals", "artifacts"})
+    @JsonIgnoreProperties({"refusals", "files", "citableTexts"})
     public record Retained(
             SourceContractVersion contractVersion,
             String catalogDigest,
-            String artifactKind,
+            String itemKind,
             Instant capturedAt,
             List<RetainedSource> sources) {
         public Retained {
@@ -91,14 +69,14 @@ public record JobFolderIndex(
             requireCapture(
                     contractVersion,
                     catalogDigest,
-                    artifactKind,
+                    itemKind,
                     capturedAt,
                     sources.stream().map(RetainedSource::kind).toList());
         }
     }
 
     /** One source's retained state and facts; see {@link Retained}. */
-    @JsonIgnoreProperties({"artifacts"})
+    @JsonIgnoreProperties({"files"})
     public record RetainedSource(SourceKind kind, SourceCaptureState state) {
         public RetainedSource {
             Objects.requireNonNull(kind, "kind");
@@ -109,7 +87,7 @@ public record JobFolderIndex(
     private static void requireCapture(
             SourceContractVersion contractVersion,
             String catalogDigest,
-            String artifactKind,
+            String itemKind,
             Instant capturedAt,
             List<SourceKind> sourceKinds) {
         Objects.requireNonNull(contractVersion, "contractVersion");
@@ -117,7 +95,7 @@ public record JobFolderIndex(
         if (!catalogDigest.matches("[0-9a-f]{64}")) {
             throw new IllegalArgumentException("Invalid catalog digest: " + catalogDigest);
         }
-        Objects.requireNonNull(artifactKind, "artifactKind");
+        Objects.requireNonNull(itemKind, "itemKind");
         Objects.requireNonNull(capturedAt, "capturedAt");
         if (sourceKinds.isEmpty()) {
             throw new IllegalArgumentException("sources must not be empty");

@@ -30,8 +30,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Integration tests for GitHubSubIssuesMessageHandler.
- * <p>
- * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
+ *
+ * <p>Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -104,7 +104,7 @@ class GitHubSubIssuesMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin("HephaestusTest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

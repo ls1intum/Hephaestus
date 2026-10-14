@@ -63,8 +63,8 @@ public class AgentBindingController {
             content = @Content(schema = @Schema(hidden = true)))
     @ApiResponse(
             responseCode = "409",
-            description =
-                    "The model is undeclared, or declared as another tier than this slot (problem type agent-binding-slot-mismatch, property declaredTier)",
+            description = "The model is undeclared, or declared as another tier than this slot (problem type"
+                    + " agent-binding-slot-mismatch, property declaredTier)",
             content = @Content(schema = @Schema(hidden = true)))
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "AGENT_BINDING")

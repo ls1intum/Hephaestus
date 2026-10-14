@@ -18,8 +18,8 @@ public class SlackPersonSourceIdentityContributor implements PersonSourceIdentit
     private final SlackThreadRepository repository;
 
     @Override
-    public Set<String> artifactKinds() {
-        return Set.of("chat.conversation_thread");
+    public Set<String> itemKinds() {
+        return Set.of("chat.thread");
     }
 
     @Override
@@ -34,8 +34,8 @@ public class SlackPersonSourceIdentityContributor implements PersonSourceIdentit
     }
 
     @Override
-    public List<PersonIdentity> identitiesForSource(long workspaceId, String artifactKind, long artifactId) {
-        return repository.findPersonSourceIdentities(workspaceId, artifactId).stream()
+    public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
+        return repository.findPersonSourceIdentities(workspaceId, sourceId).stream()
                 .map(row -> new PersonIdentity(row.getProviderId(), row.getSubject(), row.getTeamId()))
                 .toList();
     }

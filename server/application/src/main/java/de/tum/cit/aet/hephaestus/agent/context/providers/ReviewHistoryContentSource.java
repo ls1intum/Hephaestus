@@ -1,817 +1,96 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
-import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
-import de.tum.cit.aet.hephaestus.agent.context.StagedArtifactNames;
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
-import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewEligibility;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
-import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
-import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
-import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
-import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.FeedbackResultVisibility;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackWithdrawalRepository;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
+import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryEntry;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.core.annotation.Order;
-import org.springframework.data.domain.Pageable;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Projects visible results and feedback through the shared currentness, withdrawal and consent checks.
- * History guides inspection; it does not establish that two results describe the same behavior.
- * Developer reactions are not review evidence.
- */
+/** Reads the owning product modules' authorized snapshots, never their persistence model. */
 @Component
-@Order(500)
-public class ReviewHistoryContentSource implements EvidenceSource {
+@RequiredArgsConstructor
+public class ReviewHistoryContentSource {
+    private final ResultHistoryQuery results;
+    private final FeedbackHistoryQuery feedback;
+    private final HistoryCopies copies;
+    private final ItemLabels labels;
+    private final ObjectMapper mapper;
 
-    private static final Logger log = LoggerFactory.getLogger(ReviewHistoryContentSource.class);
-
-    static final SourceKind OBSERVATION_HISTORY = new SourceKind("hephaestus.observation-history");
-    static final SourceKind FEEDBACK_HISTORY = new SourceKind("hephaestus.feedback-history");
-
-    static final String OBSERVATIONS_FILE = SandboxLayout.HISTORY_PREFIX + "observations.json";
-    static final String FEEDBACK_FILE = SandboxLayout.HISTORY_PREFIX + "feedback.json";
-    static final String PREPARED_FILE = SandboxLayout.HISTORY_PREFIX + "prepared.json";
-
-    private final PracticeResultRepository practiceResultRepository;
-
-    private final FeedbackRepository feedbackRepository;
-    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
-    private final FeedbackWithdrawalRepository withdrawalRepository;
-    private final ResultVisibilityPolicy visibilityPolicy;
-    private final ConversationSourceLiveness conversationLiveness;
-    private final PullRequestRepository pullRequestRepository;
-    private final IssueRepository issueRepository;
-    private final StagedArtifactNames artifactNames;
-    private final ObjectMapper objectMapper;
-    private final PublicReviewEligibility publicReviewEligibility;
-    private final PersonDataCopyRecorder personCopies;
-    private final EvidenceFolderPersonDataCatalog copyAuthority;
-
-    public ReviewHistoryContentSource(
-            PracticeResultRepository practiceResultRepository,
-            FeedbackRepository feedbackRepository,
-            FeedbackEvidenceRepository feedbackEvidenceRepository,
-            FeedbackWithdrawalRepository withdrawalRepository,
-            ResultVisibilityPolicy visibilityPolicy,
-            ConversationSourceLiveness conversationLiveness,
-            PullRequestRepository pullRequestRepository,
-            IssueRepository issueRepository,
-            StagedArtifactNames artifactNames,
-            ObjectMapper objectMapper,
-            PublicReviewEligibility publicReviewEligibility,
-            PersonDataCopyRecorder personCopies,
-            EvidenceFolderPersonDataCatalog copyAuthority) {
-        this.practiceResultRepository = practiceResultRepository;
-        this.feedbackRepository = feedbackRepository;
-        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
-        this.withdrawalRepository = withdrawalRepository;
-        this.visibilityPolicy = visibilityPolicy;
-        this.conversationLiveness = conversationLiveness;
-        this.pullRequestRepository = pullRequestRepository;
-        this.issueRepository = issueRepository;
-        this.artifactNames = artifactNames;
-        this.objectMapper = objectMapper;
-        this.publicReviewEligibility = publicReviewEligibility;
-        this.personCopies = personCopies;
-        this.copyAuthority = copyAuthority;
-    }
-
-    /**
-     * The row's direct people, recorded after its producing jobs have vouched for every copied identity and before
-     * its words are formatted.
-     */
-    private void recordPeople(@Nullable Long... people) {
-
-        for (Long person : people) {
-            if (person != null) personCopies.recordUser(person);
-        }
-    }
-
-    @Override
-    public Set<SourceKind> sourceKinds() {
-        return Set.of(OBSERVATION_HISTORY, FEEDBACK_HISTORY);
-    }
-
-    /** Prepared and delivered feedback share a source kind; results have their own. */
-    @Override
-    public SourceKind sourceKindFor(String path) {
-        return FEEDBACK_FILE.equals(path) || PREPARED_FILE.equals(path) ? FEEDBACK_HISTORY : OBSERVATION_HISTORY;
-    }
-
-    /** Owns the normalized {@code inputs/history/} view used by readiness and composition. */
-    @Override
-    public boolean ownsPath(String path) {
-        return path.startsWith(SandboxLayout.HISTORY_PREFIX);
-    }
-
-    /** Every review of an artifact. History is about the person, so what they produced does not change it. */
-    @Override
-    public boolean supports(ContextRequest request) {
-        return reviewJob(request) != null;
-    }
-
-    @Override
-    public boolean required() {
-        return false;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        files.putAll(captureSelected(request, sourceKinds()).files());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
-        return captureSelected(request, selectedKinds);
-    }
-
-    private EvidenceContribution captureSelected(ContextRequest request, Set<SourceKind> selectedKinds) {
-        AgentJob job = reviewJob(request);
-        if (job == null || job.getWorkspace() == null) {
-            return new EvidenceContribution(Map.of(), Map.of());
-        }
-        long workspaceId = job.getWorkspace().getId();
-        Long subjectUserId = resolveSubject(request, job);
-        if (subjectUserId == null) {
-            // Unavailable, not empty: there is no person to read a history for, so nothing was read.
-            return absent(selectedKinds, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
-        }
-
-        // Each kind is queried and reported only when selected — the builder rejects completeness or
-        // content-state facts about a source that wasn't asked for.
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        Map<SourceKind, SourceCompleteness> completeness = new LinkedHashMap<>();
-        Map<SourceKind, SourceContentState> contentStates = new LinkedHashMap<>();
-        int practiceResultCount = -1;
-        int feedbackCount = -1;
-        int preparedCount = -1;
-
-        if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<PracticeResult> practiceResults =
-                    visibleResults(workspaceId, subjectUserId, sourceJobExcludedFromHistory(job));
-            practiceResultCount = practiceResults.size();
-            ObjectNode payload = practiceResultsPayload(workspaceId, practiceResults);
-            files.put(OBSERVATIONS_FILE, serialize(payload, OBSERVATIONS_FILE));
-            completeness.put(OBSERVATION_HISTORY, wordsCompleteness(payload));
-            // Reported explicitly rather than inferred from file presence: the file is always written,
-            // so "there is a file" would wrongly answer NON_EMPTY for a person with no history.
-            contentStates.put(
-                    OBSERVATION_HISTORY,
-                    practiceResults.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
-        }
-
-        if (selectedKinds.contains(FEEDBACK_HISTORY)) {
-            List<Feedback> deliveredRows = feedbackRepository.findDeliveredForPersonHistory(workspaceId, subjectUserId);
-            List<Feedback> queuedRows =
-                    feedbackRepository.findPreparedForRecipient(workspaceId, subjectUserId, Pageable.unpaged());
-            ShownFeedback shown = shownFeedback(workspaceId, deliveredRows, queuedRows);
-            List<Feedback> delivered = deliveredRows.stream()
-                    .filter(f -> shown.currentness().containsKey(f.getId()))
-                    .toList();
-            List<Feedback> queued = queuedRows.stream()
-                    .filter(f -> shown.currentness().containsKey(f.getId()))
-                    .toList();
-            Set<UUID> withdrawn = withdrawalRepository.withdrawnAmong(
-                    workspaceId, shown.currentness().keySet());
-            feedbackCount = delivered.size();
-            ObjectNode deliveredPayload =
-                    feedbackPayload(workspaceId, delivered, shown, withdrawn, Words.CURRENT_CLAIMS);
-            files.put(FEEDBACK_FILE, serialize(deliveredPayload, FEEDBACK_FILE));
-            preparedCount = queued.size();
-            ObjectNode queuedPayload = preparedPayload(workspaceId, queued, shown.currentness(), withdrawn);
-            files.put(PREPARED_FILE, serialize(queuedPayload, PREPARED_FILE));
-            completeness.put(
-                    FEEDBACK_HISTORY,
-                    wordsCompleteness(deliveredPayload) == SourceCompleteness.PARTIAL
-                                    || wordsCompleteness(queuedPayload) == SourceCompleteness.PARTIAL
-                            ? SourceCompleteness.PARTIAL
-                            : SourceCompleteness.COMPLETE);
-            // Prepared feedback does not make the delivered feedback record non-empty.
-            contentStates.put(
-                    FEEDBACK_HISTORY, delivered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
-        }
-
-        log.debug(
-                "Review history: workspaceId={}, subjectUserId={}, results={}, feedback={}, prepared={}",
-                workspaceId,
-                subjectUserId,
-                practiceResultCount,
-                feedbackCount,
-                preparedCount);
-        return new EvidenceContribution(
-                files, Map.copyOf(completeness), Map.of(), Map.of(), Map.of(), Map.copyOf(contentStates));
-    }
-
-    /** Full file projection; both readers use the same visibility and withdrawal checks. */
-    public void renderPersonHistory(
-            long workspaceId,
-            long personId,
-            Set<SourceKind> selectedKinds,
-            UUID excludedJobId,
-            Consumer<ObjectNode> practiceResults,
-            Consumer<ObjectNode> feedback) {
-        if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<PracticeResult> rows = authorizeResults(
-                    workspaceId, practiceResultRepository.findForPersonHistory(personId, workspaceId), excludedJobId);
-            var items = practiceResultsPayload(workspaceId, rows).path("observations");
-            for (int i = 0; i < rows.size(); i++) {
-                ObjectNode record = (ObjectNode) items.get(i);
-                record.put("synced_at", rows.get(i).getObservedAt().toString());
-                practiceResults.accept(record);
-            }
-        }
-        if (selectedKinds.contains(FEEDBACK_HISTORY)) {
-            List<Feedback> rows = feedbackRepository.findDeliveredForPersonHistory(workspaceId, personId);
-            ShownFeedback shown = shownFeedback(workspaceId, rows, List.of());
-            List<Feedback> permitted = rows.stream()
-                    .filter(row -> shown.currentness().containsKey(row.getId()))
-                    .toList();
-            Set<UUID> withdrawn = withdrawalRepository.withdrawnAmong(
-                    workspaceId, shown.currentness().keySet());
-            var items = feedbackPayload(workspaceId, permitted, shown, withdrawn, Words.CURRENT_CLAIMS)
-                    .path("feedback");
-            for (int i = 0; i < permitted.size(); i++) {
-                ObjectNode record = (ObjectNode) items.get(i);
-                record.put("synced_at", permitted.get(i).getCreatedAt().toString());
-                feedback.accept(record);
-            }
-        }
-    }
-
-    /** Admission and later disclosure use the same result visibility and feedback withdrawal decisions. */
-    public boolean permitsHistoryRecord(long workspaceId, String type, UUID id, SourceUsePurpose purpose) {
-        if (type.equals("observation")) {
-            var row = practiceResultRepository
-                    .findByIdAndWorkspaceId(id, workspaceId)
-                    .orElse(null);
-            return row != null
-                    && !authorizeResults(workspaceId, List.of(row), null, purpose)
-                            .isEmpty();
-        }
-        if (!type.equals("feedback")) return false;
-        var row = feedbackRepository.findPersonHistoryRecord(id, workspaceId).orElse(null);
-        if (row == null
-                || withdrawalRepository.withdrawnAmong(workspaceId, Set.of(id)).contains(id)) return false;
-        return shownFeedback(workspaceId, List.of(row), List.of(), purpose)
-                        .currentness()
-                        .get(id)
-                == ReviewClaimCurrentness.CURRENT;
-    }
-
-    /**
-     * {@link #permitsHistoryRecord} for several records of one type at once: the ids it would permit one by one.
-     * Each record is decided by its own row and the results it is bound to, never by another record of the
-     * batch, so the batch answers each one as it is answered alone.
-     */
-    public Set<UUID> permittedHistoryRecords(
-            long workspaceId, String type, Collection<UUID> ids, SourceUsePurpose purpose) {
-        if (ids.isEmpty()) return Set.of();
-        if (type.equals("observation")) {
-            return authorizeResults(
-                            workspaceId,
-                            practiceResultRepository.findAllByIdInAndWorkspaceId(ids, workspaceId),
-                            null,
-                            purpose)
-                    .stream()
-                    .map(PracticeResult::getId)
-                    .collect(Collectors.toSet());
-        }
-        if (!type.equals("feedback")) return Set.of();
-        List<Feedback> rows = feedbackRepository.findPersonHistoryRecords(ids, workspaceId);
-        Set<UUID> withdrawn = withdrawalRepository.withdrawnAmong(
-                workspaceId, rows.stream().map(Feedback::getId).toList());
-        List<Feedback> kept =
-                rows.stream().filter(row -> !withdrawn.contains(row.getId())).toList();
-        Map<UUID, ReviewClaimCurrentness> currentness =
-                shownFeedback(workspaceId, kept, List.of(), purpose).currentness();
-        return kept.stream()
-                .map(Feedback::getId)
-                .filter(id -> currentness.get(id) == ReviewClaimCurrentness.CURRENT)
-                .collect(Collectors.toSet());
-    }
-
-    /**
-     * The citations whose checks decide each record's own check: a result's own, and those of the
-     * results a feedback row is bound to. A record outside the workspace has none.
-     */
-    public Map<UUID, List<JsonNode>> historyRecordCitations(long workspaceId, String type, Collection<UUID> ids) {
-        if (ids.isEmpty()) return Map.of();
-        Map<UUID, List<JsonNode>> citations = new HashMap<>();
-        if (type.equals("observation")) {
-            for (PracticeResult row : practiceResultRepository.findAllByIdInAndWorkspaceId(ids, workspaceId)) {
-                citations.put(row.getId(), citationsOf(row));
-            }
-        } else if (type.equals("feedback")) {
-            for (FeedbackResultVisibility binding : feedbackEvidenceRepository.findForVisibility(workspaceId, ids)) {
-                citations
-                        .computeIfAbsent(binding.getFeedbackId(), ignored -> new ArrayList<>())
-                        .addAll(citationsOf(binding.getPracticeResult()));
-            }
-        }
-        return citations;
-    }
-
-    private static List<JsonNode> citationsOf(PracticeResult practiceResult) {
-        JsonNode evidence = practiceResult.getEvidence();
-        if (evidence == null) return List.of();
-        List<JsonNode> citations = new ArrayList<>();
-        evidence.path("citations").forEach(citations::add);
-        return citations;
-    }
-
-    private List<PracticeResult> visibleResults(long workspaceId, Long subjectUserId, @Nullable UUID excludedJobId) {
-        return authorizeResults(
-                workspaceId, practiceResultRepository.findForPersonHistory(subjectUserId, workspaceId), excludedJobId);
-    }
-
-    private List<PracticeResult> authorizeResults(
-            long workspaceId, List<PracticeResult> recent, @Nullable UUID excludedJobId) {
-        return authorizeResults(workspaceId, recent, excludedJobId, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
-    }
-
-    private List<PracticeResult> authorizeResults(
-            long workspaceId, List<PracticeResult> recent, @Nullable UUID excludedJobId, SourceUsePurpose purpose) {
-        Set<UUID> visible = visibilityPolicy.permitsAll(workspaceId, recent, purpose);
-        List<PracticeResult> authorized =
-                recent.stream().filter(o -> visible.contains(o.getId())).toList();
-        Set<Long> activeThreads =
-                activeThreads(workspaceId, authorized.stream().map(ReviewHistoryContentSource::referenceOf));
-        return authorized.stream()
-                .filter(o -> live(referenceOf(o), activeThreads))
-                // Composition receives the current results separately, with durable ids. Counting them
-                // again as history would turn a first occurrence into an apparent recurrence.
-                .filter(o -> excludedJobId == null || !excludedJobId.equals(o.getAgentJobId()))
+    public List<ResultHistoryEntry> previousResults(ReviewAssignmentSnapshot assignment) {
+        return results.forAssignment(assignment.item().workspaceId(), assignment.id(), 20).stream()
+                .filter(entry -> copies.record(copies.of(entry)))
                 .toList();
     }
 
-    /**
-     * Public composition uses the history projection without ever projecting another work or a private body. It keeps
-     * the words of a stale row as what was delivered here, still labelled stale: they record that communication, not a
-     * claim about the work as it is.
-     */
-    @Transactional(readOnly = true)
-    public ObjectNode publicSameWorkFeedback(long workspaceId, long authorId, ArtifactKind kind, long artifactId) {
-        List<Feedback> sameWork =
-                feedbackRepository.findDeliveredForPublicWorkHistory(workspaceId, authorId, kind, artifactId);
-        ShownFeedback shown = shownFeedback(workspaceId, sameWork, List.of());
-        List<Feedback> permitted = sameWork.stream()
-                .filter(f -> shown.currentness().containsKey(f.getId())
-                        && publicReviewEligibility.permitsPublicHistory(
-                                f, shown.basedOn().getOrDefault(f.getId(), List.of())))
+    public PublicHistoryRead publicSameItemFeedback(ReviewJob job, List<ReviewAssignmentSnapshot> assignments) {
+        var selected = new ArrayList<FeedbackHistoryEntry>();
+        var itemIds = assignments.stream()
+                .map(entry -> entry.item().itemId())
+                .distinct()
                 .toList();
-        Set<UUID> withdrawn = withdrawalRepository.withdrawnAmong(
-                workspaceId, permitted.stream().map(Feedback::getId).collect(Collectors.toSet()));
-        return feedbackPayload(workspaceId, permitted, shown, withdrawn, Words.DELIVERED_COMMUNICATION);
-    }
-
-    /**
-     * The feedback this review may read, as the developer's own surfaces decide it: every result it is
-     * bound to may be shown. A row whose evidence is no longer current is labelled stale: its words describe work as
-     * it was and are not evidence about the work as it is.
-     */
-    private ShownFeedback shownFeedback(long workspaceId, List<Feedback> delivered, List<Feedback> queued) {
-        return shownFeedback(workspaceId, delivered, queued, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW);
-    }
-
-    /** The rows that may be read, the currentness of their evidence, and the results each is bound to. */
-    private record ShownFeedback(
-            Map<UUID, ReviewClaimCurrentness> currentness, Map<UUID, List<PracticeResult>> basedOn) {}
-
-    private ShownFeedback shownFeedback(
-            long workspaceId, List<Feedback> delivered, List<Feedback> queued, SourceUsePurpose purpose) {
-        List<UUID> ids = Stream.concat(delivered.stream(), queued.stream())
-                .map(Feedback::getId)
-                .toList();
-        if (ids.isEmpty()) {
-            return new ShownFeedback(Map.of(), Map.of());
-        }
-        List<FeedbackResultVisibility> bindings = feedbackEvidenceRepository.findForVisibility(workspaceId, ids);
-        Set<UUID> visible = new HashSet<>(visibilityPolicy.permitsShown(
-                workspaceId,
-                bindings.stream()
-                        .map(FeedbackResultVisibility::getPracticeResult)
-                        .toList(),
-                purpose));
-        Set<Long> activeThreads = activeThreads(
-                workspaceId,
-                Stream.concat(
-                        Stream.concat(delivered.stream(), queued.stream()).map(ReviewHistoryContentSource::referenceOf),
-                        bindings.stream()
-                                .map(FeedbackResultVisibility::getPracticeResult)
-                                .map(ReviewHistoryContentSource::referenceOf)));
-        // A result from a conversation whose channel no longer consents withholds every row it is bound to.
-        bindings.stream()
-                .map(FeedbackResultVisibility::getPracticeResult)
-                .filter(o -> !live(referenceOf(o), activeThreads))
-                .forEach(o -> visible.remove(o.getId()));
-        Map<UUID, ReviewClaimCurrentness> shown = new HashMap<>(FeedbackResultVisibility.shown(bindings, visible));
-        Stream.concat(delivered.stream(), queued.stream())
-                .filter(f -> !live(referenceOf(f), activeThreads))
-                .forEach(f -> shown.remove(f.getId()));
-        Map<UUID, List<PracticeResult>> basedOn = bindings.stream()
-                .filter(binding -> shown.containsKey(binding.getFeedbackId()))
-                .sorted(Comparator.comparing(
-                        binding -> binding.getPracticeResult().getId()))
-                .collect(Collectors.groupingBy(
-                        FeedbackResultVisibility::getFeedbackId,
-                        Collectors.mapping(FeedbackResultVisibility::getPracticeResult, Collectors.toList())));
-        return new ShownFeedback(shown, basedOn);
-    }
-
-    private Set<Long> activeThreads(long workspaceId, Stream<StagedArtifactNames.Reference> artifacts) {
-        List<Long> threadIds = artifacts
-                .filter(a -> ArtifactKinds.CONVERSATION_THREAD.equals(a.kind()))
-                .map(StagedArtifactNames.Reference::id)
+        var viewers = assignments.stream()
+                .map(ReviewAssignmentSnapshot::developerId)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        return conversationLiveness.activeThreadIds(workspaceId, threadIds);
-    }
-
-    /**
-     * Anything but a conversation stands as it is, unanchored feedback included; a conversation only while its channel
-     * consents, and never without the thread it came from.
-     */
-    private static boolean live(StagedArtifactNames.Reference artifact, Set<Long> activeThreads) {
-        if (!ArtifactKinds.CONVERSATION_THREAD.equals(artifact.kind())) {
-            return true;
-        }
-        Long threadId = artifact.id();
-        return threadId != null && activeThreads.contains(threadId);
-    }
-
-    private static StagedArtifactNames.Reference referenceOf(PracticeResult practiceResult) {
-        return new StagedArtifactNames.Reference(practiceResult.getArtifactKind(), practiceResult.getArtifactId());
-    }
-
-    private static StagedArtifactNames.Reference referenceOf(Feedback feedback) {
-        return new StagedArtifactNames.Reference(feedback.getArtifactKind(), feedback.getArtifactId());
-    }
-
-    /** Which stored words a projection carries. */
-    private enum Words {
-        /** Only the words of a row whose evidence is still current. */
-        CURRENT_CLAIMS,
-        /** The words of every shown row, current or stale, as the record of what was delivered. */
-        DELIVERED_COMMUNICATION
-    }
-
-    /**
-     * The words of a row whose evidence is still current; a stale row is staged without them unless the projection
-     * records delivered communication. Claim currentness and withdrawal remain facts when copy authority withholds
-     * words. A row a workspace admin withdrew never carries words: its evidence may be sound while its words are not.
-     */
-    private static void putBody(
-            ObjectNode node,
-            Feedback f,
-            Map<UUID, ReviewClaimCurrentness> shown,
-            Set<UUID> withdrawn,
-            Words words,
-            boolean includeWords) {
-        ReviewClaimCurrentness currentness = Objects.requireNonNull(shown.get(f.getId()));
-        node.put("recordedClaimCurrentness", currentness.name());
-        boolean isWithdrawn = withdrawn.contains(f.getId());
-        if (isWithdrawn) {
-            node.put("withdrawn", true);
-        }
-        if (includeWords
-                && !isWithdrawn
-                && (currentness == ReviewClaimCurrentness.CURRENT
-                        || (currentness == ReviewClaimCurrentness.STALE && words == Words.DELIVERED_COMMUNICATION))) {
-            node.put("body", f.getBody());
-            if (f.getBody() != null) {
-                node.put("bodyRole", bodyRole(f.getChannel()));
+        for (long itemId : itemIds)
+            for (long viewer : viewers) {
+                for (var entry : feedback.forItem(job.getWorkspaceId(), itemId, viewer, 100)) {
+                    if (entry.developerAccountId() != viewer
+                            || entry.destination() != FeedbackDestination.ON_WORK
+                            || entry.deliveredAt() == null
+                            || entry.body() == null
+                            || entry.reviewId().equals(job.getReviewId())
+                            || selected.stream()
+                                    .anyMatch(prior -> prior.feedbackId().equals(entry.feedbackId()))) continue;
+                    if (!copies.of(entry).complete())
+                        throw new ResultAdmissionService.PublicHistoryRefusedException(
+                                "Historical feedback has no complete copy authority");
+                    selected.add(entry);
+                }
             }
+        var item = assignments.getFirst().item();
+        if (itemIds.size() != 1) throw new IllegalArgumentException("Public history requires one item");
+        var label = labels.labels(job.getWorkspaceId(), List.of(item)).get(item.itemId());
+        var ref = new ItemRefDTO(
+                Long.toString(item.itemId()),
+                item.kind().value(),
+                item.parentId() == null ? null : Long.toString(item.parentId()),
+                label == null ? null : label.integration(),
+                label == null
+                        ? item.kind().value()
+                        : label.noun() + (label.number() == null ? "" : " #" + label.number()),
+                label == null ? null : label.title(),
+                label == null ? null : label.url(),
+                label == null ? null : label.container(),
+                item.path(),
+                null);
+        var projection = selected.stream()
+                .map(entry -> mapper.treeToValue(entry.publicHistory(), PublicFeedbackHistoryDTO.Entry.class))
+                .toList();
+        return new PublicHistoryRead(
+                new PublicFeedbackHistoryDTO(3, Instant.now(), new PublicFeedbackHistoryDTO.History(ref, projection)),
+                selected.stream().map(copies::of).toList());
+    }
+
+    public record PublicHistoryRead(PublicFeedbackHistoryDTO response, List<HistoryCopy> copies) {
+        public PublicHistoryRead {
+            copies = List.copyOf(copies);
         }
-    }
-
-    /** A conversation unit holds mentor notes, not the mentor's spoken words. */
-    private static String bodyRole(@Nullable FeedbackChannel channel) {
-        if (channel == null) {
-            return "UNKNOWN";
-        }
-        return switch (channel) {
-            case IN_CHAT -> "MENTOR_NOTES";
-            case IN_CONTEXT, IN_APP -> "COMPOSED_GUIDANCE";
-        };
-    }
-
-    /**
-     * A history file's root: what its records are, and that they are the review records this person's history may
-     * supply — not a chronology of their work or of what was communicated to them.
-     */
-    private ObjectNode historyRoot(String recordRole) {
-        ObjectNode root = objectMapper.createObjectNode();
-        ObjectNode coverage = root.putObject("coverage");
-        coverage.put("scope", "AUTHORIZED_REVIEW_RECORDS_FOR_SUBJECT");
-        coverage.put("workChronology", "NOT_ESTABLISHED");
-        coverage.put("communicationHistory", "NOT_ESTABLISHED");
-        root.put("recordRole", recordRole);
-        return root;
-    }
-
-    private static @Nullable UUID sourceJobExcludedFromHistory(AgentJob job) {
-        String raw = job.getMetadata() == null
-                ? ""
-                : job.getMetadata().path("source_job_id").asString();
-        if (raw.isBlank()) return null;
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    /**
-     * What has been written for this person and not yet reached them. Carries {@code threadKey} because
-     * that is the handle a composer names to supersede one of these; the server rejects a key it did not
-     * stage here, so the file is the whole vocabulary of supersession for this turn.
-     *
-     * <p>It carries {@code practiceSlug} for the same reason. The key is a digest, so it says nothing
-     * about what the queued message is <em>about</em>, and a composer picking a replacement target off an
-     * opaque string is picking blind — most visibly on the conversation lane, where a run that composed
-     * nothing leaves the body null and the slug is all there is to recognise the entry by.
-     */
-    private ObjectNode preparedPayload(
-            long workspaceId, List<Feedback> queued, Map<UUID, ReviewClaimCurrentness> shown, Set<UUID> withdrawn) {
-        ObjectNode root = historyRoot("PREPARED_NOT_DELIVERED");
-        StagedArtifactNames.Resolved names = artifactNames.resolve(
-                workspaceId,
-                queued.stream().map(ReviewHistoryContentSource::referenceOf).toList());
-        Map<UUID, String> practices = queued.isEmpty()
-                ? Map.of()
-                : feedbackRepository
-                        .findHeadlinePractices(
-                                workspaceId,
-                                queued.stream().map(Feedback::getId).toList())
-                        .stream()
-                        .collect(Collectors.toMap(
-                                FeedbackRepository.HeadlinePracticeRow::getFeedbackId,
-                                FeedbackRepository.HeadlinePracticeRow::getPracticeSlug,
-                                (first, second) -> first));
-        Set<UUID> vouched = copyAuthority.recordVouchedHistoricalJobs(
-                workspaceId, queued.stream().map(Feedback::getAgentJobId).collect(Collectors.toSet()));
-        ArrayNode items = root.putArray("prepared");
-        for (Feedback f : queued) {
-            recordPeople(f.getRecipientUserId(), f.getAboutUserId());
-            ObjectNode node = items.addObject();
-            node.put("threadKey", f.getThreadKey());
-            node.put("practiceSlug", practices.get(f.getId()));
-            node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
-            names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
-            node.put(
-                    "preparedAt",
-                    f.getCreatedAt() == null ? null : f.getCreatedAt().toString());
-            // Notes to the mentor on the conversation lane, never the mentor's words: that lane stores the
-            // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live.
-            // Null when the run that queued it composed nothing,
-            // which leaves only the fact that something is queued.
-            boolean includeWords = vouched.contains(f.getAgentJobId());
-            putBody(node, f, shown, withdrawn, Words.CURRENT_CLAIMS, includeWords);
-            if (!includeWords) unavailableWords(root, node);
-        }
-        return root;
-    }
-
-    private ObjectNode practiceResultsPayload(long workspaceId, List<PracticeResult> practiceResults) {
-        ObjectNode root = historyRoot("RECORDED_OBSERVATIONS");
-        StagedArtifactNames.Resolved names = artifactNames.resolve(
-                workspaceId,
-                practiceResults.stream()
-                        .map(ReviewHistoryContentSource::referenceOf)
-                        .toList());
-        Set<UUID> vouched = copyAuthority.recordVouchedHistoricalJobs(
-                workspaceId,
-                practiceResults.stream().map(PracticeResult::getAgentJobId).collect(Collectors.toSet()));
-        ArrayNode items = root.putArray("observations");
-        for (PracticeResult o : practiceResults) {
-            recordPeople(o.getAboutUserId());
-            ObjectNode node = items.addObject();
-            // The handle delivered feedback's basedOn names; a trace, not evidence that two results agree.
-            node.put("practiceResultId", o.getId().toString());
-            node.put(
-                    "practiceSlug",
-                    o.getPractice() == null ? null : o.getPractice().getSlug());
-            if (vouched.contains(o.getAgentJobId())) node.put("summary", o.getSummary());
-
-            node.put("outcome", o.getOutcome().name());
-            node.put(
-                    "severity", o.getSeverity() == null ? null : o.getSeverity().name());
-            // As recorded, with the qualifications and bounds it carried then; a missing value stays unknown.
-            if (vouched.contains(o.getAgentJobId())) {
-                node.put("evidenceRationale", o.getEvidenceRationale());
-                JsonNode evidence = o.getEvidence();
-                if (evidence == null || evidence.isNull() || evidence.isMissingNode()) node.putNull("evidence");
-                else node.set("evidence", evidence.deepCopy());
-            } else unavailableWords(root, node);
-            putPracticeRevision(node, o.getPracticeRevision());
-            names.stageInto(node, o.getArtifactKind(), o.getArtifactId());
-            node.put(
-                    "observedAt",
-                    o.getObservedAt() == null ? null : o.getObservedAt().toString());
-        }
-        return root;
-    }
-
-    /**
-     * What was delivered, each row with the results it rests on as they were recorded: their outcome and the
-     * practice revision they were made against, never the practice's current one. A row whose words are withheld
-     * keeps these without its body; the ids are trace handles, not evidence.
-     */
-    private ObjectNode feedbackPayload(
-            long workspaceId, List<Feedback> delivered, ShownFeedback shown, Set<UUID> withdrawn, Words words) {
-        ObjectNode root = historyRoot("RECORDED_DELIVERY");
-        StagedArtifactNames.Resolved names = artifactNames.resolve(
-                workspaceId,
-                delivered.stream().map(ReviewHistoryContentSource::referenceOf).toList());
-        Set<UUID> producingJobs =
-                delivered.stream().map(Feedback::getAgentJobId).collect(Collectors.toSet());
-        shown.basedOn().values().forEach(rows -> rows.forEach(row -> producingJobs.add(row.getAgentJobId())));
-        Set<UUID> vouched = copyAuthority.recordVouchedHistoricalJobs(workspaceId, producingJobs);
-        ArrayNode items = root.putArray("feedback");
-        for (Feedback f : delivered) {
-            recordPeople(f.getRecipientUserId(), f.getAboutUserId());
-            for (PracticeResult o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
-                recordPeople(o.getAboutUserId());
-            }
-            ObjectNode node = items.addObject();
-            node.put("id", f.getId().toString());
-            node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
-            names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
-            node.put(
-                    "deliveredAt",
-                    f.getDeliveredAt() == null ? null : f.getDeliveredAt().toString());
-            node.put("reviewedRevision", f.getReviewedRevision());
-            ArrayNode basedOn = node.putArray("basedOn");
-            for (PracticeResult o : shown.basedOn().getOrDefault(f.getId(), List.of())) {
-                ObjectNode support = basedOn.addObject();
-                support.put("practiceResultId", o.getId().toString());
-                support.put(
-                        "practiceSlug",
-                        o.getPractice() == null ? null : o.getPractice().getSlug());
-                putPracticeRevision(support, o.getPracticeRevision());
-                support.put("outcome", o.getOutcome().name());
-            }
-            node.put(
-                    "publicEligible",
-                    publicReviewEligibility.permitsPublicHistory(
-                            f, shown.basedOn().getOrDefault(f.getId(), List.of())));
-            boolean includeWords = vouched.contains(f.getAgentJobId())
-                    && shown.basedOn().getOrDefault(f.getId(), List.of()).stream()
-                            .allMatch(row -> vouched.contains(row.getAgentJobId()));
-            putBody(node, f, shown.currentness(), withdrawn, words, includeWords);
-            if (!includeWords) unavailableWords(root, node);
-        }
-        return root;
-    }
-
-    private static void unavailableWords(ObjectNode root, ObjectNode row) {
-        row.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
-        root.put("wordsCoverage", "PARTIAL");
-    }
-
-    private static SourceCompleteness wordsCompleteness(ObjectNode payload) {
-        return "PARTIAL".equals(payload.path("wordsCoverage").asString())
-                ? SourceCompleteness.PARTIAL
-                : SourceCompleteness.COMPLETE;
-    }
-
-    private static void putPracticeRevision(ObjectNode node, @Nullable PracticeRevision revision) {
-        if (revision == null) {
-            node.putNull("practiceRevision");
-            return;
-        }
-        ObjectNode recorded = node.putObject("practiceRevision");
-        recorded.put("id", revision.getId() == null ? null : revision.getId().toString());
-        recorded.put("number", revision.getRevisionNumber());
-    }
-
-    /**
-     * The person the review is about: the author for work with one, the explicitly carried subject
-     * otherwise — mirrors the resolution delivery performs, so history can't be staged for one person
-     * while results are filed against another.
-     */
-    private @Nullable Long resolveSubject(ContextRequest request, AgentJob job) {
-        return switch (request) {
-            case ContextRequest.PracticeReviewRequest ignored -> pullRequestSubject(job);
-            case ContextRequest.IssueReviewRequest ignored -> authorOfIssue(job);
-            case ContextRequest.DocumentReviewRequest ignored -> metadataSubject(job);
-            case ContextRequest.ConversationReviewRequest ignored -> metadataSubject(job);
-            case ContextRequest.MentorChatRequest ignored -> null;
-        };
-    }
-
-    private @Nullable Long pullRequestSubject(AgentJob job) {
-        var metadata = job.getMetadata();
-        if (metadata != null && "REVIEWER".equals(MetaJson.optString(metadata, "subject_role"))) {
-            Long subject = metadataSubject(job);
-            return subject != null && subject > 0 ? subject : null;
-        }
-        return authorOfPullRequest(job);
-    }
-
-    private @Nullable Long authorOfPullRequest(AgentJob job) {
-        Long id = metadataLong(job, "pull_request_id");
-        if (id == null) return null;
-        return pullRequestRepository
-                .findByIdWithAuthorAndRepository(id)
-                .map(PullRequest::getAuthor)
-                .map(author -> author.getId())
-                .orElse(null);
-    }
-
-    private @Nullable Long authorOfIssue(AgentJob job) {
-        Long id = metadataLong(job, "issue_id");
-        if (id == null) return null;
-        return issueRepository
-                .findByIdWithAuthorAndRepository(id)
-                .map(Issue::getAuthor)
-                .map(author -> author.getId())
-                .orElse(null);
-    }
-
-    private @Nullable Long metadataSubject(AgentJob job) {
-        return metadataLong(job, "about_user_id");
-    }
-
-    private static @Nullable Long metadataLong(AgentJob job, String field) {
-        var metadata = job.getMetadata();
-        if (metadata == null || metadata.isNull()) return null;
-        var node = metadata.get(field);
-        return node == null || node.isNull() || !node.isNumber() ? null : node.asLong();
-    }
-
-    private EvidenceContribution absent(Set<SourceKind> selectedKinds, SourceCaptureState state) {
-        Map<SourceKind, SourceCaptureState> overrides = new LinkedHashMap<>();
-        for (SourceKind kind : sourceKinds()) {
-            if (selectedKinds.contains(kind)) overrides.put(kind, state);
-        }
-        return new EvidenceContribution(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), overrides);
-    }
-
-    private byte[] serialize(ObjectNode payload, String path) {
-        try {
-            return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
-        } catch (RuntimeException e) {
-            throw new EvidenceCollectionException("Failed to serialize review history: " + path, e);
-        }
-    }
-
-    private static @Nullable AgentJob reviewJob(ContextRequest request) {
-        return switch (request) {
-            case ContextRequest.PracticeReviewRequest r -> r.job();
-            case ContextRequest.IssueReviewRequest r -> r.job();
-            case ContextRequest.DocumentReviewRequest r -> r.job();
-            case ContextRequest.ConversationReviewRequest r -> r.job();
-            case ContextRequest.MentorChatRequest ignored -> null;
-        };
     }
 }

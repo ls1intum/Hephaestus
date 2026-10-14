@@ -1,43 +1,55 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/** Chooses the actor an account speaks through in one workspace, as {@code workspace-context.mdx} describes. */
+/**
+ * Chooses the actor an account speaks through in one workspace, as {@code workspace-context.mdx}
+ * describes.
+ */
 @Component
 public class WorkspaceActorSelector {
 
     private final ConnectionService connectionService;
-    private final List<ScmTokenSource> scmSources;
-    private final WorkspaceMembershipRepository membershipRepository;
     private final IdentityProviderRepository identityProviderRepository;
+    private final GitProviderRegistry providers;
 
     public WorkspaceActorSelector(
             ConnectionService connectionService,
-            List<ScmTokenSource> scmSources,
-            WorkspaceMembershipRepository membershipRepository,
-            IdentityProviderRepository identityProviderRepository) {
+            IdentityProviderRepository identityProviderRepository,
+            GitProviderRegistry providers) {
         this.connectionService = connectionService;
-        this.scmSources = scmSources;
-        this.membershipRepository = membershipRepository;
         this.identityProviderRepository = identityProviderRepository;
+        this.providers = providers;
     }
 
-    /** @param memberIdsInLinkOrder the account's actors that are members of the workspace, in linking order */
+    /**
+     * @param memberIdsInLinkOrder the account's actors that are members of the workspace, in
+     *     linking order
+     */
     public Optional<Long> select(long workspaceId, List<Long> memberIdsInLinkOrder) {
         if (memberIdsInLinkOrder.size() <= 1) {
             return memberIdsInLinkOrder.stream().findFirst();
         }
         Set<Long> onConnectedInstance = connectedInstance(workspaceId)
-                .map(instance -> membershipRepository.findMemberUserIdsByWorkspaceIdAndProvider(
-                        workspaceId, memberIdsInLinkOrder, instance.type(), instance.serverUrl()))
+                .map(instance -> memberIdsInLinkOrder.stream()
+                        .filter(id -> providers
+                                .actor(id)
+                                .map(actor -> actor.providerType()
+                                                .equals(instance.type().name())
+                                        && actor.serverUrl().equals(instance.serverUrl()))
+                                .orElse(false))
+                        .collect(Collectors.toSet()))
                 .orElseGet(Set::of);
         return memberIdsInLinkOrder.stream()
                 .filter(onConnectedInstance::contains)
@@ -46,8 +58,8 @@ public class WorkspaceActorSelector {
     }
 
     /**
-     * The identity provider of the instance the workspace's active SCM connection reads from; empty without a
-     * connection or before anything from that instance was recorded.
+     * The identity provider of the instance the workspace's active SCM connection reads from; empty
+     * without a connection or before anything from that instance was recorded.
      */
     public Optional<Long> connectedProviderId(long workspaceId) {
         return connectedInstance(workspaceId)
@@ -57,13 +69,23 @@ public class WorkspaceActorSelector {
     }
 
     private Optional<ConnectedInstance> connectedInstance(long workspaceId) {
-        return connectionService
-                .findActiveProviderKind(workspaceId)
-                .flatMap(kind -> scmSources.stream()
-                        .filter(source -> source.kind() == kind)
-                        .findFirst()
-                        .flatMap(source -> source.serverUrl(workspaceId))
-                        .map(serverUrl -> new ConnectedInstance(IdentityProviderType.from(kind), serverUrl)));
+        var kind = connectionService.findActiveProviderKind(workspaceId).orElse(null);
+        if (kind == IntegrationKind.GITHUB) {
+            var server = connectionService
+                    .findActiveGitHubAppConfig(workspaceId)
+                    .map(config -> Objects.requireNonNullElse(config.serverUrl(), "https://github.com"))
+                    .or(() -> connectionService
+                            .findActiveGitHubPatConfig(workspaceId)
+                            .map(config -> Objects.requireNonNullElse(config.serverUrl(), "https://github.com")));
+            return server.map(url -> new ConnectedInstance(IdentityProviderType.GITHUB, url));
+        }
+        if (kind == IntegrationKind.GITLAB)
+            return connectionService
+                    .findActiveGitLabConfig(workspaceId)
+                    .map(config -> new ConnectedInstance(
+                            IdentityProviderType.GITLAB,
+                            Objects.requireNonNullElse(config.serverUrl(), "https://gitlab.com")));
+        return Optional.empty();
     }
 
     private record ConnectedInstance(IdentityProviderType type, String serverUrl) {}

@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -51,7 +53,7 @@ public class LlmBudgetService {
      * simply skips the submission.
      */
     @Transactional(readOnly = true)
-    public boolean blockSubmission(Workspace workspace, String jobType, @Nullable FundingSource fundingSource) {
+    public boolean blockSubmission(Workspace workspace, String jobType, @Nullable UsageFundingSource fundingSource) {
         LlmBudgetDecision.Block block = headroom(workspace).decide().decideFor(fundingSource);
         if (!block.blocked()) {
             return false;
@@ -66,15 +68,15 @@ public class LlmBudgetService {
                 .counter(
                         AgentMetrics.LLM_BUDGET_BLOCKED,
                         "surface",
-                        "agent_job",
+                        "review_job",
                         "cap",
-                        FundingSource.capTag(block.purse()))
+                        UsageFundingSource.capTag(block.purse()))
                 .increment();
         return true;
     }
 
-    private static String purseLabel(@Nullable FundingSource purse) {
-        return purse == FundingSource.WORKSPACE ? "own-provider" : "shared-model";
+    private static String purseLabel(@Nullable UsageFundingSource purse) {
+        return purse == UsageFundingSource.WORKSPACE ? "own-provider" : "shared-model";
     }
 
     private static String reasonLabel(LlmBudgetBlockReason reason) {

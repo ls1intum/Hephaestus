@@ -27,121 +27,145 @@ function withPractice(change: (practice: Record<string, unknown>) => void) {
 	return copy;
 }
 
-await test("all shipped practices use the flat occasion schema", () => {
+function withDefinition(change: (definition: Record<string, unknown>) => void) {
+	return withPractice((practice) => change(asRecord(practice.definition, "definition")));
+}
+
+await test("all shipped practices use complete definitions with immutable outer kinds", () => {
 	assert.equal(validate(catalogue), true, JSON.stringify(validate.errors));
 });
 
 for (const [name, change] of [
 	[
-		"the removed occasion array",
+		"a retired flat criteria field",
 		(p) => {
-			p.on = [{ signals: p.signals }];
+			p.criteria = "Old flat standard";
 		},
 	],
 	[
-		"a string in place of a signal list",
+		"a missing immutable kind",
 		(p) => {
-			p.signals = "scm.pull_request.opened";
+			delete p.kind;
 		},
 	],
 	[
-		"an empty signal list",
+		"a malformed item kind",
 		(p) => {
-			p.signals = [];
+			p.kind = "scm.pull_request.extra";
 		},
 	],
 	[
-		"duplicate signals",
+		"a retired resource field",
 		(p) => {
-			p.signals = ["scm.pull_request.opened", "scm.pull_request.opened"];
-		},
-	],
-	[
-		"an explicit empty evidence list",
-		(p) => {
-			p.evidenceRequirements = [];
-		},
-	],
-	[
-		"an invalid evidence stance",
-		(p) => {
-			p.evidenceRequirements = [{ sourceKind: "scm.pull-request.diff", stance: "OPTIONAL" }];
-		},
-	],
-	[
-		"a misspelled evidence field",
-		(p) => {
-			p.needs = [];
-		},
-	],
-	[
-		"a string draft flag",
-		(p) => {
-			p.onDrafts = "true";
-		},
-	],
-	[
-		"an invalid subject",
-		(p) => {
-			p.subject = "OWNER";
-		},
-	],
-	[
-		"the removed gate field",
-		(p) => {
-			p.appliesWhen = {
-				absentSays: "No Swift code",
-				anyOf: [{ changedPathMatches: ["**/*.swift"] }],
-			};
-		},
-	],
-	[
-		"a gate with no alternatives",
-		(p) => {
-			p.precondition = { absentSays: "No Swift code", anyOf: [] };
-		},
-	],
-	[
-		"a gate clause with two predicates",
-		(p) => {
-			p.precondition = {
-				absentSays: "No Swift code",
-				anyOf: [{ changedPathMatches: ["**/*.swift"], diffContains: ["View"] }],
-			};
-		},
-	],
-	[
-		"visual alt text over 300 characters",
-		(p) => {
-			p.visual = { file: "practices/guidance/a-practice/visual.svg", alt: "a".repeat(301) };
-		},
-	],
-	[
-		"a visual outside the guidance folder",
-		(p) => {
-			p.visual = { file: "practices/visual.svg", alt: "Two changes." };
-		},
-	],
-	[
-		"a guide that is not Markdown",
-		(p) => {
-			p.guide = "practices/guidance/a-practice/guide.html";
+			p.precompute = "script.ts";
 		},
 	],
 ] satisfies [string, (practice: Record<string, unknown>) => void][]) {
-	await test(`the catalogue rejects ${name}`, () => {
-		assert.equal(validate(withPractice(change)), false);
-	});
+	await test(`the catalog rejects ${name}`, () =>
+		assert.equal(validate(withPractice(change)), false));
 }
 
-await test("the schema permits omitted optional occasion fields", () => {
-	const value = withPractice((p) => {
-		delete p.evidenceRequirements;
-		delete p.subject;
-		delete p.onDrafts;
-		delete p.precondition;
+for (const [name, change] of [
+	[
+		"missing required nullable about",
+		(d) => {
+			delete d.about;
+		},
+	],
+	[
+		"missing required nullable scan",
+		(d) => {
+			delete d.scan;
+		},
+	],
+	[
+		"a retired outcome-era subject",
+		(d) => {
+			d.subject = "AUTHOR";
+		},
+	],
+	[
+		"an invalid about role",
+		(d) => {
+			d.about = "OWNER";
+		},
+	],
+	[
+		"a null delivery boolean",
+		(d) => {
+			d.lineNotes = null;
+		},
+	],
+	[
+		"a flat event list",
+		(d) => {
+			d.reviewOn = ["scm.pull_request.opened"];
+		},
+	],
+	[
+		"an invalid event name",
+		(d) => {
+			d.reviewOn = { events: ["scm.pull_request"], state: {} };
+		},
+	],
+	[
+		"a retired evidence stance",
+		(d) => {
+			d.reads = {
+				contract: "2.0.0",
+				sources: [{ source: "scm.pull-request.core", need: "EXHAUSTIVE" }],
+			};
+		},
+	],
+	[
+		"a retired review mode",
+		(d) => {
+			d.reviewedBy = { by: "LANGUAGE_MODEL", humanReason: null, limits: [] };
+		},
+	],
+	[
+		"an empty applicability alternative list",
+		(d) => {
+			d.appliesWhen = { otherwise: "No relevant code", anyOf: [] };
+		},
+	],
+	[
+		"two applicability predicates in one clause",
+		(d) => {
+			d.appliesWhen = {
+				otherwise: "No relevant code",
+				anyOf: [{ changedPath: ["**/*.swift"], diffContains: ["View"] }],
+			};
+		},
+	],
+	[
+		"an empty scan selection",
+		(d) => {
+			d.scan = { itemKind: "scm.file", include: [], exclude: [], context: [] };
+		},
+	],
+] satisfies [string, (definition: Record<string, unknown>) => void][]) {
+	await test(`the definition rejects ${name}`, () =>
+		assert.equal(validate(withDefinition(change)), false));
+}
+
+await test("event-free developerless definitions retain explicit nullable keys", () => {
+	const value = withDefinition((d) => {
+		d.about = null;
+		d.reviewOn = { events: [], state: {} };
 	});
 	assert.equal(validate(value), true, JSON.stringify(validate.errors));
+});
+
+await test("the catalog publishes exactly thirteen scan definitions", () => {
+	const scans = asArray(catalogue.groups, "groups").flatMap((groupValue) => {
+		const group = asRecord(groupValue, "group");
+		return asArray(group.practices, "practices").filter((practiceValue) => {
+			const practice = asRecord(practiceValue, "practice");
+			return asRecord(practice.definition, "definition").scan !== null;
+		});
+	});
+	assert.equal(scans.length, 13);
 });
 
 /**
@@ -159,7 +183,11 @@ await test("no shipped text carries a review output field or a name a code ident
 		assert.doesNotMatch(String(group.name), camelCase, `group ${String(group.slug)}`);
 		for (const practiceValue of asArray(group.practices, "practices")) {
 			const practice = asRecord(practiceValue, "practice");
-			assert.doesNotMatch(String(practice.name), camelCase, `name of ${String(practice.slug)}`);
+			assert.doesNotMatch(
+				String(asRecord(practice.definition, "definition").name),
+				camelCase,
+				`name of ${String(practice.slug)}`,
+			);
 		}
 	}
 });

@@ -1,0 +1,62 @@
+package de.tum.cit.aet.hephaestus.agent.job;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Instant;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+class ReviewJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private ReviewJobRepository jobs;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Autowired
+    private ObjectMapper mapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Test
+    void evidenceRefusalSettlesProcessingWithoutModelExecutionOrResults() {
+        databaseTestUtils.cleanDatabase();
+        var job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, (workspaces.save(TestEntities.activeWorkspace("evidence-refusal"))).getId());
+
+        job.setStatus(ReviewJobStatus.RUNNING);
+        job.setWorkerId("owner");
+        job.setConfigSnapshot(mapper.createObjectNode());
+        var id = jobs.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job)).getId();
+        var output = mapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
+        Integer refused =
+                transactions.execute(status -> jobs.transitionToEvidenceRefused(id, "other", 0, Instant.now(), output));
+        assertThat(refused).isZero();
+        Integer settled =
+                transactions.execute(status -> jobs.transitionToEvidenceRefused(id, "owner", 0, Instant.now(), output));
+        assertThat(settled).isEqualTo(1);
+        var saved = jobs.findById(id).orElseThrow();
+        assertThat(saved.getStatus()).isEqualTo(ReviewJobStatus.COMPLETED);
+        assertThat(saved.getProcessingStatus()).isEqualTo(ProcessingStatus.DONE);
+        assertThat(saved.getCompletedAt()).isNotNull();
+        assertThat(saved.getExecutionStartedAt()).isNull();
+        assertThat(saved.getDeliveryCommentId()).isNull();
+        assertThat(saved.getOutput()).isEqualTo(output);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM practice_result WHERE review_job_id = ?", Long.class, id))
+                .isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM feedback WHERE review_job_id = ?", Long.class, id))
+                .isZero();
+    }
+}

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeReleaseProposalDTO;
@@ -32,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @RequestMapping("/practices/releases")
 @Tag(name = "Practice Catalog", description = "Review catalogue changes before they affect a workspace")
 @RequiredArgsConstructor
+@ConditionalOnServerRole
 public class PracticeReleaseController {
 
     private final PracticeReleaseService releases;
@@ -64,7 +66,7 @@ public class PracticeReleaseController {
             @Parameter(required = true) @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable
                     String ifMatch,
             @Valid @RequestBody AcceptPracticeReleaseRequestDTO request) {
-        Practice practice = releases.accept(ctx, slug, precondition(ifMatch), request.choices());
+        Practice practice = releases.accept(ctx, slug, precondition(ifMatch), request.asMap());
         return ResponseEntity.ok(presenter.present(ctx.id(), practice));
     }
 

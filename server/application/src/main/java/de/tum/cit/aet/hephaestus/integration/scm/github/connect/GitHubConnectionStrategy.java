@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenServic
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppUserAuthorizationClient;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppUserAuthorizationClient.UserInstallation;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubUserAuthorizationException;
-import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -25,12 +25,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Connects a workspace to a GitHub App installation. The {@code installation_id} GitHub appends to the callback can be
- * forged, so it is only a claim: the App requests user authorization during installation, and the connect proves the
- * claim with the returned {@code code} — the installation must be one the authorizing person can access, on an account
- * they own. The signed state proves which workspace and administrator started the flow; this proves the installation.
+ * Connects a workspace to a GitHub App installation. The {@code installation_id} GitHub appends to
+ * the callback can be forged, so it is only a claim: the App requests user authorization during
+ * installation, and the connect proves the claim with the returned {@code code} — the installation
+ * must be one the authorizing person can access, on an account they own. The signed state proves
+ * which workspace and administrator started the flow; this proves the installation.
  *
- * @see <a href="https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-setup-url">GitHub: the installation_id can be spoofed</a>
+ * @see <a
+ *     href="https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-setup-url">GitHub:
+ *     the installation_id can be spoofed</a>
  */
 @ConditionalOnServerRole
 @Component
@@ -74,24 +77,30 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
     @Override
     public ConnectInitiation initiate(InitiateRequest request) {
         if (installationUrl == null) {
-            throw new IllegalStateException(
-                    "We could not start the GitHub App installation because it is not set up on this instance. Ask your instance operator to set it up.");
+            throw new IllegalStateException("We could not start the GitHub App installation because it is not set up on"
+                    + " this instance. Ask your instance operator to set it up.");
         }
         if (!userAuthorization.isConfigured()) {
             throw new IllegalStateException(
-                    "We could not verify the GitHub App installation because its sign-in is not set up on this instance. Ask your instance operator to set it up.");
+                    "We could not verify the GitHub App installation because its sign-in is not set"
+                            + " up on this instance. Ask your instance operator to set it up.");
         }
         String state = oauthStateService.issue(request.workspaceId(), IntegrationKind.GITHUB, request.actorAccountId());
         String separator = installationUrl.contains("?") ? "&" : "?";
-        URI vendorUrl = URI.create(installationUrl + separator + CALLBACK_PARAM_STATE + "="
+        URI vendorUrl = URI.create(installationUrl
+                + separator
+                + CALLBACK_PARAM_STATE
+                + "="
                 + URLEncoder.encode(state, StandardCharsets.UTF_8));
         return new ConnectInitiation.RedirectToVendor(vendorUrl, state);
     }
 
     @Override
     public boolean isProviderInitiated(Map<String, String> callbackParams) {
-        // With user authorization during installation, GitHub sends every installer here — including one who
-        // installed from GitHub or from the workspace wizard, where the installation webhook creates the workspace.
+        // With user authorization during installation, GitHub sends every installer here —
+        // including one who
+        // installed from GitHub or from the workspace wizard, where the installation webhook
+        // creates the workspace.
         return callbackParams.containsKey(CALLBACK_PARAM_SETUP_ACTION);
     }
 
@@ -108,19 +117,20 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
         String code = callbackParams.get(CALLBACK_PARAM_CODE);
         if (code == null || code.isBlank()) {
             return new ConnectFinalization.Failed(
-                    "GitHub did not confirm who installed the app, so Hephaestus cannot connect the installation."
-                            + " The GitHub App must request user authorization during installation.");
+                    "GitHub did not confirm who installed the app, so Hephaestus cannot connect the"
+                            + " installation. The GitHub App must request user authorization during"
+                            + " installation.");
         }
         try {
             return verify(ref, installationId.get(), code);
         } catch (GitHubUserAuthorizationException e) {
             log.warn(
-                    "GitHub installation verification failed: workspaceId={}, installationId={}, error={}",
+                    "GitHub installation verification failed: workspaceId={}, installationId={}," + " error={}",
                     ref.workspaceId(),
                     installationId.get(),
                     e.getMessage());
             return new ConnectFinalization.Failed(
-                    "GitHub could not confirm your access to this installation. Connect GitHub again.");
+                    "GitHub could not confirm your access to this installation. Connect GitHub" + " again.");
         }
     }
 
@@ -130,7 +140,8 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
                 userAuthorization.findAccessibleInstallation(userToken, installationId);
         if (installation.isEmpty()) {
             log.warn(
-                    "Rejected GitHub installation the authorizing user cannot access: workspaceId={}, installationId={}",
+                    "Rejected GitHub installation the authorizing user cannot access:"
+                            + " workspaceId={}, installationId={}",
                     ref.workspaceId(),
                     installationId);
             return new ConnectFinalization.Failed("Your GitHub account cannot access this installation of the app.");
@@ -141,7 +152,8 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
                 || login == null
                 || !owns(userToken, installation.get().targetType(), account.id(), login)) {
             log.warn(
-                    "Rejected GitHub installation the authorizing user does not own: workspaceId={}, installationId={}",
+                    "Rejected GitHub installation the authorizing user does not own:"
+                            + " workspaceId={}, installationId={}",
                     ref.workspaceId(),
                     installationId);
             return new ConnectFinalization.Failed("Only an owner of the GitHub account "
@@ -154,8 +166,9 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
     }
 
     /**
-     * Binding an installation hands the workspace every repository it covers, which can be more than the authorizing
-     * person may read, so seeing the installation is not enough: they must own the account it is installed on.
+     * Binding an installation hands the workspace every repository it covers, which can be more
+     * than the authorizing person may read, so seeing the installation is not enough: they must own
+     * the account it is installed on.
      */
     private boolean owns(String userToken, @Nullable String targetType, long accountId, String login) {
         return switch (targetType) {
@@ -182,8 +195,9 @@ public class GitHubConnectionStrategy implements ConnectionStrategy {
     }
 
     /**
-     * Uninstalls the App only for a connection that recorded its installation, which the installation webhook and a
-     * verified connect do. A row without one never proved it controls the installation behind its key.
+     * Uninstalls the App only for a connection that recorded its installation, which the
+     * installation webhook and a verified connect do. A row without one never proved it controls
+     * the installation behind its key.
      */
     @Override
     public Optional<Runnable> prepareProviderTeardown(IntegrationRef ref) {

@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.manifest;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
@@ -15,14 +15,14 @@ import org.springframework.stereotype.Component;
 /**
  * GitLab integration manifest.
  *
- * <p>Feedback-delivery, inline-feedback and approval capabilities are gated on
- * {@code hephaestus.integration.gitlab.enabled}, the same flag the GraphQL provider and channel beans require —
- * the bootstrap demands matching SPI beans for every declared capability. GitLab is opt-in (default off), but
- * the manifest bean stays registered either way so a workspace can be told that connecting GitLab would wake a
- * dormant practice.
+ * <p>Feedback-delivery, inline-feedback and approval capabilities are gated on {@code
+ * hephaestus.integration.gitlab.enabled}, the same flag the GraphQL provider and channel beans
+ * require — the bootstrap demands matching SPI beans for every declared capability. GitLab is
+ * opt-in (default off), but the manifest bean stays registered either way so a workspace can be
+ * told that connecting GitLab would wake a dormant practice.
  *
- * <p>No {@code RATE_LIMITED}: no per-kind {@code RateLimitTracker}. No {@code SCOPE_CHANGES}: GitLab has no
- * install/uninstall/scope webhooks to fire it.
+ * <p>No {@code RATE_LIMITED}: no per-kind {@code RateLimitTracker}. No {@code SCOPE_CHANGES}:
+ * GitLab has no install/uninstall/scope webhooks to fire it.
  */
 @Component
 public class GitLabManifest implements IntegrationManifest {
@@ -50,8 +50,8 @@ public class GitLabManifest implements IntegrationManifest {
 
     /** A merge hook often names no merger; the read after it, or a sync, does. */
     @Override
-    public Set<ActorRole> rolesNamedAfterTheOccasion() {
-        return Set.of(ActorRole.MERGER);
+    public Set<AboutRole> rolesNamedAfterTheOccasion() {
+        return Set.of(AboutRole.MERGER);
     }
 
     @Override
@@ -67,31 +67,31 @@ public class GitLabManifest implements IntegrationManifest {
 
     /**
      * Delivery lanes track the same enablement flag as the channel beans; claiming a lane whose
-     * {@code SummaryChannel} is not wired fails at boot.
+     * {@code SummaryWriter} is not wired fails at boot.
      */
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(
-                Set.of(ScmSignals.PULL_REQUEST, ScmSignals.ISSUE),
+                Set.of(ScmItemEvents.PULL_REQUEST, ScmItemEvents.ISSUE),
                 Map.of(
-                        ScmSignals.PULL_REQUEST,
+                        ScmItemEvents.PULL_REQUEST,
                         Set.of(
-                                ScmSignals.PULL_REQUEST_OPENED,
-                                ScmSignals.PULL_REQUEST_READY,
-                                ScmSignals.PULL_REQUEST_SYNCHRONIZED,
-                                ScmSignals.PULL_REQUEST_EDITED,
-                                ScmSignals.PULL_REQUEST_LINKED_ISSUE_UPDATED,
-                                ScmSignals.PULL_REQUEST_REVIEWED,
-                                ScmSignals.PULL_REQUEST_MERGED,
-                                ScmSignals.PULL_REQUEST_CLOSED),
-                        ScmSignals.ISSUE,
-                        Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_UPDATED, ScmSignals.ISSUE_CLOSED)),
+                                ScmItemEvents.PULL_REQUEST_OPENED,
+                                ScmItemEvents.PULL_REQUEST_READY,
+                                ScmItemEvents.PULL_REQUEST_SYNCHRONIZED,
+                                ScmItemEvents.PULL_REQUEST_EDITED,
+                                ScmItemEvents.PULL_REQUEST_LINKED_ISSUE_UPDATED,
+                                ScmItemEvents.PULL_REQUEST_REVIEW_SUBMITTED,
+                                ScmItemEvents.PULL_REQUEST_MERGED,
+                                ScmItemEvents.PULL_REQUEST_CLOSED),
+                        ScmItemEvents.ISSUE,
+                        Set.of(ScmItemEvents.ISSUE_OPENED, ScmItemEvents.ISSUE_UPDATED, ScmItemEvents.ISSUE_CLOSED)),
                 gitlabStackEnabled
                         ? Map.of(
-                                ScmSignals.PULL_REQUEST,
-                                Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),
-                                ScmSignals.ISSUE,
-                                Set.of(FeedbackLane.IN_CONTEXT_SUMMARY))
+                                ScmItemEvents.PULL_REQUEST,
+                                Set.of(CopyCapability.SUMMARY, CopyCapability.LINE_NOTE),
+                                ScmItemEvents.ISSUE,
+                                Set.of(CopyCapability.SUMMARY))
                         : Map.of());
     }
 }

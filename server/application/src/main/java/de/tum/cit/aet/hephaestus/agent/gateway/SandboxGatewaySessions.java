@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.gateway;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxOutputArchive;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import java.io.IOException;
@@ -123,7 +123,7 @@ public class SandboxGatewaySessions {
     }
 
     private static byte[] tokenHash(String token) {
-        return AgentJob.computeTokenHash(token).getBytes(StandardCharsets.US_ASCII);
+        return ReviewJob.computeTokenHash(token).getBytes(StandardCharsets.US_ASCII);
     }
 
     private void requireBudget(long bytes) {

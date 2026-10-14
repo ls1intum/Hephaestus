@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.runtime.worker;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobCancellationReason;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobExecutor;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobCancellationReason;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobExecutor;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.Heartbeat;
@@ -41,7 +41,7 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
     private final WorkerControlClient client;
     private final WorkerCapacityState state;
     private final WorkerProperties properties;
-    private final Optional<AgentJobExecutor> executor;
+    private final Optional<ReviewJobExecutor> executor;
     private final Optional<WorkerMentorSessions> mentorSessions;
     private final ApplicationEventPublisher events;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -51,7 +51,7 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
             WorkerControlClient client,
             WorkerCapacityState state,
             WorkerProperties properties,
-            Optional<AgentJobExecutor> executor,
+            Optional<ReviewJobExecutor> executor,
             Optional<WorkerMentorSessions> mentorSessions,
             ApplicationEventPublisher events,
             MeterRegistry meterRegistry) {
@@ -105,11 +105,11 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
     }
 
     /** Drains the executor; false if a job was left unsettled or a container stop did not return. */
-    private boolean drainExecutor(AgentJobExecutor exec, Duration timeout) {
+    private boolean drainExecutor(ReviewJobExecutor exec, Duration timeout) {
         exec.stopAcceptingNewJobs();
         if (timeout.isZero()) {
             log.info("Drain mode IMMEDIATE — cancelling in-flight jobs without waiting.");
-            return exec.cancelInFlight(AgentJobCancellationReason.DRAIN_IMMEDIATE);
+            return exec.cancelInFlight(ReviewJobCancellationReason.DRAIN_IMMEDIATE);
         }
         boolean clean = exec.awaitInFlight(timeout);
         if (clean) {
@@ -117,7 +117,7 @@ public class WorkerDrainCoordinator implements SmartLifecycle {
             return true;
         }
         log.warn("Drain budget exhausted after {}; cancelling in-flight jobs.", timeout);
-        return exec.cancelInFlight(AgentJobCancellationReason.DRAIN_GRACEFUL);
+        return exec.cancelInFlight(ReviewJobCancellationReason.DRAIN_GRACEFUL);
     }
 
     private void safeSend(WorkerControlFrame frame) {

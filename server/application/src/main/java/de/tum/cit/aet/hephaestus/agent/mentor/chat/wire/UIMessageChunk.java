@@ -37,7 +37,7 @@ import tools.jackson.databind.JsonNode;
     @JsonSubTypes.Type(value = UIMessageChunk.TurnError.class, name = "error"),
     @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
     @JsonSubTypes.Type(value = UIMessageChunk.DataResult.class, name = "data-result"),
-    @JsonSubTypes.Type(value = UIMessageChunk.DataResultObservation.class, name = "data-result-observation"),
+    @JsonSubTypes.Type(value = UIMessageChunk.DataProblem.class, name = "data-problem"),
 })
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public sealed interface UIMessageChunk {
@@ -249,43 +249,36 @@ public sealed interface UIMessageChunk {
             Objects.requireNonNull(data, "data");
         }
 
-        public record DataResultPayload(UUID practiceResultId, String text) {}
+        public record DataResultPayload(UUID resultId, String text) {}
 
-        public static DataResult of(UUID practiceResultId, String text) {
-            return new DataResult(UUID.randomUUID(), new DataResultPayload(practiceResultId, text));
+        public static DataResult of(UUID resultId, String text) {
+            return new DataResult(UUID.randomUUID(), new DataResultPayload(resultId, text));
         }
     }
 
     /**
-     * Hephaestus-specific data part emitted when Pi calls the {@code link_observation} custom tool: the feedback the
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_problem} custom tool: the feedback the
      * mentor wrote about one located problem, with the result it belongs to. Permanent, like {@link DataResult}.
      */
-    record DataResultObservation(
+    record DataProblem(
             @JsonProperty("id") UUID id,
-            @JsonProperty("data") DataResultObservationPayload data) implements UIMessageChunk {
-        public static final String PART_TYPE = "data-result-observation";
+            @JsonProperty("data") DataProblemPayload data) implements UIMessageChunk {
+        public static final String PART_TYPE = "data-problem";
 
-        public DataResultObservation {
+        public DataProblem {
             Objects.requireNonNull(id, "id");
             Objects.requireNonNull(data, "data");
         }
 
-        public record DataResultObservationPayload(UUID practiceResultId, UUID observationId, String text) {}
+        public record DataProblemPayload(UUID resultId, UUID problemId, String text) {}
 
-        public static DataResultObservation of(UUID practiceResultId, UUID observationId, String text) {
-            return new DataResultObservation(
-                    UUID.randomUUID(), new DataResultObservationPayload(practiceResultId, observationId, text));
+        public static DataProblem of(UUID resultId, UUID problemId, String text) {
+            return new DataProblem(UUID.randomUUID(), new DataProblemPayload(resultId, problemId, text));
         }
     }
 
-    /**
-     * The stored link parts of a reply, read by what they name. A {@link #LEGACY_PART_TYPE} part was written before
-     * results had problems: its {@code observationId} is a practice result id, and is never read as a problem.
-     */
+    /** The stored link parts of a reply, read by what they name. */
     final class LinkParts {
-
-        /** The part type of a link stored before protocol 2; its {@code data.observationId} names a result. */
-        public static final String LEGACY_PART_TYPE = "data-observation";
 
         private LinkParts() {}
 
@@ -314,10 +307,8 @@ public sealed interface UIMessageChunk {
             String type = part.path("type").asString("");
             JsonNode data = part.path("data");
             String id;
-            if (DataResult.PART_TYPE.equals(type) || DataResultObservation.PART_TYPE.equals(type)) {
-                id = data.path("practiceResultId").asString("");
-            } else if (LEGACY_PART_TYPE.equals(type)) {
-                id = data.path("observationId").asString("");
+            if (DataResult.PART_TYPE.equals(type) || DataProblem.PART_TYPE.equals(type)) {
+                id = data.path("resultId").asString("");
             } else {
                 return null;
             }
@@ -329,11 +320,11 @@ public sealed interface UIMessageChunk {
             }
         }
 
-        /** The problem a stored link part names: only a {@link DataResultObservation} names one. */
-        public static @Nullable UUID observationOf(JsonNode part) {
-            if (!DataResultObservation.PART_TYPE.equals(part.path("type").asString(""))) return null;
+        /** The problem a stored link part names: only a {@link DataProblem} names one. */
+        public static @Nullable UUID problemOf(JsonNode part) {
+            if (!DataProblem.PART_TYPE.equals(part.path("type").asString(""))) return null;
             try {
-                return UUID.fromString(part.path("data").path("observationId").asString(""));
+                return UUID.fromString(part.path("data").path("problemId").asString(""));
             } catch (IllegalArgumentException unreadable) {
                 return null;
             }

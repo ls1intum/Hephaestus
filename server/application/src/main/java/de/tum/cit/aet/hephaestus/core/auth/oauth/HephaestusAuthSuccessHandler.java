@@ -31,9 +31,9 @@ import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.stereotype.Component;
 
 /**
- * Production success handler for {@code oauth2Login}. Delegates account resolution / JIT /
- * linking to {@link AccountProvisioningService}, then mints a Hephaestus cookie-JWT via
- * {@link HephaestusJwtIssuer} and redirects to the validated {@code returnTo}.
+ * Production success handler for {@code oauth2Login}. Delegates account resolution / JIT / linking
+ * to {@link AccountProvisioningService}, then mints a Hephaestus cookie-JWT via {@link
+ * HephaestusJwtIssuer} and redirects to the validated {@code returnTo}.
  *
  * <p>Account lookup is always {@code (provider, subject)} — never email (nOAuth defence).
  */
@@ -48,16 +48,17 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     private final AuthIntentCookie authIntentCookie;
     private final AuthProperties authProperties;
     private final AuthEventLogger authEventLogger;
-    private final IdentityLinkAuthentication identityLinkAuthentication;
+    private final IdentityAuthentication identityLinkAuthentication;
     private final ClientSessionService clientSessionService;
     private final InstalledClientRegistry installedClients;
     private final Clock clock;
     private final CsrfAuthenticationStrategy csrfAuthentication;
 
     /**
-     * SPA origin (no trailing slash) prepended to every post-OAuth redirect, so the browser lands on
-     * the app and not on the API origin. Blank in production (SPA + API share an origin → a relative
-     * path is correct); set to e.g. {@code http://localhost:4200} in local dev where they differ.
+     * SPA origin (no trailing slash) prepended to every post-OAuth redirect, so the browser lands
+     * on the app and not on the API origin. Blank in production (SPA + API share an origin → a
+     * relative path is correct); set to e.g. {@code http://localhost:4200} in local dev where they
+     * differ.
      */
     private final String appBaseUrl;
 
@@ -67,7 +68,7 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             AuthIntentCookie authIntentCookie,
             AuthProperties authProperties,
             AuthEventLogger authEventLogger,
-            IdentityLinkAuthentication identityLinkAuthentication,
+            IdentityAuthentication identityLinkAuthentication,
             ClientSessionService clientSessionService,
             InstalledClientRegistry installedClients,
             Clock clock,
@@ -116,21 +117,25 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             return;
         }
         if (client instanceof ClientCallback.Unregistered) {
-            // The sealed pair is no longer registered: nothing is minted and nothing goes to that callback.
+            // The sealed pair is no longer registered: nothing is minted and nothing goes to that
+            // callback.
             log.warn("auth.success: installed-client sign-in whose client is no longer registered");
             redirectToApp(request, response, "/auth/error?code=client_not_registered");
             return;
         }
 
-        // The IdP round-trip can outlive — or be replaced by — the session that authorized the linking,
-        // so the authority to attach an identity is re-checked here rather than trusted from the cookie
+        // The IdP round-trip can outlive — or be replaced by — the session that authorized the
+        // linking,
+        // so the authority to attach an identity is re-checked here rather than trusted from the
+        // cookie
         // that carried the intent out.
         if (intent != null && intent.mode() == AuthIntentCookie.Intent.Mode.LINK) {
             Long linkingAccountId;
             try {
                 linkingAccountId = identityLinkAuthentication.resolveAuthenticatedAccountId(request);
             } catch (StepUpRequiredException e) {
-                // The intent is already cleared: recovery signs in again and starts a new, explicit link.
+                // The intent is already cleared: recovery signs in again and starts a new, explicit
+                // link.
                 redirectToApp(request, response, AuthBeginController.stepUpRequiredPath(intent.returnTo()));
                 return;
             }
@@ -154,15 +159,18 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             refuse(request, response, client, "link_requires_auth");
             return;
         } catch (AccountLinkConflictException e) {
-            log.warn("auth.success: refused link because the identity is already linked to another account");
+            log.warn("auth.success: refused link because the identity is already linked to another" + " account");
             refuse(request, response, client, "identity_already_linked");
             return;
         }
         Account account = provisioned.account();
 
-        // Authoritative account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account must
-        // never obtain a fresh JWT — otherwise a re-login silently resurrects a deleting account and a
-        // suspended account is fully re-enabled. We bail out BEFORE minting the cookie. The decoder /
+        // Authoritative account-status gate (ADR 0017). A SUSPENDED / DELETING / DELETED account
+        // must
+        // never obtain a fresh JWT — otherwise a re-login silently resurrects a deleting account
+        // and a
+        // suspended account is fully re-enabled. We bail out BEFORE minting the cookie. The decoder
+        // /
         // JwtPrincipalFactory enforce the same invariant as defense-in-depth, but this is where the
         // login decision is made, so it must be rejected here too. No cookie is set on this path.
         if (account.getStatus() != Account.Status.ACTIVE) {
@@ -174,8 +182,10 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             return;
         }
 
-        // An installed-client sign-in ends in a single-use code bound to the client's PKCE challenge,
-        // redeemed by the client itself. No cookie is set: the window that ran the sign-in never holds a
+        // An installed-client sign-in ends in a single-use code bound to the client's PKCE
+        // challenge,
+        // redeemed by the client itself. No cookie is set: the window that ran the sign-in never
+        // holds a
         // Hephaestus session.
         if (client instanceof ClientCallback.Registered registered) {
             Instant now = clock.instant();
@@ -208,14 +218,17 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             return;
         }
 
-        // Attaching an identity to a session that is already signed in is not a sign-in: minting a token
-        // here would reset both the absolute session ceiling and auth_time, so linking would become a way
+        // Attaching an identity to a session that is already signed in is not a sign-in: minting a
+        // token
+        // here would reset both the absolute session ceiling and auth_time, so linking would become
+        // a way
         // to renew the very freshness the step-up gate reads.
         if (intent == null || intent.mode() != AuthIntentCookie.Intent.Mode.LINK) {
             Instant now = clock.instant();
             HephaestusJwtIssuer.Token issued = jwtIssuer.issue(
                     Objects.requireNonNull(account.getId()),
-                    // Absolute session ceiling, stamped once at login and carried through every refresh,
+                    // Absolute session ceiling, stamped once at login and carried through
+                    // every refresh,
                     // alongside the auth_time this login establishes.
                     TokenConstraints.session(now.plus(authProperties.sessionMaxLifetime()), now),
                     request);
@@ -226,9 +239,12 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
             csrfAuthentication.onAuthentication(authentication, request, response);
         }
 
-        // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT. IDENTITY_LINKED
-        // only when a NEW identity was actually attached to an existing account (per the provisioning
-        // result); otherwise LOGIN. Audit writes are best-effort and never break the login — see AuthEventLogger.
+        // Audit the completed authentication, symmetric with AuthSessionService's LOGOUT.
+        // IDENTITY_LINKED
+        // only when a NEW identity was actually attached to an existing account (per the
+        // provisioning
+        // result); otherwise LOGIN. Audit writes are best-effort and never break the login — see
+        // AuthEventLogger.
         authEventLogger
                 .event(
                         provisioned.identityLinked() ? AuthEvent.EventType.IDENTITY_LINKED : AuthEvent.EventType.LOGIN,
@@ -241,8 +257,8 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
     }
 
     /**
-     * Ends the sign-in with {@code code}: at the installed client's registered callback when the sign-in
-     * started there, on the SPA error page otherwise.
+     * Ends the sign-in with {@code code}: at the installed client's registered callback when the
+     * sign-in started there, on the SPA error page otherwise.
      */
     private void refuse(HttpServletRequest request, HttpServletResponse response, ClientCallback client, String code)
             throws IOException {
@@ -262,8 +278,8 @@ public class HephaestusAuthSuccessHandler extends SimpleUrlAuthenticationSuccess
 
     /**
      * Redirect to a SPA path, prefixing the app origin when it differs from the API origin (local
-     * dev). {@code path} is always a server-validated, same-origin relative path (leading {@code /}),
-     * so prefixing a trusted, configured origin cannot widen it into an open redirect.
+     * dev). {@code path} is always a server-validated, same-origin relative path (leading {@code
+     * /}), so prefixing a trusted, configured origin cannot widen it into an open redirect.
      */
     private void redirectToApp(HttpServletRequest request, HttpServletResponse response, String path)
             throws IOException {

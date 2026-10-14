@@ -111,7 +111,9 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
     private static final long CONNECTED_PROVIDER_ID = 100L;
 
-    /** The workspace's active connection is on one GitLab instance, whose group row linking picks. */
+    /**
+     * The workspace's active connection is on one GitLab instance, whose group row linking picks.
+     */
     private final WorkspaceActorSelector actorSelector = mock(WorkspaceActorSelector.class);
 
     @Mock
@@ -167,7 +169,8 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         ReflectionTestUtils.setField(workspace, "id", 1L);
 
         // GitLab integration metadata lives on a Connection row, not on Workspace. Each test that
-        // triggers initialize() needs an active GitLab Connection + bearer token; default-configure that
+        // triggers initialize() needs an active GitLab Connection + bearer token; default-configure
+        // that
         // here so the test bodies don't have to know about the Connection registry.
         lenient()
                 .when(connectionService.findActiveGitLabConfig(anyLong()))
@@ -480,7 +483,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             initService.initialize(workspace);
 
-            assertThat(workspace.getOrganization()).isEqualTo(organization);
+            assertThat(workspace.getOrganizationId()).isEqualTo(organization.getId());
 
             verify(repositoryMonitors).monitorAll(workspace, repos);
 
@@ -530,7 +533,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         void shouldSkipOrgLinkingWhenAlreadyLinked() {
             Organization existingOrg = new Organization();
             existingOrg.setLogin("my-group/subgroup");
-            workspace.setOrganization(existingOrg);
+            workspace.setOrganizationId(existingOrg.getId());
 
             List<Repository> repos = List.of(createRepo("my-group/project-a"));
             GitLabSyncResult syncResult = GitLabSyncResult.completed(repos, 1, 0, 0);
@@ -583,7 +586,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         @Test
         void shouldSkipWhenAlreadyLinked() {
             Organization existingOrg = new Organization();
-            workspace.setOrganization(existingOrg);
+            workspace.setOrganizationId(existingOrg.getId());
 
             initService.linkWorkspaceToOrganization(workspace);
 
@@ -615,7 +618,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             assertThat(captor.getValue().getOrganization()).isEqualTo(organization);
 
             // In-memory reference must be updated too, for subsequent init phases in the same call.
-            assertThat(workspace.getOrganization()).isEqualTo(organization);
+            assertThat(workspace.getOrganizationId()).isEqualTo(organization.getId());
         }
 
         @Test

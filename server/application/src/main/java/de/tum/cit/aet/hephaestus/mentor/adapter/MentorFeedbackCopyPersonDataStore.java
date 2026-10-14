@@ -56,17 +56,18 @@ final class MentorFeedbackCopyPersonDataStore extends JdbcPersonDataStore {
         var params = new HashMap<>(parameters(person, mapper));
         params.put("copies", mapper.writeValueAsString(references));
         var rows = jdbc.query("""
-                SELECT m.id,m.thread_id,t.workspace_id,c."workspaceId"
-                FROM jsonb_to_recordset(CAST(:copies AS jsonb)) c("workspaceId" bigint,"messageId" uuid)
-                JOIN chat_message m ON m.id=c."messageId"
-                JOIN chat_thread t ON t.id=m.thread_id
-                WHERE NOT (t.user_id=ANY(:users))
-                ORDER BY m.id
-                """, params, (rs, row) -> {
+            SELECT m.id,m.thread_id,t.workspace_id,c."workspaceId"
+            FROM jsonb_to_recordset(CAST(:copies AS jsonb)) c("workspaceId" bigint,"messageId" uuid)
+            JOIN chat_message m ON m.id=c."messageId"
+            JOIN chat_thread t ON t.id=m.thread_id
+            WHERE NOT (t.account_id=:account)
+            ORDER BY m.id
+            """, params, (rs, row) -> {
             if (rs.getLong(3) != rs.getLong(4)) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
-                        "A conversation copy has a different workspace. Correct the exact delivery reference of the copy.");
+                        "A conversation copy has a different workspace. Correct the exact delivery reference of the"
+                                + " copy.");
             }
             return new PersonDataSelection.RowKey(
                     runtime

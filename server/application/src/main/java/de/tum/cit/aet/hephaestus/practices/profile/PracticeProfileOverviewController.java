@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.PracticeProfileOverviewDTO;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * The practice profile's overview, for the calling developer and nobody else: like the standings it is read
  * off, there is no user parameter on this route.
  */
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @PreAuthorize("@workspaceSecure.isMember()")
 @RequestMapping("/practice-profile")

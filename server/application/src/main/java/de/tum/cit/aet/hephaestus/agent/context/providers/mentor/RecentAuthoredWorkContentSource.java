@@ -1,14 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +19,7 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises {@code inputs/context/recent_authored_work.json} for a {@link MentorChatRequest}.
+ * Materialises {@code inputs/context/recent_authored_work.json} for a {@link MentorContextRequest}.
  *
  * <p><b>Why this exists (the mentor must know the work, not just results about it).</b> The other mentor
  * contexts describe the work only indirectly (results, delivered feedback, counts), so a reference like "my
@@ -41,13 +39,13 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
 
     private static final int MAX_PULL_REQUESTS = 20;
     private static final int MAX_ISSUES = 20;
-    private final UserRepository userRepository;
+    private final AccountSummaryQuery accounts;
     private final MentorContextQueryRepository queryRepository;
     private final ObjectMapper objectMapper;
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
     @Override
@@ -58,8 +56,8 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
     /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorContextKeys}. */
     @Override
     @Transactional(readOnly = true)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        MentorContextRequest req = request;
         ObjectNode payload = buildPayload(req.workspaceId(), req.developerId());
         try {
             files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
@@ -70,9 +68,8 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
 
     /** Reads the current bounded context; formatted personal copies are not retained between turns. */
     public ObjectNode buildPayload(Long workspaceId, Long developerId) {
-        User user = userRepository
-                .findById(developerId)
-                .orElseThrow(() -> new EntityNotFoundException("User", developerId.toString()));
+        var account = accounts.findAllByIds(List.of(developerId)).get(developerId);
+        if (account == null) throw new EntityNotFoundException("Account", developerId.toString());
 
         List<PullRequest> prs = queryRepository.findRecentAuthoredPullRequests(
                 workspaceId, developerId, PageRequest.of(0, MAX_PULL_REQUESTS));
@@ -80,14 +77,16 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
                 queryRepository.findRecentAuthoredIssues(workspaceId, developerId, PageRequest.of(0, MAX_ISSUES));
 
         ObjectNode root = objectMapper.createObjectNode();
-        root.putObject("user").put("login", user.getLogin()).put("name", user.getName());
+        root.putObject("account").put("displayName", account.displayName());
 
         ArrayNode prArr = root.putArray("pullRequests");
         for (PullRequest pr : prs) {
             ObjectNode node = prArr.addObject();
-            node.put("artifactId", pr.getId());
+            node.put("sourceId", pr.getId());
             node.put("resource", MergeReadinessContentSource.resourceOf(pr.getId()));
-            node.put("reviewsResource", ReviewAttemptsContentSource.resourceOf(ArtifactKinds.PULL_REQUEST, pr.getId()));
+            node.put(
+                    "reviewsResource",
+                    ReviewAttemptsContentSource.resourceOf(new ItemKind("scm.pull_request"), pr.getId()));
             node.put("number", pr.getNumber());
             node.put("title", pr.getTitle());
             if (pr.getHtmlUrl() != null) {
@@ -107,8 +106,10 @@ public class RecentAuthoredWorkContentSource implements ContentSource {
         ArrayNode issueArr = root.putArray("issues");
         for (Issue issue : issues) {
             ObjectNode node = issueArr.addObject();
-            node.put("artifactId", issue.getId());
-            node.put("reviewsResource", ReviewAttemptsContentSource.resourceOf(ArtifactKinds.ISSUE, issue.getId()));
+            node.put("sourceId", issue.getId());
+            node.put(
+                    "reviewsResource",
+                    ReviewAttemptsContentSource.resourceOf(new ItemKind("scm.issue"), issue.getId()));
             node.put("number", issue.getNumber());
             node.put("title", issue.getTitle());
             if (issue.getHtmlUrl() != null) {

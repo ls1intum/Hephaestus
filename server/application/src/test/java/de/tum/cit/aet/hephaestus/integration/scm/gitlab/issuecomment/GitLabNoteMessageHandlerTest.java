@@ -10,8 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -210,7 +210,8 @@ class GitLabNoteMessageHandlerTest extends BaseUnitTest {
 
             handler.onMessage(mockMessage(event));
 
-            // The same rows at the same times as the discussion sync makes, and the note's own GID so a
+            // The same rows at the same times as the discussion sync makes, and the note's own GID
+            // so a
             // later sync finds them; live, so an approval note is the approval itself.
             verify(reviewReconciler)
                     .recordSystemNote(

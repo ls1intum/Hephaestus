@@ -6,8 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeature;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -31,16 +31,18 @@ import org.springframework.security.oauth2.core.user.DefaultOAuth2User;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 
 /**
- * Real-Postgres proof of what unit/repository tests cannot give: that login-side and SCM-side resolve
- * the SAME {@code git_provider} row for one person, so the practice-review gate's
- * {@code (User.provider.id, String.valueOf(User.nativeId))} tuple matches the {@code IdentityLink}
- * the login flow stored. Drives the real provisioning path (the inline comments mark each seam).
+ * Real-Postgres proof of what unit/repository tests cannot give: that login-side and SCM-side
+ * resolve the SAME {@code git_provider} row for one person, so the practice-review gate's {@code
+ * (User.provider.id, String.valueOf(User.nativeId))} tuple matches the {@code Identity} the login
+ * flow stored. Drives the real provisioning path (the inline comments mark each seam).
  */
 class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationTest {
 
     private static final String ROLE = "run_practice_review";
-    // Explicit-port base URL so origin canonicalization is genuinely exercised (a state production can
-    // hold), not a no-op. LoginProvider.setBaseUrl already strips trailing slashes; a path would be invalid.
+    // Explicit-port base URL so origin canonicalization is genuinely exercised (a state production
+    // can
+    // hold), not a no-op. LoginProvider.setBaseUrl already strips trailing slashes; a path would be
+    // invalid.
     private static final String LOGIN_BASE_URL = "https://gitlab.lrz.de:8443";
     private static final String REGISTRATION_ID = "gitlab-e2e";
     private static final long NATIVE_ID = 583231L; // numeric provider user id, shared by login + sync
@@ -55,7 +57,7 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
     private AccountFeatureRepository accountFeatureRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinkRepository;
+    private IdentityRepository identityRepository;
 
     @Autowired
     private LoginProviderRepository loginProviderRepository;
@@ -70,7 +72,8 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
     void practiceRoleResolvesEndToEndThroughLoginAndSyncForTheSamePerson() {
         seedLoginProvider(REGISTRATION_ID, LoginProvider.ProviderType.GITLAB, LOGIN_BASE_URL);
 
-        // Pin the production seam that makes subject numeric: the real ClientRegistration's name attr.
+        // Pin the production seam that makes subject numeric: the real ClientRegistration's name
+        // attr.
         ClientRegistration registration =
                 Objects.requireNonNull(clientRegistrationRepository.findByRegistrationId(REGISTRATION_ID));
         String nameAttr = Objects.requireNonNull(
@@ -79,7 +82,8 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
                 .as("login must key the principal name on the provider's numeric id")
                 .isEqualTo("id");
 
-        // Principal name keyed by the PRODUCTION attr (asserted == "id" above); subject is derived the
+        // Principal name keyed by the PRODUCTION attr (asserted == "id" above); subject is derived
+        // the
         // way HephaestusAuthSuccessHandler does — principal.getName() — and stored unchanged.
         OAuth2User principal = new DefaultOAuth2User(
                 List.of(new SimpleGrantedAuthority("ROLE_USER")),
@@ -91,32 +95,38 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
                         REGISTRATION_ID, subject, principal, AuthIntentCookie.Intent.login(null, null))
                 .account();
 
-        IdentityLink link = identityLinkRepository
+        Identity link = identityRepository
                 .findActiveByAccountId(persistedId(account.getId()))
                 .get(0);
-        // (a) the stored subject IS the numeric id — exactly what the gate stringifies from User.nativeId.
-        assertThat(link.getSubject()).isEqualTo(String.valueOf(NATIVE_ID));
+        // (a) the stored subject IS the numeric id — exactly what the gate stringifies from
+        // User.nativeId.
+        assertThat(link.getProviderUserKey()).isEqualTo(String.valueOf(NATIVE_ID));
         long loginResolvedProviderId = link.getProviderId();
 
-        // (b) the SCM side independently resolves the SAME git_provider row at the canonical origin.
+        // (b) the SCM side independently resolves the SAME git_provider row at the canonical
+        // origin.
         String origin = originOf(LOGIN_BASE_URL);
         IdentityProvider scmProvider = gitProviderRepository
                 .findByTypeAndServerUrl(IdentityProviderType.GITLAB, origin)
-                .orElseThrow(() -> new AssertionError("login created no git_provider at canonical origin " + origin
-                        + " — login/SCM canonicalization diverged"));
+                .orElseThrow(() -> new AssertionError("login created no git_provider at canonical origin "
+                        + origin
+                        + " — login/SCM canonicalization"
+                        + " diverged"));
         assertThat(persistedId(scmProvider.getId())).isEqualTo(loginResolvedProviderId);
 
         // Synced SCM User for the same person under that same provider row.
         User user = userRepository.save(TestUserFactory.createUser(NATIVE_ID, "octocat", scmProvider));
         accountFeatureRepository.save(new AccountFeature(persistedId(account.getId()), ROLE));
 
-        // THE PROOF: the (provider.id, valueOf(nativeId)) tuple the gate passes resolves the granted flag.
+        // THE PROOF: the (provider.id, valueOf(nativeId)) tuple the gate passes resolves the
+        // granted flag.
         assertThat(accountFeatureRepository.existsActiveFeatureForProviderSubject(
                         persistedId(user.getProvider().getId()), String.valueOf(user.getNativeId()), ROLE))
                 .isTrue();
     }
 
-    // Cross-provider isolation (same numeric subject on a different instance must NOT inherit the flag)
+    // Cross-provider isolation (same numeric subject on a different instance must NOT inherit the
+    // flag)
     // is owned by ProductionSchemaContractIntegrationTest at the query layer — not duplicated here.
 
     private void seedLoginProvider(String registrationId, LoginProvider.ProviderType type, String baseUrl) {
@@ -131,7 +141,9 @@ class PracticeRoleResolutionEndToEndIntegrationTest extends RealAuthIntegrationT
         loginProviderRepository.save(provider);
     }
 
-    /** Mirror of {@code RegistrationToGitProviderResolver#originOf} for the convergence cross-check. */
+    /**
+     * Mirror of {@code RegistrationToGitProviderResolver#originOf} for the convergence cross-check.
+     */
     private static String originOf(String baseUrl) {
         URI uri = URI.create(baseUrl);
         String origin = uri.getScheme() + "://" + uri.getHost();

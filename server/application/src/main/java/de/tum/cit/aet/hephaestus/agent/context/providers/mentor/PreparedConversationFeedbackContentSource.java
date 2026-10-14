@@ -1,244 +1,53 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.PreparedConversationFact;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackHistoryQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Stream;
-import org.springframework.data.domain.PageRequest;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
 
 @Component
+@RequiredArgsConstructor
 public class PreparedConversationFeedbackContentSource implements ContentSource {
-
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "prepared_conversation_feedback.json";
-
-    private static final int MAX_PREPARED = 3;
-    private static final int MAX_CANDIDATES = 12;
-
-    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private final FeedbackHistoryQuery feedback;
+    private final HistoryCopies copies;
     private final ConversationConsentGate consentGate;
     private final ObjectMapper objectMapper;
-    private final PracticeResultRepository practiceResultRepository;
-    private final ResultVisibilityPolicy visibilityPolicy;
-    private final AgentJobRepository agentJobRepository;
-    private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
-    private final FeedbackRepository feedbackRepository;
-    private final ReviewedWorkCoverage reviewedWorkCoverage;
-    private final EvidenceFolderPersonDataCatalog personCopies;
 
-    public PreparedConversationFeedbackContentSource(
-            FeedbackEvidenceRepository feedbackEvidenceRepository,
-            ConversationConsentGate consentGate,
-            ObjectMapper objectMapper,
-            PracticeResultRepository practiceResultRepository,
-            ResultVisibilityPolicy visibilityPolicy,
-            AgentJobRepository agentJobRepository,
-            PracticeFeedbackDeliveryPolicy deliveryPolicy,
-            FeedbackRepository feedbackRepository,
-            ReviewedWorkCoverage reviewedWorkCoverage,
-            EvidenceFolderPersonDataCatalog personCopies) {
-        this.feedbackEvidenceRepository = feedbackEvidenceRepository;
-        this.consentGate = consentGate;
-        this.objectMapper = objectMapper;
-        this.practiceResultRepository = practiceResultRepository;
-        this.visibilityPolicy = visibilityPolicy;
-        this.agentJobRepository = agentJobRepository;
-        this.deliveryPolicy = deliveryPolicy;
-        this.feedbackRepository = feedbackRepository;
-        this.reviewedWorkCoverage = reviewedWorkCoverage;
-        this.personCopies = personCopies;
+    @Override
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
-    }
-
-    @Override
-    public boolean required() {
-        return false;
-    }
-
-    @Override
-    @Transactional
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
-        long workspaceId = req.workspaceId();
-        List<PreparedConversationFact> prepared = feedbackEvidenceRepository.findPreparedConversationFactsForRecipient(
-                workspaceId, req.developerId(), PageRequest.of(0, MAX_CANDIDATES));
-
-        Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
-        Map<UUID, PracticeResult> practiceResults = practiceResultsById(workspaceId, prepared);
-        Set<UUID> visible = visibilityPolicy.permitsForNewDelivery(
-                workspaceId, practiceResults.values(), SourceUsePurpose.CONVERSATIONAL_MENTORING);
-        Set<UUID> vouchedJobs = personCopies.recordVouchedHistoricalJobs(
-                workspaceId,
-                Stream.concat(
-                                prepared.stream()
-                                        .filter(fact -> visible.contains(fact.getPracticeResultId()))
-                                        .map(PreparedConversationFact::getAgentJobId),
-                                practiceResults.values().stream()
-                                        .filter(o -> visible.contains(o.getId()))
-                                        .map(PracticeResult::getAgentJobId))
-                        .toList());
-        Map<UUID, ObjectNode> reviewedWork = reviewedWorkCoverage.of(
-                workspaceId,
-                practiceResults.values().stream()
-                        .filter(o -> visible.contains(o.getId()))
-                        .toList());
-
-        ObjectNode root = objectMapper.createObjectNode();
-
+    @Transactional(readOnly = true)
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        var root = objectMapper.createObjectNode().put("readAt", Instant.now().toString());
         consentGate.writeUntrustedEnvelope(root);
-
-        ArrayNode arr = root.putArray("preparedConversationFeedback");
-        for (PreparedConversationFact fact : prepared) {
-            if (arr.size() >= MAX_PREPARED) break;
-            if (!visible.contains(fact.getPracticeResultId())) {
-                continue;
-            }
-            if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind())
-                    && (fact.getArtifactId() == null || !activeThreadIds.contains(fact.getArtifactId()))) {
-                continue;
-            }
-            AgentJob job = agentJobRepository
-                    .findByIdAndWorkspaceId(fact.getAgentJobId(), workspaceId)
-                    .orElse(null);
-            if (job == null) {
-                feedbackRepository.markPreparedSuppressed(
-                        fact.getFeedbackId(), workspaceId, FeedbackSuppressionReason.ARTIFACT_GONE.name());
-                continue;
-            }
-            var decision = deliveryPolicy.evaluateForRecipient(
-                    job,
-                    DeliveryPolicyStage.EGRESS,
-                    fact.getFeedbackId(),
-                    DeliveryPolicySurface.CONVERSATION,
-                    req.developerId(),
-                    Set.of(fact.getPracticeSlug()));
-            if (!decision.allowed()) {
-                feedbackRepository.markPreparedSuppressed(
-                        fact.getFeedbackId(), workspaceId, decision.refusal().name());
-                continue;
-            }
-            ObjectNode node = arr.addObject();
-            node.put("practiceResultId", fact.getPracticeResultId().toString());
-            node.put("practiceSlug", fact.getPracticeSlug());
-            node.put("practiceName", fact.getPracticeName());
-            PracticeResult practiceResult = practiceResults.get(fact.getPracticeResultId());
-            boolean wordsAvailable = practiceResult != null
-                    && vouchedJobs.contains(fact.getAgentJobId())
-                    && vouchedJobs.contains(practiceResult.getAgentJobId());
-            if (wordsAvailable) node.put("summary", fact.getSummary());
-            else {
-                node.put("wordsUnavailable", EvidenceFolderPersonDataCatalog.COPY_AUTHORITY_UNAVAILABLE);
-                root.put("wordsCoverage", "PARTIAL");
-            }
-            if (fact.getSeverity() != null) {
-                node.put("severity", fact.getSeverity().name());
-            }
-            if (wordsAvailable && fact.getEvidenceRationale() != null) {
-                node.put("evidenceRationale", fact.getEvidenceRationale());
-            }
-            if (fact.getArtifactKind() != null) {
-                node.put("artifactKind", fact.getArtifactKind().value());
-            }
-            if (fact.getArtifactId() != null) {
-                node.put("artifactId", fact.getArtifactId());
-            }
-            if (fact.getPreparedAt() != null) {
-                node.put("preparedAt", fact.getPreparedAt().toString());
-            }
-            if (practiceResult != null) {
-                // The review behind the practiceResult, not the job that composed this feedback.
-                node.put("reviewId", practiceResult.getAgentJobId().toString());
-
-                node.put("outcome", practiceResult.getOutcome().name());
-                if (wordsAvailable && practiceResult.getEvidence() != null) {
-                    node.set("evidence", practiceResult.getEvidence());
-                }
-                ObjectNode work = reviewedWork.get(practiceResult.getId());
-                if (work != null) {
-                    node.set("reviewedWork", work);
-                }
-            }
-            if (wordsAvailable) writeNotes(node, fact.getBody());
+        var rows = root.putArray("preparedConversationFeedback");
+        for (var entry : feedback.forDeveloper(
+                request.workspaceId(), request.developerId(), Instant.now().minus(90, ChronoUnit.DAYS), 12)) {
+            if (rows.size() == 3) break;
+            if (entry.destination() != FeedbackDestination.CONVERSATION
+                    || entry.state() != FeedbackState.READY
+                    || (entry.threadId() != null && !request.threadId().equals(entry.threadId()))
+                    || entry.body() == null
+                    || !copies.record(copies.of(entry))) continue;
+            var row = rows.addObject()
+                    .put("feedbackId", entry.feedbackId().toString())
+                    .put("body", entry.body());
+            row.set("resultIds", objectMapper.valueToTree(entry.resultIds()));
+            row.set("problemIds", objectMapper.valueToTree(entry.problemIds()));
         }
-        root.put("totalPrepared", arr.size());
-        try {
-            files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(root));
-        } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize prepared conversation feedback context", e);
-        }
-    }
-
-    private static void writeNotes(ObjectNode node, String body) {
-        ConversationBriefBody.Brief brief = ConversationBriefBody.parse(body);
-        if (brief == null) {
-            return;
-        }
-        node.put("topic", brief.title());
-        ObjectNode notes = node.putObject("notes");
-        notes.put("situation", brief.situation());
-        notes.put("capability", brief.capability());
-        notes.put("evidenceSummary", brief.evidenceSummary());
-        notes.put("inConversationSignal", brief.inConversationSignal());
-        if (brief.alreadySaid() != null) {
-            notes.put("alreadySaid", brief.alreadySaid());
-        }
-    }
-
-    private Map<UUID, PracticeResult> practiceResultsById(long workspaceId, List<PreparedConversationFact> facts) {
-        Set<UUID> ids = new LinkedHashSet<>();
-        for (PreparedConversationFact fact : facts) {
-            ids.add(fact.getPracticeResultId());
-        }
-        if (ids.isEmpty()) {
-            return Map.of();
-        }
-        List<PracticeResult> rows = practiceResultRepository.findAllByIdInAndWorkspaceId(ids, workspaceId);
-        Map<UUID, PracticeResult> byId = new HashMap<>(rows.size());
-        for (PracticeResult practiceResult : rows) {
-            byId.put(practiceResult.getId(), practiceResult);
-        }
-        return byId;
-    }
-
-    private static List<Long> conversationThreadIds(List<PreparedConversationFact> facts) {
-        List<Long> ids = new ArrayList<>();
-        for (PreparedConversationFact fact : facts) {
-            if (ArtifactKinds.CONVERSATION_THREAD.equals(fact.getArtifactKind()) && fact.getArtifactId() != null) {
-                ids.add(fact.getArtifactId());
-            }
-        }
-        return ids;
+        files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(root));
     }
 }

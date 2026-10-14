@@ -137,7 +137,7 @@ const INTENTIONALLY_MISSING_PATHS = [
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
 		value: "description.md",
-		reason: "a captured artifact written into the agent workspace",
+		reason: "a captured item written into the agent workspace",
 	},
 	{
 		document: "docs/contributor/practice-review-runtime.mdx",
@@ -146,8 +146,8 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/practice-review-runtime.mdx",
-		value: "work/composition/observations.json",
-		reason: "the admitted observations, written inside the agent workspace for the composer",
+		value: "work/composition/results.json",
+		reason: "the admitted results, written inside the agent workspace for the composer",
 	},
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
@@ -156,7 +156,7 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/agent/workspace-abi.mdx",
-		value: "inputs/history/observations.json",
+		value: "inputs/history/results.json",
 		reason: "the staged history record, written into the agent workspace",
 	},
 	{
@@ -172,6 +172,11 @@ const INTENTIONALLY_MISSING_PATHS = [
 	},
 	{
 		document: "docs/contributor/local-development.mdx",
+		value: "server/.env",
+		reason: "a developer-local secrets file that must stay untracked",
+	},
+	{
+		document: "docs/contributor/database-migration.mdx",
 		value: "server/.env",
 		reason: "a developer-local secrets file that must stay untracked",
 	},

@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
@@ -20,15 +20,16 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab milestone webhook events.
- * <p>
- * Routes to {@link GitLabMilestoneProcessor} based on the action:
+ *
+ * <p>Routes to {@link GitLabMilestoneProcessor} based on the action:
+ *
  * <ul>
- *   <li>{@code create} / {@code update} / {@code close} / {@code reopen} &rarr;
- *       {@link GitLabMilestoneProcessor#process} (state is encoded in the DTO)</li>
+ *   <li>{@code create} / {@code update} / {@code close} / {@code reopen} &rarr; {@link
+ *       GitLabMilestoneProcessor#process} (state is encoded in the DTO)
  * </ul>
- * <p>
- * GitLab does not send a webhook when a milestone is deleted — stale milestones
- * are cleaned up by the GraphQL sync service's stale removal logic.
+ *
+ * <p>GitLab does not send a webhook when a milestone is deleted — stale milestones are cleaned up
+ * by the GraphQL sync service's stale removal logic.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)

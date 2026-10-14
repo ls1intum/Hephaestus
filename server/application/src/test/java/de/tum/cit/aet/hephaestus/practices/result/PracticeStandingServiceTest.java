@@ -2,473 +2,185 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.lenient;
-import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.result.trend.TrendProperties;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewTestData;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
+import org.mockito.ArgumentMatchers;
+import org.mockito.Mockito;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import tools.jackson.databind.json.JsonMapper;
 
-@ExtendWith(MockitoExtension.class)
-class PracticeStandingServiceTest extends BaseUnitTest {
-
-    private static final Long WORKSPACE_ID = 1L;
-    private static final Long USER_ID = 7L;
-    private static final Instant NOW = Instant.parse("2026-08-05T10:00:00Z");
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
-    @Mock
-    private PracticeResultRepository practiceResultRepository;
-
-    @Mock
-    private FeedbackEvidenceRepository feedbackEvidenceRepository;
-
-    @Mock
-    private CurrentDeveloperLookup currentDeveloperLookup;
-
-    @Mock
-    private PracticeRepository practiceRepository;
-
-    @Mock
-    private ResultVisibilityPolicy visibilityPolicy;
-
-    @Mock
-    private WorkspaceReviewDefaultsProvider workspaceReviewDefaultsProvider;
-
-    @Mock
-    private Clock clock;
-
-    private PracticeStandingService practiceStandingService;
-
-    private final List<Practice> workspacePractices = new ArrayList<>();
+@Tag("unit")
+class PracticeStandingServiceTest {
+    private final Instant now = Instant.parse("2026-08-05T10:00:00Z");
+    private final ResultReadQuery read = mock(ResultReadQuery.class);
+    private final ResultViewQuery views = mock(ResultViewQuery.class);
+    private final CurrentDeveloperLookup developer = mock(CurrentDeveloperLookup.class);
+    private final ResultVisibilityPolicy visibility = mock(ResultVisibilityPolicy.class);
+    private final PracticeRepository practices = mock(PracticeRepository.class);
+    private final JdbcClient jdbc = mock(JdbcClient.class, RETURNS_DEEP_STUBS);
+    private final List<ResultView> data = new ArrayList<>();
+    private final Clock clock = Clock.fixed(now, ZoneOffset.UTC);
+    private final PracticeStandingService service = new PracticeStandingService(
+            read,
+            views,
+            new JsonMapper(),
+            jdbc,
+            developer,
+            visibility,
+            practices,
+            new PracticeTrendService(new TrendProperties(), clock),
+            clock);
 
     @BeforeEach
-    void setUp() {
-        lenient().when(clock.instant()).thenReturn(NOW);
-        lenient().when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
-            Collection<PracticeResult> practiceResults = invocation.getArgument(1);
-            return practiceResults.stream().map(PracticeResult::getId).collect(Collectors.toSet());
+    void data() {
+        when(developer.currentDeveloperId()).thenReturn(Optional.of(7L));
+        when(practices.findByWorkspaceId(1L))
+                .thenAnswer(i -> data.isEmpty()
+                        ? List.of(ReviewTestData.practice(1, 1, "test-practice"))
+                        : List.of(data.getFirst().practice()));
+        when(read.forDevelopersSince(eq(1L), anyCollection(), any(Instant.class), anyBoolean()))
+                .thenAnswer(i -> data.stream().map(ResultView::result).toList());
+        when(views.views(eq(1L), anyCollection())).thenAnswer(i -> {
+            Collection<Result> rows = i.getArgument(1);
+            var ids = rows.stream().map(Result::getId).toList();
+            return data.stream().filter(v -> ids.contains(v.result().getId())).toList();
         });
-        lenient()
-                .when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
-                .thenAnswer(invocation -> List.copyOf(workspacePractices));
-        lenient()
-                .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
-                .thenReturn(WorkspaceReviewDefaults.UNSET);
-        practiceStandingService = new PracticeStandingService(
-                practiceResultRepository,
-                feedbackEvidenceRepository,
-                currentDeveloperLookup,
-                visibilityPolicy,
-                practiceRepository,
-                workspaceReviewDefaultsProvider,
-                new PracticeTrendService(new TrendProperties(), clock),
-                clock);
-    }
-
-    private PracticeResult bad(Practice practice, @Nullable Severity severity) {
-        return bad(practice, severity, 42L);
-    }
-
-    private PracticeResult bad(Practice practice, @Nullable Severity severity, long artifactId) {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(artifactId)
-                .agentJobId(runOf(artifactId))
-                .observedAt(observedAtOf(artifactId))
-                .summary("a problem")
-                .outcome(Outcome.NOT_MET)
-                .severity(severity)
-                .build();
-    }
-
-    /**
-     * A problem result whose stored evidence lists the places of its two problems, in problem order: the shape
-     * admission stores for a result with several observations.
-     */
-    private PracticeResult badAtTwoPlaces(Practice practice, long artifactId) {
-        ObjectNode evidence = MAPPER.createObjectNode();
-        ArrayNode citations = evidence.putArray("citations");
-        citations.add(diffCitation("src/Recorder.swift", 212));
-        citations.add(diffCitation("src/Player.swift", 40));
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(artifactId)
-                .agentJobId(runOf(artifactId))
-                .observedAt(observedAtOf(artifactId))
-                .summary("two problems")
-                .outcome(Outcome.NOT_MET)
-                .severity(Severity.MAJOR)
-                .evidence(evidence)
-                .build();
-    }
-
-    private static ObjectNode diffCitation(String path, int line) {
-        return MAPPER.createObjectNode()
-                .put("sourceKind", "scm.pull-request.diff")
-                .put("artifactPath", "context/diff.patch")
-                .put("path", path)
-                .put("side", "NEW")
-                .put("startLine", line)
-                .put("endLine", line)
-                .put("quote", "fail()");
-    }
-
-    /** A problem-free review of one piece of reviewed work: what a recovered practice looks like in the evidence. */
-    private PracticeResult good(Practice practice, long artifactId) {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(UUID.randomUUID())
-                .practice(practice)
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(artifactId)
-                .agentJobId(runOf(artifactId))
-                .observedAt(observedAtOf(artifactId))
-                .summary("a strength")
-                .outcome(Outcome.MET)
-                .build();
-    }
-
-    /** The same review about the developer, a hundred days further back: older than the trend horizon. */
-    private static PracticeResult aged(PracticeResult practiceResult) {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(practiceResult.getId())
-                .practice(practiceResult.getPractice())
-                .aboutUserId(USER_ID)
-                .artifactKind(practiceResult.getArtifactKind())
-                .artifactId(practiceResult.getArtifactId())
-                .agentJobId(practiceResult.getAgentJobId())
-                .observedAt(practiceResult.getObservedAt().minus(Duration.ofDays(100)))
-                .summary(practiceResult.getSummary())
-                .outcome(practiceResult.getOutcome())
-                .severity(practiceResult.getSeverity())
-                .build();
-    }
-
-    /** The same review, taken by a backfill campaign rather than a live review. */
-    private static PracticeResult backfilled(PracticeResult practiceResult) {
-        return backfilled(practiceResult, practiceResult.getArtifactId());
-    }
-
-    /** {@link #backfilled(PracticeResult)}, moved onto another piece of work at the campaign's own, later time. */
-    private static PracticeResult backfilled(PracticeResult practiceResult, long artifactId) {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(practiceResult.getId())
-                .practice(practiceResult.getPractice())
-                .artifactKind(practiceResult.getArtifactKind())
-                .artifactId(artifactId)
-                .agentJobId(practiceResult.getAgentJobId())
-                .observedAt(practiceResult.getObservedAt())
-                .summary(practiceResult.getSummary())
-                .outcome(practiceResult.getOutcome())
-                .severity(practiceResult.getSeverity())
-                .origin(ResultOrigin.BACKFILL)
-                .build();
-    }
-
-    /**
-     * One review run per artifact, ordered so a higher artifact id is the more recent piece of reviewed work. The trend's
-     * bundling is opportunity-indexed, so the exact instants only have to be distinct and inside the window.
-     */
-    private static Instant observedAtOf(long artifactId) {
-        return NOW.minusSeconds(1_000_000L - artifactId * 1_000L);
-    }
-
-    private static UUID runOf(long artifactId) {
-        return new UUID(0L, artifactId);
-    }
-
-    /** A practice of the workspace: the standings list only practices the workspace still reviews. */
-    private Practice practice(String slug) {
-        Practice practice = new Practice();
-        workspacePractices.add(practice);
-        practice.setSlug(slug);
-        practice.setName("Handling failure robustly");
-        practice.setCriteria("ordinary criteria");
-        return practice;
-    }
-
-    /** The lookup the caller's own standings resolve through; the snapshot read is told whose they are. */
-    private void theCurrentDeveloper() {
-        when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.of(USER_ID));
-    }
-
-    private List<PracticeStandingDTO> standingsOver(List<PracticeResult> window) {
-        theCurrentDeveloper();
-        when(practiceResultRepository.findByDeveloperAndWorkspaceBetween(
-                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), any(Instant.class)))
-                .thenReturn(window);
-        when(feedbackEvidenceRepository.findLatestFeedbackBodiesByResultIds(any(), any(), any()))
+        Mockito.lenient()
+                .when(visibility.permitsHistory(eq(1L), anyCollection(), any()))
+                .thenAnswer(i -> {
+                    Collection<Result> rows = i.getArgument(1);
+                    return rows.stream().map(Result::getId).collect(Collectors.toSet());
+                });
+        Mockito.lenient()
+                .when(visibility.permitsAt(eq(1L), anyCollection(), any(), any()))
+                .thenAnswer(i -> {
+                    Collection<Result> rows = i.getArgument(1);
+                    return rows.stream().map(Result::getId).collect(Collectors.toSet());
+                });
+        Mockito.lenient()
+                .when(visibility.permitsAll(eq(1L), anyCollection(), any()))
+                .thenAnswer(i -> {
+                    Collection<Result> rows = i.getArgument(1);
+                    return rows.stream().map(Result::getId).collect(Collectors.toSet());
+                });
+        when(jdbc.sql(anyString())
+                        .param(anyString(), any())
+                        .param(anyString(), any())
+                        .query(ArgumentMatchers.<RowMapper<Map.Entry<UUID, String>>>any())
+                        .list())
                 .thenReturn(List.of());
-        return practiceStandingService.getStandings(WORKSPACE_ID);
     }
 
     @Test
-    @DisplayName("two clean newer pieces of reviewed work restore STRENGTH even though an older review found a problem")
-    void recentCleanEvidenceOutweighsTheOlderRecord() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeStandingDTO> standings =
-                standingsOver(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L), good(practice, 43L)));
-
-        assertThat(standings).hasSize(1);
-        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
-        assertThat(standings.get(0).toWorkOn()).hasSize(1);
+    void recentCleanWorkAcknowledgesAnOlderProblem() {
+        add(1, ResultOutcome.NOT_MET);
+        add(2, ResultOutcome.MET);
+        add(3, ResultOutcome.MET);
+        assertThat(card().standing()).isEqualTo(PracticeStanding.STRENGTH);
     }
 
     @Test
-    @DisplayName("one clean piece of reviewed work after a problem does not outweigh it — the standing stays MIXED")
-    void singleCleanOpportunityDoesNotRestoreStrength() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeStandingDTO> standings =
-                standingsOver(List.of(bad(practice, Severity.MAJOR, 41L), good(practice, 42L)));
-
-        assertThat(standings).hasSize(1);
-        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.MIXED);
-    }
-
-    /**
-     * The newest problems decide the label whatever the count of decided work, since the share is measured against
-     * a full window's weight: one problem on the newest piece is one setback, two in a row a pattern.
-     */
-    @ParameterizedTest(name = "{0} clean then {1} problem(s) read {2}")
-    @CsvSource({
-        "0, 1, MIXED",
-        "1, 1, MIXED",
-        "2, 1, MIXED",
-        "3, 1, MIXED",
-        "0, 2, DEVELOPING",
-        "1, 2, DEVELOPING",
-        "2, 2, DEVELOPING",
-        "1, 0, STRENGTH",
-        "2, 0, STRENGTH",
-        "3, 0, STRENGTH",
-        "4, 0, STRENGTH"
-    })
-    void shouldReadTheNewestProblemsAlikeWhateverTheCountOfDecidedWork(
-            int clean, int problems, PracticeStandingDTO.Standing expected) {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeResult> evidence = new ArrayList<>();
-        for (long piece = 0; piece < clean; piece++) {
-            evidence.add(good(practice, 40L + piece));
-        }
-        for (long piece = 0; piece < problems; piece++) {
-            evidence.add(bad(practice, Severity.MAJOR, 50L + piece));
-        }
-
-        assertThat(standingsOver(evidence))
-                .singleElement()
-                .extracting(PracticeStandingDTO::standing)
-                .isEqualTo(expected);
+    void oneCleanOpportunityDoesNotRestoreStrength() {
+        add(1, ResultOutcome.NOT_MET);
+        add(2, ResultOutcome.MET);
+        assertThat(card().standing()).isEqualTo(PracticeStanding.MIXED);
     }
 
     @Test
-    @DisplayName("only the newest four pieces of reviewed work decide the standing, however long the older record is")
-    void olderWorkItemsFallOutOfTheStandingWindow() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeStandingDTO> standings = standingsOver(List.of(
-                bad(practice, Severity.MAJOR, 31L),
-                bad(practice, Severity.MAJOR, 32L),
-                bad(practice, Severity.MAJOR, 33L),
-                bad(practice, Severity.MAJOR, 34L),
-                bad(practice, Severity.MAJOR, 35L),
-                good(practice, 41L),
-                good(practice, 42L),
-                good(practice, 43L),
-                good(practice, 44L)));
-
-        assertThat(standings).hasSize(1);
-        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
-        assertThat(standings.get(0).toWorkOn()).hasSize(5);
+    void aRecentProblemRemainsVisibleAlongsideOlderStrengths() {
+        add(1, ResultOutcome.MET);
+        add(2, ResultOutcome.MET);
+        add(3, ResultOutcome.MET);
+        add(4, ResultOutcome.NOT_MET);
+        assertThat(card().standing()).isEqualTo(PracticeStanding.MIXED);
+        assertThat(card().toWorkOn()).hasSize(1);
+        assertThat(card().strengths()).hasSize(3);
     }
 
     @Test
-    @DisplayName("a BAD result with null severity does not NPE the sort and ranks after a graded one")
-    void nullSeverityDoesNotBreakStandingSort() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeStandingDTO> standings =
-                standingsOver(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-
-        assertThat(standings).hasSize(1);
-        List<Severity> order =
-                standings.get(0).toWorkOn().stream().map(i -> i.severity()).toList();
-        assertThat(order).containsExactly(Severity.CRITICAL, null);
+    void aVerdictlessReviewIsDifferentFromNoReview() {
+        assertThat(card().standing()).isEqualTo(PracticeStanding.NOT_OBSERVED);
+        add(1, ResultOutcome.DOES_NOT_APPLY);
+        assertThat(card().standing()).isEqualTo(PracticeStanding.NO_OPPORTUNITY);
+        assertThat(card().doesNotApplyOnly()).isTrue();
     }
 
     @Test
-    @DisplayName("a problem seen on a single piece of reviewed work is shown, not withheld for lack of corroboration")
-    void singleArtifactProblemIsShownWorstFirst() {
-        Practice practice = practice("robust-error-handling");
-        PracticeResult critical = bad(practice, Severity.CRITICAL, 42L);
-        PracticeResult minor = bad(practice, Severity.MINOR, 42L);
-
-        List<PracticeStandingDTO> standings = standingsOver(List.of(minor, critical));
-
-        assertThat(standings).hasSize(1);
-        List<PracticeStandingResultDTO> practiceResults = standings.get(0).toWorkOn();
-        assertThat(practiceResults.stream().map(PracticeStandingResultDTO::practiceResultId))
-                .containsExactly(critical.getId(), minor.getId());
+    void feedbackModeOffStillContributesResults() {
+        add(1, ResultOutcome.MET);
+        data.getFirst().practice().setFeedbackMode(FeedbackMode.OFF);
+        assertThat(card().standing()).isEqualTo(PracticeStanding.STRENGTH);
     }
 
     @Test
-    @DisplayName(
-            "every problem in the window reaches the standing, whichever locus or piece of reviewed work it came from")
-    void unrelatedProblemsAcrossLociAreAllListed() {
-        Practice practice = practice("robust-error-handling");
-        PracticeResult locusA = bad(practice, Severity.CRITICAL, 42L);
-        PracticeResult locusB = bad(practice, Severity.MINOR, 43L);
-
-        List<PracticeStandingDTO> standings = standingsOver(List.of(locusA, locusB));
-
-        assertThat(standings).hasSize(1);
-        assertThat(standings.get(0).toWorkOn().stream().map(PracticeStandingResultDTO::practiceResultId))
-                .containsExactlyInAnyOrder(locusA.getId(), locusB.getId());
+    void anEndedClaimDoesNotBecomeCurrentAgain() {
+        add(1, ResultOutcome.NOT_MET);
+        var prior = data.getFirst();
+        prior.result().end(ResultEndReason.REPLACED, now.minusSeconds(1));
+        add(2, ResultOutcome.MET);
+        data.getLast().result().setItemId(prior.result().getItemId());
+        assertThat(card().toWorkOn()).isEmpty();
+        assertThat(card().strengths()).hasSize(1);
     }
 
     @Test
-    @DisplayName("a result with several problems is one piece of feedback, located at its first place")
-    void shouldListAResultOnceWhenItHasSeveralProblems() {
-        Practice practice = practice("robust-error-handling");
-        PracticeResult twoProblems = badAtTwoPlaces(practice, 42L);
-
-        List<PracticeStandingDTO> standings = standingsOver(List.of(good(practice, 41L), twoProblems));
-
-        assertThat(standings).singleElement().satisfies(standing -> {
-            assertThat(standing.standing()).isEqualTo(PracticeStandingDTO.Standing.MIXED);
-            assertThat(standing.toWorkOn()).singleElement().satisfies(feedback -> {
-                assertThat(feedback.practiceResultId()).isEqualTo(twoProblems.getId());
-                assertThat(feedback.locator()).isEqualTo("src/Recorder.swift:212");
-            });
-        });
+    void keepsRequestedEvidenceSeparateFromEventEvidence() {
+        add(1, ResultOutcome.NOT_MET);
+        add(2, ResultOutcome.MET);
+        data.getLast().review().setOrigin(ReviewOrigin.REQUEST);
+        assertThat(card().standing()).isEqualTo(PracticeStanding.DEVELOPING);
     }
 
     @Test
-    @DisplayName("a practice only a backfill campaign judged reads the campaign's work by the same recency rule")
-    void shouldReadTheCampaignByRecencyWhenNoLiveReviewJudgedThePractice() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeStandingDTO> standings = standingsOver(List.of(
-                backfilled(bad(practice, Severity.MAJOR, 41L)),
-                backfilled(good(practice, 42L)),
-                backfilled(good(practice, 43L))));
-
-        // Two clean pieces of work after the slip, as with live work, not "any problem means needs attention".
-        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
-        assertThat(standings.get(0).toWorkOn()).hasSize(1);
-        // The campaign never moves the trend, so the standing rests on no work the trend counts.
-        assertThat(Objects.requireNonNull(standings.get(0).trendSupport()).opportunities())
-                .isZero();
+    void theWindowDoesNotCountEvidenceRecordedAfterItsEdge() {
+        add(1, ResultOutcome.MET);
+        var edge = data.getFirst().result().getRecordedAt();
+        add(2, ResultOutcome.NOT_MET);
+        var snapshots = service.getStandingSnapshots(1L, 7L, List.of(edge, now));
+        assertThat(snapshots.getFirst().dtos().getFirst().standing()).isEqualTo(PracticeStanding.STRENGTH);
+        assertThat(snapshots.getLast().dtos().getFirst().standing()).isEqualTo(PracticeStanding.MIXED);
     }
 
-    @Test
-    @DisplayName("a later backfill campaign does not speak for work a live review judged")
-    void shouldKeepTheLiveVerdictWhenACampaignReviewedTheSameWorkLater() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeStandingDTO> standings = standingsOver(List.of(
-                bad(practice, Severity.MAJOR, 41L),
-                bad(practice, Severity.MAJOR, 42L),
-                backfilled(good(practice, 43L), 41L),
-                backfilled(good(practice, 44L), 42L)));
-
-        assertThat(standings.get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.DEVELOPING);
+    private PracticeStandingDTO card() {
+        return service.getStandings(1L).getFirst();
     }
 
-    @Test
-    @DisplayName("all time reads evidence older than the trend horizon by the same recency rule, never a binary share")
-    void shouldReadOldEvidenceByRecencyWhenTheWorkspaceSpanStartsBeforeTheHorizon() {
-        Practice practice = practice("robust-error-handling");
-        List<PracticeResult> old = new ArrayList<>();
-        old.add(aged(bad(practice, Severity.MAJOR, 30L)));
-        for (long artifactId = 31L; artifactId <= 39L; artifactId++) {
-            old.add(aged(good(practice, artifactId)));
-        }
-        when(practiceResultRepository.findLatestRunsByWorkspaceSince(eq(WORKSPACE_ID), any(), eq(Instant.EPOCH)))
-                .thenReturn(old);
-
-        StandingSnapshot snapshot = Objects.requireNonNull(practiceStandingService
-                .getWorkspaceStandingSnapshots(WORKSPACE_ID, Set.of(USER_ID), Instant.EPOCH)
-                .byDeveloper()
-                .get(USER_ID));
-
-        // Nine clean pieces of work after one slip, all a hundred days back: going well, as it would be if recent.
-        assertThat(snapshot.dtos().get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
-        assertThat(snapshot.practices().values())
-                .singleElement()
-                .extracting(StandingSnapshot.PracticeStanding::share)
-                .isEqualTo(1.0);
-    }
-
-    @Test
-    @DisplayName("each edge sees only the evidence recorded by then, and the window is loaded up to the newest edge")
-    void shouldCutTheEvidencePerEdgeWhenReadingStandingsAtSeveralEdges() {
-        Practice practice = practice("robust-error-handling");
-        PracticeResult problem = bad(practice, Severity.MAJOR, 43L);
-        when(practiceResultRepository.findByDeveloperAndWorkspaceBetween(
-                        eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), any(Instant.class)))
-                .thenReturn(List.of(good(practice, 40L), good(practice, 41L), good(practice, 42L), problem));
-        when(feedbackEvidenceRepository.findLatestFeedbackBodiesByResultIds(any(), any(), any()))
-                .thenReturn(List.of());
-        Instant beforeTheProblem = observedAtOf(42L);
-
-        List<StandingSnapshot> snapshots =
-                practiceStandingService.getStandingSnapshots(WORKSPACE_ID, USER_ID, List.of(beforeTheProblem, NOW));
-
-        assertThat(snapshots).hasSize(2);
-        assertThat(snapshots.get(0).dtos().get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.STRENGTH);
-        assertThat(snapshots.get(1).dtos().get(0).standing()).isEqualTo(PracticeStandingDTO.Standing.MIXED);
-        assertThat(snapshots.get(1).dtos().get(0).toWorkOn().stream().map(PracticeStandingResultDTO::practiceResultId))
-                .containsExactly(problem.getId());
-
-        ArgumentCaptor<Instant> until = ArgumentCaptor.forClass(Instant.class);
-        verify(practiceResultRepository)
-                .findByDeveloperAndWorkspaceBetween(eq(USER_ID), eq(WORKSPACE_ID), any(Instant.class), until.capture());
-        assertThat(until.getValue()).isEqualTo(NOW);
+    private void add(long id, ResultOutcome outcome) {
+        data.add(ReviewTestData.view(
+                id, UUID.randomUUID(), now.minus(Duration.ofDays(10 - id)), new ItemKind("scm.pull_request"), outcome));
     }
 }

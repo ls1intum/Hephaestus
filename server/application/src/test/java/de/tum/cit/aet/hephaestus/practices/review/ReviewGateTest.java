@@ -1,1072 +1,184 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.nullable;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.ReviewLimit;
+import de.tum.cit.aet.hephaestus.practices.ReviewOn;
+import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultVisibilityPolicy;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkChanges;
-import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mock;
+import tools.jackson.databind.json.JsonMapper;
 
-class ReviewGateTest extends BaseUnitTest {
-
-    private static final SignalName SIGNAL = ScmSignals.PULL_REQUEST_OPENED;
-    private static final Long WORKSPACE_ID = 1L;
-    private static final Long PR_ID = 42L;
-
-    @Mock
-    private PracticeReviewReadiness practiceReviewReadiness;
-
-    @Mock
-    private PracticeRepository practiceRepository;
-
-    @Mock
-    private WorkspaceResolver workspaceResolver;
-
-    /**
-     * Lenient because most tests never reach the manual-request question; an unstubbed answer of {@code false}
-     * is exactly "this signal is an ordinary occasion", which is what they are about.
-     */
-    @Mock(strictness = Mock.Strictness.LENIENT)
-    private PracticeSignalOptions signalOptions;
-
-    @Mock(strictness = Mock.Strictness.LENIENT)
-    private PracticeReviewCoverageService coverageService;
-
-    private ReviewGate gate;
+@Tag("unit")
+class ReviewGateTest {
+    private final PracticeRepository practices = mock(PracticeRepository.class);
+    private final PracticeReviewReadiness readiness = mock(PracticeReviewReadiness.class);
+    private final ReviewGate gate = new ReviewGate(practices, new JsonMapper(), readiness);
+    private final Workspace workspace = workspace();
 
     @BeforeEach
-    void setUp() {
-        gate = new ReviewGate(
-                practiceReviewReadiness,
-                practiceRepository,
-                workspaceResolver,
-                signalOptions,
-                coverageService,
-                new AutomatedReviewFence(Map.of()),
-                mock(PracticeResultRepository.class),
-                mock(ResultVisibilityPolicy.class),
-                mock(ReviewedWorkChanges.class));
-        when(coverageService.assess(
-                        any(Workspace.class),
-                        nullable(String.class),
-                        nullable(String.class),
-                        nullable(ReviewSubject.class),
-                        anyBoolean()))
-                .thenReturn(coverage(true, true, ReviewSubjectStatus.RESOLVED_LINKED_HUMAN));
-        when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class)))
-                .thenReturn(new PracticeReviewCoverageService.CoverageAssessment(
-                        ReviewRepositoryMode.ALL_MONITORED,
-                        ReviewPersonMode.ALL_ELIGIBLE,
-                        ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
-                        true,
-                        true,
-                        true,
-                        true));
-    }
-
-    private static PracticeReviewCoverageService.CoverageAssessment coverage(
-            boolean repositoryMatched, boolean branchMatched, ReviewSubjectStatus subjectStatus) {
-        boolean personMatched = subjectStatus == ReviewSubjectStatus.RESOLVED_LINKED_HUMAN;
-        return new PracticeReviewCoverageService.CoverageAssessment(
-                ReviewRepositoryMode.SELECTED,
-                ReviewPersonMode.ALL_ELIGIBLE,
-                subjectStatus,
-                repositoryMatched,
-                branchMatched,
-                personMatched,
-                repositoryMatched && branchMatched && personMatched);
-    }
-
-    private PullRequest createPullRequest() {
-        PullRequest pr = new PullRequest();
-        pr.setId(PR_ID);
-        pr.setLabels(new HashSet<>());
-        pr.setAssignees(new HashSet<>());
-        pr.setDraft(false);
-        User author = new User();
-        author.setId(7L);
-        author.setType(User.Type.USER);
-        pr.setAuthor(author);
-
-        Repository repo = new Repository();
-        repo.setNameWithOwner("ls1intum/Hephaestus");
-        pr.setRepository(repo);
-
-        return pr;
-    }
-
-    private Label createLabel(String name) {
-        Label label = new Label();
-        label.setName(name);
-        return label;
-    }
-
-    private Workspace createWorkspace() {
-        Workspace workspace = new Workspace();
-        workspace.setId(WORKSPACE_ID);
-        workspace.setWorkspaceSlug("test-workspace");
-        WorkspaceFeatures features = new WorkspaceFeatures();
-        features.setPracticesEnabled(true);
-        features.setPracticeReviewAutoTriggerEnabled(true);
-        features.setPracticeReviewManualTriggerEnabled(true);
-        workspace.setFeatures(features);
-        return workspace;
-    }
-
-    private Practice createPractice(SignalName... signals) {
-        Practice practice = new Practice();
-        PracticeTestEvidence.configure(practice, signals);
-        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        return practice;
-    }
-
-    private Practice createDraftPractice(SignalName... signals) {
-        Practice practice = new Practice();
-        practice.setSignals(List.of(signals));
-        practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST));
-        practice.setReviewWhen(Map.of());
-        practice.setSubject(ActorRole.AUTHOR);
-        practice.setPrecondition(null);
-        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        return practice;
-    }
-
-    private Workspace setupThroughPracticeMatching(Practice... practices) {
-        Workspace workspace = createWorkspace();
-        when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-        when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-        when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practices));
-        return workspace;
-    }
-
-    @ParameterizedTest
-    @CsvSource({"OPEN,true", "CLOSED,false", "MERGED,false", "MISSING,false"})
-    void automaticReviewUsesRecordedLifecycleState(String state, boolean admitted) {
-        var work = createPullRequest();
-        if (!state.equals("MISSING")) work.setState(Issue.State.valueOf(state));
-        var practice = createPractice(SIGNAL);
-        practice.setReviewWhen(Map.of("state", Set.of("OPEN")));
-        setupThroughPracticeMatching(practice);
-        var decision = gate.evaluate(work, SIGNAL, TriggerMode.AUTO);
-        if (admitted) {
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).reviewState())
-                    .containsEntry("state", "OPEN")
-                    .containsEntry("draftStatus", "NOT_DRAFT");
-        } else assertThat(decision).isInstanceOf(GateDecision.Skip.class);
+    void ready() {
+        when(readiness.hasRunnableAgent(1L)).thenReturn(true);
     }
 
     @Test
-    void manualReviewBypassesAutomaticStateRestrictions() {
-        var work = createPullRequest();
-        work.setState(Issue.State.CLOSED);
-        var practice = createPractice(SIGNAL);
-        practice.setReviewWhen(Map.of("state", Set.of("OPEN")));
-        var workspace = createWorkspace();
-        when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-        when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
-        assertThat(gate.evaluatePullRequest(work, workspace, SIGNAL, TriggerMode.MANUAL))
+    void feedbackModeOffStillAdmitsTheReview() {
+        var p = practice(1, DefinitionTestFixtures.definition());
+        p.setFeedbackMode(FeedbackMode.OFF);
+        when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                .thenReturn(List.of(p));
+        assertThat(gate.evaluate(
+                        workspace,
+                        snapshot(Map.of()),
+                        ReviewOrigin.EVENT,
+                        new ItemEventName("scm.pull_request.opened"),
+                        List.of()))
                 .isInstanceOf(GateDecision.Run.class);
     }
 
     @Test
-    void shouldRefuseBotReviewerBeforeMembershipOrPracticeLookup() {
-        PullRequest pr = createPullRequest();
-        Workspace workspace = createWorkspace();
-        when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-        var decision = (GateDecision.Skip) gate.evaluate(
-                pr, ScmSignals.PULL_REQUEST_REVIEWED, TriggerMode.AUTO, ReviewSubject.reviewer(8L, false));
-        assertThat(decision.resolvedSignalReason()).isEqualTo(SignalStateReason.BOT_REVIEWER);
-        assertThat(decision.resolvedSignalReason().describe()).contains("reviewer is a bot");
-        verifyNoInteractions(coverageService, practiceRepository);
+    void peopleAndNobodyAreNotExecutedByHephaestus() {
+        for (var by : List.of(ReviewedByKind.PEOPLE, ReviewedByKind.NOBODY)) {
+            var original = DefinitionTestFixtures.definition();
+            var definition = new PracticeDefinition(
+                    original.name(),
+                    original.reviewOn(),
+                    null,
+                    original.about(),
+                    original.reads(),
+                    new ReviewedBy(
+                            by,
+                            by == ReviewedByKind.PEOPLE
+                                    ? new ReviewLimit("MANUAL_REVIEW", "People review this practice.")
+                                    : null,
+                            List.of()),
+                    original.criteria(),
+                    null,
+                    null,
+                    true,
+                    original.guidance());
+            when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                    .thenReturn(List.of(practice(1, definition)));
+            assertThat(gate.evaluate(
+                            workspace,
+                            snapshot(Map.of()),
+                            ReviewOrigin.EVENT,
+                            new ItemEventName("scm.pull_request.opened"),
+                            List.of()))
+                    .isInstanceOf(GateDecision.Skip.class);
+        }
     }
 
     @Test
-    void shouldRefuseBotAuthorEvenWhenAdministrativeReviewBypassesCoverage() {
-        PullRequest pr = createPullRequest();
-        var author = new User();
-        author.setId(8L);
-        author.setType(User.Type.BOT);
-        pr.setAuthor(author);
-        Workspace workspace = createWorkspace();
-        when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-        var decision = (GateDecision.Skip) gate.evaluateAdministrative(pr, SIGNAL);
-        assertThat(decision.resolvedSignalReason()).isEqualTo(SignalStateReason.BOT_AUTHOR);
-        assertThat(decision.resolvedSignalReason().describe()).contains("author is a bot");
-        verifyNoInteractions(coverageService, practiceRepository);
+    void automaticStateFiltersDoNotExcludeARequestedReview() {
+        var original = DefinitionTestFixtures.definition();
+        var d = new PracticeDefinition(
+                original.name(),
+                new ReviewOn(original.reviewOn().events(), Map.of("state", Set.of("open"))),
+                null,
+                original.about(),
+                original.reads(),
+                original.reviewedBy(),
+                original.criteria(),
+                null,
+                null,
+                true,
+                original.guidance());
+        when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                .thenReturn(List.of(practice(1, d)));
+        assertThat(gate.evaluate(
+                        workspace,
+                        snapshot(Map.of("state", "closed")),
+                        ReviewOrigin.EVENT,
+                        new ItemEventName("scm.pull_request.opened"),
+                        List.of()))
+                .isInstanceOf(GateDecision.Skip.class);
+        assertThat(gate.evaluate(workspace, snapshot(Map.of("state", "closed")), ReviewOrigin.REQUEST, null, List.of()))
+                .isInstanceOf(GateDecision.Run.class);
     }
 
-    /**
-     * A review somebody asked for by hand. No bundled practice binds {@code scm.pull_request.manual_review},
-     * so matching a request by signal would refuse every one of them with "no matching practices". The
-     * request instead admits every practice on the kind.
-     */
-    @Nested
-    class ManualRequestTests {
-
-        private static final SignalName REQUEST = ScmSignals.PULL_REQUEST_MANUAL_REVIEW;
-
-        @BeforeEach
-        void treatTheRequestSignalAsARequest() {
-            when(signalOptions.isManualRequest(REQUEST)).thenReturn(true);
-        }
-
-        @Test
-        @DisplayName("a request admits practices bound to entirely different signals of the same kind")
-        void requestAdmitsEveryPracticeOnTheKind() {
-            PullRequest pr = createPullRequest();
-            Practice onOpened = createPractice(ScmSignals.PULL_REQUEST_OPENED);
-            Practice onMerged = createPractice(ScmSignals.PULL_REQUEST_MERGED);
-            setupThroughPracticeMatching(onOpened, onMerged);
-            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactlyInAnyOrder(onOpened, onMerged);
-        }
-
-        @Test
-        @DisplayName("a request about a draft is honoured: the person asking has answered that question")
-        void requestIgnoresTheDraftFilter() {
-            PullRequest pr = createPullRequest();
-            pr.setDraft(true);
-            Practice notOnDrafts = createPractice(ScmSignals.PULL_REQUEST_OPENED);
-            setupThroughPracticeMatching(notOnDrafts);
-
-            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactly(notOnDrafts);
-        }
-
-        @Test
-        @DisplayName("Off still means off, however the review was occasioned")
-        void requestDoesNotOverrideTheTier() {
-            PullRequest pr = createPullRequest();
-            Practice silenced = createPractice(ScmSignals.PULL_REQUEST_OPENED);
-            silenced.setAutonomy(PracticeAutonomy.OFF);
-            setupThroughPracticeMatching(silenced);
-
-            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).resolvedSignalReason())
-                    .isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
-        }
-
-        @Test
-        @DisplayName("a practice on another kind is not dragged in by a pull-request request")
-        void requestStaysWithinItsKind() {
-            PullRequest pr = createPullRequest();
-            Practice onIssues = createPractice(ScmSignals.ISSUE_OPENED);
-            setupThroughPracticeMatching(onIssues);
-
-            GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-        }
+    @Test
+    void feedbackPauseDoesNotStopResultCapture() {
+        workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
+        when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                .thenReturn(List.of(practice(1, DefinitionTestFixtures.definition())));
+        assertThat(gate.evaluate(workspace, snapshot(Map.of()), ReviewOrigin.REQUEST, null, List.of()))
+                .isInstanceOf(GateDecision.Run.class);
     }
 
-    /**
-     * A request is judged in the workspace that asked. The repository's name can resolve to another
-     * workspace — several monitor one repository, and the same name exists on other provider servers — and
-     * that workspace's settings must not decide whether this one reviews.
-     */
-    @Nested
-    class RequestingWorkspaceTests {
-
-        private static final SignalName REQUEST = ScmSignals.PULL_REQUEST_MANUAL_REVIEW;
-
-        @BeforeEach
-        void treatTheRequestSignalAsARequest() {
-            when(signalOptions.isManualRequest(REQUEST)).thenReturn(true);
-        }
-
-        @Test
-        void admitsARequestFromAWorkspaceThatTakesRequestsWithoutAskingWhichWorkspaceTheNameResolvesTo() {
-            PullRequest pr = createPullRequest();
-            Workspace asking = createWorkspace();
-            when(coverageService.admits(asking, "ls1intum/Hephaestus", pr.getBaseRefName(), pr.reviewSubject()))
-                    .thenReturn(true);
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
-                    .thenReturn(List.of(createPractice(ScmSignals.PULL_REQUEST_OPENED)));
-
-            GateDecision decision = gate.evaluatePullRequest(pr, asking, REQUEST, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).workspace()).isSameAs(asking);
-            verifyNoInteractions(workspaceResolver);
-        }
-
-        @Test
-        void refusesARequestFromAWorkspaceThatDoesNotTakeRequests() {
-            PullRequest pr = createPullRequest();
-            Workspace asking = createWorkspace();
-            asking.getFeatures().setPracticeReviewManualTriggerEnabled(false);
-            when(coverageService.admits(asking, "ls1intum/Hephaestus", pr.getBaseRefName(), pr.reviewSubject()))
-                    .thenReturn(true);
-
-            GateDecision decision = gate.evaluatePullRequest(pr, asking, REQUEST, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).contains("manual trigger disabled");
-            verifyNoInteractions(workspaceResolver);
-        }
+    @Test
+    void selectsOnlyRequestedPractices() {
+        var first = practice(1, DefinitionTestFixtures.definition());
+        var second = practice(2, DefinitionTestFixtures.definition());
+        when(practices.findByWorkspaceIdAndKind(1L, new ItemKind("scm.pull_request")))
+                .thenReturn(List.of(first, second));
+        var result = gate.evaluate(workspace, snapshot(Map.of()), ReviewOrigin.REQUEST, null, List.of(2L));
+        assertThat(result)
+                .isInstanceOfSatisfying(
+                        GateDecision.Run.class,
+                        r -> assertThat(r.matchedPractices()).containsExactly(second));
     }
 
-    /**
-     * Whether a draft occasions a review is a per-practice timing condition, not a workspace-wide one: a fleet-wide veto
-     * would put the draft-specific criteria of a practice like {@code ready-and-traceable-handoff} out of
-     * reach of the only artifact they apply to.
-     */
-    @Nested
-    class DraftGateTests {
-
-        @Test
-        @DisplayName("a draft does not occasion a practice that did not ask for drafts")
-        void skipDraftForAPracticeThatDoesNotWantThem() {
-            PullRequest pr = createPullRequest();
-            pr.setDraft(true);
-            setupThroughPracticeMatching(createPractice(SIGNAL));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason())
-                    .isEqualTo("no practices match this signal and recorded review state");
-        }
-
-        @Test
-        @DisplayName("a timing condition that allows drafts reaches its draft-specific criteria")
-        void reviewDraftForAPracticeThatAsksForThem() {
-            PullRequest pr = createPullRequest();
-            pr.setDraft(true);
-            Practice reviewsDrafts = createDraftPractice(SIGNAL);
-            setupThroughPracticeMatching(reviewsDrafts);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactly(reviewsDrafts);
-        }
-
-        @Test
-        @DisplayName("a draft admits only the practices that asked for it, not the whole set")
-        void draftAdmitsOnlyThePracticesThatAllowIt() {
-            PullRequest pr = createPullRequest();
-            pr.setDraft(true);
-            Practice reviewsDrafts = createDraftPractice(SIGNAL);
-            setupThroughPracticeMatching(createPractice(SIGNAL), reviewsDrafts);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactly(reviewsDrafts);
-        }
-
-        @Test
-        @DisplayName("a practice that asks for drafts still reviews work that is not a draft")
-        void unrestrictedTimingAlsoCoversNonDrafts() {
-            PullRequest pr = createPullRequest();
-            Practice reviewsDrafts = createDraftPractice(SIGNAL);
-            setupThroughPracticeMatching(reviewsDrafts);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-        }
+    @Test
+    void recordsTheUnavailableModelReason() {
+        when(readiness.hasRunnableAgent(1L)).thenReturn(false);
+        assertThat(gate.evaluate(workspace, snapshot(Map.of()), ReviewOrigin.REQUEST, null, List.of()))
+                .isInstanceOfSatisfying(
+                        GateDecision.Skip.class,
+                        r -> assertThat(r.eventReason()).isEqualTo(ItemEventReason.REVIEW_MODEL_UNBOUND));
     }
 
-    @Nested
-    class WorkspaceResolutionTests {
-
-        @Test
-        void skipWhenNoWorkspace() {
-            PullRequest pr = createPullRequest();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.empty());
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no workspace");
-        }
-
-        @Test
-        void skipWhenNullRepository() {
-            PullRequest pr = createPullRequest();
-            pr.setRepository(null);
-            when(workspaceResolver.resolveForRepository(null)).thenReturn(Optional.empty());
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no workspace");
-        }
+    @Test
+    void rejectsForeignWorkspaceItems() {
+        workspace.setId(2L);
+        assertThatThrownBy(() -> gate.evaluate(workspace, snapshot(Map.of()), ReviewOrigin.REQUEST, null, List.of()))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
-    @Nested
-    class PracticesEnabledTests {
-
-        @Test
-        void skipWhenPracticesDisabled() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticesEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
-            verifyNoInteractions(practiceReviewReadiness, practiceRepository);
-        }
-
-        @Test
-        void practicesDisabledOutranksAnOutOfCoverageSkip() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticesEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(
-                            any(Workspace.class),
-                            nullable(String.class),
-                            nullable(String.class),
-                            nullable(ReviewSubject.class),
-                            anyBoolean()))
-                    .thenReturn(coverage(true, false, ReviewSubjectStatus.RESOLVED_LINKED_HUMAN));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
-        }
+    private static Practice practice(long id, PracticeDefinition d) {
+        return ReviewTestData.practice(1, id, "practice-" + id, d);
     }
 
-    @Nested
-    class TriggerModeTests {
-
-        @Test
-        void skipWhenAutoTriggerDisabled() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("auto-trigger disabled for workspace");
-            verifyNoInteractions(practiceReviewReadiness, practiceRepository);
-        }
-
-        @Test
-        void skipWhenManualTriggerDisabled() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("manual trigger disabled for workspace");
-            verifyNoInteractions(practiceReviewReadiness, practiceRepository);
-        }
-
-        @Test
-        void skipWhenBothTriggersDisabled() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
-            workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-
-            GateDecision autoDecision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-            GateDecision manualDecision = gate.evaluate(pr, SIGNAL, TriggerMode.MANUAL);
-
-            assertThat(autoDecision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) autoDecision).reason()).isEqualTo("auto-trigger disabled for workspace");
-            assertThat(manualDecision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) manualDecision).reason())
-                    .isEqualTo("manual trigger disabled for workspace");
-        }
-
-        @Test
-        void continueWhenAutoTriggerDisabledButModeIsManual() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(false);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.MANUAL);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no runnable practice-review agent");
-        }
-
-        @Test
-        void continueWhenManualTriggerDisabledButModeIsAuto() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticeReviewManualTriggerEnabled(false);
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(false);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no runnable practice-review agent");
-        }
+    private static Workspace workspace() {
+        var ws = new Workspace();
+        ws.setId(1L);
+        ws.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        return ws;
     }
 
-    @Nested
-    class AgentBindingGateTests {
-
-        @Test
-        void skipWhenNoRunnablePractice() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(false);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no runnable practice-review agent");
-        }
-    }
-
-    @Nested
-    class PracticeMatchingTests {
-
-        @Test
-        void skipWhenNoMatchingPractices() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(ScmSignals.PULL_REQUEST_REVIEWED);
-            setupThroughPracticeMatching(practice);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason())
-                    .isEqualTo("no practices match this signal and recorded review state");
-        }
-
-        @Test
-        void returnsAllMatchingPractices() {
-            PullRequest pr = createPullRequest();
-            Practice matching1 = createPractice(SIGNAL, ScmSignals.PULL_REQUEST_REVIEWED);
-            Practice matching2 = createPractice(SIGNAL);
-            Practice nonMatching = createPractice(ScmSignals.PULL_REQUEST_REVIEWED);
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
-                    .thenReturn(List.of(matching1, matching2, nonMatching));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            GateDecision.Run run = (GateDecision.Run) decision;
-            assertThat(run.matchedPractices()).hasSize(2);
-            assertThat(run.matchedPractices()).containsExactly(matching1, matching2);
-        }
-    }
-
-    @Nested
-    class ReviewAudienceTests {
-
-        @Test
-        void runsWithoutAssigneeOrRoleCheck() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            Workspace workspace = setupThroughPracticeMatching(practice);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            GateDecision.Run run = (GateDecision.Run) decision;
-            assertThat(run.workspace()).isEqualTo(workspace);
-            assertThat(run.matchedPractices()).containsExactly(practice);
-        }
-    }
-
-    @Nested
-    class HappyPathTests {
-
-        @Test
-        @DisplayName("Should return Run with workspace and matched practices when all checks pass")
-        void fullHappyPath() {
-            PullRequest pr = createPullRequest();
-            pr.getLabels().add(createLabel("enhancement"));
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(practice);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            GateDecision.Run run = (GateDecision.Run) decision;
-            assertThat(run.workspace().getId()).isEqualTo(WORKSPACE_ID);
-            assertThat(run.workspace().getWorkspaceSlug()).isEqualTo("test-workspace");
-            assertThat(run.matchedPractices()).containsExactly(practice);
-        }
-    }
-
-    /**
-     * OFF is the only autonomy that stops a review; HUMAN_APPROVAL is as reviewed as AUTOMATIC and differs only in what
-     * may be said about the result, so its signals must reach the agent exactly like AUTOMATIC's do.
-     */
-    @Nested
-    class AutonomyAdmissionTests {
-
-        @Test
-        void runsWhenTheOnlyBoundPracticeIsProposingSilently() {
-            PullRequest pr = createPullRequest();
-            Practice measured = createPractice(SIGNAL);
-            measured.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
-            setupThroughPracticeMatching(measured);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactly(measured);
-        }
-
-        @Test
-        void skipsAndNamesTheTierWhenEveryBoundPracticeIsOff() {
-            PullRequest pr = createPullRequest();
-            Practice silenced = createPractice(SIGNAL);
-            silenced.setAutonomy(PracticeAutonomy.OFF);
-            setupThroughPracticeMatching(silenced);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            GateDecision.Skip skip = (GateDecision.Skip) decision;
-            assertThat(skip.reason()).isEqualTo("every practice bound to this signal is off");
-            // The whole point of the separate reason: an admin turned this down, and can turn it back up.
-            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
-            assertThat(skip.resolvedSignalReason().isRetryable()).isTrue();
-        }
-
-        @Test
-        void keepsTheGenericReasonWhenNothingIsBoundAtAll() {
-            PullRequest pr = createPullRequest();
-            Practice other = createPractice(ScmSignals.PULL_REQUEST_MERGED);
-            other.setAutonomy(PracticeAutonomy.OFF);
-            setupThroughPracticeMatching(other);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            GateDecision.Skip skip = (GateDecision.Skip) decision;
-            assertThat(skip.reason()).isEqualTo("no practices match this signal and recorded review state");
-            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.GATE_SKIPPED);
-        }
-
-        @Test
-        void admitsOnlyTheReviewablePracticesWhenTheSignalIsSharedWithAnOffOne() {
-            PullRequest pr = createPullRequest();
-            Practice silenced = createPractice(SIGNAL);
-            silenced.setAutonomy(PracticeAutonomy.OFF);
-            Practice delivering = createPractice(SIGNAL);
-            setupThroughPracticeMatching(silenced, delivering);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactly(delivering);
-        }
-    }
-
-    /**
-     * A binding names a signal and cannot name the trunk it fires against, so this is where "we only
-     * review merges into main" is expressible at all.
-     */
-    @Nested
-    class ReviewScopeTests {
-
-        @Test
-        void pausedDeliveryDoesNotStopReviewCompute() {
-            PullRequest pr = createPullRequest();
-            Workspace workspace = setupThroughPracticeMatching(createPractice(SIGNAL));
-            workspace.getReviewSettings().setDeliveryStatus(PracticeDeliveryStatus.PAUSED);
-
-            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Run.class);
-        }
-
-        @Test
-        void admitsAPullRequestTargetingAScopedBranch() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("main");
-            setupThroughPracticeMatching(createPractice(SIGNAL));
-
-            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Run.class);
-        }
-
-        @Test
-        void refusesAPullRequestTargetingABranchOutsideTheScope() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("develop");
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject(), true))
-                    .thenReturn(coverage(true, false, ReviewSubjectStatus.RESOLVED_LINKED_HUMAN));
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            GateDecision.Skip skip = (GateDecision.Skip) decision;
-            assertThat(skip.reason()).contains("outside review coverage");
-            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
-            // Terminal, not pending: the branch the artifact targeted will not change, so re-offering it
-            // would be the reaper re-deciding a decision that cannot come out differently.
-            assertThat(skip.resolvedSignalReason().isRetryable()).isFalse();
-        }
-
-        /**
-         * An author the roster has not admitted yet, such as a student who reaches a GitLab subgroup through its
-         * parent group before the next member sync, waits rather than being passed over for good: the work is
-         * offered again once they are a member.
-         */
-        @Test
-        void waitsForAnAuthorWhoIsNotAMemberYetOnAScopedBranch() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("main");
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject(), true))
-                    .thenReturn(coverage(true, true, ReviewSubjectStatus.UNLINKED));
-
-            GateDecision.Skip skip = (GateDecision.Skip) gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.SUBJECT_UNLINKED);
-            assertThat(skip.resolvedSignalReason().isRetryable()).isTrue();
-        }
-
-        @Test
-        void refusesForGoodWhenTheBranchIsOutsideTheScopeWhoeverTheAuthorIs() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("develop");
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject(), true))
-                    .thenReturn(coverage(true, false, ReviewSubjectStatus.UNLINKED));
-
-            GateDecision.Skip skip = (GateDecision.Skip) gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
-        }
-
-        @Test
-        void refusesForGoodAMemberTheSelectionLeavesOutAndABot() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("main");
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            PracticeReviewCoverageService.CoverageAssessment unselected =
-                    new PracticeReviewCoverageService.CoverageAssessment(
-                            ReviewRepositoryMode.ALL_MONITORED,
-                            ReviewPersonMode.SELECTED,
-                            ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
-                            true,
-                            true,
-                            false,
-                            false);
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject(), true))
-                    .thenReturn(unselected, coverage(true, true, ReviewSubjectStatus.NON_HUMAN));
-
-            assertThat(((GateDecision.Skip) gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).resolvedSignalReason())
-                    .isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
-            assertThat(((GateDecision.Skip) gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).resolvedSignalReason())
-                    .isEqualTo(SignalStateReason.BOT_AUTHOR);
-        }
-
-        @Test
-        void anAdministrativeEvaluationMayRunOutsideCoverage() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("develop");
-            Workspace workspace = createWorkspace();
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(createPractice(SIGNAL)));
-
-            assertThat(gate.evaluatePullRequestAdministrative(pr, workspace, SIGNAL))
-                    .isInstanceOf(GateDecision.Run.class);
-            verifyNoInteractions(workspaceResolver, coverageService);
-        }
-
-        /** Cheap enough to sit ahead of every query — no catalogue read happens for out-of-scope work. */
-        @Test
-        void refusesBeforePayingForAnyPracticeLookup() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("develop");
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject(), true))
-                    .thenReturn(coverage(true, false, ReviewSubjectStatus.RESOLVED_LINKED_HUMAN));
-
-            gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            verifyNoInteractions(practiceRepository);
-            verifyNoInteractions(practiceReviewReadiness);
-        }
-
-        @Test
-        void refusesARepositoryTheWorkspaceSyncsButDoesNotReview() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("main");
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject(), true))
-                    .thenReturn(coverage(false, false, ReviewSubjectStatus.RESOLVED_LINKED_HUMAN));
-
-            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Skip.class);
-        }
-
-        @Test
-        void reviewerScopeUsesTheReviewerRatherThanThePullRequestAuthor() {
-            PullRequest pr = createPullRequest();
-            pr.setBaseRefName("main");
-            ReviewSubject reviewer = new ReviewSubject(99L, true);
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.assess(workspace, "ls1intum/Hephaestus", "main", reviewer, true))
-                    .thenReturn(coverage(true, false, ReviewSubjectStatus.RESOLVED_LINKED_HUMAN));
-
-            assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO, reviewer)).isInstanceOf(GateDecision.Skip.class);
-            verify(coverageService).assess(workspace, "ls1intum/Hephaestus", "main", reviewer, true);
-            verify(coverageService, never()).assess(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject(), true);
-        }
-
-        /**
-         * An issue has no target branch, so a branch scope must not silently stop issue review. Only the
-         * repository axis can narrow it — which is the documented limit, pinned here.
-         */
-        @Test
-        void aBranchScopeDoesNotNarrowIssueReview() {
-            Issue issue = new Issue();
-            issue.setId(7L);
-            issue.setAssignees(new HashSet<>());
-            User author = new User();
-            author.setId(7L);
-            author.setType(User.Type.USER);
-            issue.setAuthor(author);
-            Repository repo = new Repository();
-            repo.setNameWithOwner("ls1intum/Hephaestus");
-            issue.setRepository(repo);
-            Workspace workspace = createWorkspace();
-            when(workspaceResolver.resolveAllForRepository("ls1intum/Hephaestus"))
-                    .thenReturn(List.of(workspace));
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            Practice issuePractice = createPractice(ScmSignals.ISSUE_OPENED);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(issuePractice));
-            GateDecision decision = gate.evaluateIssue(issue, WORKSPACE_ID, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-        }
-
-        @Test
-        void reviewsAnIssueInTheRequestedWorkspaceWhenSeveralMonitorItsRepository() {
-            Issue issue = new Issue();
-            issue.setId(7L);
-            issue.setAssignees(new HashSet<>());
-            Repository repo = new Repository();
-            repo.setNameWithOwner("ls1intum/Hephaestus");
-            issue.setRepository(repo);
-            Workspace first = createWorkspace();
-            Workspace second = createWorkspace();
-            second.setId(2L);
-            when(workspaceResolver.resolveAllForRepository("ls1intum/Hephaestus"))
-                    .thenReturn(List.of(first, second));
-            when(practiceReviewReadiness.hasRunnableAgent(2L)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(2L)).thenReturn(List.of(createPractice(ScmSignals.ISSUE_OPENED)));
-
-            GateDecision decision = gate.evaluateIssue(issue, 2L, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).workspace().getId()).isEqualTo(2L);
-            verify(practiceRepository, never()).findByWorkspaceId(WORKSPACE_ID);
-        }
-    }
-
-    /**
-     * The gate reached by a kind that has no repository, no branch and no assignee. An entry point that
-     * took a {@code PullRequest} or an {@code Issue} could not gate such a kind at all: it would go
-     * straight to submission, losing the difference between "no practice for this work" and "a practice
-     * bound to it and turned off".
-     */
-    @Nested
-    class RepoLessSignalGate {
-
-        private static final SignalName DOCUMENT_PUBLISHED = SignalName.of("docs.document.published");
-
-        @Test
-        void runsWhenAPracticeIsBoundToTheSignalAndAudible() {
-            Workspace workspace = createWorkspace();
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID))
-                    .thenReturn(List.of(createPractice(DOCUMENT_PUBLISHED)));
-
-            GateDecision decision = gate.evaluateSignal(
-                    workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true), Map.of());
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).matchedPractices()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("a practice turned all the way down is a different answer from no practice at all")
-        void separatesSilencedFromAbsent() {
-            Workspace workspace = createWorkspace();
-            when(practiceReviewReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
-            Practice silenced = createPractice(DOCUMENT_PUBLISHED);
-            silenced.setAutonomy(PracticeAutonomy.OFF);
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(silenced));
-
-            GateDecision silencedDecision = gate.evaluateSignal(
-                    workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true), Map.of());
-
-            assertThat(silencedDecision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) silencedDecision).resolvedSignalReason())
-                    .isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
-
-            when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());
-            GateDecision absentDecision = gate.evaluateSignal(
-                    workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true), Map.of());
-
-            assertThat(((GateDecision.Skip) absentDecision).resolvedSignalReason())
-                    .isEqualTo(SignalStateReason.GATE_SKIPPED);
-        }
-
-        @Test
-        void refusesWhenPracticesAreDisabledForTheWorkspace() {
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticesEnabled(false);
-
-            GateDecision decision = gate.evaluateSignal(
-                    workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true), Map.of());
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            verifyNoInteractions(practiceRepository);
-        }
-
-        @Test
-        void refusesWhenAutoTriggerIsOff() {
-            Workspace workspace = createWorkspace();
-            workspace.getFeatures().setPracticeReviewAutoTriggerEnabled(false);
-
-            assertThat(gate.evaluateSignal(
-                            workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true), Map.of()))
-                    .isInstanceOf(GateDecision.Skip.class);
-        }
-
-        @Test
-        void shouldRefuseRepositorylessKindWhenSpecificRepositoriesAreSelected() {
-            Workspace workspace = createWorkspace();
-            when(coverageService.assessRepositoryless(any(Workspace.class), any(ReviewSubject.class)))
-                    .thenReturn(new PracticeReviewCoverageService.CoverageAssessment(
-                            ReviewRepositoryMode.SELECTED,
-                            ReviewPersonMode.ALL_ELIGIBLE,
-                            ReviewSubjectStatus.RESOLVED_LINKED_HUMAN,
-                            false,
-                            false,
-                            true,
-                            false));
-
-            GateDecision decision = gate.evaluateSignal(
-                    workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO, new ReviewSubject(7L, true), Map.of());
-
-            assertThat(((GateDecision.Skip) decision).resolvedSignalReason())
-                    .isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
-        }
-    }
-
-    @Nested
-    class WithdrawnFromAutomatedReview {
-
-        @Test
-        void shouldOccasionNoReviewFromACopyWhoseCatalogueEntryWithdrewAutomatedReview() {
-            var reason = new PracticeEvidenceLimitation("AT_CLOSE_STATE_NOT_CAPTURED", "Nothing records the close.");
-            gate = new ReviewGate(
-                    practiceReviewReadiness,
-                    practiceRepository,
-                    workspaceResolver,
-                    signalOptions,
-                    coverageService,
-                    new AutomatedReviewFence(Map.of(
-                            "withdrawn",
-                            new PracticeDefinition(
-                                    "Withdrawn",
-                                    PracticeTestEvidence.signals(SIGNAL),
-                                    PracticeTestEvidence.needsFor(SIGNAL.artifactKind()),
-                                    Map.of(),
-                                    ActorRole.AUTHOR,
-                                    null,
-                                    "Criteria",
-                                    null,
-                                    PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
-                                            .withdrawnFor(reason),
-                                    null,
-                                    null,
-                                    null))),
-                    mock(PracticeResultRepository.class),
-                    mock(ResultVisibilityPolicy.class),
-                    mock(ReviewedWorkChanges.class));
-            PullRequest pr = createPullRequest();
-            Practice adopted = createPractice(SIGNAL);
-            adopted.setSlug("withdrawn");
-            adopted.setSourceCuratedSlug("withdrawn");
-            Practice authored = createPractice(SIGNAL);
-            authored.setSlug("authored-here");
-            setupThroughPracticeMatching(adopted, authored);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Run.class);
-            assertThat(((GateDecision.Run) decision).matchedPractices()).containsExactly(authored);
-        }
+    private static ItemSnapshot snapshot(Map<String, String> state) {
+        return new ItemSnapshot(
+                new ItemRef(1, 1, new ItemKind("scm.pull_request"), 1L, null, null),
+                new ItemVersion("v1", null),
+                new IntegrationRef(IntegrationKind.GITHUB, 1, "test", null),
+                state,
+                List.of(),
+                new ItemLabel(1, "Review", "Pull request", 1, "project", null, IntegrationKind.GITHUB));
     }
 }

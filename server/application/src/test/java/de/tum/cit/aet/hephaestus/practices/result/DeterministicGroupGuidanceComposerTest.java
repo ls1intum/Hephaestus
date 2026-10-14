@@ -2,12 +2,12 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -29,8 +29,7 @@ class DeterministicGroupGuidanceComposerTest {
                 List.of(item()),
                 List.of());
 
-        String guidance =
-                DeterministicGroupGuidanceComposer.compose(PracticeGroupStandingDTO.Standing.DEVELOPING, List.of(gap));
+        String guidance = DeterministicGroupGuidanceComposer.compose(PracticeStanding.DEVELOPING, List.of(gap));
 
         assertThat(guidance)
                 .isEqualTo("Your recent feedback suggests that “Test Coverage” is the next practice to work on. "
@@ -42,12 +41,11 @@ class DeterministicGroupGuidanceComposerTest {
         PracticeStandingDTO strength = card("reviews", "Actionable Reviews", null, null, List.of(), List.of(item()));
         PracticeStandingDTO gap = card("tests", "Test Coverage", null, null, List.of(item()), List.of());
 
-        String guidance = DeterministicGroupGuidanceComposer.compose(
-                PracticeGroupStandingDTO.Standing.MIXED, List.of(gap, strength));
+        String guidance = DeterministicGroupGuidanceComposer.compose(PracticeStanding.MIXED, List.of(gap, strength));
 
         assertThat(guidance)
-                .isEqualTo(
-                        "Your recent feedback shows a strength in “Actionable Reviews”. Next, work on “Test Coverage”.");
+                .isEqualTo("Your recent feedback shows a strength in “Actionable Reviews”. Next, work on “Test"
+                        + " Coverage”.");
     }
 
     @Test
@@ -60,15 +58,14 @@ class DeterministicGroupGuidanceComposerTest {
                 "Code Quality",
                 null,
                 null,
-                PracticeStandingDTO.Standing.MIXED,
+                PracticeStanding.MIXED,
                 List.of(item()),
                 List.of(),
                 null,
                 null,
                 false);
 
-        String guidance = DeterministicGroupGuidanceComposer.compose(
-                PracticeGroupStandingDTO.Standing.MIXED, List.of(oneSetback));
+        String guidance = DeterministicGroupGuidanceComposer.compose(PracticeStanding.MIXED, List.of(oneSetback));
 
         assertThat(guidance)
                 .isEqualTo("Your recent feedback suggests that “Test Coverage” is the next practice to work on.");
@@ -85,15 +82,14 @@ class DeterministicGroupGuidanceComposerTest {
                 "Code Quality",
                 null,
                 null,
-                PracticeStandingDTO.Standing.STRENGTH,
+                PracticeStanding.STRENGTH,
                 List.of(item()),
                 List.of(item()),
                 null,
                 null,
                 false);
 
-        String guidance =
-                DeterministicGroupGuidanceComposer.compose(PracticeGroupStandingDTO.Standing.STRENGTH, List.of(fixed));
+        String guidance = DeterministicGroupGuidanceComposer.compose(PracticeStanding.STRENGTH, List.of(fixed));
 
         assertThat(guidance)
                 .isEqualTo("Your recent feedback shows a strength in “Test Coverage”. Keep building on it.");
@@ -101,23 +97,22 @@ class DeterministicGroupGuidanceComposerTest {
 
     @ParameterizedTest
     @EnumSource(
-            value = PracticeGroupStandingDTO.Standing.class,
+            value = PracticeStanding.class,
             names = {"NOT_OBSERVED", "NO_OPPORTUNITY"})
-    void shouldReturnNoGuidanceForEveryNonVerdictStatus(PracticeGroupStandingDTO.Standing status) {
+    void shouldReturnNoGuidanceForEveryNonVerdictStatus(PracticeStanding status) {
         assertThat(DeterministicGroupGuidanceComposer.compose(status, List.of()))
                 .isNull();
     }
 
     @Test
     void shouldKeepLongCatalogGuidanceCompactAndOnOneLine() {
-        String longExemplar = ("Explain the motivation, constraints, rollout, alternatives, and expected outcome "
-                        + "in language that lets a reviewer understand the decision without reconstructing it from code.\n")
+        String longExemplar = ("Explain the motivation, constraints, rollout, alternatives, and expected outcome in"
+            + " language that lets a reviewer understand the decision without reconstructing it from code.\n")
                 .repeat(3);
         PracticeStandingDTO gap =
                 card("pr-descriptions", "PR Descriptions", null, longExemplar, List.of(item()), List.of());
 
-        String guidance =
-                DeterministicGroupGuidanceComposer.compose(PracticeGroupStandingDTO.Standing.DEVELOPING, List.of(gap));
+        String guidance = DeterministicGroupGuidanceComposer.compose(PracticeStanding.DEVELOPING, List.of(gap));
 
         assertThat(guidance).doesNotContain("\n").endsWith("…").hasSizeLessThan(300);
     }
@@ -129,9 +124,9 @@ class DeterministicGroupGuidanceComposerTest {
             @Nullable String whatGoodLooksLike,
             List<PracticeStandingResultDTO> toWorkOn,
             List<PracticeStandingResultDTO> strengths) {
-        PracticeStandingDTO.Standing standing = !toWorkOn.isEmpty() && !strengths.isEmpty()
-                ? PracticeStandingDTO.Standing.MIXED
-                : !toWorkOn.isEmpty() ? PracticeStandingDTO.Standing.DEVELOPING : PracticeStandingDTO.Standing.STRENGTH;
+        PracticeStanding standing = !toWorkOn.isEmpty() && !strengths.isEmpty()
+                ? PracticeStanding.MIXED
+                : !toWorkOn.isEmpty() ? PracticeStanding.DEVELOPING : PracticeStanding.STRENGTH;
         return new PracticeStandingDTO(
                 slug,
                 name,
@@ -150,13 +145,11 @@ class DeterministicGroupGuidanceComposerTest {
     private static PracticeStandingResultDTO item() {
         return new PracticeStandingResultDTO(
                 UUID.randomUUID(),
-                "Observation",
+                "Problem",
                 null,
                 null,
-                Outcome.NOT_MET,
-                ArtifactKinds.PULL_REQUEST,
-                1L,
-                null,
-                ResultOrigin.LIVE);
+                ResultOutcome.NOT_MET,
+                new ItemRefDTO("1", "scm.pull_request", null, null, "Pull request", null, null, null, null, null),
+                ReviewOrigin.EVENT);
     }
 }

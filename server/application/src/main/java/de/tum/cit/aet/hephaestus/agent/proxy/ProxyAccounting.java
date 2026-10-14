@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
@@ -73,7 +73,8 @@ public class ProxyAccounting {
      * spend, which the ledger cannot see until the run ends.
      */
     public boolean refuseForBudget(ProxyRouting routing) {
-        return countedRefusal(budgetGate.isBlocked(routing), routing, FundingSource.capTag(routing.connectionScope()));
+        return countedRefusal(
+                budgetGate.isBlocked(routing), routing, UsageFundingSource.capTag(routing.connectionScope()));
     }
 
     public boolean refuseForDirectModelCap(ProxyRouting routing, ProxyRouting.BilledAttempt attempt) {
@@ -82,7 +83,7 @@ public class ProxyAccounting {
 
     /**
      * Counted by the cap that refused, because different people fix each one: an admin raises a monthly
-     * budget ({@link FundingSource#capTag}), and an operator raises the per-attempt direct model token or
+     * budget ({@link UsageFundingSource#capTag}), and an operator raises the per-attempt direct model token or
      * search unit limit ({@code practice_script_attempt}).
      */
     private boolean countedRefusal(boolean refused, ProxyRouting routing, String cap) {
@@ -165,7 +166,7 @@ public class ProxyAccounting {
             return;
         }
         switch (attempt.sourceType()) {
-            case AGENT_JOB -> usageAccumulator.accumulate(attempt, usage);
+            case REVIEW_JOB -> usageAccumulator.accumulate(attempt, usage);
             case MENTOR_TURN -> mentorTurnUsageAccumulator.accumulate(attempt, usage);
             case PRACTICE_SCRIPT_DECISION, PRACTICE_SCRIPT_EMBEDDING, PRACTICE_SCRIPT_RERANKING -> {}
         }

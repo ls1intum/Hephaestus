@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import java.util.Arrays;
 import java.util.List;
 

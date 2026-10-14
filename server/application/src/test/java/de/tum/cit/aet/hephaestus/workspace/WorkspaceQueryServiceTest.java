@@ -8,14 +8,15 @@ import de.tum.cit.aet.hephaestus.core.settings.spi.PublicActivityPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import de.tum.cit.aet.hephaestus.testconfig.MockSecurityContextUtils;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceListItemDTO;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 class WorkspaceQueryServiceTest extends BaseUnitTest {
 
@@ -23,13 +24,10 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
     private WorkspaceRepository workspaceRepository;
 
     @Mock
-    private WorkspaceMembershipRepository workspaceMembershipRepository;
+    private MembershipRepository workspaceMembershipRepository;
 
     @Mock
     private RepositoryToMonitorRepository repositoryToMonitorRepository;
-
-    @Mock
-    private CurrentAccountUsers currentAccountUsers;
 
     @Mock
     private ConnectionService connectionService;
@@ -42,7 +40,6 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
                 workspaceRepository,
                 workspaceMembershipRepository,
                 repositoryToMonitorRepository,
-                currentAccountUsers,
                 connectionService,
                 publicActivityPolicy,
                 new WorkspaceProperties(false, null, false, null, WorkspaceProperties.CreationPolicy.ADMIN_ONLY),
@@ -56,19 +53,17 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
         Workspace alphaWorkspace = workspace(1L, "alpha-space", "Alpha Workspace", true);
         Workspace bravoWorkspace = workspace(2L, "bravo-space", "Bravo Workspace", false);
 
-        User currentUser = new User();
-        currentUser.setId(42L);
+        authenticate();
 
-        WorkspaceMembership bravoMembership = membership(bravoWorkspace);
-        WorkspaceMembership alphaMembership = membership(alphaWorkspace);
+        Membership bravoMembership = membership(bravoWorkspace);
+        Membership alphaMembership = membership(alphaWorkspace);
 
         WorkspaceQueryService service = newService();
 
-        when(workspaceMembershipRepository.findByUser_IdIn(Set.of(42L)))
-                .thenReturn(List.of(bravoMembership, alphaMembership));
+        when(workspaceMembershipRepository.findByAccount_Id(42L)).thenReturn(List.of(bravoMembership, alphaMembership));
         when(workspaceRepository.findAllById(List.of(2L, 1L))).thenReturn(List.of(bravoWorkspace, alphaWorkspace));
 
-        List<Workspace> workspaces = service.findAccessibleWorkspaces(List.of(currentUser));
+        List<Workspace> workspaces = service.findAccessibleWorkspaces();
 
         assertThat(workspaces).extracting(Workspace::getWorkspaceSlug).containsExactly("alpha-space", "bravo-space");
     }
@@ -77,32 +72,28 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
     void shouldReturnNoWorkspacesForAnonymousUsers() {
         WorkspaceQueryService service = newService();
 
-        List<Workspace> workspaces = service.findAccessibleWorkspaces(List.<User>of());
+        List<Workspace> workspaces = service.findAccessibleWorkspaces();
 
         assertThat(workspaces).isEmpty();
     }
 
     @Test
-    void findAccessibleWorkspacesUnionsMembershipsAcrossAllLinkedIdentities() {
-        // The account is signed in via GitLab (user 103, no membership) but also links a GitHub identity
-        // (user 2) that IS a workspace member. The accessible list must include that workspace.
-        Workspace githubWorkspace = workspace(1L, "gh-space", "GitHub Workspace", false);
+    void shouldKeepAccountMembershipWhenProviderMirrorsAreAbsent() {
+        authenticate();
+        var workspace = workspace(1L, "gh-space", "Workspace", false);
+        when(workspaceMembershipRepository.findByAccount_Id(42L)).thenReturn(List.of(membership(workspace)));
+        when(workspaceRepository.findAllById(List.of(1L))).thenReturn(List.of(workspace));
+        assertThat(newService().findAccessibleWorkspaces()).containsExactly(workspace);
+    }
 
-        User gitlabIdentity = new User();
-        gitlabIdentity.setId(103L);
-        User githubIdentity = new User();
-        githubIdentity.setId(2L);
+    private static void authenticate() {
+        SecurityContextHolder.setContext(
+                MockSecurityContextUtils.createSecurityContext("developer", "42", new String[0], "token"));
+    }
 
-        WorkspaceQueryService service = newService();
-
-        when(currentAccountUsers.resolve()).thenReturn(List.of(gitlabIdentity, githubIdentity));
-        when(workspaceMembershipRepository.findByUser_IdIn(Set.of(103L, 2L)))
-                .thenReturn(List.of(membership(githubWorkspace)));
-        when(workspaceRepository.findAllById(List.of(1L))).thenReturn(List.of(githubWorkspace));
-
-        List<Workspace> workspaces = service.findAccessibleWorkspaces();
-
-        assertThat(workspaces).extracting(Workspace::getWorkspaceSlug).containsExactly("gh-space");
+    @AfterEach
+    void clearAuthentication() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -150,10 +141,10 @@ class WorkspaceQueryServiceTest extends BaseUnitTest {
         return workspace;
     }
 
-    private WorkspaceMembership membership(Workspace workspace) {
-        WorkspaceMembership membership = new WorkspaceMembership();
+    private Membership membership(Workspace workspace) {
+        Membership membership = new Membership();
         membership.setWorkspace(workspace);
-        membership.setId(new WorkspaceMembership.Id(workspace.getId(), 42L));
+        membership.setId(new Membership.Id(workspace.getId(), 42L));
         return membership;
     }
 }

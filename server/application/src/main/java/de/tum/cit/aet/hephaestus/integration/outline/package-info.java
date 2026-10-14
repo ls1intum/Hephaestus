@@ -1,13 +1,11 @@
-/**
- * Outline vendor adapter: mirrors allow-listed Outline collections into local documents and projects them
- * into the agent's context so design docs and decision records reach practice reviews. A closed Modulith
- * module — the agent reads through its own {@code agent::documentation-source} SPI, which this module
- * implements. It records document signals into the shared ledger but produces no results
- * of its own — a review of a document is composed in the agent module, off that ledger.
- */
+/** Outline mirrors workspace documents, records item events, and supplies consent-gated capture. */
 @org.springframework.modulith.ApplicationModule(
         displayName = "Integration · Outline",
         allowedDependencies = {
+            "integration.chat::item",
+            "integration.docs::item",
+            "evidence",
+            "evidence::capture",
             "core::person-data",
             // Connection registry + SPI ports (credential provider, manifest, lifecycle listener, connect strategy).
             "integration.core",
@@ -33,7 +31,7 @@
             // Document authors resolve through auth SPI ports only — never core.auth or SCM domain types.
             "core::auth-spi",
             // Outline owns outline_document and projects it to the agent one-way, so no cycle forms.
-            "agent::documentation-source",
+            "mentor::spi",
         })
 @org.jspecify.annotations.NullMarked
 package de.tum.cit.aet.hephaestus.integration.outline;

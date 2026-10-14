@@ -1,24 +1,17 @@
 package de.tum.cit.aet.hephaestus.practices.spi;
 
-import io.swagger.v3.oas.annotations.media.Schema;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "What one practice's script needs, as its newest review reported it")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PracticeScriptSummaryDTO(
-        @NonNull String practiceSlug,
-        @NonNull String practiceName,
-
-        @Nullable
-        @Schema(description = "The review that reported the needs; null when no review ran the current script yet")
-        PracticeScriptAsOfDTO asOf,
-
-        @NonNull
-        @Schema(
-                description = "True when the newest review ran an earlier version of the script, so its needs "
-                        + "are not shown")
-        Boolean scriptChanged,
-
-        @NonNull @Schema(description = "The models the script declared; empty when it declares none or asOf is null")
-        List<PracticeScriptNeedDTO> needs) {}
+        String practiceSlug,
+        String practiceName,
+        @Nullable PracticeScriptAsOfDTO asOf,
+        boolean scriptChanged,
+        List<PracticeScriptNeedDTO> needs) {
+    public PracticeScriptSummaryDTO {
+        needs = List.copyOf(needs);
+    }
+}

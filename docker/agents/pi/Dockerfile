@@ -90,6 +90,7 @@ RUN mkdir -p /tmp/abi-check && ln -sf /opt/pi-sdk/node_modules /tmp/abi-check/no
 COPY --from=dependencies /opt/practice-scripts/node_modules /opt/practice-scripts/node_modules
 COPY practice-scripts/package.json practice-scripts/child.ts /opt/practice-scripts/
 COPY practice-scripts/lib/ /opt/practice-scripts/lib/
+COPY practice-scripts/kits/ /opt/practice-scripts/kits/
 
 # The runner imports the practice program host through a link the runtime creates before Node starts
 # (`PracticeRunnerProfile.setupCommands`): `/workspace/work/practice-scripts/lib` → `/opt/practice-scripts/lib`.
@@ -98,12 +99,13 @@ COPY practice-scripts/lib/ /opt/practice-scripts/lib/
 RUN mkdir -p /tmp/host-check/work/practice-scripts/practices && \
     ln -s /opt/pi-sdk/node_modules /tmp/host-check/node_modules && \
     ln -sfn /opt/practice-scripts/lib /tmp/host-check/work/practice-scripts/lib && \
+    ln -sfn /opt/practice-scripts/kits /tmp/host-check/work/practice-scripts/kits && \
     printf '%s\n' \
       'import { createAgentSession } from "@earendil-works/pi-coding-agent";' \
-      'import { BUILTIN_PROGRAM, runPracticeProgram } from "./work/practice-scripts/lib/program-host.ts";' \
-      'import { parseCandidate } from "./work/practice-scripts/lib/contract.ts";' \
+      'import { BUILTIN_SCRIPT, runPracticeProgram } from "./work/practice-scripts/lib/core/program-host.ts";' \
+      'import { parseCandidate } from "./work/practice-scripts/lib/core/contract.ts";' \
       'if (typeof createAgentSession !== "function" || typeof runPracticeProgram !== "function") { throw new Error("the host cannot load the Pi SDK and the toolkit together"); }' \
-      'if (typeof BUILTIN_PROGRAM.run !== "function" || parseCandidate({}).ok) { throw new Error("the toolkit contract does not load"); }' \
+      'if (typeof BUILTIN_SCRIPT.run !== "function" || parseCandidate({}).ok) { throw new Error("the toolkit contract does not load"); }' \
       > /tmp/host-check/.run-pi.ts && \
     node /tmp/host-check/.run-pi.ts && \
     rm -rf /tmp/host-check
@@ -158,7 +160,7 @@ RUN mkdir -p /workspace/work /workspace/out /workspace/.pi /workspace/.sessions 
     chown -R 1000:1000 /workspace/work /workspace/out /workspace/.pi /workspace/.sessions && \
     ln -s /opt/pi-sdk/node_modules /workspace/node_modules
 
-LABEL hephaestus.agent.runtime-contract=5
+LABEL hephaestus.agent.runtime-contract=6
 LABEL hephaestus.agent.node-version=${NODE_VERSION}
 LABEL hephaestus.agent.pi-version=${PI_VERSION}
 

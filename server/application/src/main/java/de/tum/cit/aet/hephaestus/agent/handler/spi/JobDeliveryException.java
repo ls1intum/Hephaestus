@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.spi;
 import java.io.Serial;
 
 /**
- * Thrown when a {@link JobTypeHandler} fails to deliver results for a completed job.
+ * Thrown when the review runtime fails to deliver results for a completed job.
  *
  * <p>The executor catches this to mark the job as {@code FAILED} with a clear,
  * handler-provided reason. Unchecked so it can propagate through lambda boundaries

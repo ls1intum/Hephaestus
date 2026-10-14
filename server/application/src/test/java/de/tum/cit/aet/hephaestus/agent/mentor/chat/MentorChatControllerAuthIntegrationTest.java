@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -96,7 +96,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
         Workspace workspace = createWorkspace("mentor-happy-space", "Happy", "mentor-happy", AccountType.ORG, owner);
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, mentor, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .post()

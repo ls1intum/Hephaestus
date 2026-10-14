@@ -1,20 +1,20 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobPracticeScriptUsage;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.JobJwt;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtInvalidException;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,6 +25,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -38,8 +39,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Spring Security filter that authenticates requests to the LLM proxy using proxy-scoped bearer
- * tokens: an {@code AgentJob}'s job token, or a mentor session's registry-minted token (the mentor's
- * interactive sandbox is not an {@code AgentJob} row).
+ * tokens: an {@code ReviewJob}'s job token, or a mentor session's registry-minted token (the mentor's
+ * interactive sandbox is not an {@code ReviewJob} row).
  *
  * <p>The token's scopes become its authorities, and {@link LlmProxySecurityConfig} decides which paths
  * each scope reaches. The path decides the routing: on {@code /internal/llm/practice-script/{slot}/**} the
@@ -63,14 +64,14 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
      */
     public static final String PRACTICE_SCRIPT_PRACTICE_HEADER = "x-hephaestus-practice";
 
-    private final AgentJobRepository agentJobRepository;
+    private final ReviewJobRepository agentJobRepository;
     private final WorkerJwtVerifier jwtVerifier;
     private final MentorProxyCredentialRegistry mentorRegistry;
     private final ObjectMapper objectMapper;
     private final String workerId;
 
     JobTokenAuthenticationFilter(
-            AgentJobRepository agentJobRepository,
+            ReviewJobRepository agentJobRepository,
             WorkerJwtVerifier jwtVerifier,
             MentorProxyCredentialRegistry mentorRegistry,
             ObjectMapper objectMapper,
@@ -121,7 +122,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Invalid runtime URL for token");
                 return;
             }
-            Optional<AgentJob> job = agentJobRepository.findByIdWithWorkspace(jwt.jobId());
+            Optional<ReviewJob> job = agentJobRepository.findById(jwt.jobId());
             Optional<ConfigSnapshot> snapshot = runningSnapshot(jwt, job);
             if (snapshot.isPresent() && request.getRequestURI().startsWith(PRACTICE_SCRIPT_PATH)) {
                 ModelKind slot = practiceScriptSlot(request.getRequestURI());
@@ -132,7 +133,8 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 routing = practiceScriptRouting(job.orElseThrow(), snapshot.get(), slot);
                 if (routing.isEmpty()) {
                     response.sendError(
-                            HttpServletResponse.SC_NOT_FOUND, "No " + slot.slot() + " model is bound for this job");
+                            HttpServletResponse.SC_NOT_FOUND,
+                            "No " + slot.name().toLowerCase(Locale.ROOT) + " model is bound for this job");
                     return;
                 }
             } else {
@@ -156,11 +158,11 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private boolean isOwnedByAnotherWorker(JobJwt jwt, Optional<AgentJob> optionalJob) {
+    private boolean isOwnedByAnotherWorker(JobJwt jwt, Optional<ReviewJob> optionalJob) {
         return optionalJob
-                .filter(job -> job.getStatus() == AgentJobStatus.RUNNING
-                        && job.getWorkspace().getId().equals(jwt.workspaceId())
-                        && job.getRetryCount() == jwt.attempt())
+                .filter(job -> job.getStatus() == ReviewJobStatus.RUNNING
+                        && (job.getWorkspaceId() == jwt.workspaceId())
+                        && job.getAttempt() == jwt.attempt())
                 .map(job -> job.getWorkerId() != null && !workerId.equals(job.getWorkerId()))
                 .orElse(false);
     }
@@ -181,15 +183,15 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /** The job's frozen snapshot, when the token names the attempt that this worker runs. */
-    private Optional<ConfigSnapshot> runningSnapshot(JobJwt jwt, Optional<AgentJob> optionalJob) {
+    private Optional<ConfigSnapshot> runningSnapshot(JobJwt jwt, Optional<ReviewJob> optionalJob) {
         if (optionalJob.isEmpty()) {
             return Optional.empty();
         }
-        AgentJob job = optionalJob.get();
+        ReviewJob job = optionalJob.get();
         if (!workerId.equals(job.getWorkerId())
-                || job.getStatus() != AgentJobStatus.RUNNING
-                || !job.getWorkspace().getId().equals(jwt.workspaceId())
-                || job.getRetryCount() != jwt.attempt()) {
+                || job.getStatus() != ReviewJobStatus.RUNNING
+                || !(job.getWorkspaceId() == jwt.workspaceId())
+                || job.getAttempt() != jwt.attempt()) {
             return Optional.empty();
         }
         if (job.getConfigSnapshot() == null) {
@@ -204,12 +206,12 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         }
     }
 
-    private ProxyRouting reviewRouting(AgentJob job, ConfigSnapshot snapshot) {
+    private ProxyRouting reviewRouting(ReviewJob job, ConfigSnapshot snapshot) {
         return routing(
                 "job:" + job.getId(),
                 job,
                 snapshot.model(),
-                LlmUsageSourceType.AGENT_JOB,
+                UsageSourceType.REVIEW_JOB,
                 spentSoFarUsd(job, snapshot),
                 0L,
                 0L,
@@ -223,18 +225,18 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
      *
      * @return empty when no model of that kind is bound for this job
      */
-    private Optional<ProxyRouting> practiceScriptRouting(AgentJob job, ConfigSnapshot snapshot, ModelKind slot) {
+    private Optional<ProxyRouting> practiceScriptRouting(ReviewJob job, ConfigSnapshot snapshot, ModelKind slot) {
         FrozenModel model = slot == ModelKind.CHAT ? snapshot.model() : snapshot.practiceScriptSlot(slot);
         if (model == null) {
             return Optional.empty();
         }
-        List<PracticeScriptKindTotal> used = agentJobRepository.sumPracticeScriptUsageByKind(
-                job.getWorkspace().getId(), job.getId(), job.getRetryCount());
+        List<PracticeScriptKindTotal> used =
+                agentJobRepository.sumPracticeScriptUsageByKind(job.getWorkspaceId(), job.getId(), job.getAttempt());
         return Optional.of(routing(
                 "job:" + job.getId() + ":practice-script",
                 job,
                 model,
-                AgentJobPracticeScriptUsage.ledgerSourceType(slot),
+                ScriptUsage.ledgerSourceType(slot),
                 practiceScriptSpentUsd(job, snapshot, used, model.connectionScope()),
                 used.stream().mapToLong(PracticeScriptKindTotal::tokens).sum(),
                 used.stream().mapToLong(PracticeScriptKindTotal::searchUnits).sum(),
@@ -243,9 +245,9 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
     private static ProxyRouting routing(
             String principal,
-            AgentJob job,
+            ReviewJob job,
             FrozenModel model,
-            LlmUsageSourceType sourceType,
+            UsageSourceType sourceType,
             BigDecimal spentUsd,
             long directModelTokens,
             long directModelSearchUnits,
@@ -257,11 +259,11 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
                 model.connectionScope(),
                 model.connectionId(),
                 model.modelId(),
-                job.getWorkspace().getId(),
+                job.getWorkspaceId(),
                 new ProxyRouting.BilledAttempt(
                         sourceType,
                         job.getId(),
-                        job.getRetryCount(),
+                        job.getAttempt(),
                         spentUsd,
                         job.getWorkerId(),
                         directModelTokens,
@@ -272,7 +274,10 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
 
     /** Priced per kind like the ledger rows that the attempt ends with, not once per practice. */
     private static BigDecimal practiceScriptSpentUsd(
-            AgentJob job, ConfigSnapshot snapshot, List<PracticeScriptKindTotal> used, @Nullable FundingSource purse) {
+            ReviewJob job,
+            ConfigSnapshot snapshot,
+            List<PracticeScriptKindTotal> used,
+            @Nullable UsageFundingSource purse) {
         BigDecimal spent =
                 Objects.equals(snapshot.connectionScope(), purse) ? spentSoFarUsd(job, snapshot) : BigDecimal.ZERO;
         for (PracticeScriptKindTotal total : used) {
@@ -303,7 +308,7 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
         }
         String slot = rest.substring(0, end);
         return Arrays.stream(ModelKind.values())
-                .filter(kind -> kind.slot().equals(slot))
+                .filter(kind -> kind.name().toLowerCase(Locale.ROOT).equals(slot))
                 .findFirst()
                 .orElse(null);
     }
@@ -313,22 +318,18 @@ public class JobTokenAuthenticationFilter extends OncePerRequestFilter {
      * cannot drift from what the ledger will charge it. Reasoning tokens are deliberately absent from
      * the arguments: they are already counted inside the output bucket.
      */
-    private static BigDecimal spentSoFarUsd(AgentJob job, ConfigSnapshot snapshot) {
+    private static BigDecimal spentSoFarUsd(ReviewJob job, ConfigSnapshot snapshot) {
         LlmPriceSnapshot price = snapshot.priceSnapshot();
         if (price == null) {
             return BigDecimal.ZERO;
         }
         BigDecimal cost = price.calculateCost(
-                        zeroIfNull(job.getLlmTotalInputTokens()),
-                        zeroIfNull(job.getLlmTotalOutputTokens()),
-                        zeroIfNull(job.getLlmCacheReadTokens()),
-                        zeroIfNull(job.getLlmCacheWriteTokens()))
+                        job.getLlmInputTokens(),
+                        job.getLlmOutputTokens(),
+                        job.getLlmCacheReadTokens(),
+                        job.getLlmCacheWriteTokens())
                 .usd();
         return cost != null ? cost : BigDecimal.ZERO;
-    }
-
-    private static long zeroIfNull(@Nullable Integer tokens) {
-        return tokens != null ? tokens : 0L;
     }
 
     /**

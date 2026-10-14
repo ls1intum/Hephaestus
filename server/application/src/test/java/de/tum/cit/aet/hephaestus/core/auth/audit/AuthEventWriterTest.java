@@ -44,6 +44,7 @@ class AuthEventWriterTest extends BaseUnitTest {
                 null,
                 null,
                 null,
+                null,
                 false);
 
         // The swallow invariant: the request must not see the audit failure.

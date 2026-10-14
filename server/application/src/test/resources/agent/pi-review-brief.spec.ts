@@ -69,7 +69,7 @@ function primaryCapture(t: { after: (cleanup: () => void) => void }) {
 	const tree = "repos/reviewed/.git/HEAD";
 	const refs = "repos/reviewed/.git/hephaestus-captured-refs";
 	const index = {
-		artifactKind: "scm.pull_request",
+		itemKind: "scm.pull_request",
 		sources: [
 			{
 				kind: "scm.repository.tree",
@@ -79,18 +79,19 @@ function primaryCapture(t: { after: (cleanup: () => void) => void }) {
 					limitations: ["Submodules are not captured."],
 					facts: { immutableIdentity: `${HEAD}:${"d".repeat(40)}` },
 				},
-				artifacts: [{ path: tree }, { path: refs }],
+				files: [{ path: tree }, { path: refs }],
 			},
 			{
 				kind: "scm.pull-request.diff",
+				citation: { side: "REQUIRED", revision: "OPTIONAL" },
 				state: { availability: "AVAILABLE", facts: { immutableIdentity: `${BASE}:${HEAD}` } },
-				artifacts: [{ path: "context/change.json" }],
+				files: [{ path: "context/change.json" }],
 			},
 		],
-		artifacts: [
-			{ kind: "scm.repository.tree", artifact: { path: tree } },
-			{ kind: "scm.repository.tree", artifact: { path: refs } },
-			{ kind: "scm.pull-request.diff", artifact: { path: "context/change.json" } },
+		files: [
+			{ kind: "scm.repository.tree", file: { path: tree } },
+			{ kind: "scm.repository.tree", file: { path: refs } },
+			{ kind: "scm.pull-request.diff", file: { path: "context/change.json" } },
 		],
 	};
 	return { root, index };
@@ -109,24 +110,24 @@ function cited(
 	return {
 		index: 0,
 		sourceKind,
-		artifactPath:
+		sourcePath:
 			sourceKind === "scm.repository.tree" ? "repos/reviewed/.git/HEAD" : "context/change.json",
 		path,
 		revision,
 		startLine: 1,
 		quote: "x",
-		verification: { status: "VERIFIED", scope: "EXACT_LOCATION", artifactSha256: sha(text) },
+		verification: { status: "VERIFIED", scope: "EXACT_LOCATION", sourceFileSha256: sha(text) },
 		...extra,
 	};
 }
 
-/** A public NOT_MET result whose one observation cites these lines: a problem's citations are its observations'. */
+/** A public NOT_MET result whose one problem cites these lines: a problem's citations are its problems'. */
 const decided = (citations: unknown[]) => ({
-	practiceResultId: "r",
+	resultId: "r",
 	outcome: "NOT_MET",
 	publicEligible: true,
 	citations: [],
-	observations: [{ observationId: "o", citations }],
+	problems: [{ problemId: "o", citations }],
 });
 
 /** A reader over fixed blobs and one pinned diff that remembers every blob and range it was asked for. */
@@ -169,7 +170,7 @@ void test("cited primary code arrives whole, once per file and revision, with it
 		[
 			decided([cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" })]),
 			{
-				practiceResultId: "second",
+				resultId: "second",
 				outcome: "NOT_MET",
 				publicEligible: true,
 				citations: [
@@ -177,17 +178,17 @@ void test("cited primary code arrives whole, once per file and revision, with it
 					cited("scm.repository.tree", "App/Model.swift", EARLIER, model),
 					cited("scm.pull-request.diff", "App/Legacy.swift", BASE, legacy, { side: "OLD" }),
 				],
-				observations: [],
+				problems: [],
 			},
 			// The review on the work never acknowledges a MET result, so the code it cites is not read.
 			{
-				practiceResultId: "strength",
+				resultId: "strength",
 				outcome: "MET",
 				publicEligible: true,
 				citations: [
 					cited("scm.repository.tree", "App/Strength.swift", HEAD, "struct Strength {}\n"),
 				],
-				observations: [],
+				problems: [],
 			},
 		],
 		read.reader,
@@ -224,7 +225,7 @@ void test("cited primary code arrives whole, once per file and revision, with it
 	);
 });
 
-void test("every citation of a public result is read: its own, its example's and each observation's", (t) => {
+void test("every citation of a public result is read: its own, its example's and each problem's", (t) => {
 	const { root, index } = primaryCapture(t);
 	const model = "struct Item {}\n";
 	const example = "func handled() throws {}\n";
@@ -240,7 +241,7 @@ void test("every citation of a public result is read: its own, its example's and
 		index,
 		[
 			{
-				practiceResultId: "r",
+				resultId: "r",
 				outcome: "NOT_MET",
 				publicEligible: true,
 				citations: [cited("scm.repository.tree", "App/Model.swift", EARLIER, model)],
@@ -248,9 +249,9 @@ void test("every citation of a public result is read: its own, its example's and
 					citation: cited("scm.repository.tree", "App/Handled.swift", HEAD, example),
 					note: "This one is handled.",
 				},
-				observations: [
+				problems: [
 					{
-						observationId: "o-1",
+						problemId: "o-1",
 						citations: [
 							cited("scm.pull-request.diff", "App/Loader.swift", HEAD, LOADER, { side: "NEW" }),
 						],
@@ -295,11 +296,11 @@ void test("private, auxiliary, undecided or unverifiable citations never expose 
 			},
 			{
 				...decided([cited("scm.repository.tree", "Private.swift", HEAD, text)]),
-				outcome: "UNDETERMINED",
+				outcome: "COULD_NOT_DETERMINE",
 			},
 			decided([
 				cited("scm.repository.tree", "Private.swift", HEAD, text, {
-					artifactPath: "repos/other/.git/HEAD",
+					sourcePath: "repos/other/.git/HEAD",
 				}),
 				{
 					...cited("scm.repository.tree", "Private.swift", HEAD, text),
@@ -469,10 +470,10 @@ function pullRequestIndex(
 	const source = (kind: string, state: Record<string, unknown>, path: string) => ({
 		kind,
 		state,
-		artifacts: state.availability === "AVAILABLE" && recorded.includes(path) ? [{ path }] : [],
+		files: state.availability === "AVAILABLE" && recorded.includes(path) ? [{ path }] : [],
 	});
 	return {
-		artifactKind: "scm.pull_request",
+		itemKind: "scm.pull_request",
 		capturedAt: "2026-10-01T10:00:00Z",
 		sources: [
 			source("scm.pull-request.core", core, "context/metadata.json"),
@@ -480,10 +481,10 @@ function pullRequestIndex(
 				? []
 				: [source("scm.linked-work-items", linked, "context/linked_work_items.json")]),
 		],
-		artifacts: [
-			{ kind: "scm.pull-request.core", artifact: { path: "context/metadata.json" } },
-			{ kind: "scm.linked-work-items", artifact: { path: "context/linked_work_items.json" } },
-		].filter((entry) => recorded.includes(entry.artifact.path)),
+		files: [
+			{ kind: "scm.pull-request.core", file: { path: "context/metadata.json" } },
+			{ kind: "scm.linked-work-items", file: { path: "context/linked_work_items.json" } },
+		].filter((entry) => recorded.includes(entry.file.path)),
 	};
 }
 
@@ -779,16 +780,17 @@ void test("an issue uses only its recorded issue core", () => {
 	});
 	try {
 		const index = {
-			artifactKind: "scm.issue",
+			itemKind: "scm.issue",
 			capturedAt: "2026-10-01T10:00:00Z",
 			sources: [
 				{
 					kind: "scm.issue.core",
+					citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 					state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-					artifacts: [{ path: "context/metadata.json" }],
+					files: [{ path: "context/metadata.json" }],
 				},
 			],
-			artifacts: [{ kind: "scm.issue.core", artifact: { path: "context/metadata.json" } }],
+			files: [{ kind: "scm.issue.core", file: { path: "context/metadata.json" } }],
 		};
 		const context = buildSameWorkContext(root, "context", index, {
 			repositoryFullName: "group/repo",
@@ -800,9 +802,9 @@ void test("an issue uses only its recorded issue core", () => {
 		const mismatched = buildSameWorkContext(root, "context", index, FRAMING);
 		assert.match(mismatched, /another issue than the task/u);
 		assert.doesNotMatch(mismatched, /A capability/u);
-		const firstArtifact = index.artifacts[0];
-		assert.ok(firstArtifact);
-		firstArtifact.kind = "scm.pull-request.core";
+		const firstSourceFile = index.files[0];
+		assert.ok(firstSourceFile);
+		firstSourceFile.kind = "scm.pull-request.core";
 		assert.doesNotMatch(buildSameWorkContext(root, "context", index, FRAMING), /A capability/u);
 	} finally {
 		rmSync(root, { recursive: true, force: true });
@@ -996,8 +998,9 @@ function discussionIndex(kind: string, file: string, state: Record<string, unkno
 		sources: [
 			{
 				kind: "scm.pull-request.core",
+				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-				artifacts: [{ path: "context/metadata.json" }],
+				files: [{ path: "context/metadata.json" }],
 			},
 			{
 				kind,
@@ -1007,12 +1010,12 @@ function discussionIndex(kind: string, file: string, state: Record<string, unkno
 					completeness: "PARTIAL",
 					...state,
 				},
-				artifacts: [{ path: file }],
+				files: [{ path: file }],
 			},
 		],
-		artifacts: [
-			{ kind: "scm.pull-request.core", artifact: { path: "context/metadata.json" } },
-			{ kind, artifact: { path: file } },
+		files: [
+			{ kind: "scm.pull-request.core", file: { path: "context/metadata.json" } },
+			{ kind, file: { path: file } },
 		],
 	};
 }
@@ -1068,7 +1071,7 @@ void test("captured advice keeps native identity, edits and attribution while se
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
 	const history = buildPublicReviewHistory(root, "context", index, FRAMING);
 	assert.equal(history.capturedAt, DISCUSSION_CUTOFF);
-	assert.equal(history.reviewedRevision, "a".repeat(40));
+	assert.equal(history.itemVersion, "a".repeat(40));
 	assert.deepEqual(history.recipient, { author: "owner", authorId: "11" });
 	assert.deepEqual(
 		history.statements.map((row) => row.eligibleForPriorAdvice),
@@ -1370,7 +1373,7 @@ void test("native inline and review decision revisions are not replaced by the c
 		const statement = history.statements[0];
 		assert.ok(statement);
 		assert.equal(statement.eligibleForPriorAdvice, true);
-		assert.match(statement.reviewedRevision ?? "", /^original-/u);
+		assert.match(statement.itemVersion ?? "", /^original-/u);
 		if (kind === "scm.review-threads") {
 			assert.ok(
 				!("capturedId" in statement) && !("threadId" in statement) && !("inReplyToId" in statement),
@@ -1396,7 +1399,7 @@ void test("unlisted, unavailable, malformed and oversized discussion never becom
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
 	for (const candidate of [
 		index,
-		{ ...index, artifacts: [] },
+		{ ...index, files: [] },
 		discussionIndex("scm.general-review-comments", GENERAL_PATH, {
 			availability: "UNAVAILABLE",
 			reasonCode: "PROVIDER_UNREACHABLE",
@@ -1430,7 +1433,7 @@ void test("an incomplete work identity, missing code head or unavailable core su
 			nodePath.join(root, "context/metadata.json"),
 			JSON.stringify({ repository_full_name: "group/repo", pr_number: 7, commit_sha: commit }),
 		);
-		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).reviewedRevision, null);
+		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).itemVersion, null);
 	}
 	for (const identity of [
 		{ pr_number: 7 },
@@ -1442,20 +1445,20 @@ void test("an incomplete work identity, missing code head or unavailable core su
 			nodePath.join(root, "context/metadata.json"),
 			JSON.stringify({ ...identity, commit_sha: "a".repeat(40) }),
 		);
-		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).reviewedRevision, null);
+		assert.equal(buildPublicReviewHistory(root, "context", index, FRAMING).itemVersion, null);
 	}
 	writeFileSync(nodePath.join(root, "context/metadata.json"), discussionMetadata());
 	for (const framing of [
 		{ repositoryFullName: undefined, pullRequestNumber: 7 },
 		{ repositoryFullName: "group/repo", pullRequestNumber: undefined },
 	]) {
-		assert.equal(buildPublicReviewHistory(root, "context", index, framing).reviewedRevision, null);
+		assert.equal(buildPublicReviewHistory(root, "context", index, framing).itemVersion, null);
 	}
 	const missing = {
 		...index,
 		sources: index.sources.filter((source) => source.kind !== "scm.pull-request.core"),
 	};
-	assert.equal(buildPublicReviewHistory(root, "context", missing, FRAMING).reviewedRevision, null);
+	assert.equal(buildPublicReviewHistory(root, "context", missing, FRAMING).itemVersion, null);
 });
 
 void test("a positively mismatching core cannot lend its discussion to this work", (t) => {
@@ -1481,7 +1484,7 @@ void test("a positively mismatching core cannot lend its discussion to this work
 	);
 	assert.equal(history.statements.length, 0);
 	assert.equal(history.recipient.authorId, null);
-	assert.equal(history.reviewedRevision, null);
+	assert.equal(history.itemVersion, null);
 	assert.match(
 		history.sources.find((source) => source.path === GENERAL_PATH)?.omitted ?? "",
 		/other reviewed work/u,
@@ -1520,13 +1523,14 @@ void test("rendered and total discussion bounds omit whole sources and their wit
 			...generalIndex.sources,
 			{
 				kind: "scm.pull-request.comments",
+				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", content: "NON_EMPTY", completeness: "COMPLETE" },
-				artifacts: [{ path: inlinePath }],
+				files: [{ path: inlinePath }],
 			},
 		],
-		artifacts: [
-			...generalIndex.artifacts,
-			{ kind: "scm.pull-request.comments", artifact: { path: inlinePath } },
+		files: [
+			...generalIndex.files,
+			{ kind: "scm.pull-request.comments", file: { path: inlinePath } },
 		],
 	};
 	const history = buildPublicReviewHistory(root, "context", index, FRAMING, {
@@ -1570,23 +1574,25 @@ void test("an issue discussion uses its own core recipient and stored native com
 	});
 	t.after(() => rmSync(root, { recursive: true, force: true }));
 	const index = {
-		artifactKind: "scm.issue",
+		itemKind: "scm.issue",
 		capturedAt: DISCUSSION_CUTOFF,
 		sources: [
 			{
 				kind: "scm.issue.core",
+				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-				artifacts: [{ path: "context/metadata.json" }],
+				files: [{ path: "context/metadata.json" }],
 			},
 			{
 				kind: "scm.issue.comments",
+				citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 				state: { availability: "AVAILABLE", completeness: "COMPLETE" },
-				artifacts: [{ path: "context/comments.json" }],
+				files: [{ path: "context/comments.json" }],
 			},
 		],
-		artifacts: [
-			{ kind: "scm.issue.core", artifact: { path: "context/metadata.json" } },
-			{ kind: "scm.issue.comments", artifact: { path: "context/comments.json" } },
+		files: [
+			{ kind: "scm.issue.core", file: { path: "context/metadata.json" } },
+			{ kind: "scm.issue.comments", file: { path: "context/comments.json" } },
 		],
 	};
 	const history = buildPublicReviewHistory(root, "context", index, FRAMING);
@@ -1599,12 +1605,12 @@ void test("an issue discussion uses its own core recipient and stored native com
 	assert.equal(history.sources.length, 1);
 });
 
-void test("public discussion keeps the work author as its addressee even when the occasion concerns a reviewer", (t) => {
+void test("public discussion keeps the work author as its addressee even when the applicability concerns a reviewer", (t) => {
 	const reviewPath = "context/review_threads.json";
 	const index = discussionIndex("scm.general-review-comments", GENERAL_PATH);
 	const reviewIndex = discussionIndex("scm.review-threads", reviewPath);
 	index.sources.push(...reviewIndex.sources.slice(1));
-	index.artifacts.push(...reviewIndex.artifacts.slice(1));
+	index.files.push(...reviewIndex.files.slice(1));
 	const root = workspace({
 		"context/metadata.json": JSON.stringify({
 			repository_full_name: "group/repo",

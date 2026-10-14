@@ -9,6 +9,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,7 +29,12 @@ import org.jspecify.annotations.Nullable;
  */
 @Entity
 @Immutable
-@Table(name = "slack_channel_consent_event")
+@Table(
+        name = "slack_channel_consent_event",
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_slack_channel_consent_event_tenant",
+                        columnNames = {"id", "workspace_id"}))
 @Getter
 @NoArgsConstructor
 public class SlackChannelConsentEvent {
@@ -56,13 +62,9 @@ public class SlackChannelConsentEvent {
     @Column(name = "to_state", nullable = false, length = 16)
     private ConsentState toState;
 
-    /**
-     * The workspace {@code User} (admin) who made the change; null if driven by a system path rather than an admin.
-     * FK'd to {@code "user"(id)} ON DELETE SET NULL ({@code sfk_slack_channel_consent_event_actor}); DB-only FK,
-     * no JPA association.
-     */
-    @Column(name = "actor_user_id")
-    private @Nullable Long actorUserId;
+    /** Authenticated admin account, or null for a system transition or an erased actor. */
+    @Column(name = "actor_account_id")
+    private @Nullable Long actorAccountId;
 
     @Column(name = "reason")
     private @Nullable String reason;
@@ -76,13 +78,13 @@ public class SlackChannelConsentEvent {
             String slackChannelId,
             @Nullable ConsentState fromState,
             ConsentState toState,
-            @Nullable Long actorUserId,
+            @Nullable Long actorAccountId,
             @Nullable String reason) {
         this.workspaceId = workspaceId;
         this.slackChannelId = slackChannelId;
         this.fromState = fromState;
         this.toState = toState;
-        this.actorUserId = actorUserId;
+        this.actorAccountId = actorAccountId;
         this.reason = reason;
     }
 }

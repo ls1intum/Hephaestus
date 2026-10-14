@@ -2,17 +2,16 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser.PracticeScriptRunReport;
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.agent.runtime.ScriptModelUse;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelUseDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
@@ -21,7 +20,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -39,9 +40,10 @@ import tools.jackson.databind.ObjectMapper;
 class PracticeScriptRunRecorder {
 
     private final PiResultParser parser;
-    private final AgentJobPracticeScriptRunRepository runs;
+    private final ScriptRunRepository runs;
     private final MeterRegistry meterRegistry;
     private final ObjectMapper objectMapper;
+    private final ReviewJobAssignments assignments;
 
     /**
      * Runs inside the attempt's terminal transaction, after the attempt kept its ownership fence, so each attempt
@@ -51,69 +53,53 @@ class PracticeScriptRunRecorder {
      * @param slots the models that this attempt froze for its practice scripts, by kind. Each claim replaces the
      *     job's snapshot, and the attempt still holds its ownership fence here, so the snapshot is this attempt's.
      */
-    void record(AgentJob job, byte @Nullable [] report, Map<ModelKind, FrozenModel> slots, Instant finishedAt) {
+    void record(ReviewJob job, byte @Nullable [] report, Map<ModelKind, FrozenModel> slots, Instant finishedAt) {
         if (report == null) return;
-        Map<String, Long> admitted = admittedRevisions(job.getEvidenceSnapshot());
-        if (admitted.isEmpty()) return;
-        long workspaceId = job.getWorkspace().getId();
-        Set<Long> withScript = runs.findPracticeScriptRevisionIdsByWorkspaceId(workspaceId, admitted.values());
-        Map<String, PracticeProgramKind> kinds = new HashMap<>();
-        admitted.forEach((slug, revisionId) -> kinds.put(
-                slug, withScript.contains(revisionId) ? PracticeProgramKind.CUSTOM : PracticeProgramKind.BUILTIN));
+        var admitted = assignments.load(job).stream()
+                .collect(Collectors.toMap(ReviewAssignmentSnapshot::practiceSlug, Function.identity()));
+        long workspaceId = job.getWorkspaceId();
+        Map<String, ScriptKind> kinds = new HashMap<>();
+        admitted.forEach((slug, assignment) -> kinds.put(
+                slug, assignment.practice().definition().script() == null ? ScriptKind.BUILTIN : ScriptKind.CUSTOM));
 
         List<PracticeScriptRunReport> reported = parser.parsePracticeScriptReport(report, kinds);
         runs.saveAll(reported.stream()
-                .map(run -> new AgentJobPracticeScriptRun(
-                        job,
-                        job.getRetryCount(),
-                        run.practiceSlug(),
-                        admitted.get(run.practiceSlug()),
-                        run.status(),
-                        run.programKind(),
-                        run.programDigest(),
-                        run.stopReason(),
-                        run.calls() == null ? null : objectMapper.valueToTree(run.calls()),
-                        run.coverageReached() == null ? null : objectMapper.valueToTree(run.coverageReached()),
-                        // A program that never started declared nothing, whatever the report lists.
-                        run.status() == PracticeScriptRunStatus.NOT_REACHED ? null : stored(run.models(), slots),
-                        finishedAt,
-                        run.error(),
-                        run.durationMs()))
+                .map(run -> {
+                    var assignment = Objects.requireNonNull(admitted.get(run.practiceSlug()));
+                    return new ScriptRun(
+                            job.getId(),
+                            job.getAttempt(),
+                            assignment.practice().practiceId(),
+                            workspaceId,
+                            assignment.practice().practiceVersionId(),
+                            run.status(),
+                            run.programKind(),
+                            run.stopReason(),
+                            run.calls() == null ? null : objectMapper.valueToTree(run.calls()),
+                            run.status() == ScriptRunStatus.NOT_REACHED ? null : stored(run.models(), slots),
+                            finishedAt,
+                            run.error(),
+                            run.durationMs());
+                })
                 .toList());
         afterCommit(() -> reported.forEach(run -> scripts(run.status()).increment()));
     }
 
-    private @Nullable JsonNode stored(
-            @Nullable List<PracticeScriptModelUseDTO> models, Map<ModelKind, FrozenModel> slots) {
+    private @Nullable JsonNode stored(@Nullable List<ScriptModelUse> models, Map<ModelKind, FrozenModel> slots) {
         return models == null
                 ? null
                 : objectMapper.valueToTree(models.stream()
                         .map(use -> {
-                            FrozenModel slot = slots.get(
-                                    AgentPurpose.valueOf(use.purpose().name()).kind());
+                            FrozenModel slot =
+                                    slots.get(ModelKind.valueOf(use.slot().name()));
                             return StoredModelUse.of(use, slot == null ? null : slot.dataHandlingTier());
                         })
                         .toList());
     }
 
-    private Counter scripts(PracticeScriptRunStatus status) {
+    private Counter scripts(ScriptRunStatus status) {
         return meterRegistry.counter(
                 AgentMetrics.AGENT_REVIEW_PRACTICE_SCRIPTS,
                 Tags.of("status", status.name().toLowerCase(Locale.ROOT)));
-    }
-
-    /** The admitted practices by slug, as the job's evidence snapshot recorded them when it was prepared. */
-    private static Map<String, Long> admittedRevisions(@Nullable JsonNode snapshot) {
-        JsonNode practices = snapshot == null ? null : snapshot.get("practices");
-        if (practices == null || !practices.isArray()) return Map.of();
-        Map<String, Long> admitted = new HashMap<>();
-        for (JsonNode practice : practices) {
-            JsonNode slug = practice.path("slug");
-            JsonNode revisionId = practice.path("revisionId");
-            if (slug.isString() && revisionId.isIntegralNumber()) {
-                admitted.put(slug.asString(), revisionId.asLong());
-            }
-        }
-        return admitted;
     }
 }

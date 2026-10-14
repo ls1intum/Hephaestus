@@ -1,18 +1,17 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.OutcomeVectorDTO;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.dto.PracticeTrendDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendOpportunityDTO;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendSupportDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -36,7 +35,7 @@ public final class PracticeTrend {
      * Every piece of work in the look-back with a decided opportunity, uncapped: {@link #opportunities} is cut to
      * what a chart draws, and a group's count of reviewed work must still reach past that cut.
      */
-    private final Set<ReviewedWorkKey> reviewedWork;
+    private final Map<Long, ItemKind> reviewedWork;
 
     /** Absent for INSUFFICIENT_EVIDENCE, and for a group result, which aggregates rather than diffs. */
     private final BetaPosterior.@Nullable Difference difference;
@@ -49,7 +48,7 @@ public final class PracticeTrend {
             @Nullable OutcomeVector currentOutcomes,
             @Nullable OutcomeVector previousOutcomes,
             List<EvidenceOpportunity> opportunities,
-            Set<ReviewedWorkKey> reviewedWork,
+            Map<Long, ItemKind> reviewedWork,
             BetaPosterior.@Nullable Difference difference) {
         this.slug = slug;
         this.scope = scope;
@@ -58,7 +57,7 @@ public final class PracticeTrend {
         this.currentOutcomes = currentOutcomes;
         this.previousOutcomes = previousOutcomes;
         this.opportunities = List.copyOf(opportunities);
-        this.reviewedWork = Set.copyOf(reviewedWork);
+        this.reviewedWork = Map.copyOf(reviewedWork);
         this.difference = difference;
     }
 
@@ -149,13 +148,13 @@ public final class PracticeTrend {
         if (clean.isEmpty()) {
             return new CleanWork(0, decided.size(), null, null, List.of());
         }
-        ArtifactKind kind = CleanWork.mostOf(clean.stream().map(EvidenceOpportunity::artifactKind));
+        ItemKind kind = CleanWork.mostOf(clean.stream().map(EvidenceOpportunity::itemKind));
         return new CleanWork(
                 clean.size(),
                 decided.size(),
                 kind,
                 clean.getLast().occurredAt(),
-                clean.stream().map(EvidenceOpportunity::jobId).toList());
+                clean.stream().map(EvidenceOpportunity::reviewId).toList());
     }
 
     /**
@@ -163,14 +162,14 @@ public final class PracticeTrend {
      * @param decidedWork every piece of work that produced a verdict, the ceiling of {@code count}
      * @param kind the kind of work most of the clean work is, or null with none
      * @param since when the oldest piece of the clean work was reviewed, or null with none
-     * @param jobIds the runs that reviewed the clean work, newest first; what resolves where the work lives
+     * @param reviewIds the runs that reviewed the clean work, newest first; what resolves where the work lives
      */
     public record CleanWork(
             int count,
             int decidedWork,
-            @Nullable ArtifactKind kind,
+            @Nullable ItemKind kind,
             @Nullable Instant since,
-            List<UUID> jobIds) {
+            List<UUID> reviewIds) {
         /** The value most of the clean work shares, the newest piece's on a tie; null with no values. */
         public static <T> @Nullable T mostOf(Stream<T> newestFirst) {
             return newestFirst
@@ -201,7 +200,7 @@ public final class PracticeTrend {
         return opportunities;
     }
 
-    Set<ReviewedWorkKey> reviewedWork() {
+    Map<Long, ItemKind> reviewedWork() {
         return reviewedWork;
     }
 
@@ -223,13 +222,13 @@ public final class PracticeTrend {
                             return new TrendOpportunityDTO(
                                     index,
                                     opportunity.occurredAt(),
-                                    opportunity.artifactKind(),
-                                    opportunity.artifactId(),
+                                    opportunity.itemKind(),
+                                    Long.toString(opportunity.itemId()),
                                     new OutcomeVectorDTO(
                                             opportunity.outcomes().met(),
                                             opportunity.outcomes().notMet(),
-                                            opportunity.outcomes().notApplicable(),
-                                            opportunity.outcomes().undetermined()),
+                                            opportunity.outcomes().doesNotApply(),
+                                            opportunity.outcomes().couldNotDetermine()),
                                     opportunity.bundle());
                         })
                         .toList());

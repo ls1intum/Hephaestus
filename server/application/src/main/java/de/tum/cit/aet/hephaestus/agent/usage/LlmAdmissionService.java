@@ -10,6 +10,9 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import java.math.BigDecimal;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -102,7 +105,7 @@ public class LlmAdmissionService {
     private LlmPriceSnapshot instancePrice(Long modelId) {
         return priceRepository
                 .findByModelIdAndEffectiveToIsNull(modelId)
-                .map(price -> snapshot(price.getPricingMode(), FundingSource.INSTANCE, price.getId(), null, price))
+                .map(price -> snapshot(price.getPricingMode(), UsageFundingSource.INSTANCE, price.getId(), null, price))
                 .orElseThrow(() -> new IllegalStateException("The configured model has no usable price"));
     }
 
@@ -110,12 +113,12 @@ public class LlmAdmissionService {
         WorkspaceLlmModel model = workspaceModelRepository
                 .findByIdAndWorkspaceId(modelId, workspaceId)
                 .orElseThrow(LlmAdmissionService::modelUnavailable);
-        return snapshot(model.getPricingMode(), FundingSource.WORKSPACE, null, model.getId(), model);
+        return snapshot(model.getPricingMode(), UsageFundingSource.WORKSPACE, null, model.getId(), model);
     }
 
     private static LlmPriceSnapshot snapshot(
             PricingMode mode,
-            FundingSource source,
+            UsageFundingSource source,
             @Nullable Long priceId,
             @Nullable Long workspaceModelId,
             LlmModelPrice price) {
@@ -132,7 +135,7 @@ public class LlmAdmissionService {
 
     private static LlmPriceSnapshot snapshot(
             PricingMode mode,
-            FundingSource source,
+            UsageFundingSource source,
             @Nullable Long priceId,
             @Nullable Long workspaceModelId,
             WorkspaceLlmModel model) {
@@ -149,17 +152,17 @@ public class LlmAdmissionService {
 
     private static LlmPriceSnapshot snapshot(
             PricingMode mode,
-            FundingSource source,
+            UsageFundingSource source,
             @Nullable Long priceId,
             @Nullable Long workspaceModelId,
             @Nullable BigDecimal input,
             @Nullable BigDecimal output,
             @Nullable BigDecimal cacheRead,
             @Nullable BigDecimal cacheWrite) {
-        PricingState state =
+        UsagePricingState state =
                 switch (mode) {
-                    case PRICED -> PricingState.PRICED;
-                    case NO_CHARGE -> PricingState.NO_CHARGE;
+                    case PRICED -> UsagePricingState.PRICED;
+                    case NO_CHARGE -> UsagePricingState.NO_CHARGE;
                     case UNPRICED -> throw new IllegalStateException("The configured model has no usable price");
                 };
         return new LlmPriceSnapshot(source, state, priceId, workspaceModelId, input, output, cacheRead, cacheWrite);

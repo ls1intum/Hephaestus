@@ -26,7 +26,7 @@ import {
 	newModelCallTiming,
 } from "../../../main/resources/agent/pi-model-failure.ts";
 import { isRecord } from "../../../main/resources/agent/pi-result-normalize.ts";
-import { GOLDEN_CAUSE, PRACTICES_DIR } from "./golden-review-workspace.ts";
+import { GOLDEN_INPUTS, PRACTICES_DIR } from "./golden-review-workspace.ts";
 
 // The runner reads /workspace and the environment at module scope, so each scenario is a child
 // process: this file re-enters itself with the SDK mocked and drives one review through it.
@@ -36,21 +36,21 @@ const LIB = nodePath.resolve(
 	"../../../../../../docker/agents/practice-scripts/lib",
 );
 
-const supportOccurrence = (artifactKind: string, artifactId: number) => ({
-	practiceResultId: `support-${artifactKind}-${artifactId}`,
-	artifactKind,
-	artifactId,
+const supportOccurrence = (itemKind: string, itemId: number) => ({
+	resultId: `support-${itemKind}-${itemId}`,
+	itemKind,
+	itemId: String(itemId),
 	outcome: "NOT_MET",
-	origin: "LIVE",
+	origin: "EVENT",
 	summary: "A selected negative occurrence",
-	observedAt: "2026-10-07T08:00:00Z",
+	recordedAt: "2026-10-07T08:00:00Z",
 });
 
 /** One citation as admission projects it: its index, its coordinates, its verification and whether a note may sit on it. */
 const admittedCitation = {
 	index: 0,
 	sourceKind: "scm.pull-request.diff",
-	artifactPath: "evidence/change.json",
+	sourcePath: "evidence/change.json",
 	path: "src/Auth.java",
 	side: "NEW",
 	startLine: 10,
@@ -60,9 +60,9 @@ const admittedCitation = {
 	anchorable: true,
 };
 
-/** An admitted observation: one located problem of a NOT_MET result. */
-const admittedChild = (observationId: string, citation: unknown = admittedCitation) => ({
-	observationId,
+/** An admitted problem: one located problem of a NOT_MET result. */
+const admittedChild = (problemId: string, citation: unknown = admittedCitation) => ({
+	problemId,
 	position: 0,
 	severity: "MAJOR",
 	summary: "Login calls insecure() on every sign-in",
@@ -73,33 +73,97 @@ const admittedChild = (observationId: string, citation: unknown = admittedCitati
 	anchorable: true,
 });
 
-/** An admitted NOT_MET result of test-practice, as admission projects it, with its one observation. */
+/** An admitted NOT_MET result of test-practice, as admission projects it, with its one problem. */
 const admittedResult = {
-	practiceResultId: "result-1",
+	resultId: "result-1",
 	practiceSlug: "test-practice",
 	outcome: "NOT_MET",
-	severity: "MAJOR",
 	summary: "Added authentication call is insecure",
 	explanation: "The changed authentication code calls insecure().",
 	summaryOnly: false,
 	publicEligible: true,
 	citations: [],
-	evidence: { search: { consulted: ["scm.pull-request.diff"], lookedFor: "x", boundary: "y" } },
+	evidence: {
+		citations: [],
+		search: { consulted: ["scm.pull-request.diff"], lookedFor: "x", boundary: "y" },
+	},
 	example: null,
-	coverage: { source: "host", reads: 1, truncatedReads: 0, failedReads: 0, complete: true },
-	observations: [admittedChild("observation-1")],
+	coverage: {
+		source: "host",
+		reads: 1,
+		truncatedReads: 0,
+		failedReads: 0,
+		receipts: [],
+		complete: true,
+	},
+	problems: [admittedChild("problem-1")],
 };
 
-/** An admitted MET result: its own citations decide it, and it has no observation. */
-const metResult = (practiceResultId: string, practiceSlug: string) => ({
+/** An admitted MET result: its own citations decide it, and it has no problem. */
+const metResult = (resultId: string, practiceSlug: string) => ({
 	...admittedResult,
-	practiceResultId,
+	resultId,
 	practiceSlug,
 	outcome: "MET",
-	severity: null,
 	citations: [{ ...admittedCitation, anchorable: false }],
-	observations: [],
+	problems: [],
 });
+
+/** The worker wire response carries result citations in evidence and problem ids as id. */
+function admissionDto(value: unknown) {
+	const row = recordOf(value);
+	const { citations, problems, severity: _severity, ...fields } = row;
+	return {
+		...fields,
+		evidence: { ...recordOf(row.evidence), citations },
+		problems: listOf(problems).map((child) => {
+			const { problemId, ...problem } = recordOf(child);
+			return { ...problem, id: problemId };
+		}),
+	};
+}
+
+function historyDto(value: unknown) {
+	const response = recordOf(value);
+	const history = recordOf(response.history);
+	const entries = listOf(history.feedback)
+		.map(recordOf)
+		.filter(
+			(entry) =>
+				!["fresh", "body-transport"].includes(process.env.PI_PUBLIC_HISTORY_MODE ?? "") ||
+				entry.id === "00000000-0000-4000-8000-000000000001",
+		);
+	const first = entries[0];
+	const item = {
+		id: "1",
+		kind: "scm.pull_request",
+		url: "https://gitlab.example/group/repo/-/merge_requests/3",
+		...(first !== undefined && isRecord(first.item) ? first.item : {}),
+	};
+	return {
+		contractVersion: 3,
+		readAt: response.readAt,
+		history: {
+			item,
+			feedback: entries.map((entry) => ({
+				id: entry.id,
+				destination: entry.destination,
+				state: "DELIVERED",
+				deliveredAt: entry.deliveredAt ?? "2026-10-07T10:00:00Z",
+				itemVersion: null,
+				body: entry.body ?? null,
+				bodyUnavailable: entry.wordsUnavailable === "COPY_AUTHORITY_UNAVAILABLE",
+				currentness:
+					process.env.PI_PUBLIC_HISTORY_MODE === "missing-currentness"
+						? undefined
+						: (entry.recordedClaimCurrentness ?? "UNVERIFIABLE"),
+				withdrawn: entry.withdrawn ?? false,
+				basedOn: entry.basedOn ?? [],
+				copies: [],
+			})),
+		},
+	};
+}
 
 const timing = (calls: number[][], failedElapsedMs: number) => ({
 	timedCalls: calls.length,
@@ -133,7 +197,7 @@ function readToolText(path: string): string {
 
 const changeCitation = {
 	sourceKind: "scm.pull-request.diff",
-	artifactPath: "evidence/change.json",
+	sourcePath: "evidence/change.json",
 	path: "src/Auth.java",
 	side: "NEW",
 	startLine: 10,
@@ -161,7 +225,7 @@ const STAGED_PREPARED_HISTORY = JSON.stringify({
 		{
 			threadKey: "queued-current",
 			practiceSlug: "test-practice",
-			channel: "IN_CHAT",
+			destination: "CONVERSATION",
 			recordedClaimCurrentness: "CURRENT",
 			bodyRole: "MENTOR_NOTES",
 			body: "Earlier prepared mentor wording.",
@@ -169,7 +233,7 @@ const STAGED_PREPARED_HISTORY = JSON.stringify({
 		{
 			threadKey: "queued-withdrawn",
 			practiceSlug: "test-practice",
-			channel: "IN_CHAT",
+			destination: "CONVERSATION",
 			withdrawn: true,
 			recordedClaimCurrentness: "STALE",
 		},
@@ -183,19 +247,19 @@ const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 	feedback: [
 		{
 			id: "feedback-same-work",
-			channel: "IN_CONTEXT",
+			destination: "ON_WORK",
 			publicEligible: true,
-			artifact: {
+			item: {
 				kind: "scm.pull_request",
 				url: "https://gitlab.example/group/repo/-/merge_requests/3",
 			},
 			deliveredAt: "2026-09-01T10:00:00Z",
-			reviewedRevision: "c".repeat(40),
+			itemVersion: "c".repeat(40),
 			basedOn: [
 				{
 					id: "earlier-1",
 					practiceSlug: "test-practice",
-					practiceRevision: null,
+					practiceVersion: null,
 					outcome: "NOT_MET",
 				},
 			],
@@ -205,13 +269,13 @@ const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 		},
 		{
 			id: "feedback-earlier-work",
-			channel: "IN_APP",
-			artifact: {
+			destination: "PRACTICE_PAGE",
+			item: {
 				kind: "scm.pull_request",
 				url: "https://gitlab.example/group/repo/-/merge_requests/1",
 			},
 			deliveredAt: "2026-08-01T10:00:00Z",
-			reviewedRevision: null,
+			itemVersion: null,
 			basedOn: [],
 			recordedClaimCurrentness: "CURRENT",
 			bodyRole: "COMPOSED_GUIDANCE",
@@ -219,18 +283,18 @@ const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 		},
 		{
 			id: "feedback-withdrawn",
-			channel: "IN_APP",
-			artifact: {
+			destination: "PRACTICE_PAGE",
+			item: {
 				kind: "scm.pull_request",
 				url: "https://gitlab.example/group/repo/-/merge_requests/2",
 			},
 			deliveredAt: "2026-08-15T10:00:00Z",
-			reviewedRevision: "d".repeat(40),
+			itemVersion: "d".repeat(40),
 			basedOn: [
 				{
 					id: "earlier-2",
 					practiceSlug: "test-practice",
-					practiceRevision: null,
+					practiceVersion: null,
 					outcome: "NOT_MET",
 				},
 			],
@@ -239,71 +303,76 @@ const STAGED_FEEDBACK_HISTORY = JSON.stringify({
 		},
 		{
 			id: "feedback-legacy",
-			channel: null,
-			artifact: {
+			destination: null,
+			item: {
 				kind: "scm.pull_request",
 				url: "https://gitlab.example/group/repo/-/merge_requests/4",
 			},
 			deliveredAt: "2026-07-01T10:00:00Z",
-			reviewedRevision: null,
+			itemVersion: null,
 			basedOn: [],
 			recordedClaimCurrentness: "CURRENT",
 			bodyRole: "UNKNOWN",
-			body: "A legacy delivered note without a recorded channel.",
+			body: "A legacy delivered note without a recorded destination.",
 		},
 	],
 });
 
-/** A delivered record as the server stages it, on one channel, resting on one recorded NOT_MET observation. */
-const deliveredRecord = (id: string, channel: string, practiceSlug: string, overrides = {}) => ({
+/** A delivered record as the server stages it, on one destination, resting on one recorded NOT_MET problem. */
+const deliveredRecord = (
+	id: string,
+	destination: string,
+	practiceSlug: string,
+	overrides = {},
+) => ({
 	id,
-	channel,
-	artifact: {
+	destination,
+	item: {
 		kind: "scm.pull_request",
 		url: "https://gitlab.example/group/repo/-/merge_requests/1",
 	},
 	deliveredAt: "2026-08-01T10:00:00Z",
-	reviewedRevision: null,
-	basedOn: [{ id: `earlier-${id}`, practiceSlug, practiceRevision: null, outcome: "NOT_MET" }],
+	itemVersion: null,
+	basedOn: [{ id: `earlier-${id}`, practiceSlug, practiceVersion: null, outcome: "NOT_MET" }],
 	publicEligible: false,
 	recordedClaimCurrentness: "CURRENT",
-	bodyRole: channel === "IN_CHAT" ? "MENTOR_NOTES" : "COMPOSED_GUIDANCE",
-	body: `Earlier ${channel} feedback about ${practiceSlug}.`,
+	bodyRole: destination === "CONVERSATION" ? "MENTOR_NOTES" : "COMPOSED_GUIDANCE",
+	body: `Earlier ${destination} feedback about ${practiceSlug}.`,
 	...overrides,
 });
 
 /**
- * One delivered IN_APP card about each practice. On IN_CHAT, second-practice has current notes, and test-practice
+ * One delivered PRACTICE_PAGE card about each practice. On CONVERSATION, second-practice has current notes, and test-practice
  * has only records that do not count: malformed, MET-based, stale, withdrawn and undated.
  */
 const ALREADY_SAID_HISTORY = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
 	recordRole: "RECORDED_DELIVERY",
 	feedback: [
-		deliveredRecord("app-test", "IN_APP", "test-practice"),
-		deliveredRecord("app-second", "IN_APP", "second-practice"),
-		deliveredRecord("context-test", "IN_CONTEXT", "test-practice"),
-		deliveredRecord("chat-second", "IN_CHAT", "second-practice"),
-		deliveredRecord("chat-other", "IN_CHAT", "other-practice"),
-		deliveredRecord("chat-test-malformed", "IN_CHAT", "test-practice", { withdrawn: "false" }),
-		deliveredRecord("chat-test-met", "IN_CHAT", "test-practice", {
+		deliveredRecord("app-test", "PRACTICE_PAGE", "test-practice"),
+		deliveredRecord("app-second", "PRACTICE_PAGE", "second-practice"),
+		deliveredRecord("context-test", "ON_WORK", "test-practice"),
+		deliveredRecord("chat-second", "CONVERSATION", "second-practice"),
+		deliveredRecord("chat-other", "CONVERSATION", "other-practice"),
+		deliveredRecord("chat-test-malformed", "CONVERSATION", "test-practice", { withdrawn: "false" }),
+		deliveredRecord("chat-test-met", "CONVERSATION", "test-practice", {
 			basedOn: [{ id: "earlier-met", practiceSlug: "test-practice", outcome: "MET" }],
 		}),
-		deliveredRecord("chat-test-stale", "IN_CHAT", "test-practice", {
+		deliveredRecord("chat-test-stale", "CONVERSATION", "test-practice", {
 			recordedClaimCurrentness: "STALE",
 			bodyRole: undefined,
 			body: undefined,
 		}),
-		deliveredRecord("chat-test-withdrawn", "IN_CHAT", "test-practice", {
+		deliveredRecord("chat-test-withdrawn", "CONVERSATION", "test-practice", {
 			withdrawn: true,
 			bodyRole: undefined,
 			body: undefined,
 		}),
-		deliveredRecord("chat-test-undated", "IN_CHAT", "test-practice", { deliveredAt: null }),
+		deliveredRecord("chat-test-undated", "CONVERSATION", "test-practice", { deliveredAt: null }),
 	],
 });
 
-/** Prepared IN_CHAT notes about test-practice: queued, never delivered. */
+/** Prepared CONVERSATION notes about test-practice: queued, never delivered. */
 const ALREADY_SAID_PREPARED = JSON.stringify({
 	coverage: HISTORY_COVERAGE,
 	recordRole: "PREPARED_NOT_DELIVERED",
@@ -311,7 +380,7 @@ const ALREADY_SAID_PREPARED = JSON.stringify({
 		{
 			threadKey: "queued-test",
 			practiceSlug: "test-practice",
-			channel: "IN_CHAT",
+			destination: "CONVERSATION",
 			preparedAt: "2026-09-01T10:00:00Z",
 			recordedClaimCurrentness: "CURRENT",
 			bodyRole: "MENTOR_NOTES",
@@ -360,7 +429,7 @@ const met = (summary: string) => ({
 /** The captured record of the work, quoted by a result that rests on it. */
 const recordCitation = {
 	sourceKind: "scm.pull-request.core",
-	artifactPath: "evidence/metadata.json",
+	sourcePath: "evidence/metadata.json",
 	path: "evidence/metadata.json",
 	startLine: 1,
 	quote: '"title": "Add login"',
@@ -368,14 +437,14 @@ const recordCitation = {
 
 /** A result that decides nothing; for a practice that reads the change, it must show it read it. */
 const undecided = (consulted: string[]) => ({
-	outcome: "NOT_APPLICABLE",
+	outcome: "DOES_NOT_APPLY",
 	summary: "Nothing to assess in this change",
 	explanation: "The change touches only metadata.",
 	citations: [recordCitation],
 	evidence: {
 		inapplicability: {
 			consulted,
-			subject: "authentication calls",
+			prerequisite: "authentication calls",
 			ruledOutBy: "no code changed",
 		},
 	},
@@ -385,10 +454,10 @@ const undecided = (consulted: string[]) => ({
 function practice(
 	slug: string,
 	readsSources = ["scm.pull-request.core", "scm.pull-request.diff"],
-	revisionId?: unknown,
+	versionId?: unknown,
 	group = "code",
 ) {
-	return { slug, group, readsSources, ...(revisionId === undefined ? {} : { revisionId }) };
+	return { slug, group, readsSources, ...(versionId === undefined ? {} : { versionId }) };
 }
 
 /** The reviewed pull request's record, complete, as the server stages `metadata.json`. */
@@ -412,7 +481,7 @@ const WORK_RECORD = {
 };
 
 /** A program that prepares one lead on the added call and asks one review with it. */
-const LEADS_PROGRAM = `import { definePracticeScript } from "../lib/practice-script.ts";
+const LEADS_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
@@ -445,7 +514,7 @@ function readFeedbackResults(path: string) {
 
 function readResults(path: string) {
 	const payload = recordOf(JSON.parse(readFileSync(path, "utf8")));
-	assert.equal(payload.schemaVersion, 2);
+	assert.equal(payload.contractVersion, 3);
 	return listOf(payload.results).map(recordOf);
 }
 
@@ -474,12 +543,12 @@ interface CustomTool {
 }
 
 const withhold = (
-	channel: string,
+	destination: string,
 	practiceSlug: string,
 	withholdReason: string,
 	basedOn = [practiceSlug === "test-practice" ? "result-1" : "result-2"],
 ) => ({
-	channel,
+	destination,
 	practiceSlug,
 	basedOn,
 	action: "WITHHOLD",
@@ -533,16 +602,16 @@ if (scenario !== undefined && scenario !== "") {
 	mock.module(change, {
 		namedExports: { ...derived, writeChangeView: () => record("derive-change") },
 	});
-	/** A second NOT_MET practice's result, with its own observation. */
+	/** A second NOT_MET practice's result, with its own problem. */
 	const secondNotMet = {
 		...admittedResult,
-		practiceResultId: "result-2",
+		resultId: "result-2",
 		practiceSlug: "second-practice",
-		observations: [admittedChild("observation-2")],
+		problems: [admittedChild("problem-2")],
 	};
-	/** An admitted abstention: its own citations carry the limit it recorded, and it has no observation. */
+	/** An admitted abstention: its own citations carry the limit it recorded, and it has no problem. */
 	const abstention = (
-		practiceResultId: string,
+		resultId: string,
 		practiceSlug: string,
 		path: string,
 		startLine: number,
@@ -550,11 +619,11 @@ if (scenario !== undefined && scenario !== "") {
 		quote: string,
 	) => ({
 		...admittedResult,
-		practiceResultId,
+		resultId,
 		practiceSlug,
 		severity: null,
 		citations: [{ ...admittedCitation, path, startLine, endLine, quote }],
-		observations: [],
+		problems: [],
 	});
 	const admitted = (): unknown[] => {
 		switch (scenario) {
@@ -566,7 +635,7 @@ if (scenario !== undefined && scenario !== "") {
 					return {
 						...admittedResult,
 						...candidate,
-						practiceResultId: `result-${ids.indexOf(String(posted.practiceSlug)) + 1}`,
+						resultId: `result-${ids.indexOf(String(posted.practiceSlug)) + 1}`,
 						practiceSlug: posted.practiceSlug,
 						severity: null,
 						citations: listOf(candidate.citations).map((citation, index) => ({
@@ -574,7 +643,7 @@ if (scenario !== undefined && scenario !== "") {
 							index,
 							anchorable: false,
 						})),
-						observations: [],
+						problems: [],
 					};
 				});
 			}
@@ -619,11 +688,11 @@ if (scenario !== undefined && scenario !== "") {
 										42,
 										"+ unresolvedCurrentRequest();",
 									),
-									outcome: "UNDETERMINED",
+									outcome: "COULD_NOT_DETERMINE",
 									summary: "Unwarranted conformance summary",
 									explanation: "Unwarranted conformance rationale",
 									evidence: {
-										undecidability: [
+										openQuestions: [
 											{
 												openQuestion: "Which current request governs?",
 												wouldSettleIt:
@@ -641,11 +710,11 @@ if (scenario !== undefined && scenario !== "") {
 										73,
 										"+ unchangedInterface();",
 									),
-									outcome: "NOT_APPLICABLE",
+									outcome: "DOES_NOT_APPLY",
 									evidence: {
 										inapplicability: {
 											consulted: ["scm.pull-request.diff"],
-											subject: "A changed external interface",
+											prerequisite: "A changed external interface",
 											ruledOutBy: "The captured interface is unchanged.",
 										},
 									},
@@ -660,17 +729,17 @@ if (scenario !== undefined && scenario !== "") {
 				return [
 					{
 						...admittedResult,
-						observations: [admittedChild("observation-1"), admittedChild("observation-1b")],
+						problems: [admittedChild("problem-1"), admittedChild("problem-1b")],
 					},
 					{
 						...admittedResult,
-						practiceResultId: "result-history",
+						resultId: "result-history",
 						summary: PRIVATE_HISTORY_SENTENCE,
 						explanation: PRIVATE_HISTORY_SENTENCE,
 						publicEligible: false,
-						observations: [
+						problems: [
 							{
-								...admittedChild("observation-history", {
+								...admittedChild("problem-history", {
 									index: 0,
 									sourceKind: "hephaestus.feedback-history",
 									path: "history/feedback.json",
@@ -702,7 +771,7 @@ if (scenario !== undefined && scenario !== "") {
 		if (nativeSdk) {
 			assert.equal(String(input), "https://unused.invalid/admit-results");
 		}
-		if (String(input).endsWith("/complete-public-review")) {
+		if (String(input).endsWith("/prepare-feedback")) {
 			publicCompletionAttempts += 1;
 			const mode = process.env.PI_PUBLIC_COMPLETION_MODE;
 			if (mode !== undefined) {
@@ -713,9 +782,8 @@ if (scenario !== undefined && scenario !== "") {
 				);
 				const submitted: unknown = JSON.parse(body);
 				assert.ok(isRecord(submitted));
-				assert.equal(submitted.schemaVersion, 1);
-				assert.equal(submitted.admissionDigest, "admitted-digest");
-				assert.ok(isRecord(submitted.review));
+				assert.equal(submitted.reviewId, "11111111-1111-4111-8111-111111111111");
+				assert.ok(Array.isArray(submitted.composition));
 			}
 			if (mode === "refused") {
 				return Response.json(
@@ -726,7 +794,11 @@ if (scenario !== undefined && scenario !== "") {
 			if (mode === "lost-ack" && publicCompletionAttempts === 1) {
 				throw new TypeError("fetch failed");
 			}
-			return Response.json({ schemaVersion: 1, accepted: true, reviewDigest: "a".repeat(64) });
+			return Response.json({
+				feedbackIds: [],
+				preparedAt: "2026-10-14T12:00:00Z",
+				contentDigest: "a".repeat(64),
+			});
 		}
 		if (String(input).endsWith("/public-feedback-history")) {
 			const mode = process.env.PI_PUBLIC_HISTORY_MODE;
@@ -747,116 +819,126 @@ if (scenario !== undefined && scenario !== "") {
 				return new Response('{"schemaVersion":');
 			}
 			if (mode === "invalid" || mode === "invalid-link") {
-				return Response.json({
-					schemaVersion: 1,
-					readAt: "2026-10-07T11:00:00Z",
-					history: {
-						feedback: [
-							{
-								id: "00000000-0000-4000-8000-000000000001",
-								channel: "IN_CONTEXT",
-								publicEligible: true,
-								artifact: {
-									kind: "scm.pull_request",
-									url:
-										mode === "invalid-link"
-											? 42
-											: "https://gitlab.example/group/repo/-/merge_requests/3",
+				return Response.json(
+					historyDto({
+						schemaVersion: 1,
+						readAt: "2026-10-07T11:00:00Z",
+						history: {
+							feedback: [
+								{
+									id: "00000000-0000-4000-8000-000000000001",
+									destination: "ON_WORK",
+									publicEligible: true,
+									item: {
+										kind: "scm.pull_request",
+										url:
+											mode === "invalid-link"
+												? 42
+												: "https://gitlab.example/group/repo/-/merge_requests/3",
+									},
+									deliveredAt: mode === "invalid" ? "invalid" : "2026-10-07T10:00:00Z",
+									recordedClaimCurrentness: "CURRENT",
+									body: "Malformed non-null delivery time",
 								},
-								deliveredAt: mode === "invalid" ? "invalid" : "2026-10-07T10:00:00Z",
-								recordedClaimCurrentness: "CURRENT",
-								body: "Malformed non-null delivery time",
-							},
-						],
-					},
-				});
+							],
+						},
+					}),
+				);
 			}
 			if (mode === "unavailable-words" || mode === "missing-currentness") {
-				return Response.json({
-					schemaVersion: 1,
-					readAt: "2026-10-07T11:00:00Z",
-					history: {
-						wordsCoverage: "PARTIAL",
-						feedback: ["CURRENT", "STALE"].map((currentness, index) => ({
-							id: `00000000-0000-4000-8000-00000000000${index + 1}`,
-							channel: "IN_CONTEXT",
-							publicEligible: true,
-							artifact: {
-								kind: "scm.pull_request",
-								url: "https://gitlab.example/group/repo/-/merge_requests/3",
-							},
-							deliveredAt: "2026-10-07T10:00:00Z",
-							...(mode === "missing-currentness" ? {} : { recordedClaimCurrentness: currentness }),
-							...(index === 1 ? { withdrawn: true } : {}),
-							wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE",
-						})),
-					},
-				});
+				return Response.json(
+					historyDto({
+						schemaVersion: 1,
+						readAt: "2026-10-07T11:00:00Z",
+						history: {
+							wordsCoverage: "PARTIAL",
+							feedback: ["CURRENT", "STALE"].map((currentness, index) => ({
+								id: `00000000-0000-4000-8000-00000000000${index + 1}`,
+								destination: "ON_WORK",
+								publicEligible: true,
+								item: {
+									kind: "scm.pull_request",
+									url: "https://gitlab.example/group/repo/-/merge_requests/3",
+								},
+								deliveredAt: "2026-10-07T10:00:00Z",
+								...(mode === "missing-currentness"
+									? {}
+									: { recordedClaimCurrentness: currentness }),
+								...(index === 1 ? { withdrawn: true } : {}),
+								wordsUnavailable: "COPY_AUTHORITY_UNAVAILABLE",
+							})),
+						},
+					}),
+				);
 			}
 			if (mode === "refused") {
 				return new Response("Attempt no longer owns the job", { status: 409 });
 			}
 			if (mode === "fresh" || mode === "body-transport") {
-				return Response.json({
-					schemaVersion: 1,
-					readAt: "2026-10-07T11:00:00Z",
-					history: {
-						feedback: [
-							{
-								id: "00000000-0000-4000-8000-000000000001",
-								channel: "IN_CONTEXT",
-								publicEligible: true,
-								artifact: {
-									kind: "scm.pull_request",
-									url: "https://gitlab.example/group/repo/-/merge_requests/3",
-								},
-								deliveredAt: "2026-10-07T10:00:00Z",
-								recordedClaimCurrentness: "CURRENT",
-								body: "Fresh delivered communication",
-							},
-							{
-								id: "00000000-0000-4000-8000-000000000002",
-								channel: "IN_CONTEXT",
-								publicEligible: true,
-								artifact: {
-									kind: "scm.pull_request",
-									url: "https://gitlab.example/group/repo/-/merge_requests/3",
-								},
-								deliveredAt: null,
-								recordedClaimCurrentness: "CURRENT",
-								body: "Delivered with unknown time",
-							},
-							...[{ kind: "scm.pull_request" }, { kind: "scm.pull_request", url: null }].map(
-								(artifact, index) => ({
-									id: `00000000-0000-4000-8000-00000000000${index + 3}`,
-									channel: "IN_CONTEXT",
+				return Response.json(
+					historyDto({
+						schemaVersion: 1,
+						readAt: "2026-10-07T11:00:00Z",
+						history: {
+							feedback: [
+								{
+									id: "00000000-0000-4000-8000-000000000001",
+									destination: "ON_WORK",
 									publicEligible: true,
-									artifact,
-									deliveredAt: "2026-10-07T08:00:00Z",
+									item: {
+										kind: "scm.pull_request",
+										url: "https://gitlab.example/group/repo/-/merge_requests/3",
+									},
+									deliveredAt: "2026-10-07T10:00:00Z",
 									recordedClaimCurrentness: "CURRENT",
-									body: "Delivery with unknown work link",
-								}),
-							),
-						],
-					},
-				});
+									body: "Fresh delivered communication",
+								},
+								{
+									id: "00000000-0000-4000-8000-000000000002",
+									destination: "ON_WORK",
+									publicEligible: true,
+									item: {
+										kind: "scm.pull_request",
+										url: "https://gitlab.example/group/repo/-/merge_requests/3",
+									},
+									deliveredAt: null,
+									recordedClaimCurrentness: "CURRENT",
+									body: "Delivered with unknown time",
+								},
+								...[{ kind: "scm.pull_request" }, { kind: "scm.pull_request", url: null }].map(
+									(item, index) => ({
+										id: `00000000-0000-4000-8000-00000000000${index + 3}`,
+										destination: "ON_WORK",
+										publicEligible: true,
+										item,
+										deliveredAt: "2026-10-07T08:00:00Z",
+										recordedClaimCurrentness: "CURRENT",
+										body: "Delivery with unknown work link",
+									}),
+								),
+							],
+						},
+					}),
+				);
 			}
 			const path = nodePath.join(cwd, "history/feedback.json");
 			const history: unknown = existsSync(path)
 				? JSON.parse(readFileSync(path, "utf8"))
 				: { feedback: [] };
 			assert.ok(isRecord(history) && Array.isArray(history.feedback));
-			return Response.json({
-				schemaVersion: 1,
-				readAt: "2026-10-07T11:00:00Z",
-				history: {
-					...history,
-					feedback: history.feedback.filter(
-						(entry: unknown) =>
-							isRecord(entry) && entry.channel === "IN_CONTEXT" && entry.publicEligible === true,
-					),
-				},
-			});
+			return Response.json(
+				historyDto({
+					schemaVersion: 1,
+					readAt: "2026-10-07T11:00:00Z",
+					history: {
+						...history,
+						feedback: history.feedback.filter(
+							(entry: unknown) =>
+								isRecord(entry) && entry.destination === "ON_WORK" && entry.publicEligible === true,
+						),
+					},
+				}),
+			);
 		}
 		assert.ok(String(input).endsWith("/admit-results"), String(input));
 		record("admit");
@@ -867,7 +949,7 @@ if (scenario !== undefined && scenario !== "") {
 			now = 1_000_000 + Number(process.env.AGENT_BUDGET_MS) - 200;
 		}
 		const rows = admitted();
-		const supportMode = process.env.PI_IN_APP_SUPPORT_MODE;
+		const supportMode = process.env.PI_PRACTICE_PAGE_SUPPORT_MODE;
 
 		let selected: ReturnType<typeof supportOccurrence>[] = [];
 		if (
@@ -928,7 +1010,7 @@ if (scenario !== undefined && scenario !== "") {
 							} else if (inline) {
 								decision = "HAS_INLINE_ANCHOR";
 							}
-							return [{ practiceResultId: row.practiceResultId, decision }];
+							return [{ resultId: row.resultId, decision }];
 						}),
 					};
 		let support: unknown = complete;
@@ -947,19 +1029,19 @@ if (scenario !== undefined && scenario !== "") {
 					{
 						practiceSlug: "test-practice",
 						decision: "ADMIT",
-						occurrences: [{ ...supportOccurrence("scm.issue", 1), practiceRevisionId: "unknown" }],
+						occurrences: [{ ...supportOccurrence("scm.issue", 1), practiceVersionId: "unknown" }],
 					},
 				],
 			};
 		}
 
 		return Response.json({
-			schemaVersion: 2,
+			contractVersion: 3,
 			admissionDigest: "admitted-digest",
-			results: rows,
+			admitted: rows.map(admissionDto),
 			withheld: [],
-			inAppSupport: support,
-			inChatEligibility: chatRouting,
+			practicePageSupport: support,
+			conversationEligibility: chatRouting,
 		});
 	});
 	const manager = {
@@ -1025,7 +1107,7 @@ if (scenario !== undefined && scenario !== "") {
 					// The measurement session's loader comes first; the review composition's own follows it.
 					const first = !existsSync(nodePath.join(cwd, "system-prompt.md"));
 					const privateComposition = options.systemPrompt.includes(
-						"Compose from admitted observations.",
+						"Compose from admitted problems.",
 					);
 					let promptFile = "system-prompt.md";
 					if (!first) {
@@ -1687,7 +1769,7 @@ if (scenario !== undefined && scenario !== "") {
 											.slice(from)
 											.map((message) => ["report_review"].filter((name) => message.includes(name)));
 									const said = {
-										decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 									};
 									const decidesNothing = {};
@@ -1706,7 +1788,7 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-qualify" && reviewCompacted) {
 									const raised = {
-										decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 									};
 									// The review never acknowledges a MET result: a text that also rests on one is refused.
@@ -1743,7 +1825,7 @@ if (scenario !== undefined && scenario !== "") {
 									writeFileSync(
 										nodePath.join(cwd, "qualification-refused.txt"),
 										await attempt("r-q1", {
-											decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 										}),
 									);
@@ -1751,8 +1833,8 @@ if (scenario !== undefined && scenario !== "") {
 										`qualification-stored:${await attempt("r-q", {
 											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 											decisions: [
-												{ practiceResultId: "result-1", disposition: "RAISE" },
-												{ practiceResultId: "result-2", disposition: "BELOW_BAR" },
+												{ resultId: "result-1", disposition: "RAISE" },
+												{ resultId: "result-2", disposition: "BELOW_BAR" },
 											],
 										})}`,
 									);
@@ -1767,7 +1849,7 @@ if (scenario !== undefined && scenario !== "") {
 									// The composer leaves a problem undecided, then withholds it naming no witness, and then
 									// sends the corrected whole review.
 									const said = {
-										decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 									};
 									await this.steer();
@@ -1776,7 +1858,7 @@ if (scenario !== undefined && scenario !== "") {
 									record(`reselect-retained:${this.pendingMessageCount}`);
 									record(
 										`reselect-unwitnessed:${await attempt("r-1", {
-											decisions: [{ practiceResultId: "result-1", disposition: "ALREADY_SAID" }],
+											decisions: [{ resultId: "result-1", disposition: "ALREADY_SAID" }],
 										})}`,
 									);
 									record(
@@ -1796,7 +1878,7 @@ if (scenario !== undefined && scenario !== "") {
 									// The final review withholds the one problem, and the response then ends in a model error.
 									record(
 										`complete-final:${await attempt("r-e", {
-											decisions: [{ practiceResultId: "result-1", disposition: "BELOW_BAR" }],
+											decisions: [{ resultId: "result-1", disposition: "BELOW_BAR" }],
 										})}`,
 									);
 									emit({
@@ -1808,32 +1890,32 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "compose" || scenario === "compose-foreign-provider") {
 									record(
 										`review-refused:${await attempt("r-1", {
-											decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 											summary: { body: "Fine. <!-- marker -->", basedOn: ["result-1"] },
 											inline: [
 												{
 													body: "On this line.",
-													basedOn: ["observation-1"],
-													anchor: { observationId: "observation-1b", citationIndex: 0 },
+													basedOn: ["problem-1"],
+													anchor: { problemId: "problem-1b", citationIndex: 0 },
 												},
 											],
 										})}`,
 									);
 									record(
 										`review-history:${await attempt("r-h", {
-											decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 											summary: { body: "A sentence.", basedOn: ["result-history"] },
 										})}`,
 									);
 									record(
 										`review-stored:${await attempt("r-2", {
-											decisions: [{ practiceResultId: "result-1", disposition: "RAISE" }],
+											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
 											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
 											inline: [
 												{
 													body: "`insecure()` runs here before the token is checked; call the checked helper instead.",
-													basedOn: ["observation-1"],
-													anchor: { observationId: "observation-1", citationIndex: 0 },
+													basedOn: ["problem-1"],
+													anchor: { problemId: "problem-1", citationIndex: 0 },
 												},
 											],
 										})}`,
@@ -1848,8 +1930,8 @@ if (scenario !== undefined && scenario !== "") {
 									!counterevidence
 										? ["result-1", "result-2"]
 										: ["result-1"];
-								const decisions = ids.map((practiceResultId) => ({
-									practiceResultId,
+								const decisions = ids.map((resultId) => ({
+									resultId,
 									disposition: "BELOW_BAR",
 								}));
 								if (scenario === "compose-fold" && !reviewerOnly) {
@@ -1889,11 +1971,11 @@ if (scenario !== undefined && scenario !== "") {
 								// The composer's finishing prompt: the runner asks once more for the practices
 								// with a NOT_MET result, and a WITHHOLD is a recorded decision.
 								// Sent without basedOn: a WITHHOLD rests on its practice's NOT_MET result,
-								// found under the slug as any unit's slug is read.
+								// found under the slug as any piece's slug is read.
 								const withheld = await tool("report_feedback").execute("f-9", {
-									units: [
+									feedback: [
 										{
-											channel: "IN_APP",
+											destination: "PRACTICE_PAGE",
 											practiceSlug: " Test_Practice ",
 											action: "WITHHOLD",
 											withholdReason: "below_bar",
@@ -1907,42 +1989,42 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "compose-support") {
 									const feedback = tool("report_feedback");
 									const reply = await feedback.execute("support", {
-										units: [
+										feedback: [
 											{
-												channel: "IN_APP",
+												destination: "PRACTICE_PAGE",
 												practiceSlug: "test-practice",
-												basedOn: ["observation-1"],
+												basedOn: ["problem-1"],
 												action: "NEW",
 												title: "A repeated problem",
 												body: "The recurring problem",
 												nextStep: "Check the boundary",
 											},
 											{
-												channel: "IN_CHAT",
+												destination: "CONVERSATION",
 												practiceSlug: "test-practice",
-												basedOn: ["observation-1"],
+												basedOn: ["problem-1"],
 												action: "NEW",
 												title: "Discuss the boundary",
 												notes: {
 													situation: "Current problem",
 													capability: "Check the boundary",
 													evidenceSummary: "The admitted occurrence",
-													inConversationSignal: "A boundary discussion",
+													inConversationLearning: "A boundary discussion",
 												},
 											},
 										],
 									});
-									record(`support-units:${JSON.stringify(reply)}`);
+									record(`support-items:${JSON.stringify(reply)}`);
 									if (
-										process.env.PI_IN_APP_SUPPORT_MODE === "empty" ||
-										process.env.PI_IN_APP_SUPPORT_MODE === "duplicate"
+										process.env.PI_PRACTICE_PAGE_SUPPORT_MODE === "empty" ||
+										process.env.PI_PRACTICE_PAGE_SUPPORT_MODE === "duplicate"
 									) {
 										await feedback.execute("below", {
-											units: [
+											feedback: [
 												{
-													channel: "IN_APP",
+													destination: "PRACTICE_PAGE",
 													practiceSlug: "test-practice",
-													basedOn: ["observation-1"],
+													basedOn: ["problem-1"],
 													action: "WITHHOLD",
 													withholdReason: "BELOW_BAR",
 												},
@@ -1982,11 +2064,11 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-private-complete-error") {
 									await tool("report_feedback").execute("complete", {
-										units: [
+										feedback: [
 											{
-												channel: "IN_APP",
+												destination: "PRACTICE_PAGE",
 												practiceSlug: "test-practice",
-												basedOn: ["observation-1"],
+												basedOn: ["problem-1"],
 												action: "WITHHOLD",
 												withholdReason: "BELOW_BAR",
 											},
@@ -2008,11 +2090,11 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-partial-error") {
 									await tool("report_feedback").execute("partial", {
-										units: [
+										feedback: [
 											{
-												channel: "IN_APP",
+												destination: "PRACTICE_PAGE",
 												practiceSlug: "test-practice",
-												basedOn: ["observation-1"],
+												basedOn: ["problem-1"],
 												action: "WITHHOLD",
 												withholdReason: "BELOW_BAR",
 											},
@@ -2056,11 +2138,11 @@ if (scenario !== undefined && scenario !== "") {
 									scenario === "compose-complete-error"
 								) {
 									await tool("report_feedback").execute("paid", {
-										units: [
+										feedback: [
 											{
-												channel: "IN_APP",
+												destination: "PRACTICE_PAGE",
 												practiceSlug: "test-practice",
-												basedOn: ["observation-1"],
+												basedOn: ["problem-1"],
 												action: "WITHHOLD",
 												withholdReason: "BELOW_BAR",
 											},
@@ -2074,42 +2156,42 @@ if (scenario !== undefined && scenario !== "") {
 									return;
 								}
 								if (scenario === "compose-already-said") {
-									// A withholding that names earlier feedback needs a delivered record on its own channel
+									// A withholding that names earlier feedback needs a delivered record on its own destination
 									// for every NOT_MET practice it folds in; a refused one is stored nowhere and the lane
 									// can still be decided.
 									const feedback = tool("report_feedback");
 									const both = ["result-1", "result-2"];
 									const first = await feedback.execute("said", {
-										units: [
-											withhold("IN_CHAT", "second-practice", "NO_MATERIAL_CHANGE", [
+										feedback: [
+											withhold("CONVERSATION", "second-practice", "NO_MATERIAL_CHANGE", [
 												"result-2",
 												"result-1",
 											]),
-											withhold("IN_CHAT", "test-practice", "ALREADY_SAID"),
-											withhold("IN_APP", "test-practice", "ALREADY_SAID", both),
+											withhold("CONVERSATION", "test-practice", "ALREADY_SAID"),
+											withhold("PRACTICE_PAGE", "test-practice", "ALREADY_SAID", both),
 										],
 									});
 									record(`said-first:${JSON.stringify(first)}`);
 									const second = await feedback.execute("said-again", {
-										units: [
-											withhold("IN_CHAT", "test-practice", "NO_MATERIAL_CHANGE"),
-											withhold("IN_CHAT", "second-practice", "NO_MATERIAL_CHANGE", [
+										feedback: [
+											withhold("CONVERSATION", "test-practice", "NO_MATERIAL_CHANGE"),
+											withhold("CONVERSATION", "second-practice", "NO_MATERIAL_CHANGE", [
 												"result-2",
 												"result-3",
 											]),
-											withhold("IN_CHAT", "test-practice", "BELOW_BAR"),
+											withhold("CONVERSATION", "test-practice", "BELOW_BAR"),
 										],
 									});
 									record(`said-second:${JSON.stringify(second)}`);
 									return;
 								}
 								if (scenario === "compose-fold") {
-									// Two practices saw one event: one private unit names the practice that best names it
+									// Two practices saw one event: one private piece names the practice that best names it
 									// and folds the other's result into basedOn, which decides both.
 									const folded = await tool("report_feedback").execute("f-fold", {
-										units: [
+										feedback: [
 											{
-												channel: "IN_APP",
+												destination: "PRACTICE_PAGE",
 												practiceSlug: "test-practice",
 												basedOn: ["result-1", "result-2", "qualification-und", "qualification-na"],
 												action: "WITHHOLD",
@@ -2141,9 +2223,9 @@ if (scenario !== undefined && scenario !== "") {
 									`private-turn history=${String(text.includes(PRIVATE_HISTORY_SENTENCE))} review=${String(text.includes("The review composed for this work"))}`,
 								);
 								const card = {
-									channel: "IN_APP",
+									destination: "PRACTICE_PAGE",
 									practiceSlug: "test-practice",
-									basedOn: ["observation-1"],
+									basedOn: ["problem-1"],
 									action: "NEW",
 									title: "Insecure call",
 									body: "The pattern across your work.",
@@ -2151,7 +2233,7 @@ if (scenario !== undefined && scenario !== "") {
 								};
 								const feedback = tool("report_feedback");
 								// The schema carries the shape and the vocabulary and no rule: a rule is applied
-								// per unit, by the tool, so one wrong unit never discards the others in the call.
+								// per piece, by the tool, so one wrong piece never discards the others in the call.
 								const schema = JSON.stringify(feedback.parameters);
 								for (const keyword of ["maxLength", "additionalProperties", "minItems", "oneOf"]) {
 									assert.ok(
@@ -2159,50 +2241,50 @@ if (scenario !== undefined && scenario !== "") {
 										`${keyword} in ${schema.slice(0, 200)}`,
 									);
 								}
-								assert.match(schema, /One of: IN_APP\./u);
-								assert.match(schema, /Required: channel, practiceSlug, basedOn, action\./u);
+								assert.match(schema, /One of: PRACTICE_PAGE\./u);
+								assert.match(schema, /Required: destination, practiceSlug, basedOn, action\./u);
 								const historical = await feedback
 									.execute("historical", {
-										units: [{ ...card, basedOn: ["support-scm.issue-3"] }],
+										feedback: [{ ...card, basedOn: ["support-scm.issue-3"] }],
 									})
 									.then(() => "accepted")
 									.catch((error: unknown) =>
 										error instanceof Error ? error.message : String(error),
 									);
 								record(`feedback-historical:${historical}`);
-								// Trying to break it: every unit but the first is wrong in its own way, and each
+								// Trying to break it: every piece but the first is wrong in its own way, and each
 								// is answered on its own while the first is stored.
 								const reply = await feedback.execute("f-1", {
-									units: [
-										{ ...card, channel: "in_app", basedOn: "observation-1" },
+									feedback: [
+										{ ...card, destination: "PRACTICE_PAGE", basedOn: "problem-1" },
 										{
-											channel: "IN_APP",
+											destination: "PRACTICE_PAGE",
 											practiceSlug: "test-practice",
 											action: "NEW",
 											basedOn: [],
 										},
 										{ ...card, verdict: "BAD" },
 										{ ...card, body: "x".repeat(8001) },
-										{ ...card, channel: "IN_CHAT", withholdReason: "NOT_A_REASON" },
+										{ ...card, destination: "CONVERSATION", withholdReason: "NOT_A_REASON" },
 										{ ...card, practiceSlug: "other-practice" },
-										{ ...card, channel: "IN_CONTEXT", body: undefined },
-										"a unit as a string",
+										{ ...card, destination: "ON_WORK", body: undefined },
+										"a piece as a string",
 									],
 								});
 								record(`feedback:${JSON.stringify(reply)}`);
-								// A single unit sent bare where the list was asked for is the list of one.
+								// A single piece sent bare where the list was asked for is the list of one.
 								const bare = await feedback
 									.execute("f-2", {
-										units: {
+										feedback: {
 											...card,
-											channel: "IN_CHAT",
+											destination: "CONVERSATION",
 											body: undefined,
 											nextStep: undefined,
 											notes: {
 												situation: "s",
 												capability: "c",
 												evidenceSummary: "e",
-												inConversationSignal: "i",
+												inConversationLearning: "i",
 											},
 										},
 									})
@@ -2329,9 +2411,9 @@ if (scenario !== undefined && scenario !== "") {
 								const sibling =
 									currentSlug === "test-practice" ? "second-practice" : "test-practice";
 								const before = stateText();
-								// Seven refused submissions in each session: two sessions refuse more than the limit, and
+								// Six refused submissions in each session: two sessions refuse more than the limit, and
 								// neither practice is closed, since one practice's refusals spend none of the other's.
-								for (let attempt = 0; attempt < 7; attempt += 1) {
+								for (let attempt = 0; attempt < 6; attempt += 1) {
 									await assert.rejects(
 										firstTool.execute(
 											`refused-${attempt}`,
@@ -2344,10 +2426,14 @@ if (scenario !== undefined && scenario !== "") {
 									);
 								}
 								// A result that names the other practice is this session's: the host binds the practice.
-								const own = await firstTool.execute("own", {
-									...notMet(`Own ${currentSlug}`),
-									practiceSlug: sibling,
-								});
+								await assert.rejects(
+									firstTool.execute("foreign", {
+										...notMet(`Own ${currentSlug}`),
+										practiceSlug: sibling,
+									}),
+									/unknown.*practiceSlug/u,
+								);
+								const own = await firstTool.execute("own", notMet(`Own ${currentSlug}`));
 								assert.equal(stateText(), before);
 								record(`own:${currentSlug}:${JSON.stringify(own)}`);
 								return;
@@ -2496,7 +2582,7 @@ if (scenario !== undefined && scenario !== "") {
 										"o-1",
 										notMet(summary, {
 											sourceKind: "scm.repository.tree",
-											artifactPath: "repos/primary/.git/HEAD",
+											sourcePath: "repos/primary/.git/HEAD",
 											path,
 											startLine: 2,
 											quote,
@@ -2523,7 +2609,7 @@ if (scenario !== undefined && scenario !== "") {
 										"o-2",
 										notMet(`Cited at revision line ${startLine}`, {
 											sourceKind: "scm.repository.tree",
-											artifactPath: "repos/primary/.git/HEAD",
+											sourcePath: "repos/primary/.git/HEAD",
 											path: "src/Auth.java",
 											revision,
 											startLine,
@@ -2604,16 +2690,16 @@ if (scenario !== undefined && scenario !== "") {
 									report.execute("invalid-range", encoded("insecure();", "[L999]")),
 									/citation does not match/u,
 								);
-								// The declaration names no artifact; submitting still refuses one the capture did not stage.
+								// The declaration names no sourceFile; submitting still refuses one the capture did not stage.
 								await assert.rejects(
 									report.execute(
-										"uncaptured-artifact",
+										"uncaptured-sourceFile",
 										notMet("Unsafe authentication call", {
 											...changeCitation,
-											artifactPath: "evidence/never-captured.json",
+											sourcePath: "evidence/never-captured.json",
 										}),
 									),
-									/artifact 'evidence\/never-captured\.json' was not staged by 'scm\.pull-request\.diff'/u,
+									/sourceFile 'evidence\/never-captured\.json' was not staged by 'scm\.pull-request\.diff'/u,
 								);
 								assert.match(notesText(), /Nothing recorded yet/u);
 								const nullableCitation = {
@@ -2626,7 +2712,7 @@ if (scenario !== undefined && scenario !== "") {
 								const nullableEvidence = {
 									search: null,
 									inapplicability: null,
-									undecidability: null,
+									openQuestions: null,
 								};
 								// A warrant another outcome owes is refused, never moved or dropped.
 								await assert.rejects(
@@ -2636,7 +2722,7 @@ if (scenario !== undefined && scenario !== "") {
 											...nullableEvidence,
 											inapplicability: {
 												consulted: ["scm.pull-request.diff"],
-												subject: "none",
+												prerequisite: "none",
 												ruledOutBy: "none",
 											},
 										},
@@ -2719,12 +2805,12 @@ if (scenario !== undefined && scenario !== "") {
 									[
 										"third-practice",
 										{
-											outcome: "UNDETERMINED",
+											outcome: "COULD_NOT_DETERMINE",
 											summary: "Whether the call is reachable",
 											explanation: "The change adds the call; its callers are outside the change.",
 											citations: [changeCitation],
 											evidence: {
-												undecidability: [
+												openQuestions: [
 													{
 														openQuestion: "Is insecure() reachable from the login flow?",
 														wouldSettleIt: "The callers of Auth outside this change.",
@@ -2753,12 +2839,12 @@ if (scenario !== undefined && scenario !== "") {
 								if (currentSlug === "review-tone") {
 									record(
 										`tone-undecided:${await said("tone", {
-											outcome: "UNDETERMINED",
+											outcome: "COULD_NOT_DETERMINE",
 											summary: "The tone of the reviewer's note is ambiguous",
 											explanation: "The note can be read as a question or as an order.",
 											citations: metadataOnly.citations,
 											evidence: {
-												undecidability: [
+												openQuestions: [
 													{
 														openQuestion: "Is the note a question or an order?",
 														wouldSettleIt: "The reviewer's next note on the thread.",
@@ -2836,10 +2922,10 @@ if (scenario !== undefined && scenario !== "") {
 							assert.ok(isRecord(corrected) && isRecord(corrected.details));
 							assert.equal(corrected.details.revised, 1);
 							assert.match(notesText(), /test-practice: NOT_MET — A typed correction/u);
-							const { side: _side, ...sideless } = changeCitation;
+							const correctedCitation = changeCitation;
 							const reply = await report.execute(
 								"o-1",
-								revise("Unsafe authentication call", sideless),
+								revise("Unsafe authentication call", correctedCitation),
 							);
 							record(`batch:${JSON.stringify(reply)}`);
 							// A result that names another practice is still this session's: the host binds the practice.
@@ -2867,23 +2953,27 @@ if (scenario !== undefined && scenario !== "") {
 							record(`corrected-kind:${JSON.stringify(kind)}`);
 							// A record cited under the diff's source kind, with a diff side: recorded as the
 							// record's own source, without the side admission would refuse.
-							const side = await report.execute(
-								"o-side",
-								revise("A record cited with a diff side", {
-									sourceKind: "scm.pull-request.diff",
-									artifactPath: "evidence/metadata.json",
-									path: "evidence/metadata.json",
-									side: "NEW",
-									revision: "c".repeat(40),
-									startLine: 1,
-									quote: '"title": "Add login"',
-								}),
+							await assert.rejects(
+								report.execute(
+									"o-side",
+									revise("A record cited with a diff side", {
+										sourceKind: "scm.pull-request.core",
+										sourcePath: "evidence/metadata.json",
+										path: "evidence/metadata.json",
+										side: "NEW",
+										revision: "c".repeat(40),
+										startLine: 1,
+										quote: '"title": "Add login"',
+									}),
+								),
+								/forbidden by the source catalog/u,
 							);
-							record(`corrected-side:${JSON.stringify(side)}`);
+							record("corrected-side:refused by the source catalog");
 							const path = await report.execute(
 								"o-path",
 								revise("A record quoted under the change", {
-									...changeCitation,
+									sourceKind: "scm.pull-request.core",
+									sourcePath: "evidence/metadata.json",
 									path: "evidence/metadata.json",
 									startLine: 1,
 									endLine: 1,
@@ -2895,7 +2985,7 @@ if (scenario !== undefined && scenario !== "") {
 							// A resend of what is already submitted stores nothing: an error, or it reads as done.
 							const resent = await report
 								.execute("o-3", revise("The login change calls an insecure helper"))
-								.then(() => "accepted")
+								.then((answer) => JSON.stringify(answer))
 								.catch((error: unknown) =>
 									error instanceof Error ? error.message : String(error),
 								);
@@ -3121,7 +3211,7 @@ if (scenario !== undefined && scenario !== "") {
 				"tree-citation":
 					"verifies a HEAD repository citation against the checkout and finalizes out/",
 				compose:
-					"uses selected native issue and merge request identities while retaining current-only unit grounding",
+					"uses selected native issue and merge request identities while retaining current-only piece grounding",
 				"compose-foreign-provider":
 					"keeps distinct native work identities separate from provider URL text",
 				"compose-continuation":
@@ -3154,9 +3244,9 @@ if (scenario !== undefined && scenario !== "") {
 				"compose-context-unavailable":
 					"keeps missing and empty standards and unknown history explicit without inventing their contents",
 				"compose-fold":
-					"counts a NOT_MET practice folded into another practice's unit as decided and asks no more",
+					"counts a NOT_MET practice folded into another practice's piece as decided and asks no more",
 				"compose-already-said":
-					"withholds as already said only on the channel and practice that captured delivered feedback records",
+					"withholds as already said only on the destination and practice that captured delivered feedback records",
 				"compose-already-said-inline":
 					"refuses even a withholding on an open lane for a practice the server routed elsewhere",
 				"compose-support-cooldown":
@@ -3186,7 +3276,7 @@ if (scenario !== undefined && scenario !== "") {
 					);
 					writeFileSync(
 						nodePath.join(cwd, "feedback-composer.md"),
-						"Compose from admitted observations.",
+						"Compose from admitted problems.",
 					);
 					writeFileSync(nodePath.join(cwd, "review-composer.md"), "Write the review on the work.");
 					writeFileSync(nodePath.join(cwd, "feedback-style.md"), "Write clear, useful feedback.");
@@ -3207,13 +3297,13 @@ if (scenario !== undefined && scenario !== "") {
 					if (stage === "compose-support") {
 						mkdirSync(nodePath.join(cwd, "history"), { recursive: true });
 						writeFileSync(
-							nodePath.join(cwd, "history/observations.json"),
+							nodePath.join(cwd, "history/problems.json"),
 							JSON.stringify({
-								observations: [
+								problems: [
 									{
 										practiceSlug: "test-practice",
 										outcome: "NOT_MET",
-										artifact: {
+										item: {
 											kind: "scm.issue",
 											url: "https://gitlab.example/group/repo/-/issues/1",
 										},
@@ -3221,7 +3311,7 @@ if (scenario !== undefined && scenario !== "") {
 									{
 										practiceSlug: "test-practice",
 										outcome: "NOT_MET",
-										artifact: {
+										item: {
 											kind: "scm.issue",
 											url: "https://gitlab.example/group/repo/-/issues/2",
 										},
@@ -3244,11 +3334,11 @@ if (scenario !== undefined && scenario !== "") {
 					let practiceCriteria = "# Test practice\nCriteria.";
 					if (stage.startsWith("provider-reply-")) {
 						practiceCriteria =
-							"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n\n## Occasion\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Grounding\nCite the added call in the captured change.\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.";
+							"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n\n## applicability\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Grounding\nCite the added call in the captured change.\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.";
 					}
 					if (stage === "measure-context-compact") {
 						practiceCriteria =
-							"    let answer = qualified(work)\n\n# Standard\nBounded criterion.  \n\n## Occasion\nOnly captured work.\n\n## Judge\nQualify the outcome.\n\n## Defer\nUnknown remains unknown.  \n\n";
+							"    let answer = qualified(work)\n\n# Standard\nBounded criterion.  \n\n## applicability\nOnly captured work.\n\n## Judge\nQualify the outcome.\n\n## Defer\nUnknown remains unknown.  \n\n";
 					} else if (stage === "context-unfit") {
 						practiceCriteria = "Essential criteria. ".repeat(30_000);
 					} else if (stage === "compose-reselect" || stage === "compose-recover") {
@@ -3276,22 +3366,22 @@ if (scenario !== undefined && scenario !== "") {
 							nodePath.join(cwd, "evidence/composition.json"),
 							JSON.stringify({
 								enabled: true,
-								channels: {
-									IN_APP: { enabled: true, maxUnits: 1 },
-									IN_CONTEXT: { enabled: true, maxUnits: 1 },
+								destinations: {
+									PRACTICE_PAGE: { enabled: true, maxPieces: 1 },
+									ON_WORK: { enabled: true, maxPieces: 1 },
 									...(stage === "compose-support" || stage === "compose-already-said"
 										? {
-												IN_CHAT: {
+												CONVERSATION: {
 													enabled: fixture !== "compose-support-refused-only",
-													maxUnits: 1,
+													maxPieces: 1,
 												},
 											}
 										: {}),
 								},
-								inContextPlacementKinds:
+								onWorkCopyForms:
 									stage === "compose" || stage === "compose-foreign-provider"
-										? ["ARTIFACT", "DIFF"]
-										: ["ARTIFACT"],
+										? ["FILE_NOTE", "LINE_NOTE"]
+										: ["FILE_NOTE"],
 							}),
 						);
 					}
@@ -3300,9 +3390,9 @@ if (scenario !== undefined && scenario !== "") {
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition-continuation.json"),
 							JSON.stringify({
-								schemaVersion: 2,
+								contractVersion: 3,
 								admissionDigest: "continued-digest",
-								results: [admittedResult],
+								admitted: [admissionDto(admittedResult)],
 								withheld: [],
 							}),
 						);
@@ -3346,43 +3436,46 @@ if (scenario !== undefined && scenario !== "") {
 					writeFileSync(
 						nodePath.join(cwd, "evidence/manifest.json"),
 						JSON.stringify({
-							artifactKind: "scm.pull_request",
+							itemKind: "scm.pull_request",
 							...(fixture === "compose-fresh-history" ||
 							fixture === "compose-history-body-transport"
 								? { capturedAt: "2026-10-07T09:00:00Z" }
 								: {}),
-							artifacts: [
-								{ kind: "scm.pull-request.core", artifact: { path: "evidence/metadata.json" } },
-								{ kind: "scm.pull-request.diff", artifact: { path: "evidence/change.json" } },
+							files: [
+								{ kind: "scm.pull-request.core", file: { path: "evidence/metadata.json" } },
+								{ kind: "scm.pull-request.diff", file: { path: "evidence/change.json" } },
 								// The checkout witness: admission verifies every quote of code against it.
-								{ kind: "scm.repository.tree", artifact: { path: "repos/primary/.git/HEAD" } },
+								{ kind: "scm.repository.tree", file: { path: "repos/primary/.git/HEAD" } },
 								{
 									kind: "scm.repository.tree",
-									artifact: { path: "repos/primary/.git/hephaestus-captured-refs" },
+									file: { path: "repos/primary/.git/hephaestus-captured-refs" },
 								},
 								// A capture this large must not make the reporter's declaration uncompilable.
 								...(stage === "argument-repairs"
 									? Array.from({ length: 5000 }, (_, index) => ({
 											kind: "scm.pull-request.core",
-											artifact: { path: `evidence/captured/${index}.json` },
+											file: { path: `evidence/captured/${index}.json` },
 										}))
 									: []),
 							],
 							sources: [
 								{
 									kind: "scm.pull-request.core",
+									citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 									state: { availability: "AVAILABLE" },
-									artifacts: [{ path: "evidence/metadata.json" }],
+									files: [{ path: "evidence/metadata.json" }],
 								},
 								{
 									kind: "scm.pull-request.diff",
+									citation: { side: "REQUIRED", revision: "OPTIONAL" },
 									state: { availability: "AVAILABLE" },
-									artifacts: [{ path: "evidence/change.json" }],
+									files: [{ path: "evidence/change.json" }],
 								},
 								{
 									kind: "scm.repository.tree",
+									citation: { side: "FORBIDDEN", revision: "OPTIONAL" },
 									state: { availability: "AVAILABLE" },
-									artifacts: [
+									files: [
 										{ path: "repos/primary/.git/HEAD" },
 										{ path: "repos/primary/.git/hephaestus-captured-refs" },
 									],
@@ -3392,7 +3485,7 @@ if (scenario !== undefined && scenario !== "") {
 					);
 					let index = [practice("test-practice")];
 					if (stage === "compose") {
-						index = [practice("test-practice", undefined, 42)];
+						index = [practice("test-practice", undefined, "42")];
 					} else if (stage === "compose-foreign-provider") {
 						index = [practice("test-practice", undefined, "42")];
 					}
@@ -3439,10 +3532,9 @@ if (scenario !== undefined && scenario !== "") {
 					writeFileSync(nodePath.join(cwd, "catalog/practices/index.json"), JSON.stringify(index));
 					for (const { slug } of index) {
 						writeFileSync(
-							nodePath.join(cwd, PRACTICES_DIR, `${slug}.cause.json`),
-							JSON.stringify(GOLDEN_CAUSE),
+							nodePath.join(cwd, PRACTICES_DIR, `${slug}.inputs.json`),
+							JSON.stringify({ ...GOLDEN_INPUTS, practice: { ...GOLDEN_INPUTS.practice, slug } }),
 						);
-						writeFileSync(nodePath.join(cwd, PRACTICES_DIR, `${slug}.previous.json`), "null");
 					}
 					writeFileSync(
 						nodePath.join(cwd, "catalog/practices/second-practice.md"),
@@ -3457,7 +3549,11 @@ if (scenario !== undefined && scenario !== "") {
 					writeFileSync(
 						nodePath.join(cwd, "task.json"),
 						JSON.stringify({
-							schemaVersion: 5,
+							schemaVersion: 6,
+							reviewId: "11111111-1111-4111-8111-111111111111",
+							jobId: "22222222-2222-4222-8222-222222222222",
+							attempt: 1,
+							workspaceId: "1",
 							contextRoot: "evidence",
 							repositoryRoot: "repos/primary",
 							manifest: "evidence/manifest.json",
@@ -3485,7 +3581,7 @@ if (scenario !== undefined && scenario !== "") {
 								PI_PUBLIC_COMPLETION_MODE: fixture.startsWith("compose-completion-")
 									? fixture.slice("compose-completion-".length)
 									: undefined,
-								PI_IN_APP_SUPPORT_MODE: fixture.startsWith("compose-support-")
+								PI_PRACTICE_PAGE_SUPPORT_MODE: fixture.startsWith("compose-support-")
 									? fixture.slice("compose-support-".length)
 									: new Map([["compose-already-said-inline", "first-inline"]]).get(fixture),
 								PI_UNAVAILABLE_CONTEXT: String(fixture === "compose-context-unavailable"),
@@ -3619,22 +3715,20 @@ if (scenario !== undefined && scenario !== "") {
 							const privateIndex = events.findIndex((event) => event.startsWith("private-turn"));
 							const lastAttempt = attempts.at(-1);
 							assert.ok(lastAttempt !== undefined);
-							assert.ok(privateIndex > events.indexOf(lastAttempt));
-							assert.ok(
-								Array.isArray(payload.units) && payload.units.length > 0,
-								"Private feedback still completes",
-							);
+							assert.ok(privateIndex < events.indexOf(lastAttempt));
+							assert.ok(Array.isArray(payload.feedback));
+							assert.equal(payload.feedback.length > 0, fixture !== "compose-completion-refused");
 							if (fixture === "compose-completion-refused") {
 								assert.equal(payload.review, null);
 								assert.deepEqual(payload.compositionFailures, [
 									{ phase: "PUBLIC_REVIEW", reason: "SERVER_REFUSED" },
+									{ phase: "PRIVATE_FEEDBACK", reason: "SERVER_REFUSED" },
 								]);
-								assert.ok(events.includes("private-turn history=true review=false"));
 							} else {
 								assert.ok(isRecord(payload.review));
 								assert.deepEqual(payload.compositionFailures, []);
-								assert.ok(events.includes("private-turn history=true review=true"));
 							}
+							assert.ok(events.includes("private-turn history=true review=true"));
 							if (attempts.length === 2) {
 								const [first, second] = attempts;
 								assert.ok(first !== undefined && second !== undefined);
@@ -3710,13 +3804,13 @@ if (scenario !== undefined && scenario !== "") {
 						);
 						assert.ok(isRecord(feedback));
 						assert.deepEqual(
-							listOf(feedback.results).map((row) => recordOf(row).practiceResultId),
+							listOf(feedback.results).map((row) => recordOf(row).resultId),
 							["result-1", "result-2", "qualification-und", "qualification-na"],
 						);
-						assert.ok(Array.isArray(feedback.units) && feedback.units.length > 0);
+						assert.ok(Array.isArray(feedback.feedback) && feedback.feedback.length > 0);
 						assert.ok(
-							feedback.units.every(
-								(unit: unknown) => isRecord(unit) && unit.channel !== "IN_CONTEXT",
+							feedback.feedback.every(
+								(piece: unknown) => isRecord(piece) && piece.destination !== "ON_WORK",
 							),
 						);
 						return;
@@ -3767,8 +3861,8 @@ if (scenario !== undefined && scenario !== "") {
 								const payload: unknown = JSON.parse(
 									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 								);
-								assert.ok(isRecord(payload) && Array.isArray(payload.units));
-								assert.equal(payload.units.length, 1);
+								assert.ok(isRecord(payload) && Array.isArray(payload.feedback));
+								assert.equal(payload.feedback.length, 1);
 							}
 
 							const failures: Record<string, [string, unknown, number, unknown][]> = {
@@ -3899,15 +3993,12 @@ if (scenario !== undefined && scenario !== "") {
 							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
 							ran({ "second-practice": "ok", "test-practice": "ok" });
 							if (stage === "scope-ownership") {
-								// Each session's seven refusals are its own practice's, and each result is bound to the
-								// practice of the session that submitted it, whatever the result named.
+								// Each session's six refusals are its own practice's, and each result is bound to the
+								// practice of the session that submitted it, only after the v3 candidate is valid.
 								for (const slug of ["test-practice", "second-practice"]) {
 									assert.match(
 										events.find((event) => event.startsWith(`own:${slug}:`)) ?? "",
-										new RegExp(
-											`${slug}: stored \\(negative\\)[\\s\\S]*practiceSlug dropped: the host binds the practice`,
-											"u",
-										),
+										new RegExp(`${slug}: stored \\(negative\\)`, "u"),
 									);
 								}
 								assert.doesNotMatch(child.stderr, /refusal limit/u);
@@ -4205,8 +4296,8 @@ for (const item of [
   { ...base, problems: [without(problem, "basis")] },
   { ...base, problems: [{ ...problem, basis: { ...problem.basis, type: "state" } }] },
   { ...base, problems: [{ ...problem, citations: [] }] },
-  { ...base, problems: [{ ...problem, citations: [without(citation, "artifactPath")] }] },
-  { ...base, problems: [{ ...problem, citations: [{ ...citation, artifactPath: "" }] }] },
+  { ...base, problems: [{ ...problem, citations: [without(citation, "sourcePath")] }] },
+  { ...base, problems: [{ ...problem, citations: [{ ...citation, sourcePath: "" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, sourceKind: "hephaestus.result-history" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, side: "MIDDLE" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, startLine: 0 }] }] },
@@ -4215,25 +4306,25 @@ for (const item of [
 }
 // Optional fields stay optional: their absence is accepted as it is, not filled in.
 const decided = { outcome: "MET", summary: base.summary, explanation: base.explanation, citations: [citation] };
-const inapplicability = { consulted: [citation.sourceKind], subject: "Runtime behavior", ruledOutBy: "Only documentation changed." };
+const inapplicability = { consulted: [citation.sourceKind], prerequisite: "Runtime behavior", ruledOutBy: "Only documentation changed." };
 const question = { openQuestion: "Was the described test run?", wouldSettleIt: "The referenced test report." };
 for (const item of [
   { ...base, problems: [{ ...problem, citations: [without(without(without(citation, "side"), "endLine"), "quote")] }] },
   { ...decided, evidence: {} },
-  { ...decided, outcome: "NOT_APPLICABLE", evidence: { inapplicability } },
-  { ...decided, outcome: "UNDETERMINED", evidence: { undecidability: [question] } },
+  { ...decided, outcome: "DOES_NOT_APPLY", evidence: { inapplicability } },
+  { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: { openQuestions: [question] } },
 ]) {
   assert.deepEqual(validate(item), item);
 }
 // Nullable absence is valid for every outcome, including a provider that requires all declared fields.
-const absent = { search: null, inapplicability: null, undecidability: null };
+const absent = { search: null, inapplicability: null, openQuestions: null };
 const withoutQuote = { ...citation, side: null, revision: null, endLine: null, quote: null };
-const nulls = { problems: null, severity: null, example: null };
+const nulls = { problems: null, example: null };
 const nullableCases = [
-  { ...base, severity: null, example: null, problems: [{ ...problem, key: null, nextStep: null, citations: [withoutQuote] }], evidence: absent },
+  { ...base, example: null, problems: [{ ...problem, key: null, nextStep: null, citations: [withoutQuote] }], evidence: absent },
   { ...decided, ...nulls, citations: [withoutQuote], evidence: absent },
-  { ...decided, ...nulls, outcome: "NOT_APPLICABLE", citations: [withoutQuote], evidence: { ...absent, inapplicability } },
-  { ...decided, ...nulls, outcome: "UNDETERMINED", citations: [withoutQuote], evidence: { ...absent, undecidability: [{ ...question, citation: null }] } },
+  { ...decided, ...nulls, outcome: "DOES_NOT_APPLY", citations: [withoutQuote], evidence: { ...absent, inapplicability } },
+  { ...decided, ...nulls, outcome: "COULD_NOT_DETERMINE", citations: [withoutQuote], evidence: { ...absent, openQuestions: [{ ...question, citation: null }] } },
 ];
 const responseDeclaration = convertResponsesTools([{ ...tool, description: "Submit a result." }])[0];
 assert.equal(responseDeclaration.strict, false);
@@ -4255,8 +4346,8 @@ for (const [field, invalid] of [
   }
 }
 for (const item of [
-  { ...decided, outcome: "NOT_APPLICABLE", evidence: { inapplicability: {} } },
-  { ...decided, outcome: "UNDETERMINED", evidence: { undecidability: [{}] } },
+  { ...decided, outcome: "DOES_NOT_APPLY", evidence: { inapplicability: {} } },
+  { ...decided, outcome: "COULD_NOT_DETERMINE", evidence: { openQuestions: [{}] } },
   { ...base, evidence: { search: {} } },
 ]) {
   assert.throws(() => validate(item));
@@ -4337,7 +4428,13 @@ for (const item of nullableCases) {
 								],
 							);
 							const admission = recordOf(JSON.parse(readFileSync(admissionPath, "utf8")));
-							assert.deepEqual(Object.keys(admission), ["schemaVersion", "results"]);
+							assert.deepEqual(Object.keys(admission), [
+								"contractVersion",
+								"reviewId",
+								"jobId",
+								"attempt",
+								"results",
+							]);
 							assert.ok(!JSON.stringify(admission).includes("revises"));
 							assert.ok(!JSON.stringify(admission).includes("Authentication call goes through"));
 							// After admission, a submission outside an open review is refused and changes nothing.
@@ -4369,7 +4466,7 @@ for (const item of nullableCases) {
 									([slug, candidate]) => [slug, candidate.outcome],
 								),
 								[
-									["review-tone", "UNDETERMINED"],
+									["review-tone", "COULD_NOT_DETERMINE"],
 									["test-practice", "NOT_MET"],
 								],
 							);
@@ -4415,7 +4512,7 @@ for (const item of nullableCases) {
 								"evidence/manifest.json",
 								"catalog/practices/index.json",
 								"catalog/practices",
-								"history/observations.json",
+								"history/problems.json",
 							]) {
 								assert.ok(system.includes(path), path);
 							}
@@ -4436,7 +4533,7 @@ for (const item of nullableCases) {
 							assert.match(reply, /test-practice: revised \(negative\)/u, child.stderr);
 							assert.match(
 								events.find((event) => event.startsWith("outside:")) ?? "",
-								/test-practice: revised \(negative\)[\s\S]*practiceSlug dropped: the host binds the practice/u,
+								/unknown.*practiceSlug/u,
 							);
 							// Nothing is left for the session to submit, so it ends with this call.
 							assert.match(reply, /"terminate":true/u);
@@ -4476,17 +4573,11 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								events.find((event) => event.startsWith("corrected-side:")) ?? "",
-								/test-practice: revised \(negative\)\.[^#]*evidence\/metadata\.json is staged by scm\.pull-request\.core, not scm\.pull-request\.diff; recorded as scm\.pull-request\.core/u,
-							);
-							// A side selects a line of the change and a revision a commit of the checkout; on a record
-							// each says nothing, and is dropped.
-							assert.match(
-								events.find((event) => event.startsWith("corrected-side:")) ?? "",
-								/side dropped — only a line of the change has a side[\s\S]*revision dropped — only a repository file is read at a revision/u,
+								/refused by the source catalog/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("corrected-path:")) ?? "",
-								/recorded against it/u,
+								/revised/u,
 							);
 							const result = candidatesIn(nodePath.join(cwd, "out/result.json"));
 							assert.deepEqual([...result.keys()], ["second-practice", "test-practice"]);
@@ -4531,7 +4622,7 @@ for (const item of nullableCases) {
 							assert.ok(first.includes("### `evidence/metadata.json`"), first.slice(0, 300));
 							assert.match(
 								first,
-								/## How submit_result takes a result[\s\S]*"artifactPath": "evidence\/change\.json"/u,
+								/## How submit_result takes a result[\s\S]*"sourcePath": "evidence\/change\.json"/u,
 							);
 							assert.ok(third.includes("### `evidence/metadata.json`"));
 							assert.doesNotMatch(third, /### Practice `test-practice`|test-practice: NOT_MET/u);
@@ -4692,7 +4783,7 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								refused,
-								/NOT_MET for a problem it proves, or UNDETERMINED with the open question/u,
+								/NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("met-notes:")) ?? "",
@@ -4712,13 +4803,14 @@ for (const item of nullableCases) {
 								reads: 1,
 								truncatedReads: 1,
 								failedReads: 0,
+								receipts: [],
 								complete: false,
 								omitted: [
 									{
 										what: "reads cut short at the tool's output limit",
 										count: 1,
 										reason: "truncated",
-										units: ["work/change/diff.patch"],
+										items: ["work/change/diff.patch"],
 									},
 								],
 							});
@@ -4750,7 +4842,7 @@ for (const item of nullableCases) {
 							assert.deepEqual(problem?.citations, [
 								{
 									sourceKind: "scm.repository.tree",
-									artifactPath: "repos/primary/.git/HEAD",
+									sourcePath: "repos/primary/.git/HEAD",
 									path: "src/Auth.java",
 									startLine: 2,
 									endLine: 2,
@@ -4765,7 +4857,7 @@ for (const item of nullableCases) {
 							const payload: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
-							assert.ok(isRecord(payload) && Array.isArray(payload.units));
+							assert.ok(isRecord(payload) && Array.isArray(payload.feedback));
 							assert.ok(payload.review !== null);
 							assert.equal(payload.admissionDigest, "admitted-digest");
 							assert.deepEqual(
@@ -4777,18 +4869,22 @@ for (const item of nullableCases) {
 
 							const mode = fixture.slice("compose-support-".length);
 							assert.equal(
-								payload.units.some(
-									(unit: unknown) =>
-										isRecord(unit) && unit.channel === "IN_CHAT" && unit.action === "NEW",
+								payload.feedback.some(
+									(piece: unknown) =>
+										isRecord(piece) &&
+										piece.destination === "CONVERSATION" &&
+										piece.action === "NEW",
 								),
 								!["refused-only", "inline", "routing-missing", "mentor-unavailable"].includes(mode),
 							);
 							assert.deepEqual(
-								payload.units
-									.filter((unit: unknown) => isRecord(unit) && unit.channel === "IN_APP")
-									.map((unit: unknown) => {
-										assert.ok(isRecord(unit));
-										return unit.action;
+								payload.feedback
+									.filter(
+										(piece: unknown) => isRecord(piece) && piece.destination === "PRACTICE_PAGE",
+									)
+									.map((piece: unknown) => {
+										assert.ok(isRecord(piece));
+										return piece.action;
 									}),
 								new Map<string, string[]>([
 									["selected", ["NEW"]],
@@ -4817,41 +4913,44 @@ for (const item of nullableCases) {
 								).length,
 								mode === "refused-only" || mode === "inline" ? 0 : 1,
 							);
-							const unitReply = events.find((event) => event.startsWith("support-units:")) ?? "";
+							const pieceReply = events.find((event) => event.startsWith("support-items:")) ?? "";
 							if (mode === "cooldown") {
-								// The cooldown closes IN_APP; the composer cannot open it again, and the notes stand.
-								assert.match(unitReply, /#1: IN_APP is not a lane this run may write for/u);
-								assert.match(unitReply, /#2: stored a IN_CHAT unit for test-practice \(NEW\)/u);
+								// The cooldown closes PRACTICE_PAGE; the composer cannot open it again, and the notes stand.
+								assert.match(pieceReply, /#1: PRACTICE_PAGE is not a lane this run may write for/u);
+								assert.match(
+									pieceReply,
+									/#2: stored a CONVERSATION piece for test-practice \(NEW\)/u,
+								);
 								assert.match(
 									child.stderr,
-									/IN_APP closed for this run: no practice is routed to it/u,
+									/PRACTICE_PAGE closed for this run: no practice is routed to it/u,
 								);
 							}
 							if (mode === "routing-missing") {
-								assert.match(unitReply, /#2: IN_CHAT is not a lane this run may write for/u);
+								assert.match(pieceReply, /#2: CONVERSATION is not a lane this run may write for/u);
 								assert.match(
 									child.stderr,
-									/IN_CHAT closed for this run: routing missing or malformed/u,
+									/CONVERSATION closed for this run: routing missing or malformed/u,
 								);
 							}
 							if (mode === "mentor-unavailable") {
-								assert.match(unitReply, /#2: IN_CHAT is not a lane this run may write for/u);
+								assert.match(pieceReply, /#2: CONVERSATION is not a lane this run may write for/u);
 								assert.match(
 									child.stderr,
-									/IN_CHAT closed for this run: no practice is routed to it/u,
+									/CONVERSATION closed for this run: no practice is routed to it/u,
 								);
 							}
 							if (mode === "inline") {
-								// Nothing private is asked of the model; the review and every observation remain.
-								assert.equal(unitReply, "");
-								assert.equal(payload.units.length, 0);
+								// Nothing private is asked of the model; the review and every problem remain.
+								assert.equal(pieceReply, "");
+								assert.equal(payload.feedback.length, 0);
 								assert.match(
 									child.stderr,
-									/IN_APP closed for this run: no practice is routed to it/u,
+									/PRACTICE_PAGE closed for this run: no practice is routed to it/u,
 								);
 								assert.match(
 									child.stderr,
-									/IN_CHAT closed for this run: no practice is routed to it/u,
+									/CONVERSATION closed for this run: no practice is routed to it/u,
 								);
 							}
 							break;
@@ -4930,12 +5029,6 @@ for (const item of nullableCases) {
 										eligibleForAlreadySaid: true,
 										eligibleForPriorAdvice: false,
 									},
-									{
-										id: "00000000-0000-4000-8000-000000000002",
-										deliveredAt: null,
-										eligibleForAlreadySaid: false,
-										eligibleForPriorAdvice: false,
-									},
 								]);
 								assert.ok(
 									!JSON.stringify(debug.publicHistory).includes("Fresh delivered communication"),
@@ -4970,7 +5063,11 @@ for (const item of nullableCases) {
 									),
 								);
 								assert.ok(isRecord(answer) && isRecord(answer.history));
-								assert.equal(answer.history.wordsCoverage, "PARTIAL");
+								assert.ok(
+									listOf(answer.history.feedback).every(
+										(entry) => recordOf(entry).bodyUnavailable === true,
+									),
+								);
 							}
 
 							// Measurement, then the review on the work in a fresh session, then the private lanes in
@@ -4997,12 +5094,12 @@ for (const item of nullableCases) {
 							// The captured record of this same work comes first, and the measurement task never.
 							const record = reviewTurn.indexOf('"title": "Add login"');
 							assert.ok(
-								record !== -1 && record < reviewTurn.indexOf('"practiceResultId": "result-1"'),
+								record !== -1 && record < reviewTurn.indexOf('"resultId": "result-1"'),
 								reviewTurn,
 							);
 							assert.match(reviewTurn, /linked_work_items\.json[^\n]*not part of this capture/u);
-							assert.match(reviewTurn, /"practiceResultId": "result-1"/u);
-							assert.match(reviewTurn, /"observationId": "observation-1"/u);
+							assert.match(reviewTurn, /"resultId": "result-1"/u);
+							assert.match(reviewTurn, /"problemId": "problem-1"/u);
 							assert.match(reviewTurn, /"quote": "\+ insecure\(\);"/u);
 							if (
 								fixture !== "compose-fresh-history" &&
@@ -5018,33 +5115,34 @@ for (const item of nullableCases) {
 										slug: "test-practice",
 										name: "test-practice",
 										knownLimitations: [],
-										...(stage === "compose" ? { revisionId: 42 } : {}),
+										...(["compose", "compose-foreign-provider"].includes(stage)
+											? { versionId: "42" }
+											: {}),
 									},
 								],
 							});
-							// The NOT_MET practice's standard comes whole, once, after the work and before the observations.
+							// The NOT_MET practice's standard comes whole, once, after the work and before the problems.
 							const standard = reviewTurn.indexOf("```markdown\n# Test practice\nCriteria.\n```");
 							assert.ok(
-								record < standard &&
-									standard < reviewTurn.indexOf('"practiceResultId": "result-1"'),
+								record < standard && standard < reviewTurn.indexOf('"resultId": "result-1"'),
 								reviewTurn,
 							);
 							assert.equal(reviewTurn.split("# Test practice\nCriteria.").length, 2, reviewTurn);
 							assert.ok(!reviewTurn.includes(PRIVATE_HISTORY_SENTENCE), reviewTurn);
-							assert.ok(!reviewTurn.includes("observation-history"), reviewTurn);
+							assert.ok(!reviewTurn.includes("problem-history"), reviewTurn);
 							assert.ok(!reviewTurn.includes("result-history"), reviewTurn);
 							assert.ok(!reviewTurn.includes("Review the practice."), reviewTurn);
 							assert.match(
 								events.find((event) => event.startsWith("review-refused:")) ?? "",
-								/review refused, nothing was stored:[\s\S]*summary: body may not contain an HTML comment[\s\S]*inline #1: anchor names observation-1b, which this note's basedOn does not, itself or through its result/u,
+								/review refused, nothing was stored:[\s\S]*summary: body may not contain an HTML comment[\s\S]*inline #1: anchor names problem-1b, which this note's basedOn does not, itself or through its result/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("review-history:")) ?? "",
-								/result-history, which is not one of the NOT_MET results or observations this review may rest on/u,
+								/result-history, which is not one of the NOT_MET results or problems this review may rest on/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("review-stored:")) ?? "",
-								/Stored the review: a summary resting on 1 result\(s\) and observation\(s\), 1 line note\(s\), 0 withholding decision\(s\)[\s\S]*"terminate":true/u,
+								/Stored the review: a summary resting on 1 result\(s\) and problem\(s\), 1 line note\(s\), 0 withholding decision\(s\)[\s\S]*"terminate":true/u,
 							);
 							assert.ok(!events.includes("review-retry"), events.join("\n"));
 							// The private lanes keep the person's history, and see what the review said.
@@ -5054,15 +5152,24 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-historical:")) ?? "",
-								/does not name an admitted result or observation from this run/u,
+								/does not name an admitted result or problem from this run/u,
 							);
 							const reply = events.find((event) => event.startsWith("feedback:")) ?? "";
 							// The composition turn goes on to its summary; only the retry ends on its last decision.
 							assert.match(reply, /"terminate":false/u);
-							assert.match(reply, /#1: stored a IN_APP unit for test-practice \(NEW\); 1\/1 used/u);
+							assert.match(
+								reply,
+								/#1: stored a PRACTICE_PAGE piece for test-practice \(NEW\); 1\/1 used/u,
+							);
 							assert.match(reply, /#2: basedOn is required/u);
-							assert.match(reply, /#3: unknown unit field\(s\): verdict — a unit takes channel/u);
-							assert.match(reply, /#4: body must be at most 8000 characters; this one is 8001/u);
+							assert.match(
+								reply,
+								/#3: unknown piece field\(s\): verdict — a piece takes destination/u,
+							);
+							assert.match(
+								reply,
+								/#4: the complete feedback text must be at most 8000 characters/u,
+							);
 							assert.match(
 								reply,
 								/#5: withholdReason must be one of NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR \(received 'NOT_A_REASON'\)/u,
@@ -5073,15 +5180,15 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								reply,
-								/#7: the review on the work is written in its own turn, not as a unit here; skipped\./u,
+								/#7: the review on the work is written in its own turn, not as a piece here; skipped\./u,
 							);
 							assert.match(
 								reply,
-								/#8: each item of units is one unit object .*\(received string\)/u,
+								/#8: each item of feedback is one piece object .*\(received string\)/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-bare:")) ?? "",
-								/#1: IN_CHAT is not a lane this run may write for/u,
+								/#1: CONVERSATION is not a lane this run may write for/u,
 							);
 							const second = readFileSync(nodePath.join(cwd, "prompt-3.md"), "utf8");
 							// Private composition receives stable context anew, without measurement criteria or tool examples.
@@ -5089,14 +5196,14 @@ for (const item of nullableCases) {
 							assert.doesNotMatch(second, /### Practice `test-practice`|How submit_result takes/u);
 							assert.equal(
 								readFileSync(nodePath.join(cwd, "private-system-prompt.md"), "utf8"),
-								"Write clear, useful feedback.\n\nCompose from admitted observations.",
+								"Write clear, useful feedback.\n\nCompose from admitted problems.",
 							);
 							assert.doesNotMatch(
 								second,
-								/Compose from admitted observations|How submit_result takes/u,
+								/Compose from admitted problems|How submit_result takes/u,
 							);
-							assert.match(second, /"practiceResultId": "result-1"/u);
-							assert.match(second, /"observationId": "observation-1"/u);
+							assert.match(second, /"resultId": "result-1"/u);
+							assert.match(second, /"problemId": "problem-1"/u);
 							// The quoted lines and the verification records stay on disk, where the composer
 							// can read them if needed; the search it recorded is still shown.
 							assert.ok(second.includes("## This turn"));
@@ -5105,10 +5212,7 @@ for (const item of nullableCases) {
 							// measuring leads or a sibling's criteria; the staged files stay readable.
 							const criteriaAt = composerTurn.indexOf("# Test practice\nCriteria.");
 							assert.ok(criteriaAt !== -1, composerTurn);
-							assert.ok(
-								criteriaAt < composerTurn.indexOf('"practiceResultId": "result-1"'),
-								composerTurn,
-							);
+							assert.ok(criteriaAt < composerTurn.indexOf('"resultId": "result-1"'), composerTurn);
 							assert.doesNotMatch(
 								composerTurn,
 								/Leads from the practice script|insecure call: |Complete second criterion/u,
@@ -5117,7 +5221,7 @@ for (const item of nullableCases) {
 							for (const fact of [
 								'"id": "feedback-same-work"',
 								'"deliveredAt": "2026-08-15T10:00:00Z"',
-								`"reviewedRevision": "${"d".repeat(40)}"`,
+								`"itemVersion": "${"d".repeat(40)}"`,
 								'"id": "earlier-2"',
 								'"recordedClaimCurrentness": "STALE"',
 								'"withdrawn": true',
@@ -5221,19 +5325,19 @@ for (const item of nullableCases) {
 							);
 							assert.ok(typeof feedback === "object" && feedback !== null);
 							assert.equal(Reflect.get(feedback, "admissionDigest"), "admitted-digest");
-							assert.equal(Reflect.get(feedback, "contractVersion"), 2);
+							assert.equal(Reflect.get(feedback, "contractVersion"), 3);
 							assert.equal(Reflect.get(feedback, "lead"), undefined);
-							const units: unknown = Reflect.get(feedback, "units");
-							assert.ok(Array.isArray(units) && units.length === 1, JSON.stringify(units));
-							assert.ok(isRecord(units[0]) && units[0].channel === "IN_APP");
+							const pieces: unknown = Reflect.get(feedback, "feedback");
+							assert.ok(Array.isArray(pieces) && pieces.length === 1, JSON.stringify(feedback));
+							assert.ok(isRecord(pieces[0]) && pieces[0].destination === "PRACTICE_PAGE");
 							// The review as stored: the summary verbatim, the note on its cited line.
 							assert.deepEqual(Reflect.get(feedback, "review"), {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ practiceResultId: "result-1" }] },
+								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
 								inline: [
 									{
 										body: "`insecure()` runs here before the token is checked; call the checked helper instead.",
-										basedOn: [{ practiceResultId: "result-1", observationId: "observation-1" }],
-										anchor: { observationId: "observation-1", citationIndex: 0 },
+										basedOn: [{ resultId: "result-1", problemId: "problem-1" }],
+										anchor: { problemId: "problem-1", citationIndex: 0 },
 									},
 								],
 								withheld: [],
@@ -5271,10 +5375,10 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "prompt-4.md"), "utf8"),
 								/## Undecided[\s\S]*each with a NOT_MET result: test-practice/u,
 							);
-							// The retry knows the room each lane has left, so it writes no unit that is skipped.
+							// The retry knows the room each lane has left, so it writes no piece that is skipped.
 							assert.match(
 								readFileSync(nodePath.join(cwd, "prompt-4.md"), "utf8"),
-								/Room left for new units: IN_APP 1 of 1/u,
+								/Room left for new items: PRACTICE_PAGE 1 of 1/u,
 							);
 							assert.match(
 								child.stderr,
@@ -5292,7 +5396,7 @@ for (const item of nullableCases) {
 							assert.equal(events.filter((event) => event === "steer").length, 1);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-finish:")) ?? "",
-								/#1: stored a IN_APP unit for test-practice \(WITHHOLD\)/u,
+								/#1: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\)/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-finish:")) ?? "",
@@ -5307,11 +5411,11 @@ for (const item of nullableCases) {
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
 							assert.ok(typeof feedback === "object" && feedback !== null);
-							const units: unknown = Reflect.get(feedback, "units");
-							assert.ok(Array.isArray(units) && units.length === 1);
-							const unit: unknown = units[0];
-							assert.ok(typeof unit === "object" && unit !== null);
-							assert.equal(Reflect.get(unit, "withholdReason"), "BELOW_BAR");
+							const pieces: unknown = Reflect.get(feedback, "feedback");
+							assert.ok(Array.isArray(pieces) && pieces.length === 1);
+							const piece: unknown = pieces[0];
+							assert.ok(typeof piece === "object" && piece !== null);
+							assert.equal(Reflect.get(piece, "withholdReason"), "BELOW_BAR");
 							break;
 						}
 						case "compose-empty": {
@@ -5369,7 +5473,7 @@ for (const item of nullableCases) {
 							);
 							assert.ok(isRecord(feedback));
 							assert.deepEqual(feedback.review, {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ practiceResultId: "result-1" }] },
+								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
 								inline: [],
 								withheld: [],
 							});
@@ -5399,7 +5503,7 @@ for (const item of nullableCases) {
 							const turn = prompts.find((prompt) => prompt.startsWith("## The review to write"));
 							assert.ok(turn !== undefined, events.join("\n"));
 							assert.ok(turn.includes(staged), turn);
-							assert.ok(turn.indexOf(staged) < turn.indexOf('"observations": ['), turn);
+							assert.ok(turn.indexOf(staged) < turn.indexOf('"problems": ['), turn);
 							assert.ok(!refused.includes(JSON.stringify(staged).slice(1, -1)), refused);
 							// The retry holds only what is owed and how to finish.
 							const retry = prompts.find((prompt) => prompt.startsWith("## Undecided"));
@@ -5434,11 +5538,11 @@ for (const item of nullableCases) {
 									),
 									reviewTurn,
 								);
-								assert.ok(!reviewTurn.includes('"practiceResultId": "result-2"'), reviewTurn);
+								assert.ok(!reviewTurn.includes('"resultId": "result-2"'), reviewTurn);
 								// A text that also rests on the MET result is refused whole.
 								assert.match(
 									events.find((event) => event.startsWith("mixed-met:")) ?? "",
-									/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or observations this review may rest on/u,
+									/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or problems this review may rest on/u,
 								);
 								// A review sent after a compaction is refused with the whole review turn; one sent in the same
 								// batch is refused too; the next turn's is stored.
@@ -5448,28 +5552,28 @@ for (const item of nullableCases) {
 									/review refused, nothing was stored: the session's context was compacted/u,
 								);
 								assert.ok(refused.includes(reviewTurn), refused);
-								assert.ok(refused.includes(`"reviewedRevision": "${"a".repeat(40)}"`), refused);
+								assert.ok(refused.includes(`"itemVersion": "${"a".repeat(40)}"`), refused);
 								assert.match(
 									readFileSync(nodePath.join(cwd, "restore-batch-refused.txt"), "utf8"),
 									/review refused, nothing was stored/u,
 								);
 								assert.match(
 									events.find((event) => event.startsWith("compacted-stored:")) ?? "",
-									/Stored the review: a summary resting on 1 result\(s\) and observation\(s\)/u,
+									/Stored the review: a summary resting on 1 result\(s\) and problem\(s\)/u,
 								);
 								const stored: unknown = JSON.parse(
 									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 								);
 								assert.ok(isRecord(stored));
 								assert.deepEqual(stored.review, {
-									summary: { body: REVIEW_SUMMARY, basedOn: [{ practiceResultId: "result-1" }] },
+									summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
 									inline: [],
 									withheld: [],
 								});
 								reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
 								break;
 							}
-							// Both practices have a NOT_MET observation: the review turn carries both standards whole,
+							// Both practices have a NOT_MET problem: the review turn carries both standards whole,
 							// and a refusal answered while the session holds them does not repeat them.
 							for (const standard of standards) {
 								assert.ok(reviewTurn.includes(standard), reviewTurn);
@@ -5492,9 +5596,9 @@ for (const item of nullableCases) {
 							assert.ok(isRecord(feedback));
 							assert.equal(feedback.admissionDigest, "admitted-digest");
 							assert.deepEqual(feedback.review, {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ practiceResultId: "result-1" }] },
+								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
 								inline: [],
-								withheld: [{ basedOn: [{ practiceResultId: "result-2" }], reason: "BELOW_BAR" }],
+								withheld: [{ basedOn: [{ resultId: "result-2" }], reason: "BELOW_BAR" }],
 							});
 							assert.ok(events.includes("qualification:canonical-unchanged"), events.join("\n"));
 							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
@@ -5542,7 +5646,7 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								said("reselect-final"),
-								/Stored the review: a summary resting on 1 result\(s\) and observation\(s\)[\s\S]*"terminate":true/u,
+								/Stored the review: a summary resting on 1 result\(s\) and problem\(s\)[\s\S]*"terminate":true/u,
 							);
 							assert.ok(events.includes('reselect-terminal:{"action":"end"}'), events.join("\n"));
 							assert.ok(events.includes("reselect-drained:0"), events.join("\n"));
@@ -5550,7 +5654,7 @@ for (const item of nullableCases) {
 							// The review never acknowledges a MET result: a text that also rests on one is refused whole.
 							assert.match(
 								said("reselect-met"),
-								/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or observations this review may rest on/u,
+								/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or problems this review may rest on/u,
 							);
 							assert.match(
 								said("reselect-after-review"),
@@ -5580,7 +5684,7 @@ for (const item of nullableCases) {
 							);
 							assert.ok(isRecord(feedback));
 							assert.deepEqual(feedback.review, {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ practiceResultId: "result-1" }] },
+								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
 								inline: [],
 								withheld: [],
 							});
@@ -5589,59 +5693,59 @@ for (const item of nullableCases) {
 						case "compose-already-said": {
 							assert.equal(child.status, 0, child.stderr);
 							const first = events.find((event) => event.startsWith("said-first:")) ?? "";
-							// The primary second-practice has IN_CHAT notes; the folded-in NOT_MET test-practice has none.
+							// The primary second-practice has CONVERSATION notes; the folded-in NOT_MET test-practice has none.
 							assert.match(
 								first,
-								/#1: NO_MATERIAL_CHANGE rests on feedback recorded as delivered on IN_CHAT for test-practice in/u,
+								/#1: NO_MATERIAL_CHANGE rests on feedback recorded as delivered on CONVERSATION for test-practice in/u,
 							);
-							// Prepared notes, the IN_APP card, the public review, other practices, and malformed,
-							// MET-based, stale, withdrawn and undated IN_CHAT records leave test-practice without one.
+							// Prepared notes, the PRACTICE_PAGE card, the public review, other practices, and malformed,
+							// MET-based, stale, withdrawn and undated CONVERSATION records leave test-practice without one.
 							assert.match(
 								first,
-								/#2: ALREADY_SAID rests on feedback recorded as delivered on IN_CHAT for test-practice in/u,
+								/#2: ALREADY_SAID rests on feedback recorded as delivered on CONVERSATION for test-practice in/u,
 							);
-							// Both NOT_MET practices have an IN_APP card; a withholding uses no slot on its lane.
+							// Both NOT_MET practices have an PRACTICE_PAGE card; a withholding uses no slot on its lane.
 							assert.match(
 								first,
-								/#3: stored a IN_APP unit for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+								/#3: stored a PRACTICE_PAGE piece for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
 							);
 							const second = events.find((event) => event.startsWith("said-second:")) ?? "";
 							assert.match(
 								second,
-								/#1: NO_MATERIAL_CHANGE rests on feedback recorded as delivered on IN_CHAT for test-practice in/u,
+								/#1: NO_MATERIAL_CHANGE rests on feedback recorded as delivered on CONVERSATION for test-practice in/u,
 							);
 							// The refused grouping left the pair open; MET counterevidence owes no history.
 							assert.match(
 								second,
-								/#2: stored a IN_CHAT unit for second-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+								/#2: stored a CONVERSATION piece for second-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
 							);
 							// test-practice's problem is on the diff: the open lane refuses even a withholding for it.
 							const inline = fixture === "compose-already-said-inline";
 							assert.match(
 								second,
 								inline
-									? /#3: IN_CHAT cannot carry feedback about test-practice this run \(HAS_INLINE_ANCHOR\); write no unit for it there, not even a WITHHOLD\. Skipped\./u
-									: /#3: stored a IN_CHAT unit for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
+									? /#3: CONVERSATION cannot carry feedback about test-practice this run \(HAS_INLINE_ANCHOR\); write no piece for it there, not even a WITHHOLD\. Skipped\./u
+									: /#3: stored a CONVERSATION piece for test-practice \(WITHHOLD\); 0\/1 used on that lane\./u,
 							);
 							const payload: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 							);
-							assert.ok(isRecord(payload) && Array.isArray(payload.units));
+							assert.ok(isRecord(payload) && Array.isArray(payload.feedback));
 							assert.deepEqual(
-								payload.units.map((unit: unknown) => {
-									assert.ok(isRecord(unit));
-									assert.ok(Array.isArray(unit.basedOn));
+								payload.feedback.map((piece: unknown) => {
+									assert.ok(isRecord(piece));
+									assert.ok(Array.isArray(piece.basedOn));
 									// Each rests on results, written out as evidence references.
-									const refs = unit.basedOn.map((ref: unknown) => {
-										assert.ok(isRecord(ref) && ref.observationId === undefined);
-										return String(ref.practiceResultId);
+									const refs = piece.basedOn.map((ref: unknown) => {
+										assert.ok(isRecord(ref) && ref.problemId === undefined);
+										return String(ref.resultId);
 									});
-									return `${String(unit.channel)}:${String(unit.practiceSlug)}:${String(unit.withholdReason)}:${refs.join("+")}`;
+									return `${String(piece.destination)}:${String(piece.practiceSlug)}:${String(piece.withholdReason)}:${refs.join("+")}`;
 								}),
 								[
-									"IN_APP:test-practice:ALREADY_SAID:result-1+result-2",
-									"IN_CHAT:second-practice:NO_MATERIAL_CHANGE:result-2+result-3",
-									...(inline ? [] : ["IN_CHAT:test-practice:BELOW_BAR:result-1"]),
+									"PRACTICE_PAGE:test-practice:ALREADY_SAID:result-1+result-2",
+									"CONVERSATION:second-practice:NO_MATERIAL_CHANGE:result-2+result-3",
+									...(inline ? [] : ["CONVERSATION:test-practice:BELOW_BAR:result-1"]),
 								],
 							);
 							assert.deepEqual(payload.compositionFailures, []);
@@ -5654,7 +5758,7 @@ for (const item of nullableCases) {
 								/stored/u,
 							);
 							// The turn, the finishing turn, the review and the private composition; the review's one
-							// decisions cover both observations, so neither composition asks again.
+							// decisions cover both problems, so neither composition asks again.
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1", "prompt:2", "prompt:3", "prompt:4"],
@@ -5732,11 +5836,11 @@ for (const item of nullableCases) {
 								assert.ok(limits.includes("+ unresolvedCurrentRequest();"));
 								assert.ok(limits.includes("+ unchangedInterface();"));
 								assert.ok(!publicTurn.includes("qualification-und"));
-								assert.ok(privateTurn.includes('"practiceResultId": "qualification-und"'));
+								assert.ok(privateTurn.includes('"resultId": "qualification-und"'));
 								assert.doesNotMatch(privateTurn, /"quote"|"verification"/u);
 								assert.match(
 									events.find((event) => event.startsWith("qualification-support:")) ?? "",
-									/qualification-und, which is not one of the NOT_MET results or observations this review may rest on/u,
+									/qualification-und, which is not one of the NOT_MET results or problems this review may rest on/u,
 								);
 								const restored =
 									events.find((event) => event.startsWith("qualification-restored:")) ?? "";
@@ -5745,14 +5849,14 @@ for (const item of nullableCases) {
 								const feedback: unknown = JSON.parse(
 									readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
 								);
-								assert.ok(isRecord(feedback) && Array.isArray(feedback.units));
-								const unit: unknown = feedback.units[0];
-								assert.ok(isRecord(unit));
-								assert.deepEqual(unit.basedOn, [
-									{ practiceResultId: "result-1" },
-									{ practiceResultId: "result-2" },
-									{ practiceResultId: "qualification-und" },
-									{ practiceResultId: "qualification-na" },
+								assert.ok(isRecord(feedback) && Array.isArray(feedback.feedback));
+								const piece: unknown = feedback.feedback[0];
+								assert.ok(isRecord(piece));
+								assert.deepEqual(piece.basedOn, [
+									{ resultId: "result-1" },
+									{ resultId: "result-2" },
+									{ resultId: "qualification-und" },
+									{ resultId: "qualification-na" },
 								]);
 							}
 							break;
@@ -5774,7 +5878,7 @@ for (const item of nullableCases) {
 									(item) => item.outcome,
 								),
 								// By slug: second-practice, test-practice, third-practice.
-								["NOT_APPLICABLE", "MET", "UNDETERMINED"],
+								["DOES_NOT_APPLY", "MET", "COULD_NOT_DETERMINE"],
 							);
 							const echoed: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
@@ -5785,7 +5889,7 @@ for (const item of nullableCases) {
 								readFeedbackResults(nodePath.join(cwd, "out/feedback.json")).map(
 									(item) => item.outcome,
 								),
-								["NOT_APPLICABLE", "MET", "UNDETERMINED"],
+								["DOES_NOT_APPLY", "MET", "COULD_NOT_DETERMINE"],
 							);
 							assert.equal(echoed.review, null);
 							assert.deepEqual(echoed.compositionFailures, []);
@@ -5868,7 +5972,7 @@ for (const item of nullableCases) {
 							const result: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/result.json"), "utf8"),
 							);
-							assert.deepEqual(result, { schemaVersion: 2, results: [] });
+							assert.partialDeepStrictEqual(result, { contractVersion: 3, results: [] });
 							assert.ok(!existsSync(nodePath.join(cwd, "out/practice-scripts.json")));
 							assert.ok(!existsSync(nodePath.join(cwd, "admission.json")));
 							assert.ok(!events.includes("derive-change"));
@@ -5878,7 +5982,7 @@ for (const item of nullableCases) {
 							assert.ok(isRecord(feedback));
 							assert.equal(feedback.admissionDigest, "continued-digest");
 							assert.ok(feedback.review !== null);
-							assert.deepEqual(feedback.units, []);
+							assert.deepEqual(feedback.feedback, []);
 							// The private lane was open and its negative stays undecided: that is said, not dropped.
 							assert.deepEqual(feedback.compositionFailures, [
 								{ phase: "PRIVATE_FEEDBACK", reason: "PRIVATE_NOT_RECOVERED" },

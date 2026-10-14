@@ -47,18 +47,22 @@ class WorkspaceSubdomainAuthIntegrationTest extends RealAuthIntegrationTest {
     void shouldKeepPublicApiPrefixWhenOldWorkspacePathRedirects() {
         var workspace = persistWorkspace("prefix-tenant");
         var account = accounts.save(new Account("Path alias member"));
-        jdbc.update(
-                "INSERT INTO identity_provider(id,type,server_url,created_at) VALUES(993101,'GITHUB','https://prefix.example',now())");
+        jdbc.update("INSERT INTO identity_provider(id,type,server_url,created_at)"
+                + " VALUES(993101,'GITHUB','https://prefix.example',now())");
         jdbc.update("""
-                INSERT INTO "user"(id,provider_id,native_id,login,type,avatar_url,html_url)
-                VALUES(993102,993101,993102,'prefix-member','USER','','https://prefix.example/prefix-member')
-                """);
+            INSERT INTO "user"(id,provider_id,native_id,login,type,avatar_url,html_url)
+            VALUES(993102,993101,993102,'prefix-member','USER','','https://prefix.example/prefix-member')
+            """);
         jdbc.update(
-                "INSERT INTO identity_link(account_id,provider_id,subject,linked_at) VALUES(?,993101,'993102',now())",
+                "INSERT INTO"
+                        + " identity(account_id,provider_id,provider_user_key,linked_via,linked_at)"
+                        + " VALUES(?,993101,'993102','MANUAL',now())",
                 account.getId());
         jdbc.update(
-                "INSERT INTO workspace_membership(workspace_id,user_id,role,created_at,hidden) VALUES(?,993102,'MEMBER',now(),false)",
-                workspace.getId());
+                "INSERT INTO membership(workspace_id,account_id,role,joined_at,hidden)"
+                        + " VALUES(?,?,'MEMBER',now(),false)",
+                workspace.getId(),
+                account.getId());
         var session = issuer.issue(Objects.requireNonNull(account.getId()), TokenConstraints.session(null, null), null)
                 .value();
         workspaces.renameSlug(workspace.getId(), "prefix-current");

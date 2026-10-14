@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -34,23 +34,23 @@ class ProxyStandInAdmissionTest {
 
     private static String problem(String severity, int line) {
         return """
-                {"severity":"%s","summary":"The failure is dropped","explanation":"The catch block is empty.",
-                 "citations":[%s],"basis":{"type":"introduced","head":0,"explanation":"The change adds it."}}
-                """.formatted(severity, citation(line));
+            {"severity":"%s","summary":"The failure is dropped","explanation":"The catch block is empty.",
+             "citations":[%s],"basis":{"type":"introduced","head":0,"explanation":"The change adds it."}}
+            """.formatted(severity, citation(line));
     }
 
     /** A candidate of {@code outcome}, a JSON value as sent; a negative carries one MINOR problem. */
     private static String candidate(String outcome) {
         String problems = "\"NOT_MET\"".equals(outcome) ? ",\"problems\":[" + problem("MINOR", 7) + "]" : "";
         return """
-                {"outcome":%s,"summary":"Handles errors","explanation":"The handler records the failure.",
-                 "citations":[%s,%s],"evidence":{}%s}
-                """.formatted(outcome, citation(3), citation(5), problems);
+            {"outcome":%s,"summary":"Handles errors","explanation":"The handler records the failure.",
+             "citations":[%s,%s],"evidence":{}%s}
+            """.formatted(outcome, citation(3), citation(5), problems);
     }
 
     @ParameterizedTest
-    @EnumSource(Outcome.class)
-    void shouldAdmitEveryOutcomeAsSentWithItsGroundsAndIndexedCitations(Outcome outcome) {
+    @EnumSource(ResultOutcome.class)
+    void shouldAdmitEveryOutcomeAsSentWithItsGroundsAndIndexedCitations(ResultOutcome outcome) {
         JsonNode request = request(entry("handles-errors", candidate("\"" + outcome.name() + "\"")));
         JsonNode sent = request.deepCopy();
 
@@ -73,7 +73,7 @@ class ProxyStandInAdmissionTest {
         assertThat(admitted.path("citations").get(0).path("index").asInt()).isZero();
         assertThat(admitted.path("citations").get(1).path("index").asInt()).isEqualTo(1);
         assertThat(admitted.path("citations").get(1).path("startLine").asInt()).isEqualTo(5);
-        if (outcome == Outcome.NOT_MET) {
+        if (outcome == ResultOutcome.NOT_MET) {
             assertThat(admitted.path("severity").asString()).isEqualTo("MINOR");
             assertThat(admitted.path("observations")).singleElement().satisfies(child -> {
                 assertThat(UUID.fromString(child.path("observationId").asString()))
@@ -93,9 +93,9 @@ class ProxyStandInAdmissionTest {
     @Test
     void shouldStoreTheWorstProblemSeverityWhenTheNegativeStatesNone() {
         String negative = """
-                {"outcome":"NOT_MET","summary":"Handles errors","explanation":"Two failures are dropped.",
-                 "citations":[],"evidence":{},"problems":[%s,%s]}
-                """.formatted(problem("MINOR", 3), problem("MAJOR", 5));
+            {"outcome":"NOT_MET","summary":"Handles errors","explanation":"Two failures are dropped.",
+             "citations":[],"evidence":{},"problems":[%s,%s]}
+            """.formatted(problem("MINOR", 3), problem("MAJOR", 5));
 
         JsonNode admitted = PracticeRunnerLiveLlmTest.ProxyStandIn.admit(request(entry("handles-errors", negative)))
                 .path("results")

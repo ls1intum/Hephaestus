@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -14,17 +13,17 @@ import org.jspecify.annotations.NonNull;
  * one answers to no single practice. A field nothing reads is a field that can only go stale or, worse, be
  * filtered on later as though it meant something.
  *
- * @param jobId the run the opportunity was read off: the newest one that reviewed this piece of work
+ * @param reviewId the run the opportunity was read off: the newest one that reviewed this piece of work
  */
 record EvidenceOpportunity(
-        @NonNull ArtifactKind artifactKind,
-        long artifactId,
-        @NonNull UUID jobId,
+        @NonNull ItemKind itemKind,
+        long itemId,
+        @NonNull UUID reviewId,
         @NonNull Instant occurredAt,
         @NonNull OutcomeVector outcomes,
         @NonNull TrendBundle bundle) {
-    ReviewedWorkKey key() {
-        return new ReviewedWorkKey(artifactKind, artifactId);
+    long key() {
+        return itemId;
     }
 
     boolean decided() {
@@ -37,6 +36,6 @@ record EvidenceOpportunity(
     }
 
     EvidenceOpportunity withBundle(TrendBundle value) {
-        return new EvidenceOpportunity(artifactKind, artifactId, jobId, occurredAt, outcomes, value);
+        return new EvidenceOpportunity(itemKind, itemId, reviewId, occurredAt, outcomes, value);
     }
 }

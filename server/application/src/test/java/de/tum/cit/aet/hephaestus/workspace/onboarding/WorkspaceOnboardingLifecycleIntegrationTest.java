@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAiChoiceExport;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiChoice;
 import java.time.Instant;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
@@ -18,10 +20,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
-    private WorkspaceMemberOnboardingRepository members;
+    private MembershipRepository members;
 
     @Autowired
-    private AccountAiChoiceRepository choices;
+    private AccountRepository choices;
 
     @Autowired
     private WorkspaceOnboardingSettingsRepository settings;
@@ -48,8 +50,8 @@ class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceInteg
                 accounts.save(new Account("Export subject")).getId());
         long other = Objects.requireNonNull(
                 accounts.save(new Account("Other member")).getId());
-        chose(account, MemberAiChoice.NO_AI);
-        chose(other, MemberAiChoice.IN_HOUSE_ONLY);
+        chose(account, AiChoice.NO_AI);
+        chose(other, AiChoice.IN_HOUSE_ONLY);
         seen(first, account);
         seen(second, account);
         seen(first, other);
@@ -63,39 +65,41 @@ class WorkspaceOnboardingLifecycleIntegrationTest extends AbstractWorkspaceInteg
         assertThat(exported.aiChoice()).isEqualTo("NO_AI");
 
         new TransactionTemplate(transactions).executeWithoutResult(status -> lifecycle.eraseAccount(account));
-        assertThat(exports.choice(account)).isNull();
-        assertThat(members.findByWorkspace_IdAndAccountId(first.getId(), account))
+        assertThat(members.findByAccount_Id(account)).isEmpty();
+        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), account))
                 .isEmpty();
         var otherExport = exports.choice(other);
         assertThat(otherExport).isNotNull();
         assertThat(otherExport.aiChoice()).isEqualTo("IN_HOUSE_ONLY");
-        assertThat(members.findByWorkspace_IdAndAccountId(first.getId(), other)).isPresent();
+        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), other))
+                .isPresent();
         assertThat(settings.findByWorkspaceId(first.getId())).isPresent();
 
         new TransactionTemplate(transactions)
                 .executeWithoutResult(status -> lifecycle.deleteWorkspaceData(first.getId()));
         assertThat(settings.findByWorkspaceId(first.getId())).isEmpty();
-        assertThat(members.findByWorkspace_IdAndAccountId(first.getId(), other)).isEmpty();
-        assertThat(members.findByWorkspace_IdAndAccountId(second.getId(), other))
+        assertThat(members.findByWorkspace_IdAndAccount_Id(first.getId(), other))
+                .isEmpty();
+        assertThat(members.findByWorkspace_IdAndAccount_Id(second.getId(), other))
                 .isPresent();
         // Purging a workspace never touches a member's account-level answer.
         assertThat(exports.choice(other)).isNotNull();
     }
 
-    private void chose(long accountId, MemberAiChoice choice) {
-        var row = new AccountAiChoice();
-        row.setAccountId(accountId);
+    private void chose(long accountId, AiChoice choice) {
+        var row = accounts.findById(accountId).orElseThrow();
         row.setAiChoice(choice);
-        row.setUpdatedAt(Instant.now());
+        row.setAiChoiceAt(Instant.now());
         choices.save(row);
     }
 
     private void seen(Workspace workspace, long accountId) {
-        var member = new WorkspaceMemberOnboarding();
+        var member = new Membership();
         member.setWorkspace(workspace);
-        member.setAccountId(accountId);
-        member.setSeenRevision(0L);
-        member.setUpdatedAt(Instant.now());
+        member.setId(new Membership.Id(workspace.getId(), accountId));
+        member.setId(new Membership.Id(workspace.getId(), accountId));
+        member.setOnboardingSeenRevision(0L);
+
         members.save(member);
     }
 }

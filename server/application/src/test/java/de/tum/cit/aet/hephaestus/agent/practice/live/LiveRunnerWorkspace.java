@@ -3,19 +3,35 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 import static de.tum.cit.aet.hephaestus.agent.practice.live.PracticeCriteriaCaseFixtures.FIXTURE_DIR;
 import static de.tum.cit.aet.hephaestus.agent.practice.live.PracticeCriteriaCaseFixtures.fixtureCommand;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
+import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import de.tum.cit.aet.hephaestus.testconfig.PiSdkInstallation;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
@@ -23,12 +39,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -179,7 +193,7 @@ final class LiveRunnerWorkspace {
         Files.copy(FIXTURE_DIR.resolve("comments.json"), context.resolve("comments.json"));
         Files.write(
                 workspace.resolve(SandboxLayout.MANIFEST_PATH),
-                MAPPER.writeValueAsBytes(manifest(capturedArtifacts())));
+                MAPPER.writeValueAsBytes(manifest(workspace, capturedFiles())));
         return record;
     }
 
@@ -191,7 +205,7 @@ final class LiveRunnerWorkspace {
     }
 
     /** What {@link #stageChange} captured, by path, with the source that captured each. */
-    static Map<String, String> capturedArtifacts() {
+    static Map<String, String> capturedFiles() {
         Map<String, String> artifacts = new LinkedHashMap<>();
         artifacts.put(SandboxLayout.CONTEXT_PREFIX + "metadata.json", "scm.pull-request.core");
         artifacts.put(SandboxLayout.CONTEXT_PREFIX + "change.json", "scm.pull-request.diff");
@@ -201,21 +215,17 @@ final class LiveRunnerWorkspace {
     }
 
     /** The folder index of these artifacts, every source available, as {@code JobFolderIndex} serializes one. */
-    static ObjectNode manifest(Map<String, String> artifacts) {
-        ObjectNode manifest = MAPPER.createObjectNode().put("artifactKind", "scm.pull_request");
-        var sources = manifest.putArray("sources");
-        var registered = manifest.putArray("artifacts");
-        new LinkedHashSet<>(artifacts.values()).forEach(kind -> {
-            ObjectNode source = sources.addObject().put("kind", kind);
-            source.putObject("state").put("availability", "AVAILABLE").put("content", "NON_EMPTY");
-            var listed = source.putArray("artifacts");
-            artifacts.forEach((path, owner) -> {
-                if (owner.equals(kind)) listed.addObject().put("path", path);
-            });
-        });
-        artifacts.forEach((path, kind) ->
-                registered.addObject().put("kind", kind).putObject("artifact").put("path", path));
-        return manifest;
+    static ObjectNode manifest(Path workspace, Map<String, String> files) throws IOException {
+        var snapshot = EvidenceSnapshotFixtures.snapshot(MAPPER);
+        var sources = new LinkedHashMap<String, ObjectNode>();
+        for (var entry : files.entrySet()) {
+            byte[] bytes = Files.readAllBytes(workspace.resolve(entry.getKey()));
+            var source = sources.computeIfAbsent(
+                    entry.getValue(), kind -> EvidenceSnapshotFixtures.availableSource(snapshot, kind, null));
+            EvidenceSnapshotFixtures.file(snapshot, source, entry.getKey(), ProvenanceDigest.sha256Hex(bytes))
+                    .put("bytes", bytes.length);
+        }
+        return snapshot.withObject("manifest");
     }
 
     private static void writeFiles(Path repo, Map<String, String> files) throws IOException {
@@ -231,54 +241,78 @@ final class LiveRunnerWorkspace {
             throws IOException {
         Path practices = workspace.resolve(SandboxLayout.PRACTICES_PREFIX);
         Files.createDirectories(practices);
-        Files.write(
-                practices.resolve("index.json"),
-                MAPPER.writeValueAsBytes(
-                        List.of(Map.of("slug", slug, "name", name, "group", "security", "revisionId", revisionId))));
+        var definition = RuntimePracticeTestData.definition(new ItemKind("scm.pull_request"), name, criteria, null);
+        var entry = MAPPER.createObjectNode()
+                .put("slug", slug)
+                .put("name", name)
+                .put("practiceId", "1")
+                .put("versionId", Long.toString(revisionId))
+                .put("reviewDigest", "a".repeat(64));
+        entry.set("definition", MAPPER.valueToTree(definition));
+        Files.write(practices.resolve("index.json"), MAPPER.writeValueAsBytes(List.of(entry)));
         Files.writeString(practices.resolve(slug + ".md"), criteria);
     }
 
-    /**
-     * What {@code PracticeScriptInputs} stages for every practice in the catalog index: why it is reviewed and its
-     * earlier claim, none here. A practice without a program runs the built-in review.
-     */
-    static void stagePracticeInputs(Path workspace, String kind, @Nullable Map<String, String> programs)
-            throws IOException {
-        JsonNode index = MAPPER.readTree(
+    static void stageFixtureInputs(Path workspace, String kind) throws IOException {
+        var task = MAPPER.readValue(
+                workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME).toFile(), TaskEnvelope.class);
+        var work = MAPPER.readTree(workspace
+                .resolve(SandboxLayout.CONTEXT_PREFIX + "metadata.json")
+                .toFile());
+        var item = new ItemRef(Long.parseLong(task.workspaceId()), 1, new ItemKind(kind), 1L, null, null);
+        ItemVersion version;
+        if (kind.equals("scm.pull_request")) {
+            var change = MAPPER.readTree(workspace
+                    .resolve(SandboxLayout.CONTEXT_PREFIX + "change.json")
+                    .toFile());
+            version = ScmVersion.pullRequest(
+                    change.path("base_sha").asString(),
+                    change.path("head_sha").asString(),
+                    work.path("title").asString(),
+                    work.path("body").isNull() ? null : work.path("body").asString());
+        } else version = ScmVersion.ofContentDigest(work.toString());
+        var index = MAPPER.readTree(
                 workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json").toFile());
-        Path staged = workspace.resolve(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX);
-        Files.createDirectories(staged);
-        for (JsonNode practice : index) {
-            String slug = practice.path("slug").asString();
-            ObjectNode cause = MAPPER.createObjectNode().put("kind", kind);
-            cause.putObject("subject").put("role", "AUTHOR");
-            cause.putObject("practice")
-                    .put("revisionId", practice.path("revisionId").asLong(1));
-            cause.putObject("scope")
-                    .put("key", kind + ":1:AUTHOR")
-                    .put("mode", "change")
-                    .put("description", "What its author contributed to the reviewed work");
-            ObjectNode why = cause.putObject("cause")
-                    .put("type", "requested")
-                    .put("origin", "MANUAL")
-                    .put("admittedAt", LiveWorkRecords.AT.toString());
-            ObjectNode state = why.putObject("state").put("state", "OPEN");
-            if (kind.equals("scm.pull_request")) {
-                state.put("draftStatus", "NOT_DRAFT");
-            }
-            Files.write(
-                    staged.resolve(slug + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX), MAPPER.writeValueAsBytes(cause));
-            Files.writeString(staged.resolve(slug + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX), "null\n");
-            String program = programs == null ? null : programs.get(slug);
-            if (program != null) {
-                Files.writeString(staged.resolve(slug + ".ts"), program);
+        for (var entry : index) {
+            var definition = MAPPER.treeToValue(entry.path("definition"), PracticeDefinition.class);
+            long practiceId = Long.parseLong(entry.path("practiceId").asString());
+            long versionId = Long.parseLong(entry.path("versionId").asString());
+            var pinned = new PinnedPractice(
+                    practiceId,
+                    versionId,
+                    definition,
+                    entry.path("reviewDigest").asString(),
+                    new ReviewMethod(1, "b".repeat(64), List.of()));
+            var assignment = new ReviewAssignmentSnapshot(
+                    new ReviewAssignmentId(task.reviewId(), practiceId, 1),
+                    item,
+                    version,
+                    definition.about() == null ? null : 1L,
+                    entry.path("slug").asString(),
+                    pinned);
+            var review = new ReviewSnapshot(
+                    task.reviewId(),
+                    item.workspaceId(),
+                    item,
+                    ReviewKind.ITEM,
+                    version,
+                    ReviewOrigin.REQUEST,
+                    1,
+                    List.of(pinned));
+            var inputs =
+                    new PracticeScriptInputs(MAPPER).stage(review, assignment, work, LiveWorkRecords.AT, null, null);
+            for (var file : inputs.entrySet()) {
+                Path path = workspace.resolve(file.getKey());
+                Files.createDirectories(path.getParent());
+                Files.write(path, file.getValue());
             }
         }
     }
 
     /** The task envelope, built from the production record so that a new field fails here at compile time. */
-    static void stageTask(Path workspace, String prompt) throws IOException {
-        TaskEnvelope envelope = TaskEnvelope.of(UUID.randomUUID(), 1L, new Task(prompt, 1, "test/fixture"));
+    static void stageTask(Path workspace, String prompt, UUID reviewId, UUID jobId, int attempt, long workspaceId)
+            throws IOException {
+        TaskEnvelope envelope = TaskEnvelope.of(reviewId, jobId, attempt, workspaceId, new Task(prompt));
         Files.write(
                 workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME),
                 MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(envelope));

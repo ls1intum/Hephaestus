@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.catalog.CreateWorkspaceLlmConnectionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.catalog.CreateWorkspaceLlmModelRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettings;
@@ -10,7 +9,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.InstanceLlmSettingsRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionService;
@@ -20,26 +18,29 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentBindingService;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedJobInputsFixtures;
-import de.tum.cit.aet.hephaestus.agent.context.ReviewedWork;
-import de.tum.cit.aet.hephaestus.agent.context.providers.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.agent.gateway.SandboxGatewayProperties;
 import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeCatalogInjector;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobLifecycleService;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobPracticeScriptRun;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobPracticeScriptRunRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobPracticeScriptUsage;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptKindTotal;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptRunRecorderFixtures;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
+import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
+import de.tum.cit.aet.hephaestus.agent.job.ScriptRun;
+import de.tum.cit.aet.hephaestus.agent.job.ScriptRunRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
@@ -48,32 +49,44 @@ import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEvent;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueue;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ScriptRunStatus;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
 import de.tum.cit.aet.hephaestus.testconfig.PiSdkInstallation;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
@@ -134,6 +147,32 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @LiveLlmTest
 class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
+    @Autowired
+    private ItemWriter itemWriter;
+
+    @Autowired
+    private List<ItemSource> itemSources;
+
+    @Autowired
+    private ReviewService reviews;
+
+    @Autowired
+    private ReviewQueue reviewQueue;
+
+    @Autowired
+    private ReviewJobAssignments reviewAssignments;
+
+    @Autowired
+    private MemberAiRoutingAdapter runtimeModelRouting;
+
+    @Autowired
+    private PracticeCatalogInjector catalogInputs;
+
+    @Autowired
+    private PracticeScriptInputs scriptInputs;
+
+    @Autowired
+    private PracticeVersionService runtimePracticeVersions;
 
     private static final Path EVERY_SLOT = Path.of(
                     "..", "..", "docker", "agents", "practice-scripts", "fixtures", "every-slot.ts")
@@ -149,12 +188,12 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     private static final String SOURCE_BRANCH = "feat/login";
 
     private static final String CRITERIA = """
-            # Comments explain why
+        # Comments explain why
 
-            ## Standard
-            An added comment states a constraint the code cannot express, and no added comment restates the code or
-            marks unfinished work that is merged anyway.
-            """;
+        ## Standard
+        An added comment states a constraint the code cannot express, and no added comment restates the code or
+        marks unfinished work that is merged anyway.
+        """;
 
     private static final int GATEWAY_PORT = freePort();
 
@@ -194,7 +233,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     private LlmAdmissionService admission;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private LlmUsageEventRepository usageEvents;
@@ -212,13 +251,13 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     private PracticePiAdapter practiceAdapter;
 
     @Autowired
-    private AgentJobLifecycleService lifecycle;
+    private ReviewJobLifecycleService lifecycle;
 
     @Autowired
     private PracticeRepository practiceRepository;
 
     @Autowired
-    private PracticeRevisionRepository revisionRepository;
+    private PracticeVersionRepository revisionRepository;
 
     @Autowired
     private PullRequestRepository pullRequests;
@@ -233,7 +272,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     private PiResultParser parser;
 
     @Autowired
-    private AgentJobPracticeScriptRunRepository runs;
+    private ScriptRunRepository runs;
 
     @Autowired
     private MeterRegistry meterRegistry;
@@ -281,7 +320,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         User developer = persistUser("practice-script-live-developer");
         Workspace workspace = workspace(developer);
         WorkspaceContext context =
-                WorkspaceContext.fromWorkspace(workspace, Set.of(WorkspaceMembership.WorkspaceRole.ADMIN), null);
+                WorkspaceContext.fromWorkspace(workspace, Set.of(Membership.WorkspaceRole.ADMIN), null);
         WorkspaceContextHolder.setContext(context);
         EnumSet<ModelKind> boundKinds = EnumSet.noneOf(ModelKind.class);
         bind(
@@ -349,14 +388,15 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         root = workDir;
         // The spec is staged first: the change's checkout and the job's capture are pinned to the same commit.
         Practice practice = practice(workspace, Files.readString(EVERY_SLOT));
-        AgentJob draft = runningJob(workspace, practice);
-        ConfigSnapshot snapshot = ConfigSnapshot.fromJson(draft.getConfigSnapshot(), objectMapper);
+        LiveRunnerWorkspace.stageCartChange(workDir);
+        ReviewJob job = capture(runningJob(workspace, practice), workDir, developer);
+        ConfigSnapshot snapshot = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
         Map<ModelKind, FrozenModel> frozen = snapshot.practiceScriptModels();
         assertThat(frozen.keySet()).isEqualTo(called);
         String jobToken = jwtIssuer.issueForJobUntil(
-                draft.getId(),
+                job.getId(),
                 context.id(),
-                draft.getRetryCount(),
+                job.getAttempt(),
                 Instant.now().plus(Duration.ofSeconds(LiveRunnerWorkspace.TIMEOUT_SECONDS + 300L)));
         PracticeSandboxSpec spec = practiceAdapter.buildSandboxSpec(new PracticeAgentRequest(
                 snapshot.apiProtocol(),
@@ -371,15 +411,34 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 .as("one job token, no second credential")
                 .doesNotContainKey("PRACTICE_SCRIPT_PROXY_TOKEN");
         LiveRunnerWorkspace.stageSpec(workDir, spec.inputFiles());
-        LiveRunnerWorkspace.stageCartChange(workDir);
-        long revisionId = Objects.requireNonNull(practice.getCurrentRevision().getId());
-        LiveRunnerWorkspace.stagePractice(workDir, SLUG, "Every slot", CRITERIA, revisionId);
-        LiveRunnerWorkspace.stagePracticeInputs(
+        long revisionId = Objects.requireNonNull(practice.getCurrentVersion().getId());
+
+        var assigned = reviewAssignments.load(job);
+        var frozenReview = reviewAssignments.review(job);
+        var staged = new LinkedHashMap<String, byte[]>();
+        catalogInputs.inject(staged, assigned);
+        for (var assignment : assigned)
+            staged.putAll(scriptInputs.stage(
+                    frozenReview,
+                    assignment,
+                    objectMapper.readTree(workDir.resolve(SandboxLayout.CONTEXT_PREFIX + "metadata.json")
+                            .toFile()),
+                    Objects.requireNonNull(job.getStartedAt()),
+                    null,
+                    null));
+        for (var entry : staged.entrySet()) {
+            Path target = workDir.resolve(entry.getKey());
+            Files.createDirectories(target.getParent());
+            Files.write(target, entry.getValue());
+        }
+        LiveRunnerWorkspace.stageTask(
                 workDir,
-                ArtifactKinds.PULL_REQUEST.value(),
-                Map.of(SLUG, Objects.requireNonNull(practice.getPracticeScript())));
-        LiveRunnerWorkspace.stageTask(workDir, "Review merge request #1 in test/fixture against " + SLUG + ".");
-        AgentJob job = capture(draft, workDir, developer);
+                "Review merge request #1 in test/fixture against " + SLUG + ".",
+                job.getReviewId(),
+                job.getId(),
+                job.getAttempt(),
+                job.getWorkspaceId());
+        jobRepository.saveAndFlush(job);
 
         warmUp(chat, warmUps);
         Path log = workDir.resolve("runner.log");
@@ -395,73 +454,80 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         }
         String runnerLog = Files.readString(log);
 
-        AgentJob ended = jobRepository.findById(job.getId()).orElseThrow();
-        JsonNode metadata = Objects.requireNonNull(ended.getMetadata());
-        String refusal = metadata.path(ResultAdmissionService.REFUSAL_METADATA_KEY)
-                .path("reasonCode")
-                .asString("");
-        assertThat(!metadata.path(ResultAdmissionService.DIGEST_METADATA_KEY)
-                                .asString("")
-                                .isBlank()
-                        || !refusal.isBlank())
-                .as("the server's admission decided on the runner's submission: %s%n%s", metadata, runnerLog)
+        ReviewJob ended = jobRepository.findById(job.getId()).orElseThrow();
+
+        String refusal = ended.getCapture() == null
+                ? ""
+                : ended.getCapture().path("withheld").get(0) == null
+                        ? ""
+                        : ended.getCapture()
+                                .path("withheld")
+                                .get(0)
+                                .path("reason")
+                                .asString();
+        assertThat(ResultAdmissionService.isAdmitted(ended) || !refusal.isBlank())
+                .as("the server's admission decided on the submission: %s%n%s", ended.getCapture(), runnerLog)
                 .isTrue();
-        assertThat(refusal)
-                .as("the submission's envelope is the one admission reads")
-                .isNotEqualTo("malformed_admission");
+        assertThat(refusal).isNotEqualTo("malformed_admission");
 
         Path reportFile = workDir.resolve(SandboxLayout.OUTPUT_PREFIX + SandboxLayout.PRACTICE_SCRIPT_REPORT_FILE);
         assertThat(reportFile).as(runnerLog).exists();
         transactions.executeWithoutResult(status -> PracticeScriptRunRecorderFixtures.record(
-                parser, runs, meterRegistry, objectMapper, ended, readBytes(reportFile), frozen, Instant.now()));
-        AgentJobPracticeScriptRun run = runs.findByWorkspaceIdAndJobIdIn(context.id(), List.of(job.getId())).stream()
-                .filter(row -> row.practiceSlug().equals(SLUG))
+                parser,
+                runs,
+                meterRegistry,
+                objectMapper,
+                reviewAssignments,
+                ended,
+                readBytes(reportFile),
+                frozen,
+                Instant.now()));
+        ScriptRun run = runs.findByWorkspaceIdAndJobIdIn(context.id(), List.of(job.getId())).stream()
+                .filter(row -> row.getId().getPracticeId() == practice.getId())
                 .findFirst()
                 .orElseThrow();
         String report = Files.readString(reportFile) + "\n" + runnerLog;
-        assertThat(run.getStatus()).as(report).isEqualTo(PracticeScriptRunStatus.OK);
-        assertThat(run.getProgramKind()).isEqualTo(PracticeProgramKind.CUSTOM);
-        assertThat(run.getProgramDigest()).isEqualTo(ProvenanceDigest.sha256Hex(Files.readAllBytes(EVERY_SLOT)));
+        assertThat(run.getStatus()).as(report).isEqualTo(ScriptRunStatus.OK);
+        assertThat(run.getScriptKind()).isEqualTo(ScriptKind.CUSTOM);
         JsonNode calls = Objects.requireNonNull(run.getCalls());
         assertThat(calls.path("review").asInt())
                 .as("one review session: %s", report)
                 .isEqualTo(1);
         for (ModelKind kind : called) {
-            assertThat(calls.path(kind.slot()).asInt())
+            assertThat(calls.path(kind.name().toLowerCase(Locale.ROOT)).asInt())
                     .as("%s was called: %s", kind, report)
                     .isPositive();
         }
         for (JsonNode slot : Objects.requireNonNull(run.getModels())) {
-            assertThat(slot.path("notRated").isEmpty())
+            assertThat(slot.path("failures").isEmpty())
                     .as("every bound slot answered every call: %s", report)
                     .isTrue();
         }
 
         Map<ModelKind, PracticeScriptKindTotal> usage =
-                jobRepository.sumPracticeScriptUsageByKind(context.id(), job.getId(), job.getRetryCount()).stream()
+                jobRepository.sumPracticeScriptUsageByKind(context.id(), job.getId(), job.getAttempt()).stream()
                         .collect(Collectors.toMap(PracticeScriptKindTotal::modelKind, Function.identity()));
         assertThat(usage.keySet()).isEqualTo(called);
 
         lifecycle.cancel(context.id(), job.getId());
 
-        Map<LlmUsageSourceType, LlmUsageEvent> ledger = usageEvents.findAll().stream()
+        Map<UsageSourceType, LlmUsageEvent> ledger = usageEvents.findAll().stream()
                 .filter(event -> event.getSourceId().equals(job.getId()))
-                .filter(event -> event.getSourceType() != LlmUsageSourceType.AGENT_JOB)
+                .filter(event -> event.getSourceType() != UsageSourceType.REVIEW_JOB)
                 .collect(Collectors.toMap(LlmUsageEvent::getSourceType, Function.identity()));
         assertThat(ledger.keySet())
-                .containsExactlyInAnyOrderElementsOf(boundKinds.stream()
-                        .map(AgentJobPracticeScriptUsage::ledgerSourceType)
-                        .toList());
+                .containsExactlyInAnyOrderElementsOf(
+                        boundKinds.stream().map(ScriptUsage::ledgerSourceType).toList());
         for (ModelKind kind : boundKinds) {
-            LlmUsageEvent row = Objects.requireNonNull(ledger.get(AgentJobPracticeScriptUsage.ledgerSourceType(kind)));
+            LlmUsageEvent row = Objects.requireNonNull(ledger.get(ScriptUsage.ledgerSourceType(kind)));
             PracticeScriptKindTotal counted = Objects.requireNonNull(usage.get(kind));
             assertThat(counted.inputTokens()).as("%s input tokens", kind).isPositive();
             assertThat(row.getModel())
                     .isEqualTo(Objects.requireNonNull(frozen.get(kind)).upstreamModelId());
             assertThat((long) row.getTotalCalls()).isEqualTo(counted.calls());
             assertThat(row.getInputTokens()).isEqualTo(counted.inputTokens());
-            assertThat(row.getSourceAttempt()).isEqualTo(job.getRetryCount());
-            assertThat(row.getPricingState()).isEqualTo(PricingState.PRICED);
+            assertThat(row.getSourceAttempt()).isEqualTo(job.getAttempt());
+            assertThat(row.getPricingState()).isEqualTo(UsagePricingState.PRICED);
         }
     }
 
@@ -483,8 +549,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = createWorkspace(
                 slug, "Practice script live", slug + "-org", AccountType.ORG, persistUser(slug + "-owner"));
         ensureAdminMembership(workspace);
-        workspaceMembershipService.createMembership(
-                workspace, developer.getId(), WorkspaceMembership.WorkspaceRole.MEMBER);
+        workspaceMembershipService.createMembership(workspace, developer.getId(), Membership.WorkspaceRole.MEMBER);
         return workspace;
     }
 
@@ -531,17 +596,16 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
 
     /** The practice whose program is the every-slot fixture. */
     private Practice practice(Workspace workspace, String program) {
-        Practice practice = new Practice();
-        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-        practice.setWorkspace(workspace);
-        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
-        practice.setSlug(SLUG);
-        practice.setName("Every slot");
-        practice.setCriteria(CRITERIA);
-        practice.setPracticeScript(program);
-        PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_OPENED);
-        practice = practiceRepository.saveAndFlush(practice);
-        practice.setCurrentRevision(revisionRepository.save(new PracticeRevision(practice, 1)));
+
+        Practice practice = runtimePracticeVersions.create(
+                workspace,
+                SLUG,
+                new ItemKind("scm.pull_request"),
+                RuntimePracticeTestData.definition(new ItemKind("scm.pull_request"), "Every slot", CRITERIA, program),
+                null,
+                0,
+                null);
+        practice.setFeedbackMode(FeedbackMode.AUTOMATIC);
         return practiceRepository.saveAndFlush(practice);
     }
 
@@ -549,48 +613,39 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
      * A running review owned by this worker, so that the proxy accepts its token. Submission freezes the bound models
      * and the claim prices them; both are private to the job pipeline, so this does the same from the same bindings.
      */
-    private AgentJob runningJob(Workspace workspace, Practice practice) {
-        Long workspaceId = workspace.getId();
-        JsonNode metadata = objectMapper.createObjectNode();
-        AgentJobType type = AgentJobType.PULL_REQUEST_REVIEW;
-        var review = reviewPolicy.binding(workspaceId, type, metadata).orElseThrow();
+    private ReviewJob runningJob(Workspace workspace, Practice practice) {
+        long actor = SecurityUtils.getCurrentAccountId().orElseThrow();
+        var binding = runtimeModelRouting
+                .binding(workspace.getId(), AgentPurpose.PRACTICE_REVIEW, actor)
+                .orElseThrow();
         Map<ModelKind, FrozenModel> slots = new EnumMap<>(ModelKind.class);
-        for (AgentPurpose purpose : AgentPurpose.practiceScript()) {
-            reviewPolicy
-                    .practiceScriptBinding(workspaceId, purpose, type, metadata)
-                    .ifPresent(binding -> slots.put(
+        slots.put(
+                ModelKind.CHAT,
+                FrozenModel.from(binding, resolver)
+                        .withPriceSnapshot(admission.admit(binding).price()));
+        for (AgentPurpose purpose : AgentPurpose.practiceScript())
+            runtimeModelRouting
+                    .practiceScriptBinding(workspace.getId(), purpose, actor)
+                    .ifPresent(selected -> slots.put(
                             purpose.kind(),
-                            FrozenModel.from(binding, resolver)
-                                    .withPriceSnapshot(admission.admit(binding).price())));
-        }
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        job.setJobType(type);
-        job.setArtifactKind(ArtifactKinds.PULL_REQUEST);
-        job.setMetadata(metadata);
-        job.setStatus(AgentJobStatus.RUNNING);
-        job.setWorkerId(workerProperties.resolvedWorkerId());
-        job.setStartedAt(Instant.now());
-        job.setExecutionStartedAt(Instant.now());
-        job.setConfigSnapshot(ConfigSnapshot.from(review, resolver)
-                .withPriceSnapshot(admission.admit(review).price())
-                .withPracticeScript(slots.isEmpty() ? null : slots)
+                            FrozenModel.from(selected, resolver)
+                                    .withPriceSnapshot(admission.admit(selected).price())));
+        var job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, workspace.getId());
+        job.setInput(new ReviewJobInput(1, List.of(new ReviewAssignmentId(job.getReviewId(), practice.getId(), 1))));
+        job.setConfigSnapshot(ConfigSnapshot.from(binding, resolver)
+                .withPriceSnapshot(admission.admit(binding).price())
+                .withPracticeScript(slots)
                 .toJson(objectMapper));
-        ObjectNode snapshot = EvidenceSnapshotFixtures.snapshot(objectMapper);
-        EvidenceSnapshotFixtures.admittedPractice(
-                snapshot,
-                SLUG,
-                Objects.requireNonNull(practice.getCurrentRevision().getId()));
-        job.setEvidenceSnapshot(snapshot);
-        return jobRepository.saveAndFlush(job);
+        job.setCapture(EvidenceSnapshotFixtures.snapshot(objectMapper));
+        return job;
     }
 
     /**
      * What the server captured for the job: the pull request at the staged commit, the job's metadata naming it, and
      * the record {@code PullRequestContentSource} writes from both, staged where the runner reads it.
      */
-    private AgentJob capture(AgentJob job, Path workDir, User developer) throws IOException, InterruptedException {
+    private ReviewJob capture(ReviewJob job, Path workDir, User developer) throws IOException, InterruptedException {
         Path context = workDir.resolve(SandboxLayout.CONTEXT_PREFIX);
         JsonNode change = objectMapper.readTree(context.resolve("change.json").toFile());
         String base = change.path("base_sha").asString();
@@ -642,18 +697,20 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 .findByRepositoryIdAndNumber(repository.getId(), 1)
                 .orElseThrow()
                 .getId());
-        ObjectNode metadata = LiveWorkRecords.pullRequestJob(
+        var capturedWork = LiveWorkRecords.capturedPullRequest(
                 pullRequestId, Objects.requireNonNull(repository.getId()), 1, head, TITLE, BODY, SOURCE_BRANCH);
-        @Nullable Instant admittedAt = job.getCreatedAt();
+        @Nullable Instant admittedAt = job.getAvailableAt();
         byte[] record = Objects.requireNonNull(
                 transactions.execute(status -> LiveWorkRecords.staged(PullRequestContentSource.workRecord(
-                        pullRequests.findByIdForReviewContext(pullRequestId).orElseThrow(), metadata, admittedAt))));
+                        pullRequests.findByIdForReviewContext(pullRequestId).orElseThrow(),
+                        capturedWork,
+                        admittedAt))));
         Files.write(context.resolve("metadata.json"), record);
 
         // One capture for both sides: the job's snapshot, and the folder index the runner reads.
         Map<String, byte[]> files = new LinkedHashMap<>();
         Map<String, Path> onDisk = new LinkedHashMap<>();
-        ObjectNode snapshot = (ObjectNode) Objects.requireNonNull(job.getEvidenceSnapshot());
+        ObjectNode snapshot = (ObjectNode) Objects.requireNonNull(job.getCapture());
         Map<String, ObjectNode> sources = new LinkedHashMap<>();
         Map<String, String> identities = Map.of(
                 "scm.pull-request.diff",
@@ -661,7 +718,7 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 "scm.repository.tree",
                 LiveRunnerWorkspace.treeIdentity(workDir));
         for (Map.Entry<String, String> captured :
-                LiveRunnerWorkspace.capturedArtifacts().entrySet()) {
+                LiveRunnerWorkspace.capturedFiles().entrySet()) {
             String path = captured.getKey();
             String kind = captured.getValue();
             ObjectNode source = sources.computeIfAbsent(
@@ -669,23 +726,65 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
             byte[] bytes = Files.readAllBytes(workDir.resolve(path));
             if (kind.equals("scm.repository.tree")) onDisk.put(path, workDir.resolve(path));
             else files.put(path, bytes);
-            EvidenceSnapshotFixtures.artifact(snapshot, source, path, ProvenanceDigest.sha256Hex(bytes))
+            EvidenceSnapshotFixtures.file(snapshot, source, path, ProvenanceDigest.sha256Hex(bytes))
                     .put("mediaType", path.endsWith(".json") ? "application/json" : "text/plain")
                     .put("bytes", bytes.length);
+        }
+
+        var texts = snapshot.withObject("manifest").withArray("citableTexts");
+        for (var entry : LiveRunnerWorkspace.capturedFiles().entrySet()) {
+            String path = entry.getKey();
+            String kind = entry.getValue();
+            var text = texts.addObject()
+                    .put("source", kind)
+                    .put("path", path)
+                    .put("side", "NEW")
+                    .put("stagedPath", path)
+                    .put("sha256", ProvenanceDigest.sha256Hex(Files.readAllBytes(workDir.resolve(path))));
+            if (kind.equals("scm.repository.tree")) text.put("revision", head);
         }
         Files.write(
                 workDir.resolve(SandboxLayout.MANIFEST_PATH),
                 objectMapper.writeValueAsBytes(snapshot.path("manifest")));
-        snapshot.set(
-                ReviewedWork.SNAPSHOT_KEY,
-                objectMapper.valueToTree(ReviewedWork.captured(
-                                objectMapper.writeValueAsBytes(snapshot.path("manifest")),
-                                files,
-                                pullRequestId,
-                                objectMapper)
-                        .orElseThrow()));
-        job.setMetadata(metadata);
-        job.setEvidenceSnapshot(snapshot);
+
+        var item = itemWriter.upsert(new ItemRegistration(
+                job.getWorkspaceId(), new ItemKind("scm.pull_request"), pullRequestId, null, null));
+        var source = itemSources.stream()
+                .filter(candidate -> candidate.kind().equals(item.kind()))
+                .findFirst()
+                .orElseThrow();
+        var pinned = source.current(item).orElseThrow();
+        long actor = SecurityUtils.getCurrentAccountId().orElseThrow();
+        var reviewId = reviews.request(new ReviewRequest(
+                job.getWorkspaceId(),
+                item.itemId(),
+                ReviewKind.ITEM,
+                pinned.version(),
+                ReviewOrigin.REQUEST,
+                null,
+                actor,
+                null,
+                null,
+                null,
+                null,
+                List.of(job.getInput().assignments().getFirst().practiceId()),
+                false));
+        var review = reviews.find(job.getWorkspaceId(), reviewId).orElseThrow();
+        UUID jobId = reviewQueue.enqueue(
+                review,
+                item.itemId(),
+                review.practices().stream()
+                        .map(practice -> new ReviewAssignmentId(reviewId, practice.practiceId(), item.itemId()))
+                        .toList());
+        var priced = job.getConfigSnapshot();
+        job = jobRepository.findByIdAndWorkspaceId(jobId, item.workspaceId()).orElseThrow();
+        job.setConfigSnapshot(priced);
+        job.setStatus(ReviewJobStatus.RUNNING);
+        job.setWorkerId(workerProperties.resolvedWorkerId());
+        job.setStartedAt(Instant.now());
+        job.setExecutionStartedAt(Instant.now());
+        job.setCapture(snapshot);
+        reviews.start(item.workspaceId(), reviewId);
         job = jobRepository.saveAndFlush(job);
         // The checkout goes with its witnesses, as RepositoryTreeContentSource stages it, so admission can verify a
         // quote of code against it.

@@ -5,7 +5,8 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmFeedbackFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedCommentThreads;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedGraphQlClient;
@@ -15,21 +16,25 @@ import java.util.Map;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import reactor.core.publisher.Mono;
 
-/** The real {@link GitLabSummaryChannel} over a GitLab whose issue and merge request notes the test controls. */
+/**
+ * The real {@link GitLabSummaryWriter} over a GitLab whose issue and merge request notes the test
+ * controls.
+ */
 public final class ScriptedGitLabNotes {
 
     private static final String BOT = "gid://gitlab/User/1";
 
     private final ScriptedCommentThreads threads = new ScriptedCommentThreads("gid://gitlab/Note/");
-    private final SummaryChannel channel;
+    private final SummaryWriter channel;
 
     public ScriptedGitLabNotes(OutboundEgressGuard egressGuard) {
         GitLabGraphQlClientProvider provider = mock(GitLabGraphQlClientProvider.class);
         when(provider.forScope(anyLong())).thenReturn(ScriptedGraphQlClient.of(this::answer));
-        channel = new GitLabSummaryChannel(provider, new GitLabMrResolver(provider), egressGuard);
+        channel = new GitLabSummaryWriter(
+                provider, new GitLabMrResolver(provider), egressGuard, ScmFeedbackFixtures.resolver());
     }
 
-    public SummaryChannel channel() {
+    public SummaryWriter channel() {
         return channel;
     }
 
@@ -61,7 +66,10 @@ public final class ScriptedGitLabNotes {
         };
     }
 
-    /** Every scripted note was written through the channel, so the identity it authenticates as wrote it. */
+    /**
+     * Every scripted note was written through the channel, so the identity it authenticates as
+     * wrote it.
+     */
     private Mono<ClientGraphQlResponse> notes(String path, String noteable) {
         return threads.read(
                 noteable,

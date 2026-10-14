@@ -12,10 +12,11 @@ import static com.slack.api.model.block.element.BlockElements.button;
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.block.composition.ConfirmationDialogObject;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackHephaestusUiLinks;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackConsentBlocks;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
@@ -33,6 +34,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)
 public class SlackAppHomeService {
 
@@ -90,10 +92,11 @@ public class SlackAppHomeService {
         List<LayoutBlock> blocks = new ArrayList<>();
         blocks.add(header(h -> h.text(plainText("Hephaestus practice mentor"))));
         boolean mentorReady = mentorReadinessQuery.isReady(workspaceId);
-        Optional<User> developer = identityResolver.resolveDeveloper(workspaceId, teamId, slackUserId);
-        Optional<String> login = developer.map(User::getLogin);
+        Optional<AccountSummaryQuery.AccountSummary> developer =
+                identityResolver.resolveDeveloper(workspaceId, teamId, slackUserId);
+        Optional<String> login = developer.map(AccountSummaryQuery.AccountSummary::displayName);
         Optional<MentorRefusal> refusal = mentorReady
-                ? developer.flatMap(user -> mentorTurnRunner.refusal(workspaceId, user.getId()))
+                ? developer.flatMap(user -> mentorTurnRunner.refusal(workspaceId, user.id()))
                 : Optional.empty();
         boolean channelMessagesAllowed =
                 !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
@@ -169,11 +172,10 @@ public class SlackAppHomeService {
             return List.of();
         }
         return List.of(
-                section(
-                        s -> s.text(
-                                markdownText(
-                                        "*Account settings.* Use this Home tab to control how Hephaestus uses your Slack messages. "
-                                                + "Open Hephaestus to manage your sign-in, your connected accounts, and your research participation."))),
+                section(s ->
+                        s.text(markdownText("*Account settings.* Use this Home tab to control how Hephaestus uses your"
+                                + " Slack messages. Open Hephaestus to manage your sign-in, your connected"
+                                + " accounts, and your research participation."))),
                 actions(a -> a.elements(asElements(button(b -> b.text(plainText("Open account settings"))
                         .url(url)
                         .actionId(ACTION_OPEN_HEPHAESTUS)
@@ -203,10 +205,11 @@ public class SlackAppHomeService {
 
     List<LayoutBlock> channelMessageBlocks(boolean allowed) {
         String status = allowed
-                ? "*Channel-message context is allowed.* Hephaestus may use the new messages that you send in monitored "
-                        + "channels to personalize how it mentors you in private. If you turn this off, Hephaestus stops "
-                        + "future use and deletes the channel-message data that it collected from you."
-                : "*Channel-message context is not allowed.* Hephaestus does not use your messages in monitored channels.";
+                ? "*Channel-message context is allowed.* Hephaestus may use the new messages that you send in"
+                      + " monitored channels to personalize how it mentors you in private. If you turn this off,"
+                      + " Hephaestus stops future use and deletes the channel-message data that it collected from you."
+                : "*Channel-message context is not allowed.* Hephaestus does not use your messages in monitored"
+                        + " channels.";
         return List.of(
                 section(s -> s.text(markdownText(status))),
                 actions(a -> a.elements(asElements(

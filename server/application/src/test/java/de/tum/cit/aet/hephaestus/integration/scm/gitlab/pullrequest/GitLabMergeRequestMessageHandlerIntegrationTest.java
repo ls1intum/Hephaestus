@@ -4,41 +4,21 @@ import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValid
 import static de.tum.cit.aet.hephaestus.integration.scm.GraphQlResponseStubValidator.assertVendorCouldReturn;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
-import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobEventListener;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
-import de.tum.cit.aet.hephaestus.agent.job.LinkedRepairFollowups;
-import de.tum.cit.aet.hephaestus.agent.job.PullRequestSignalResubmitter;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignal;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactSignalRepository;
-import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalState;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.MergeStateStatus;
@@ -52,12 +32,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlResponseHandler;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncConstants;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabWebhookContextResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.dto.GitLabMergeRequestEventDTO;
@@ -65,17 +44,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreview.GitLab
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabDiscussionSyncService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewthread.GitLabPullRequestReviewThreadProcessor;
-import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
-import de.tum.cit.aet.hephaestus.practices.review.ReviewGate;
-import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedGraphQlClient;
-import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
@@ -88,16 +60,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
@@ -109,7 +77,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -120,8 +87,8 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * The webhook flow from recorded GitLab payloads (gitlab.lrz.de) to the database: MR !3 is opened, closed and
- * reopened, MR !2 updated and merged, MR !4 approved and unapproved.
+ * The webhook flow from recorded GitLab payloads (gitlab.lrz.de) to the database: MR !3 is opened,
+ * closed and reopened, MR !2 updated and merged, MR !4 approved and unapproved.
  */
 @Tag("integration")
 @DisplayName("GitLab Merge Request Message Handler")
@@ -146,6 +113,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private static final long NATIVE_MR2_ID = 334047L;
     private static final int MR2_IID = 2;
     private static final String MR2_TITLE = "Implement OAuth authentication";
+
     /** The head of MR !2 in its recorded update hook. */
     private static final String MR2_HEAD = "11499a581bf88090fa5e0abbf6d73e10e6fb56a7";
 
@@ -196,10 +164,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private RecordingScmEventListener eventListener;
 
     @Autowired
-    private ArtifactSignalRepository artifactSignalRepository;
+    private ItemEventRepository artifactSignalRepository;
 
     @Autowired
-    private SignalRecorder signalRecorder;
+    private ItemWriter signalRecorder;
 
     @Autowired
     private IntegrationManifestRegistry manifests;
@@ -302,7 +270,7 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         void shouldReportAnEditedDescriptionButNotAnUpdateThatLeftTheTextAlone() throws Exception {
             receive(update("2026-01-31 19:04:04 +0100", null));
             eventListener.clear();
-            String repaired = "This MR implements OAuth2 so partners can sign in without a password.\n\nCloses #5";
+            String repaired = "This MR implements OAuth2 so partners can sign in without a password.\n\n" + "Closes #5";
 
             receive(update("2026-01-31 19:10:00 +0100", repaired));
             receive(update("2026-01-31 19:12:00 +0100", repaired));
@@ -440,20 +408,27 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     @Nested
     class ReviewerStates {
 
-        /** The reviewers after their reviews, as {@code merge_request.update.reviewers} lists them. */
+        /**
+         * The reviewers after their reviews, as {@code merge_request.update.reviewers} lists them.
+         */
         private static final Map<String, RequestedReviewer.ReviewState> REVIEWED = Map.of(
                 "user1", RequestedReviewer.ReviewState.APPROVED,
                 "sjones", RequestedReviewer.ReviewState.REQUESTED_CHANGES,
                 "user2", RequestedReviewer.ReviewState.REVIEWED,
                 "user3", RequestedReviewer.ReviewState.UNREVIEWED);
 
-        /** The list a sync reads in the snapshot tests: {@code user1} asked again, and no one else. */
+        /**
+         * The list a sync reads in the snapshot tests: {@code user1} asked again, and no one else.
+         */
         private static final Map<String, RequestedReviewer.ReviewState> SYNCED =
                 Map.of("user1", RequestedReviewer.ReviewState.UNREVIEWED);
 
         private static final Instant STORED_AT = Instant.parse("2026-01-31T18:20:00Z");
 
-        /** The {@code updated_at} of the merge request {@link #syncedMergeRequest} stores, as a hook states it. */
+        /**
+         * The {@code updated_at} of the merge request {@link #syncedMergeRequest} stores, as a hook
+         * states it.
+         */
         private static final String SYNCED_UPDATED_AT = "2026-01-31 19:10:00 +0100";
 
         /** When the second list was stated, against the stored one's {@link #STORED_AT}. */
@@ -510,7 +485,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsEntry("user1", RequestedReviewer.ReviewState.UNREVIEWED);
         }
 
-        /** GitLab before 18.6 lists reviewers without their state, so only the sync states them; who is listed changes. */
+        /**
+         * GitLab before 18.6 lists reviewers without their state, so only the sync states them; who
+         * is listed changes.
+         */
         @Test
         void shouldKeepEachStoredStateWhenAHookListsTheReviewersWithoutOne() throws Exception {
             sync(
@@ -529,7 +507,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                             "user2", RequestedReviewer.ReviewState.REVIEWED));
         }
 
-        /** A state from a GitLab newer than Hephaestus must not leave the verdict it replaced standing. */
+        /**
+         * A state from a GitLab newer than Hephaestus must not leave the verdict it replaced
+         * standing.
+         */
         @Test
         void shouldStoreNoStateWhenTheHookStatesOneHephaestusDoesNotKnow() throws Exception {
             receive(loadPayload("merge_request.update.reviewers.derived"));
@@ -544,7 +525,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsEntry("user1", null);
         }
 
-        /** GitLab leaves {@code reviewers} and {@code assignees} out of a hook when there are none. */
+        /**
+         * GitLab leaves {@code reviewers} and {@code assignees} out of a hook when there are none.
+         */
         @Test
         void shouldRemoveTheLastReviewersAndAssigneesWhenTheHookLeavesTheListsOut() throws Exception {
             receive(loadPayload("merge_request.update.reviewers.derived"));
@@ -577,7 +560,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(reviewerStates()).containsExactlyInAnyOrderEntriesOf(expected);
         }
 
-        /** A sync page applies unless it was asked for before the webhook arrived; applying it twice changes nothing. */
+        /**
+         * A sync page applies unless it was asked for before the webhook arrived; applying it twice
+         * changes nothing.
+         */
         @ParameterizedTest
         @EnumSource(Order.class)
         void shouldApplyASyncPageUnlessItWasReadBeforeTheStoredWebhook(Order page) throws Exception {
@@ -590,8 +576,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         /**
-         * A webhook applies unless it arrived before the stored sync page was asked for, even when it waited in the
-         * stream until after; its payload is as new as the merge request the sync stored, so only its arrival dates it.
+         * A webhook applies unless it arrived before the stored sync page was asked for, even when
+         * it waited in the stream until after; its payload is as new as the merge request the sync
+         * stored, so only its arrival dates it.
          */
         @ParameterizedTest
         @EnumSource(Order.class)
@@ -606,9 +593,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         /**
-         * A sync page read after the webhook arrived is written while the webhook is handled. The webhook reads the
-         * merge request under its row lock, so it waits for the sync to commit and compares against the sync's list,
-         * not against the one stored before.
+         * A sync page read after the webhook arrived is written while the webhook is handled. The
+         * webhook reads the merge request under its row lock, so it waits for the sync to commit
+         * and compares against the sync's list, not against the one stored before.
          */
         @Test
         void shouldCompareAgainstTheListAConcurrentSyncCommittedWhileTheWebhookWaited() throws Exception {
@@ -643,16 +630,17 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         /**
-         * What the one other backend waiting on a lock in this database waits on, once there is one. Its statement text
-         * is cut at {@code track_activity_query_size}, so it cannot show the locking clause of a long select.
+         * What the one other backend waiting on a lock in this database waits on, once there is
+         * one. Its statement text is cut at {@code track_activity_query_size}, so it cannot show
+         * the locking clause of a long select.
          */
         private String lockAnotherBackendWaitsOn() throws InterruptedException {
             Instant deadline = Instant.now().plus(Duration.ofSeconds(30));
             while (Instant.now().isBefore(deadline)) {
                 List<@Nullable String> waiting = jdbcTemplate.queryForList("""
-                        SELECT wait_event FROM pg_stat_activity
-                        WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()
-                        """, String.class);
+                    SELECT wait_event FROM pg_stat_activity
+                    WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()
+                    """, String.class);
                 if (!waiting.isEmpty()) {
                     return String.valueOf(waiting.getFirst());
                 }
@@ -683,7 +671,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     ProcessingContext.forSync(null, savedRepo).withObservedAt(fetchedAt));
         }
 
-        /** A recorded payload at another {@code updated_at}, for a test about the order payloads arrive in. */
+        /**
+         * A recorded payload at another {@code updated_at}, for a test about the order payloads
+         * arrive in.
+         */
         private GitLabMergeRequestEventDTO at(String filename, String updatedAt) throws IOException {
             ObjectNode payload = (ObjectNode) objectMapper.readTree(
                     new ClassPathResource("gitlab/" + filename + ".json").getContentAsString(StandardCharsets.UTF_8));
@@ -705,9 +696,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     /**
-     * What the merge request's review decision says, from what the sync read about its reviewers. GitLab's
-     * {@code approved} means the approval rules are met, which a project requiring no approval meets with nobody
-     * approving.
+     * What the merge request's review decision says, from what the sync read about its reviewers.
+     * GitLab's {@code approved} means the approval rules are met, which a project requiring no
+     * approval meets with nobody approving.
      */
     @Nested
     class ReviewDecisions {
@@ -762,12 +753,15 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
             assertThat(reviewDecision()).isEqualTo(ReviewDecision.CHANGES_REQUESTED);
             assertThat(reviewStates())
-                    .as(
-                            "the approver's approval is theirs, and the request for changes is the requester's system note's")
+                    .as("the approver's approval is theirs, and the request for changes is the"
+                            + " requester's system note's")
                     .containsExactly(Map.entry("approver", PullRequestReview.State.APPROVED));
         }
 
-        /** Without Premium a request for changes blocks nothing, but the reviewer's state still says it stands. */
+        /**
+         * Without Premium a request for changes blocks nothing, but the reviewer's state still says
+         * it stands.
+         */
         @Test
         void shouldReportAReviewersRequestForChangesWhereItDoesNotBlockMerging() {
             sync(syncedMergeRequest(
@@ -799,8 +793,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         /**
-         * GitLab sends {@code approval} and {@code unapproval} where the approval rules are not met, or stay met: each is
-         * one person's act, and the stored decision no longer stands after it.
+         * GitLab sends {@code approval} and {@code unapproval} where the approval rules are not
+         * met, or stay met: each is one person's act, and the stored decision no longer stands
+         * after it.
          */
         @Test
         void shouldRefreshApprovalMembershipOnlyFromTheNativeSnapshot() throws Exception {
@@ -860,7 +855,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     /**
-     * Refresh occasions cannot overwrite newer native snapshots or establish approval membership themselves.
+     * Refresh occasions cannot overwrite newer native snapshots or establish approval membership
+     * themselves.
      */
     @Nested
     class ApprovalActsOnTheCurrentHead {
@@ -975,12 +971,15 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         @Test
         void shouldLeaveAStandingApprovalToTheReadWhenAnApprovalHookArrivesAfterAReset() throws Exception {
             receiveWithApprovals(loadPayload("merge_request.approved"), List.of(approver()));
-            // GitLab's reset on the push says whose approvals went only by resetting them all, so it dismisses no one.
+            // GitLab's reset on the push says whose approvals went only by resetting them all, so
+            // it dismisses no one.
             receive(systemReset(NEXT_HEAD, "2026-01-31 22:30:00 +0100", "approvals_reset_on_push"));
             eventListener.clear();
 
-            // GitLab fires the hook from the merge request as it is when the hook runs, so the head it names is no
-            // approved revision, and an approval that already stands is the readiness read's to reconcile.
+            // GitLab fires the hook from the merge request as it is when the hook runs, so the head
+            // it names is no
+            // approved revision, and an approval that already stands is the readiness read's to
+            // reconcile.
             GitLabMergeRequestEventDTO reapproval =
                     approvalEvent("merge_request.approved", NEXT_HEAD, "2026-01-31 22:30:00 +0100");
             receive(reapproval);
@@ -1037,13 +1036,15 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     /**
-     * What a read of one merge request after its webhook records ({@link GitLabMergeRequestProcessor#applyReadiness}),
-     * and what it may not.
+     * What a read of one merge request after its webhook records ({@link
+     * GitLabMergeRequestProcessor#applyReadiness}), and what it may not.
      */
     @Nested
     class ReadinessRead {
 
-        /** A read begun after the hook below was received, so no stored review snapshot is newer. */
+        /**
+         * A read begun after the hook below was received, so no stored review snapshot is newer.
+         */
         private Instant readAt = Instant.EPOCH;
 
         @BeforeEach
@@ -1280,7 +1281,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                 throws Exception {
             receive(approvalEvent("merge_request.approved", NEXT_HEAD, "2026-01-31T22:31:00.080+01:00"));
 
-            // GitLab's GraphQL dates to the second: this read may describe the version before the hook's.
+            // GitLab's GraphQL dates to the second: this read may describe the version before the
+            // hook's.
             assertThat(read(approvedAt(Instant.parse("2026-01-31T21:31:00Z")), readAt))
                     .isFalse();
 
@@ -1340,7 +1342,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(pr.getReviewDecision()).isEqualTo(ReviewDecision.APPROVED);
         }
 
-        /** A read of the stored head and version that GitLab answered with {@code mergeable} and {@code status}. */
+        /**
+         * A read of the stored head and version that GitLab answered with {@code mergeable} and
+         * {@code status}.
+         */
         private GitLabMergeRequestReadinessReader.Facts mergeability(boolean mergeable, String status) {
             return new GitLabMergeRequestReadinessReader.Facts(
                     savedRepo.getNativeId(),
@@ -1499,8 +1504,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     /**
-     * A sync page that failed to give a merge request's head records nothing that holds for a head: the upsert keeps
-     * the stored head, which is not the one the page read.
+     * A sync page that failed to give a merge request's head records nothing that holds for a head:
+     * the upsert keeps the stored head, which is not the one the page read.
      */
     @Nested
     class SyncedPagesWithoutTheirHead {
@@ -1644,8 +1649,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
 
         /**
-         * Pages and reads at one GitLab version are ordered by when they were asked for, as the reviews are: an earlier
-         * page applied after a later accepted pair leaves it, and a later page with its own pair replaces it.
+         * Pages and reads at one GitLab version are ordered by when they were asked for, as the
+         * reviews are: an earlier page applied after a later accepted pair leaves it, and a later
+         * page with its own pair replaces it.
          */
         @Test
         void shouldKeepTheDiffBaseOfALaterAcceptedReadOverAnEarlierPageAtTheSameVersion() {
@@ -1677,7 +1683,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     .isTrue();
             assertThat(mr2().getBaseRefOid()).isEqualTo("b".repeat(40));
 
-            // Asked for now, before the read above was: its pair at the same version does not replace that read's.
+            // Asked for now, before the read above was: its pair at the same version does not
+            // replace that read's.
             syncPage(paired(FIRST_HEAD, FIRST_HEAD, "c".repeat(40)), List.of());
             assertThat(mr2().getBaseRefOid()).isEqualTo("b".repeat(40));
 
@@ -1693,11 +1700,14 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             PullRequest moved = mr2();
             assertThat(moved.getHeadRefOid()).isEqualTo(NEXT_HEAD);
             assertThat(moved.getBaseRefOid())
-                    .as("the base of the previous head is forgotten when no pair came with the new one")
+                    .as("the base of the previous head is forgotten when no pair came with the" + " new one")
                     .isNull();
         }
 
-        /** MR !2 at the listing's version, with {@code head} and the diffRefs GitLab paired with {@code pairedHead}. */
+        /**
+         * MR !2 at the listing's version, with {@code head} and the diffRefs GitLab paired with
+         * {@code pairedHead}.
+         */
         private Map<String, @Nullable Object> paired(@Nullable String head, String pairedHead, String base) {
             Map<String, @Nullable Object> node =
                     page(head, "2026-01-31T18:10:00Z", null, "mergeable", List.of(approverNode()));
@@ -1711,7 +1721,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     ProcessingContext.forSync(null, savedRepo).withObservedAt(fetchedAt));
         }
 
-        /** Merge request !2 as GitLab's listing gives it; a null head, version or pipeline is sent as null. */
+        /**
+         * Merge request !2 as GitLab's listing gives it; a null head, version or pipeline is sent
+         * as null.
+         */
         private Map<String, @Nullable Object> page(
                 @Nullable String head,
                 @Nullable String updatedAt,
@@ -1759,7 +1772,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /** A sync page's head pipeline is dated by when the page was asked for, like the pipeline hook. */
+    /**
+     * A sync page's head pipeline is dated by when the page was asked for, like the pipeline hook.
+     */
     @Nested
     class SyncedHeadChecks {
 
@@ -1839,7 +1854,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         return user;
     }
 
-    /** Runs the merge request sync over one page GitLab answered with {@code node} and {@code errors}. */
+    /**
+     * Runs the merge request sync over one page GitLab answered with {@code node} and {@code
+     * errors}.
+     */
     private void syncPage(Map<String, @Nullable Object> node, List<Map<String, ?>> errors) {
         syncPage(node, errors, null);
     }
@@ -1886,7 +1904,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         });
     }
 
-    /** A recorded hook of MR !4 at GitLab's {@code updatedAt} that names no head: none, or a blank one. */
+    /**
+     * A recorded hook of MR !4 at GitLab's {@code updatedAt} that names no head: none, or a blank
+     * one.
+     */
     private GitLabMergeRequestEventDTO headless(String filename, String updatedAt, boolean blank) throws IOException {
         return edited(filename, attributes -> {
             if (blank) {
@@ -1898,7 +1919,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         });
     }
 
-    /** GitLab's own reset of MR !4's approvals after a push, as its unapproval hook with {@code system}. */
+    /**
+     * GitLab's own reset of MR !4's approvals after a push, as its unapproval hook with {@code
+     * system}.
+     */
     private GitLabMergeRequestEventDTO systemReset(String head, String updatedAt, String systemAction)
             throws IOException {
         return edited("merge_request.unapproved", attributes -> {
@@ -1926,7 +1950,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         return objectMapper.treeToValue(payload, GitLabMergeRequestEventDTO.class);
     }
 
-    /** Delivers a hook, then applies the independent native approver snapshot the test specifies. */
+    /**
+     * Delivers a hook, then applies the independent native approver snapshot the test specifies.
+     */
     private void receiveWithApprovals(
             GitLabMergeRequestEventDTO event, List<GitLabMergeRequestProcessor.SyncUserData> currentApprovers) {
         receive(event);
@@ -1988,8 +2014,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     /**
-     * An update hook names no thread, and GitLab sends one when the last open thread is resolved: the discussions are
-     * read after it and their resolution recorded where the delivery may still write.
+     * An update hook names no thread, and GitLab sends one when the last open thread is resolved:
+     * the discussions are read after it and their resolution recorded where the delivery may still
+     * write.
      */
     @Nested
     class DiscussionResolution {
@@ -2051,7 +2078,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             assertThat(thread.getNodeId()).isNull();
         }
 
-        /** MR !2's update hook at a later time with no {@code changes}, as GitLab sends it for a resolution. */
+        /**
+         * MR !2's update hook at a later time with no {@code changes}, as GitLab sends it for a
+         * resolution.
+         */
         private GitLabMergeRequestEventDTO unchangedUpdate() throws IOException {
             ObjectNode payload =
                     (ObjectNode) objectMapper.readTree(new ClassPathResource("gitlab/merge_request.update.json")
@@ -2102,7 +2132,10 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
                     List.of());
         }
 
-        /** The merge request handler, reading the discussions GitLab answers with {@code answer} and nothing else. */
+        /**
+         * The merge request handler, reading the discussions GitLab answers with {@code answer} and
+         * nothing else.
+         */
         private GitLabMergeRequestMessageHandler handlerReadingDiscussions(Supplier<ClientGraphQlResponse> answer) {
             GitLabGraphQlClientProvider clients = mock(GitLabGraphQlClientProvider.class);
             when(clients.forScope(any())).thenReturn(ScriptedGraphQlClient.of(request -> Mono.fromSupplier(answer)));
@@ -2237,7 +2270,8 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
             receive(loadPayload("merge_request.update"));
             eventListener.clear();
 
-            // Merge -> PullRequestClosed(wasMerged=true), then PullRequestMerged once the read after it ran
+            // Merge -> PullRequestClosed(wasMerged=true), then PullRequestMerged once the read
+            // after it ran
             deliver(loadPayload("merge_request.merge"));
             assertThat(eventListener.ofType(ScmDomainEvent.PullRequestClosed.class))
                     .hasSize(1);
@@ -2287,801 +2321,9 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     }
 
     /**
-     * A merge's review judges who merged only once Hephaestus knows who that was. MR !2's recorded merge hook names a
-     * merge commit but no merger and no merge time, and its user is the author, which says nothing about who merged.
-     * The listener and resubmitter are constructed here, as in {@link TombstonedWork}.
+     * A merge's review judges who merged only once Hephaestus knows who that was. MR !2's recorded
+     * merge hook names a merge commit but no merger and no merge time, and its user is the author,
+     * which says nothing about who merged. The listener and resubmitter are constructed here, as in
+     * {@link TombstonedWork}.
      */
-    @Nested
-    class MergeAdmission {
-
-        private static final String MERGE_SHA = "b186370e62e2ae348df64fb187c13aff4008457b";
-        private static final Instant MERGE_VERSION = Instant.parse("2026-01-31T18:04:07Z");
-        private static final Instant MERGED_AT = Instant.parse("2026-01-31T18:04:06Z");
-
-        private final AgentJobService jobs = mock(AgentJobService.class);
-        private final ReviewGate gate = mock(ReviewGate.class);
-
-        /** Settles the occasion as the real submission does, so a redelivery meets a decided signal. */
-        @BeforeEach
-        void submissionSettlesTheOccasion() {
-            when(jobs.submit(any(), any(), any(), any(), any())).thenAnswer(invocation -> {
-                signalRecorder.markTriggered(invocation.getArgument(3), UUID.randomUUID());
-                return Optional.empty();
-            });
-        }
-
-        @Test
-        void shouldKeepTheMergeCommitTheHookNamesWithoutTakingAnyoneForTheMerger() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            receive(loadPayload("merge_request.merge"));
-
-            PullRequest merged = mr2();
-            assertThat(merged.getState()).isEqualTo(Issue.State.MERGED);
-            assertThat(merged.getMergeCommitSha()).isEqualTo(MERGE_SHA);
-            assertThat(merged.getMergedBy()).isNull();
-        }
-
-        @Test
-        void shouldRecordTheMergerAndTimeGitLabNamesAfterTheHook() throws Exception {
-            merge();
-
-            assertThat(mergeRead(MR2_HEAD, MERGE_VERSION, author())).isTrue();
-
-            PullRequest merged = mr2();
-            assertThat(Objects.requireNonNull(merged.getMergedBy()).getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(merged.getMergedAt()).isEqualTo(MERGED_AT);
-            assertThat(merged.getMergeCommitSha()).isEqualTo(MERGE_SHA);
-        }
-
-        @Test
-        void shouldRecordNoMergeFactsReadOfAnotherMergeAndReplaceNoneRecorded() throws Exception {
-            merge();
-
-            assertThat(mergeRead("f".repeat(40), MERGE_VERSION, author())).isFalse();
-            assertThat(terminalRead(NATIVE_MR2_ID + 1, "merged", MERGE_SHA, author()))
-                    .isFalse();
-            assertThat(terminalRead(NATIVE_MR2_ID, "opened", MERGE_SHA, author()))
-                    .isFalse();
-            assertThat(terminalRead(NATIVE_MR2_ID, "merged", "e".repeat(40), author()))
-                    .isFalse();
-            assertThat(mr2().getMergedBy()).isNull();
-
-            // The facts of a completed merge do not change, so a report of it dated an older version still names its
-            // merger.
-            assertThat(mergeRead(MR2_HEAD, MERGE_VERSION.minusSeconds(60), author()))
-                    .isTrue();
-            assertThat(mergeRead(MR2_HEAD, MERGE_VERSION, syncedUser(NATIVE_TUTOR_ID, "tutor")))
-                    .isFalse();
-            assertThat(Objects.requireNonNull(mr2().getMergedBy()).getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-        }
-
-        @Test
-        void shouldHoldTheMergeReviewUntilTheMergerIsKnownThenReviewTheSelfMerge() throws Exception {
-            ScmDomainEvent.PullRequestMerged event = merge();
-            gateRuns(mergerPractice());
-
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(event));
-
-            ArtifactSignal held = mergeSignal();
-            assertThat(held.getState()).isEqualTo(SignalState.PENDING);
-            assertThat(held.getStateReason()).isEqualTo(SignalStateReason.MERGE_ACTOR_UNAVAILABLE);
-            transactionTemplate.executeWithoutResult(status -> resubmitter().resubmit(held));
-            assertThat(mergeSignal().getStateReason()).isEqualTo(SignalStateReason.MERGE_ACTOR_UNAVAILABLE);
-            verifyNoInteractions(jobs);
-
-            mergeRead(MR2_HEAD, MERGE_VERSION, author());
-            transactionTemplate.executeWithoutResult(status -> resubmitter().resubmit(held));
-
-            ScmEventPayload.PullRequestData submitted = submitted();
-            assertThat(submitted.mergedById()).isNotNull().isEqualTo(submitted.authorId());
-        }
-
-        @Test
-        void shouldNameAnotherMergerRatherThanTheAuthor() throws Exception {
-            ScmDomainEvent.PullRequestMerged event = merge();
-            mergeRead(MR2_HEAD, MERGE_VERSION, syncedUser(NATIVE_TUTOR_ID, "tutor"));
-            gateRuns(mergerPractice());
-
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(event));
-
-            ScmEventPayload.PullRequestData submitted = submitted();
-            assertThat(submitted.mergedById())
-                    .isEqualTo(userRepository
-                            .findByNativeIdAndProviderId(NATIVE_TUTOR_ID, persistedId(savedProvider))
-                            .orElseThrow()
-                            .getId());
-            assertThat(submitted.mergedById()).isNotEqualTo(submitted.authorId());
-        }
-
-        @Test
-        void shouldReviewAMergeRightAwayWhenNoPracticeJudgesTheMerger() throws Exception {
-            ScmDomainEvent.PullRequestMerged event = merge();
-            gateRuns(new Practice());
-
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(event));
-
-            assertThat(submitted().mergedById()).isNull();
-        }
-
-        @Test
-        void shouldLetTheLiveMergeClaimTheMergeASyncRecordedFirstAndReviewItOnce() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            syncPage(mergedPage(), List.of());
-            ScmDomainEvent.PullRequestMerged synced =
-                    eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getLast();
-            assertThat(synced.context().isSync()).isTrue();
-            gateRuns(mergerPractice());
-
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(synced));
-            assertThat(mergeSignal().getState()).isEqualTo(SignalState.RECORDED);
-            verifyNoInteractions(jobs);
-
-            eventListener.clear();
-            // Older than the page the sync stored, so it changes nothing; the merge request is merged all the same.
-            deliver(loadPayload("merge_request.merge"));
-            ScmDomainEvent.PullRequestMerged live =
-                    eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getFirst();
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(live));
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(live));
-
-            // Once: the redelivery finds the occasion taken.
-            assertThat(submitted().mergedById())
-                    .isNotNull()
-                    .isEqualTo(submitted().authorId());
-        }
-
-        @Test
-        void shouldOfferTheMergeOnlyAfterItsReadAndWithTheMergerTheReadNamed() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            eventListener.clear();
-            AtomicBoolean offeredDuringRead = new AtomicBoolean(true);
-            AtomicReference<Issue.@Nullable State> storedDuringRead = new AtomicReference<>();
-            GitLabMergeRequestReadinessReader reader = mock(GitLabMergeRequestReadinessReader.class);
-            when(reader.read(any(), anyString(), eq(MR2_IID))).thenAnswer(invocation -> {
-                offeredDuringRead.set(!eventListener
-                        .ofType(ScmDomainEvent.PullRequestMerged.class)
-                        .isEmpty());
-                storedDuringRead.set(mr2().getState());
-                return mergedFacts(author());
-            });
-
-            handlerReading(reader).dispatchEvent(loadPayload("merge_request.merge"), Instant.now());
-
-            assertThat(storedDuringRead.get()).isEqualTo(Issue.State.MERGED);
-            assertThat(offeredDuringRead.get()).isFalse();
-            ScmDomainEvent.PullRequestMerged offered =
-                    eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getFirst();
-            assertThat(offered.context().isSync()).isFalse();
-            gateRuns(mergerPractice());
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(offered));
-            ScmEventPayload.PullRequestData submitted = submitted();
-            assertThat(submitted.mergedById()).isNotNull().isEqualTo(submitted.authorId());
-            assertThat(submitted.mergedAt()).isEqualTo(MERGED_AT);
-            assertThat(mr2().getMergeCommitSha()).isEqualTo(MERGE_SHA);
-        }
-
-        @Test
-        void shouldHoldTheMergeTheReadCouldNotNameAMergerForUntilASyncDoesThenReviewItOnce() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            eventListener.clear();
-            GitLabMergeRequestReadinessReader reader = mock(GitLabMergeRequestReadinessReader.class);
-
-            handlerReading(reader).dispatchEvent(loadPayload("merge_request.merge"), Instant.now());
-
-            ScmDomainEvent.PullRequestMerged offered =
-                    eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getFirst();
-            gateRuns(mergerPractice());
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(offered));
-            ArtifactSignal held = mergeSignal();
-            assertThat(mr2().getState()).isEqualTo(Issue.State.MERGED);
-            assertThat(held.getState()).isEqualTo(SignalState.PENDING);
-            assertThat(held.getStateReason()).isEqualTo(SignalStateReason.MERGE_ACTOR_UNAVAILABLE);
-            assertThat(held.getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT);
-            verifyNoInteractions(jobs);
-
-            syncPage(mergedPage(), List.of());
-            transactionTemplate.executeWithoutResult(status -> resubmitter().resubmit(held));
-
-            ScmEventPayload.PullRequestData submitted = submitted();
-            assertThat(submitted.mergedById()).isNotNull().isEqualTo(submitted.authorId());
-            // Settled, so the reaper, which re-offers only pending occasions, does not offer it again.
-            assertThat(mergeSignal().getState()).isEqualTo(SignalState.TRIGGERED);
-            assertThat(mergeSignal().getDiscoveredVia()).isEqualTo(DiscoveredVia.EVENT);
-        }
-
-        @Test
-        void shouldRecordTheMergerAReadNamesWithinTheSecondOfAMillisecondMergeHook() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            eventListener.clear();
-            GitLabMergeRequestReadinessReader reader = mock(GitLabMergeRequestReadinessReader.class);
-            // GraphQL reports the merged version to the second; the hook stored it to the millisecond.
-            when(reader.read(any(), anyString(), eq(MR2_IID))).thenReturn(mergedFacts(author()));
-
-            handlerReading(reader).dispatchEvent(millisecondMerge(), Instant.now());
-
-            PullRequest merged = mr2();
-            assertThat(merged.getUpdatedAt()).isEqualTo(Instant.parse("2026-01-31T18:04:07.317Z"));
-            assertThat(Objects.requireNonNull(merged.getMergedBy()).getLogin()).isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            ScmDomainEvent.PullRequestMerged offered =
-                    eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getFirst();
-            gateRuns(mergerPractice());
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(offered));
-            ScmEventPayload.PullRequestData submitted = submitted();
-            assertThat(submitted.mergedById()).isNotNull().isEqualTo(submitted.authorId());
-        }
-
-        @Test
-        void shouldRecoverOnlyTheStandingNativeDateAfterAMillisecondMergeHook() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            transactionTemplate.executeWithoutResult(tx -> {
-                PullRequest mr = pullRequestRepository
-                        .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
-                        .orElseThrow();
-                var author = Objects.requireNonNull(mr.getAuthor());
-                var approval = new PullRequestReview();
-                approval.setNativeId(
-                        GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR2_ID, author.getNativeId()));
-                approval.setProvider(savedRepo.getProvider());
-                approval.setAuthor(author);
-                approval.setPullRequest(mr);
-                approval.setState(PullRequestReview.State.APPROVED);
-                approval.setCommitId(MR2_HEAD);
-                reviewRepository.save(approval);
-                mr.addReview(approval);
-            });
-            eventListener.clear();
-            var hook = millisecondMerge();
-            var attrs = Objects.requireNonNull(hook.objectAttributes());
-            var actualDate = Instant.parse("2026-01-31T18:03:19.087Z");
-            long nativeApprover = GitLabSyncConstants.extractNumericId(Objects.requireNonNull(author().globalId()));
-            var rows = new GitLabApprovalClient.Snapshot(
-                    NATIVE_MR2_ID,
-                    MR2_IID,
-                    savedRepo.getNativeId(),
-                    "merged",
-                    Instant.parse("2026-01-31T18:04:07.317Z"),
-                    attrs.title(),
-                    attrs.description(),
-                    List.of(new GitLabApprovalClient.Approval(
-                            new GitLabApprovalClient.Approver(nativeApprover), actualDate)));
-            var terminal = mergedFacts(author());
-            var response = new GitLabMergeRequestReadinessReader.Facts(
-                    terminal.projectNativeId(),
-                    terminal.mergeRequestNativeId(),
-                    terminal.state(),
-                    terminal.updatedAt(),
-                    terminal.headSha(),
-                    true,
-                    "mergeable",
-                    true,
-                    GitLabHeadPipeline.NO_PIPELINE,
-                    List.of(),
-                    List.of(author()),
-                    terminal.merge(),
-                    rows);
-            var reader = mock(GitLabMergeRequestReadinessReader.class);
-            when(reader.read(any(), anyString(), eq(MR2_IID))).thenReturn(response);
-
-            handlerReading(reader).dispatchEvent(hook, Instant.now());
-
-            var merged = mr2();
-            var approval = reviewRepository
-                    .findByNativeIdAndProviderId(
-                            GitLabMergeRequestProcessor.generateApprovalNativeId(NATIVE_MR2_ID, nativeApprover),
-                            Objects.requireNonNull(savedRepo.getProvider().getId()))
-                    .orElseThrow();
-            assertThat(approval.getSubmittedAt()).isEqualTo(actualDate);
-            assertThat(approval.getCommitId())
-                    .as("GitLab names no approved revision, so a head stored for the approval was a guess and goes")
-                    .isNull();
-            assertThat(merged.getHeadCheckState()).isNull();
-            assertThat(eventListener.ofType(ScmDomainEvent.ReviewSubmitted.class))
-                    .isEmpty();
-        }
-
-        @Test
-        void shouldLetASyncNameTheMergerOfAMillisecondMergeHookWithoutTakingAnythingElseFromTheOlderPage()
-                throws Exception {
-            receive(loadPayload("merge_request.update"));
-            eventListener.clear();
-            // The read after the hook failed.
-            handlerReading(mock(GitLabMergeRequestReadinessReader.class))
-                    .dispatchEvent(millisecondMerge(), Instant.now());
-            ScmDomainEvent.PullRequestMerged offered =
-                    eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getFirst();
-            gateRuns(mergerPractice());
-            transactionTemplate.executeWithoutResult(status -> listener().onPullRequestMerged(offered));
-            ArtifactSignal held = mergeSignal();
-            assertThat(held.getStateReason()).isEqualTo(SignalStateReason.MERGE_ACTOR_UNAVAILABLE);
-
-            // Dated to the second, each page is older than the hook's version.
-            Map<String, @Nullable Object> open = mergedPage();
-            open.put("updatedAt", "2026-01-31T18:04:07Z");
-            open.put("state", "opened");
-            syncPage(open, List.of());
-            Map<String, @Nullable Object> otherHead = mergedPage();
-            otherHead.put("updatedAt", "2026-01-31T18:04:07Z");
-            otherHead.put("diffHeadSha", "f".repeat(40));
-            syncPage(otherHead, List.of());
-            assertThat(mr2().getState()).isEqualTo(Issue.State.MERGED);
-            assertThat(mr2().getMergedBy()).isNull();
-
-            Map<String, @Nullable Object> merged = mergedPage();
-            merged.put("updatedAt", "2026-01-31T18:04:07Z");
-            merged.put("title", "A title from the older page");
-            syncPage(merged, List.of());
-            PullRequest repaired = mr2();
-            assertThat(Objects.requireNonNull(repaired.getMergedBy()).getLogin())
-                    .isEqualTo(FIXTURE_AUTHOR_LOGIN);
-            assertThat(repaired.getTitle()).isNotEqualTo("A title from the older page");
-            assertThat(repaired.getUpdatedAt()).isEqualTo(Instant.parse("2026-01-31T18:04:07.317Z"));
-
-            transactionTemplate.executeWithoutResult(status -> resubmitter().resubmit(held));
-            ScmEventPayload.PullRequestData submitted = submitted();
-            assertThat(submitted.mergedById()).isNotNull().isEqualTo(submitted.authorId());
-        }
-
-        @ParameterizedTest
-        @ValueSource(strings = {"Older description", "Newer description"})
-        void shouldTakeNothingFromAPageOfTheSameSecondAsANewerMillisecondEdit(String pageDescription) throws Exception {
-            receive(update("2026-01-31T19:04:04.900+01:00", "Newer description"));
-            eventListener.clear();
-            Map<String, @Nullable Object> page = mergedPage();
-            page.put("state", "opened");
-            page.put("updatedAt", "2026-01-31T18:04:04Z");
-            page.put("description", pageDescription);
-            page.put("mergedAt", null);
-            page.put("mergeCommitSha", null);
-            page.put("mergeUser", null);
-            page.put("detailedMergeStatus", "mergeable");
-
-            syncPage(page, List.of());
-
-            PullRequest stored = mr2();
-            assertThat(stored.getBody()).isEqualTo("Newer description");
-            assertThat(stored.getUpdatedAt()).isEqualTo(Instant.parse("2026-01-31T18:04:04.900Z"));
-            assertThat(eventListener.ofType(ScmDomainEvent.PullRequestUpdated.class))
-                    .isEmpty();
-        }
-
-        /** The merge request handler, reading GitLab through {@code reader}. */
-        private GitLabMergeRequestMessageHandler handlerReading(GitLabMergeRequestReadinessReader reader) {
-            return new GitLabMergeRequestMessageHandler(
-                    mergeRequestProcessor,
-                    webhookContextResolver,
-                    mock(GitLabClosingIssueClient.class),
-                    reader,
-                    mock(GitLabDiscussionSyncService.class),
-                    natsMessageDeserializer,
-                    transactionTemplate);
-        }
-
-        private GitLabMergeRequestReadinessReader.Facts mergedFacts(GitLabMergeRequestProcessor.SyncUserData merger) {
-            return mergedFacts(merger, MERGE_VERSION);
-        }
-
-        private GitLabMergeRequestReadinessReader.Facts mergedFacts(
-                GitLabMergeRequestProcessor.SyncUserData merger, Instant version) {
-            return new GitLabMergeRequestReadinessReader.Facts(
-                    savedRepo.getNativeId(),
-                    NATIVE_MR2_ID,
-                    "merged",
-                    version,
-                    MR2_HEAD,
-                    false,
-                    "not_open",
-                    null,
-                    GitLabHeadPipeline.NOT_CAPTURED,
-                    null,
-                    null,
-                    new GitLabMergeRequestReadinessReader.Merge(merger, MERGED_AT, MERGE_SHA),
-                    null);
-        }
-
-        /** MR !2's merge hook as GitLab 19 sends it: its times to the millisecond, and no merger. */
-        private GitLabMergeRequestEventDTO millisecondMerge() throws IOException {
-            return edited("merge_request.merge", attributes -> {
-                attributes.put("updated_at", "2026-01-31T19:04:07.317+01:00");
-                attributes.put("merged_at", "2026-01-31T19:04:07.329+01:00");
-                attributes.putNull("merge_user_id");
-            });
-        }
-
-        private ScmDomainEvent.PullRequestMerged merge() throws Exception {
-            receive(loadPayload("merge_request.update"));
-            eventListener.clear();
-            deliver(loadPayload("merge_request.merge"));
-            return eventListener.ofType(ScmDomainEvent.PullRequestMerged.class).getFirst();
-        }
-
-        /** A read of MR !2 at its head reporting {@code nativeId} in {@code state}, merged into {@code commit}. */
-        private boolean terminalRead(
-                long nativeId, String state, String commit, GitLabMergeRequestProcessor.SyncUserData merger) {
-            return mergeRequestProcessor.applyTerminalFacts(
-                    savedRepo,
-                    MR2_IID,
-                    new GitLabMergeRequestReadinessReader.Facts(
-                            savedRepo.getNativeId(),
-                            nativeId,
-                            state,
-                            MERGE_VERSION,
-                            MR2_HEAD,
-                            false,
-                            "not_open",
-                            null,
-                            GitLabHeadPipeline.NOT_CAPTURED,
-                            null,
-                            null,
-                            new GitLabMergeRequestReadinessReader.Merge(merger, MERGED_AT, commit),
-                            null));
-        }
-
-        private boolean mergeRead(
-                String head, Instant version, GitLabMergeRequestProcessor.@Nullable SyncUserData merger) {
-            return mergeRequestProcessor.applyTerminalFacts(
-                    savedRepo,
-                    MR2_IID,
-                    new GitLabMergeRequestReadinessReader.Facts(
-                            savedRepo.getNativeId(),
-                            NATIVE_MR2_ID,
-                            "merged",
-                            version,
-                            head,
-                            false,
-                            "not_open",
-                            null,
-                            GitLabHeadPipeline.NOT_CAPTURED,
-                            null,
-                            null,
-                            new GitLabMergeRequestReadinessReader.Merge(merger, MERGED_AT, MERGE_SHA),
-                            null));
-        }
-
-        /** MR !2 merged by its author, as a sync reads it after the merge. */
-        private Map<String, @Nullable Object> mergedPage() {
-            Map<String, @Nullable Object> node = new HashMap<>();
-            node.put("id", "gid://gitlab/MergeRequest/" + NATIVE_MR2_ID);
-            node.put("iid", String.valueOf(MR2_IID));
-            node.put("title", MR2_TITLE);
-            node.put("state", "merged");
-            node.put("createdAt", "2026-01-31T18:00:00Z");
-            node.put("updatedAt", "2026-01-31T18:30:00Z");
-            node.put("mergedAt", MERGED_AT.toString());
-            node.put("sourceBranch", "feature/oauth");
-            node.put("targetBranch", "main");
-            node.put("diffHeadSha", MR2_HEAD);
-            node.put("mergeCommitSha", MERGE_SHA);
-            node.put("mergeable", false);
-            node.put("detailedMergeStatus", "not_open");
-            node.put("approved", true);
-            node.put("headPipeline", null);
-            node.put("reviewers", connection(List.of()));
-            node.put("approvedBy", connection(List.of()));
-            node.put("author", userNode(NATIVE_AUTHOR_ID, FIXTURE_AUTHOR_LOGIN));
-            node.put("mergeUser", userNode(NATIVE_AUTHOR_ID, FIXTURE_AUTHOR_LOGIN));
-            return node;
-        }
-
-        private GitLabMergeRequestProcessor.SyncUserData author() {
-            return syncedUser(NATIVE_AUTHOR_ID, FIXTURE_AUTHOR_LOGIN);
-        }
-
-        /** A practice judging the merger's conduct when the merge request is merged. */
-        private Practice mergerPractice() {
-            Practice practice = new Practice();
-            practice.setSignals(List.of(ScmSignals.PULL_REQUEST_MERGED));
-            practice.setEvidenceRequirements(PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST));
-            practice.setReviewWhen(Map.of());
-            practice.setSubject(ActorRole.MERGER);
-            practice.setPrecondition(null);
-            return practice;
-        }
-
-        private void gateRuns(Practice practice) {
-            var decision = new GateDecision.Run(savedWorkspace, List.of(practice), 1, TriggerMode.AUTO);
-            when(gate.evaluate(any(), eq(ScmSignals.PULL_REQUEST_MERGED), eq(TriggerMode.AUTO)))
-                    .thenReturn(decision);
-            when(gate.evaluateQueued(
-                            any(), eq(savedWorkspace.getId()), eq(ScmSignals.PULL_REQUEST_MERGED), any(), anyBoolean()))
-                    .thenReturn(decision);
-        }
-
-        private AgentJobEventListener listener() {
-            return new AgentJobEventListener(
-                    jobs,
-                    pullRequestRepository,
-                    gate,
-                    workspaceResolver,
-                    signalRecorder,
-                    manifests,
-                    repositoryPreparer);
-        }
-
-        private PullRequestSignalResubmitter resubmitter() {
-            return new PullRequestSignalResubmitter(
-                    jobs,
-                    pullRequestRepository,
-                    gate,
-                    signalRecorder,
-                    reviewRepository,
-                    manifests,
-                    mock(LinkedRepairFollowups.class));
-        }
-
-        private ArtifactSignal mergeSignal() {
-            return artifactSignalRepository
-                    .findForArtifact(savedWorkspace.getId(), ScmSignals.PULL_REQUEST.value(), mr2().getId())
-                    .stream()
-                    .filter(signal -> signal.key().signalName().equals(ScmSignals.PULL_REQUEST_MERGED))
-                    .findFirst()
-                    .orElseThrow();
-        }
-
-        /** The one review submitted, as the job carries the merge request. */
-        private ScmEventPayload.PullRequestData submitted() {
-            var request = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-            verify(jobs)
-                    .submit(
-                            eq(savedWorkspace.getId()),
-                            eq(AgentJobType.PULL_REQUEST_REVIEW),
-                            request.capture(),
-                            any(),
-                            any());
-            return request.getValue().pullRequest();
-        }
-
-        private PullRequest mr2() {
-            return pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR2_IID)
-                    .orElseThrow();
-        }
-    }
-
-    @Nested
-    class TombstonedWork {
-
-        /**
-         * The hold is provider-neutral, so this proves it on the GitLab adapter's own path: the merge
-         * request, the domain event and the restoring delivery all come from real webhook payloads rather
-         * than from a hand-built {@code ScmDomainEvent}.
-         *
-         * <p>The listener is constructed here because {@code hephaestus.agent.enabled} is off in the
-         * integration profile, and driven inside a transaction because its {@code REQUIRES_NEW} proxy is
-         * bypassed by direct construction.
-         */
-        @Test
-        void tombstonedMergeRequestHoldsItsOccasionUntilAFurtherDeliveryRestoresIt() throws Exception {
-            receive(loadPayload("merge_request.open"));
-            ScmDomainEvent.PullRequestCreated created = eventListener
-                    .ofType(ScmDomainEvent.PullRequestCreated.class)
-                    .getFirst();
-            long pullRequestId = pullRequestRepository
-                    .findByRepositoryIdAndNumber(savedRepo.getId(), MR3_IID)
-                    .orElseThrow()
-                    .getId();
-            assertThat(issueRepository.tombstonePullRequestsByRepositoryIdAndNumbers(
-                            savedRepo.getId(), List.of(MR3_IID), Instant.now()))
-                    .isEqualTo(1);
-
-            var jobs = mock(AgentJobService.class);
-            var gate = mock(ReviewGate.class);
-            var listener = new AgentJobEventListener(
-                    jobs,
-                    pullRequestRepository,
-                    gate,
-                    workspaceResolver,
-                    signalRecorder,
-                    manifests,
-                    repositoryPreparer);
-            transactionTemplate.executeWithoutResult(status -> listener.onPullRequestCreated(created));
-
-            ArtifactSignal held = artifactSignalRepository
-                    .findForArtifact(savedWorkspace.getId(), ScmSignals.PULL_REQUEST.value(), pullRequestId)
-                    .getFirst();
-            assertThat(held.getState()).isEqualTo(SignalState.PENDING);
-            assertThat(held.getStateReason()).isEqualTo(SignalStateReason.ARTIFACT_NOT_VISIBLE);
-            verifyNoInteractions(jobs, gate);
-
-            receive(loadPayload("merge_request.reopen"));
-            assertThat(pullRequestRepository
-                            .findById(pullRequestId)
-                            .orElseThrow()
-                            .getDeletedAt())
-                    .isNull();
-
-            var decision = new GateDecision.Run(savedWorkspace, List.of(), 1, TriggerMode.AUTO);
-            when(gate.evaluateQueued(
-                            any(), eq(savedWorkspace.getId()), eq(ScmSignals.PULL_REQUEST_OPENED), any(), eq(false)))
-                    .thenReturn(decision);
-            transactionTemplate.executeWithoutResult(status -> new PullRequestSignalResubmitter(
-                            jobs,
-                            pullRequestRepository,
-                            gate,
-                            signalRecorder,
-                            reviewRepository,
-                            manifests,
-                            mock(LinkedRepairFollowups.class))
-                    .resubmit(held));
-
-            var request = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-            verify(jobs)
-                    .submit(
-                            eq(savedWorkspace.getId()),
-                            eq(AgentJobType.PULL_REQUEST_REVIEW),
-                            request.capture(),
-                            eq(held.key()),
-                            eq(decision));
-            assertThat(request.getValue().pullRequest().id()).isEqualTo(pullRequestId);
-            assertThat(request.getValue().headRefName()).isEqualTo(MR3_SOURCE_BRANCH);
-            assertThat(request.getValue().baseRefName()).isEqualTo(MR3_TARGET_BRANCH);
-            assertThat(request.getValue().triggerSignal()).isEqualTo(ScmSignals.PULL_REQUEST_OPENED);
-        }
-    }
-
-    private GitLabMergeRequestProcessor.SyncReviewerData syncedReviewer(
-            long id, String username, @Nullable String state) {
-        return new GitLabMergeRequestProcessor.SyncReviewerData(syncedUser(id, username), state);
-    }
-
-    private GitLabMergeRequestProcessor.SyncUserData syncedUser(long id, String username) {
-        return new GitLabMergeRequestProcessor.SyncUserData(
-                "gid://gitlab/User/" + id, username, username, null, null, null, null);
-    }
-
-    /** MR !2 as a sync reads it, with only what these tests need; a list the sync did not read whole is null. */
-    private GitLabMergeRequestProcessor.SyncMergeRequestData syncedMergeRequest(
-            boolean approved,
-            @Nullable String detailedMergeStatus,
-            @Nullable List<GitLabMergeRequestProcessor.SyncReviewerData> reviewers,
-            @Nullable List<GitLabMergeRequestProcessor.SyncUserData> approvers) {
-        return syncedMergeRequest(
-                approved, detailedMergeStatus, reviewers, approvers, MR2_HEAD, GitLabHeadPipeline.NOT_CAPTURED);
-    }
-
-    /** MR !2 as a sync reads it at {@code head}, with its head pipeline as read. */
-    private GitLabMergeRequestProcessor.SyncMergeRequestData syncedMergeRequest(
-            boolean approved,
-            @Nullable String detailedMergeStatus,
-            @Nullable List<GitLabMergeRequestProcessor.SyncReviewerData> reviewers,
-            @Nullable List<GitLabMergeRequestProcessor.SyncUserData> approvers,
-            @Nullable String head,
-            GitLabHeadPipeline headPipeline) {
-        return syncedMergeRequest(approved, detailedMergeStatus, reviewers, approvers, head, headPipeline, null);
-    }
-
-    /** MR !2 as a sync reads it at {@code head}, with the diff base GitLab paired with that head where it gave one. */
-    private GitLabMergeRequestProcessor.SyncMergeRequestData syncedMergeRequest(
-            boolean approved,
-            @Nullable String detailedMergeStatus,
-            @Nullable List<GitLabMergeRequestProcessor.SyncReviewerData> reviewers,
-            @Nullable List<GitLabMergeRequestProcessor.SyncUserData> approvers,
-            @Nullable String head,
-            GitLabHeadPipeline headPipeline,
-            @Nullable String base) {
-        return new GitLabMergeRequestProcessor.SyncMergeRequestData(
-                "gid://gitlab/MergeRequest/" + NATIVE_MR2_ID,
-                String.valueOf(MR2_IID),
-                MR2_TITLE,
-                null, // description
-                "opened",
-                false, // draft
-                null, // mergeable
-                detailedMergeStatus,
-                approved,
-                "https://gitlab.lrz.de/" + FIXTURE_REPO_FULL_NAME + "/-/merge_requests/" + MR2_IID,
-                "2026-01-31T18:00:00Z",
-                "2026-01-31T18:10:00Z",
-                null, // closedAt
-                null, // mergedAt
-                1, // commitCount
-                0, // additions
-                0, // deletions
-                0, // fileCount
-                "feature/oauth",
-                "main",
-                head, // diffHeadSha
-                base, // baseSha
-                null, // mergeCommitSha
-                false, // discussionLocked
-                0, // commentsCount
-                "gid://gitlab/User/" + NATIVE_AUTHOR_ID,
-                FIXTURE_AUTHOR_LOGIN,
-                FIXTURE_AUTHOR_LOGIN,
-                null, // authorAvatarUrl
-                null, // authorWebUrl
-                null,
-                null, // authorPublicEmail
-                null, // mergeUserGlobalId
-                null, // mergeUserUsername
-                null, // mergeUserName
-                null, // mergeUserAvatarUrl
-                null, // mergeUserWebUrl
-                null,
-                null, // mergeUserPublicEmail
-                null, // syncLabels
-                null, // syncAssignees
-                reviewers,
-                approvers,
-                null, // syncParticipants
-                null, // milestoneIid
-                headPipeline,
-                null,
-                null); // closingIssueNumbers
-    }
-
-    /** Delivers {@code event} as the stream does: stored, then read from GitLab, then offered for review. */
-    private void deliver(GitLabMergeRequestEventDTO event) {
-        handler.dispatchEvent(event, Instant.now());
-    }
-
-    /** Handles {@code event} as a delivery that reached the stream now. */
-    private void receive(GitLabMergeRequestEventDTO event) {
-        handler.handle(event, Instant.now());
-    }
-
-    /** MR !2's update hook at {@code updatedAt}, carrying {@code description} where one is given. */
-    private GitLabMergeRequestEventDTO update(String updatedAt, @Nullable String description) throws IOException {
-        ObjectNode payload = (ObjectNode) objectMapper.readTree(
-                new ClassPathResource("gitlab/merge_request.update.json").getContentAsString(StandardCharsets.UTF_8));
-        ObjectNode attributes = (ObjectNode) payload.get("object_attributes");
-        attributes.put("updated_at", updatedAt);
-        if (description != null) {
-            attributes.put("description", description);
-        }
-        return objectMapper.treeToValue(payload, GitLabMergeRequestEventDTO.class);
-    }
-
-    private GitLabMergeRequestEventDTO loadPayload(String filename) throws IOException {
-        ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
-        String json = resource.getContentAsString(StandardCharsets.UTF_8);
-        return objectMapper.readValue(json, GitLabMergeRequestEventDTO.class);
-    }
-
-    private void setupTestData() {
-        savedProvider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
-                .orElseGet(() -> gitProviderRepository.save(
-                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
-
-        Organization org = new Organization();
-        org.setNativeId(1L);
-        org.setLogin(FIXTURE_ORG_LOGIN);
-        org.setCreatedAt(Instant.now());
-        org.setUpdatedAt(Instant.now());
-        org.setName("HephaestusTest");
-        org.setAvatarUrl("");
-        org.setHtmlUrl("https://gitlab.lrz.de/hephaestustest");
-        org.setProvider(savedProvider);
-        org = organizationRepository.save(org);
-
-        Repository repo = new Repository();
-        repo.setNativeId(246765L);
-        repo.setName("demo-repository");
-        repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
-        repo.setHtmlUrl("https://gitlab.lrz.de/hephaestustest/demo-repository");
-        repo.setVisibility(Repository.Visibility.PRIVATE);
-        repo.setDefaultBranch("main");
-        repo.setCreatedAt(Instant.now());
-        repo.setUpdatedAt(Instant.now());
-        repo.setPushedAt(Instant.now());
-        repo.setOrganization(org);
-        repo.setProvider(savedProvider);
-        savedRepo = repositoryRepository.save(repo);
-
-        Workspace workspace = new Workspace();
-        workspace.setWorkspaceSlug("hephaestus-test-gitlab");
-        workspace.setDisplayName("HephaestusTest GitLab");
-        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
-        workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
-        workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
-        workspace.setAccountType(AccountType.ORG);
-        savedWorkspace = workspaceRepository.save(workspace);
-    }
-
-    private static long persistedId(IdentityProvider provider) {
-        Long id = provider.getId();
-        assertNotNull(id);
-        return id;
-    }
 }

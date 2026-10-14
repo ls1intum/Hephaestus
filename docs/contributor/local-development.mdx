@@ -180,7 +180,7 @@ If work is missing, the seed stops before it writes.
 - Removal deletes only rows that the seed wrote, and the answers that you gave to the demo feedback. It refuses to run while a review is queued or running.
 - The seed writes reviews and results directly with the `POSTGRES_*` values in `server/.env`. It refuses a `POSTGRES_HOST` that is not a loopback address.
 - Before it writes, the seed signs in to the server through dev sign-in and finds that account in the database. Thus, it never writes to a database that no dev server reads.
-- The server pins the practice revisions and writes the reader's feedback through two dev endpoints. Removal rewinds only the revisions that the server appended for the seed.
+- The server pins the practice versions and writes the reader's feedback through two dev endpoints. Removal rewinds only the practice versions that the server appended for the seed.
 - All reviews are complete, and the only feedback is in-app feedback. Thus, no worker picks up the demo, and nothing goes to a provider.
 
 ### Port overrides
@@ -570,3 +570,10 @@ For a Gradle wrapper update, also run the build with `--warning-mode all` and re
 compatibility before accepting a new major. Do not suppress upstream deprecations to make the
 upgrade appear clean. A JDK-line change updates `.java-version` and Renovate's matching
 `constraints.java`. `gate:toolchain` rejects drift between them.
+
+## Reset an earlier practice preview
+
+A database that applied an earlier push of the unreleased practice cutover changelog must be reset before this build starts.
+Run `vp run dev:reset`. This deletes local database data.
+Then start the normal development environment.
+Released installations use the forward migration and verified backup procedure, not this reset.

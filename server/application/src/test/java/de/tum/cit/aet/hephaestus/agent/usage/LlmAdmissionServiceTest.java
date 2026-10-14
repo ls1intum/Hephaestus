@@ -20,6 +20,8 @@ import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.math.BigDecimal;
@@ -100,7 +102,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
                 "https://api.example/v1", "openai-responses", "gpt-authoritative", null, null, null);
         when(resolver.resolve(binding)).thenReturn(resolved);
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L));
         LlmModelPrice price = new LlmModelPrice();
         price.setId(40L);
         price.setPricingMode(PricingMode.PRICED);
@@ -111,8 +113,8 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
         AdmittedLlmModel admitted = service.admit(binding);
 
         assertThat(admitted.resolved().upstreamModelId()).isEqualTo("gpt-authoritative");
-        assertThat(admitted.price().fundingSource()).isEqualTo(FundingSource.INSTANCE);
-        assertThat(admitted.price().pricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(admitted.price().fundingSource()).isEqualTo(UsageFundingSource.INSTANCE);
+        assertThat(admitted.price().pricingState()).isEqualTo(UsagePricingState.PRICED);
         assertThat(admitted.price().appliedPriceId()).isEqualTo(40L);
         assertThat(admitted.price().per1mInputUsd()).isEqualByComparingTo("1.25");
     }
@@ -135,14 +137,14 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
                 .thenReturn(new ResolvedLlmModel(
                         "https://byo.example/v1", "openai-responses", "byo-model", null, null, null));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.WORKSPACE, 11L, 21L, 30L));
         when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L))
                 .thenReturn(Optional.of(workspaceModel(binding)));
 
         AdmittedLlmModel admitted = service.admit(binding);
 
-        assertThat(admitted.price().fundingSource()).isEqualTo(FundingSource.WORKSPACE);
-        assertThat(admitted.price().pricingState()).isEqualTo(PricingState.PRICED);
+        assertThat(admitted.price().fundingSource()).isEqualTo(UsageFundingSource.WORKSPACE);
+        assertThat(admitted.price().pricingState()).isEqualTo(UsagePricingState.PRICED);
         assertThat(admitted.price().appliedWorkspaceModelId()).isEqualTo(21L);
         assertThat(admitted.price().appliedPriceId()).isNull();
         assertThat(admitted.price().per1mInputUsd()).isEqualByComparingTo("0.50");
@@ -167,7 +169,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
                 .thenReturn(new ResolvedLlmModel(
                         "https://byo.example/v1", "openai-responses", "byo-model", null, null, null));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.WORKSPACE, 11L, 21L, 30L));
         when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L))
                 .thenReturn(Optional.of(workspaceModel(binding)));
 
@@ -210,7 +212,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
                 .thenReturn(new ResolvedLlmModel(
                         "https://api.example/v1", "openai-embeddings", "text-embedding-3-small", null, null, null));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 10L, 20L, 30L));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 10L, 20L, 30L));
         LlmModelPrice price = new LlmModelPrice();
         price.setId(41L);
         price.setPricingMode(PricingMode.PRICED);
@@ -238,7 +240,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
                 .thenReturn(new ResolvedLlmModel(
                         "https://byo.example/v1", "cohere-rerank", "rerank-v3.5", null, null, null));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.WORKSPACE, 11L, 21L, 30L));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.WORKSPACE, 11L, 21L, 30L));
         when(workspaceModelRepository.findByIdAndWorkspaceId(21L, 30L))
                 .thenReturn(Optional.of(workspaceModel(binding)));
 

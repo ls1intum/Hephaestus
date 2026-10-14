@@ -2,6 +2,13 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.core.TransactionCallbacks;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -38,8 +45,9 @@ public class LlmUsageRecorder {
 
     /** @param searchUnits what Cohere reranking calls billed instead of tokens; 0 for every other sample */
     public record LlmUsageSample(
-            LlmUsageJobType jobType,
-            LlmUsageSourceType sourceType,
+            @Nullable UUID reviewId,
+            String jobType,
+            UsageSourceType sourceType,
             UUID sourceId,
             int sourceAttempt,
             @Nullable String model,
@@ -71,7 +79,7 @@ public class LlmUsageRecorder {
      * rate for search units, so a priced sample with search units is never charged.
      */
     private static boolean isPricedWithARateMissing(LlmUsageSample sample, LlmPriceSnapshot price) {
-        return (price.pricingState() == PricingState.PRICED
+        return (price.pricingState() == UsagePricingState.PRICED
                 && ((sample.inputTokens() > 0 && price.per1mInputUsd() == null)
                         || (sample.outputTokens() > 0 && price.per1mOutputUsd() == null)
                         || (sample.cacheReadTokens() > 0 && price.per1mCacheReadUsd() == null)
@@ -83,7 +91,7 @@ public class LlmUsageRecorder {
     private static LlmPriceSnapshot asUnpriced(LlmPriceSnapshot price) {
         return new LlmPriceSnapshot(
                 price.fundingSource(),
-                PricingState.UNPRICED,
+                UsagePricingState.UNPRICED,
                 price.appliedPriceId(),
                 price.appliedWorkspaceModelId(),
                 price.per1mInputUsd(),
@@ -94,7 +102,7 @@ public class LlmUsageRecorder {
 
     private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot quoted) {
         int sourceAttempt = Math.max(0, sample.sourceAttempt());
-        long unreportedCalls = sample.sourceType() == LlmUsageSourceType.MENTOR_TURN
+        long unreportedCalls = sample.sourceType() == UsageSourceType.MENTOR_TURN
                 ? 0
                 : usageRepository.sumUnreportedPracticeScriptCalls(
                         workspaceId,
@@ -110,7 +118,8 @@ public class LlmUsageRecorder {
         int inserted = usageRepository.insertIfAbsent(new LlmUsageInsert(
                 UUID.randomUUID(),
                 workspaceId,
-                sample.jobType().name(),
+                sample.reviewId(),
+                sample.jobType(),
                 sample.sourceType().name(),
                 sample.sourceId(),
                 sourceAttempt,
@@ -133,7 +142,7 @@ public class LlmUsageRecorder {
                 price.per1mCacheWriteUsd(),
                 sample.provenance().name(),
                 Math.max(0, sample.searchUnits()),
-                unreportedCalls));
+                Math.toIntExact(unreportedCalls)));
         if (inserted == 0) {
             log.debug(
                     "LLM usage already recorded for sourceType={}, sourceId={}, sourceAttempt={}",
@@ -142,7 +151,7 @@ public class LlmUsageRecorder {
                     sample.sourceAttempt());
             return false;
         }
-        if (price.pricingState() == PricingState.UNPRICED) {
+        if (price.pricingState() == UsagePricingState.UNPRICED) {
             meterRegistry.counter(AgentMetrics.LLM_USAGE_UNCOSTED).increment();
         }
         registerBudgetAlert(workspaceId, price, cost);
@@ -158,7 +167,8 @@ public class LlmUsageRecorder {
             return;
         }
         log.warn(
-                "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={}, sourceAttempt={}",
+                "LLM cost clamped to fit the ledger column: clamp={}, storedUsd={}, sourceType={}, sourceId={},"
+                        + " sourceAttempt={}",
                 computed.clamp(),
                 computed.usd(),
                 sample.sourceType(),
@@ -174,8 +184,8 @@ public class LlmUsageRecorder {
     }
 
     private void registerBudgetAlert(Long workspaceId, LlmPriceSnapshot price, @Nullable BigDecimal cost) {
-        if (price.fundingSource() != FundingSource.INSTANCE
-                || price.pricingState() != PricingState.PRICED
+        if (price.fundingSource() != UsageFundingSource.INSTANCE
+                || price.pricingState() != UsagePricingState.PRICED
                 || cost == null
                 || cost.signum() <= 0) {
             return;

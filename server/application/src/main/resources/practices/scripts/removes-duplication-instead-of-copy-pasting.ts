@@ -1,15 +1,11 @@
+import { duplicatePairs, MIN_RUN_LINES } from "../kits/scm/duplication.ts";
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
+import { isTestPath, languageOf } from "../kits/scm/languages.ts";
 // Finds each pair of added blocks whose lines have the same shape when names and literals are set
 // aside. The review decides if a pair is one unit of knowledge written twice, or an idiom that the
 // platform makes look alike.
-import { factsOf } from "../lib/bounded-text.ts";
-import { duplicatePairs, MIN_RUN_LINES } from "../lib/duplication.ts";
-import { isTestPath, languageOf } from "../lib/languages.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { factsOf } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 const MAX_PAIRS = 20;
 
@@ -21,8 +17,9 @@ export const LABELS = {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
 		const sourceFiles = [...change.values()].filter(
 			(file) => languageOf(file.path) !== null && !isTestPath(file.path),
 		);

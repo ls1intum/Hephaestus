@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Instant;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -24,15 +24,15 @@ final class PracticeTrendCalculator {
     private PracticeTrendCalculator() {}
 
     static PracticeTrend calculatePractice(
-            String practiceSlug, List<PracticeResult> practiceResults, Instant cutoff, TrendProperties properties) {
+            String practiceSlug, List<ResultView> practiceResults, Instant cutoff, TrendProperties properties) {
         OpportunityBundler.Bundles bundles =
                 OpportunityBundler.bundle(practiceResults, cutoff, properties.getBundleSize());
         int missing = bundles.opportunitiesUntilComparable(properties.getBundleSize(), properties.getMinBundleSize());
         // Counted before the cap: the cap shortens a chart, not the work a reader is told was reviewed.
-        Set<ReviewedWorkKey> reviewedWork = bundles.trail().stream()
+        Map<Long, ItemKind> reviewedWork = bundles.trail().stream()
                 .filter(EvidenceOpportunity::decided)
-                .map(EvidenceOpportunity::key)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+                .collect(Collectors.toMap(
+                        EvidenceOpportunity::key, EvidenceOpportunity::itemKind, (left, right) -> left));
         List<EvidenceOpportunity> trail = OpportunityBundler.cappedTrail(bundles.trail(), properties.getBundleSize());
         TrendSupport support = TrendSupportFactory.forPractice(
                 properties, bundles.current().size(), bundles.previous().size(), missing, reviewedWork, trail);

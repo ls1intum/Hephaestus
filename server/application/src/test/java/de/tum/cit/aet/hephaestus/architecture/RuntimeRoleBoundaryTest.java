@@ -134,7 +134,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
             // registers its gauges — permanent zeros in agent.queue.* / mentor.in_flight.* from pods that
             // never sample. Gate the bean, not just the tick.
             Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentQueueHealthSampler", RuntimeRole.SERVER_PROPERTY),
-            Map.entry("de.tum.cit.aet.hephaestus.agent.job.AgentJobRetentionService", RuntimeRole.SERVER_PROPERTY),
+            Map.entry("de.tum.cit.aet.hephaestus.agent.job.ReviewJobRetentionService", RuntimeRole.SERVER_PROPERTY),
             // Product feedback is a member- and admin-facing web surface, and SurveyService reads research
             // consent through a port only the server role implements.
             Map.entry("de.tum.cit.aet.hephaestus.productfeedback.FeedbackController", RuntimeRole.SERVER_PROPERTY),

@@ -1,33 +1,30 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import java.util.UUID;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Persisted-admission fixtures for tests of downstream authorization, not quote verification. */
+/** Persisted proof for downstream authorization tests; admission itself must verify real bytes. */
 public final class AdmittedResultFixtures {
     private AdmittedResultFixtures() {}
 
-    public static JsonNode evidence(UUID jobId, String sourceKind) {
-        return evidence(jobId, sourceKind, "context/evidence.txt", "evidence.txt", "verified quote");
+    public static JsonNode evidence(String sourceKind) {
+        return evidence(sourceKind, "context/evidence.txt", "evidence.txt", "verified quote");
     }
 
-    /** One admitted citation at line 1 of {@code path}, carrying the verdict a real admission records. */
-    public static JsonNode evidence(UUID jobId, String sourceKind, String artifactPath, String path, String quote) {
-        var job = new AgentJob();
-        job.setId(jobId);
+    public static JsonNode evidence(String sourceKind, String sourcePath, String path, String quote) {
         var evidence = new JsonMapper().createObjectNode();
         var citation = evidence.putArray("citations")
                 .addObject()
                 .put("sourceKind", sourceKind)
-                .put("artifactPath", artifactPath)
+                .put("sourcePath", sourcePath)
                 .put("path", path)
                 .put("startLine", 1)
                 .put("endLine", 1)
-                .put("quote", quote)
-                .put("quoteRedacted", false);
-        CitationVerification.record(citation, job, "a".repeat(64), CitationVerification.quoteDigest(quote));
+                .put("quote", quote);
+        citation.putObject("verification")
+                .put("status", "VERIFIED")
+                .put("artifactSha256", "a".repeat(64))
+                .put("quoteSha256", CitationVerification.quoteDigest(quote));
         return evidence;
     }
 }

@@ -4,8 +4,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.agent.context.EvidenceDirectory;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
+import de.tum.cit.aet.hephaestus.evidence.capture.EvidenceDirectory;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;

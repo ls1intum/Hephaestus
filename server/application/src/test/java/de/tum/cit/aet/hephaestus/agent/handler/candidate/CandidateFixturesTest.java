@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,9 +36,9 @@ class CandidateFixturesTest extends BaseUnitTest {
 
     private static final Map<String, Class<? extends Candidate>> CANDIDATES = Map.of(
             "candidate-met-with-example.json", MetCandidate.class,
-            "candidate-not-applicable.json", NotApplicableCandidate.class,
+            "candidate-not-applicable.json", DoesNotApplyCandidate.class,
             "candidate-not-met.json", NotMetCandidate.class,
-            "candidate-undetermined.json", UndeterminedCandidate.class);
+            "candidate-undetermined.json", CouldNotDetermineCandidate.class);
 
     @Test
     void shouldParseEveryCandidateFixtureToItsOutcomeWhenTheFixtureIsValid() throws IOException {
@@ -51,34 +51,9 @@ class CandidateFixturesTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldAcceptOnlyFullLowercaseHexRevisionsWhenTheSharedCorpusIsParsed() throws IOException {
-        ObjectNode corpus = fixture("citation-revisions.json");
-        for (String verdict : List.of("valid", "invalid")) {
-            for (JsonNode revision : corpus.path(verdict)) {
-                ObjectNode candidate = fixture("candidate-met-with-example.json");
-                ((ObjectNode) candidate.path("citations").get(0)).put("revision", revision.asString());
-                if (verdict.equals("valid")) {
-                    assertThatCode(() -> CandidateParser.parse(candidate))
-                            .as(revision.asString())
-                            .doesNotThrowAnyException();
-                } else {
-                    assertThatThrownBy(() -> CandidateParser.parse(candidate))
-                            .as(revision.asString())
-                            .isInstanceOfSatisfying(
-                                    CandidateRefusedException.class,
-                                    refused -> assertThat(refused.refusal())
-                                            .isEqualTo(CandidateRefusal.MALFORMED_CANDIDATE));
-                }
-            }
-        }
-    }
-
-    @Test
-    void shouldStoreTheWorstProblemSeverityWhenTheNotMetFixtureDeclaresNone() throws IOException {
+    void shouldKeepSeverityOnEachProblem() throws IOException {
         NotMetCandidate candidate = (NotMetCandidate) CandidateParser.parse(fixture("candidate-not-met.json"));
 
-        assertThat(candidate.declaredSeverity()).isNull();
-        assertThat(candidate.severity()).isEqualTo(Severity.MAJOR);
         assertThat(candidate.problems())
                 .extracting(CandidateProblem::severity)
                 .containsExactly(Severity.MAJOR, Severity.MINOR);
@@ -114,7 +89,7 @@ class CandidateFixturesTest extends BaseUnitTest {
         assertThat(Set.copyOf(codes.values()))
                 .as("the fixtures refuse with every code")
                 .isEqualTo(Arrays.stream(CandidateRefusal.values())
-                        .map(CandidateRefusal::code)
+                        .map(CandidateRefusal::wireValue)
                         .collect(Collectors.toSet()));
         invalid.forEach((name, fixture) -> assertThatThrownBy(() -> CandidateParser.parse(fixture))
                 .as(name)
@@ -126,7 +101,7 @@ class CandidateFixturesTest extends BaseUnitTest {
     @Test
     void shouldReportAnEmptyListAsItsRuleWhenAListMustNameSomething() throws IOException {
         ObjectNode noQuestion = fixture("candidate-undetermined.json");
-        evidence(noQuestion).putArray("undecidability");
+        evidence(noQuestion).putArray("openQuestions");
         assertRefused(noQuestion, CandidateRefusal.MALFORMED_CANDIDATE);
 
         ObjectNode nothingConsulted = fixture("candidate-met-with-example.json");
@@ -156,22 +131,6 @@ class CandidateFixturesTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseAsMalformedWhenACitationBreaksItsShape() throws IOException {
-        ObjectNode sideless = fixture("candidate-met-with-example.json");
-        firstCitation(sideless).remove("side");
-        assertRefused(sideless, CandidateRefusal.MALFORMED_CANDIDATE);
-
-        ObjectNode sideOffDiff = fixture("candidate-not-applicable.json");
-        firstCitation(sideOffDiff).put("side", "NEW");
-        assertRefused(sideOffDiff, CandidateRefusal.MALFORMED_CANDIDATE);
-
-        ObjectNode revisionOffTree = fixture("candidate-not-applicable.json");
-        firstCitation(revisionOffTree).put("revision", "a".repeat(40));
-        assertRefused(revisionOffTree, CandidateRefusal.MALFORMED_CANDIDATE);
-
-        ObjectNode shortRevision = fixture("candidate-met-with-example.json");
-        firstCitation(shortRevision).put("revision", "a".repeat(39));
-        assertRefused(shortRevision, CandidateRefusal.MALFORMED_CANDIDATE);
-
         ObjectNode backwards = fixture("candidate-met-with-example.json");
         firstCitation(backwards).put("startLine", 9).put("endLine", 8);
         assertRefused(backwards, CandidateRefusal.MALFORMED_CANDIDATE);
@@ -181,7 +140,7 @@ class CandidateFixturesTest extends BaseUnitTest {
         assertRefused(emptySource, CandidateRefusal.MALFORMED_CANDIDATE);
 
         ObjectNode emptyArtifact = fixture("candidate-met-with-example.json");
-        firstCitation(emptyArtifact).put("artifactPath", "");
+        firstCitation(emptyArtifact).put("sourcePath", "");
         assertRefused(emptyArtifact, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
@@ -265,7 +224,7 @@ class CandidateFixturesTest extends BaseUnitTest {
 
         ObjectNode severityOnMet = fixture("candidate-met-with-example.json");
         severityOnMet.put("severity", "MINOR");
-        assertRefused(severityOnMet, CandidateRefusal.SEVERITY_OUTCOME_MISMATCH);
+        assertRefused(severityOnMet, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
     @Test

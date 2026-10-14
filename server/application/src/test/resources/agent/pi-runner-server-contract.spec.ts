@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { after, test } from "node:test";
 
-import { executionReportSchema } from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
+import { executionReportSchema } from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { PRACTICES_DIR } from "./golden-review-workspace.ts";
 import {
 	directProgram,
@@ -19,14 +19,14 @@ import {
 // `RunnerOutputAdmissionIntegrationTest` admits these files and records the report on the server. Set
 // UPDATE_RUNNER_OUTPUT=1 to write them again after a change to what the runner writes.
 
-const OUTPUT = nodePath.join(import.meta.dirname, "../practice-results/runner-output");
+const OUTPUT = nodePath.join(import.meta.dirname, "contract-v3/runner-output");
 const UPDATE = process.env.UPDATE_RUNNER_OUTPUT === "1";
 
 /** The criterion the practices are staged with, as `stagePractices` writes it. */
 const CRITERION = "Added authentication calls use checked(), not insecure().";
 
 /** A program written for the retired leads contract. */
-const LEGACY_PROGRAM = `import { definePracticeScript } from "../lib/practice-script.ts";
+const LEGACY_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: { version: 1, kinds: { call: "An added call." } },
 	async run() {
@@ -49,7 +49,7 @@ stagePractices(cwd, PRACTICES);
 
 /**
  * The golden workspace stages the captured sources under `evidence/`; the server stages them under `context/`
- * (`SandboxLayout.CONTEXT_PREFIX`), and a citation names its artifact by that path.
+ * (`SandboxLayout.CONTEXT_PREFIX`), and a citation names its sourceFile by that path.
  */
 function toServerContextRoot(): void {
 	renameSync(nodePath.join(cwd, "evidence"), nodePath.join(cwd, "context"));
@@ -93,7 +93,7 @@ const sessionCandidate = {
 			citations: [
 				{
 					sourceKind: "scm.pull-request.core",
-					artifactPath: "context/metadata.json",
+					sourcePath: "context/metadata.json",
 					path: "context/metadata.json",
 					startLine: titleLine,
 					endLine: titleLine,

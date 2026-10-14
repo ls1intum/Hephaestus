@@ -31,6 +31,7 @@ const sidebars: SidebarsConfig = {
 				"practice-scripts",
 				"ai-providers",
 				"practice-review",
+				"practice-scans",
 				"practice-review-operations",
 				"product-feedback",
 			],

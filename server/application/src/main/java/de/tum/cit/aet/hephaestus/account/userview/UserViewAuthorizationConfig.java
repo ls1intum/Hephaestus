@@ -24,7 +24,10 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Ordered after the step-up gate, so a refused confirmation never leaves a {@code USER_VIEW} success behind. */
+/**
+ * Ordered after the step-up gate, so a refused confirmation never leaves a {@code USER_VIEW}
+ * success behind.
+ */
 @ConditionalOnServerRole
 @Configuration(proxyBeanMethods = false)
 public class UserViewAuthorizationConfig {
@@ -32,7 +35,7 @@ public class UserViewAuthorizationConfig {
     @Bean
     @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
     static Advisor userViewAuthorizationAdvisor(
-            ObjectProvider<ViewedUserService> viewedUsers, ObjectProvider<UserViewAccess> access) {
+            ObjectProvider<ViewedAccountService> viewedUsers, ObjectProvider<UserViewAccess> access) {
         AuthorizationManager<MethodInvocation> manager = (authentication, invocation) -> {
             HttpServletRequest request =
                     ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
@@ -43,14 +46,14 @@ public class UserViewAuthorizationConfig {
                         "The request does not include the " + UserViewContextHolder.REASON_HEADER + " header.");
             }
             long workspaceId = WorkspaceContextHolder.getContext().id();
-            long userId = viewedUserId(invocation);
-            var user = viewedUsers.getObject().requireUser(workspaceId, userId);
+            long accountId = viewedAccountId(invocation);
+            var user = viewedUsers.getObject().requireAccount(workspaceId, accountId);
             String query = request.getQueryString();
             access.getObject()
                     .record(
                             workspaceId,
-                            userId,
-                            user.accountId(),
+                            null,
+                            Long.parseLong(user.accountId()),
                             reason,
                             query == null ? request.getRequestURI() : request.getRequestURI() + "?" + query);
             return new AuthorizationDecision(true);
@@ -61,14 +64,18 @@ public class UserViewAuthorizationConfig {
         return interceptor;
     }
 
-    /** Spring has already converted the {@code userId} path variable by the time the advisor runs. */
-    private static long viewedUserId(MethodInvocation invocation) {
+    /**
+     * Spring has already converted the {@code accountId} path variable by the time the advisor
+     * runs.
+     */
+    private static long viewedAccountId(MethodInvocation invocation) {
         Parameter[] parameters = invocation.getMethod().getParameters();
         for (int i = 0; i < parameters.length; i++) {
-            if (parameters[i].getName().equals("userId") && invocation.getArguments()[i] instanceof Long userId) {
-                return userId;
+            if (parameters[i].getName().equals("accountId")
+                    && invocation.getArguments()[i] instanceof String accountId) {
+                return Long.parseLong(accountId);
             }
         }
-        throw new IllegalStateException(invocation.getMethod() + " carries @UserViewRead but has no userId");
+        throw new IllegalStateException(invocation.getMethod() + " carries @UserViewRead but has no accountId");
     }
 }

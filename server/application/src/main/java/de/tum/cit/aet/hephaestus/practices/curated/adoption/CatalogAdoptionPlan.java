@@ -2,67 +2,64 @@ package de.tum.cit.aet.hephaestus.practices.curated.adoption;
 
 import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.GroupDefinition;
-import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedGroupRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeDefinitionDTO;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPracticeDocument;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import org.jspecify.annotations.Nullable;
 
 record CatalogAdoptionPlan(
         String slug,
-        PracticeDefinition definition,
+        CatalogPracticeDocument document,
         CatalogAdoptionAvailability availability,
         CatalogGroupDisposition groupDisposition,
         @Nullable String groupSlug,
         @Nullable GroupDefinition groupDefinition,
-        int groupDisplayOrder,
-        PracticeAutonomy initialAutonomy,
+        int groupPosition,
+        FeedbackMode initialFeedbackMode,
+        String offeredDigest,
         String etag) {
     static CatalogAdoptionPlan create(
             String slug,
-            PracticeDefinition definition,
+            CatalogPracticeDocument document,
             CatalogAdoptionAvailability availability,
-            CatalogGroupDisposition groupDisposition,
+            CatalogGroupDisposition disposition,
             @Nullable String groupSlug,
-            @Nullable GroupDefinition groupDefinition,
-            int groupDisplayOrder) {
-        PracticeAutonomy initialAutonomy =
-                definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
-                        ? PracticeAutonomy.HUMAN_APPROVAL
-                        : PracticeAutonomy.OFF;
-        CanonicalDigest digest = new CanonicalDigest()
-                .add("catalog-adoption-plan-v1")
+            @Nullable GroupDefinition group,
+            int position,
+            String offeredDigest) {
+        String tag = new CanonicalDigest()
                 .add(slug)
-                .add(definition.digest(slug))
+                .add(offeredDigest)
                 .add(availability.name())
-                .add(groupDisposition.name())
+                .add(disposition.name())
                 .addNullable(groupSlug)
-                .addNullable(groupDefinition == null || groupSlug == null ? null : groupDefinition.digest(groupSlug))
-                .addInt(groupDisplayOrder)
-                .add(initialAutonomy.name());
+                .addNullable(group == null ? null : group.name())
+                .addNullable(group == null ? null : group.description())
+                .addNullable(group == null ? null : group.icon())
+                .addNullable(group == null ? null : group.color())
+                .addInt(position)
+                .hex();
         return new CatalogAdoptionPlan(
                 slug,
-                definition,
+                document,
                 availability,
-                groupDisposition,
+                disposition,
                 groupSlug,
-                groupDefinition,
-                groupDisplayOrder,
-                initialAutonomy,
-                digest.hex());
+                group,
+                position,
+                FeedbackMode.APPROVE_FIRST,
+                offeredDigest,
+                tag);
     }
 
     CatalogPracticePreviewDTO preview() {
         return new CatalogPracticePreviewDTO(
                 slug,
-                CuratedPracticeDefinitionDTO.from(slug, definition),
+                document.kind().value(),
+                document.definition(),
                 availability,
-                new CatalogAdoptionGroupDTO(
-                        groupDisposition,
-                        groupSlug,
-                        groupDefinition == null ? null : CuratedGroupRequestDTO.of(groupDefinition)),
-                initialAutonomy,
-                definition.provenanceFingerprint(slug),
+                new CatalogAdoptionGroupDTO(groupDisposition, groupSlug, groupDefinition),
+                initialFeedbackMode,
+                offeredDigest,
                 CatalogAdoptionService.formatted(etag));
     }
 }

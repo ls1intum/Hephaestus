@@ -14,7 +14,6 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -31,6 +30,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookLabel;
@@ -162,7 +162,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void purgeConfidentialTombstonesStoredSnapshot() {
-            // Public → confidential flip: the previously-mirrored public row must be tombstoned so it
+            // Public → confidential flip: the previously-mirrored public row must be tombstoned so
+            // it
             // drops out of every live query.
             GitLabIssueEventDTO event = createEvent("update", "opened", true);
             when(issueRepository.tombstoneIssuesByRepositoryIdAndNumbers(eq(REPO_ID), eq(List.of(ISSUE_IID)), any()))
@@ -514,7 +515,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
             when(gitLabUserService.findOrCreateUser(any(GitLabWebhookUser.class), eq(PROVIDER_ID)))
                     .thenReturn(createUserEntity());
 
-            // An ordinary title/description edit (no changes.labels) must not trigger label-based detection.
+            // An ordinary title/description edit (no changes.labels) must not trigger label-based
+            // detection.
             processor.processUpdated(createUpdateEventWithChanges(titleChanged()), createContext());
 
             verify(eventPublisher, never()).publishEvent(any(ScmDomainEvent.IssueLabeled.class));
@@ -538,9 +540,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
         }
 
         /**
-         * GitLab has one update action for every field it tracks, most of which the review evidence never
-         * reads. Publishing regardless would mint a fresh occasion for a due-date edit — a review nobody
-         * asked for, on evidence that did not move.
+         * GitLab has one update action for every field it tracks, most of which the review evidence
+         * never reads. Publishing regardless would mint a fresh occasion for a due-date edit — a
+         * review nobody asked for, on evidence that did not move.
          */
         @Test
         void publishesNothingWhenTheUpdateMovedNoFieldTheDomainNames() {
@@ -1146,8 +1148,10 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldHumaniseMultiWordTypeNameBeforeLookup() {
-            // The lookup depends on humaniseTypeName: TEST_CASE must become "Test Case" (not "TEST_CASE"
-            // or "test case") before the case-insensitive query — the single-word "TASK" case can't catch
+            // The lookup depends on humaniseTypeName: TEST_CASE must become "Test Case" (not
+            // "TEST_CASE"
+            // or "test case") before the case-insensitive query — the single-word "TASK" case can't
+            // catch
             // a regression in the multi-word/lowercasing path.
             var organization = new Organization();
             organization.setId(42L);
@@ -1233,7 +1237,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldResolveNullIssueTypeWhenOrganizationMissing() {
-            // No organization on the repository → early return null; the issue_type FK passed to upsert is
+            // No organization on the repository → early return null; the issue_type FK passed to
+            // upsert is
             // null and the COALESCE on the DB side preserves any previously set value.
             testRepo.setOrganization(null);
 
@@ -1265,7 +1270,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                             any());
         }
 
-        /** A minimal sync payload carrying the given GraphQL issue-type enum (e.g. {@code TASK}). */
+        /**
+         * A minimal sync payload carrying the given GraphQL issue-type enum (e.g. {@code TASK}).
+         */
         private GitLabIssueProcessor.SyncIssueData syncDataWithType(String typeName) {
             return new GitLabIssueProcessor.SyncIssueData(
                     "gid://gitlab/Issue/422296",
@@ -1346,7 +1353,9 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
                 null);
     }
 
-    /** An {@code action=update} event carrying the given {@code changes} diff and no label delta. */
+    /**
+     * An {@code action=update} event carrying the given {@code changes} diff and no label delta.
+     */
     private GitLabIssueEventDTO createUpdateEventWithChanges(GitLabIssueEventDTO.Changes changes) {
         return withChanges(null, changes);
     }
@@ -1426,7 +1435,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void onlyEmitsLabelsAbsentFromPrevious() {
-            // current = {1,2}, previous = {1}: only id=2 is newly added; the re-sent id=1 must NOT re-emit.
+            // current = {1,2}, previous = {1}: only id=2 is newly added; the re-sent id=1 must NOT
+            // re-emit.
             var label1 = new GitLabWebhookLabel(1L, "bug", "#ff0000");
             var label2 = new GitLabWebhookLabel(2L, "feature", "#00ff00");
 
@@ -1438,7 +1448,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void emitsNothingWhenLabelAlreadyPresent() {
-            // An unrelated edit that re-sends an existing label (previous == current) must not trigger
+            // An unrelated edit that re-sends an existing label (previous == current) must not
+            // trigger
             // IssueLabeled.
             var label1 = new GitLabWebhookLabel(1L, "bug", "#ff0000");
 
@@ -1458,7 +1469,8 @@ class GitLabIssueProcessorTest extends BaseUnitTest {
 
         @Test
         void emptyWhenNoLabelChangeSection() {
-            // No changes diff at all → an ordinary title/description edit never spuriously adds labels.
+            // No changes diff at all → an ordinary title/description edit never spuriously adds
+            // labels.
             var event = new GitLabIssueEventDTO("issue", "issue", null, null, null, List.of(), null, null);
 
             assertThat(event.addedLabels()).isEmpty();

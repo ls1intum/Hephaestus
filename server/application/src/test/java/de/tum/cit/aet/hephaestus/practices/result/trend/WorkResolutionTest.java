@@ -6,7 +6,8 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.prob
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -31,7 +32,7 @@ class WorkResolutionTest {
 
         assertThat(resolution.resolvedAt()).isEqualTo(Instant.parse("2026-05-04T09:00:00Z"));
         assertThat(resolution.cleanWork())
-                .extracting(WorkResolution.Work::id, WorkResolution.Work::jobId)
+                .extracting(WorkResolution.Work::itemId, WorkResolution.Work::reviewId)
                 .containsExactly(tuple(11L, first), tuple(12L, second), tuple(13L, third));
     }
 
@@ -41,13 +42,13 @@ class WorkResolutionTest {
         UUID firstRun = UUID.randomUUID();
         UUID secondRun = UUID.randomUUID();
         UUID otherWork = UUID.randomUUID();
+        var prior = clean(11L, firstRun, "2026-05-02T09:00:00Z");
+        prior.result().end(ResultEndReason.REPLACED, Instant.parse("2026-05-03T09:00:00Z"));
         WorkResolution resolution = resolve(List.of(
-                clean(11L, firstRun, "2026-05-02T09:00:00Z"),
-                clean(11L, secondRun, "2026-05-03T09:00:00Z"),
-                clean(12L, otherWork, "2026-05-04T09:00:00Z")));
+                prior, clean(11L, secondRun, "2026-05-03T09:00:00Z"), clean(12L, otherWork, "2026-05-04T09:00:00Z")));
 
         assertThat(resolution.cleanWork())
-                .extracting(WorkResolution.Work::id, WorkResolution.Work::jobId, WorkResolution.Work::at)
+                .extracting(WorkResolution.Work::itemId, WorkResolution.Work::reviewId, WorkResolution.Work::at)
                 .containsExactly(
                         tuple(11L, secondRun, Instant.parse("2026-05-03T09:00:00Z")),
                         tuple(12L, otherWork, Instant.parse("2026-05-04T09:00:00Z")));
@@ -63,7 +64,9 @@ class WorkResolutionTest {
                 noVerdict(14L, UUID.randomUUID(), "2026-05-05T09:00:00Z"),
                 clean(15L, UUID.randomUUID(), "2026-05-06T09:00:00Z")));
 
-        assertThat(resolution.cleanWork()).extracting(WorkResolution.Work::id).containsExactly(13L, 15L);
+        assertThat(resolution.cleanWork())
+                .extracting(WorkResolution.Work::itemId)
+                .containsExactly(13L, 15L);
         assertThat(resolution.resolvedAt()).isNull();
     }
 
@@ -74,12 +77,14 @@ class WorkResolutionTest {
                 clean(9L, UUID.randomUUID(), PREPARED_AT.toString()),
                 clean(11L, UUID.randomUUID(), "2026-05-02T09:00:00Z")));
 
-        assertThat(resolution.cleanWork()).extracting(WorkResolution.Work::id).containsExactly(11L);
+        assertThat(resolution.cleanWork())
+                .extracting(WorkResolution.Work::itemId)
+                .containsExactly(11L);
         assertThat(resolution.resolvedAt()).isNull();
     }
 
     /** The path the cards and the profile take: bundle the practice's work once, then read one piece of feedback. */
-    private static WorkResolution resolve(List<PracticeResult> practiceResults) {
+    private static WorkResolution resolve(List<ResultView> practiceResults) {
         return WorkResolution.Opportunities.of(practiceResults, Instant.EPOCH).resolve(PREPARED_AT);
     }
 }

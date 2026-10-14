@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.dto;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Size;
 import org.jspecify.annotations.Nullable;
@@ -21,5 +21,5 @@ public record FeedbackResponseRequestDTO(
 
         @Nullable
         @Size(max = 2000)
-        @Schema(description = "Optional explanation; required when resolution is DISPUTED.", maxLength = 2000)
+        @Schema(description = "Optional explanation; required when resolution is DISAGREE.", maxLength = 2000)
         String comment) {}

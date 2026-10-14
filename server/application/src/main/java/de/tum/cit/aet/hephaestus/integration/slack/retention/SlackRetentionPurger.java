@@ -25,11 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
  * activity ({@code last_ts}) is older than the cutoff — equivalently every message in it is older than the cutoff,
  * since {@code last_ts} is the maximum message {@code ts}. For each aged thread the purge, in one transaction:
  * <ol>
- *   <li>erases the derived {@code chat.conversation_thread} results/feedback via the practices
+ *   <li>erases the derived {@code chat.thread} results/feedback via the practices
  *       {@link ConversationFeedbackErasure} port <b>before</b> the aggregates are dropped, so the derived rows
  *       (and their cascade children) never outlive the {@code slack_thread} they were composed over;</li>
  *   <li>deletes the raw {@code slack_message} rows belonging to those aged thread aggregates; and</li>
- *   <li>drops the aged {@code slack_thread} aggregates — which hold the {@code participant_member_ids} PII.</li>
+ *   <li>drops the aged {@code slack_thread} aggregates — which hold the {@code participant_account_ids} PII.</li>
  * </ol>
  * A thread with any activity newer than the cutoff is retained whole (its recent messages keep it a live
  * conversation), so nothing is half-pruned and no derived row is orphaned.
@@ -68,7 +68,7 @@ public class SlackRetentionPurger {
         // 2) Delete raw messages at the same thread grain as the aggregate selection.
         long messagesDeleted = slackMessageRepository.deleteByWorkspaceIdAndThreadIds(workspaceId, agedThreadIds);
 
-        // 3) Drop the aged thread aggregates (carry participant_member_ids PII).
+        // 3) Drop the aged thread aggregates (carry participant_account_ids PII).
         slackThreadRepository.deleteByWorkspaceIdAndIdIn(workspaceId, agedThreadIds);
         return messagesDeleted;
     }

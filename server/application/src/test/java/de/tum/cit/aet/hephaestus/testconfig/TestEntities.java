@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.Commit;
@@ -114,8 +114,8 @@ public final class TestEntities {
         return provider;
     }
 
-    /** An {@link AgentJob} with no fields set (mutate as needed). */
-    public static AgentJob agentJob() {
-        return new AgentJob();
+    /** An {@link ReviewJob} with no fields set (mutate as needed). */
+    public static ReviewJob reviewJob() {
+        return new ReviewJob();
     }
 }

@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend.dto;
 
-import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
+import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.TrendScope;
+import de.tum.cit.aet.hephaestus.practices.review.dto.OutcomeVectorDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;

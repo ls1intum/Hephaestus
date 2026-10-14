@@ -18,8 +18,8 @@ class ConversationCooldownKeyTest extends BaseUnitTest {
         String early = "conversation_review:C0ABC:1700000000.100000:42:1700000900.500000";
         String late = "conversation_review:C0ABC:1700000000.100000:42:1700009999.900000";
 
-        String earlyPrefix = AgentJobService.extractCooldownKeyPrefix(early);
-        String latePrefix = AgentJobService.extractCooldownKeyPrefix(late);
+        String earlyPrefix = ReviewJobService.extractCooldownKeyPrefix(early);
+        String latePrefix = ReviewJobService.extractCooldownKeyPrefix(late);
 
         assertThat(earlyPrefix).isEqualTo("conversation_review:C0ABC:1700000000.100000:42:");
         // A late reply (new lastTs) collapses onto the SAME cooldown prefix — it will be blocked by cooldown,

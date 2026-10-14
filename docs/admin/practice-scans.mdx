@@ -1,0 +1,114 @@
+---
+id: practice-scans
+title: Scan a repository
+description: Start a default-branch scan, read its evidence boundary and export its report.
+---
+
+# Scan a repository
+
+A scan checks supported workspace practices against files on a monitored repository's default branch.
+GitHub and GitLab support scans. Slack and Outline do not.
+Scans produce admin reports, not developer feedback or personal standing.
+
+## Start a scan
+
+1. Open Scans in workspace administration.
+2. Select Start scan.
+3. Select a monitored repository.
+4. Select the practices with scan support.
+5. Enter a budget.
+6. Start the scan.
+
+The scan pins the default-branch commit before execution.
+A different branch is refused. The branch cannot move within this scan.
+Only one scan per workspace can be active.
+A repeated request with the same identity and body returns the same scan.
+A changed body with that identity is a conflict, not a second scan.
+
+## Read the report
+
+Files counts distinct eligible file items.
+Outcome counts describe practice/file pairs, so a file can contribute to several practices.
+Reused is a subset of reviewed pairs, not another verdict.
+The report separates these facts:
+
+- Results judged in this scan.
+- Results reused from earlier reviews with equal proof identity and method.
+- Withheld pairs with recorded refusal reasons.
+- Not reviewed pairs left untouched when the scan closed.
+- Listing completeness and execution completion.
+
+Complete requires a complete listing and every selected pair judged or reused.
+Withheld or unreached work produces Partial.
+Failed and Cancelled retain the work already reached.
+A valid empty selection has zero pairs, not a fabricated Met result.
+Incomplete listing has no invented total file count.
+
+Recorded counts preserve the totals at closure.
+Current open-problem counts exclude accepted, incorrect or inaccessible proof.
+Accepting a result changes open counts without changing its recorded outcome.
+A hidden quotation does not imply that no problem exists.
+
+## Compare scans
+
+Comparison uses the previous terminal scan of the same repository and default branch.
+Each practice needs equal selectors, review digest and frozen model method.
+A changed standard or method starts a comparison break.
+
+A reused result keeps its original producer review.
+The report links through the scan's durable membership.
+A model change or changed context requires new judgment rather than a cache hit.
+
+New, Unchanged and Updated describe comparable problem identities.
+Absent requires complete new proof at a changed file version.
+A complete Not met result can prove one earlier problem absent while recording another problem.
+
+Met can also establish repair within its evidence boundary.
+Missed reads, withholding, marks, applicability exclusions and removed files do not prove absence.
+Completed files in a partial scan can establish their own comparison. The unreached remainder cannot.
+
+## Read listing warnings
+
+The removal guard uses the entire repository inventory before practice filters.
+An incomplete listing removes no files or current results.
+A proposed removal of exactly 20 percent or more is suspect and also removes nothing.
+A changed selector cannot make a real repository file disappear.
+Renaming a file creates a new file item. It is not a claimed repair.
+
+## Cancel a scan
+
+1. Open the active scan.
+2. Select Cancel scan.
+
+Cancellation waits for the active execution job to settle.
+The report keeps admitted work and identifies the unreached remainder.
+Start a fresh scan to review again. A cancelled scan does not silently restart.
+
+## Schedules
+
+Repository schedules freeze target repositories and a budget in their batch.
+Targets execute serially through the same scan driver.
+Pause stops new targets and cancels active scan work through its normal cancellation boundary.
+Resume continues the uncreated targets in the frozen batch.
+A schedule with referenced batches cannot be deleted until those references are gone.
+
+## Export SARIF
+
+1. Open the terminal scan report.
+2. Select Export SARIF.
+
+An active scan cannot export its report.
+A partial terminal export states that execution did not complete.
+Each visible problem becomes one SARIF result. Coverage totals remain separate.
+Marks and erasure can exclude proof without rewriting close-time totals.
+
+Raw scan proof expires after 400 days by default.
+Expired proof pages and SARIF exports are unavailable, while aggregate reports remain readable.
+The [operations reference](./practice-review-operations.mdx) owns retention controls.
+
+## Cost and limits
+
+A scan freezes its budget and complete model-slot method.
+Unknown priced cost remains unknown. It is never treated as free budget spend.
+A budget, deadline or required source refusal leaves explicit Withheld or Not reviewed work.
+The [AI provider guide](./ai-providers.mdx#cost-and-limits) owns model limits and prices.

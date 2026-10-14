@@ -31,14 +31,14 @@ A switch cannot recall a request that a provider already accepted.
 | **Silent mode**, instance settings                                                                                                  | New SCM, Slack, and email writes through the egress gateway. This includes edits, inline comments, approvals, reactions, mentor replies, reminders, and retries. It covers all email from the notification module. Withheld email is final and does not send when silent mode is turned off. | Review compute, persistence, reads/sync, in-app feedback, or declared OAuth, webhook-registration, and operator-alert exemptions |
 | `AGENT_ENABLED=false`, deployment environment on submitting servers and claiming workers                                            | Queued review runtime. Recreate affected containers to apply it                                                                                                                                                                                                                              | Already-running sandboxes, interactive mentor, sync, or every external write. Not a runtime global AI stop                       |
 | Workspace **Review settings** controls: **Start from work activity**, **Start requested reviews**                                   | Their respective review entry points                                                                                                                                                                                                                                                         | Other workspaces, existing work, or external delivery already in progress                                                        |
-| Workspace/group/practice autonomy **Off**                                                                                           | Reviewing those practices under the effective inherited policy                                                                                                                                                                                                                               | Other practices and other AI features. A workspace default does not override explicit group/practice choices                     |
+| Workspace/group/practice Feedback mode **Off**                                                                                      | New feedback at all destinations                                                                                                                                                                                                                                                             | Eligible reviews and stored results                                                                                              |
 | Workspace **Sending feedback → Send feedback** off                                                                                  | External practice feedback and mentor delivery for that workspace                                                                                                                                                                                                                            | Measurement and in-app feedback. Not an instance restore boundary                                                                |
 | Recipient **Comments and Slack reminders** off                                                                                      | Covered feedback comments and related reminders for that recipient                                                                                                                                                                                                                           | All other recipients, integration plumbing, or all mentor activity                                                               |
 | Every **Heph** row turned off under the workspace's **AI models**. `HEPHAESTUS_INTEGRATION_SLACK_ENABLED=false` on applicable roles | Respective mentor/Slack features                                                                                                                                                                                                                                                             | SCM writes, other AI work, or restored database credentials                                                                      |
 | Model/connection disabled. Each funding source's budget set to zero                                                                 | Work using that model/connection or budget                                                                                                                                                                                                                                                   | Other funding sources. Already-incurred costs. Budgets are not strict reservations                                               |
 
-[Practice review](./practice-review#autonomy-coverage-and-delivery) defines workspace and recipient
-controls. There is no independent per-channel toggle matrix. For an immediate all-AI stop, stop
+[Practice review](./practice-review#feedback-mode-review-scope-and-delivery) defines workspace and recipient
+controls. There is no independent per-destination toggle matrix. For an immediate all-AI stop, stop
 server/worker/sandbox processes and deny model-provider egress. Silent mode does not stop compute.
 
 ### Turn silent mode on, verify it, and turn it off
@@ -99,7 +99,7 @@ Turning silent mode off affects all workspaces and never flushes suppressed feed
 23. Keep restore-clone network isolation.
 24. Use controlled providers for clone drills.
 25. Run bounded reviews on controlled GitHub/GitLab work and Slack conversations for each enabled lane.
-26. Inspect practice results and `SUPPRESSED` / `INSTANCE_SILENCED` outcomes.
+26. Inspect practice results and `WITHHELD` / `INSTANCE_SILENCED` outcomes.
 27. Correlate provider-side object inventories and egress observations, including retries and edits to existing feedback.
 28. For Outline, verify no unplanned document writes or webhook registration.
 
@@ -110,7 +110,7 @@ Turning silent mode off affects all workspaces and never flushes suppressed feed
 31. Remain silent if writes are unexplained, migrations fail, or spend is unaccounted for.
 32. If necessary, use recovery below.
 
-33. **Turn off silent mode deliberately**. Only after the rollout gates pass, review all workspace populations, recipient consent, mentor settings, and autonomy.
+33. **Turn off silent mode deliberately**. Only after the rollout gates pass, review all workspace review scope, account consent, mentor settings, and feedback mode.
 34. After the rollout gates pass, turn silent mode off with the current ETag.
 35. Prefer **Review before sending** for a bounded pilot.
 36. Prove that old suppressed work stays suppressed.
@@ -343,7 +343,7 @@ Reconciliation can restore current source state, **not all historical events or 
 GitHub, GitLab, Slack, and Outline have different recovery limits.
 
 **Replay is an exception requiring a separate drill.**
-The [dispatch recovery contract](./practice-review-operations#running-instance) covers interrupted writes.
+The [send recovery contract](./practice-review-operations#running-instance) covers interrupted writes.
 It does not establish that identities derived from lost jobs survive a database rewind.
 
 1. Preserve the retained stream.
@@ -356,7 +356,7 @@ It does not establish that identities derived from lost jobs survive a database 
 
    - A stable identity cannot be reconstructed.
    - Provider lookup is inconclusive.
-   - Any live placement is unaccounted for.
+   - Any live copy is unaccounted for.
 
 6. Under those conditions, leave delivery suppressed.
 7. Under those same conditions, reconcile manually.
@@ -446,7 +446,7 @@ entered erasure or its job capability has been revoked.
 
 The preview freezes delivery facts, not only row IDs.
 If a provider write starts or its result changes after inspection, export and erasure reject the stale preview.
-An unconfirmed write or legacy comment without an exact inspection locator stops the request and identifies its dispatch or review.
+An unconfirmed write or legacy comment without an exact inspection locator stops the request and identifies its send or review.
 The system does not treat it as never delivered.
 
 1. If the preview is stale, create a new preview before confirming removal again.
@@ -547,43 +547,45 @@ Deleting in-app data does not delete a provider comment. If external copies must
 
 1. Turn on silent mode.
 2. Stop active writers/sandboxes.
-3. Preserve their dispatch state.
+3. Preserve their send state.
 4. Pause sending for the affected workspace.
    This prevents content recreation when silent mode is later turned off.
 5. Locate the piece of feedback from the workspace review trace.
-6. With authorized read-only database access, inventory **all** placements, not only the summary.
+6. With authorized read-only database access, inventory **all** copies, not only the summary.
 7. Run the query below with `psql` variables set to verified workspace and feedback IDs.
 
    The query deliberately omits bodies.
 
    ```sql
-   SELECT f.id, f.agent_job_id, f.artifact_kind, f.artifact_id,
-          f.delivery_state, f.replaces_id, p.id AS placement_id,
-          p.placement_type, p.posted_comment_ref, p.chat_message_id
+   SELECT f.id, f.review_id, f.item_id, f.destination,
+          f.state, f.replaces_id, p.id AS copy_id,
+          p.kind, p.external_ref, p.external_url, p.chat_message_id,
+          p.path, p.start_line, p.end_line, p.side, p.posted_at
    FROM feedback f
-   LEFT JOIN feedback_placement p ON p.feedback_id = f.id
+   LEFT JOIN feedback_copy p
+     ON p.feedback_id = f.id AND p.workspace_id = f.workspace_id
    WHERE f.workspace_id = :'workspace_id'::bigint
      AND f.id = :'feedback_id'::uuid;
    ```
 
-8. For conversational placements, follow `chat_message_id` through `chat_message.thread_id` to the workspace-scoped `mentor_slack_thread.chat_thread_id` mapping.
+8. For conversation copies, follow `chat_message_id` through `chat_message.thread_id` to the workspace-scoped `mentor_slack_thread.chat_thread_id` mapping.
 
    That mapping identifies the Slack conversation.
    The thread root is **not** the outgoing reply's deletion ID.
-   Some mentor replies and reminders have no feedback placement or durable outgoing timestamp.
+   Some mentor replies and reminders have no feedback copy or durable outgoing timestamp.
    The ledger query alone cannot establish complete Slack removal.
 
 9. Use the provider's paginated [conversation replies](https://docs.slack.dev/reference/methods/conversations.replies/) API to find each exact bot-authored reply and its `ts`.
 10. If provider inventory is inaccessible or ambiguous, record the gap.
 11. If provider inventory is inaccessible or ambiguous, keep removal incomplete.
 12. Follow replacement history.
-13. Check matching workspace/job rows in `feedback_dispatch`.
-14. Include `delivered_external_ref`, `delivered_placements`, and `UNCERTAIN` partial writes not yet projected into the ledger.
-15. Before deletion, verify repository/project, artifact, provider account, author, and content against the provider.
+13. Check matching workspace/job rows in `feedback_send`.
+14. Include `delivered_external_ref`, `delivered_copies`, and `UNCERTAIN` partial writes not yet projected into the ledger.
+15. Before deletion, verify repository/project, item, provider account, author, and content against the provider.
 16. Never infer an API object type from a numeric ID alone.
 17. Use a separate authorized operator session to delete each confirmed provider object.
 18. Do not turn off application silent mode for cleanup.
-19. Select the endpoint for the actual placement:
+19. Select the endpoint for the actual copy:
 
     | Placement                                    | Provider API                                                                                                                                                                        |
     | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -610,8 +612,8 @@ Deleting in-app data does not delete a provider comment. If external copies must
 25. After a timeout, read before retrying.
 26. Record each ledger ID/provider reference, deletion result, verification time, and operator in the restricted incident record.
 27. Include partial failures.
-28. Do not substitute `SUPERSEDED`, `DISCARDED`, recipient resolution, or edited dispatch fences for retraction.
-29. Before delivery resumes, verify no live placements or unresolved dispatches can recreate the content.
+28. Do not substitute `REPLACED`, `REJECTED`, recipient resolution, or edited write fences for retraction.
+29. Before delivery resumes, verify no live copies or unresolved sends can recreate the content.
 30. If you cannot prove this, keep the workspace paused.
 31. Only then purge, if requested.
 32. Retain minimal lawful removal evidence under the incident retention policy.
@@ -637,8 +639,8 @@ traffic and recovery objectives. Assign an owner and test the alert delivery rou
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Poison events / repeated consumer failures          | Preserve stream sequence, kind, reason and delivery count, not raw payloads in logs. Current poison handling **ACKs** at the retry limit. It does not move data to a durable DLQ. NATS maximum-delivery advisories are not a DLQ either. Recover the retained event before retention expires if authorized. Never raise the retry cap to hide a poison loop. | Reproduce with a sanitized fixture, fix the cause, replay one controlled event under silence, then reconcile the bounded gap. Healthy subsequent events continue.                               |
 | Dead-letter alert from deployment tooling           | Identify which system owns the queue. Do not assume an application replay endpoint exists. Preserve IDs/configuration and restrict payload access.                                                                                                                                                                                                           | Redrive only after fixing the cause, with a bounded batch and verified delivery idempotency. Record irrecoverable events.                                                                       |
-| Rising oldest queue age, stale sampler, failed jobs | Check eligible/held/running separately, worker availability, readiness, model assignments, database and provider health. Do not delete jobs or reset leases manually.                                                                                                                                                                                           | Oldest age falls and new work completes. Held work is explained rather than silently counted as healthy.                                                                                        |
-| `UNCERTAIN` / failed dispatch                       | Turn on silent mode if content safety is in doubt. Restore provider lookup/credentials. Never clear the write fence or create a new dispatch to bypass uncertainty.                                                                                                                                                                                          | Existing provider objects are reconciled without duplicate creates, including inline placements.                                                                                                |
+| Rising oldest queue age, stale sampler, failed jobs | Check eligible/held/running separately, worker availability, readiness, model assignments, database and provider health. Do not delete jobs or reset leases manually.                                                                                                                                                                                        | Oldest age falls and new work completes. Held work is explained rather than silently counted as healthy.                                                                                        |
+| `UNCERTAIN` / failed send                           | Turn on silent mode if content safety is in doubt. Restore provider lookup/credentials. Never clear the write fence or create a new send to bypass uncertainty.                                                                                                                                                                                              | Existing provider objects are reconciled without duplicate creates, including inline copies.                                                                                                    |
 | Budget breach / unpriced usage                      | Identify shared versus workspace-owned funding. Pause each affected budget/model. For runaway global spend stop all AI processes/egress. Silent mode does not stop spending.                                                                                                                                                                                 | Validate usage ledger against provider billing, explain unpriced buckets and in-flight overshoot. Observe a bounded fresh run before restoring caps. Budget-held work can resume automatically. |
 | Backup stale / restore failed                       | Preserve the last good backup, check destination credentials, disk, WAL coverage and encryption-key recovery. Escalate at the agreed RPO, not after the next deploy.                                                                                                                                                                                         | A new off-host backup and isolated restore succeed within measured objectives.                                                                                                                  |
 | Broker storage exhaustion                           | Follow the documented broker/receiver restart order after freeing space. Keep ingress loss visible. Do not purge streams merely to clear an alert.                                                                                                                                                                                                           | Receiver durable acknowledgments and consumption recover. Inventory missing events and verify configured bounds.                                                                                |
@@ -701,7 +703,7 @@ It must include these facts:
 - Provider counts before/after.
 - Failures and follow-up owner.
 
-1. Repeat drills after changes to migrations, dispatch identity, provider APIs, broker configuration, or backups.
+1. Repeat drills after changes to migrations, write identity, provider APIs, broker configuration, or backups.
 
 - [GitLab Silent Mode](https://docs.gitlab.com/administration/silent_mode/)
 - [PostgreSQL continuous archiving](https://www.postgresql.org/docs/current/continuous-archiving.html)

@@ -68,9 +68,9 @@ void test("ignores additive metadata without relaxing required path validation",
 });
 
 void test("accepts the envelope produced by the Java task writer, at the version the runner supports", () => {
-	assert.equal(SUPPORTED_SCHEMA_VERSION, 5);
+	assert.equal(SUPPORTED_SCHEMA_VERSION, 6);
 	const envelope: unknown = JSON.parse(
-		readFileSync(new URL("../task-fixtures/v5/practice-review.json", import.meta.url), "utf8"),
+		readFileSync(new URL("contract-v3/task.json", import.meta.url), "utf8"),
 	);
 	assert.ok(typeof envelope === "object" && envelope !== null);
 	assert.equal(taskPaths(envelope).contextRoot, Reflect.get(envelope, "contextRoot"));
@@ -84,9 +84,20 @@ void test("accepts the envelope produced by the Java task writer, at the version
 for (const [name, envelope] of Object.entries({
 	"the previous schema": { schemaVersion: 4, ...paths, prompt: "Review" },
 	"an older schema": { schemaVersion: 3, ...paths, prompt: "Review" },
-	"missing paths": { schemaVersion: 5, prompt: "Review" },
+	"missing paths": {
+		schemaVersion: 6,
+		reviewId: "11111111-1111-4111-8111-111111111111",
+		jobId: "22222222-2222-4222-8222-222222222222",
+		attempt: 1,
+		workspaceId: "1",
+		prompt: "Review",
+	},
 	traversal: {
-		schemaVersion: 5,
+		schemaVersion: 6,
+		reviewId: "11111111-1111-4111-8111-111111111111",
+		jobId: "22222222-2222-4222-8222-222222222222",
+		attempt: 1,
+		workspaceId: "1",
 		...paths,
 		manifest: "../secret",
 		prompt: "Review",

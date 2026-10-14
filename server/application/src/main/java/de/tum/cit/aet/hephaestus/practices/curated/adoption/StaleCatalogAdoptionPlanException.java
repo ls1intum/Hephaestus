@@ -8,12 +8,14 @@ public class StaleCatalogAdoptionPlanException extends RuntimeException {
     private static final long serialVersionUID = 1L;
 
     public StaleCatalogAdoptionPlanException() {
-        super("The practice or its workspace adoption outcome changed. Review the current definition before adopting.");
+        super("The practice or its workspace adoption outcome changed. Review the current"
+                + " definition before adopting.");
     }
 
     public StaleCatalogAdoptionPlanException(Throwable cause) {
         super(
-                "The practice or its workspace adoption outcome changed. Review the current definition before adopting.",
+                "The practice or its workspace adoption outcome changed. Review the current"
+                        + " definition before adopting.",
                 cause);
     }
 }

@@ -329,9 +329,11 @@ export default defineConfig({
 			]),
 			"gate:agent-tests": group(["test:agents"]),
 			"test:agents": run(
-				"node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/practice-scripts/*.test.ts docker/agents/practice-scripts/lib/*.test.ts docker/agents/pi/*.test.ts",
+				"node --test server/application/src/test/resources/agent/*.spec.ts docker/agents/practice-scripts/*.test.ts docker/agents/practice-scripts/lib/core/**/*.test.ts docker/agents/practice-scripts/kits/**/*.test.ts docker/agents/pi/*.test.ts",
 			),
-			"test:tooling": run("node --test scripts/*.test.ts"),
+			"test:tooling": run(
+				"node --test scripts/*.test.ts server/application/src/test/resources/integration/scm/sarif/*.test.ts",
+			),
 
 			// Load tests
 			"gate:load-format": cached(`vp fmt --check ${loadSources}`),
@@ -438,12 +440,6 @@ export default defineConfig({
 			}),
 			"check:ports": run("node scripts/check-ports.ts"),
 			"dev:e2e:setup": run("node scripts/e2e-setup.ts"),
-			"dev:practices-across-the-workspace:seed": run(
-				"node scripts/seed-practices-across-the-workspace.ts",
-			),
-			"dev:practices-across-the-workspace:remove": run(
-				"node scripts/seed-practices-across-the-workspace.ts remove",
-			),
 			"dev:public-test": run("node scripts/jean-public-test.ts"),
 		},
 	},

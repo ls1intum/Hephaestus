@@ -20,13 +20,14 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * {@code GET /admin/audit} — the read-only instance-admin audit viewer against the <b>real</b>
- * security chain (genuine cookie-JWT, no mock decoder), mirroring {@code AccountAdminRoleIntegrationTest}.
+ * security chain (genuine cookie-JWT, no mock decoder), mirroring {@code
+ * AccountAdminRoleIntegrationTest}.
  *
- * <p>Asserts (a) the {@code app_admin} authority gate (a plain user is 403'd), (b) that seeded events
- * are surfaced newest-first with the attribution fields intact, and (c) that the {@code eventType}
- * filter narrows the result. Events are seeded directly through the repository so the test exercises
- * the VIEWER deterministically (the audit write path swallows failures by design). Requires Docker,
- * like every {@code @Tag("integration")}.
+ * <p>Asserts (a) the {@code app_admin} authority gate (a plain user is 403'd), (b) that seeded
+ * events are surfaced newest-first with the attribution fields intact, and (c) that the {@code
+ * eventType} filter narrows the result. Events are seeded directly through the repository so the
+ * test exercises the VIEWER deterministically (the audit write path swallows failures by design).
+ * Requires Docker, like every {@code @Tag("integration")}.
  */
 class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
 
@@ -129,8 +130,10 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
                 persistedId(admin.getId()),
                 null);
 
-        // Two values on one dimension is a disjunction, not a last-one-wins overwrite. The unfiltered
-        // case pins the other half of the predicate: a null list must not degrade into `IN ()`, which
+        // Two values on one dimension is a disjunction, not a last-one-wins overwrite. The
+        // unfiltered
+        // case pins the other half of the predicate: a null list must not degrade into `IN ()`,
+        // which
         // Hibernate cannot bind — a break no single-value test would surface.
         webTestClient
                 .get()
@@ -280,7 +283,8 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void csvExportNeutralizesFormulaInjectionAndEscapesEmbeddedQuotes() {
         Account admin = persist("Keeper Admin", Account.AppRole.APP_ADMIN);
-        // A failure reason that is BOTH a spreadsheet formula (leading '=') and carries an embedded quote.
+        // A failure reason that is BOTH a spreadsheet formula (leading '=') and carries an embedded
+        // quote.
         seedFailure(
                 1L,
                 AuthEvent.EventType.LOGIN_FAILED,
@@ -299,7 +303,8 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
                 .getResponseBody();
 
         assertThat(csv).isNotNull();
-        // Formula trigger neutralized: the cell is quoted and the leading '=' is prefixed with an apostrophe.
+        // Formula trigger neutralized: the cell is quoted and the leading '=' is prefixed with an
+        // apostrophe.
         assertThat(csv).contains("\"'=cmd");
         // RFC-4180: the embedded double-quote is doubled.
         assertThat(csv).contains("\"\"x\"\"");
@@ -341,7 +346,7 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
 
     private void seedFailure(long id, AuthEvent.EventType type, Instant occurredAt, String failureReason) {
         AuthEventData data = new AuthEventData(
-                type, AuthEvent.Result.FAILURE, null, null, null, failureReason, null, null, null, null, false);
+                type, AuthEvent.Result.FAILURE, null, null, null, null, failureReason, null, null, null, null, false);
         authEventRepository.save(AuthEvent.create(data, id, occurredAt, "127.0.0.1", "test-agent"));
     }
 
@@ -352,7 +357,18 @@ class AuthAuditControllerIntegrationTest extends RealAuthIntegrationTest {
             @Nullable Long accountId,
             @Nullable Long actingAccountId) {
         AuthEventData data = new AuthEventData(
-                type, AuthEvent.Result.SUCCESS, accountId, null, actingAccountId, null, null, null, null, null, false);
+                type,
+                AuthEvent.Result.SUCCESS,
+                accountId,
+                null,
+                null,
+                actingAccountId,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false);
         authEventRepository.save(AuthEvent.create(data, id, occurredAt, "127.0.0.1", "test-agent"));
     }
 

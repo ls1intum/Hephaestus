@@ -6,8 +6,8 @@
 import {
 	EXECUTION_REPORT_SCHEMA_VERSION,
 	type ExecutionEntry,
-} from "./work/practice-scripts/lib/contract.ts";
-import type { ProgramOutcome } from "./work/practice-scripts/lib/program-host.ts";
+} from "./work/practice-scripts/lib/core/contract.ts";
+import type { ProgramOutcome } from "./work/practice-scripts/lib/core/program-host.ts";
 
 /** The bounds the server reads `out/practice-scripts.json` within. */
 export const PRACTICE_SCRIPT_REPORT_MAX_BYTES = 64 * 1024;
@@ -35,7 +35,7 @@ export function errorLine(error: unknown): string | undefined {
 		return undefined;
 	}
 	const [first = ""] = error.replace(BLANK_START, "").split(/[\r\n]/u, 1);
-	// A code point takes at most two UTF-16 units, so the head holds the cut, and the rest of a long
+	// A code point takes at most two UTF-16 feedback, so the head holds the cut, and the rest of a long
 	// line is never split into code points.
 	// With the `u` flag, `.` matches one code point, an unpaired surrogate included.
 	const cut = (first.slice(0, 2 * PRACTICE_SCRIPT_ERROR_MAX_CHARS).match(/./gsu) ?? [])
@@ -51,11 +51,11 @@ function entryOf(slug: string, outcome: ProgramOutcome): ExecutionEntry {
 	return {
 		practiceSlug: slug,
 		program: outcome.program,
-		models: outcome.models.map(({ slot, need, bound, notRated }) => ({
+		models: outcome.models.map(({ slot, need, bound, failures }) => ({
 			slot,
 			need,
 			bound,
-			notRated,
+			failures,
 		})),
 		status: outcome.status,
 		stopReason: outcome.stopReason,
@@ -73,7 +73,7 @@ function entryOf(slug: string, outcome: ProgramOutcome): ExecutionEntry {
  * claim about a practice that the report does not name.
  */
 export function executionReport(practices: readonly (readonly [string, ProgramOutcome])[]): string {
-	// By UTF-16 code unit, as Java compares strings.
+	// By UTF-16 code piece, as Java compares strings.
 	const sorted = practices.toSorted(([a], [b]) => Number(a > b) - Number(a < b));
 	const kept: { entry: ExecutionEntry; text: string }[] = [];
 	let bytes = Buffer.byteLength(

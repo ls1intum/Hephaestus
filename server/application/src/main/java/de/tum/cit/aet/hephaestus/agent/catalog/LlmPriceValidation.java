@@ -44,7 +44,8 @@ final class LlmPriceValidation {
             boolean anyPositive = rates.stream().anyMatch(rate -> rate != null && rate.signum() > 0);
             if (!anyPositive) {
                 throw new IllegalArgumentException(
-                        "A price needs at least one rate greater than zero. For a model without usage charges, choose No metered API cost.");
+                        "A price needs at least one rate greater than zero. For a model without usage charges, choose"
+                                + " No metered API cost.");
             }
             boolean anyTooLarge =
                     rates.stream().anyMatch(rate -> rate != null && rate.compareTo(MAX_RATE_EXCLUSIVE) >= 0);

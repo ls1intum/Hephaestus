@@ -11,13 +11,13 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
@@ -81,7 +81,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
                 .thenReturn(Optional.of(activeConnection()));
         lenient()
-                .when(identityResolver.resolveMemberId(anyLong(), anyString(), any(), anyString()))
+                .when(identityResolver.resolveAccountId(anyLong(), anyString(), any(), anyString()))
                 .thenReturn(Optional.empty());
         lenient()
                 .when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID))
@@ -260,7 +260,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
         when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
                 .thenReturn(List.of(doc));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
                 .thenReturn(Optional.of(555L));
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
@@ -268,9 +268,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         assertThat(result).singleElement().satisfies(projected -> {
             assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
             assertThat(projected.createdBySubject()).isEqualTo("0aa1bb2c-user");
-            assertThat(projected.createdByMemberId()).isEqualTo(555L);
+            assertThat(projected.createdByAccountId()).isEqualTo(555L);
             assertThat(projected.updatedByName()).isEqualTo("Ada Lovelace");
-            assertThat(projected.updatedByMemberId()).isEqualTo(555L);
+            assertThat(projected.updatedByAccountId()).isEqualTo(555L);
         });
     }
 
@@ -286,7 +286,7 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
         projector.documentsForWorkspace(WORKSPACE_ID);
 
-        verify(identityResolver, times(1)).resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user");
+        verify(identityResolver, times(1)).resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user");
     }
 
     @Test
@@ -295,14 +295,14 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
         when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
                 .thenReturn(List.of(doc));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
                 .thenReturn(Optional.empty());
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
 
         assertThat(result).singleElement().satisfies(projected -> {
             assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
-            assertThat(projected.createdByMemberId()).isNull();
+            assertThat(projected.createdByAccountId()).isNull();
         });
     }
 
@@ -319,9 +319,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
         assertThat(result).singleElement().satisfies(projected -> {
             assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
-            assertThat(projected.createdByMemberId()).isNull();
+            assertThat(projected.createdByAccountId()).isNull();
         });
-        verify(identityResolver, never()).resolveMemberId(anyLong(), anyString(), any(), anyString());
+        verify(identityResolver, never()).resolveAccountId(anyLong(), anyString(), any(), anyString());
     }
 
     @Test
@@ -331,9 +331,9 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
         doc.setCollaboratorSubjects(List.of("0aa1bb2c-user", "9dd8ee7f-user", "0aa1bb2c-user"));
         when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
                 .thenReturn(List.of(doc));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user"))
                 .thenReturn(Optional.of(555L));
-        when(identityResolver.resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "9dd8ee7f-user"))
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "9dd8ee7f-user"))
                 .thenReturn(Optional.empty());
 
         List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
@@ -344,14 +344,14 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
             assertThat(projected.collaborators().get(0).subject()).isEqualTo("0aa1bb2c-user");
             // Creator/last-editor collaborator carries the known display name + resolved member.
             assertThat(projected.collaborators().get(0).name()).isEqualTo("Ada Lovelace");
-            assertThat(projected.collaborators().get(0).memberId()).isEqualTo(555L);
+            assertThat(projected.collaborators().get(0).accountId()).isEqualTo(555L);
             // A middle editor has no name in the list payload — subject (+ member id if linked) only.
             assertThat(projected.collaborators().get(1).subject()).isEqualTo("9dd8ee7f-user");
             assertThat(projected.collaborators().get(1).name()).isNull();
-            assertThat(projected.collaborators().get(1).memberId()).isNull();
+            assertThat(projected.collaborators().get(1).accountId()).isNull();
         });
         // The memo covers collaborators too: the shared subject resolves once for author + collaborator slots.
-        verify(identityResolver, times(1)).resolveMemberId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user");
+        verify(identityResolver, times(1)).resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "0aa1bb2c-user");
     }
 
     @Test

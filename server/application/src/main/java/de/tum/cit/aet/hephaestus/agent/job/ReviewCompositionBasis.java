@@ -19,7 +19,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * The original public writer inputs of one admitted review: the finite authorized records and whole standards it
  * was written from, kept so a writer lost after admission can be replaced without assessing again. Cold by design:
- * no association reaches it from {@code AgentJob}, and only a composition reads its payload, by job.
+ * no association reaches it from {@code ReviewJob}, and only a composition reads its payload, by job.
  *
  * <p>The row is scoped to its job's workspace and removed with the job. Its admission attempt and digest are the
  * identity the admitted citations were verified under; {@code copyId} is the person-evidence receipt that indexes
@@ -69,13 +69,6 @@ public class ReviewCompositionBasis {
 
     @Column(name = "copy_id", nullable = false)
     private UUID copyId;
-
-    /** The logical serialized payload size before JSONB persistence; whole standards have no small cap. */
-    @Column(name = "byte_size", nullable = false)
-    private long byteSize;
-
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt;
 
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;

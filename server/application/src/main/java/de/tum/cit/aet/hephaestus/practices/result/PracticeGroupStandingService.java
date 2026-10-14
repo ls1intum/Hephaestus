@@ -1,17 +1,19 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.dto.FeedbackSourceCountDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot.PracticeStandingSnapshot;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
-import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendSupportDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.GuidanceSource;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -35,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 public class PracticeGroupStandingService {
 
@@ -92,20 +95,19 @@ public class PracticeGroupStandingService {
     private static PracticeGroupStandingDTO toGroupStanding(
             PracticeGroup group,
             List<PracticeStandingDTO> cards,
-            Map<String, PracticeStanding> practices,
+            Map<String, PracticeStandingSnapshot> practices,
             Set<String> eligiblePracticeSlugs,
             GroupSignal signal) {
         List<PracticeStandingDTO> verdicts = votingVerdicts(cards, eligiblePracticeSlugs);
-        PracticeGroupStandingDTO.Standing standing = groupStanding(cards, verdicts, practices);
-        boolean hasDisplayableData = PracticeGroupStandingDTO.isVerdict(standing);
+        PracticeStanding standing = groupStanding(cards, verdicts, practices);
+        boolean hasDisplayableData = StandingScale.isVerdict(standing);
         // Item-level, unlike the standing: the question here is which KINDS of evidence exist to show, which a
         // practice standing has already abstracted away.
         boolean hasProblems = cards.stream().anyMatch(card -> !card.toWorkOn().isEmpty());
         boolean hasStrengths = cards.stream().anyMatch(card -> !card.strengths().isEmpty());
 
         String guidance = hasDisplayableData ? DeterministicGroupGuidanceComposer.compose(standing, verdicts) : null;
-        PracticeGroupStandingDTO.GuidanceSource guidanceSource =
-                hasDisplayableData ? PracticeGroupStandingDTO.GuidanceSource.RULE_BASED : null;
+        GuidanceSource guidanceSource = hasDisplayableData ? GuidanceSource.RULE_BASED : null;
 
         return new PracticeGroupStandingDTO(
                 group.getSlug(),
@@ -124,19 +126,19 @@ public class PracticeGroupStandingService {
     private static List<PracticeStandingDTO> votingVerdicts(
             List<PracticeStandingDTO> cards, Set<String> eligiblePracticeSlugs) {
         return cards.stream()
-                .filter(card -> PracticeStandingDTO.isVerdict(card.standing()))
+                .filter(card -> StandingScale.isVerdict(card.standing()))
                 .filter(card -> eligiblePracticeSlugs.contains(card.slug()))
                 .toList();
     }
 
-    private static PracticeGroupStandingDTO.Standing groupStanding(
+    private static PracticeStanding groupStanding(
             List<PracticeStandingDTO> cards,
             List<PracticeStandingDTO> verdicts,
-            Map<String, PracticeStanding> practices) {
+            Map<String, PracticeStandingSnapshot> practices) {
         if (verdicts.isEmpty()) {
-            return cards.stream().anyMatch(card -> card.standing() == PracticeStandingDTO.Standing.NO_OPPORTUNITY)
-                    ? PracticeGroupStandingDTO.Standing.NO_OPPORTUNITY
-                    : PracticeGroupStandingDTO.Standing.NOT_OBSERVED;
+            return cards.stream().anyMatch(card -> card.standing() == PracticeStanding.NO_OPPORTUNITY)
+                    ? PracticeStanding.NO_OPPORTUNITY
+                    : PracticeStanding.NOT_OBSERVED;
         }
         double groupShare = verdicts.stream()
                 .mapToDouble(card -> Objects.requireNonNull(
@@ -144,9 +146,9 @@ public class PracticeGroupStandingService {
                 .average()
                 .orElseThrow();
         return switch (StandingScale.classify(groupShare)) {
-            case STRENGTH -> PracticeGroupStandingDTO.Standing.STRENGTH;
-            case MIXED -> PracticeGroupStandingDTO.Standing.MIXED;
-            case DEVELOPING -> PracticeGroupStandingDTO.Standing.DEVELOPING;
+            case STRENGTH -> PracticeStanding.STRENGTH;
+            case MIXED -> PracticeStanding.MIXED;
+            case DEVELOPING -> PracticeStanding.DEVELOPING;
             case NOT_OBSERVED, NO_OPPORTUNITY ->
                 throw new IllegalStateException("StandingScale only classifies verdicts");
         };
@@ -190,12 +192,12 @@ public class PracticeGroupStandingService {
      * stopped casting, and the standing beside this already excludes it.
      */
     private Map<String, GroupSignal> groupSignals(PracticeStandingService.StandingSnapshot snapshot) {
-        Map<String, List<PracticeResult>> evidenceByGroup = new LinkedHashMap<>();
+        Map<String, List<ResultView>> evidenceByGroup = new LinkedHashMap<>();
         Map<String, List<PracticeTrend>> trendsByGroup = new LinkedHashMap<>();
         Set<String> eligibleSlugs = snapshot.eligiblePracticesByGroup().values().stream()
                 .flatMap(List::stream)
                 .collect(Collectors.toSet());
-        for (PracticeStanding practice : snapshot.practices().values()) {
+        for (PracticeStandingSnapshot practice : snapshot.practices().values()) {
             String groupSlug = practice.dto().groupSlug();
             if (groupSlug == null) {
                 continue;
@@ -218,9 +220,9 @@ public class PracticeGroupStandingService {
         Set<String> groupSlugs = new LinkedHashSet<>(evidenceByGroup.keySet());
         groupSlugs.addAll(snapshot.eligiblePracticesByGroup().keySet());
         for (String groupSlug : groupSlugs) {
-            List<PracticeResult> evidence = evidenceByGroup.getOrDefault(groupSlug, List.of());
+            List<ResultView> evidence = evidenceByGroup.getOrDefault(groupSlug, List.of());
             Instant oldest = evidence.stream()
-                    .map(PracticeResult::getObservedAt)
+                    .map(view -> view.result().getRecordedAt())
                     .min(Instant::compareTo)
                     .orElse(null);
             PracticeTrend direction = practiceTrendService.calculateGroup(
@@ -247,18 +249,18 @@ public class PracticeGroupStandingService {
         return (int) Math.max(1, Math.min(PracticeStandingService.LOOKBACK_DAYS, calendarDays));
     }
 
-    private static List<FeedbackSourceCountDTO> sourceCounts(List<PracticeResult> evidence) {
-        // Ordered by kind value, not by declaration order: ArtifactKind is an open vocabulary of
+    private static List<FeedbackSourceCountDTO> sourceCounts(List<ResultView> evidence) {
+        // Ordered by kind value, not by declaration order: ItemKind is an open vocabulary of
         // "<domain>.<kind>" strings, so there is no enum ordinal left to render stably against.
-        Map<ArtifactKind, Set<Long>> artifactsByType = new TreeMap<>(Comparator.comparing(ArtifactKind::value));
-        for (PracticeResult practiceResult : evidence) {
+        Map<ItemKind, Set<Long>> artifactsByType = new TreeMap<>(Comparator.comparing(ItemKind::value));
+        for (ResultView view : evidence) {
             artifactsByType
-                    .computeIfAbsent(practiceResult.getArtifactKind(), ignored -> new HashSet<>())
-                    .add(practiceResult.getArtifactId());
+                    .computeIfAbsent(new ItemKind(view.item().kind()), ignored -> new HashSet<>())
+                    .add(view.result().getItemId());
         }
         return artifactsByType.entrySet().stream()
                 .map(entry -> new FeedbackSourceCountDTO(
-                        entry.getKey(), (long) entry.getValue().size()))
+                        entry.getKey().value(), entry.getValue().size()))
                 .toList();
     }
 }

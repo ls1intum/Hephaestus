@@ -1,8 +1,4 @@
-import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
-// Finds the merge as the record holds it, and each review thread that the record does not show as
-// resolved by the merge. Each thread lead tells where the thread is anchored, when it was opened and
-// if the provider calls it outdated. The review reads each thread against the merge.
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	candidateThreads,
 	dated,
@@ -12,7 +8,12 @@ import {
 	resolvedByMerge,
 	reviewsMergedWork,
 	threadLead,
-} from "../lib/review.ts";
+} from "../kits/scm/review.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
+// Finds the merge as the record holds it, and each review thread that the record does not show as
+// resolved by the merge. Each thread lead tells where the thread is anchored, when it was opened and
+// if the provider calls it outdated. The review reads each thread against the merge.
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	merge:
@@ -31,8 +32,9 @@ export const LABELS = {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		if (!reviewsMergedWork(ctx.cause)) {
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		if (!reviewsMergedWork(ctx.review)) {
 			return ctx.review({
 				leads: [],
 				directions: [
@@ -40,7 +42,7 @@ export default definePracticeScript({
 				],
 			});
 		}
-		const merge = mergeFacts(ctx.work);
+		const merge = mergeFacts(domain.item);
 		const mergeUndated = !dated(merge.mergedAt);
 		const record = await readReviewThreads(ctx.evidence);
 		const threads = record?.threads ?? [];
@@ -66,7 +68,7 @@ export default definePracticeScript({
 		}
 		return ctx.review({
 			leads: [
-				mergeLead(ctx.work, merge, LABELS.merge),
+				mergeLead(domain.item, merge, LABELS.merge),
 				...selected.map((thread) => threadLead(thread, merge, LABELS)),
 			],
 			limitations:

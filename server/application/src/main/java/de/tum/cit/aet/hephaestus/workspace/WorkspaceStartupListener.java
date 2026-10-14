@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceProvisioningHook;
+import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceProvisioning;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,25 +17,26 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 
 /**
- * Spring lifecycle hook that kicks off workspace provisioning and monitoring once the application is ready.
- * Disabled during tests and OpenAPI spec generation to prevent GitHub API calls.
+ * Spring lifecycle hook that kicks off workspace provisioning and monitoring once the application
+ * is ready. Disabled during tests and OpenAPI spec generation to prevent GitHub API calls.
  *
  * <h2>Startup Sequence</h2>
+ *
  * <ol>
- *   <li>Provision workspaces (create from config or load from database)</li>
- *   <li>Publish {@link WorkspacesInitializedEvent} - signals installation consumer can start</li>
- *   <li>Activate workspaces (reconcile GitHub App repositories, then run the full GraphQL sync for repos,
- *       issues, PRs if startup sync is enabled)</li>
+ *   <li>Provision workspaces (create from config or load from database)
+ *   <li>Publish {@link WorkspacesInitializedEvent} - signals installation consumer can start
+ *   <li>Activate workspaces (reconcile GitHub App repositories, then run the full GraphQL sync for
+ *       repos, issues, PRs if startup sync is enabled)
  * </ol>
  *
  * <p>Phases 1-3 run on {@code applicationTaskExecutor} so {@link ApplicationReadyEvent} dispatch
- * returns immediately. Without the hop the main thread was blocked on synchronous GitHub-App
- * REST calls for ~7 s after Spring reported "Started Application", delaying readiness for any
- * downstream subscribers and the perceived dev-loop start time.
+ * returns immediately. Without the hop the main thread was blocked on synchronous GitHub-App REST
+ * calls for ~7 s after Spring reported "Started Application", delaying readiness for any downstream
+ * subscribers and the perceived dev-loop start time.
  *
  * <p>Ordering: {@link Order#value()} is intentionally {@link Ordered#LOWEST_PRECEDENCE}; the NATS
- * consumer's {@code @Order(1)} {@code init()} runs first to establish the connection before
- * {@link WorkspacesInitializedEvent} could fire from the worker thread.
+ * consumer's {@code @Order(1)} {@code init()} runs first to establish the connection before {@link
+ * WorkspacesInitializedEvent} could fire from the worker thread.
  */
 @Component
 @Profile("!specs & !test")
@@ -44,7 +46,7 @@ public class WorkspaceStartupListener {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceStartupListener.class);
 
-    private final WorkspaceProvisioningService provisioningService;
+    private final WorkspaceProvisioning provisioningService;
     private final WorkspaceActivationService workspaceActivationService;
     private final WorkspaceRepository workspaceRepository;
     private final ApplicationEventPublisher eventPublisher;
@@ -52,7 +54,7 @@ public class WorkspaceStartupListener {
     private final List<WorkspaceProvisioningHook> provisioningHooks;
 
     public WorkspaceStartupListener(
-            WorkspaceProvisioningService provisioningService,
+            WorkspaceProvisioning provisioningService,
             WorkspaceActivationService workspaceActivationService,
             WorkspaceRepository workspaceRepository,
             ApplicationEventPublisher eventPublisher,
@@ -99,7 +101,8 @@ public class WorkspaceStartupListener {
         log.info("Workspaces initialized: count={}", workspaceCount);
         eventPublisher.publishEvent(new WorkspacesInitializedEvent(workspaceCount));
 
-        // Phase 3: Activate workspaces in parallel (repository reconciliation and full sync can take a while)
+        // Phase 3: Activate workspaces in parallel (repository reconciliation and full sync can
+        // take a while)
         workspaceActivationService.activateAllWorkspaces();
     }
 }

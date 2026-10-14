@@ -1,3 +1,4 @@
+import { scm, expectKind, requireChange, type DiffFile, type FileTree } from "../kits/scm/index.ts";
 // Finds the changed lines of dependency manifests, for the review to judge if each dependency edit was
 // deliberate: an intended add, remove or bump with a fitting constraint. A careless edit loosens a pin,
 // drops a version, or leaves no lockfile. A table of manifests, keyed by the file name, covers all
@@ -14,15 +15,8 @@
 //   bumped        the same constraint shape with a different version
 // A manifest that spreads one dependency over several lines (Maven, XcodeGen) gets no such kind. Its
 // changed dependency lines are raw-manifest-line leads.
-import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type DiffFile,
-	type FileTree,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"only-added":
@@ -355,8 +349,9 @@ async function checkoutPaths(tree: FileTree | null, names: ReadonlySet<string>):
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
 		const leads: ReviewLead[] = [];
 		const changedManifests = new Set<string>();
 		const touchedLockfiles = new Set<string>();
@@ -372,7 +367,7 @@ export default definePracticeScript({
 		const allLockfileNames = new Set(
 			ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
 		);
-		const checkoutLockfiles = await checkoutPaths(ctx.files?.head ?? null, allLockfileNames);
+		const checkoutLockfiles = await checkoutPaths(domain.files?.head ?? null, allLockfileNames);
 
 		for (const [path, df] of change) {
 			const base = basenameLower(path);
@@ -404,7 +399,7 @@ export default definePracticeScript({
 			const added = collectDeps(df, eco, "added");
 			const removed = collectDeps(df, eco, "removed");
 
-			// helper to find the diff line for a dependency name on a given side (for lead placement). Match on a
+			// helper to find the diff line for a dependency name on a given side (for lead location). Match on a
 			// quote/word/coordinate boundary, not a bare substring, so a prefix-sharing sibling (react vs
 			// react-dom, or a scoped name appearing inside another package's URL) doesn't grab the wrong line.
 			const lineFor = (name: string, side: "added" | "removed"): number => {
@@ -475,7 +470,7 @@ export default definePracticeScript({
 		const directions: string[] = [];
 		if (changedManifests.size > 0) {
 			directions.push(
-				`Manifest-named file(s) changed (${changedManifests.size}). The name alone is no occasion: a changed external dependency declaration, resolution, source or pin inside one is, and internal target, test-target, scheme or build-setting wiring alone is not.`,
+				`Manifest-named file(s) changed (${changedManifests.size}). The name alone is no applicability: a changed external dependency declaration, resolution, source or pin inside one is, and internal target, test-target, scheme or build-setting wiring alone is not.`,
 				`Candidate lines, matched by shape and not yet placed in a dependency section: ${onlyAdded} only on an added line, ${onlyRemoved} only on a removed line, ${pinsLoosened} pin(s) loosened, ${pinsDropped} pin(s) dropped, ${bumped} version bump(s).`,
 				"A metadata field such as a package.json engines entry or a Cargo rust-version has the same shape, and a name on one side only may be a moved or reformatted line rather than a new or dropped dependency.",
 				`Read the section around each before treating it as a dependency change${unpairedManifestLines > 0 ? `; the ${unpairedManifestLines} raw multi-line manifest line(s) are not in these counts, so a zero here does not show that nothing changed` : ""}. Then investigate whether each dependency constraint change is deliberate and appropriately bounded.`,

@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -45,8 +45,11 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/** Only the outbound Slack token exchange is a double; state signing, the callback and persistence are real.
- * Shares the {@code slack-signed} context with SlackChannelAdminControllerIntegrationTest. */
+/**
+ * Only the outbound Slack token exchange is a double; state signing, the callback and persistence
+ * are real. Shares the {@code slack-signed} context with
+ * SlackChannelAdminControllerIntegrationTest.
+ */
 @TestPropertySource(
         properties = {
             "hephaestus.integration.slack.enabled=true",
@@ -68,7 +71,7 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
     private ConnectionRepository connectionRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinks;
+    private IdentityRepository identityLinks;
 
     @Autowired
     private SlackOAuthClient slackOAuthClient;
@@ -83,9 +86,10 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
 
     @BeforeEach
     void setUp() {
-        // The test schema is Hibernate-generated; the one-ACTIVE-connection-per-Slack-team index is Liquibase's.
-        jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_connection_one_active_slack_per_team"
-                + " ON connection (instance_key) WHERE state = 'ACTIVE' AND kind = 'SLACK'");
+        // The test schema is Hibernate-generated; the one-ACTIVE-connection-per-Slack-team index is
+        // Liquibase's.
+        jdbcTemplate.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_connection_one_active_slack_per_team ON"
+                + " connection (instance_key) WHERE state = 'ACTIVE' AND kind = 'SLACK'");
         team = "T" + System.nanoTime();
         when(slackOAuthClient.exchangeCode(any(), any()))
                 .thenReturn(new OAuthV2Access(
@@ -149,7 +153,8 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
                 .containsEntry("reason", "connected_elsewhere")
                 .containsEntry(
                         "description",
-                        "This Slack workspace is already connected to the Hephaestus workspace \"Staging\" ("
+                        "This Slack workspace is already connected to the Hephaestus workspace"
+                                + " \"Staging\" ("
                                 + source.getWorkspaceSlug()
                                 + "). Disconnect Slack there before you connect it here.");
         assertThat(connectionRepository.findActive(target.getId(), IntegrationKind.SLACK))
@@ -157,8 +162,9 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
     }
 
     /**
-     * An install into {@code source} that already passed its ownership check holds the index entry uncommitted;
-     * the install into {@code target} passes its own check, blocks on that entry, and fails once it commits.
+     * An install into {@code source} that already passed its ownership check holds the index entry
+     * uncommitted; the install into {@code target} passes its own check, blocks on that entry, and
+     * fails once it commits.
      */
     @Test
     void shouldReportTheSameConflictWhenAConcurrentInstallCommitsFirst() throws Exception {
@@ -196,8 +202,9 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
     }
 
     /**
-     * The same team reauthorized in its own workspace replaces the token on the row that holds it — reached directly
-     * while active, and through a fresh pending placeholder and the team's natural key while suspended.
+     * The same team reauthorized in its own workspace replaces the token on the row that holds it —
+     * reached directly while active, and through a fresh pending placeholder and the team's natural
+     * key while suspended.
      */
     @ParameterizedTest
     @EnumSource(
@@ -226,7 +233,10 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
                 .isEqualTo(new ConnectionConfig.SlackConfig(team, "Intro Course", null, Set.of()));
     }
 
-    /** Completes a real callback and returns the workspace's one Slack row, which must be {@code existing}. */
+    /**
+     * Completes a real callback and returns the workspace's one Slack row, which must be {@code
+     * existing}.
+     */
     private Connection reauthorize(Workspace workspace, User admin, Connection existing) {
         webTestClient
                 .get()
@@ -240,7 +250,7 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
                 .isFound()
                 .expectBody(Void.class);
         assertThat(jdbcTemplate.queryForList(
-                        "SELECT id FROM connection WHERE workspace_id = ? AND kind = 'SLACK'",
+                        "SELECT id FROM connection WHERE workspace_id = ? AND kind =" + " 'SLACK'",
                         Long.class,
                         workspace.getId()))
                 .containsExactly(existing.getId());
@@ -255,8 +265,8 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
     private void awaitBlockedOn(String xid, CompletableFuture<?> waiter) throws InterruptedException {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(30));
         while (Objects.requireNonNull(jdbcTemplate.queryForObject(
-                        "SELECT count(*) FROM pg_locks WHERE locktype = 'transactionid' AND NOT granted"
-                                + " AND transactionid::text = ?",
+                        "SELECT count(*) FROM pg_locks WHERE locktype = 'transactionid' AND"
+                                + " NOT granted AND transactionid::text = ?",
                         Long.class,
                         xid))
                 == 0) {

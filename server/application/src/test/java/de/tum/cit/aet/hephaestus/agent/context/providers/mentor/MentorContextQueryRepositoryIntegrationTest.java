@@ -132,8 +132,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private ChatThread seedThreadWithUserMessage(String firstPrompt) {
-        ChatThread thread =
-                persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, Set.of(user.getId()), firstPrompt);
+        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), firstPrompt);
         persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null, admittedMentorConfig());
         return thread;
     }
@@ -167,8 +166,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         other.setAccountLogin("other-org");
         other.setAccountType(AccountType.ORG);
         other = workspaceRepository.save(other);
-        ChatThread foreign = persistence.ensureThread(
-                other.getId(), UUID.randomUUID(), user, Set.of(user.getId()), "foreign prompt");
+        ChatThread foreign = persistence.ensureThread(other.getId(), UUID.randomUUID(), user.getId(), "foreign prompt");
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(

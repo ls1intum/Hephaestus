@@ -277,7 +277,8 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         @DisplayName(
-                "No shell-side credential export — LLM_PROXY_URL/TOKEN come from NetworkPolicy, not AGENT_BUDGET_MS env")
+                "No shell-side credential export — LLM_PROXY_URL/TOKEN come from NetworkPolicy, not AGENT_BUDGET_MS"
+                        + " env")
         void noLegacyProviderEnvVars() {
             var env = factory.build(spec("openai-completions", "gpt-x", false)).environment();
             assertThat(env)

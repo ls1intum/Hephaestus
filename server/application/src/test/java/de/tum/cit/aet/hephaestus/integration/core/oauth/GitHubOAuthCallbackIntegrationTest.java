@@ -5,7 +5,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -36,8 +36,8 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.web.util.UriBuilder;
 
 /**
- * Connecting a GitHub App installation through the callback. Only GitHub's answers about the authorizing person are a
- * double; state signing, the callback and persistence are real.
+ * Connecting a GitHub App installation through the callback. Only GitHub's answers about the
+ * authorizing person are a double; state signing, the callback and persistence are real.
  */
 class GitHubOAuthCallbackIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -51,7 +51,7 @@ class GitHubOAuthCallbackIntegrationTest extends AbstractWorkspaceIntegrationTes
     private ConnectionRepository connectionRepository;
 
     @Autowired
-    private IdentityLinkRepository identityLinks;
+    private IdentityRepository identityLinks;
 
     @Autowired
     private GitHubAppUserAuthorizationClient userAuthorization;
@@ -135,8 +135,8 @@ class GitHubOAuthCallbackIntegrationTest extends AbstractWorkspaceIntegrationTes
         ProblemDetail problem = jsonCallback(target, stranger, 409);
 
         assertThat(problem.getDetail())
-                .isEqualTo("This GitHub App installation is already connected to another Hephaestus workspace."
-                        + " A workspace admin there must disconnect GitHub first.");
+                .isEqualTo("This GitHub App installation is already connected to another Hephaestus"
+                        + " workspace. A workspace admin there must disconnect GitHub first.");
         assertThat(problem.getProperties()).containsEntry("error", "connected_elsewhere");
         assertThat(connectionRepository.findActive(target.getId(), IntegrationKind.GITHUB))
                 .isEmpty();

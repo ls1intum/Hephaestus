@@ -10,7 +10,7 @@ import {
 	LEGACY_CONTRACT_ERROR,
 	REASONS,
 	type ExecutionEntry,
-} from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
+} from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { PRACTICES_DIR } from "./golden-review-workspace.ts";
 import {
 	capturedLines,
@@ -36,7 +36,7 @@ after(() => {
 });
 
 /** A program whose `review()` asks for a review with a prepared direction, and returns its result. */
-const REVIEWING_PROGRAM = `import { definePracticeScript } from "../lib/practice-script.ts";
+const REVIEWING_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
@@ -46,7 +46,7 @@ export default definePracticeScript({
 `;
 
 /** A program written for the retired leads contract. */
-const LEGACY_PROGRAM = `import { definePracticeScript } from "../lib/practice-script.ts";
+const LEGACY_PROGRAM = `import { definePracticeScript } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: { version: 1, kinds: { call: "An added call." } },
 	async run() {
@@ -123,12 +123,12 @@ void test("a custom program that returns a result directly opens no session, and
 			{
 				practiceSlug: "a-direct",
 				candidate: {
-					outcome: "NOT_APPLICABLE",
+					outcome: "DOES_NOT_APPLY",
 					summary: "No user interface changes; note none",
 					citations: [
 						{
 							sourceKind: "scm.pull-request.core",
-							artifactPath: "evidence/metadata.json",
+							sourcePath: "evidence/metadata.json",
 							startLine: 1,
 							endLine: 1,
 						},
@@ -144,7 +144,7 @@ void test("a custom program that returns a result directly opens no session, and
 		{
 			practiceSlug: "a-direct",
 			program: { kind: "custom", digest: digestOf(main.cwd, "a-direct") },
-			models: [{ slot: "chat", need: "optional", bound: false, notRated: {} }],
+			models: [{ slot: "chat", need: "optional", bound: false, failures: {} }],
 			status: "ok",
 			stopReason: null,
 			calls: noCalls,
@@ -241,7 +241,7 @@ void test("the admission request is result.json and review-state.json, sorted by
 	assert.deepEqual(readJsonFile(main.cwd, "out/result.json"), body);
 	assert.deepEqual(readJsonFile(main.cwd, "out/review-state.json"), body);
 	assert.partialDeepStrictEqual(body, {
-		schemaVersion: 2,
+		contractVersion: 3,
 		results: [{ practiceSlug: "a-direct" }, { practiceSlug: "b-builtin" }],
 	});
 	assert.equal(field(admission, "reviewInputPresent"), false);
@@ -289,7 +289,12 @@ void test("a composition continuation derives no change, runs no program and wri
 		(cwd) => {
 			writeFileSync(
 				nodePath.join(cwd, "evidence/composition-continuation.json"),
-				JSON.stringify({ schemaVersion: 2, admissionDigest: "digest", results: [], withheld: [] }),
+				JSON.stringify({
+					contractVersion: 3,
+					admissionDigest: "digest",
+					admitted: [],
+					withheld: [],
+				}),
 			);
 		},
 	);

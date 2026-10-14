@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.conversation;
 
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationCandidateSource;
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationCandidateSource;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationThreadCandidate;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import java.util.Arrays;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 
 /**
  * Slack-owned implementation of the agent {@link ConversationCandidateSource} SPI, over Slack's own
- * {@code slack_thread}/{@code slack_message} tables. The agent {@code ConversationThreadTriggerScheduler} consumes
+ * {@code slack_thread}/{@code slack_message} tables. The provider {@code SlackThreadEventScheduler} consumes
  * it through the SPI to enqueue {@code CONVERSATION_REVIEW} jobs and never reaches into the Slack schema.
  *
  * <p>{@link #settledCandidates} is an inherently cross-workspace sweep (each candidate carries its own
@@ -47,7 +47,7 @@ public class SlackConversationCandidateSource implements ConversationCandidateSo
                 row.getSlackThreadTs(),
                 row.getLastTs(),
                 row.getLastReviewedTs(),
-                Arrays.stream(row.getParticipantMemberIds()).boxed().toList());
+                Arrays.stream(row.getParticipantAccountIds()).boxed().toList());
     }
 
     @Override

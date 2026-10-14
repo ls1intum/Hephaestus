@@ -6,6 +6,9 @@
  * SQL against the Slack tables from {@code agent} would couple to another module's schema where the Modulith
  * import check, which reads Java imports, cannot see it.
  */
-@org.springframework.modulith.NamedInterface("conversation-source")
-@org.jspecify.annotations.NullMarked
+@NamedInterface("conversation-source")
+@NullMarked
 package de.tum.cit.aet.hephaestus.agent.conversation;
+
+import org.jspecify.annotations.NullMarked;
+import org.springframework.modulith.NamedInterface;

@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -31,11 +31,11 @@ public class WorkspaceReviewDefaultsProvider {
      * {@link #forWorkspace}, which answers what is in force rather than whether anybody decided it.
      */
     @Transactional(readOnly = true)
-    public @Nullable PracticeAutonomy rawDefaultAutonomy(Long workspaceId) {
+    public @Nullable FeedbackMode rawDefaultFeedbackMode(Long workspaceId) {
         return workspaceRepository
                 .findById(workspaceId)
-                .map(workspace -> workspace.getReviewSettings().getDefaultAutonomy())
-                .map(PracticeAutonomy::valueOf)
+                .map(workspace -> workspace.getReviewSettings().getDefaultFeedbackMode())
+                .map(FeedbackMode::valueOf)
                 .orElse(null);
     }
 }

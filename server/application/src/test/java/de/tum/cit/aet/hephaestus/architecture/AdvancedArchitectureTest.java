@@ -210,7 +210,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         return;
                     }
 
-                    // Sub-SPI interfaces (e.g. family-typed extensions like ScmFeedbackChannel,
+                    // Sub-SPI interfaces (e.g. family-typed domain contracts,
                     // sealed permits like FeedbackAnchor.DocumentAnchor) are contracts, not adapters.
                     if (javaClass.isInterface()) {
                         return;
@@ -248,8 +248,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                             || // IntegrationManifest impls + bootstrap utilities
                             javaClass.getPackageName().contains(".registry")
                             || // ConnectionPurgeContributor lives with the entity
-                            // A domain descriptor belongs beside the artifact it describes, not in a vendor package.
-                            javaClass.getSimpleName().endsWith("ArtifactDescriptor")
+                            // A domain descriptor belongs beside the item it describes, not in a vendor package.
+                            javaClass.getSimpleName().endsWith("ItemDescriptor")
                             || javaClass.getSimpleName().endsWith("Adapter")
                             || javaClass.getSimpleName().endsWith("Provider")
                             || javaClass.getSimpleName().endsWith("Tracker")
@@ -432,7 +432,8 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "%s is an integration test but does not declare a Spring slice, integration tag, or full-context base",
+                                                "%s is an integration test but does not declare a Spring slice,"
+                                                        + " integration tag, or full-context base",
                                                 javaClass.getSimpleName())));
                             }
                         }

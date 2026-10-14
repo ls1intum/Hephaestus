@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Pins vendor-neutrality of {@code integration.core.**}. {@code integration.scm.domain.**}
- * is intentionally allowed — it is the cross-vendor SCM domain layer.
+ * belongs to a domain module and is reached through neutral ports.
  */
 class IntegrationCoreVendorNeutralityTest extends HephaestusArchitectureTest {
 
@@ -21,7 +21,9 @@ class IntegrationCoreVendorNeutralityTest extends HephaestusArchitectureTest {
                 .should()
                 .dependOnClassesThat()
                 .resideInAnyPackage(
-                        "de.tum.cit.aet.hephaestus.integration.scm.github..",
+                        "de.tum.cit.aet.hephaestus.integration.scm..",
+                        "de.tum.cit.aet.hephaestus.integration.chat..",
+                        "de.tum.cit.aet.hephaestus.integration.docs..",
                         "de.tum.cit.aet.hephaestus.integration.scm.gitlab..",
                         "de.tum.cit.aet.hephaestus.integration.slack..",
                         "de.tum.cit.aet.hephaestus.integration.outline..")

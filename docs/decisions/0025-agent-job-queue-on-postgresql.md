@@ -9,7 +9,7 @@
 
 The practice-review agent job queue ran on a NATS JetStream stream
 (`AGENT`) that carried nothing but job ids: a worker pulled an id off the stream, then loaded the
-actual `agent_job` row from PostgreSQL to do anything with it. The `agent_job` table was already
+actual `review_job` row from PostgreSQL to do anything with it. The `review_job` table was already
 the source of truth for job state, retry count, and outcome — JetStream only decided *which*
 worker got to claim *which* id next, a job JetStream is not needed for once the claiming worker
 reads and writes the same database the job lives in.
@@ -46,9 +46,9 @@ That left two systems asked to agree about one queue:
 ## Considered options
 
 1. **Keep JetStream, harden it** — add a Postgres-side reconciliation pass that periodically
-   re-validates every claimed id against the `agent_job` table, on top of the existing ack/retry
+   re-validates every claimed id against the `review_job` table, on top of the existing ack/retry
    config. Closes the drift risk but keeps both systems and their independent tuning knobs.
-2. **Poll-based delivery straight from `agent_job`** — each worker replica polls the table on an
+2. **Poll-based delivery straight from `review_job`** — each worker replica polls the table on an
    interval, claims a batch with `FOR UPDATE SKIP LOCKED`, and the same table row is the only place
    retry count, ownership, and outcome live.
 3. **Move to a different broker** — out of scope; would trade one duplicated-truth problem for
@@ -56,7 +56,7 @@ That left two systems asked to agree about one queue:
 
 ## Decision
 
-Option 2. The agent job queue is delivered by polling `agent_job` directly:
+Option 2. The agent job queue is delivered by polling `review_job` directly:
 
 - `AGENT_ENABLED` (default `false`) replaces `AGENT_NATS_ENABLED` as the flag that lets a JVM
   claim and execute jobs, combined with the worker runtime role exactly as before
@@ -67,7 +67,7 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
   `FOR UPDATE SKIP LOCKED`, so replicas divide the backlog instead of contending for it.
 - `AGENT_MAX_RETRIES` (default `5`) replaces JetStream's `max-deliver` as the bound on how many
   times a job is retried before it is left failed.
-- **Eligibility is a column, not a timer.** `agent_job.available_at` gates the candidate query, so a
+- **Eligibility is a column, not a timer.** `review_job.available_at` gates the candidate query, so a
   requeue (orphan recovery, worker drain, classified infra failure) schedules its own next attempt
   with backoff instead of becoming instantly reclaimable. This is what replaces JetStream's
   `ack-wait`.
@@ -104,14 +104,14 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
 **Negative / accepted.**
 
 - **Polling load.** Every eligible replica runs one cheap, indexed query per `AGENT_POLL_INTERVAL`
-  (default: once a second) against `agent_job`, whether or not there is work. This scales linearly
+  (default: once a second) against `review_job`, whether or not there is work. This scales linearly
   with worker replica count; it does not scale with job volume, so it stays cheap at the replica
   counts this system operates at today.
 - **No push-based wakeup.** A job submitted the instant after a poll waits out the rest of the
   interval rather than being dispatched immediately, unlike JetStream's push consumer. Acceptable
   given the default 1s interval against jobs that run for minutes.
 - **The queue is now our table to keep small.** A broker expired its own messages; a table does not.
-  `agent_job` therefore carries a retention obligation the stream used to absorb — `AgentJobRetentionService`
+  `review_job` therefore carries a retention obligation the stream used to absorb — `AgentJobRetentionService`
   strips heavy payload columns past `AGENT_PAYLOAD_RETENTION` (default `P14D`) and deletes terminal
   rows past `AGENT_ROW_RETENTION` (default `P90D`), and the table is autovacuum-tuned for its churn.
   Retention on a queue table is a correctness surface, not housekeeping: it must never delete a row
@@ -136,7 +136,7 @@ Option 2. The agent job queue is delivered by polling `agent_job` directly:
 
 ## Revisit trigger
 
-Worker replica count grows to where polling load on `agent_job` becomes measurable against the
+Worker replica count grows to where polling load on `review_job` becomes measurable against the
 database's own budget; or a push-based wakeup (e.g. `LISTEN`/`NOTIFY`) becomes worth the added
 complexity to shave the poll-interval latency off job start; or a tenant's wait behind a busy
 workspace becomes a real complaint, at which point per-workspace fairness lanes (round-robin or

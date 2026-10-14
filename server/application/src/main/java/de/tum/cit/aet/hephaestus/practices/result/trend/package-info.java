@@ -56,5 +56,7 @@
  * reachable at that size it never changed a verdict. {@code UNCERTAIN} carries the first case honestly and
  * {@code TrendSupport}'s counts carry the second.
  */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package de.tum.cit.aet.hephaestus.practices.result.trend;
+
+import org.jspecify.annotations.NullMarked;

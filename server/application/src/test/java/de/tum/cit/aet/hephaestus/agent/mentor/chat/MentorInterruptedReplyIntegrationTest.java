@@ -10,9 +10,8 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
@@ -39,8 +38,8 @@ class MentorInterruptedReplyIntegrationTest extends AbstractWorkspaceIntegration
                 createWorkspace("interrupted-reply", "Interrupted Reply", "org-ir", AccountType.ORG, mentor);
         ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
         UUID threadId = UUID.randomUUID();
-        ChatThread thread = persistence.ensureThread(
-                workspace.getId(), threadId, mentor, Set.of(mentor.getId()), "How do I link issues?");
+        ChatThread thread =
+                persistence.ensureThread(workspace.getId(), threadId, mentor.getId(), "How do I link issues?");
         UUID assistantId = UUID.randomUUID();
         var cookie =
                 persistence.persistInFlight(thread, "How do I link issues?", assistantId, null, admittedMentorConfig());

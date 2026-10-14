@@ -1,6 +1,6 @@
 // Options a program may not set: provider options, headers (another practice's name among them), a
 // huge output. The host drops or caps them.
-import { definePracticeScript, generateText } from "../lib/practice-script.ts";
+import { definePracticeScript, generateText } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { chat: "required" } },

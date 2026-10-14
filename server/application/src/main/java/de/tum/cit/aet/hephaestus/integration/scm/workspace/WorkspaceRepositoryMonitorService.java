@@ -1,0 +1,760 @@
+package de.tum.cit.aet.hephaestus.integration.scm.workspace;
+
+import static de.tum.cit.aet.hephaestus.core.TransactionCallbacks.afterCommit;
+
+import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.connection.SourceProviderNamespaces;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationRepositoryEnumerator;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InstallationSuspensionTracker;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
+import de.tum.cit.aet.hephaestus.integration.core.spi.WorkspaceDataSyncTrigger;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.events.RepositoryAboutToBeDeletedEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
+import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
+import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryManagementNotAllowedException;
+import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryProviderNotConnectedException;
+import io.micrometer.common.util.StringUtils;
+import java.util.Collection;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+
+/**
+ * Manages monitored repositories within workspaces. All methods take workspace slug/context as
+ * parameters to identify which workspace to operate on.
+ */
+@Service
+@WorkspaceAgnostic("Manages workspace-repository mapping configuration")
+public class WorkspaceRepositoryMonitorService {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkspaceRepositoryMonitorService.class);
+    private static final String GITHUB_SERVER_URL = "https://github.com";
+
+    private final NatsConnectionProperties natsProperties;
+
+    private final WorkspaceRepository workspaceRepository;
+    private final RepositoryToMonitorRepository repositoryToMonitorRepository;
+    private final RepositoryRepository repositoryRepository;
+    private final IdentityProviderRepository gitProviderRepository;
+
+    // natsConsumerService absent under webhook profile.
+    private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
+    private final WorkspaceScopeFilter workspaceScopeFilter;
+    private final GitRepositoryManager gitRepositoryManager;
+
+    /**
+     * Per-kind ports. The workspace module never imports a vendor-specific service —
+     * installation-bound operations dispatch by the workspace's bound kind. A missing impl for a
+     * given kind is treated as "this kind doesn't support installation-bound operations" (e.g.
+     * GitLab PAT) rather than an error.
+     */
+    private final Map<IntegrationKind, InstallationSuspensionTracker> suspensionTrackers;
+
+    private final Map<IntegrationKind, InstallationRepositoryEnumerator> installationEnumerators;
+    private final Map<IntegrationKind, WorkspaceDataSyncTrigger> dataSyncTriggers;
+    private final ApplicationEventPublisher eventPublisher;
+
+    private final ConnectionService connectionService;
+    private final ConnectionRepository connectionRepository;
+    private final TransactionTemplate transactionTemplate;
+
+    public WorkspaceRepositoryMonitorService(
+            NatsConnectionProperties natsProperties,
+            WorkspaceRepository workspaceRepository,
+            RepositoryToMonitorRepository repositoryToMonitorRepository,
+            RepositoryRepository repositoryRepository,
+            IdentityProviderRepository gitProviderRepository,
+            ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
+            WorkspaceScopeFilter workspaceScopeFilter,
+            GitRepositoryManager gitRepositoryManager,
+            ConnectionService connectionService,
+            ConnectionRepository connectionRepository,
+            List<InstallationSuspensionTracker> suspensionTrackerList,
+            List<InstallationRepositoryEnumerator> installationEnumeratorList,
+            List<WorkspaceDataSyncTrigger> dataSyncTriggerList,
+            ApplicationEventPublisher eventPublisher,
+            TransactionTemplate transactionTemplate) {
+        this.natsProperties = natsProperties;
+        this.workspaceRepository = workspaceRepository;
+        this.repositoryToMonitorRepository = repositoryToMonitorRepository;
+        this.repositoryRepository = repositoryRepository;
+        this.gitProviderRepository = gitProviderRepository;
+        this.natsConsumerService = natsConsumerService;
+        this.workspaceScopeFilter = workspaceScopeFilter;
+        this.gitRepositoryManager = gitRepositoryManager;
+        this.connectionService = connectionService;
+        this.connectionRepository = connectionRepository;
+        this.eventPublisher = eventPublisher;
+        this.transactionTemplate = transactionTemplate;
+
+        Map<IntegrationKind, InstallationSuspensionTracker> suspensionMap = new EnumMap<>(IntegrationKind.class);
+        for (InstallationSuspensionTracker t : suspensionTrackerList) {
+            suspensionMap.put(t.kind(), t);
+        }
+        this.suspensionTrackers = suspensionMap;
+
+        Map<IntegrationKind, InstallationRepositoryEnumerator> enumeratorMap = new EnumMap<>(IntegrationKind.class);
+        for (InstallationRepositoryEnumerator e : installationEnumeratorList) {
+            enumeratorMap.put(e.kind(), e);
+        }
+        this.installationEnumerators = enumeratorMap;
+
+        Map<IntegrationKind, WorkspaceDataSyncTrigger> triggerMap = new EnumMap<>(IntegrationKind.class);
+        for (WorkspaceDataSyncTrigger t : dataSyncTriggerList) {
+            triggerMap.put(t.kind(), t);
+        }
+        this.dataSyncTriggers = triggerMap;
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getMonitoredRepositories(String slug) {
+        Workspace workspace = requireWorkspace(slug);
+        log.debug(
+                "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
+                workspace.getId(),
+                LoggingUtils.sanitizeForLog(slug));
+        return workspace.getRepositoriesToMonitor().stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> getMonitoredRepositories(WorkspaceContext workspaceContext) {
+        String slug = requireSlug(workspaceContext);
+        Workspace workspace = requireWorkspace(slug);
+        log.debug(
+                "Retrieved monitored repositories: workspaceId={}, workspaceSlug={}",
+                workspace.getId(),
+                LoggingUtils.sanitizeForLog(slug));
+        return workspace.getRepositoriesToMonitor().stream()
+                .map(RepositoryToMonitor::getNameWithOwner)
+                .toList();
+    }
+
+    public void addRepositoryToMonitor(String slug, String nameWithOwner)
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+        Workspace workspace = requireWorkspace(slug);
+
+        if (isGitHubAppWorkspace(workspace)) {
+            throw new RepositoryManagementNotAllowedException(slug);
+        }
+
+        IntegrationKind kind = connectionService
+                .findActiveProviderKind(workspace.getId())
+                .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+        if (kind == IntegrationKind.GITLAB) {
+            addGitLabRepositoryToMonitor(workspace, nameWithOwner);
+            return;
+        }
+
+        if (workspace.getRepositoriesToMonitor().stream()
+                .anyMatch(r -> r.getNameWithOwner().equals(nameWithOwner))) {
+            log.debug(
+                    "Skipped repository monitor addition: reason=alreadyMonitored,"
+                            + " nameWithOwner={}, workspaceId={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    workspace.getId());
+            throw new RepositoryAlreadyMonitoredException(nameWithOwner);
+        }
+
+        ConnectionConfig config = connectionRepository
+                .findActive(workspace.getId(), kind)
+                .map(connection -> connection.getConfig())
+                .orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+        IdentityProvider provider =
+                sourceProvider(kind, config).orElseThrow(() -> new RepositoryProviderNotConnectedException(slug));
+        Optional<Repository> repository = repositoryRepository.findByNameWithOwnerAndProviderId(
+                nameWithOwner, Objects.requireNonNull(provider.getId()));
+        if (repository.isEmpty()) {
+            log.debug(
+                    "Skipped repository monitor addition: reason=repositoryNotFound," + " nameWithOwner={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner));
+            throw new EntityNotFoundException("Repository", nameWithOwner);
+        }
+
+        log.info(
+                "Added repository to monitor: nameWithOwner={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspace.getId());
+
+        RepositoryToMonitor repositoryToMonitor = new RepositoryToMonitor();
+        repositoryToMonitor.setNameWithOwner(nameWithOwner);
+        repositoryToMonitor.setNativeId(repository.orElseThrow().getNativeId());
+        repositoryToMonitor.setWorkspace(workspace);
+        persistRepositoryMonitor(workspace, repositoryToMonitor, false);
+    }
+
+    /**
+     * Adds a GitLab project by name. The check and the write happen in one transaction holding the
+     * connection's lifecycle lock, which disconnect and {@code GitLabRepositoryMonitors} also take,
+     * and a project already stored for the connection's instance is recognised by its id, so a
+     * project the workspace monitors under another path is not monitored twice. A name GitLab has
+     * not reported yet is monitored without an id until GitLab reports it at that path. Only the
+     * scope consumer refresh and the sync run after the commit.
+     */
+    private void addGitLabRepositoryToMonitor(Workspace workspace, String nameWithOwner) {
+        Long workspaceId = workspace.getId();
+        RepositoryToMonitor monitor = transactionTemplate.execute(status -> {
+            ConnectionConfig config = connectionRepository
+                    .lockActiveConfig(workspaceId, IntegrationKind.GITLAB)
+                    .orElseThrow(() -> new RepositoryProviderNotConnectedException(workspace.getWorkspaceSlug()));
+            Long nativeId = sourceProvider(IntegrationKind.GITLAB, config)
+                    .flatMap(provider -> repositoryRepository.findByNameWithOwnerAndProviderId(
+                            nameWithOwner, Objects.requireNonNull(provider.getId())))
+                    .map(Repository::getNativeId)
+                    .orElse(null);
+            if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspaceId, nameWithOwner)
+                    || (nativeId != null
+                            && !repositoryToMonitorRepository
+                                    .findByWorkspaceIdAndNativeId(workspaceId, nativeId)
+                                    .isEmpty())) {
+                throw new RepositoryAlreadyMonitoredException(nameWithOwner);
+            }
+            Workspace owner = workspaceRepository
+                    .findById(workspaceId)
+                    .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId));
+            RepositoryToMonitor created = new RepositoryToMonitor();
+            created.setNameWithOwner(nameWithOwner);
+            created.setNativeId(nativeId);
+            created.setWorkspace(owner);
+            owner.getRepositoriesToMonitor().add(created);
+            return repositoryToMonitorRepository.saveAndFlush(created);
+        });
+        log.info(
+                "Added repository to monitor: nameWithOwner={}, workspaceId={}",
+                LoggingUtils.sanitizeForLog(nameWithOwner),
+                workspaceId);
+        announceRepositoryMonitor(workspace, Objects.requireNonNull(monitor), false);
+    }
+
+    public void addRepositoryToMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+        addRepositoryToMonitor(requireSlug(workspaceContext), nameWithOwner);
+    }
+
+    public void addRepositoriesToMonitor(String slug, Collection<String> namesWithOwners)
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+        for (String nameWithOwner : namesWithOwners) {
+            addRepositoryToMonitor(slug, nameWithOwner);
+        }
+    }
+
+    public void addRepositoriesToMonitor(WorkspaceContext workspaceContext, Collection<String> namesWithOwners)
+            throws RepositoryAlreadyMonitoredException, EntityNotFoundException {
+        addRepositoriesToMonitor(requireSlug(workspaceContext), namesWithOwners);
+    }
+
+    public void removeRepositoryFromMonitor(String slug, String nameWithOwner) throws EntityNotFoundException {
+        transactionTemplate.executeWithoutResult(status -> {
+            Workspace workspace = requireWorkspace(slug);
+
+            if (isGitHubAppWorkspace(workspace)) {
+                throw new RepositoryManagementNotAllowedException(slug);
+            }
+
+            RepositoryToMonitor repositoryToMonitor = workspace.getRepositoriesToMonitor().stream()
+                    .filter(r -> r.getNameWithOwner().equals(nameWithOwner))
+                    .findFirst()
+                    .orElse(null);
+
+            if (repositoryToMonitor == null) {
+                log.debug(
+                        "Skipped repository monitor removal: reason=notMonitored,"
+                                + " nameWithOwner={}, workspaceId={}",
+                        LoggingUtils.sanitizeForLog(nameWithOwner),
+                        workspace.getId());
+                throw new EntityNotFoundException("Repository", nameWithOwner);
+            }
+
+            log.info(
+                    "Removed repository from monitor: nameWithOwner={}, workspaceId={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    workspace.getId());
+
+            List<Long> repositoryIds =
+                    repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(repositoryToMonitor.getId());
+            deleteRepositoryMonitor(workspace, repositoryToMonitor);
+            repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
+        });
+    }
+
+    public void removeRepositoryFromMonitor(WorkspaceContext workspaceContext, String nameWithOwner)
+            throws EntityNotFoundException {
+        removeRepositoryFromMonitor(requireSlug(workspaceContext), nameWithOwner);
+    }
+
+    /**
+     * Provider events preserve the native identity; a reused path is not the removed repository.
+     */
+    @Transactional
+    public Optional<Workspace> removeRepositoryMonitorForInstallation(
+            long installationId, String nameWithOwner, @Nullable Long expectedNativeId) {
+        return removeRepositoryMonitorInTransaction(installationId, nameWithOwner, expectedNativeId);
+    }
+
+    private Optional<Workspace> removeRepositoryMonitorInTransaction(
+            long installationId, String nameWithOwner, @Nullable Long expectedNativeId) {
+        if (StringUtils.isBlank(nameWithOwner)) {
+            return Optional.empty();
+        }
+
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
+        if (workspaceOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        Workspace workspace = workspaceOpt.get();
+        var monitorOpt =
+                repositoryToMonitorRepository.findByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner);
+        if (monitorOpt.isEmpty()) {
+            return workspaceOpt;
+        }
+
+        RepositoryToMonitor monitor = monitorOpt.get();
+        if (expectedNativeId != null) {
+            boolean matches = monitor.getNativeId() != null
+                    ? expectedNativeId.equals(monitor.getNativeId())
+                    : repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId()).stream()
+                            .map(repositoryRepository::findById)
+                            .flatMap(Optional::stream)
+                            .anyMatch(repository -> expectedNativeId.equals(repository.getNativeId()));
+            if (!matches) {
+                log.debug(
+                        "Skipped repository removal: reason=identityMismatch, workspaceId={}," + " monitorId={}",
+                        workspace.getId(),
+                        monitor.getId());
+                return workspaceOpt;
+            }
+        }
+        List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId());
+        var result = removeRepositoryMonitorInternal(workspace, monitor);
+        repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
+
+        return result;
+    }
+
+    /**
+     * Remove all repository monitors tied to an installation and optionally delete orphaned
+     * repositories.
+     *
+     * @param installationId the GitHub App installation ID
+     * @param deleteRepositories if true, also delete Repository entities that are no longer
+     *     monitored by any workspace
+     */
+    @Transactional
+    public Optional<Workspace> removeAllRepositoriesFromMonitor(long installationId, boolean deleteRepositories) {
+        return removeAllRepositoriesInTransaction(installationId, deleteRepositories);
+    }
+
+    private Optional<Workspace> removeAllRepositoriesInTransaction(long installationId, boolean deleteRepositories) {
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
+        workspaceOpt.ifPresent(workspace -> {
+            List<RepositoryToMonitor> monitors = repositoryToMonitorRepository.findByWorkspaceId(workspace.getId());
+            for (RepositoryToMonitor monitor : monitors) {
+                List<Long> repositoryIds = deleteRepositories
+                        ? repositoryToMonitorRepository.findSourceRepositoryIdsOfMonitor(monitor.getId())
+                        : List.of();
+                deleteRepositoryMonitor(workspace, monitor);
+                repositoryIds.forEach(this::deleteRepositoryIfOrphaned);
+            }
+        });
+        return workspaceOpt;
+    }
+
+    /**
+     * Creates a Repository entity and corresponding RepositoryToMonitor from a provisioning
+     * snapshot (webhook metadata). Idempotent: an existing repository is updated with the snapshot
+     * data; an existing monitor is left alone.
+     */
+    @Transactional
+    public void ensureRepositoryAndMonitorFromSnapshot(
+            long installationId, ProvisioningListener.RepositorySnapshot snapshot) {
+        if (snapshot == null || StringUtils.isBlank(snapshot.nameWithOwner())) {
+            return;
+        }
+
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
+        if (workspaceOpt.isEmpty()) {
+            return;
+        }
+
+        Workspace workspace = workspaceOpt.get();
+
+        IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException(
+                        "GitHub is not set up on this instance. Ask your" + " instance operator to set it up."));
+
+        ensureRepositoryFromSnapshot(
+                workspace, provider, snapshot.id(), snapshot.nameWithOwner(), snapshot.name(), snapshot.isPrivate());
+
+        ensureRepositoryMonitorInternal(workspace, provider, snapshot.nameWithOwner(), true);
+    }
+
+    /**
+     * Enumerate all repositories available to the installation when repository selection is ALL and
+     * ensure monitors exist.
+     *
+     * @param installationId the GitHub App installation ID
+     * @param protectedRepositories repositories to keep even if not in installation (can be null)
+     * @param deferSync if true, skip immediate sync (use during provisioning when activation will
+     *     sync in bulk)
+     */
+    @Transactional
+    public void ensureAllInstallationRepositoriesCovered(
+            long installationId, @Nullable Collection<String> protectedRepositories, boolean deferSync) {
+        // Check suspension BEFORE adding repos so NATS replay of old "created" events
+        // cannot trigger hundreds of failed syncs.
+        if (isInstallationSuspended(installationId)) {
+            log.info(
+                    "Skipped repository enumeration: reason=installationSuspended," + " installationId={}",
+                    installationId);
+            return;
+        }
+
+        var workspaceOpt = workspaceRepository.findActiveByInstallationIdForUpdate(installationId);
+        if (workspaceOpt.isEmpty()) {
+            return;
+        }
+
+        Workspace workspace = workspaceOpt.get();
+        if (!isGitHubAppWorkspace(workspace)) {
+            return;
+        }
+
+        InstallationRepositoryEnumerator enumerator = installationEnumerators.get(IntegrationKind.GITHUB);
+        if (enumerator == null) {
+            log.debug(
+                    "Skipped repository enumeration: reason=noEnumeratorForKind, installationId={}," + " kind={}",
+                    installationId,
+                    IntegrationKind.GITHUB);
+            return;
+        }
+        var snapshots = enumerator.enumerate(installationId);
+        if (snapshots.isEmpty()) {
+            log.warn(
+                    "Skipped repository enumeration: reason=noDataReturned, installationId={}," + " workspaceSlug={}",
+                    installationId,
+                    LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()));
+            return;
+        }
+
+        // Filter snapshots BEFORE processing to avoid creating Repository entities for filtered
+        // repos
+        List<InstallationRepositoryEnumerator.InstallationRepository> allowedSnapshots = snapshots.stream()
+                .filter(s -> workspaceScopeFilter.isRepositoryAllowed(s.nameWithOwner()))
+                .toList();
+
+        if (allowedSnapshots.size() < snapshots.size()) {
+            log.debug(
+                    "Filtered repositories during enumeration: allowed={}, total={}," + " installationId={}",
+                    allowedSnapshots.size(),
+                    snapshots.size(),
+                    installationId);
+        }
+
+        Set<String> desiredRepositories = allowedSnapshots.stream()
+                .map(snapshot -> snapshot.nameWithOwner())
+                .filter(name -> !StringUtils.isBlank(name))
+                .map(name -> name.toLowerCase(Locale.ENGLISH))
+                .collect(Collectors.toSet());
+
+        if (protectedRepositories != null) {
+            protectedRepositories.stream()
+                    .filter(name -> !StringUtils.isBlank(name))
+                    .filter(name -> workspaceScopeFilter.isRepositoryAllowed(name))
+                    .map(name -> name.toLowerCase(Locale.ENGLISH))
+                    .forEach(desiredRepositories::add);
+        }
+
+        IdentityProvider provider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, GITHUB_SERVER_URL)
+                .orElseThrow(() -> new IllegalStateException(
+                        "GitHub is not set up on this instance. Ask your" + " instance operator to set it up."));
+
+        allowedSnapshots.forEach(snapshot -> {
+            ensureRepositoryFromSnapshot(
+                    workspace,
+                    provider,
+                    snapshot.id(),
+                    snapshot.nameWithOwner(),
+                    snapshot.name(),
+                    snapshot.isPrivate());
+            ensureRepositoryMonitorInternal(workspace, provider, snapshot.nameWithOwner(), deferSync);
+        });
+
+        repositoryToMonitorRepository.findByWorkspaceId(workspace.getId()).stream()
+                .filter(monitor -> !StringUtils.isBlank(monitor.getNameWithOwner()))
+                .filter(monitor ->
+                        !desiredRepositories.contains(monitor.getNameWithOwner().toLowerCase(Locale.ENGLISH)))
+                .forEach(monitor ->
+                        removeRepositoryMonitorInTransaction(installationId, monitor.getNameWithOwner(), null));
+    }
+
+    private Optional<IdentityProvider> sourceProvider(IntegrationKind kind, ConnectionConfig config) {
+        return PersonSourceNamespace.from(kind.name(), SourceProviderNamespaces.configuredUrl(config))
+                .flatMap(namespace -> gitProviderRepository.findByTypeAndServerUrl(
+                        IdentityProviderType.from(kind), namespace.serverUrl()));
+    }
+
+    /**
+     * Best-effort capture of the provider's stable repository id ({@code native_id}) at
+     * monitor-creation time by resolving the (already-upserted) domain {@link Repository} by name
+     * on the workspace's provider. A repository of the same name on another provider does not
+     * count: its id would hide the monitored one from every scoped query ({@code
+     * MonitoredRepositoryScope}). Returns {@code null} when the repository is not yet known locally
+     * on that provider, in which case the periodic sync backfills it later via {@link
+     * de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider#reconcileSyncTargetIdentity}.
+     */
+    @Nullable
+    private Long resolveNativeId(String nameWithOwner, @Nullable IdentityProvider provider) {
+        if (StringUtils.isBlank(nameWithOwner) || provider == null || provider.getId() == null) {
+            return null;
+        }
+        return repositoryRepository
+                .findByNameWithOwnerAndProviderId(nameWithOwner, provider.getId())
+                .map(Repository::getNativeId)
+                .orElse(null);
+    }
+
+    private boolean shouldUseNats(Workspace workspace) {
+        return natsProperties.enabled() && workspace != null;
+    }
+
+    /**
+     * Deletes an exact source repository only after its last matching monitor is removed. Callers
+     * capture its internal id before removal and flush that removal before this check. A same-named
+     * row on another provider is neither a deletion target nor proof that this source remains
+     * monitored.
+     */
+    public void deleteRepositoryIfOrphaned(Long repositoryId) {
+        long monitorCount = repositoryToMonitorRepository.countForRepository(repositoryId);
+        if (monitorCount > 0) {
+            log.debug(
+                    "Skipped repository deletion: reason=stillMonitored, repositoryId={}," + " monitorCount={}",
+                    repositoryId,
+                    monitorCount);
+            return;
+        }
+        repositoryRepository.findById(repositoryId).ifPresent(repository -> {
+            gitRepositoryManager.deleteOrphanedRepository(repositoryId);
+            eventPublisher.publishEvent(new RepositoryAboutToBeDeletedEvent(repositoryId));
+            repositoryRepository.delete(repository);
+            log.debug("Deleted orphaned repository: repositoryId={}", repositoryId);
+        });
+    }
+
+    /**
+     * Persist a repository monitor and optionally trigger immediate sync.
+     *
+     * @param deferSync if true, skip immediate sync (useful during provisioning when activation
+     *     will sync all repositories in bulk)
+     */
+    private void persistRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
+        // Use saveAndFlush to force immediate constraint check so callers can catch
+        // DataIntegrityViolationException
+        repositoryToMonitorRepository.saveAndFlush(monitor);
+        workspace.getRepositoriesToMonitor().add(monitor);
+        workspaceRepository.save(workspace);
+        announceRepositoryMonitor(workspace, monitor, deferSync);
+    }
+
+    /**
+     * Refreshes the scope consumer for a stored monitor and starts its sync unless {@code
+     * deferSync}; persists neither the monitor nor its workspace. The consumer reads its routing
+     * from committed monitors, so the refresh waits for the caller's transaction to commit and does
+     * not run if it rolls back.
+     */
+    private void announceRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor, boolean deferSync) {
+        boolean repositoryAllowed = workspaceScopeFilter.isRepositoryAllowed(monitor);
+        if (shouldUseNats(workspace) && repositoryAllowed) {
+            Long workspaceId = workspace.getId();
+            afterCommit(() -> natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId)));
+        }
+        if (deferSync) {
+            log.debug(
+                    "Persisted repository with deferred sync: repoName={}",
+                    LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
+            return;
+        }
+        if (repositoryAllowed) {
+            // Sync the just-persisted target through the bound kind's trigger (async, looked up
+            // by monitor id). No trigger for the active kind = no sync wiring, not an error.
+            connectionService.findActiveProviderKind(workspace.getId()).ifPresent(kind -> {
+                WorkspaceDataSyncTrigger trigger = dataSyncTriggers.get(kind);
+                if (trigger != null) {
+                    trigger.syncSingleSyncTarget(monitor.getId());
+                } else {
+                    log.debug(
+                            "Skipped single-target sync: reason=noTriggerForKind," + " repoName={}, kind={}",
+                            LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()),
+                            kind);
+                }
+            });
+        } else {
+            log.debug(
+                    "Persisted repository without sync: reason=filteredByScope, repoName={}",
+                    LoggingUtils.sanitizeForLog(monitor.getNameWithOwner()));
+        }
+    }
+
+    private void deleteRepositoryMonitor(Workspace workspace, RepositoryToMonitor monitor) {
+        // Remove from collection first - orphanRemoval=true will handle deletion
+        workspace.getRepositoriesToMonitor().remove(monitor);
+        workspaceRepository.saveAndFlush(workspace);
+        if (shouldUseNats(workspace)) {
+            // Like announceRepositoryMonitor, the refresh waits for the commit that removes the
+            // monitor.
+            Long workspaceId = workspace.getId();
+            afterCommit(() -> natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId)));
+        }
+    }
+
+    /**
+     * Idempotently ensures a repository monitor exists for a workspace.
+     *
+     * <p>Handles race conditions from NATS message replay by catching duplicate key violations. If
+     * another thread/message already created the monitor, we simply return success - that's the
+     * idempotent behavior we want.
+     */
+    private Optional<Workspace> ensureRepositoryMonitorInternal(
+            Workspace workspace, IdentityProvider provider, String nameWithOwner, boolean deferSync) {
+        if (workspace == null || StringUtils.isBlank(nameWithOwner)) {
+            return Optional.ofNullable(workspace);
+        }
+
+        if (repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(workspace.getId(), nameWithOwner)) {
+            return Optional.of(workspace);
+        }
+
+        RepositoryToMonitor monitor = new RepositoryToMonitor();
+        monitor.setNameWithOwner(nameWithOwner);
+        monitor.setNativeId(resolveNativeId(nameWithOwner, provider));
+        monitor.setWorkspace(workspace);
+
+        try {
+            persistRepositoryMonitor(workspace, monitor, deferSync);
+        } catch (DataIntegrityViolationException e) {
+            log.debug(
+                    "Repository monitor already exists (idempotent): repoName={}, workspaceId={}",
+                    LoggingUtils.sanitizeForLog(nameWithOwner),
+                    workspace.getId());
+        }
+
+        return Optional.of(workspace);
+    }
+
+    private Optional<Workspace> removeRepositoryMonitorInternal(Workspace workspace, RepositoryToMonitor monitor) {
+        if (workspace == null || monitor == null) {
+            return Optional.ofNullable(workspace);
+        }
+
+        deleteRepositoryMonitor(workspace, monitor);
+        return Optional.of(workspace);
+    }
+
+    /**
+     * Creates or updates a Repository entity from a snapshot (installation enumeration or
+     * provisioning). The organization comes from the workspace so repositories from organization
+     * installations get the proper organization_id.
+     *
+     * <p>Uses a native SQL upsert ({@code INSERT ... ON CONFLICT DO UPDATE}) to atomically handle
+     * concurrent inserts from NATS event processing and GraphQL sync, eliminating optimistic
+     * locking errors. Visibility and HTML URL are derived inside the SQL from {@code isPrivate} and
+     * {@code nameWithOwner} respectively.
+     */
+    private void ensureRepositoryFromSnapshot(
+            Workspace workspace,
+            IdentityProvider provider,
+            long nativeId,
+            String nameWithOwner,
+            String name,
+            boolean isPrivate) {
+        if (StringUtils.isBlank(nameWithOwner)) {
+            return;
+        }
+
+        repositoryRepository.upsertFromSnapshot(
+                nativeId,
+                Objects.requireNonNull(provider.getId()),
+                nameWithOwner,
+                name,
+                isPrivate,
+                workspace.getOrganizationId() != null ? workspace.getOrganizationId() : null);
+    }
+
+    private Workspace requireWorkspace(String slug) {
+        if (StringUtils.isBlank(slug)) {
+            throw new IllegalArgumentException("Workspace slug must not be blank.");
+        }
+        return workspaceRepository
+                .findByWorkspaceSlug(slug)
+                .orElseThrow(() -> new EntityNotFoundException("Workspace", slug));
+    }
+
+    private String requireSlug(WorkspaceContext workspaceContext) {
+        Objects.requireNonNull(workspaceContext, "WorkspaceContext must not be null");
+        String slug = workspaceContext.slug();
+        if (StringUtils.isBlank(slug)) {
+            throw new IllegalArgumentException("Workspace context slug must not be blank.");
+        }
+        return slug;
+    }
+
+    /**
+     * Dispatches the installation-suspension check across kind-specific trackers (today only the
+     * GitHub adapter contributes an impl); true if any tracker reports suspended.
+     */
+    private boolean isInstallationSuspended(long installationId) {
+        for (InstallationSuspensionTracker t : suspensionTrackers.values()) {
+            if (t.isInstallationMarkedSuspended(installationId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Workspace is bound to a GitHub App installation (vs GitHub PAT or GitLab PAT). */
+    private boolean isGitHubAppWorkspace(Workspace workspace) {
+        return (connectionService
+                        .findActiveProviderKind(workspace.getId())
+                        .map(k -> k == IntegrationKind.GITHUB)
+                        .orElse(false)
+                && connectionService
+                        .findActiveGitHubAppConfig(workspace.getId())
+                        .isPresent());
+    }
+}

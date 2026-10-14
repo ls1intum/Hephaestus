@@ -34,7 +34,7 @@ public final class MentorRunnerClient implements AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(MentorRunnerClient.class);
 
-    public static final int PROTOCOL_VERSION = 2;
+    public static final int PROTOCOL_VERSION = 3;
     public static final Duration DEFAULT_CONTROL_TIMEOUT = Duration.ofSeconds(10);
     /**
      * Deadline for the {@code prompt} JSON-RPC <em>ack</em> — not a turn duration. The runner
@@ -249,8 +249,10 @@ public final class MentorRunnerClient implements AutoCloseable {
                 handleFetchContext(frame);
             } else if ("link_result".equals(method)) {
                 handleLink(frame, LinkKind.RESULT);
-            } else if ("link_observation".equals(method)) {
-                handleLink(frame, LinkKind.OBSERVATION);
+            } else if ("link_problem".equals(method)) {
+                handleLink(frame, LinkKind.PROBLEM);
+            } else if ("show_feedback".equals(method)) {
+                handleLink(frame, LinkKind.FEEDBACK);
             } else {
                 log.debug("Unknown runner-side method '{}' — ignoring", method);
             }
@@ -349,7 +351,7 @@ public final class MentorRunnerClient implements AutoCloseable {
     }
 
     /**
-     * The runner asks before its {@code link_result} or {@code link_observation} tool reports success or emits the
+     * The runner asks before its {@code link_result} or {@code link_problem} tool reports success or emits the
      * link, so the server, not the model, decides which result or problem a reply may show feedback about. A refusal
      * is one message whatever the reason, so the answer never tells an id that does not exist from one that belongs
      * to someone else.
@@ -410,8 +412,9 @@ public final class MentorRunnerClient implements AutoCloseable {
 
     /** What a link names: a practice result, or one located problem of a result. */
     public enum LinkKind {
-        RESULT("link_result", "practiceResultId"),
-        OBSERVATION("link_observation", "observationId");
+        RESULT("link_result", "resultId"),
+        PROBLEM("link_problem", "problemId"),
+        FEEDBACK("show_feedback", "feedbackId");
 
         private final String method;
         private final String idKey;

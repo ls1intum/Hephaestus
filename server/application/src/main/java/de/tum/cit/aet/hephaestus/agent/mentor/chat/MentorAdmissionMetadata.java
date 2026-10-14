@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import java.math.BigDecimal;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -59,8 +59,8 @@ final class MentorAdmissionMetadata {
         }
         try {
             return new LlmPriceSnapshot(
-                    FundingSource.valueOf(rates.path("fundingSource").asString()),
-                    PricingState.valueOf(rates.path("pricingState").asString()),
+                    UsageFundingSource.valueOf(rates.path("fundingSource").asString()),
+                    UsagePricingState.valueOf(rates.path("pricingState").asString()),
                     longOrNull(rates, "appliedPriceId"),
                     longOrNull(rates, "appliedWorkspaceModelId"),
                     decimalOrNull(rates, "per1mInputUsd"),

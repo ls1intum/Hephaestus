@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.collection;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.MirrorState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.SyncStatus;
@@ -15,9 +16,15 @@ import org.jspecify.annotations.Nullable;
  * collections table lists, pauses, resumes, and removes.
  */
 @Schema(description = "A mirrored Outline collection with its sync state and live document count")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record OutlineCollectionDTO(
-        @NonNull @Schema(description = "Internal registry row id")
-        Long id,
+        @NonNull
+        @Schema(
+                description = "Internal registry row id",
+                type = "string",
+                pattern = "^[1-9][0-9]*$",
+                requiredMode = Schema.RequiredMode.REQUIRED)
+        String id,
 
         @NonNull @Schema(description = "Outline collection id (UUID; the natural key)")
         String collectionId,
@@ -47,8 +54,8 @@ public record OutlineCollectionDTO(
         Long documentCount,
 
         @Schema(
-                description =
-                        "Documents upstream reported for this collection at the last enumeration (coverage denominator)")
+                description = "Documents upstream reported for this collection at the last enumeration (coverage"
+                        + " denominator)")
         @Nullable
         Integer documentsUpstream,
 
@@ -67,7 +74,7 @@ public record OutlineCollectionDTO(
     /** Projects a registry row plus its live document count into the DTO. */
     public static OutlineCollectionDTO from(OutlineCollection collection, long documentCount) {
         return new OutlineCollectionDTO(
-                collection.getId(),
+                collection.getId().toString(),
                 collection.getCollectionId(),
                 collection.getName(),
                 collection.getUrlId(),

@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 import de.tum.cit.aet.hephaestus.agent.BoundedBatchPass;
 import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics;
 import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Job;
-import de.tum.cit.aet.hephaestus.core.PrivacyJobMetrics.Outcome;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
 import java.time.Instant;
@@ -62,11 +62,13 @@ public class LlmUsageRetentionSweeper {
     public long sweepNow() {
         try {
             BoundedBatchPass.Result result = deleteExpiredInBatches();
-            metrics.record(Job.LLM_USAGE_RETENTION, result.truncated() ? Outcome.INCOMPLETE : Outcome.SUCCESS);
+            metrics.record(
+                    Job.LLM_USAGE_RETENTION,
+                    result.truncated() ? PrivacyJobMetrics.Outcome.INCOMPLETE : PrivacyJobMetrics.Outcome.SUCCESS);
             metrics.recordAffected(Job.LLM_USAGE_RETENTION, result.affected());
             return result.affected();
         } catch (RuntimeException e) {
-            metrics.record(Job.LLM_USAGE_RETENTION, Outcome.FAILURE);
+            metrics.record(Job.LLM_USAGE_RETENTION, PrivacyJobMetrics.Outcome.FAILURE);
             throw e;
         }
     }

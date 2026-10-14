@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 
 /**
  * The one scale both a practice standing and the group standing above it are read off.
@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
  * <p>The thresholds are asymmetric on purpose. {@code STRENGTH} is a claim about the developer and needs a
  * majority well past the middle; {@code DEVELOPING} only points at where attention would pay off.
  */
-final class StandingScale {
+public final class StandingScale {
 
     /**
      * Positive share ABOVE which the subject reads as a strength. Short of unanimity, so a dozen practices are
@@ -33,17 +33,33 @@ final class StandingScale {
 
     private StandingScale() {}
 
+    public static boolean isVerdict(PracticeStanding standing) {
+        return standing == PracticeStanding.STRENGTH
+                || standing == PracticeStanding.MIXED
+                || standing == PracticeStanding.DEVELOPING;
+    }
+
+    static int rank(PracticeStanding standing) {
+        return switch (standing) {
+            case DEVELOPING -> 0;
+            case STRENGTH -> 1;
+            case MIXED -> 2;
+            case NOT_OBSERVED -> 3;
+            case NO_OPPORTUNITY -> 4;
+        };
+    }
+
     /**
      * Classifies a positive share in {@code [0,1]}. The caller must know there is evidence at all: this scale
      * cannot tell "half of it went badly" from "we know nothing", so 0.0 must never stand in for the latter.
      */
-    static PracticeStandingDTO.Standing classify(double positiveShare) {
+    static PracticeStanding classify(double positiveShare) {
         if (positiveShare > STRENGTH_SHARE) {
-            return PracticeStandingDTO.Standing.STRENGTH;
+            return PracticeStanding.STRENGTH;
         }
         if (positiveShare >= MIXED_SHARE) {
-            return PracticeStandingDTO.Standing.MIXED;
+            return PracticeStanding.MIXED;
         }
-        return PracticeStandingDTO.Standing.DEVELOPING;
+        return PracticeStanding.DEVELOPING;
     }
 }

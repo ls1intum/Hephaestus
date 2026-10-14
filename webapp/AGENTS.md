@@ -287,7 +287,7 @@ Use the name in `docs/contributor/practice-feedback-language.md`.
 It is the product's word, not the server's or the screen's previous word.
 
 The verdict of one practice about one piece of work is a **result**.
-One problem under a not met result is an **observation**, and the screen calls it a problem.
+One located problem under a Not met result is a **problem** in code and on screen.
 The unit delivered to a developer is **feedback**.
 None of them is a "finding" or a "message".
 

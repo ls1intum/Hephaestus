@@ -28,10 +28,12 @@ import {
 	FETCH_CONTEXT_ALLOWED,
 	isFetchContextKey,
 	type JsonRpcId,
-	type LinkObservationEvent,
-	type LinkObservationRequest,
+	type LinkProblemEvent,
+	type LinkProblemRequest,
 	type LinkResultEvent,
 	type LinkResultRequest,
+	type ShowFeedbackEvent,
+	type ShowFeedbackRequest,
 	MENTOR_PROTOCOL_VERSION,
 	MENTOR_TOOL_NAMES,
 	type MentorErrorCode,
@@ -46,7 +48,7 @@ import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from
 /** The Pi SDK module, resolved from `<workspace>/node_modules` by bare specifier at runtime. */
 type PiSdk = typeof PiSdkModule;
 
-// Pi SDK is loaded lazily so the protocol layer (framing, JSON-RPC dispatch, fetch_context
+// Pi SDK is loaded lazily so the protocol layer (framing, JSON-RPC delivery, fetch_context
 // callback plumbing) can be exercised in test environments without an LLM proxy. Set
 // `MENTOR_RUNNER_PROTOCOL_ONLY=1` to swap the SDK-backed runtime for `createStubRuntime`, which
 // satisfies the same `MentorRuntime` contract and emits deterministic events sufficient for
@@ -199,7 +201,7 @@ function writeFrame(frame: MentorOutboundFrame) {
 	process.stdout.write(`${JSON.stringify(frame)}\n`);
 }
 
-/** Pause dispatch when stdout backs up past this size; prevents OOM under slow SSE consumers. */
+/** Pause delivery when stdout backs up past this size; prevents OOM under slow SSE consumers. */
 const STDOUT_BACKPRESSURE_THRESHOLD_BYTES = 256 * 1024;
 
 function sendResult(id: JsonRpcId | undefined, result: MentorResult) {
@@ -270,7 +272,7 @@ interface FetchContextDetails {
 
 type FetchContextToolResult = AgentToolResult<FetchContextDetails>;
 
-/** One in-flight server callback (`fetch_context`, `link_result`, `link_observation`), keyed by its JSON-RPC id in `ThreadState`. */
+/** One in-flight server callback (`fetch_context`, `link_result`, `link_problem`), keyed by its JSON-RPC id in `ThreadState`. */
 interface PendingCallback {
 	resolve: (result: unknown) => void;
 	reject: (reason: Error) => void;
@@ -333,7 +335,7 @@ let systemPrompt: string | null = null;
 let runtimeInitFailure: { err: unknown; at: number } | null = null;
 const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 
-// Serialised dispatch chain — every stdin frame AND watchdog rebind appends here so callers
+// Serialised delivery chain — every stdin frame AND watchdog rebind appends here so callers
 // cannot race `runtime.switchSession` against each other.
 let dispatchQueue = Promise.resolve();
 
@@ -358,7 +360,7 @@ async function runAfter(previous: Promise<void>, fn: () => unknown): Promise<voi
 		}
 		await fn();
 	} catch (error) {
-		log("dispatch queue swallowed:", errorText(error));
+		log("delivery queue swallowed:", errorText(error));
 	}
 }
 
@@ -658,55 +660,71 @@ async function askServer(
 }
 
 /**
- * What a link names. A result is a practice's verdict on one piece of reviewed work; an observation is one located
+ * What a link names. A result is a practice's verdict on one piece of reviewed work; a problem is one located
  * problem of a `NOT_MET` result. Each has its own tool, callback and event, so the server never has to tell the two
  * ids apart.
  */
 interface LinkTool {
-	name: "link_result" | "link_observation";
+	name: "link_result" | "link_problem" | "show_feedback";
 	label: string;
-	idKey: "practiceResultId" | "observationId";
+	idKey: "resultId" | "problemId" | "feedbackId";
 	noun: string;
 	purpose: string;
 	request: (
 		threadId: string,
 		id: string,
 		linkedId: string,
-	) => LinkResultRequest | LinkObservationRequest;
-	event: (linkedId: string, text: string) => LinkResultEvent | LinkObservationEvent;
+	) => LinkResultRequest | LinkProblemRequest | ShowFeedbackRequest;
+	event: (linkedId: string, text: string) => LinkResultEvent | LinkProblemEvent | ShowFeedbackEvent;
 }
 
 const LINK_TOOLS = [
 	{
 		name: "link_result",
 		label: "Link Result",
-		idKey: "practiceResultId",
+		idKey: "resultId",
 		noun: "result",
 		purpose:
 			"one Hephaestus practice result: a practice's verdict on one piece of their work. Use it when you discuss " +
 			"the verdict.",
-		request: (threadId, id, practiceResultId) => ({
+		request: (threadId, id, resultId) => ({
 			jsonrpc: JSONRPC_VERSION,
 			id,
 			method: "link_result",
-			params: { threadId, practiceResultId },
+			params: { threadId, resultId },
 		}),
-		event: (practiceResultId, text) => ({ type: "link_result", practiceResultId, text }),
+		event: (resultId, text) => ({ type: "link_result", resultId, text }),
 	},
 	{
-		name: "link_observation",
-		label: "Link Observation",
-		idKey: "observationId",
-		noun: "observation",
+		name: "link_problem",
+		label: "Link Problem",
+		idKey: "problemId",
+		noun: "problem",
 		purpose:
-			"one observation: one located problem of a NOT_MET practice result. Use it when you discuss that one problem.",
-		request: (threadId, id, observationId) => ({
+			"one problem: one located problem of a NOT_MET practice result. Use it when you discuss that one problem.",
+		request: (threadId, id, problemId) => ({
 			jsonrpc: JSONRPC_VERSION,
 			id,
-			method: "link_observation",
-			params: { threadId, observationId },
+			method: "link_problem",
+			params: { threadId, problemId },
 		}),
-		event: (observationId, text) => ({ type: "link_observation", observationId, text }),
+		event: (problemId, text) => ({ type: "link_problem", problemId, text }),
+	},
+	{
+		name: "show_feedback",
+		label: "Show Feedback",
+		idKey: "feedbackId",
+		noun: "prepared feedback",
+		purpose:
+			"one prepared piece of feedback listed for this mentor thread. Use its feedbackId when you raise " +
+			"the prepared point; the server claims its copy before any words are shown.",
+		request: (threadId, id, feedbackId) => ({
+			jsonrpc: JSONRPC_VERSION,
+			id,
+			method: "show_feedback",
+			params: { threadId, feedbackId },
+		}),
+		event: (feedbackId, text) => ({ type: "show_feedback", feedbackId, text }),
 	},
 ] as const satisfies readonly LinkTool[];
 
@@ -719,7 +737,7 @@ function defineLinkTool(sdk: PiSdk, link: LinkTool) {
 		description:
 			`Give the developer your feedback about ${link.purpose} \`text\` is shown to them as part of your reply, ` +
 			"exactly where you call this, so write it to them in your own words and do not repeat it in your answer. " +
-			"Only feedback shown this way counts as raised with them.",
+			"The server confirms delivery only from the completed turn's actual transport receipt.",
 		parameters: {
 			type: "object",
 			additionalProperties: false,
@@ -739,7 +757,7 @@ function defineLinkTool(sdk: PiSdk, link: LinkTool) {
 			if (!linkedId || !text) {
 				throw new Error(`${name}: ${idKey} and text are required`);
 			}
-			// The server decides which result or observation a reply may show feedback about: nothing is shown or
+			// The server decides which result or problem a reply may show feedback about: nothing is shown or
 			// reported as shown until it admits this one, and a refusal fails the call.
 			const { threadId, result } = await askServer(
 				(thread, id) => link.request(thread, id, linkedId),
@@ -1218,7 +1236,7 @@ async function handleShutdown(id: JsonRpcId | undefined) {
 // occasionally balloon (e.g. `results_history.json` for a heavy reviewer); without a cap, a single
 // tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
 // comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
-// units), not bytes; context JSONs are ASCII-dominant so the variance is small.
+// feedback), not bytes; context JSONs are ASCII-dominant so the variance is small.
 const FETCH_CONTEXT_MAX_CHARS = 200_000;
 
 /**
@@ -1458,7 +1476,7 @@ function rejectPendingCallbacks(state: ThreadState, reason: string) {
 }
 
 /**
- * The dispatch table. `satisfies Record<MentorMethod, MethodHandler>` is the contract check: a
+ * The delivery table. `satisfies Record<MentorMethod, MethodHandler>` is the contract check: a
  * method declared in pi-mentor-protocol.ts with no handler here — or a handler whose signature has
  * drifted — fails the build rather than answering Java with method_not_found at runtime.
  */
@@ -1476,7 +1494,7 @@ function isMentorMethod(method: string): method is MentorMethod {
 	return Object.hasOwn(METHODS, method);
 }
 
-async function dispatch(frame: unknown) {
+async function delivery(frame: unknown) {
 	// Java sends requests and callback responses, but no batches. Reject top-level arrays explicitly.
 	if (Array.isArray(frame)) {
 		sendError(null, ERR.INVALID_REQUEST, "batch requests are not supported on this transport");
@@ -1649,7 +1667,7 @@ function start() {
 		enqueue(async () => {
 			let frame: unknown;
 			try {
-				// The only place untrusted bytes become values. `dispatch` takes `unknown` and
+				// The only place untrusted bytes become values. `delivery` takes `unknown` and
 				// narrows structurally from here, so nothing downstream trusts the shape.
 				frame = JSON.parse(line);
 			} catch (error) {
@@ -1657,15 +1675,15 @@ function start() {
 				return;
 			}
 			try {
-				await dispatch(frame);
+				await delivery(frame);
 			} catch (error) {
-				log("dispatch failed:", error);
+				log("delivery failed:", error);
 			}
 		});
 	});
 
 	process.stdin.on("data", (chunk) => splitter(chunk));
-	// EOF routes through the dispatch queue so SIGTERM and EOF run the same teardown.
+	// EOF routes through the delivery queue so SIGTERM and EOF run the same teardown.
 	process.stdin.on("end", () => {
 		log("stdin EOF — shutting down");
 		enqueue(async () => handleShutdown(undefined));

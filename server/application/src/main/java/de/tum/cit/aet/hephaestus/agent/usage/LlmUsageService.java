@@ -1,14 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
@@ -33,7 +35,7 @@ public class LlmUsageService {
     private final LlmBudgetService llmBudgetService;
 
     private final ConfigAuditPort configAudit;
-    private final AgentJobRepository jobRepository;
+    private final ReviewJobRepository jobRepository;
 
     /** Display-only; no number it produces is ever compared against a budget. */
     private final FxRateLookup fxRateLookup;
@@ -43,7 +45,7 @@ public class LlmUsageService {
             WorkspaceRepository workspaceRepository,
             LlmBudgetService llmBudgetService,
             ConfigAuditPort configAudit,
-            AgentJobRepository jobRepository,
+            ReviewJobRepository jobRepository,
             FxRateLookup fxRateLookup) {
         this.usageRepository = usageRepository;
         this.workspaceRepository = workspaceRepository;
@@ -63,7 +65,7 @@ public class LlmUsageService {
         List<LlmUsageByJobTypeDTO> byJobType =
                 usageRepository.aggregateByJobType(workspaceId, window.from(), window.to()).stream()
                         .map(row -> new LlmUsageByJobTypeDTO(
-                                LlmUsageJobType.valueOf(row.getJobType()),
+                                row.getJobType(),
                                 row.getPricedTotalCostUsd(),
                                 row.getByoTotalCostUsd(),
                                 row.getUnpricedEventCount(),
@@ -137,8 +139,8 @@ public class LlmUsageService {
                 unpricedRuns,
                 instanceVerdict,
                 ownProviderVerdict,
-                decision.blocks(FundingSource.INSTANCE),
-                decision.blocks(FundingSource.WORKSPACE),
+                decision.blocks(UsageFundingSource.INSTANCE),
+                decision.blocks(UsageFundingSource.WORKSPACE),
                 byJobType,
                 byDay,
                 byPractice,

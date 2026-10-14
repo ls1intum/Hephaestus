@@ -7,7 +7,7 @@
 //   hello handshake       → MentorChatService#verifyProtocol
 //   event → UI chunks     → PiEventToUiChunkTranslator
 //   fetch_context replies → MentorChatService#handleFetchContext
-//   link_result / link_observation → MentorRunnerClient#handleLink
+//   link_result / link_problem → MentorRunnerClient#handleLink
 
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 
@@ -19,9 +19,14 @@ export const JSONRPC_VERSION = "2.0";
  * MentorRunnerClient.PROTOCOL_VERSION and refuses the session on a mismatch, so the two move
  * together or not at all.
  */
-export const MENTOR_PROTOCOL_VERSION = 2;
+export const MENTOR_PROTOCOL_VERSION = 3;
 
-export const MENTOR_TOOL_NAMES = ["fetch_context", "link_result", "link_observation"] as const;
+export const MENTOR_TOOL_NAMES = [
+	"fetch_context",
+	"link_result",
+	"link_problem",
+	"show_feedback",
+] as const;
 
 // Context-key whitelist for the fetch_context tool. Java remains authoritative and
 // re-checks against MentorContextKeys.ALLOWED_OUTPUT_KEYS.
@@ -39,14 +44,14 @@ export const FETCH_CONTEXT_ALLOWED = new Set([
 	"inputs/context/current_thread_history.json",
 	"inputs/context/outline_docs.json",
 ]);
-// One authored pull request by artifactId, in any stored state, read on demand; mirrors MergeReadinessContentSource.ITEM_KEY.
-const MERGE_READINESS_ITEM = /^inputs\/context\/merge_readiness\/\d{1,18}\.json$/u;
+// One authored pull request by itemId, in any stored state, read on demand; mirrors MergeReadinessContentSource.ITEM_KEY.
+const MERGE_READINESS_ITEM = /^inputs\/context\/merge_readiness\/[1-9][0-9]{0,18}\.json$/u;
 // One listed result's detail by its canonical id; mirrors ResultHistoryContentSource.DETAIL_KEY.
 const RESULT_DETAIL =
 	/^inputs\/context\/results_history\/[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}\.json$/u;
-// One authored pull request's or issue's retained reviews by artifactId; mirrors ReviewAttemptsContentSource.WORK_KEY.
+// One authored pull request's or issue's retained reviews by sourceId; mirrors ReviewAttemptsContentSource.ITEM_KEY.
 const REVIEW_ATTEMPTS_ITEM =
-	/^inputs\/context\/review_attempts\/(?:pull_request|issue)\/\d{1,18}\.json$/u;
+	/^inputs\/context\/review_attempts\/(?:pull_request|issue)\/[1-9][0-9]{0,18}\.json$/u;
 
 export function isFetchContextKey(key: string): boolean {
 	return (
@@ -60,7 +65,7 @@ export function isFetchContextKey(key: string): boolean {
 /**
  * JSON-RPC 2.0 §4 restricts an id to String, Number or Null. Java always sends a Number (an
  * `AtomicLong` counter) and the runner echoes back whatever it received; the runner's own
- * callbacks (`fetch_context`, `link_result`, `link_observation`) use a String id, which Java echoes back unchanged in turn.
+ * callbacks (`fetch_context`, `link_result`, `link_problem`) use a String id, which Java echoes back unchanged in turn.
  */
 export type JsonRpcId = string | number | null;
 
@@ -225,22 +230,29 @@ export interface TurnWatchdogFiredEvent {
 
 /**
  * Emitted by the `link_result` tool: feedback about one practice result, the verdict of a practice on one piece of
- * reviewed work. Java requires `practiceResultId` to parse as a UUID and `text` to be nonblank: `text` is shown to
- * the developer as part of the reply, and only a link that carries it settles feedback.
+ * reviewed work. Java requires `resultId` to parse as a UUID and `text` to be nonblank: `text` is shown to
+ * the developer as part of the reply. A result link does not settle prepared feedback delivery.
  */
 export interface LinkResultEvent {
 	type: "link_result";
-	practiceResultId: string;
+	resultId: string;
 	text: string;
 }
 
 /**
- * Emitted by the `link_observation` tool: feedback about one observation, a located problem of a `NOT_MET` result.
- * Java reads `observationId` and `text` as it reads a {@link LinkResultEvent}'s.
+ * Emitted by the `link_problem` tool: feedback about one problem, a located problem of a `NOT_MET` result.
+ * Java reads `problemId` and `text` as it reads a {@link LinkResultEvent}'s.
  */
-export interface LinkObservationEvent {
-	type: "link_observation";
-	observationId: string;
+export interface LinkProblemEvent {
+	type: "link_problem";
+	problemId: string;
+	text: string;
+}
+
+/** Prepared feedback shown after its exact copy was claimed for this mentor turn. */
+export interface ShowFeedbackEvent {
+	type: "show_feedback";
+	feedbackId: string;
 	text: string;
 }
 
@@ -251,7 +263,8 @@ export type MentorRunnerEvent =
 	| PiErrorEvent
 	| TurnWatchdogFiredEvent
 	| LinkResultEvent
-	| LinkObservationEvent;
+	| LinkProblemEvent
+	| ShowFeedbackEvent;
 
 /**
  * Everything that can appear as `params.event`. The runner forwards every Pi SDK session event
@@ -303,12 +316,12 @@ export interface FetchContextSuccessResponse {
 
 export interface LinkResultParams {
 	threadId: string;
-	practiceResultId: string;
+	resultId: string;
 }
 
-export interface LinkObservationParams {
+export interface LinkProblemParams {
 	threadId: string;
-	observationId: string;
+	problemId: string;
 }
 
 /**
@@ -322,18 +335,26 @@ export interface LinkResultRequest {
 	params: LinkResultParams;
 }
 
-/** The `link_observation` counterpart of {@link LinkResultRequest}, for one observation of a result. */
-export interface LinkObservationRequest {
+/** The `link_problem` counterpart of {@link LinkResultRequest}, for one problem of a result. */
+export interface LinkProblemRequest {
 	jsonrpc: typeof JSONRPC_VERSION;
 	id: string;
-	method: "link_observation";
-	params: LinkObservationParams;
+	method: "link_problem";
+	params: LinkProblemParams;
+}
+
+/** The server claims the prepared copy before admitting any words to the turn. */
+export interface ShowFeedbackRequest {
+	jsonrpc: typeof JSONRPC_VERSION;
+	id: string;
+	method: "show_feedback";
+	params: { threadId: string; feedbackId: string };
 }
 
 export interface LinkSuccessResponse {
 	jsonrpc: typeof JSONRPC_VERSION;
 	id: JsonRpcId;
-	result: { practiceResultId: string } | { observationId: string };
+	result: { resultId: string } | { problemId: string } | { feedbackId: string };
 }
 
 /** Java's answer when it refuses or fails a callback. */
@@ -347,7 +368,8 @@ export interface ServerCallbackErrorResponse {
 export type ServerCallbackRequest =
 	| FetchContextRequest
 	| LinkResultRequest
-	| LinkObservationRequest;
+	| LinkProblemRequest
+	| ShowFeedbackRequest;
 
 /** Everything the runner writes to stdout. */
 export type MentorOutboundFrame =

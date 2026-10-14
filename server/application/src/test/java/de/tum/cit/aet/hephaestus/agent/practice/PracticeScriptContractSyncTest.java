@@ -3,303 +3,73 @@ package de.tum.cit.aet.hephaestus.agent.practice;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
-import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
-import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
-import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.agent.metrics.AgentMetrics;
 import de.tum.cit.aet.hephaestus.agent.proxy.JobTokenAuthenticationFilter;
-import de.tum.cit.aet.hephaestus.agent.runtime.AgentImageProperties;
-import de.tum.cit.aet.hephaestus.agent.runtime.PiResultParser;
-import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.agent.sandbox.ImagePullPolicy;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewStateDimension;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocsSignals;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.DocumentArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeProgramKind;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptNotRatedReason;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunStatus;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptStopReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.ObjectMapper;
 
-/**
- * Cross-language sync test. The practice script runner refuses the whole models file for one slot or
- * protocol it does not know, and a script's inputs for one moment, state or outcome it does not know, so the
- * names that the server writes must be the ones that {@code docker/agents/practice-scripts/lib/contract.ts}
- * accepts.
- */
 class PracticeScriptContractSyncTest extends BaseUnitTest {
+    private static String contract() throws IOException {
+        for (Path root = Path.of("").toAbsolutePath(); root != null; root = root.getParent()) {
+            Path file = root.resolve("docker/agents/practice-scripts/lib/core/contract.ts");
+            if (Files.isRegularFile(file)) return Files.readString(file);
+        }
+        throw new IOException("The practice script core contract was not found");
+    }
 
-    private static final Pattern QUOTED = Pattern.compile("\"([^\"]+)\"");
+    private static List<String> values(String contract, String name) {
+        var array = Pattern.compile("\\b" + name + "\\s*=\\s*\\[([^]]*)]", Pattern.DOTALL)
+                .matcher(contract);
+        if (!array.find()) throw new IllegalArgumentException("The core contract has no array named " + name);
+        return Pattern.compile("\"([^\"]+)\"")
+                .matcher(array.group(1))
+                .results()
+                .map(match -> match.group(1))
+                .toList();
+    }
 
     @Test
-    void shouldWriteOnlySlotsAndProtocolsThePracticeScriptRunnerAccepts() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-
-        assertThat(quotedIn(contract, "MODEL_SLOTS = ["))
+    void shouldUseTheSameClosedOutcomesSeveritiesOriginsAndRoles() throws IOException {
+        var source = contract();
+        assertThat(values(source, "OUTCOMES"))
                 .containsExactlyElementsOf(
-                        Arrays.stream(ModelKind.values()).map(ModelKind::slot).toList());
-        assertThat(quotedIn(contract, "PROTOCOLS = ["))
+                        Arrays.stream(ResultOutcome.values()).map(Enum::name).toList());
+        assertThat(values(source, "SEVERITIES"))
+                .containsExactlyElementsOf(
+                        Arrays.stream(Severity.values()).map(Enum::name).toList());
+        assertThat(values(source, "ORIGINS"))
+                .containsExactlyElementsOf(
+                        Arrays.stream(ReviewOrigin.values()).map(Enum::name).toList());
+        assertThat(values(source, "ABOUT_ROLES"))
+                .containsExactlyElementsOf(
+                        Arrays.stream(AboutRole.values()).map(Enum::name).toList());
+    }
+
+    @Test
+    void shouldUseTheSameModelSlotsProtocolsAndAttributionHeader() throws IOException {
+        var source = contract();
+        assertThat(values(source, "MODEL_SLOTS"))
+                .containsExactlyElementsOf(Arrays.stream(ModelKind.values())
+                        .map(kind -> kind.name().toLowerCase(Locale.ROOT))
+                        .toList());
+        assertThat(values(source, "PROTOCOLS"))
                 .containsExactlyElementsOf(Arrays.stream(LlmApiProtocol.values())
                         .map(LlmApiProtocol::wire)
                         .toList());
-    }
-
-    /** The proxy refuses a practice script call without the practice header, or with a slug it does not accept. */
-    @Test
-    void shouldAttributeEveryPracticeScriptCallTheWayTheProxyReadsIt() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-
-        assertThat(contract)
-                .contains("PRACTICE_SCRIPT_PRACTICE_HEADER = \""
-                        + JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER + "\"")
-                .contains("PRACTICE_SLUG = /^" + SandboxLayout.PRACTICE_SLUG.pattern() + "$/u");
-    }
-
-    /** The server drops a practice script report entry with a reason it does not know, so the lists must match. */
-    @Test
-    void shouldKnowEveryReasonThePracticeScriptRunnerReportsAsNotRated() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-
-        assertThat(quotedIn(contract, "REASONS = ["))
-                .containsExactlyElementsOf(Arrays.stream(PracticeScriptNotRatedReason.values())
-                        .map(PracticeScriptNotRatedReason::wire)
-                        .toList());
-    }
-
-    /**
-     * The server drops a report entry with a status it does not know. Every status that the runner records for an
-     * admitted practice must reach its own {@link PracticeScriptRunStatus}; only "did not finish" has no runner
-     * status.
-     */
-    @Test
-    void shouldReadEveryStatusThePracticeScriptRunnerRecords() throws IOException {
-        List<String> statuses = quotedIn(
-                Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts")),
-                "RUN_STATUSES = [");
-        SimpleMeterRegistry meters = new SimpleMeterRegistry();
-        List<String> entries = statuses.stream()
-                .map(status -> """
-                    {"practiceSlug":"practice-%s","program":{"kind":"builtin","digest":null},"models":[],\
-                    "status":"%s","stopReason":%s,\
-                    "calls":{"review":0,"chat":0,"decision":0,"embedding":0,"reranking":0},\
-                    "coverageReached":{"reads":0,"truncatedReads":0,"failedReads":0},"durationMs":null}\
-                    """.formatted(status, status, status.equals("ok") ? "null" : "\"deadline\""))
-                .toList();
-        Map<String, PracticeProgramKind> admitted = statuses.stream()
-                .collect(Collectors.toMap(status -> "practice-" + status, status -> PracticeProgramKind.BUILTIN));
-
-        List<PracticeScriptRunStatus> read = new PiResultParser(new ObjectMapper(), meters)
-                        .parsePracticeScriptReport(
-                                ("{\"schemaVersion\":2,\"truncated\":false,\"practices\":[" + String.join(",", entries)
-                                                + "]}")
-                                        .getBytes(StandardCharsets.UTF_8),
-                                admitted)
-                        .stream()
-                        .map(PiResultParser.PracticeScriptRunReport::status)
-                        .toList();
-
-        assertThat(meters.find(AgentMetrics.AGENT_PI_RESULT_PARSE_FAILURE).counter())
-                .as("no runner status is dropped")
-                .isNull();
-        assertThat(read)
-                .containsExactlyInAnyOrderElementsOf(Arrays.stream(PracticeScriptRunStatus.values())
-                        .filter(status -> status != PracticeScriptRunStatus.NOT_FINISHED)
-                        .toList());
-    }
-
-    /** The server drops a report entry with a stop reason or program kind it does not know, so the lists must match. */
-    @Test
-    void shouldKnowEveryStopReasonAndProgramKindThePracticeScriptRunnerReports() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-
-        assertThat(Stream.concat(
-                                quotedIn(contract, "REASONS = [").stream(),
-                                quotedIn(contract, "STOP_REASONS = [").stream())
-                        .toList())
-                .containsExactlyElementsOf(Arrays.stream(PracticeScriptStopReason.values())
-                        .map(PracticeScriptStopReason::wire)
-                        .toList());
-        assertThat(quotedIn(contract, "PROGRAM_KINDS = ["))
-                .containsExactlyElementsOf(Arrays.stream(PracticeProgramKind.values())
-                        .map(kind -> kind.name().toLowerCase(Locale.ROOT))
-                        .toList());
-    }
-
-    /** {@code lib/models-host.test.ts} gives every slot of the same file a model. */
-    @Test
-    void shouldWriteTheModelsFileInTheShapeThePracticeScriptRunnerTestsRead() throws IOException {
-        ObjectMapper mapper = new ObjectMapper();
-        PracticePiAdapter adapter = new PracticePiAdapter(
-                new PiRuntimeFactory(mapper),
-                new PiResultParser(mapper, new SimpleMeterRegistry()),
-                new AgentImageProperties("agent-pi:test", ImagePullPolicy.IF_NOT_PRESENT),
-                new PracticeReviewProperties(false, 15, 5, null, 12, 16000, 200_000, 1000),
-                mapper);
-        PracticeAgentRequest request = new PracticeAgentRequest(
-                "openai-responses",
-                "gpt-chat",
-                null,
-                null,
-                null,
-                "job-token",
-                600,
-                Map.of(
-                        ModelKind.CHAT, model("openai-responses", "gpt-chat", null),
-                        ModelKind.DECISION, model("openai-completions", "qwen-decider", ReasoningEffort.HIGH),
-                        ModelKind.EMBEDDING, model("openai-embeddings", "embedder", null),
-                        ModelKind.RERANKING, model("cohere-rerank", "reranker", null)));
-
-        byte[] written = adapter.buildSandboxSpec(request).inputFiles().get(SandboxLayout.PRACTICE_SCRIPT_MODELS_FILE);
-
-        assertThat(mapper.readTree(written))
-                .isEqualTo(mapper.readTree(Files.readString(
-                        resolveRepoFile("docker/agents/practice-scripts/test/practice-script-models.json"))));
-    }
-
-    /**
-     * A script reads the moment and the review state of its cause in the words of the artifact descriptors, which
-     * stay their one home: the runner refuses a cause whose moment or state value it does not know.
-     */
-    @Test
-    void shouldKnowEveryMomentAndReviewStateTheDescriptorsDeclare() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-        List<ArtifactDescriptor> descriptors = List.of(
-                new PullRequestArtifactDescriptor(),
-                new IssueArtifactDescriptor(),
-                new ConversationThreadArtifactDescriptor(),
-                new DocumentArtifactDescriptor());
-
-        assertThat(descriptors)
-                .extracting(ArtifactDescriptor::kind)
-                .containsExactly(
-                        ScmSignals.PULL_REQUEST,
-                        ScmSignals.ISSUE,
-                        ChatSignals.CONVERSATION_THREAD,
-                        DocsSignals.DOCUMENT);
-        assertThat(quotedIn(contract, "KINDS = ["))
-                .containsExactlyElementsOf(descriptors.stream()
-                        .map(descriptor -> descriptor.kind().value())
-                        .toList());
-        String moments = contract.substring(contract.indexOf("MOMENTS = {"));
-        String states = contract.substring(contract.indexOf("REVIEW_STATES = {"));
-        for (ArtifactDescriptor descriptor : descriptors) {
-            String kind = descriptor.kind().value();
-            assertThat(quotedIn(moments, "\"" + kind + "\": ["))
-                    .as("the moments of %s", kind)
-                    .containsExactlyInAnyOrderElementsOf(descriptor.signals().stream()
-                            .filter(signal -> !signal.requestedByHand())
-                            .map(signal -> signal.name().value())
-                            .toList());
-            Map<String, List<String>> declared = new LinkedHashMap<>();
-            for (ReviewStateDimension dimension :
-                    descriptor.reviewCapabilities().reviewWhenDimensions()) {
-                declared.put(
-                        dimension.key(),
-                        dimension.values().stream()
-                                .map(ReviewStateDimension.Value::value)
-                                .toList());
-            }
-            assertThat(dimensionsIn(states, kind))
-                    .as("the review state of %s", kind)
-                    .isEqualTo(declared);
-        }
-    }
-
-    /** The runner refuses a previous claim or a cause with a value the server's enums do not hold, and the reverse. */
-    @Test
-    void shouldStageOnlyOriginsOutcomesSeveritiesAndRolesThePracticeScriptRunnerAccepts() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-
-        assertThat(quotedIn(contract, "ORIGINS = [")).containsExactlyElementsOf(names(ResultOrigin.values()));
-        assertThat(quotedIn(contract, "OUTCOMES = [")).containsExactlyElementsOf(names(Outcome.values()));
-        assertThat(quotedIn(contract, "SEVERITIES = [")).containsExactlyElementsOf(names(Severity.values()));
-        // A review is never about an assignee, so no practice script reads that role.
-        assertThat(quotedIn(contract, "SUBJECT_ROLES = ["))
-                .containsExactlyElementsOf(Arrays.stream(ActorRole.values())
-                        .filter(role -> role != ActorRole.ASSIGNEE)
-                        .map(Enum::name)
-                        .toList());
-    }
-
-    /** The server stages each practice's inputs beside its slug, and the host reads them there. */
-    @Test
-    void shouldStageTheCauseAndPreviousClaimWhereTheHostReadsThem() throws IOException {
-        String contract = Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts"));
-
-        assertThat(contract)
-                .contains("CAUSE_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX + "\"")
-                .contains("PREVIOUS_FILE_SUFFIX = \"" + SandboxLayout.PRACTICE_SCRIPT_PREVIOUS_SUFFIX + "\"");
-    }
-
-    private static List<String> names(Enum<?>[] values) {
-        return Arrays.stream(values).map(Enum::name).toList();
-    }
-
-    /** The dimensions of {@code kind} in the {@code REVIEW_STATES} literal that {@code states} starts with. */
-    private static Map<String, List<String>> dimensionsIn(String states, String kind) {
-        String start = "\"" + kind + "\": {";
-        int from = states.indexOf(start);
-        assertThat(from).as("REVIEW_STATES declares %s", kind).isNotNegative();
-        String block = states.substring(from + start.length(), states.indexOf('}', from));
-        Map<String, List<String>> dimensions = new LinkedHashMap<>();
-        Matcher dimension = DIMENSION.matcher(block);
-        while (dimension.find()) {
-            dimensions.put(
-                    dimension.group(1),
-                    QUOTED.matcher(dimension.group(2))
-                            .results()
-                            .map(result -> result.group(1))
-                            .toList());
-        }
-        return dimensions;
-    }
-
-    private static final Pattern DIMENSION = Pattern.compile("(\\w+): \\[([^\\]]*)\\]");
-
-    private static FrozenModel model(String protocol, String modelId, @Nullable ReasoningEffort reasoningEffort) {
-        return new FrozenModel(
-                protocol, "https://models.example", modelId, null, null, null, null, null, reasoningEffort, null);
-    }
-
-    /** The quoted strings of the array literal that starts at {@code start}. */
-    private static List<String> quotedIn(String source, String start) {
-        int from = source.indexOf(start);
-        assertThat(from).as("contract.ts declares %s", start).isNotNegative();
-        String array = source.substring(from + start.length(), source.indexOf(']', from));
-        return QUOTED.matcher(array).results().map(result -> result.group(1)).toList();
-    }
-
-    private static Path resolveRepoFile(String relativePath) {
-        Path candidate = Path.of("..", "..").resolve(relativePath);
-        return Files.exists(candidate) ? candidate : Path.of(relativePath);
+        assertThat(source)
+                .contains("CONTRACT_VERSION = 3", JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PRACTICE_HEADER);
+        assertThat(source).contains("PRACTICE_SLUG = /^" + SandboxLayout.PRACTICE_SLUG.pattern() + "$/u");
     }
 }

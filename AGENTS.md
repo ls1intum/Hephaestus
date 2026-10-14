@@ -12,7 +12,7 @@ It delivers practice feedback on the work itself, on the developer's own practic
 
 ## What we will not compromise on
 
-1. **Feedback earns trust or it is not sent.** A review passes through occasion, evidence capture, result, and delivery.
+1. **Feedback earns trust or it is not sent.** A review passes through selection, evidence capture, result admission, and delivery.
    Each stage can stop with its own recorded reason.
    Never turn a capture failure into a claim about someone's work.
    Never report withheld feedback as missing evidence.
@@ -58,44 +58,14 @@ A maintainer's explicit instruction overrides any of it.
 If a rule conflicts with the current task, state the conflict.
 Get a decision instead of silently bypassing the rule.
 
-## A small glossary
+## Product vocabulary
 
-`docs/contributor/practice-feedback-language.md` owns the product vocabulary.
-`docs/contributor/practice-review-glossary.mdx` owns the review operation's terms.
-Define a term in one and cite it from the other.
-Use these words on every task:
-
-- **you** — the agent reading this file and changing Hephaestus.
-- **we, maintainers** — the people building Hephaestus, who are talking to you now.
-- **workspace** — one team's tenant: its connected repositories, members, practices and feedback.
-  An **instance** is one running Hephaestus deployment hosting many workspaces.
-- **practice** — a defined way of working used to review work.
-  A **practice group** collects related practices.
-  Never use *rule*, *detector*, or *category* for these concepts.
-- **practice review** — one evidence-bounded operation.
-  Hephaestus checks practices against one piece of reviewed work and may record a result for each.
-- **result** — the verdict of one practice about one piece of reviewed work.
-  Its outcome is met, not met, does not apply, or could not determine.
-- **observation** — one problem that a not met result records at a place in the work.
-  Never *finding*, *detection*.
-- **practice script** — the review program of one practice. It returns one result, which the server
-  admits or withholds. A practice without one runs the built-in program.
-- **practice feedback**, shortened to **feedback** — guidance written from results and their observations.
-  It is addressed to a developer.
-  It is uncountable.
-  Write *3 pieces of feedback*, never *messages*.
-- **channel** — where one piece of feedback is meant to appear.
-- **delivery** — whether it was prepared, delivered, withheld, failed, or replaced.
-- **reviewed work** — a pull request, merge request, issue, conversation or document under review.
-  Say *pull request* or *merge request* when the provider is known.
-- **developer** — the person a result is about.
-- **Heph** — the conversational assistant.
-  Its product area is **mentor**.
-  Neither Heph, the application, nor a review is an *agent*.
-  That word means the sandboxed runtime that executes a review.
-- **runtime role** — `server`, `worker` or `webhook`: the slice of one JAR a container boots.
-- **integration** — one connected provider: GitHub, GitLab, Slack or Outline, each with its own
-  adapter under `integration/`.
+[Practice feedback language](docs/contributor/practice-feedback-language.md) owns product terms.
+[Practice review glossary](docs/contributor/practice-review-glossary.mdx) owns review and runtime terms.
+Use their exact names in prose, code, HTTP and release notes.
+Define each term in one owning page and cite it elsewhere.
+Use concrete provider nouns in UI text and item in contributor contracts.
+The sandboxed runtime is an agent. Heph and the application are not agents.
 
 ## Hit every surface
 
@@ -115,8 +85,8 @@ State which entries applied:
   Commit all three.
 - **Schema.** An entity change needs a changelog and an ERD (`vp run db:draft-changelog`).
   A new workspace-owned table is workspace-scoped from its first migration.
-- **Channels.** Feedback appears on the reviewed work, on the developer's practice page, and in conversation.
-  A change to what feedback carries needs a decision per channel.
+- **Destinations.** Feedback appears on the reviewed work, on the developer's practice page, and in conversation.
+  A change to what feedback carries needs a decision per destination.
 - **Reverse states.** Include needs exclude, pause needs resume, customize needs reset. A one-way
   door is a bug.
 - **Both admin consoles.** Instance-wide and per-workspace administration share components.

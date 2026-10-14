@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.commit;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -14,13 +14,13 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Triggers commit metadata enrichment when new commits arrive via webhooks.
  *
- * <p>Listens for {@link ScmDomainEvent.CommitCreated} events and calls
- * {@link CommitMetadataEnrichmentService#enrichCommitMetadata} to resolve
- * multi-author contributor data, signature details, and associated PR links.
+ * <p>Listens for {@link ScmDomainEvent.CommitCreated} events and calls {@link
+ * CommitMetadataEnrichmentService#enrichCommitMetadata} to resolve multi-author contributor data,
+ * signature details, and associated PR links.
  *
- * <p>Only fires for <em>webhook</em>-originated events. Sync-originated commits
- * are already enriched by {@code GitHubDataSyncService} at the end of each sync
- * cycle, so triggering enrichment again would be redundant.
+ * <p>Only fires for <em>webhook</em>-originated events. Sync-originated commits are already
+ * enriched by {@code GitHubDataSyncService} at the end of each sync cycle, so triggering enrichment
+ * again would be redundant.
  */
 @Slf4j
 @RequiredArgsConstructor

@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageInsert;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.persistence.Column;
 import jakarta.persistence.JoinColumn;

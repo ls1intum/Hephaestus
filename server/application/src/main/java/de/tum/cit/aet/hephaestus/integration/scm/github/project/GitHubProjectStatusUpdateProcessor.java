@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.project;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.events.GitHubProjectEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectStatusUpdateDTO;
@@ -16,9 +16,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Processor for GitHub Projects V2 status updates.
- */
+/** Processor for GitHub Projects V2 status updates. */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -82,7 +80,7 @@ public class GitHubProjectStatusUpdateProcessor {
         ProjectStatusUpdate statusUpdate = statusUpdateRepository
                 .findByNodeId(dto.nodeId())
                 .orElseThrow(() -> new IllegalStateException(
-                        "ProjectStatusUpdate not found after upsert: nodeId=" + dto.nodeId()));
+                        "ProjectStatusUpdate not found after upsert:" + " nodeId=" + dto.nodeId()));
 
         // Publish events
         EventContext eventContext = EventContext.from(context);

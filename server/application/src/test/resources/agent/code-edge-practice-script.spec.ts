@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
 import {
 	leadKeys,
 	runBundled,
@@ -65,7 +65,7 @@ const movies = [
 /** The lead of one Swift line that spells a crash operator. */
 function crash(file: string, line: number, operators: string, inPreview = false) {
 	return {
-		at: { change: file, line },
+		at: { file, line },
 		kind: "crash-operator",
 		facts: { language: "swift", operators, inPreview, testFile: file.startsWith("AppTests/") },
 	};
@@ -156,42 +156,47 @@ void test("the input practice lists edge constructs in code only, and none the l
 		]),
 		[
 			[
-				{ change: "App/Services/Movies.swift", line: 1 },
+				{ file: "App/Services/Movies.swift", line: 1, endLine: 1 },
 				"edge-construct",
 				"swift",
 				"subscript or slice",
 			],
 			[
-				{ change: "App/Services/Movies.swift", line: 3 },
+				{ file: "App/Services/Movies.swift", line: 3, endLine: 3 },
 				"edge-construct",
 				"swift",
 				"division or remainder by a name",
 			],
 			[
-				{ change: "App/Services/Movies.swift", line: 4 },
+				{ file: "App/Services/Movies.swift", line: 4, endLine: 4 },
 				"edge-construct",
 				"swift",
 				"payload decode",
 			],
 			[
-				{ change: "App/Services/Movies.swift", line: 9 },
+				{ file: "App/Services/Movies.swift", line: 9, endLine: 9 },
 				"edge-construct",
 				"swift",
 				"division or remainder by a name",
 			],
 			[
-				{ change: "App/Services/Movies.swift", line: 10 },
+				{ file: "App/Services/Movies.swift", line: 10, endLine: 10 },
 				"edge-construct",
 				"swift",
 				"extreme sentinel",
 			],
-			[{ change: "server/routes.ts", line: 1 }, "edge-construct", "typescript", "request input"],
+			[
+				{ file: "server/routes.ts", line: 1, endLine: 1 },
+				"edge-construct",
+				"typescript",
+				"request input",
+			],
 		],
 	);
 	assert.equal(result.facts?.divisionOrRemainderByAName, 2);
 	assert.equal(result.facts.requestInput, 1);
 	const directions = (result.directions ?? []).join(" ");
-	assert.match(directions, /not an observation/u);
+	assert.match(directions, /not a problem/u);
 	assert.doesNotMatch(directions, /investigate whether|is absent|exported-function/u);
 });
 
@@ -269,11 +274,15 @@ void test("the error practice lists the fallbacks and bare returns its criteria 
 		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
 		[
 			[
-				{ change: "App/Parsing.swift", line: 1 },
+				{ file: "App/Loader.swift", line: 1, endLine: 1 },
+				"guard-else-return",
+				{ language: "swift" },
+			],
+			[
+				{ file: "App/Parsing.swift", line: 1, endLine: 1 },
 				"fallback-on-a-failable-conversion",
 				{ language: "swift" },
 			],
-			[{ change: "App/Loader.swift", line: 1 }, "guard-else-return", { language: "swift" }],
 		],
 	);
 });
@@ -311,13 +320,13 @@ void test("public, private and unknown credential-named values remain inspection
 	assert.deepEqual(
 		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label)]),
 		[
-			[{ change: "Client.swift", line: 1 }, "credential-named-literal"],
-			[{ change: "Client.swift", line: 2 }, "credential-named-literal"],
-			[{ change: "Client.swift", line: 3 }, "credential-named-literal"],
-			[{ change: "Client.swift", line: 4 }, "credential-named-value-in-url-path-query"],
-			[{ change: "Client.swift", line: 5 }, "credential-named-value-in-url-path-query"],
-			[{ change: "Client.swift", line: 6 }, "logs-credential-named-value-response-body"],
-			[{ change: "Client.swift", line: 7 }, "logs-credential-named-value-response-body"],
+			[{ file: "Client.swift", line: 1, endLine: 1 }, "credential-named-literal"],
+			[{ file: "Client.swift", line: 2, endLine: 2 }, "credential-named-literal"],
+			[{ file: "Client.swift", line: 3, endLine: 3 }, "credential-named-literal"],
+			[{ file: "Client.swift", line: 4, endLine: 4 }, "credential-named-value-in-url-path-query"],
+			[{ file: "Client.swift", line: 5, endLine: 5 }, "credential-named-value-in-url-path-query"],
+			[{ file: "Client.swift", line: 6, endLine: 6 }, "logs-credential-named-value-response-body"],
+			[{ file: "Client.swift", line: 7, endLine: 7 }, "logs-credential-named-value-response-body"],
 		],
 	);
 	assert.match((result.directions ?? []).join(" "), /under class 5 of the standard/u);

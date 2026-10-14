@@ -62,22 +62,39 @@ import org.springframework.util.FileSystemUtils;
 public class GitRepositoryManager {
     public static final String TREE_LIMITATION_SUBMODULE = "SUBMODULE_EXCLUDED";
     public static final String TREE_LIMITATION_UNSAFE_PATH = "UNSAFE_PATH_EXCLUDED";
-    /** Name prefix of the checkouts this manager stages under the fabric root, so a sweep can tell its leftovers apart. */
+
+    /**
+     * Name prefix of the checkouts this manager stages under the fabric root, so a sweep can tell
+     * its leftovers apart.
+     */
     public static final String GIT_SNAPSHOT_PREFIX = "git-snapshot-";
-    /** Where a fetched review head lives in the mirror; content-addressed, so a refetch is idempotent. */
+
+    /**
+     * Where a fetched review head lives in the mirror; content-addressed, so a refetch is
+     * idempotent.
+     */
     public static final String REVIEW_REFS = "refs/hephaestus/reviews/";
-    /** What the review container may see of the mirror's refs, with their types; the admission reads it back. */
+
+    /**
+     * What the review container may see of the mirror's refs, with their types; the admission reads
+     * it back.
+     */
     public static final String CAPTURED_REFS = "hephaestus-captured-refs";
 
     private static final String MIRRORS = "mirrors";
     private static final String PROCESS_SPOOL_ID = UUID.randomUUID() + "-";
     private static final Logger log = LoggerFactory.getLogger(GitRepositoryManager.class);
     private static final int PAGE_SIZE = 256;
-    /** A walk stops after this many pages that needed capture; the next sync cycle resumes from the captured set. */
+
+    /**
+     * A walk stops after this many pages that needed capture; the next sync cycle resumes from the
+     * captured set.
+     */
     private static final int MAX_DETAIL_PAGES_PER_WALK = 32;
 
     private static final List<RefSpec> MIRROR_REFSPECS =
             List.of(new RefSpec("+refs/heads/*:refs/heads/*"), new RefSpec("+refs/tags/*:refs/tags/*"));
+
     /** The mirror's heads become the checkout's remote branches, as in any developer's clone. */
     private static final List<RefSpec> SNAPSHOT_REFSPECS = List.of(
             new RefSpec("+refs/heads/*:refs/remotes/origin/*"),
@@ -112,7 +129,8 @@ public class GitRepositoryManager {
         try (Stream<Path> workspaces = Files.list(mirrors)) {
             for (Path workspace : workspaces.toList()) {
                 Path mirror = workspace.resolve(repositoryId + ".git");
-                // A fetch that just finished may still be packing in the background; a file it removes
+                // A fetch that just finished may still be packing in the background; a file it
+                // removes
                 // under the walk is not a failure to delete.
                 if (Files.isDirectory(mirror)) {
                     FileUtils.delete(mirror.toFile(), FileUtils.RECURSIVE | FileUtils.RETRY | FileUtils.SKIP_MISSING);
@@ -129,7 +147,8 @@ public class GitRepositoryManager {
             Path mirror = mirror(repository);
             try {
                 if (!isRepositoryCloned(repository) || !hasOrigin(mirror, cloneUrl)) {
-                    // A mirror is a cache keyed by ids a restore can reuse for another upstream: rebuild
+                    // A mirror is a cache keyed by ids a restore can reuse for another
+                    // upstream: rebuild
                     // rather than retarget, so no old objects survive.
                     FileSystemUtils.deleteRecursively(mirror);
                     Files.createDirectories(mirror.getParent());
@@ -139,9 +158,11 @@ public class GitRepositoryManager {
                             .call()) {
                         StoredConfig config = git.getRepository().getConfig();
                         config.setString("remote", "origin", "url", cloneUrl);
-                        // A redirect would carry the credential to a host the clone URL never named.
+                        // A redirect would carry the credential to a host the clone URL
+                        // never named.
                         config.setBoolean("http", null, "followRedirects", false);
-                        // A checkout may pin a commit no ref reaches any more; it is fetched from the mirror by id.
+                        // A checkout may pin a commit no ref reaches any more; it is
+                        // fetched from the mirror by id.
                         config.setBoolean("uploadpack", null, "allowAnySHA1InWant", true);
                         config.save();
                     }
@@ -162,7 +183,10 @@ public class GitRepositoryManager {
         });
     }
 
-    /** Fetches the provider's review ref for a head no branch reaches, such as a fork's, and pins it. */
+    /**
+     * Fetches the provider's review ref for a head no branch reaches, such as a fork's, and pins
+     * it.
+     */
     public boolean fetchRemoteCommit(
             RepositoryKey repository, String cloneUrl, String remoteRef, String expectedSha, @Nullable String token) {
         requireEnabled();
@@ -253,13 +277,14 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Hands every commit of {@code base..head} to {@code consumer} with its file changes, in no promised order: the
-     * whole range, which a staged record of a change must hold. The walk streams, so the caller's byte budget can stop
-     * it at the first commit over it; each commit's message is read as it is handed on and released after, so the
-     * messages of the range are never held together.
+     * Hands every commit of {@code base..head} to {@code consumer} with its file changes, in no
+     * promised order: the whole range, which a staged record of a change must hold. The walk
+     * streams, so the caller's byte budget can stop it at the first commit over it; each commit's
+     * message is read as it is handed on and released after, so the messages of the range are never
+     * held together.
      *
-     * @throws IllegalStateException when local git storage is disabled or the mirror does not hold either end, so
-     *     a range that could not be read is never mistaken for an empty one
+     * @throws IllegalStateException when local git storage is disabled or the mirror does not hold
+     *     either end, so a range that could not be read is never mistaken for an empty one
      */
     public void forEachCommitBetween(
             RepositoryKey repository, String base, String head, Consumer<CommitDetails> consumer) {
@@ -273,7 +298,8 @@ public class GitRepositoryManager {
                 throw new IllegalStateException("The mirror does not hold the pinned range " + base + ".." + head);
             }
             try (RevWalk walk = new RevWalk(repo)) {
-                // REVERSE buffers the whole range before yielding, so the byte budget cannot stop it early.
+                // REVERSE buffers the whole range before yielding, so the byte budget
+                // cannot stop it early.
                 walk.setRetainBody(false);
                 walk.markStart(walk.parseCommit(to));
                 walk.markUninteresting(walk.parseCommit(from));
@@ -309,7 +335,10 @@ public class GitRepositoryManager {
         });
     }
 
-    /** Every commit reachable from any ref; completion markers skip individual SHAs, never ancestor ranges. */
+    /**
+     * Every commit reachable from any ref; completion markers skip individual SHAs, never ancestor
+     * ranges.
+     */
     public void forEachMissingCommit(
             RepositoryKey repository, Function<List<String>, Set<String>> captured, Consumer<CommitDetails> consumer) {
         if (!isEnabled()) return;
@@ -350,7 +379,9 @@ public class GitRepositoryManager {
         if (!page.isEmpty() && capturedPages < MAX_DETAIL_PAGES_PER_WALK) visitPage(repo, page, captured, consumer);
     }
 
-    /** @return whether any commit of the page still needed capture */
+    /**
+     * @return whether any commit of the page still needed capture
+     */
     private boolean visitPage(
             Repository repo,
             List<RevCommit> page,
@@ -402,10 +433,14 @@ public class GitRepositoryManager {
                 deletions,
                 changes.size(),
                 changes,
-                Stream.of(commit.getParents()).map(RevCommit::getName).toList());
+                Stream.of(commit.getParents()).map(RevCommit::getName).toList(),
+                commit.getFullMessage());
     }
 
-    /** A merge's changes are those against its first parent, as {@code --diff-merges=first-parent} lists them. */
+    /**
+     * A merge's changes are those against its first parent, as {@code --diff-merges=first-parent}
+     * lists them.
+     */
     private static List<FileChange> fileChanges(Repository repo, RevCommit commit) throws IOException {
         List<FileChange> changes = new ArrayList<>();
         try (RevWalk walk = new RevWalk(repo);
@@ -451,11 +486,63 @@ public class GitRepositoryManager {
         return List.copyOf(changes);
     }
 
+    /** Captures regular files at one commit without history or author attribution. */
+    public GitTreeSnapshot readScanSnapshot(RepositoryKey repository, String sha) {
+        if (!isEnabled()) throw new IllegalStateException("Repository capture is disabled");
+        if (!ObjectId.isId(sha)) throw new GitOperationException("Invalid scan commit", new IOException());
+        return locks.withReadLock(repository, () -> {
+            Path staging = null;
+            try (Git git = Git.open(mirror(repository).toFile());
+                    RevWalk walk = new RevWalk(git.getRepository());
+                    ObjectReader reader = git.getRepository().newObjectReader();
+                    TreeWalk tree = new TreeWalk(reader)) {
+                RevCommit commit = walk.parseCommit(ObjectId.fromString(sha));
+                tree.addTree(commit.getTree());
+                tree.setRecursive(true);
+                Files.createDirectories(layout.root());
+                staging = Files.createTempDirectory(layout.root(), GIT_SNAPSHOT_PREFIX + PROCESS_SPOOL_ID);
+                long bytes = 0, files = 0;
+                Set<String> limitations = new TreeSet<>();
+                while (tree.next()) {
+                    checkInterrupted();
+                    FileMode mode = tree.getFileMode(0);
+                    if (!mode.equals(FileMode.REGULAR_FILE) && !mode.equals(FileMode.EXECUTABLE_FILE)) {
+                        continue;
+                    }
+                    String name = tree.getPathString();
+                    Path target = staging.resolve(name).normalize();
+                    if (name.contains("\\")
+                            || !target.startsWith(staging)
+                            || name.equals(".git")
+                            || name.startsWith(".git/")) {
+                        limitations.add(TREE_LIMITATION_UNSAFE_PATH);
+                        continue;
+                    }
+                    var object = reader.open(tree.getObjectId(0), Constants.OBJ_BLOB);
+                    bytes = Math.addExact(bytes, object.getSize());
+                    if (bytes > properties.maxSnapshotBytes())
+                        throw new GitOperationException("Scan tree exceeds the snapshot size limit", new IOException());
+                    Files.createDirectories(target.getParent());
+                    try (var output = Files.newOutputStream(target)) {
+                        object.copyTo(output);
+                    }
+                    files++;
+                }
+                return new GitTreeSnapshot(
+                        staging, sha, commit.getTree().getName(), bytes, files, limitations.isEmpty(), limitations);
+            } catch (IOException | RuntimeException e) {
+                if (staging != null) deleteTreeQuietly(staging);
+                throw new GitOperationException("Cannot capture the pinned scan tree", e);
+            }
+        });
+    }
+
     /**
      * A checkout of {@code sha} with its own {@code .git}: the mirror's branches and tags as remote
-     * refs, the reviewed commit detached at HEAD, symbolic links written as files holding their target,
-     * no remote configuration and no credential. Measured before anything is written; a repository over
-     * the bound is refused whole. The caller closes the snapshot to delete the directory.
+     * refs, the reviewed commit detached at HEAD, symbolic links written as files holding their
+     * target, no remote configuration and no credential. Measured before anything is written; a
+     * repository over the bound is refused whole. The caller closes the snapshot to delete the
+     * directory.
      */
     public GitTreeSnapshot readTreeSnapshot(RepositoryKey repository, String sha) {
         requireEnabled();
@@ -464,11 +551,12 @@ public class GitRepositoryManager {
     }
 
     /**
-     * The checkout {@link #readTreeSnapshot} made of {@code sha}, again: measured, bounded and limited the same way,
-     * but holding only the named original commits and their history from the local mirror's own objects. No remote
-     * is contacted and no branch, tag or other current ref is copied, so no captured-refs record is written; the
-     * caller restores the original one. A commit the mirror no longer holds refuses the snapshot rather than being
-     * replaced. The caller closes the snapshot to delete it.
+     * The checkout {@link #readTreeSnapshot} made of {@code sha}, again: measured, bounded and
+     * limited the same way, but holding only the named original commits and their history from the
+     * local mirror's own objects. No remote is contacted and no branch, tag or other current ref is
+     * copied, so no captured-refs record is written; the caller restores the original one. A commit
+     * the mirror no longer holds refuses the snapshot rather than being replaced. The caller closes
+     * the snapshot to delete it.
      */
     public GitTreeSnapshot readOriginalSnapshot(RepositoryKey repository, String sha, Collection<String> commits) {
         requireEnabled();
@@ -481,7 +569,10 @@ public class GitRepositoryManager {
         return snapshot(repository, sha, List.copyOf(wanted), "Cannot restore the original Git snapshot");
     }
 
-    /** {@code originals} empty: the mirror's current refs, as a capture takes them; else only those commits. */
+    /**
+     * {@code originals} empty: the mirror's current refs, as a capture takes them; else only those
+     * commits.
+     */
     private GitTreeSnapshot snapshot(RepositoryKey repository, String sha, List<String> originals, String failure) {
         return locks.withReadLock(repository, () -> {
             Path mirror = mirror(repository);
@@ -527,7 +618,8 @@ public class GitRepositoryManager {
                 staging = Files.createTempDirectory(layout.root(), GIT_SNAPSHOT_PREFIX + PROCESS_SPOOL_ID);
                 try (Git git = Git.init().setDirectory(staging.toFile()).call()) {
                     StoredConfig config = git.getRepository().getConfig();
-                    // A link in the checkout would let the review read outside it; it is a file holding the target.
+                    // A link in the checkout would let the review read outside it; it is a
+                    // file holding the target.
                     config.setBoolean("core", null, "symlinks", false);
                     config.save();
                     if (originals.isEmpty()) {
@@ -539,7 +631,8 @@ public class GitRepositoryManager {
                     }
                     if (!originals.isEmpty()
                             || !git.getRepository().getObjectDatabase().has(commit)) {
-                        // Pinned by id only: the reviewed commit on no ref here, or each original commit.
+                        // Pinned by id only: the reviewed commit on no ref here, or each
+                        // original commit.
                         git.fetch()
                                 .setRemote(mirror.toUri().toString())
                                 .setRefSpecs((originals.isEmpty() ? List.of(sha) : originals)
@@ -570,7 +663,10 @@ public class GitRepositoryManager {
         });
     }
 
-    /** Tags are peeled and every line carries its type, so a tag on a tree or blob is witnessed, not walked. */
+    /**
+     * Tags are peeled and every line carries its type, so a tag on a tree or blob is witnessed, not
+     * walked.
+     */
     private static void writeCapturedRefs(Repository repo) throws IOException {
         try (RevWalk walk = new RevWalk(repo);
                 Writer out = Files.newBufferedWriter(
@@ -582,8 +678,12 @@ public class GitRepositoryManager {
                 if (id == null) continue;
                 Ref peeled = repo.getRefDatabase().peel(ref);
                 ObjectId target = peeled.getPeeledObjectId() != null ? peeled.getPeeledObjectId() : id;
-                out.write(Constants.typeString(walk.parseAny(target).getType()) + " " + target.getName() + " "
-                        + ref.getName() + "\n");
+                out.write(Constants.typeString(walk.parseAny(target).getType())
+                        + " "
+                        + target.getName()
+                        + " "
+                        + ref.getName()
+                        + "\n");
             }
         }
     }
@@ -610,7 +710,10 @@ public class GitRepositoryManager {
         T apply(Repository repo) throws IOException;
     }
 
-    /** Runs a read against the mirror under its read lock; a fetch cannot rewrite refs underneath it. */
+    /**
+     * Runs a read against the mirror under its read lock; a fetch cannot rewrite refs underneath
+     * it.
+     */
     public <T> @Nullable T read(RepositoryKey repository, MirrorRead<T> operation) {
         return locks.withReadLock(repository, () -> {
             try (Git git = Git.open(mirror(repository).toFile())) {
@@ -628,7 +731,10 @@ public class GitRepositoryManager {
                 .resolve(repository.repositoryId() + ".git");
     }
 
-    /** JGit fetches from the first configured URL but reads back the last; a stale value ahead of the current one is a change. */
+    /**
+     * JGit fetches from the first configured URL but reads back the last; a stale value ahead of
+     * the current one is a change.
+     */
     private static boolean hasOrigin(Path mirror, String cloneUrl) throws IOException {
         try (Git git = Git.open(mirror.toFile())) {
             String[] urls = git.getRepository().getConfig().getStringList("remote", "origin", "url");

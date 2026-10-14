@@ -30,7 +30,6 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.consumer.ConsumerSubjectMath;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.IntegrationNatsConsumer;
 import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
@@ -57,6 +56,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabSyncServiceHolder;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenRotationClient;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabUserLookup;
@@ -79,6 +79,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.user.GitLabUserService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabConnectionWebhookController;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabRouteCredential;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.webhook.GitLabSubjectKeyDeriver;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.NatsTestContainer;
@@ -90,13 +91,12 @@ import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActivationService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepositoryMonitorService;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryAlreadyMonitoredException;
 import de.tum.cit.aet.hephaestus.workspace.exception.RepositoryProviderNotConnectedException;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTarget;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import io.nats.client.JetStreamApiException;
 import io.nats.client.JetStreamManagement;
 import io.nats.client.Nats;
@@ -148,9 +148,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * GitLab webhook events from a real JetStream stream reach the database while the workspace's full sync is
- * held open, and a new group's webhook opens only once its scope consumer is ready. Each test drives one
- * lifecycle; only the GitLab API is stubbed.
+ * GitLab webhook events from a real JetStream stream reach the database while the workspace's full
+ * sync is held open, and a new group's webhook opens only once its scope consumer is ready. Each
+ * test drives one lifecycle; only the GitLab API is stubbed.
  */
 class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
@@ -181,7 +181,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         registry.add("hephaestus.sync.nats.enabled", () -> "true");
         registry.add("hephaestus.sync.nats.server", NatsTestContainer::getServerUrl);
         registry.add("hephaestus.sync.run-on-startup", () -> "true");
-        // Production receives webhooks in its own container; this test publishes to the stream itself.
+        // Production receives webhooks in its own container; this test publishes to the stream
+        // itself.
         registry.add("hephaestus.runtime.webhook.enabled", () -> "false");
     }
 
@@ -281,7 +282,7 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     private GitLabRepositoryMonitors repositoryMonitors;
 
     @Autowired
-    private PracticeReviewRepositoryTargetRepository practiceReviewRepositoryTargetRepository;
+    private ReviewScopeRepositoryRepository practiceReviewRepositoryTargetRepository;
 
     @Autowired
     private WorkspaceRepositoryMonitorService workspaceRepositoryMonitorService;
@@ -430,7 +431,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 ConsumerConfiguration.builder()
                         .durable(ConsumerSubjectMath.scopeConsumerName(
                                         natsConnectionProperties.durableConsumerName(), restarted.getId())
-                                + "-" + STREAM)
+                                + "-"
+                                + STREAM)
                         .filterSubjects(legacyFilter().toArray(String[]::new))
                         .deliverPolicy(DeliverPolicy.New)
                         .build());
@@ -711,10 +713,11 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * The project leaves the connected group for another workspace's group. That workspace handling the move first is
-     * simulated by storing what its admission stores: the shared row at the new path; this workspace's monitor then has
-     * only its native id to be found by. Handled first here, the monitor has no native id, as one created before ids
-     * were recorded, and is found through the stored row of the same project.
+     * The project leaves the connected group for another workspace's group. That workspace handling
+     * the move first is simulated by storing what its admission stores: the shared row at the new
+     * path; this workspace's monitor then has only its native id to be found by. Handled first
+     * here, the monitor has no native id, as one created before ids were recorded, and is found
+     * through the stored row of the same project.
      */
     private void assertMoveOutStopsOnlyThisWorkspacesMonitor(boolean destinationFirst) throws Exception {
         createStream();
@@ -806,10 +809,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow()
                 .getId();
         Workspace selecting = workspaceRepository.findById(workspaceId).orElseThrow();
-        selecting.getReviewSettings().setRepositoryCoverageMode(ReviewRepositoryMode.SELECTED);
+        selecting.getReviewSettings().setReviewScopeRepositories(ReviewScopeMode.SELECTED);
         workspaceRepository.save(selecting);
-        practiceReviewRepositoryTargetRepository.save(
-                new PracticeReviewRepositoryTarget(workspaceId, original, List.of()));
+        practiceReviewRepositoryTargetRepository.save(new ReviewScopeRepository(workspaceId, original, List.of()));
         String renamed = GROUP + "/renamed-repository";
         doReturn(Optional.of(reported(projectId, renamed)))
                 .when(projectSyncService)
@@ -821,7 +823,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         deliver(connected, onProject(fixture("gitlab/issue.open.json"), renamed, projectId), "work-at-new-path");
         awaitAcknowledged();
 
-        // Before the rename event: the work event alone must have moved the original monitor and its review target.
+        // Before the rename event: the work event alone must have moved the original monitor and
+        // its review target.
         assertThat(repositoryToMonitorRepository.findByWorkspaceIdAndNativeId(workspaceId, projectId))
                 .singleElement()
                 .satisfies(monitor -> {
@@ -833,13 +836,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertThat(practiceReviewCoverageService.scope(reviewed).repositories())
                 .extracting(ReviewRepositoryTarget::nameWithOwner)
                 .containsExactly(renamed);
-        assertThat(practiceReviewCoverageService
-                        .assess(reviewed, renamed, "main", null, true)
-                        .repositoryMatched())
+        assertThat(practiceReviewCoverageService.admits(reviewed, renamed, "main", null, true))
                 .isTrue();
-        assertThat(practiceReviewCoverageService
-                        .assess(reviewed, REPOSITORY, "main", null, true)
-                        .repositoryMatched())
+        assertThat(practiceReviewCoverageService.admits(reviewed, REPOSITORY, "main", null, true))
                 .isFalse();
 
         ObjectNode rename = (ObjectNode) projectCreate(renamed, projectId);
@@ -908,9 +907,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         foreign.setNativeId(projectId);
         repositoryToMonitorRepository.save(foreign);
         practiceReviewRepositoryTargetRepository.save(
-                new PracticeReviewRepositoryTarget(workspaceId, duplicate.getId(), List.of("main")));
+                new ReviewScopeRepository(workspaceId, duplicate.getId(), List.of("main")));
         practiceReviewRepositoryTargetRepository.save(
-                new PracticeReviewRepositoryTarget(other.getId(), foreign.getId(), List.of("develop")));
+                new ReviewScopeRepository(other.getId(), foreign.getId(), List.of("develop")));
         project.setNameWithOwner(renamed);
         Repository listed = repositoryRepository.save(project);
 
@@ -959,7 +958,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertThat(repositoryMonitors.monitorAllowed(loaded, List.of(samePathElsewhere, outsideGroup)))
                 .isZero();
 
-        // The selection stored when the lock is held decides, not a Workspace the transaction loaded before.
+        // The selection stored when the lock is held decides, not a Workspace the transaction
+        // loaded before.
         Repository project = foreignRepository(NESTED_PROJECT, NESTED_PROJECT_ID);
         ExecutorService committer = Executors.newSingleThreadExecutor();
         try {
@@ -980,7 +980,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
             committer.shutdownNow();
         }
 
-        // A creator that saw the connection active waits for a disconnect holding the lock, then writes nothing.
+        // A creator that saw the connection active waits for a disconnect holding the lock, then
+        // writes nothing.
         CountDownLatch locked = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         ExecutorService threads = Executors.newFixedThreadPool(2);
@@ -1232,7 +1233,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldRecordNothingReadForAMergeRequestWhoseProjectMovesOutOfTheGroupWhileGitLabIsRead() throws Exception {
-        // Another workspace's connection records the move; this connection and its monitor are left as they were.
+        // Another workspace's connection records the move; this connection and its monitor are left
+        // as they were.
         PullRequest mergeRequest = deliverMergeRequestUpdateWhileGitLabIsRead(
                 connected -> transactionTemplate.executeWithoutResult(status -> repositoryRepository
                         .findByNameWithOwner(REPOSITORY)
@@ -1245,9 +1247,10 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Delivers an update of merge request !2 through the connection's hook, with issue #5 stored and GitLab reporting
-     * the merge request mergeable and closing #5, and runs {@code duringRead} while GitLab is read after the update is
-     * stored. Returns the merge request as stored once the delivery is acknowledged.
+     * Delivers an update of merge request !2 through the connection's hook, with issue #5 stored
+     * and GitLab reporting the merge request mergeable and closing #5, and runs {@code duringRead}
+     * while GitLab is read after the update is stored. Returns the merge request as stored once the
+     * delivery is acknowledged.
      */
     private PullRequest deliverMergeRequestUpdateWhileGitLabIsRead(Consumer<Workspace> duringRead) throws Exception {
         createStream();
@@ -1315,7 +1318,8 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldKeepTheMergeButRecordNoMergerAndOfferNoReviewWhenTheProjectMovesOutOfTheGroupWhileGitLabIsRead()
             throws Exception {
-        // Another workspace's connection records the move; this connection and its monitor are left as they were.
+        // Another workspace's connection records the move; this connection and its monitor are left
+        // as they were.
         PullRequest merged = deliverMergeWhileGitLabIsRead(
                 connected -> transactionTemplate.executeWithoutResult(status -> repositoryRepository
                         .findByNameWithOwner(REPOSITORY)
@@ -1325,7 +1329,10 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
         assertKeptOnlyWhatTheHookSaid(merged);
     }
 
-    /** The merge the hook stored before GitLab was read stays; nothing the read named is recorded or offered. */
+    /**
+     * The merge the hook stored before GitLab was read stays; nothing the read named is recorded or
+     * offered.
+     */
     private void assertKeptOnlyWhatTheHookSaid(PullRequest merged) {
         assertThat(merged.getState()).isEqualTo(Issue.State.MERGED);
         assertThat(merged.getMergeCommitSha()).isEqualTo(HOOK_MERGE_COMMIT);
@@ -1338,9 +1345,10 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Delivers merge request !2 opened and then merged through the connection's hook, whose merge names no merger or
-     * merge time, with GitLab then reporting that its author merged it, and runs {@code duringRead} while GitLab is read
-     * after the merge is stored. Returns the merge request as stored once the merge is acknowledged.
+     * Delivers merge request !2 opened and then merged through the connection's hook, whose merge
+     * names no merger or merge time, with GitLab then reporting that its author merged it, and runs
+     * {@code duringRead} while GitLab is read after the merge is stored. Returns the merge request
+     * as stored once the merge is acknowledged.
      */
     private PullRequest deliverMergeWhileGitLabIsRead(Consumer<Workspace> duringRead) throws Exception {
         createStream();
@@ -1430,7 +1438,10 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(HttpStatus.ACCEPTED);
     }
 
-    /** Posts {@code body} to the connection endpoint {@code route}, the {@code keyId/routeId} of a hook URL. */
+    /**
+     * Posts {@code body} to the connection endpoint {@code route}, the {@code keyId/routeId} of a
+     * hook URL.
+     */
     private HttpStatusCode ingest(
             long connectionId, String route, String token, String instance, String deliveryKey, byte[] body)
             throws Exception {
@@ -1708,7 +1719,10 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 .count();
     }
 
-    /** What the durable of an earlier release subscribed: the monitored repository and the group tier. */
+    /**
+     * What the durable of an earlier release subscribed: the monitored repository and the group
+     * tier.
+     */
     private static Set<String> legacyFilter() {
         return Set.of(
                 ConsumerSubjectMath.repositoryFilter(STREAM, REPOSITORY),

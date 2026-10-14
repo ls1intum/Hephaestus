@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent;
 
-import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillConflictException;
-import de.tum.cit.aet.hephaestus.agent.backfill.ReviewSweepScheduleConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUpstreamIdConflictException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentBindingSlotMismatchException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
+import de.tum.cit.aet.hephaestus.practices.review.schedule.ReviewBatchConflictException;
+import de.tum.cit.aet.hephaestus.practices.review.schedule.ReviewScheduleConflictException;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.net.URI;
 import java.util.Optional;
@@ -33,13 +33,13 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {
 
-    @ExceptionHandler(ReviewBackfillConflictException.class)
-    ProblemDetail handleReviewBackfillConflict(ReviewBackfillConflictException exception) {
+    @ExceptionHandler(ReviewBatchConflictException.class)
+    ProblemDetail handleReviewBackfillConflict(ReviewBatchConflictException exception) {
         return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
     }
 
-    @ExceptionHandler(ReviewSweepScheduleConflictException.class)
-    ProblemDetail handleReviewSweepScheduleConflict(ReviewSweepScheduleConflictException exception) {
+    @ExceptionHandler(ReviewScheduleConflictException.class)
+    ProblemDetail handleReviewSweepScheduleConflict(ReviewScheduleConflictException exception) {
         return problem(
                 HttpStatus.CONFLICT, "review-sweep-schedule-conflict", "Review sweep schedule conflict", exception);
     }
@@ -62,8 +62,8 @@ public class AgentControllerAdvice {
                 new IllegalStateException("The record changed while the server processed this request. Try again."));
     }
 
-    @ExceptionHandler(AgentJobStateConflictException.class)
-    ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {
+    @ExceptionHandler(ReviewJobStateConflictException.class)
+    ProblemDetail handleAgentJobStateConflict(ReviewJobStateConflictException exception) {
         return problem(HttpStatus.CONFLICT, "agent-job-state-conflict", "Agent job state conflict", exception);
     }
 

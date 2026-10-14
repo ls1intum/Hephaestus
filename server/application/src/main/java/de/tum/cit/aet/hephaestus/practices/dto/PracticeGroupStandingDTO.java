@@ -1,79 +1,50 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
-import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendSupportDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.GuidanceSource;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "A developer's derived qualitative standing for one Group including 1<=n<many practices")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PracticeGroupStandingDTO(
-        @NonNull @Schema(description = "Group slug") String groupSlug,
-        @NonNull @Schema(description = "Group name") String groupName,
+        String groupSlug,
+        String groupName,
+        PracticeStanding standing,
 
-        @NonNull @Schema(description = "Derived qualitative standing across the group's practices")
-        Standing standing,
-
-        @Nullable
-        @Schema(
-                description =
-                        "Developer guidance aggregated from the group's feedback (null unless the standing is a verdict). "
-                                + "The deterministic summary combines standing, next focus, and developer-facing catalog guidance.")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         String guidance,
 
-        @Nullable @Schema(description = "How the guidance text was produced (null when there is no guidance)")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         GuidanceSource guidanceSource,
 
-        @Nullable @Schema(description = "Evidence-weighted, opportunity-indexed direction across the group's practices")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         TrendDirection direction,
 
-        @Nullable @Schema(description = "Evidence support and provenance for the direction")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         TrendSupportDTO trendSupport,
 
-        @Nullable
-        @Schema(description = "Calendar span covered by the feedback, for provenance only; never a trend-analysis unit")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Integer feedbackSpanDays,
 
-        @Nullable @Schema(description = "Oldest contributing result, for provenance only (null without a verdict)")
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Instant feedbackSince,
 
-        @NonNull
-        @Schema(description = "Supporting results the standing derives from (problems first); empty without a verdict")
-        List<PracticeStandingResultDTO> practiceResults,
-
-        @NonNull
-        @Schema(
-                description =
-                        "Distinct pieces of reviewed work the results come from, per kind (provenance, not a score); empty without a verdict")
+        List<PracticeStandingResultDTO> results,
         List<FeedbackSourceCountDTO> sources) {
-    public enum Standing {
-        DEVELOPING,
-        STRENGTH,
-        MIXED,
-        NOT_OBSERVED,
-        NO_OPPORTUNITY;
-
-        /** A group's standing is its practices' rolled up, on the same scale under the same names. */
-        public PracticeStandingDTO.Standing asPracticeStanding() {
-            return switch (this) {
-                case DEVELOPING -> PracticeStandingDTO.Standing.DEVELOPING;
-                case STRENGTH -> PracticeStandingDTO.Standing.STRENGTH;
-                case MIXED -> PracticeStandingDTO.Standing.MIXED;
-                case NOT_OBSERVED -> PracticeStandingDTO.Standing.NOT_OBSERVED;
-                case NO_OPPORTUNITY -> PracticeStandingDTO.Standing.NO_OPPORTUNITY;
-            };
-        }
+    public PracticeGroupStandingDTO {
+        results = List.copyOf(results);
+        sources = List.copyOf(sources);
     }
 
-    public static boolean isVerdict(Standing standing) {
-        return standing == Standing.DEVELOPING || standing == Standing.MIXED || standing == Standing.STRENGTH;
-    }
-
-    public enum GuidanceSource {
-        RULE_BASED,
+    public static boolean isVerdict(PracticeStanding standing) {
+        return standing == PracticeStanding.DEVELOPING
+                || standing == PracticeStanding.MIXED
+                || standing == PracticeStanding.STRENGTH;
     }
 }

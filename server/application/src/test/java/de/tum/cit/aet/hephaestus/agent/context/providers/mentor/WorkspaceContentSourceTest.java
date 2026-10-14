@@ -5,7 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -60,7 +60,7 @@ class WorkspaceContentSourceTest extends BaseUnitTest {
         when(queryRepository.findPendingReviewRequestPrs(eq(1L), eq(2L))).thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
+        provider.contribute(new MentorContextRequest(1L, 2L, UUID.randomUUID(), null), files);
 
         byte[] bytes = files.get("inputs/context/workspace.json");
         assertThat(bytes).isNotNull();

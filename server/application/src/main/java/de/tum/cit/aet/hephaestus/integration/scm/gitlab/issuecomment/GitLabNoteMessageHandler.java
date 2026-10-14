@@ -4,8 +4,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -170,7 +170,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
                         event.objectAttributes().id());
             case null, default ->
                 log.debug(
-                        "Skipped note with unsupported noteable type: projectPath={}, noteableType={}, noteId={}",
+                        "Skipped note with unsupported noteable type: projectPath={}," + " noteableType={}, noteId={}",
                         safeProjectPath,
                         noteableType,
                         event.objectAttributes().id());
@@ -184,8 +184,8 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
     }
 
     /**
-     * Records the review decision a system note names its author for. A note's embedded
-     * {@code merge_request.detailed_merge_status} is the merge request's, not its author's: GitLab reports
+     * Records the review decision a system note names its author for. A note's embedded {@code
+     * merge_request.detailed_merge_status} is the merge request's, not its author's: GitLab reports
      * {@code requested_changes} there on every note while anyone's request for changes stands.
      */
     private void recordReviewDecision(GitLabNoteEventDTO event) {
@@ -210,7 +210,8 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
                 .orElse(null);
         if (at == null || author == null || pullRequest == null) {
             log.debug(
-                    "Skipped review-decision note: reason=unresolved, noteId={}, mrIid={}, authorPresent={}, mrPresent={}",
+                    "Skipped review-decision note: reason=unresolved, noteId={}, mrIid={},"
+                            + " authorPresent={}, mrPresent={}",
                     note.id(),
                     mr.iid(),
                     author != null,
@@ -235,7 +236,7 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
         var mr = event.mergeRequest();
         if (mr == null || mr.iid() == null) {
             log.warn(
-                    "Bot command on MR note but no embedded merge_request data: projectPath={}, noteId={}",
+                    "Bot command on MR note but no embedded merge_request data: projectPath={}," + " noteId={}",
                     safeProjectPath,
                     attrs.id());
             return;
@@ -247,14 +248,15 @@ public class GitLabNoteMessageHandler extends AbstractIntegrationMessageHandler<
             return;
         }
 
-        // Dropped here rather than published unattributed: a command without a named author cannot be
+        // Dropped here rather than published unattributed: a command without a named author cannot
+        // be
         // authorized downstream, and the subscriber would still spend real budget on it.
         var user = event.user();
         Long providerId = context.providerId();
         Long scopeId = context.scopeId();
         if (user == null || user.id() == null || providerId == null || scopeId == null) {
             log.warn(
-                    "Bot command: no identifiable author on the note payload, projectPath={}, mrIid={}, noteId={}",
+                    "Bot command: no identifiable author on the note payload, projectPath={}," + " mrIid={}, noteId={}",
                     safeProjectPath,
                     mr.iid(),
                     attrs.id());

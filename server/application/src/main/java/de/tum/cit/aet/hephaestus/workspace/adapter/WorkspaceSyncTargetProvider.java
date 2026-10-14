@@ -18,8 +18,8 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceScopeFilter;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTarget;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepository;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -36,18 +36,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Adapter that bridges workspace entities to the sync engine SPI.
- * <p>
- * This adapter maps workspace domain concepts to the generic SPI abstractions:
+ *
+ * <p>This adapter maps workspace domain concepts to the generic SPI abstractions:
+ *
  * <ul>
- *   <li>Workspace → Scope (identified by scopeId)</li>
- *   <li>RepositoryToMonitor → SyncTarget (identified by syncTargetId)</li>
+ *   <li>Workspace → Scope (identified by scopeId)
+ *   <li>RepositoryToMonitor → SyncTarget (identified by syncTargetId)
  * </ul>
- * <p>
- * Implements the full sync provider interface hierarchy:
+ *
+ * <p>Implements the full sync provider interface hierarchy:
+ *
  * <ul>
- *   <li>{@link SyncTargetProvider} - Core sync target operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTimestampProvider SyncTimestampProvider} - Sync timestamp operations</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider BackfillStateProvider} - Backfill state management</li>
+ *   <li>{@link SyncTargetProvider} - Core sync target operations
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.SyncTimestampProvider
+ *       SyncTimestampProvider} - Sync timestamp operations
+ *   <li>{@link de.tum.cit.aet.hephaestus.integration.core.spi.BackfillStateProvider
+ *       BackfillStateProvider} - Backfill state management
  * </ul>
  */
 @Component
@@ -64,7 +68,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     // Absent under the webhook runtime role — reconcile then skips the consumer refresh.
     private final ObjectProvider<IntegrationNatsConsumer> natsConsumerService;
 
-    private final PracticeReviewRepositoryTargetRepository practiceReviewRepositoryTargetRepository;
+    private final ReviewScopeRepositoryRepository practiceReviewRepositoryTargetRepository;
 
     public WorkspaceSyncTargetProvider(
             WorkspaceRepository workspaceRepository,
@@ -73,7 +77,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             ConnectionService connectionService,
             NatsConnectionProperties natsProperties,
             ObjectProvider<IntegrationNatsConsumer> natsConsumerService,
-            PracticeReviewRepositoryTargetRepository practiceReviewRepositoryTargetRepository) {
+            ReviewScopeRepositoryRepository practiceReviewRepositoryTargetRepository) {
         this.workspaceRepository = workspaceRepository;
         this.repositoryToMonitorRepository = repositoryToMonitorRepository;
         this.workspaceScopeFilter = workspaceScopeFilter;
@@ -85,7 +89,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
 
     private void logSkippedForUnreadableCredential(Workspace workspace, CredentialUnreadableException e) {
         log.error(
-                "Skipping workspace from sync enumeration: reason=credentialUnreadable, workspaceId={}, connectionId={}, kind={}",
+                "Skipping workspace from sync enumeration: reason=credentialUnreadable,"
+                        + " workspaceId={}, connectionId={}, kind={}",
                 workspace.getId(),
                 e.connectionId(),
                 e.kind());
@@ -102,9 +107,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             // findActiveProviderKind fail loud. This filter runs while streaming EVERY workspace at
             // the top of the daily sync cron (getSyncSessions/getSyncStatistics);
             // letting the throw escape would abort the whole enumeration and silently skip the sync
-            // for every other tenant until the bad row is fixed out-of-band. Drop just this workspace.
+            // for every other tenant until the bad row is fixed out-of-band. Drop just this
+            // workspace.
             log.error(
-                    "Skipping workspace from sync enumeration: reason=dualActiveProvider, workspaceId={}, error={}",
+                    "Skipping workspace from sync enumeration: reason=dualActiveProvider,"
+                            + " workspaceId={}, error={}",
                     workspace.getId(),
                     e.getMessage());
             return false;
@@ -117,7 +124,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         return workspaceRepository
                 .findById(scopeId)
                 .map(ws -> ws.getRepositoriesToMonitor().stream()
-                        // Apply repository filter to respect monitoring configuration (e.g., dev environment limits)
+                        // Apply repository filter to respect monitoring
+                        // configuration (e.g., dev environment limits)
                         .filter(workspaceScopeFilter::isRepositoryAllowed)
                         .map(rtm -> SyncTargetFactory.create(ws, rtm, connectionService))
                         .toList())
@@ -154,7 +162,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             repositoryToMonitorRepository.save(rtm);
                         },
                         () -> log.debug(
-                                "Skipped sync timestamp update: reason=syncTargetNotFound, syncTargetId={}",
+                                "Skipped sync timestamp update: reason=syncTargetNotFound," + " syncTargetId={}",
                                 syncTargetId));
     }
 
@@ -227,7 +235,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             workspaceRepository.save(ws);
                         },
                         () -> log.warn(
-                                "Failed to update scope sync timestamp: reason=workspaceNotFound, workspaceId={}",
+                                "Failed to update scope sync timestamp:" + " reason=workspaceNotFound, workspaceId={}",
                                 scopeId));
     }
 
@@ -236,14 +244,13 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         // The accountLogin is always the GitHub account (org or user) that owns the repositories,
         // so it's safe to use for organization-level operations like team sync.
         // For user accounts, the team sync will simply find no teams (which is expected).
-        var organization = workspace.getOrganization();
-        String orgLogin = organization != null ? organization.getLogin() : workspace.getAccountLogin();
+        String orgLogin = workspace.getAccountLogin();
 
         return new SyncMetadata(
                 workspace.getId(),
                 workspace.getDisplayName(),
                 orgLogin,
-                organization != null ? organization.getId() : null,
+                workspace.getOrganizationId(),
                 workspace.getIssueTypesSyncedAt(),
                 workspace.getIssueDependenciesSyncedAt(),
                 workspace.getSubIssuesSyncedAt());
@@ -266,7 +273,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             workspaceRepository.save(ws);
                         },
                         () -> log.warn(
-                                "Failed to update users sync timestamp: reason=workspaceNotFound, workspaceId={}",
+                                "Failed to update users sync timestamp:" + " reason=workspaceNotFound, workspaceId={}",
                                 scopeId));
     }
 
@@ -275,7 +282,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     public Optional<TeamSyncState> getTeamSyncState(Long scopeId) {
         return workspaceRepository.findById(scopeId).map(ws -> {
             var orgNames = ws.getRepositoriesToMonitor().stream()
-                    // Apply repository filter to derive org names only from allowed repositories
+                    // Apply repository filter to derive org names only from
+                    // allowed repositories
                     .filter(workspaceScopeFilter::isRepositoryAllowed)
                     .map(RepositoryToMonitor::getNameWithOwner)
                     .map(s -> s.split("/", -1)[0])
@@ -296,7 +304,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             workspaceRepository.save(ws);
                         },
                         () -> log.warn(
-                                "Failed to update teams sync timestamp: reason=workspaceNotFound, workspaceId={}",
+                                "Failed to update teams sync timestamp:" + " reason=workspaceNotFound, workspaceId={}",
                                 scopeId));
     }
 
@@ -348,9 +356,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             repositoryToMonitorRepository.save(rtm);
                         },
                         () ->
-                                // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                                // DEBUG: Expected during workspace reconfiguration when repository
+                                // is removed mid-sync
                                 log.debug(
-                                        "Skipped issue backfill state update: reason=syncTargetNotFound, syncTargetId={}",
+                                        "Skipped issue backfill state update:"
+                                                + " reason=syncTargetNotFound, syncTargetId={}",
                                         syncTargetId));
     }
 
@@ -377,9 +387,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             repositoryToMonitorRepository.save(rtm);
                         },
                         () ->
-                                // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                                // DEBUG: Expected during workspace reconfiguration when repository
+                                // is removed mid-sync
                                 log.debug(
-                                        "Skipped pull request backfill state update: reason=syncTargetNotFound, syncTargetId={}",
+                                        "Skipped pull request backfill state update:"
+                                                + " reason=syncTargetNotFound, syncTargetId={}",
                                         syncTargetId));
     }
 
@@ -390,7 +402,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     private void removeMonitor(Long syncTargetId) {
-        // A workspace holds its monitors eagerly with orphan removal: one deleted while its loaded workspace still
+        // A workspace holds its monitors eagerly with orphan removal: one deleted while its loaded
+        // workspace still
         // holds it would be persisted again at flush, so it is removed from that set as well.
         repositoryToMonitorRepository.findById(syncTargetId).ifPresent(monitor -> {
             Workspace workspace = monitor.getWorkspace();
@@ -415,12 +428,13 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             return;
         }
         practiceReviewRepositoryTargetRepository
-                .findById(new PracticeReviewRepositoryTarget.Key(workspaceId, duplicateSyncTargetId))
+                .findById(new ReviewScopeRepository.Key(workspaceId, duplicateSyncTargetId))
                 .ifPresent(carried -> {
-                    // The kept monitor reviews what either one did: no base branches means every branch.
+                    // The kept monitor reviews what either one did: no base branches means
+                    // every branch.
                     List<String> branches = practiceReviewRepositoryTargetRepository
-                            .findById(new PracticeReviewRepositoryTarget.Key(workspaceId, keptSyncTargetId))
-                            .map(PracticeReviewRepositoryTarget::getBaseBranches)
+                            .findById(new ReviewScopeRepository.Key(workspaceId, keptSyncTargetId))
+                            .map(ReviewScopeRepository::getBaseBranches)
                             .map(own ->
                                     own.isEmpty() || carried.getBaseBranches().isEmpty()
                                             ? List.<String>of()
@@ -430,7 +444,7 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             .orElse(carried.getBaseBranches());
                     practiceReviewRepositoryTargetRepository.delete(carried);
                     practiceReviewRepositoryTargetRepository.save(
-                            new PracticeReviewRepositoryTarget(workspaceId, keptSyncTargetId, branches));
+                            new ReviewScopeRepository(workspaceId, keptSyncTargetId, branches));
                 });
         removeMonitor(duplicateSyncTargetId);
     }
@@ -443,8 +457,9 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     /**
-     * Whether the monitor's stored native id is that of another provider instance's repository of its name, as an id
-     * resolved by name alone once took it, and no repository of the workspace's own source provider holds it.
+     * Whether the monitor's stored native id is that of another provider instance's repository of
+     * its name, as an id resolved by name alone once took it, and no repository of the workspace's
+     * own source provider holds it.
      */
     private boolean holdsAnotherInstancesId(RepositoryToMonitor rtm, Long resolvedNativeId) {
         return rtm.getId() != null
@@ -459,8 +474,10 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         repositoryToMonitorRepository.findById(syncTargetId).ifPresent(rtm -> {
             boolean dirty = false;
 
-            // Capture the stable id the first time it resolves, and replace one proven to belong to another provider
-            // instance's repository of the same name: the scoped queries would hide the monitored repository.
+            // Capture the stable id the first time it resolves, and replace one
+            // proven to belong to another provider
+            // instance's repository of the same name: the scoped queries would hide
+            // the monitored repository.
             if (resolvedNativeId != null
                     && (rtm.getNativeId() == null
                             || (!rtm.getNativeId().equals(resolvedNativeId)
@@ -473,13 +490,16 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
             boolean nameDiffers = resolvedNameWithOwner != null
                     && !resolvedNameWithOwner.isBlank()
                     && !resolvedNameWithOwner.equals(rtm.getNameWithOwner());
-            // Re-key only when the stable id agrees (or was just captured) — never rename by name
+            // Re-key only when the stable id agrees (or was just captured) — never
+            // rename by name
             // alone, which could clobber a legitimately reassigned row.
             boolean idAgrees = rtm.getNativeId() != null
                     && (resolvedNativeId == null || rtm.getNativeId().equals(resolvedNativeId));
             if (nameDiffers && idAgrees) {
                 log.info(
-                        "Re-keying repository monitor after upstream rename/transfer: syncTargetId={}, oldName={}, newName={}, nativeId={}",
+                        "Re-keying repository monitor after upstream"
+                                + " rename/transfer: syncTargetId={}, oldName={},"
+                                + " newName={}, nativeId={}",
                         syncTargetId,
                         sanitizeForLog(rtm.getNameWithOwner()),
                         sanitizeForLog(resolvedNameWithOwner),
@@ -493,8 +513,10 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                 repositoryToMonitorRepository.save(rtm);
             }
 
-            // A name change moves the repo's NATS subject; rebuild the workspace consumer filters so
-            // live events under the new name are delivered instead of silently ACK-dropped.
+            // A name change moves the repo's NATS subject; rebuild the workspace
+            // consumer filters so
+            // live events under the new name are delivered instead of silently
+            // ACK-dropped.
             if (nameChanged && natsProperties.enabled() && rtm.getWorkspace() != null) {
                 Long workspaceId = rtm.getWorkspace().getId();
                 natsConsumerService.ifAvailable(svc -> svc.updateScopeConsumer(workspaceId));
@@ -509,7 +531,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
         if (nativeId == null || newNameWithOwner == null || newNameWithOwner.isBlank()) {
             return;
         }
-        // Shared repositories mean N monitors for one nativeId on this provider — re-key each, reusing the single
+        // Shared repositories mean N monitors for one nativeId on this provider — re-key each,
+        // reusing the single
         // re-key/consumer-refresh body so webhook healing and reconcile healing cannot diverge.
         for (RepositoryToMonitor rtm :
                 repositoryToMonitorRepository.findByNativeIdOnSourceProvider(nativeId, providerId)) {
@@ -518,8 +541,8 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
     }
 
     /**
-     * Persists the pagination cursor for the given kind onto the RepositoryToMonitor
-     * ({@code syncTargetId}-keyed) row.
+     * Persists the pagination cursor for the given kind onto the RepositoryToMonitor ({@code
+     * syncTargetId}-keyed) row.
      */
     @Override
     @Transactional
@@ -536,9 +559,11 @@ public class WorkspaceSyncTargetProvider implements SyncTargetProvider {
                             repositoryToMonitorRepository.save(rtm);
                         },
                         () ->
-                                // DEBUG: Expected during workspace reconfiguration when repository is removed mid-sync
+                                // DEBUG: Expected during workspace reconfiguration when repository
+                                // is removed mid-sync
                                 log.debug(
-                                        "Skipped sync cursor update: reason=syncTargetNotFound, kind={}, syncTargetId={}",
+                                        "Skipped sync cursor update: reason=syncTargetNotFound,"
+                                                + " kind={}, syncTargetId={}",
                                         kind,
                                         syncTargetId));
     }

@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -19,9 +20,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 /**
- * Unit tests for {@link RegistrationToGitProviderResolver}, the {@code GitProviderRegistry} SPI impl:
- * given a login provider's {@code (type, baseUrl)}, it upserts the {@code git_provider} row keyed on
- * the canonical server-url origin (scheme + host + explicit non-default port).
+ * Unit tests for {@link RegistrationToGitProviderResolver}, the {@code GitProviderRegistry} SPI
+ * impl: given a login provider's {@code (type, baseUrl)}, it upserts the {@code git_provider} row
+ * keyed on the canonical server-url origin (scheme + host + explicit non-default port).
  */
 @Tag("unit")
 class RegistrationToGitProviderResolverTest {
@@ -34,7 +35,8 @@ class RegistrationToGitProviderResolverTest {
     void setup() {
         gitProviderRepository = mock(IdentityProviderRepository.class);
         userRepository = mock(UserRepository.class);
-        resolver = new RegistrationToGitProviderResolver(gitProviderRepository, userRepository);
+        resolver = new RegistrationToGitProviderResolver(
+                gitProviderRepository, userRepository, org.mockito.Mockito.mock(ConnectionRepository.class));
     }
 
     @Test

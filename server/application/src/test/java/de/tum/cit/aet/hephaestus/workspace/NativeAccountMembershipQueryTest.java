@@ -4,35 +4,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
 class NativeAccountMembershipQueryTest extends BaseUnitTest {
-    private final WorkspaceMembershipRepository memberships = mock(WorkspaceMembershipRepository.class);
-    private final CurrentAccountUsers accountUsers = mock(CurrentAccountUsers.class);
-    private final AccountIdentityQuery identities = mock(AccountIdentityQuery.class);
-    private final AccountWorkspaceMembershipQueryAdapter query = new AccountWorkspaceMembershipQueryAdapter(
-            memberships, accountUsers, identities, mock(WorkspaceActorSelector.class));
+    private final MembershipRepository memberships = mock(MembershipRepository.class);
+    private final AccountDirectory accounts = mock(AccountDirectory.class);
+    private final AccountMembershipQueryAdapter query = new AccountMembershipQueryAdapter(memberships, accounts);
 
     @Test
-    void shouldResolveAdministratorByProviderIdentityRatherThanCachedActorLink() {
-        var provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
-        provider.setId(1L);
-        var actor = new User();
-        actor.setProvider(provider);
-        actor.setNativeId(123L);
-        var membership = mock(WorkspaceMembership.class);
-        when(membership.getUser()).thenReturn(actor);
-        when(membership.getRole()).thenReturn(WorkspaceMembership.WorkspaceRole.ADMIN);
-        when(memberships.findAllWithUserByWorkspaceId(7L)).thenReturn(List.of(membership));
-        when(identities.resolveActiveAccountId(1L, "123", null)).thenReturn(Optional.of(41L));
-
+    void shouldResolveAdministratorWhenAnActiveAccountHoldsTheRole() {
+        var account = new Account("Administrator");
+        account.setId(41L);
+        var member = new Membership();
+        member.setId(new Membership.Id(7L, account.getId()));
+        member.setRole(Membership.WorkspaceRole.ADMIN);
+        when(memberships.findByWorkspace_Id(7L)).thenReturn(List.of(member));
+        when(accounts.find(41L))
+                .thenReturn(Optional.of(new AccountDirectory.AccountView(
+                        41L, Account.Status.ACTIVE, "Administrator", null, null, true)));
         assertThat(query.administratorAccountIds(7L)).containsExactly(41L);
         assertThat(query.isAdministrator(7L, 41L)).isTrue();
         assertThat(query.isAdministrator(7L, 42L)).isFalse();

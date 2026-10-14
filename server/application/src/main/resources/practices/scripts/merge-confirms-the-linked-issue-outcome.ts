@@ -1,16 +1,17 @@
-// Finds each captured linked issue of a merged pull request: its task-list items as captured, ticked
-// and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
-// of them this change implements. A lead is a candidate, not a claim.
-import { factsOf } from "../lib/bounded-text.ts";
-import { REVIEW_LEAD_LIMIT } from "../lib/contract.ts";
-import { subIssueRollup } from "../lib/issue-classification.ts";
-import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { subIssueRollup } from "../kits/scm/issue-classification.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
-} from "../lib/references.ts";
-import { checkableItems, readLinkedWorkItems, reviewsMergedWork } from "../lib/review.ts";
+} from "../kits/scm/references.ts";
+import { checkableItems, readLinkedWorkItems, reviewsMergedWork } from "../kits/scm/review.ts";
+// Finds each captured linked issue of a merged pull request: its task-list items as captured, ticked
+// and unticked, its sub-issue rollup, its state, and how the change names it. The review decides which
+// of them this change implements. A lead is a candidate, not a claim.
+import { factsOf } from "../lib/core/bounded-text.ts";
+import { REVIEW_LEAD_LIMIT } from "../lib/core/contract.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"checkable-outcome":
@@ -43,8 +44,9 @@ function howLinked(
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		if (!reviewsMergedWork(ctx.cause)) {
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		if (!reviewsMergedWork(ctx.review)) {
 			return ctx.review({
 				leads: [],
 				directions: [
@@ -52,13 +54,13 @@ export default definePracticeScript({
 				],
 			});
 		}
-		const { work } = ctx;
-		const body = work.body ?? "";
+		const { item: record } = domain;
+		const body = record.body ?? "";
 		const closing = new Set(closingReferences(body));
 		const named = new Set([
-			...issueNumberReferences(work.title ?? ""),
+			...issueNumberReferences(record.title ?? ""),
 			...issueNumberReferences(body),
-			...branchIssueReferences(work.source_branch),
+			...branchIssueReferences(record.source_branch),
 		]);
 		const captured = await readLinkedWorkItems(ctx.evidence);
 		const linked = captured ?? [];

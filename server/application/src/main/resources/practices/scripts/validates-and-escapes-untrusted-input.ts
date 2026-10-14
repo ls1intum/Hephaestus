@@ -1,15 +1,11 @@
+import { isCommentLine } from "../kits/scm/declarations.ts";
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
+import { languageOf } from "../kits/scm/languages.ts";
 // Finds each added line with a dangerous operation (a sink) that has an untrusted input (a source)
 // within a small window of added lines in the same file. The review traces if the source reaches the
 // sink without validation or escaping. Each language adds rows to the source and sink tables.
-import { factsOf, noMatchDirections } from "../lib/bounded-text.ts";
-import { isCommentLine } from "../lib/declarations.ts";
-import { languageOf } from "../lib/languages.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { factsOf, noMatchDirections } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 /** A label -> pattern table row. The label is a fact of the lead, so it is rendered verbatim. */
 type PatternRows = [string, RegExp][];
@@ -182,8 +178,9 @@ function firstMatch(rows: PatternRows, content: string): string | null {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
 		const leads: ReviewLead[] = [];
 		let flowCount = 0;
 		let linesAdded = 0;

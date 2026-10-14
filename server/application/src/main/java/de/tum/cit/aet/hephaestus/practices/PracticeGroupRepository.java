@@ -7,29 +7,21 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
-import org.springframework.transaction.annotation.Transactional;
 
-@Repository
-@WorkspaceAgnostic(
-        "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save")
+@WorkspaceAgnostic("Group reads and deletion carry workspaceId")
 public interface PracticeGroupRepository extends JpaRepository<PracticeGroup, Long> {
-    List<PracticeGroup> findByWorkspaceIdOrderByDisplayOrderAscNameAsc(Long workspaceId);
+    List<PracticeGroup> findByWorkspaceIdOrderByPositionAscNameAsc(Long workspaceId);
 
-    List<PracticeGroup> findByWorkspaceIdAndVisibleInPracticeDashboardsTrueOrderByDisplayOrderAscNameAsc(
-            Long workspaceId);
+    List<PracticeGroup> findByWorkspaceIdAndShownToDevelopersTrueOrderByPositionAscNameAsc(Long workspaceId);
 
     Optional<PracticeGroup> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
-    @Query("SELECT COALESCE(MAX(a.displayOrder), -1) FROM PracticeGroup a WHERE a.workspace.id = :workspaceId")
-    int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId);
+    @Query("SELECT COALESCE(MAX(g.position), -1) FROM PracticeGroup g WHERE g.workspace.id =" + " :workspaceId")
+    int findMaxPosition(Long workspaceId);
 
-    /** Deletes all groups for the workspace. Practices' {@code practice_group_id} is SET NULL by the FK. */
     @Modifying
-    @Transactional
     @Query("DELETE FROM PracticeGroup g WHERE g.workspace.id = :workspaceId")
-    void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
+    void deleteAllByWorkspaceId(Long workspaceId);
 }

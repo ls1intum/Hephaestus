@@ -1,20 +1,20 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.workspace;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
+import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Component;
 
 /**
- * {@link ScmTokenSource} for GitLab — exposes the PAT bound to a workspace's active
- * GitLab connection plus the resolved server URL.
+ * {@link ScmTokenSource} for GitLab — exposes the PAT bound to a workspace's active GitLab
+ * connection plus the resolved server URL.
  *
- * <p>Wraps {@link GitLabTokenService} so cross-module callers (agent context preparation)
- * don't need to import the GitLab service directly. {@link ConditionalOnBean} gates this
- * impl on the GitLab service existing — under the webhook-only runtime role the GitLab
- * stack is disabled and this bean simply doesn't register.
+ * <p>Wraps {@link GitLabTokenService} so cross-module callers (agent context preparation) don't
+ * need to import the GitLab service directly. {@link ConditionalOnBean} gates this impl on the
+ * GitLab service existing — under the webhook-only runtime role the GitLab stack is disabled and
+ * this bean simply doesn't register.
  */
 @Component
 @ConditionalOnBean(GitLabTokenService.class)

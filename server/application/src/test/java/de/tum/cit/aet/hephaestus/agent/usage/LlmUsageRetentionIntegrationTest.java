@@ -2,6 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -71,9 +74,9 @@ class LlmUsageRetentionIntegrationTest extends AbstractWorkspaceIntegrationTest 
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
-        event.setJobType(LlmUsageJobType.PULL_REQUEST_REVIEW);
+        event.setJobType("PRACTICE_REVIEW");
         event.setSourceId(UUID.randomUUID());
-        event.setSourceType(LlmUsageSourceType.AGENT_JOB);
+        event.setSourceType(UsageSourceType.REVIEW_JOB);
         event.setOccurredAt(occurredAt);
         return event;
     }

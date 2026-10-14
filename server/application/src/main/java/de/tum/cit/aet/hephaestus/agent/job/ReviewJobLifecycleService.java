@@ -1,0 +1,157 @@
+package de.tum.cit.aet.hephaestus.agent.job;
+
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerJobCancelDispatcher;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+/** Post-submission lifecycle operations on an agent job: user cancel and delivery retry. */
+@Service
+public class ReviewJobLifecycleService {
+
+    private static final Logger log = LoggerFactory.getLogger(ReviewJobLifecycleService.class);
+
+    private static final Set<ReviewJobStatus> ACTIVE_STATUSES = Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING);
+
+    private final ReviewJobRepository agentJobRepository;
+    private final TransactionTemplate transactionTemplate;
+    private final @Nullable SandboxManager sandboxManager;
+    private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
+    private final LlmUsageRecorder usageRecorder;
+    private final ObjectMapper objectMapper;
+    private final ReviewJobTelemetry jobTelemetry;
+
+    public ReviewJobLifecycleService(
+            ReviewJobRepository agentJobRepository,
+            TransactionTemplate transactionTemplate,
+            @Nullable SandboxManager sandboxManager,
+            Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
+            LlmUsageRecorder usageRecorder,
+            ObjectMapper objectMapper,
+            ReviewJobTelemetry jobTelemetry) {
+        this.agentJobRepository = agentJobRepository;
+        this.transactionTemplate = transactionTemplate;
+        this.sandboxManager = sandboxManager;
+        this.workerJobCancelDispatcher = workerJobCancelDispatcher;
+        this.usageRecorder = usageRecorder;
+        this.objectMapper = objectMapper;
+        this.jobTelemetry = jobTelemetry;
+    }
+
+    private record CancelOutcome(ReviewJob job, boolean dispatchCancel) {}
+
+    /**
+     * Idempotent when the job is already CANCELLED; throws 409 for any other terminal state.
+     *
+     * <p>The ledger write runs INSIDE the status-transition transaction ({@link LlmUsageRecorder}'s
+     * append is {@code MANDATORY}) so accounting and the state change stand or fall together. Only the
+     * sandbox cancel runs after the commit, because it leaves the database.
+     */
+    public ReviewJob cancel(Long workspaceId, UUID jobId) {
+        CancelOutcome outcome = transactionTemplate.execute(status -> cancelTransition(workspaceId, jobId));
+
+        // Split deployment: ask the owning worker to stop its container over the WSS channel (ADR 0009).
+        // No-op if that worker isn't connected here — the DB transition + backstops still finish the cancel.
+        if (outcome.dispatchCancel()) {
+            String workerId = outcome.job().getWorkerId();
+            if (workerId != null) {
+                workerJobCancelDispatcher.ifPresent(d -> d.dispatch(workerId, jobId, "user-cancel"));
+            }
+
+            // Monolith / co-located worker: stop the container in-process.
+            if (sandboxManager != null) {
+                try {
+                    sandboxManager.cancel(jobId);
+                } catch (Exception e) {
+                    log.warn("Sandbox cancel failed for job {} (status already CANCELLED): {}", jobId, e.getMessage());
+                }
+            }
+        }
+
+        return outcome.job();
+    }
+
+    private ReviewJob requireJob(Long workspaceId, UUID jobId) {
+        return agentJobRepository
+                .findByIdAndWorkspaceId(jobId, workspaceId)
+                .orElseThrow(() -> new EntityNotFoundException("ReviewJob", jobId.toString()));
+    }
+
+    private int casToCancelled(UUID jobId) {
+        return agentJobRepository.transitionToCancelled(
+                jobId, Instant.now(), null, ReviewJobCancellationReason.CANCELLED_BY_REQUESTER, ACTIVE_STATUSES);
+    }
+
+    /** The status-transition CAS + races, run inside {@link #transactionTemplate}. */
+    private CancelOutcome cancelTransition(Long workspaceId, UUID jobId) {
+        ReviewJob job = requireJob(workspaceId, jobId);
+
+        if (job.getStatus() == ReviewJobStatus.CANCELLED) {
+            return new CancelOutcome(job, false);
+        }
+
+        if (!ACTIVE_STATUSES.contains(job.getStatus())) {
+            throw new ReviewJobStateConflictException("This review already finished. You cannot cancel it.");
+        }
+
+        if (casToCancelled(jobId) == 0) {
+            ReviewJob raced = requireJob(workspaceId, jobId);
+            if (!ACTIVE_STATUSES.contains(raced.getStatus())) {
+                throw new ReviewJobStateConflictException("This review finished before the server could cancel it.");
+            }
+            // Back inside the CAS window, so a concurrent claim moved it there; retry once and then
+            // report whatever state the loser observes rather than spinning against the executor.
+            if (casToCancelled(jobId) == 0) {
+                ReviewJob racedAgain = requireJob(workspaceId, jobId);
+                if (racedAgain.getStatus() != ReviewJobStatus.CANCELLED) {
+                    throw new ReviewJobStateConflictException(
+                            "This review changed state while the server canceled it. Reload the review and try again.");
+                }
+                return new CancelOutcome(racedAgain, false);
+            }
+        }
+
+        // Reload to read worker_id, which is only set at claim.
+        ReviewJob fresh = requireJob(workspaceId, jobId);
+        recordUnverifiableUsageIfStarted(workspaceId, fresh);
+        jobTelemetry.terminal(fresh, ReviewJobStatus.CANCELLED, ReviewJobTelemetry.age(fresh));
+        return new CancelOutcome(fresh, true);
+    }
+
+    /**
+     * Appends the attempt's ledger rows only once the job crossed {@code execution_started_at}. A non-null
+     * {@code worker_id} proves only that a worker claimed the row, and preparation before that boundary
+     * cannot incur provider usage — booking it would make the workspace's month unverifiable for free.
+     */
+    private void recordUnverifiableUsageIfStarted(Long workspaceId, ReviewJob job) {
+        if (job.getExecutionStartedAt() == null) {
+            return;
+        }
+        ConfigSnapshot snap = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
+        LlmPriceSnapshot price =
+                snap.priceSnapshot() != null ? snap.priceSnapshot() : LlmPriceSnapshot.unpricedInstance();
+        // A cancel from the API cannot see what the attempt consumed; the executor path that observes
+        // the cancellation bills the proxy-attributed tokens, so the review's own row carries none. A
+        // practice script call waits for the job row and is dropped once the transition above ends the
+        // attempt, so the practice script rows are complete here.
+        boolean billed =
+                TerminalUsage.none().appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
+        log.info(
+                "Recorded {} usage ledger entry (user-cancel): jobId={}",
+                billed ? "a confirmed" : "an UNPRICED",
+                job.getId());
+    }
+}

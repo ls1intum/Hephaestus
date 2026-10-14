@@ -5,8 +5,8 @@ import {
 	readCapturedCommits,
 	readCommits,
 	type ChangedFile,
-} from "../../../../../../docker/agents/practice-scripts/lib/change.ts";
-import { subjectFacts } from "../../../../../../docker/agents/practice-scripts/lib/commit-subjects.ts";
+} from "../../../../../../docker/agents/practice-scripts/kits/scm/change.ts";
+import { subjectFacts } from "../../../../../../docker/agents/practice-scripts/kits/scm/commit-subjects.ts";
 import {
 	leadKeys,
 	runBundled,
@@ -89,7 +89,7 @@ void test("a subject's shape is a fact — bare, repeated, listed, cut off — a
 async function runOnCommitRecord(slug: string, record: unknown) {
 	const result = await runBundled(slug, {
 		context: { "commits.json": record },
-		contextReference: "areas/changed-work",
+		contextReference: "areas/changed-item",
 	});
 	return { ...result, leads: result.leads ?? [] };
 }
@@ -208,7 +208,7 @@ const renamed = (name: string) => ({
 void test("a commit lead lists the edited files with their line counts before the moves, and names no kinds", async () => {
 	const commits = [
 		// A README subject whose commit also moves the source tree and adds a view: only the edited files
-		// and their counts show the second piece of work, so the moves must not push them out of view.
+		// and their counts show the second piece of item, so the moves must not push them out of view.
 		commit(
 			"1111111",
 			"Create problem statement\n",
@@ -221,7 +221,7 @@ void test("a commit lead lists the edited files with their line counts before th
 				{ status: "M", path: "README.md", additions: 20, deletions: 5 },
 			],
 		),
-		// A feature and its package entry: two top-level locations, one piece of work.
+		// A feature and its package entry: two top-level locations, one piece of item.
 		commit(
 			"2222222",
 			"Add order history, and adjust invoice loading\n",

@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Per-worker in-flight counts for review jobs and mentor sessions. Read by the capacity
- * reporter, drain coordinator, and {@code AgentJobExecutor}; resolved maxes come from
+ * reporter, drain coordinator, and {@code ReviewJobExecutor}; resolved maxes come from
  * {@link WorkerProperties}.
  */
 public final class WorkerCapacityState {
@@ -62,7 +62,7 @@ public final class WorkerCapacityState {
 
     /**
      * Idempotent: returns when the counter is already at 0 instead of throwing, because release
-     * paths fire from defensive code (e.g. {@code AgentJobExecutor.releaseCapacity}) that can't
+     * paths fire from defensive code (e.g. {@code ReviewJobExecutor.releaseCapacity}) that can't
      * tolerate an exception, and the early-shutdown / double-release window is real but harmless.
      */
     private static void decrementIfPositive(AtomicInteger counter) {

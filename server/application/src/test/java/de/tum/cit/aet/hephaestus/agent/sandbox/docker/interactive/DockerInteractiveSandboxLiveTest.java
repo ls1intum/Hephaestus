@@ -499,10 +499,11 @@ class DockerInteractiveSandboxLiveTest {
                     containerId,
                     "sh",
                     "-c",
-                    "set -e; " + "touch /workspace/scratch/probe && rm /workspace/scratch/probe && echo scratch:rw; "
-                            + "touch /workspace/context/user/probe && rm /workspace/context/user/probe && echo user:rw; "
-                            + "if touch /workspace/context/target/probe 2>/dev/null; then echo target:RW_UNEXPECTED; else echo target:ro; fi; "
-                            + "if touch /workspace/context/probe 2>/dev/null; then echo context:RW_UNEXPECTED; else echo context:ro; fi");
+                    "set -e; touch /workspace/scratch/probe && rm /workspace/scratch/probe && echo scratch:rw; touch"
+                            + " /workspace/context/user/probe && rm /workspace/context/user/probe && echo user:rw; if"
+                            + " touch /workspace/context/target/probe 2>/dev/null; then echo target:RW_UNEXPECTED; else"
+                            + " echo target:ro; fi; if touch /workspace/context/probe 2>/dev/null; then echo"
+                            + " context:RW_UNEXPECTED; else echo context:ro; fi");
             pb.redirectErrorStream(true);
             try {
                 Process p = pb.start();

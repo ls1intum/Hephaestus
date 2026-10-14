@@ -29,8 +29,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -106,8 +106,10 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         connection.setState(IntegrationState.ACTIVE);
         connection = connectionRepository.save(connection);
 
-        // A second tenant, owned by a different user. The @WithAdminUser principal is made an ADMIN of
-        // `workspace` only (via ensureAdminMembership) and never of this one, so every request it makes
+        // A second tenant, owned by a different user. The @WithAdminUser principal is made an ADMIN
+        // of
+        // `workspace` only (via ensureAdminMembership) and never of this one, so every request it
+        // makes
         // against these ids is a genuine cross-tenant reach.
         User otherOwner = persistUser("sync-other-owner-" + System.nanoTime());
         otherWorkspace = createWorkspace(
@@ -188,8 +190,10 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     void trigger_thenDuplicateWhileRunning_isIdempotentAbsorb() throws InterruptedException {
         ensureAdminMembership(workspace);
-        // Captured on the TEST thread: @WithAdminUser's SecurityContext lives in a plain (non-inheritable)
-        // ThreadLocal, so a background Thread sees no authentication unless the token travels explicitly.
+        // Captured on the TEST thread: @WithAdminUser's SecurityContext lives in a plain
+        // (non-inheritable)
+        // ThreadLocal, so a background Thread sees no authentication unless the token travels
+        // explicitly.
         String adminToken = TestAuthUtils.getCurrentUserToken();
         CountDownLatch runnerStarted = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
@@ -211,7 +215,8 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
         assertThat(runnerStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
-        // Duplicate manual trigger while the first job is still RUNNING: idempotent-absorb, 200 not 409.
+        // Duplicate manual trigger while the first job is still RUNNING: idempotent-absorb, 200 not
+        // 409.
         SyncJobDTO duplicateJob = triggerRequest(adminToken)
                 .expectStatus()
                 .isOk()
@@ -236,7 +241,8 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    @DisplayName("a BACKFILL requested while a RECONCILIATION is running is a type conflict → 409, not a 200-absorb")
+    @DisplayName(
+            "a BACKFILL requested while a RECONCILIATION is running is a type conflict → 409, not a" + " 200-absorb")
     void trigger_backfillWhileReconciliationRunning_returns409NotAbsorb() throws InterruptedException {
         ensureAdminMembership(workspace);
         when(githubSyncRunner.supportsBackfill()).thenReturn(true);
@@ -260,7 +266,8 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
         firstCaller.start();
         assertThat(runnerStarted.await(5, TimeUnit.SECONDS)).isTrue();
 
-        // Different-type request while the reconciliation holds the one-active slot: genuine conflict, not absorb.
+        // Different-type request while the reconciliation holds the one-active slot: genuine
+        // conflict, not absorb.
         triggerRequest(adminToken, SyncJobType.BACKFILL)
                 .expectStatus()
                 .isEqualTo(HttpStatus.CONFLICT)
@@ -272,7 +279,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    @DisplayName("an empty body (missing sync type) is a 400, not a misleading 409 from the NOT-NULL column")
+    @DisplayName("an empty body (missing sync type) is a 400, not a misleading 409 from the NOT-NULL" + " column")
     void trigger_missingType_returns400() {
         ensureAdminMembership(workspace);
         webTestClient
@@ -318,8 +325,10 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                             return null;
                         }
                     }
-                    // A real cooperative runner reports that it stopped early so the engine finalizes CANCELLED;
-                    // a body that merely returns after seeing the flag is (correctly) recorded SUCCEEDED.
+                    // A real cooperative runner reports that it stopped early so the engine
+                    // finalizes CANCELLED;
+                    // a body that merely returns after seeing the flag is (correctly)
+                    // recorded SUCCEEDED.
                     if (handle.isCancellationRequested()) {
                         handle.reportCancelled();
                     }
@@ -434,14 +443,16 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Test
     @WithAdminUser
-    @DisplayName("an admin of workspace A cannot reach workspace B's connection through ANY sync endpoint")
+    @DisplayName("an admin of workspace A cannot reach workspace B's connection through ANY sync" + " endpoint")
     void crossTenantConnection_everyEndpointReturns404() {
         ensureAdminMembership(workspace);
         String adminToken = TestAuthUtils.getCurrentUserToken();
         long foreignId = otherConnection.getId();
 
-        // 404, never 403: distinguishing "no such connection" from "exists, but not yours" would hand a
-        // probing admin an existence oracle over other tenants' connection ids. And never 200 — that is
+        // 404, never 403: distinguishing "no such connection" from "exists, but not yours" would
+        // hand a
+        // probing admin an existence oracle over other tenants' connection ids. And never 200 —
+        // that is
         // the IDOR itself. Both wrong answers are asserted against by pinning the exact status.
         webTestClient
                 .get()
@@ -504,8 +515,10 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @WithAdminUser
     @DisplayName("another tenant's job id, laundered through the admin's OWN connection, is still a 404")
     void crossTenantJobViaOwnConnection_returns404AndDoesNotCancel() {
-        // The cancel path resolves the job by (jobId, workspaceId) rather than via the connection, so it
-        // needs its own cross-tenant probe: a valid connection the caller genuinely owns, paired with a
+        // The cancel path resolves the job by (jobId, workspaceId) rather than via the connection,
+        // so it
+        // needs its own cross-tenant probe: a valid connection the caller genuinely owns, paired
+        // with a
         // job id belonging to another tenant.
         ensureAdminMembership(workspace);
 
@@ -537,10 +550,11 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     }
 
     /**
-     * Takes an explicit bearer token (rather than reading {@code TestAuthUtils.withCurrentUser()} at
-     * call time) so it can be invoked from a background {@link Thread}: {@code SecurityContextHolder}'s
-     * default strategy is a plain (non-inheritable) {@code ThreadLocal}, so a child thread sees no
-     * authentication unless the token is captured on the test thread and passed in explicitly.
+     * Takes an explicit bearer token (rather than reading {@code TestAuthUtils.withCurrentUser()}
+     * at call time) so it can be invoked from a background {@link Thread}: {@code
+     * SecurityContextHolder}'s default strategy is a plain (non-inheritable) {@code ThreadLocal},
+     * so a child thread sees no authentication unless the token is captured on the test thread and
+     * passed in explicitly.
      */
     private WebTestClient.ResponseSpec triggerRequest(String bearerToken) {
         return triggerRequest(bearerToken, SyncJobType.RECONCILIATION);

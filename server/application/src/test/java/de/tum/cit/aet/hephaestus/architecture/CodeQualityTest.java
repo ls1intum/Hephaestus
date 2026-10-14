@@ -148,8 +148,6 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "CommitRepository.updateEnrichmentMetadata",
                     "DiscussionCategoryRepository.upsertCategory",
                     "DiscussionRepository.upsertCore",
-                    "PracticeResultRepository.insertIfAbsent",
-                    "ObservationRepository.insert",
                     // Native INSERT ... ON CONFLICT DO NOTHING for an ingested Slack message; each column
                     // (workspace/team/channel/ts/thread_ts/author/member/text) is a distinct @Param.
                     "SlackMessageRepository.insertIfAbsent",
@@ -159,21 +157,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // JPQL admin-audit query: each nullable filter needs its own @Param for the
                     // CAST(:from AS Instant) IS NULL null-handling — a param object can't express it.
                     "AuthEventRepository.findForAdmin",
-                    // The same for the list of recorded work: each nullable bound and kind is its own @Param, since a
-                    // SpEL parameter object binds a null as bytea and the CAST(... AS Instant) IS NULL guard fails.
-                    // Callers use the SignalledArtifactFilter overload.
-                    "ArtifactSignalRepository.findSignalledArtifacts",
                     // Atomic JPQL terminal transition; Spring Data query parameters must remain individually bound.
-                    "SyncJobRepository.completeActiveJob",
-                    // Developer result feed: every optional facet needs its own @Param for the
-                    // (:hasX = FALSE OR col IN (:xs)) empty-list guard — an IN () is invalid SQL, and Spring Data
-                    // cannot bind a parameter object's components to named placeholders.
-                    "PracticeResultRepository.findByAboutUserAndWorkspace",
-                    "PracticeResultRepository.findByAboutUserAndWorkspaceSeverityFirst",
-                    // Review-run pagination at the run grain: same per-facet @Param binding, plus the
-                    // native run projection whose GROUP BY cannot be expressed through a derived query.
-                    "PracticeResultRepository.findPracticeGroupReviewRuns",
-                    "PracticeResultRepository.findPracticeGroupReviewRunResults");
+                    "SyncJobRepository.completeActiveJob");
 
             ArchCondition<JavaClass> haveMethodsWithLimitedParams =
                     new ArchCondition<>("have methods with at most " + MAX_METHOD_PARAMETERS + " parameters") {
@@ -204,7 +189,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                             events.add(SimpleConditionEvent.violated(
                                                     javaClass,
                                                     String.format(
-                                                            "COMPLEXITY: %s.%s has %d parameters (max %d) - consider parameter object",
+                                                            "COMPLEXITY: %s.%s has %d parameters (max %d) - consider"
+                                                                    + " parameter object",
                                                             javaClass.getSimpleName(),
                                                             method.getName(),
                                                             paramCount,
@@ -248,7 +234,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                             events.add(SimpleConditionEvent.violated(
                                                     javaClass,
                                                     String.format(
-                                                            "COMPLEXITY: %s.%s has %d boolean params - consider using enum or builder",
+                                                            "COMPLEXITY: %s.%s has %d boolean params - consider using"
+                                                                    + " enum or builder",
                                                             javaClass.getSimpleName(),
                                                             method.getName(),
                                                             booleanCount)));
@@ -289,7 +276,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "%s handles tokens but is not in app/auth/security/credentials/common/github package",
+                                                "%s handles tokens but is not in"
+                                                        + " app/auth/security/credentials/common/github package",
                                                 javaClass.getSimpleName())));
                             }
                         }
@@ -417,12 +405,13 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     // eagerly would recurse through evidence preparation into this mounted-store hook.
                     "FairRetryPostProcessor", // A static BeanPostProcessor must not initialize JDBC/serializer beans
                     // early.
+                    "AccountPurger", // PersonDataService's registry includes CoreAccountPersonDataCatalog, which
+                    // depends on this purger; resolve the erasure coordinator after initialization.
+                    "MembershipService", // Reads exist on every role; PeopleRegistryService is server-only.
                     "WorkspaceActivationService",
                     "GitHubLifecycleListener", // IntegrationNatsConsumer absent under the webhook runtime role
                     // (server.enabled=false) — see ADR 0008
                     "WorkspaceLifecycleService", // IntegrationNatsConsumer absent under the webhook runtime role
-                    "GitHubWorkspaceProvisioningAdapter", // Lazy-loaded to break circular reference with
-                    // GitHubDataSyncService
                     "WorkspaceRepositoryMonitorService",
                     "ScmWorkspaceContentEraser", // IntegrationNatsConsumer absent under the webhook runtime role — the
                     // erase refreshes the scope consumer once after dropping the
@@ -470,16 +459,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                     "OutlineConnectionSyncStateProvider", // Rate-limit tracker (OutlineRateLimitTracker) is
                     // @ConditionalOnProperty(outline.enabled) — same
                     // optional-bean break as the GitLab provider
-                    "IssueDiscussionBridge", // Snapshots advance even when the review listener is absent
-                    // because hephaestus.agent.enabled is false.
-                    "OutlineDocumentSyncService", // DocumentReviewTrigger's sole impl is
-                    // gated on hephaestus.agent.enabled; the mirror
-                    // records every document signal on every runtime role and only skips
-                    // the review offer where nothing could run one
                     "SecurityConfig", // InstalledClientRegistry is server-role only; the CORS configuration
                     // it contributes origins to is built on every runtime role
-                    "ResultAdmissionService", // The post-commit IN_APP support read is auxiliary; admission
-                    // must survive an unavailable reader without losing the committed results.
                     "InstanceLlmSettingsService" // LlmSettingsAudit's sole impl is @ConditionalOnServerRole, but this
                     // service is also consumed by the ungated Workspace{Llm}Service pair
                     // (BYO gate check) which load on every runtime role
@@ -583,7 +564,8 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                             events.add(SimpleConditionEvent.violated(
                                                     javaClass,
                                                     String.format(
-                                                            "LSP: %s.%s declares generic Exception - use specific exceptions",
+                                                            "LSP: %s.%s declares generic Exception - use specific"
+                                                                    + " exceptions",
                                                             javaClass.getSimpleName(), method.getName())));
                                         }
                                     });
@@ -626,8 +608,9 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                                             events.add(SimpleConditionEvent.violated(
                                                     javaClass,
                                                     String.format(
-                                                            "LSP: %s.%s throws UnsupportedOperationException - "
-                                                                    + "indicates contract violation, consider interface redesign",
+                                                            "LSP: %s.%s throws UnsupportedOperationException -"
+                                                                + " indicates contract violation, consider interface"
+                                                                + " redesign",
                                                             javaClass.getSimpleName(), method.getName())));
                                         }
                                     });

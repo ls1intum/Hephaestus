@@ -9,12 +9,13 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.config.SpringAsyncConfig;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -83,6 +84,9 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ApplicationContext applicationContext;
 
+    @Autowired
+    private UserRepository users;
+
     private ActivityLedgerReconciler reconciler;
     private WorkspaceActorSelector actorSelector;
     private long workspaceId;
@@ -119,7 +123,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         authorId = author(2, "author");
         actorSelector = mock(WorkspaceActorSelector.class);
         when(actorSelector.connectedProviderId(workspaceId)).thenReturn(Optional.of(providerId));
-        reconciler = new ActivityLedgerReconciler(ledgerRepository, fence, transactions, actorSelector);
+        reconciler = new ActivityLedgerReconciler(ledgerRepository, new ActivityPersonWriteAdmission(users, fence), transactions, actorSelector);
     }
 
     private long author(long nativeId, String login) {
@@ -307,11 +311,11 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         var release = new CountDownLatch(1);
         var writerPid = new AtomicInteger();
         var observedFence = mock(PersonDataWriteFence.class);
-        when(observedFence.holdForUserWrites(any())).thenAnswer(invocation -> {
+        when(observedFence.holdForWrite(any())).thenAnswer(invocation -> {
             writerPid.set(Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
-            return fence.holdForUserWrites(invocation.getArgument(0));
+            return fence.holdForWrite(invocation.getArgument(0));
         });
-        reconciler = new ActivityLedgerReconciler(ledgerRepository, observedFence, transactions, actorSelector);
+        reconciler = new ActivityLedgerReconciler(ledgerRepository, new ActivityPersonWriteAdmission(users, observedFence), transactions, actorSelector);
         try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
             var eraser = executor.submit(() -> new TransactionTemplate(transactions).executeWithoutResult(status -> {
                 fence.holdForErasure(List.of(new PersonIdentity(providerId, "2", null)));
@@ -323,7 +327,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
                     throw new IllegalStateException(e);
                 }
                 jdbc.update(
-                        "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
+                        "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
                         UUID.randomUUID(),
                         providerId,
                         "2",
@@ -357,7 +361,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         long deleted = issue("ISSUE", 3, otherAuthor);
         jdbc.update("UPDATE issue SET deleted_at=now() WHERE id=?", deleted);
         jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
+                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
                 UUID.randomUUID(),
                 providerId,
                 "2",
@@ -464,7 +468,7 @@ class ActivityLedgerReconcilerIntegrationTest extends BaseIntegrationTest {
         long suppressedAuthor = author(5, "suppressed");
         long hidden = issue("PULL_REQUEST", 2, suppressedAuthor);
         jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
+                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind) VALUES (?,?,?,?,'ERASED')",
                 UUID.randomUUID(),
                 providerId,
                 "5",

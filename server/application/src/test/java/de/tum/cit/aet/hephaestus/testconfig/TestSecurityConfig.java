@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
 import de.tum.cit.aet.hephaestus.SecurityConfig;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
@@ -34,7 +34,7 @@ public class TestSecurityConfig {
     @Bean
     @Primary
     public JwtDecoder mockJwtDecoder(
-            UserRepository users, IdentityProviderRepository providers, IdentityLinkRepository identities) {
+            UserRepository users, IdentityProviderRepository providers, IdentityRepository identities) {
         return token -> {
             // RFC 8693 act marks impersonation; logout also requires a valid jti.
             if (IMPERSONATION_TOKEN.equals(token)) {

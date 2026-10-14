@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
@@ -18,19 +17,20 @@ public final class EvidenceSnapshotFixtures {
 
     /** A pull-request snapshot with no sources yet; add at least one with {@link #availableSource}. */
     public static ObjectNode snapshot(ObjectMapper mapper) {
-        return snapshot(mapper, ArtifactKinds.PULL_REQUEST.value());
+        return snapshot(mapper, "scm.pull_request");
     }
 
-    public static ObjectNode snapshot(ObjectMapper mapper, String artifactKind) {
+    public static ObjectNode snapshot(ObjectMapper mapper, String itemKind) {
         ObjectNode snapshot = mapper.createObjectNode();
         ObjectNode manifest = snapshot.putObject("manifest");
-        manifest.put("contractVersion", ArtifactSourceCatalogRegistry.CURRENT_VERSION.value());
+        manifest.put("contractVersion", SourceCatalogRegistry.CURRENT_VERSION.value());
         manifest.put("catalogDigest", "0".repeat(64));
-        manifest.put("artifactKind", artifactKind);
+        manifest.put("itemKind", itemKind);
         manifest.put("capturedAt", CAPTURED_AT);
         manifest.putArray("sources");
         manifest.putArray("refusals");
-        manifest.putArray("artifacts");
+        manifest.putArray("files");
+        manifest.putArray("citableTexts");
         snapshot.putArray("practices");
         return snapshot;
     }
@@ -47,34 +47,34 @@ public final class EvidenceSnapshotFixtures {
         facts.put("capturedAt", CAPTURED_AT);
         if (immutableIdentity != null) facts.put("immutableIdentity", immutableIdentity);
         state.putArray("limitations");
-        source.putArray("artifacts");
+        source.putArray("files");
         return source;
     }
 
-    public static ObjectNode artifact(ObjectNode snapshot, ObjectNode source, String path, String sha256) {
-        ObjectNode artifact = source.withArray("artifacts")
+    public static ObjectNode file(ObjectNode snapshot, ObjectNode source, String path, String sha256) {
+        ObjectNode artifact = source.withArray("files")
                 .addObject()
                 .put("path", path)
                 .put("mediaType", "text/plain")
                 .put("sha256", sha256)
                 .put("bytes", 0);
-        var proof = snapshot.withObject("manifest").withArray("artifacts").addObject();
+        var proof = snapshot.withObject("manifest").withArray("files").addObject();
         proof.set("kind", source.path("kind"));
-        proof.set("artifact", artifact);
+        proof.set("file", artifact);
         return artifact;
     }
 
     /** Turns a source into one the capture could not read; its artifacts go with it. */
     public static void unavailable(ObjectNode snapshot, ObjectNode source) {
         source.putObject("state").put("availability", "UNAVAILABLE").put("reasonCode", "NOT_FOUND");
-        source.putArray("artifacts");
-        var artifacts = snapshot.withObject("manifest").withArray("artifacts");
+        source.putArray("files");
+        var artifacts = snapshot.withObject("manifest").withArray("files");
         for (int index = artifacts.size() - 1; index >= 0; index--) {
             if (artifacts.get(index).path("kind").equals(source.path("kind"))) artifacts.remove(index);
         }
     }
 
-    public static ObjectNode admittedPractice(ObjectNode snapshot, String slug, long revisionId) {
-        return snapshot.withArray("practices").addObject().put("slug", slug).put("revisionId", revisionId);
+    public static ObjectNode pinnedPractice(ObjectNode snapshot, String slug, long versionId) {
+        return snapshot.withArray("practices").addObject().put("slug", slug).put("practiceVersionId", versionId);
     }
 }

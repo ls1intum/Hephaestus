@@ -5,12 +5,12 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.AccountType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.InstallationData;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.RepositorySnapshot;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.exception.InstallationNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationService;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
@@ -25,9 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Handles GitHub installation webhook events and provisions scopes.
- */
+/** Handles GitHub installation webhook events and provisions scopes. */
 @Component
 public class GitHubInstallationMessageHandler extends AbstractIntegrationMessageHandler<GitHubInstallationEventDTO> {
 
@@ -124,7 +122,8 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                 boolean currentlySuspended = gitHubAppTokenService.isInstallationSuspended(installationId);
                 if (currentlySuspended) {
                     log.info(
-                            "Installation created event received but installation is currently suspended, marking suspended: installationId={}",
+                            "Installation created event received but installation is currently"
+                                    + " suspended, marking suspended: installationId={}",
                             installationId);
                     gitHubAppTokenService.markInstallationSuspended(installationId);
                     // Still create the workspace but don't activate it
@@ -134,16 +133,19 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
                     return;
                 }
             } catch (InstallationNotFoundException e) {
-                // Installation no longer exists on GitHub - do NOT create workspace for deleted installation
+                // Installation no longer exists on GitHub - do NOT create workspace for deleted
+                // installation
                 log.info(
-                        "Installation no longer exists on GitHub, skipping workspace creation: installationId={}",
+                        "Installation no longer exists on GitHub, skipping workspace creation:" + " installationId={}",
                         installationId);
                 return;
             } catch (RuntimeException e) {
                 // Network errors, credentials not configured, or other transient issues
-                // Proceed with activation - if installation is truly suspended, token minting will fail fast
+                // Proceed with activation - if installation is truly suspended, token minting will
+                // fail fast
                 log.warn(
-                        "Could not verify installation status for created event, proceeding with activation: installationId={}, error={}",
+                        "Could not verify installation status for created event, proceeding with"
+                                + " activation: installationId={}, error={}",
                         installationId,
                         e.getMessage());
             }
@@ -171,9 +173,9 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
     }
 
     /**
-     * Verify installation status via GitHub API and update workspace accordingly.
-     * This is the "webhook as trigger" pattern - we don't trust the webhook action,
-     * instead we verify the CURRENT state via API and update based on that.
+     * Verify installation status via GitHub API and update workspace accordingly. This is the
+     * "webhook as trigger" pattern - we don't trust the webhook action, instead we verify the
+     * CURRENT state via API and update based on that.
      */
     private void verifyAndUpdateInstallationStatus(Long installationId) {
         try {
@@ -196,7 +198,8 @@ public class GitHubInstallationMessageHandler extends AbstractIntegrationMessage
         } catch (RuntimeException e) {
             // Network errors or other transient issues - don't update status if we can't verify
             log.warn(
-                    "Failed to verify installation status via API, skipping status update: installationId={}, error={}",
+                    "Failed to verify installation status via API, skipping status update:"
+                            + " installationId={}, error={}",
                     installationId,
                     e.getMessage());
         }

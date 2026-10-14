@@ -4,10 +4,11 @@ import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.review.dto.WorkspaceReviewScopeDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @RequestMapping("/practices/review-settings")
 @Tag(name = "Practice Review Settings", description = "Workspace-scoped practice-review policy")
@@ -46,12 +48,12 @@ public class PracticeReviewSettingsController {
         return response(practiceReviewSettingsService.getSettings(workspaceContext));
     }
 
-    @PostMapping("/coverage-preview")
-    @Operation(summary = "Preview the effective counts for proposed practice-review coverage")
+    @PostMapping("/scope-preview")
     @RequireAtLeastWorkspaceAdmin
     @AuditExempt(reason = "computes a read-only coverage preview; stores no configuration")
-    public PracticeReviewCoveragePreviewDTO previewCoverage(
-            WorkspaceContext workspaceContext, @Valid @RequestBody WorkspaceReviewScope proposed) {
+    @Operation(operationId = "previewReviewScope")
+    public PracticeReviewScopePreviewDTO previewCoverage(
+            WorkspaceContext workspaceContext, @Valid @RequestBody WorkspaceReviewScopeDTO proposed) {
         return practiceReviewSettingsService.previewCoverage(workspaceContext, proposed);
     }
 

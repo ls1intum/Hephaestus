@@ -7,7 +7,7 @@ import { after, test } from "node:test";
 import {
 	executionReportSchema,
 	PRACTICE_SCRIPT_PRACTICE_HEADER,
-} from "../../../../../../docker/agents/practice-scripts/lib/contract.ts";
+} from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import {
 	chatMessage,
 	startStandIn,
@@ -124,7 +124,7 @@ void test("a call above what remains is not rated budget and never reaches the p
 	assert.ok(parsed.success, parsed.error?.message);
 	const entry = parsed.data.practices.find((item) => item.practiceSlug === "c-refused");
 	assert.deepEqual(entry?.models, [
-		{ slot: "chat", need: "optional", bound: true, notRated: { budget: 1 } },
+		{ slot: "chat", need: "optional", bound: true, failures: { budget: 1 } },
 	]);
 });
 

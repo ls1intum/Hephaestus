@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityRepositoryDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityTeamDTO;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.time.TimeRange;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.MonitoredRepositoryScope;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryScope;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserInfoDTO;
 import java.time.Instant;
 import java.util.List;
@@ -26,18 +26,18 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
     String PUBLIC_PERSON = """
                   AND u.type = 'USER'
                   AND EXISTS (SELECT 1 FROM identity_provider p WHERE p.id = u.provider_id AND p.type IN ('GITHUB', 'GITLAB'))
-                  AND NOT EXISTS (SELECT 1 FROM workspace_membership m
-                      WHERE m.workspace_id = :#{#scope.workspaceId()} AND m.user_id = u.id AND m.hidden)
-                  AND NOT EXISTS (SELECT 1 FROM workspace_hidden_former_member h
-                      WHERE h.workspace_id = :#{#scope.workspaceId()} AND h.user_id = u.id)
+                  AND NOT EXISTS (SELECT 1 FROM membership m
+                      WHERE m.workspace_id = :#{#scope.workspaceId()} AND m.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '') AND m.hidden)
+                  AND NOT EXISTS (SELECT 1 FROM membership h
+                      WHERE h.workspace_id = :#{#scope.workspaceId()} AND h.hidden AND h.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = ''))
                   AND NOT EXISTS (SELECT 1 FROM activity_automation a
                       WHERE a.workspace_id = :#{#scope.workspaceId()} AND a.user_id = u.id)
-                  AND NOT EXISTS (SELECT 1 FROM person_suppression s
-                      WHERE s.provider_id = u.provider_id AND s.subject = CAST(u.native_id AS text) AND s.team_key = '')
-                  AND NOT EXISTS (SELECT 1 FROM public_activity_objection o
-                      WHERE o.provider_id = u.provider_id AND o.subject = CAST(u.native_id AS text))
-                  AND NOT EXISTS (SELECT 1 FROM identity_link l JOIN account a ON a.id = l.account_id
-                      WHERE l.provider_id = u.provider_id AND l.subject = CAST(u.native_id AS text)
+                  AND NOT EXISTS (SELECT 1 FROM identity_restriction s
+                      WHERE s.kind = 'ERASED' AND s.provider_id = u.provider_id AND s.provider_user_key = CAST(u.native_id AS text) AND s.team_key = '')
+                  AND NOT EXISTS (SELECT 1 FROM identity_restriction o
+                      WHERE o.kind = 'HIDE_PUBLIC' AND o.team_key = '' AND o.provider_id = u.provider_id AND o.provider_user_key = CAST(u.native_id AS text))
+                  AND NOT EXISTS (SELECT 1 FROM identity l JOIN account a ON a.id = l.account_id
+                      WHERE l.provider_id = u.provider_id AND l.provider_user_key = CAST(u.native_id AS text)
                           AND (NOT a.public_activity_visible OR a.status IN ('DELETING', 'DELETED')))
             """;
     String PUBLIC_REPOSITORY_CONDITION = """
@@ -82,7 +82,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
     String SOURCE_HEAD = """
                 FROM activity_event e
                 JOIN "user" u ON u.id = e.actor_id
-                LEFT JOIN workspace_membership wm ON wm.workspace_id = e.workspace_id AND wm.user_id = e.actor_id
+                LEFT JOIN membership wm ON wm.workspace_id = e.workspace_id AND wm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '')
                 LEFT JOIN pull_request_review prr ON e.target_type = 'review' AND prr.id = e.target_id
                 LEFT JOIN issue pr ON pr.id = prr.pull_request_id
                 LEFT JOIN "user" author ON author.id = pr.author_id
@@ -97,12 +97,12 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             """;
     String SOURCE_TAIL = """
                   AND (:own = true OR (NOT coalesce(wm.hidden, false)
-                      AND NOT EXISTS (SELECT 1 FROM workspace_hidden_former_member h
-                          WHERE h.workspace_id = :#{#scope.workspaceId()} AND h.user_id = e.actor_id)))
+                      AND NOT EXISTS (SELECT 1 FROM membership h
+                          WHERE h.workspace_id = :#{#scope.workspaceId()} AND h.hidden AND h.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = ''))))
                   AND (:person = 0 OR e.actor_id = :person)
                   AND e.repository_id IN (:#{#scope.repositoryIds()})
                   AND (:#{#scope.teamIds().isEmpty()} = true OR (
-                      EXISTS (SELECT 1 FROM team_membership tm WHERE tm.user_id = e.actor_id AND tm.team_id IN (:#{#scope.teamIds()}))
+                      EXISTS (SELECT 1 FROM team_membership tm WHERE tm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '') AND tm.team_id IN (:#{#scope.teamIds()}))
                       AND EXISTS (SELECT 1 FROM team_repository_permission p
                           WHERE p.repository_id = e.repository_id AND p.team_id IN (:#{#scope.teamIds()}))
                       AND NOT EXISTS (SELECT 1 FROM workspace_team_repository_settings s
@@ -278,12 +278,12 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
             SELECT u.id, u.login, u.name, u.avatar_url, u.html_url,
                 u.type = 'BOT' AS bot, a.user_id IS NOT NULL AS classified
             FROM "user" u
-            LEFT JOIN workspace_membership wm ON wm.workspace_id = :workspace AND wm.user_id = u.id
+            LEFT JOIN membership wm ON wm.workspace_id = :workspace AND wm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '')
             LEFT JOIN activity_automation a ON a.workspace_id = :workspace AND a.user_id = u.id
             WHERE u.id = :person AND u.type IN ('USER', 'BOT') AND (:own = true OR (NOT coalesce(wm.hidden, false)
-              AND NOT EXISTS (SELECT 1 FROM workspace_hidden_former_member h
-                  WHERE h.workspace_id = :workspace AND h.user_id = u.id)))
-              AND ((:own = true AND wm.user_id IS NOT NULL) OR EXISTS (SELECT 1 FROM activity_event e JOIN repository r ON r.id = e.repository_id
+              AND NOT EXISTS (SELECT 1 FROM membership h
+                  WHERE h.workspace_id = :workspace AND h.hidden AND h.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = ''))))
+              AND ((:own = true AND wm.account_id IS NOT NULL AND wm.left_at IS NULL) OR EXISTS (SELECT 1 FROM activity_event e JOIN repository r ON r.id = e.repository_id
                   WHERE e.workspace_id = :workspace AND e.actor_id = u.id AND r.provider_id = u.provider_id AND EXISTS (
                       SELECT 1 FROM repository_to_monitor m WHERE m.workspace_id = :workspace
                           AND m.name_with_owner = r.name_with_owner AND
@@ -312,8 +312,8 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
 
     @Query(value = """
             SELECT u.id, u.login, u.name, u.avatar_url, u.html_url, false AS bot, false AS classified
-            FROM "user" u JOIN workspace_hidden_former_member h ON h.user_id = u.id
-            WHERE h.workspace_id = :workspace AND u.type = 'USER'
+            FROM "user" u JOIN membership h ON h.hidden AND h.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '')
+            WHERE h.workspace_id = :workspace AND h.left_at IS NOT NULL AND u.type = 'USER'
             ORDER BY lower(coalesce(u.name, u.login)), u.id
             """, nativeQuery = true)
     List<ContributorRow> findHiddenContributors(@Param("workspace") long workspace);
@@ -327,7 +327,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
                     + PUBLIC_REPOSITORY_CONDITION + " AND " + PUBLIC_MONITOR + """
                 )) AND (EXISTS (
                     SELECT 1 FROM workspace w JOIN organization o ON o.id = w.organization_id
-                    WHERE w.id = :workspace AND o.provider_id = r.provider_id) OR EXISTS (
+                    WHERE w.id = :workspace AND o.kind = 'HIDE_PUBLIC' AND o.team_key = '' AND o.provider_id = r.provider_id) OR EXISTS (
                     SELECT 1 FROM activity_event e WHERE e.workspace_id = :workspace AND e.repository_id = r.id))
                 ORDER BY r.name_with_owner
                 """,
@@ -430,14 +430,14 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
 
     @Query(value = """
             SELECT u.id FROM "user" u
-            LEFT JOIN workspace_membership wm ON wm.workspace_id = :#{#scope.workspaceId()} AND wm.user_id = u.id
+            LEFT JOIN membership wm ON wm.workspace_id = :#{#scope.workspaceId()} AND wm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '')
             WHERE u.type = 'USER' AND NOT coalesce(wm.hidden, false)
-                AND NOT EXISTS (SELECT 1 FROM workspace_hidden_former_member h
-                    WHERE h.workspace_id = :#{#scope.workspaceId()} AND h.user_id = u.id)
+                AND NOT EXISTS (SELECT 1 FROM membership h
+                    WHERE h.workspace_id = :#{#scope.workspaceId()} AND h.hidden AND h.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = ''))
                 AND NOT EXISTS (SELECT 1 FROM activity_automation a
                     WHERE a.workspace_id = :#{#scope.workspaceId()} AND a.user_id = u.id)
                 AND (:#{#scope.teamIds().isEmpty()} = true OR EXISTS (SELECT 1 FROM team_membership tm
-                    WHERE tm.user_id = u.id AND tm.team_id IN (:#{#scope.teamIds()})))
+                    WHERE tm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '') AND tm.team_id IN (:#{#scope.teamIds()})))
                 AND EXISTS (SELECT 1 FROM activity_event e JOIN repository r ON r.id = e.repository_id
                     WHERE e.workspace_id = :#{#scope.workspaceId()} AND e.actor_id = u.id
                         AND e.repository_id IN (:#{#scope.repositoryIds()}) AND r.provider_id = u.provider_id)
@@ -446,7 +446,7 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
 
     @Query(value = """
         SELECT EXISTS (SELECT 1 FROM activity_event e WHERE e.workspace_id = :workspace AND e.actor_id = :person)
-            OR EXISTS (SELECT 1 FROM workspace_membership m WHERE m.workspace_id = :workspace AND m.user_id = :person)
+            OR EXISTS (SELECT 1 FROM membership m WHERE m.workspace_id = :workspace AND m.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner JOIN "user" member_actor ON identity_owner.provider_id = member_actor.provider_id AND identity_owner.provider_user_key = CAST(member_actor.native_id AS text) AND identity_owner.team_key = '' WHERE member_actor.id = :person))
         """, nativeQuery = true)
     boolean canClassify(@Param("workspace") long workspace, @Param("person") long userId);
 
@@ -455,25 +455,25 @@ interface ActivityPeopleQueryRepository extends Repository<ActivityEvent, UUID> 
         SELECT count(DISTINCT u.id) FROM "user" u
         JOIN activity_event e ON e.actor_id = u.id AND e.workspace_id = :workspace
         JOIN repository r ON r.id = e.repository_id AND r.provider_id = u.provider_id
-        LEFT JOIN workspace_membership wm ON wm.workspace_id = :workspace AND wm.user_id = u.id
+        LEFT JOIN membership wm ON wm.workspace_id = :workspace AND wm.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = '')
         WHERE u.type = 'USER' AND
         """ + PUBLIC_REPOSITORY_CONDITION + """
           AND EXISTS (SELECT 1 FROM repository_to_monitor m WHERE m.workspace_id = :workspace AND m.name_with_owner = r.name_with_owner
           AND
           """ + PUBLIC_MONITOR + " AND " + MONITOR_AUTHORITY + ")" + """
           AND NOT EXISTS (SELECT 1 FROM activity_automation a WHERE a.workspace_id = :workspace AND a.user_id = u.id)
-          AND NOT EXISTS (SELECT 1 FROM person_suppression s WHERE s.provider_id = u.provider_id
-              AND s.subject = CAST(u.native_id AS text) AND s.team_key = '')
-          AND NOT EXISTS (SELECT 1 FROM identity_link l JOIN account a ON a.id = l.account_id
-              WHERE l.provider_id = u.provider_id AND l.subject = CAST(u.native_id AS text)
+          AND NOT EXISTS (SELECT 1 FROM identity_restriction s WHERE s.kind = 'ERASED' AND s.provider_id = u.provider_id
+              AND s.provider_user_key = CAST(u.native_id AS text) AND s.team_key = '')
+          AND NOT EXISTS (SELECT 1 FROM identity l JOIN account a ON a.id = l.account_id
+              WHERE l.provider_id = u.provider_id AND l.provider_user_key = CAST(u.native_id AS text)
                   AND a.status IN ('DELETING', 'DELETED'))
           AND e.event_type IN ('PULL_REQUEST_OPENED', 'ISSUE_CREATED', 'REVIEW_APPROVED', 'REVIEW_CHANGES_REQUESTED', 'REVIEW_COMMENTED')
-          AND (EXISTS (SELECT 1 FROM public_activity_objection o
-                WHERE o.provider_id = u.provider_id AND o.subject = CAST(u.native_id AS text))
+          AND (EXISTS (SELECT 1 FROM identity_restriction o
+                WHERE o.kind = 'HIDE_PUBLIC' AND o.team_key = '' AND o.provider_id = u.provider_id AND o.provider_user_key = CAST(u.native_id AS text))
             OR coalesce(wm.hidden, false)
-            OR EXISTS (SELECT 1 FROM workspace_hidden_former_member h WHERE h.workspace_id = :workspace AND h.user_id = u.id)
-            OR EXISTS (SELECT 1 FROM identity_link l JOIN account a ON a.id = l.account_id
-                WHERE l.provider_id = u.provider_id AND l.subject = CAST(u.native_id AS text) AND NOT a.public_activity_visible))
+            OR EXISTS (SELECT 1 FROM membership h WHERE h.workspace_id = :workspace AND h.hidden AND h.account_id IN (SELECT identity_owner.account_id FROM identity identity_owner WHERE identity_owner.provider_id = u.provider_id AND identity_owner.provider_user_key = CAST(u.native_id AS text) AND identity_owner.team_key = ''))
+            OR EXISTS (SELECT 1 FROM identity l JOIN account a ON a.id = l.account_id
+                WHERE l.provider_id = u.provider_id AND l.provider_user_key = CAST(u.native_id AS text) AND NOT a.public_activity_visible))
         """,
             nativeQuery = true)
     long countPublicHiddenPeople(

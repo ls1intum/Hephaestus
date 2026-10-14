@@ -1,31 +1,33 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.dto;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackResolution;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackUsefulness;
-import de.tum.cit.aet.hephaestus.practices.result.reaction.ReactionRepository.CurrentResponseProjection;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackResolution;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackUsefulness;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "The recipient's current assessment and resolution of delivered feedback")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record FeedbackResponseDTO(
-        @NonNull UUID feedbackId,
-        @Nullable FeedbackUsefulness usefulness,
-        @Nullable FeedbackResolution resolution,
-        @Nullable String comment,
-        @Nullable Instant respondedAt) {
-    public static FeedbackResponseDTO from(UUID feedbackId, CurrentResponseProjection current) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        FeedbackResolution resolution,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        FeedbackUsefulness usefulness,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String comment,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant createdAt) {
+
+    public static FeedbackResponseDTO from(FeedbackResponse response) {
         return new FeedbackResponseDTO(
-                feedbackId,
-                current.getUsefulness() == null ? null : FeedbackUsefulness.valueOf(current.getUsefulness()),
-                current.getResolution() == null ? null : FeedbackResolution.valueOf(current.getResolution()),
-                current.getComment(),
-                current.getRespondedAt());
+                response.getResolution(), response.getUsefulness(), response.getComment(), response.getCreatedAt());
     }
 
-    public static FeedbackResponseDTO none(UUID feedbackId) {
-        return new FeedbackResponseDTO(feedbackId, null, null, null, null);
+    public static FeedbackResponseDTO empty() {
+        return new FeedbackResponseDTO(null, null, null, null);
     }
 }

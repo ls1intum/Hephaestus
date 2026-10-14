@@ -6,8 +6,8 @@ import { once } from "node:events";
 import { pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-import { callLabel } from "./lib/call-label.ts";
-import { RETIRED_FORM_ERROR } from "./lib/contract.ts";
+import { callLabel } from "./lib/core/call-label.ts";
+import { RETIRED_FORM_ERROR } from "./lib/core/contract.ts";
 import {
 	MAX_LABEL_CHARS,
 	type ChildJob,
@@ -15,16 +15,16 @@ import {
 	type HostMessage,
 	type ReadRequest,
 	type ReadValues,
-} from "./lib/ipc.ts";
-import { isJsonObject } from "./lib/json.ts";
-import { ipcModels } from "./lib/models-ipc.ts";
+} from "./lib/core/ipc.ts";
+import { isJsonObject } from "./lib/core/json.ts";
+import { ipcModels } from "./lib/core/models-ipc.ts";
 import {
 	isPracticeScriptDefinition,
 	UnratedError,
 	type ModelNeeds,
 	type PracticeScriptDefinition,
-} from "./lib/practice-script.ts";
-import { programContext } from "./lib/program-context.ts";
+} from "./lib/core/practice-script.ts";
+import { programContext } from "./lib/core/program-context.ts";
 
 const send = process.send?.bind(process);
 if (send === undefined) {

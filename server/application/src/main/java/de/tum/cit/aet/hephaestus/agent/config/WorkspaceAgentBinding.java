@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.config;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModel;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import jakarta.persistence.Column;
@@ -119,8 +119,8 @@ public class WorkspaceAgentBinding implements ModelBindingSource {
      * Who pays for work run on this binding. Safe on a detached binding: null-testing a lazy
      * {@code @ManyToOne} reads the foreign key Hibernate already holds and never touches the session.
      */
-    public FundingSource getFundingSource() {
-        return instanceModel != null ? FundingSource.INSTANCE : FundingSource.WORKSPACE;
+    public UsageFundingSource getFundingSource() {
+        return instanceModel != null ? UsageFundingSource.INSTANCE : UsageFundingSource.WORKSPACE;
     }
 
     @PrePersist

@@ -7,17 +7,16 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult.LlmUsage;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
-import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.util.List;
@@ -43,7 +42,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("a runner report that saw more than the proxy is billed in full")
     void runnerReportWins() {
         TerminalUsage usage =
-                TerminalUsage.resolve(runner(1000, 700, 6), new AgentJobLlmUsage(4, 900, 600, 0, 0, 0), List.of());
+                TerminalUsage.resolve(runner(1000, 700, 6), new ReviewJobLlmUsage(4, 900, 600, 0, 0, 0), List.of());
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.totalCalls()).isEqualTo(6);
@@ -60,7 +59,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("compaction eating the runner's calls no longer under-bills: the proxy's larger count wins")
     void aCompactedRunnerReportDoesNotBeatTheProxy() {
         TerminalUsage usage = TerminalUsage.resolve(
-                runner(969_765, 120_000, 26), new AgentJobLlmUsage(143, 4_274_916, 500_000, 0, 0, 0), List.of());
+                runner(969_765, 120_000, 26), new ReviewJobLlmUsage(143, 4_274_916, 500_000, 0, 0, 0), List.of());
 
         assertThat(usage.totalCalls()).isEqualTo(143);
         assertThat(usage.inputTokens()).isEqualTo(4_274_916);
@@ -75,7 +74,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void cacheWritesAreNotCountedTwiceWhenTheSourcesClassifyThemDifferently() {
         TerminalUsage usage = TerminalUsage.resolve(
                 new LlmUsage("m", 49_624, 900, 0, 21_600, 0, 0.0, 3),
-                new AgentJobLlmUsage(3, 4_024, 900, 0, 21_600, 45_600),
+                new ReviewJobLlmUsage(3, 4_024, 900, 0, 21_600, 45_600),
                 List.of());
 
         assertThat(usage.verifiable()).isTrue();
@@ -91,7 +90,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void aCoveringRunnerReportIsStoredWhole() {
         TerminalUsage usage = TerminalUsage.resolve(
                 new LlmUsage("m", 5_000, 900, 40, 21_600, 45_600, 0.0, 4),
-                new AgentJobLlmUsage(3, 49_624, 800, 0, 21_600, 0),
+                new ReviewJobLlmUsage(3, 49_624, 800, 0, 21_600, 0),
                 List.of());
 
         assertThat(usage.verifiable()).isTrue();
@@ -109,7 +108,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void incomparableTotalsAreUnverifiable() {
         TerminalUsage usage = TerminalUsage.resolve(
                 new LlmUsage("m", 100, 4_000, 7, 50, 900, 0.0, 3),
-                new AgentJobLlmUsage(9, 8_000, 200, 11, 20, 0),
+                new ReviewJobLlmUsage(9, 8_000, 200, 11, 20, 0),
                 List.of());
 
         assertThat(usage.verifiable()).isFalse();
@@ -126,7 +125,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("more runner calls do not make the runner the source when its totals are smaller")
     void callCountsAreNotCoverage() {
         TerminalUsage usage =
-                TerminalUsage.resolve(runner(10, 20, 50), new AgentJobLlmUsage(2, 900, 600, 0, 0, 0), List.of());
+                TerminalUsage.resolve(runner(10, 20, 50), new ReviewJobLlmUsage(2, 900, 600, 0, 0, 0), List.of());
 
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
         assertThat(usage.inputTokens()).isEqualTo(900);
@@ -140,7 +139,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void aSelectedRunnerReportAlsoBillsThePracticeScriptChatCalls() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
-                new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
+                new ReviewJobLlmUsage(5, 800, 400, 0, 0, 0),
                 List.of(
                         new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0, 2),
                         new PracticeScriptKindTotal(ModelKind.DECISION, 5, 50_000, 9_000, 0, 0, 0, 5)));
@@ -157,7 +156,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void aSelectedRunnerReportKeepsThePracticeScriptCacheReadsApart() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
-                new AgentJobLlmUsage(5, 800, 400, 0, 0, 0),
+                new ReviewJobLlmUsage(5, 800, 400, 0, 0, 0),
                 List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 100, 260, 0, 0, 2)));
 
         assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
@@ -171,7 +170,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void aSelectedProxyDoesNotCountThePracticeScriptChatCallsTwice() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(1000, 700, 6),
-                new AgentJobLlmUsage(8, 1300, 800, 0, 0, 0),
+                new ReviewJobLlmUsage(8, 1300, 800, 0, 0, 0),
                 List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 300, 100, 0, 0, 0, 2)));
 
         assertThat(usage.verifiable()).isTrue();
@@ -184,7 +183,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @Test
     @DisplayName("no runner report at all falls back to the proxy accumulators")
     void missingRunnerReportFallsBackToTheProxy() {
-        TerminalUsage usage = TerminalUsage.fromProxy(new AgentJobLlmUsage(4, 900, 600, 30, 100, 0));
+        TerminalUsage usage = TerminalUsage.fromProxy(new ReviewJobLlmUsage(4, 900, 600, 30, 100, 0));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.totalCalls()).isEqualTo(4);
@@ -198,7 +197,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @DisplayName("a runner report claiming calls but no tokens is not evidence — the proxy is")
     void runnerReportWithZeroTokensFallsBackToTheProxy() {
         TerminalUsage usage =
-                TerminalUsage.resolve(runner(0, 0, 3), new AgentJobLlmUsage(4, 900, 600, 0, 0, 0), List.of());
+                TerminalUsage.resolve(runner(0, 0, 3), new ReviewJobLlmUsage(4, 900, 600, 0, 0, 0), List.of());
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.totalCalls()).isEqualTo(4);
@@ -210,7 +209,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void runnerReportWithNullTokenFieldsFallsBackToTheProxy() {
         LlmUsage malformed = new LlmUsage("m", null, null, null, null, null, null, 2);
 
-        TerminalUsage usage = TerminalUsage.resolve(malformed, new AgentJobLlmUsage(1, 10, 20, 0, 0, 0), List.of());
+        TerminalUsage usage = TerminalUsage.resolve(malformed, new ReviewJobLlmUsage(1, 10, 20, 0, 0, 0), List.of());
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.inputTokens()).isEqualTo(10);
@@ -219,7 +218,7 @@ class TerminalUsageTest extends BaseUnitTest {
     @Test
     @DisplayName("neither record has tokens: zero spend, and say so as unverifiable")
     void nothingToBillIsReportedAsUnverifiable() {
-        TerminalUsage usage = TerminalUsage.fromProxy(new AgentJobLlmUsage(0, 0, 0, 0, 0, 0));
+        TerminalUsage usage = TerminalUsage.fromProxy(new ReviewJobLlmUsage(0, 0, 0, 0, 0, 0));
 
         assertThat(usage.verifiable()).isFalse();
         assertThat(usage.inputTokens()).isZero();
@@ -250,7 +249,7 @@ class TerminalUsageTest extends BaseUnitTest {
     void shouldKeepMixedChatUsageUnverifiableWhenOneDirectCallReportsNoUsage() {
         TerminalUsage usage = TerminalUsage.resolve(
                 runner(100, 20, 1),
-                new AgentJobLlmUsage(2, 110, 20, 0, 0, 0),
+                new ReviewJobLlmUsage(2, 110, 20, 0, 0, 0),
                 List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 10, 0, 0, 0, 0, 1)));
 
         assertThat(usage.verifiable()).isFalse();
@@ -260,7 +259,7 @@ class TerminalUsageTest extends BaseUnitTest {
 
     @Test
     void shouldVerifyZeroWhenTheProxyRecordedAReportedZero() {
-        TerminalUsage usage = TerminalUsage.fromProxy(new AgentJobLlmUsage(1, 0, 0, 0, 0, 0));
+        TerminalUsage usage = TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 0, 0, 0, 0, 0));
 
         assertThat(usage.verifiable()).isTrue();
         assertThat(usage.totalCalls()).isEqualTo(1);
@@ -274,7 +273,7 @@ class TerminalUsageTest extends BaseUnitTest {
     class AppendPath {
 
         private final LlmUsageRecorder recorder = mock(LlmUsageRecorder.class);
-        private final AgentJobRepository jobs = mock(AgentJobRepository.class);
+        private final ReviewJobRepository jobs = mock(ReviewJobRepository.class);
         private final ConfigSnapshot snapshot = new ConfigSnapshot(
                 ConfigSnapshot.SCHEMA_VERSION,
                 "openai-completions",
@@ -283,8 +282,7 @@ class TerminalUsageTest extends BaseUnitTest {
                 null,
                 null,
                 null,
-                null,
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 1L,
                 2L,
                 7L,
@@ -301,8 +299,8 @@ class TerminalUsageTest extends BaseUnitTest {
                             "no tokens at no charge",
                             TerminalUsage.none(),
                             new LlmPriceSnapshot(
-                                    FundingSource.INSTANCE,
-                                    PricingState.NO_CHARGE,
+                                    UsageFundingSource.INSTANCE,
+                                    UsagePricingState.NO_CHARGE,
                                     null,
                                     null,
                                     null,
@@ -314,11 +312,18 @@ class TerminalUsageTest extends BaseUnitTest {
         @ParameterizedTest
         @CsvSource({"40,1,PRICED,false", "0,2,PRICED,true", "0,0,PRICED,false", "40,1,NO_CHARGE,true"})
         void shouldChooseTheLedgerStateFromCompletenessWhenDirectModelCallsFinish(
-                long tokens, long reportedCalls, PricingState pricingState, boolean billable) {
+                long tokens, long reportedCalls, UsagePricingState pricingState, boolean billable) {
             UUID jobId = UUID.randomUUID();
-            LlmPriceSnapshot price = pricingState == PricingState.NO_CHARGE
+            LlmPriceSnapshot price = pricingState == UsagePricingState.NO_CHARGE
                     ? new LlmPriceSnapshot(
-                            FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
+                            UsageFundingSource.INSTANCE,
+                            UsagePricingState.NO_CHARGE,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null,
+                            null)
                     : pricedInstance();
             ConfigSnapshot withEmbedding = snapshot.withPracticeScript(Map.of(
                     ModelKind.EMBEDDING,
@@ -326,7 +331,7 @@ class TerminalUsageTest extends BaseUnitTest {
                             "openai-embeddings",
                             "https://models.example/v1",
                             "embedding",
-                            FundingSource.INSTANCE,
+                            UsageFundingSource.INSTANCE,
                             1L,
                             2L,
                             7L,
@@ -348,7 +353,7 @@ class TerminalUsageTest extends BaseUnitTest {
                 verify(recorder, times(2)).recordUnverifiable(eq(7L), sample.capture());
             }
             var embedding = sample.getValue();
-            assertThat(embedding.sourceType()).isEqualTo(LlmUsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
+            assertThat(embedding.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_EMBEDDING);
             assertThat(embedding.totalCalls()).isEqualTo(2);
             assertThat(embedding.inputTokens()).isEqualTo(tokens);
         }
@@ -359,7 +364,7 @@ class TerminalUsageTest extends BaseUnitTest {
             when(jobs.sumPracticeScriptUsageByKind(7L, jobId, 1))
                     .thenReturn(List.of(new PracticeScriptKindTotal(ModelKind.CHAT, 2, 40, 0, 0, 0, 0, 1)));
 
-            boolean billed = TerminalUsage.fromProxy(new AgentJobLlmUsage(1, 40, 0, 0, 0, 0))
+            boolean billed = TerminalUsage.fromProxy(new ReviewJobLlmUsage(1, 40, 0, 0, 0, 0))
                     .appendTo(recorder, jobs, 7L, jobFor(jobId, 1), snapshot, pricedInstance());
 
             assertThat(billed).isFalse();
@@ -387,7 +392,7 @@ class TerminalUsageTest extends BaseUnitTest {
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(recorder).record(eq(7L), sample.capture());
-            assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.AGENT_JOB);
+            assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
             assertThat(sample.getValue().provenance()).isNotNull();
         }
@@ -401,7 +406,7 @@ class TerminalUsageTest extends BaseUnitTest {
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(recorder).recordUnverifiable(eq(7L), sample.capture());
-            assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.AGENT_JOB);
+            assertThat(sample.getValue().sourceType()).isEqualTo(UsageSourceType.REVIEW_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
             // An unpriced row's tokens are still the evidence somebody will reconcile once a price exists.
             assertThat(sample.getValue().provenance()).isNotNull();
@@ -433,7 +438,7 @@ class TerminalUsageTest extends BaseUnitTest {
 
             boolean billed = TerminalUsage.resolve(
                             new LlmUsage("m", 100, 4_000, 0, 0, 0, 0.0, 3),
-                            new AgentJobLlmUsage(9, 8_000, 200, 0, 0, 0),
+                            new ReviewJobLlmUsage(9, 8_000, 200, 0, 0, 0),
                             List.of())
                     .appendTo(recorder, jobs, 7L, jobFor(UUID.randomUUID(), 1), snapshot, price);
 
@@ -481,7 +486,7 @@ class TerminalUsageTest extends BaseUnitTest {
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
             verify(recorder, times(2)).recordUnverifiable(eq(7L), sample.capture());
             LlmUsageRecorder.LlmUsageSample decision = sample.getAllValues().get(1);
-            assertThat(decision.sourceType()).isEqualTo(LlmUsageSourceType.PRACTICE_SCRIPT_DECISION);
+            assertThat(decision.sourceType()).isEqualTo(UsageSourceType.PRACTICE_SCRIPT_DECISION);
             assertThat(decision.sourceAttempt()).isEqualTo(1);
             assertThat(decision.totalCalls()).isEqualTo(5);
             assertThat(decision.inputTokens()).isEqualTo(500_000);
@@ -491,18 +496,18 @@ class TerminalUsageTest extends BaseUnitTest {
                     .isEqualTo(sample.getAllValues().getFirst().occurredAt());
         }
 
-        private AgentJob jobFor(UUID jobId, int attempt) {
-            AgentJob job = new AgentJob();
+        private ReviewJob jobFor(UUID jobId, int attempt) {
+            ReviewJob job = new ReviewJob();
             job.setId(jobId);
-            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            job.setRetryCount(attempt);
+
+            job.setAttempt(attempt);
             return job;
         }
 
         private static LlmPriceSnapshot pricedInstance() {
             return new LlmPriceSnapshot(
-                    FundingSource.INSTANCE,
-                    PricingState.PRICED,
+                    UsageFundingSource.INSTANCE,
+                    UsagePricingState.PRICED,
                     1L,
                     null,
                     BigDecimal.ONE,

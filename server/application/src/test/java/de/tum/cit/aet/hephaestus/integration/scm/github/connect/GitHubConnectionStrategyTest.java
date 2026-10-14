@@ -23,8 +23,8 @@ import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenServic
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppUserAuthorizationClient;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppUserAuthorizationClient.UserInstallation;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubUserAuthorizationException;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.ScmWorkspaceContentEraser;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import de.tum.cit.aet.hephaestus.workspace.ScmWorkspaceContentEraser;
 import java.net.URI;
 import java.util.Map;
 import java.util.Optional;
@@ -159,7 +159,7 @@ class GitHubConnectionStrategyTest extends BaseUnitTest {
 
         assertThat(result)
                 .isEqualTo(new ConnectFinalization.Failed(
-                        "Only an owner of the GitHub account acme can connect its installation."));
+                        "Only an owner of the GitHub account acme can connect its" + " installation."));
     }
 
     @Test
@@ -206,7 +206,7 @@ class GitHubConnectionStrategyTest extends BaseUnitTest {
 
         assertThat(result)
                 .isEqualTo(new ConnectFinalization.Failed(
-                        "GitHub could not confirm your access to this installation. Connect GitHub again."));
+                        "GitHub could not confirm your access to this installation. Connect" + " GitHub again."));
         verify(userAuthorization, never()).findAccessibleInstallation(anyString(), anyLong());
     }
 

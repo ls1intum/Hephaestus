@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictExceptio
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUpstreamIdConflictException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStateConflictException;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.net.URI;
 import java.util.List;
@@ -22,7 +22,7 @@ class AgentControllerAdviceTest extends BaseUnitTest {
     @Test
     void jobStateConflictUsesSurfaceNeutralProblemDetail() {
         var problem =
-                advice.handleAgentJobStateConflict(new AgentJobStateConflictException("Job is already COMPLETED"));
+                advice.handleAgentJobStateConflict(new ReviewJobStateConflictException("Job is already COMPLETED"));
 
         assertThat(problem.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
         assertThat(problem.getTitle()).isEqualTo("Agent job state conflict");
@@ -32,7 +32,7 @@ class AgentControllerAdviceTest extends BaseUnitTest {
     @Test
     void aBlankMessageFallsBackToAGenericDetail() {
         // ProblemDetail.detail must never be blank: the UI renders it verbatim.
-        var problem = advice.handleAgentJobStateConflict(new AgentJobStateConflictException(" "));
+        var problem = advice.handleAgentJobStateConflict(new ReviewJobStateConflictException(" "));
 
         assertThat(problem.getDetail()).isEqualTo("The server could not process this request.");
     }
@@ -44,7 +44,7 @@ class AgentControllerAdviceTest extends BaseUnitTest {
     @Test
     void everyConflictCarriesItsOwnStableTypeUri() {
         List<ProblemDetail> problems = List.of(
-                advice.handleAgentJobStateConflict(new AgentJobStateConflictException("x")),
+                advice.handleAgentJobStateConflict(new ReviewJobStateConflictException("x")),
                 advice.handleConnectionInUse(new LlmConnectionInUseException(1L)),
                 advice.handleModelInUse(new LlmModelInUseException(1L)),
                 advice.handleConnectionSlugConflict(new LlmConnectionSlugConflictException("slug")),

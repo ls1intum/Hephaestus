@@ -5,11 +5,8 @@ import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
@@ -21,13 +18,16 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitFileChange;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.CommitRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.commit.util.CommitUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.commit.GitLabCommitMergeRequestLinker;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
@@ -53,19 +53,19 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab push webhook events.
- * <p>
- * On each push event, upserts the project as a {@link Repository}
- * using the embedded project metadata from the webhook payload. This ensures the repository
- * entity exists before any commit processing.
- * <p>
- * When local git checkout is enabled ({@code hephaestus.git.enabled=true}), pushes to the
- * default branch trigger a local clone/fetch and JGit commit walk, providing line-level
- * diff statistics (additions/deletions per file). Falls back to webhook-only processing
- * on error or for non-default branches.
- * <p>
- * Also ensures the parent group is linked as an Organization via DB lookup.
- * If the organization doesn't exist yet (push arrives before full sync), it is left unlinked
- * and will be resolved during the next scheduled sync.
+ *
+ * <p>On each push event, upserts the project as a {@link Repository} using the embedded project
+ * metadata from the webhook payload. This ensures the repository entity exists before any commit
+ * processing.
+ *
+ * <p>When local git checkout is enabled ({@code hephaestus.git.enabled=true}), pushes to the
+ * default branch trigger a local clone/fetch and JGit commit walk, providing line-level diff
+ * statistics (additions/deletions per file). Falls back to webhook-only processing on error or for
+ * non-default branches.
+ *
+ * <p>Also ensures the parent group is linked as an Organization via DB lookup. If the organization
+ * doesn't exist yet (push arrives before full sync), it is left unlinked and will be resolved
+ * during the next scheduled sync.
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
@@ -172,7 +172,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
 
         var repository = transactions.execute(status -> {
-            // On a connection route admission already stored the project as GitLab reports it; the payload's copy of
+            // On a connection route admission already stored the project as GitLab
+            // reports it; the payload's copy of
             // its metadata is not written over that.
             if (route.isPresent()) {
                 return repositoryRepository
@@ -184,7 +185,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             }
             IdentityProvider provider = gitProviderRepository
                     .findByTypeAndServerUrl(IdentityProviderType.GITLAB, gitLabProperties.defaultServerUrl())
-                    .orElseThrow(() -> new IllegalStateException("GitLab identity provider is unavailable"));
+                    .orElseThrow(() -> new IllegalStateException("GitLab identity provider is" + " unavailable"));
             var prepared = projectProcessor.processPushEvent(event.project(), provider);
             if (prepared == null) return null;
             ensureOrganizationLinked(prepared, projectPath, provider);
@@ -199,7 +200,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
 
             Long scopeId = resolveScopeId(repository);
 
-            // Only a default-branch push is walked for line-level statistics; every other push still
+            // Only a default-branch push is walked for line-level statistics; every other push
+            // still
             // fetches so practice reviews see fresh refs.
             if (event.isDefaultBranch() && gitRepositoryManager.isEnabled()) {
                 boolean scopeActive = scopeId != null && syncTargetProvider.isScopeActiveForSync(scopeId);
@@ -221,7 +223,10 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    /** One GraphQL round trip links every MR updated in the push window, rather than one call per commit. */
+    /**
+     * One GraphQL round trip links every MR updated in the push window, rather than one call per
+     * commit.
+     */
     private void linkCommitsToMergeRequests(@Nullable Long scopeId, Repository repository) {
         if (scopeId == null) {
             return;
@@ -234,7 +239,10 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         }
     }
 
-    /** Fetches so the mirror is current for practice reviews; commits on other branches are not walked. */
+    /**
+     * Fetches so the mirror is current for practice reviews; commits on other branches are not
+     * walked.
+     */
     private void fetchForNonDefaultBranch(GitLabPushEventDTO event, Repository repository) {
         try {
             Long scopeId = resolveScopeId(repository);
@@ -297,7 +305,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
             log.info("Processed push commits via local git: repoName={}, failed={}", repoName, failed[0]);
         } catch (Exception e) {
             log.error(
-                    "Failed to process commits via local git, falling back to webhook: repoName={}, error={}",
+                    "Failed to process commits via local git, falling back to webhook: repoName={}," + " error={}",
                     repoName,
                     e.getMessage());
             failed[0]++;
@@ -308,9 +316,9 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     // Webhook-only path (file lists without line-level stats)
 
     /**
-     * Persists the push payload's commits, one transaction each so one bad commit does not roll back
-     * its neighbours. As the fallback after a local-git failure the statistics and file lists are
-     * withheld so {@code COALESCE} keeps what JGit already captured.
+     * Persists the push payload's commits, one transaction each so one bad commit does not roll
+     * back its neighbours. As the fallback after a local-git failure the statistics and file lists
+     * are withheld so {@code COALESCE} keeps what JGit already captured.
      */
     private void processCommitsViaWebhook(GitLabPushEventDTO event, Repository repository, boolean asFallback) {
         List<CommitInfo> commits = event.commits();
@@ -379,9 +387,7 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
         publishCommitCreated(sha, repository);
     }
 
-    /**
-     * Persists file changes from webhook payload (filenames + change type, no line stats).
-     */
+    /** Persists file changes from webhook payload (filenames + change type, no line stats). */
     private void persistWebhookFileChanges(String sha, CommitInfo commitInfo, Repository repository) {
         boolean hasFiles = (commitInfo.added() != null && !commitInfo.added().isEmpty())
                 || (commitInfo.modified() != null && !commitInfo.modified().isEmpty())
@@ -434,8 +440,8 @@ public class GitLabPushMessageHandler extends AbstractIntegrationMessageHandler<
     // Scope resolution
 
     /**
-     * For a write transaction after the git fetch: whether the delivery may still write, which on a connection route
-     * means the connection is still active, held so until the transaction ends.
+     * For a write transaction after the git fetch: whether the delivery may still write, which on a
+     * connection route means the connection is still active, held so until the transaction ends.
      */
     private boolean mayWrite() {
         return GitLabRouteAdmission.current().map(routeAdmission::holdActive).orElse(true);

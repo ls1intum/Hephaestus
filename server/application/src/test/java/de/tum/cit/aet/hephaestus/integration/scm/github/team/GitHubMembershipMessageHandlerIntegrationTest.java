@@ -29,8 +29,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for GitHubMembershipMessageHandler.
- * <p>
- * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
+ *
+ * <p>Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -89,7 +89,7 @@ class GitHubMembershipMessageHandlerIntegrationTest extends BaseIntegrationTest 
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(testOrganization);
+        workspace.setOrganizationId(testOrganization.getId());
         workspace.setAccountLogin("HephaestusTest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

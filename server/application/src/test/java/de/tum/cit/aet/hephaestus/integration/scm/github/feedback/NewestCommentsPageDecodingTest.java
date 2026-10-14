@@ -8,12 +8,14 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.Test;
 
 /**
- * Every other test of {@code GitHubSummaryChannel.findExistingSummary} stubs
- * {@code ClientResponseField.toEntity} and hands back an already-built connection, so no JSON is decoded:
- * were {@code hasPreviousPage}/{@code startCursor} dropped on the way in, the scan would report a confirmed
- * {@code ABSENT} after one page and license a duplicate summary on any thread longer than the page size.
+ * Every other test of {@code GitHubSummaryWriter.findExistingSummary} stubs {@code
+ * ClientResponseField.toEntity} and hands back an already-built connection, so no JSON is decoded:
+ * were {@code hasPreviousPage}/{@code startCursor} dropped on the way in, the scan would report a
+ * confirmed {@code ABSENT} after one page and license a duplicate summary on any thread longer than
+ * the page size.
  *
- * <p>The payload is a verbatim page from api.github.com (issue comments, {@code last: 1}), cursors included.
+ * <p>The payload is a verbatim page from api.github.com (issue comments, {@code last: 1}), cursors
+ * included.
  */
 class NewestCommentsPageDecodingTest extends BaseUnitTest {
 

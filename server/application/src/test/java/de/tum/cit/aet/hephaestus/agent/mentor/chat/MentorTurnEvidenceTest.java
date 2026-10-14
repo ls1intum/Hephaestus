@@ -25,21 +25,21 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
     @Test
     void shouldPreserveCanonicalOutcomeAndCapturedWorkWithoutSourceProse() {
         String practiceResults = """
-                {"coverage":{"preparedAt":"2026-10-01T12:00:00Z","maxEntries":50},
-                 "recentResults":[{"practiceResultId":"practiceResult-id","resource":"practiceResult-resource",
-                  "reviewId":"producing-review","artifactKind":"PULL_REQUEST","artifactId":11,
-                  "presence":"ABSENT","assessment":"GOOD","outcome":"NEGATIVE",
-                  "summary":"SOURCE-PROSE-NOT-IN-RECEIPT","reviewedWork":{"producingReviewStatus":"FAILED","capturedAt":"2026-10-01T11:00:00Z",
-                   "titleAndDescriptionCoverage":"DIFFERS_FROM_STORED_WORK","headCoverage":"MATCHES_STORED_WORK",
-                   "coreCoverage":"DIFFERS_FROM_STORED_WORK","checkedFields":["title","description","head"],
-                   "providerFreshness":"UNKNOWN"}}],"omittedForSize":{"earlierResults":3}}
-                """;
+            {"coverage":{"preparedAt":"2026-10-01T12:00:00Z","maxEntries":50},
+             "recentResults":[{"resultId":"practiceResult-id","resource":"practiceResult-resource",
+              "reviewId":"producing-review","itemKind":"PULL_REQUEST","pullRequestId":11,
+              "presence":"ABSENT","assessment":"GOOD","outcome":"NEGATIVE",
+              "summary":"SOURCE-PROSE-NOT-IN-RECEIPT","reviewedWork":{"producingReviewStatus":"FAILED","capturedAt":"2026-10-01T11:00:00Z",
+               "titleAndDescriptionCoverage":"DIFFERS_FROM_STORED_WORK","headCoverage":"MATCHES_STORED_WORK",
+               "coreCoverage":"DIFFERS_FROM_STORED_WORK","checkedFields":["title","description","head"],
+               "providerFreshness":"UNKNOWN"}}],"omittedForSize":{"earlierResults":3}}
+            """;
         String readiness = """
-                {"readAt":"2026-10-01T12:01:00Z","providerFreshness":"UNKNOWN","pullRequests":[
-                 {"artifactId":11,"headSha":"new-head","checks":"FAILURE","checksFor":"CURRENT_HEAD",
-                  "description":"BODY-NOT-IN-RECEIPT","latestReviews":[{"reviewer":"service-account","bot":true,
-                   "state":"APPROVED","commit":"recorded-associated-head","commitFor":"UNKNOWN","body":"COMMENT-NOT-IN-RECEIPT"}]}]}
-                """;
+            {"readAt":"2026-10-01T12:01:00Z","providerFreshness":"UNKNOWN","pullRequests":[
+             {"pullRequestId":11,"headSha":"new-head","checks":"FAILURE","checksFor":"CURRENT_HEAD",
+              "description":"BODY-NOT-IN-RECEIPT","latestReviews":[{"reviewer":"service-account","bot":true,
+               "state":"APPROVED","commit":"recorded-associated-head","commitFor":"UNKNOWN","body":"COMMENT-NOT-IN-RECEIPT"}]}]}
+            """;
         String receipt = MentorTurnEvidence.forRunner(
                 mapper,
                 Map.of(
@@ -52,7 +52,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         var parsed = mapper.readTree(receipt);
         var practiceResult = parsed.path("observations").path("recentResults").get(0);
         assertThat(practiceResult).isNotNull();
-        assertThat(practiceResult.path("practiceResultId").asString()).isEqualTo("practiceResult-id");
+        assertThat(practiceResult.path("resultId").asString()).isEqualTo("practiceResult-id");
         assertThat(practiceResult.path("outcome").asString()).isEqualTo("NEGATIVE");
         assertThat(practiceResult.path("reviewId").asString()).isEqualTo("producing-review");
         assertThat(practiceResult
@@ -99,14 +99,14 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
                         ResultHistoryContentSource.OUTPUT_KEY,
                         "not-json".getBytes(StandardCharsets.UTF_8),
                         MergeReadinessContentSource.OUTPUT_KEY,
-                        "{\"pullRequests\":[{\"artifactId\":11,\"checks\":\"UNKNOWN\"}]}"
+                        "{\"pullRequests\":[{\"pullRequestId\":11,\"checks\":\"UNKNOWN\"}]}"
                                 .getBytes(StandardCharsets.UTF_8))));
         assertThat(parsed.path("observations").path("status").asString()).isEqualTo("UNAVAILABLE");
         assertThat(parsed.path("authoredWorkIndex").path("status").asString()).isEqualTo("UNAVAILABLE");
         assertThat(parsed.path("mergeReadiness")
                         .path("pullRequests")
                         .path(0)
-                        .path("artifactId")
+                        .path("pullRequestId")
                         .asInt())
                 .isEqualTo(11);
     }
@@ -114,17 +114,17 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
     @Test
     void shouldCarryRetainedReviewAttemptsAndTheirBoundsButNoOtherJobFields() {
         String attempts = """
-                {"readAt":"2026-10-02T14:00:00Z","coverage":{"lookbackDays":90,"maxEntries":20,"hasMore":true},
-                 "attempts":[{"reviewId":"failed-closure","artifactKind":"scm.issue","artifactId":21,"number":21,
-                  "url":"https://gitlab.example/course/-/issues/21","state":"CLOSED",
-                  "reviewsResource":"inputs/context/review_attempts/issue/21.json","status":"FAILED",
-                  "triggerMode":"AUTO","createdAt":"2026-10-01T10:00:00Z","completedAt":"2026-10-01T10:05:00Z",
-                  "errorMessage":"NOT-IN-RECEIPT"}]}
-                """;
+            {"readAt":"2026-10-02T14:00:00Z","coverage":{"lookbackDays":90,"maxEntries":20,"hasMore":true},
+             "attempts":[{"reviewId":"failed-closure","itemKind":"scm.issue","pullRequestId":21,"number":21,
+              "url":"https://gitlab.example/course/-/issues/21","state":"CLOSED",
+              "reviewsResource":"inputs/context/review_attempts/issue/21.json","status":"FAILED",
+              "triggerMode":"AUTO","createdAt":"2026-10-01T10:00:00Z","completedAt":"2026-10-01T10:05:00Z",
+              "errorMessage":"NOT-IN-RECEIPT"}]}
+            """;
         String authored = """
-                {"issues":[{"artifactId":21,"reviewsResource":"inputs/context/review_attempts/issue/21.json",
-                  "number":21,"title":"TITLE-NOT-IN-RECEIPT"}]}
-                """;
+            {"issues":[{"pullRequestId":21,"reviewsResource":"inputs/context/review_attempts/issue/21.json",
+              "number":21,"title":"TITLE-NOT-IN-RECEIPT"}]}
+            """;
         var parsed = mapper.readTree(MentorTurnEvidence.forRunner(
                 mapper,
                 Map.of(
@@ -170,11 +170,11 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         var rows = practiceResults.putArray("recentResults");
         for (int i = 0; i < 50; i++) {
             rows.addObject()
-                    .put("practiceResultId", Integer.toString(i))
+                    .put("resultId", Integer.toString(i))
                     .put("resource", "r".repeat(1_000))
                     .put("outcome", "NEGATIVE");
         }
-        practiceResults.putArray("abstentions").addObject().put("practiceResultId", "small-abstention");
+        practiceResults.putArray("abstentions").addObject().put("resultId", "small-abstention");
         String receipt = MentorTurnEvidence.forRunner(
                 mapper, Map.of(ResultHistoryContentSource.OUTPUT_KEY, mapper.writeValueAsBytes(practiceResults)));
         var selected = mapper.readTree(receipt).path("observations");
@@ -187,7 +187,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         for (var row : selected.path("recentResults")) {
             assertThat(row.path("resource").asString()).hasSize(1_000);
         }
-        assertThat(selected.path("abstentions").path(0).path("practiceResultId").asString())
+        assertThat(selected.path("abstentions").path(0).path("resultId").asString())
                 .isEqualTo("small-abstention");
     }
 
@@ -199,7 +199,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         for (int i = 0; i < 25; i++) {
             pullRequests
                     .addObject()
-                    .put("artifactId", i)
+                    .put("pullRequestId", i)
                     .put("resource", MergeReadinessContentSource.resourceOf(i))
                     .put("url", url)
                     .put("headSha", "a".repeat(40))
@@ -212,7 +212,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
             for (int i = 0; i < 30; i++) {
                 UUID id = UUID.nameUUIDFromBytes((list + i).getBytes(StandardCharsets.UTF_8));
                 rows.addObject()
-                        .put("practiceResultId", id.toString())
+                        .put("resultId", id.toString())
                         .put("resource", ResultHistoryContentSource.resourceOf(id))
                         .put("reviewId", UUID.randomUUID().toString())
                         .put("outcome", "UNDETERMINED")
@@ -223,7 +223,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         for (String list : List.of("pullRequests", "issues")) {
             var rows = authored.putArray(list);
             for (int i = 0; i < 20; i++) {
-                rows.addObject().put("artifactId", i).put("number", i).put("url", url);
+                rows.addObject().put("pullRequestId", i).put("number", i).put("url", url);
             }
         }
         var attempts = mapper.createObjectNode();
@@ -237,8 +237,8 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
             attemptRows
                     .addObject()
                     .put("reviewId", reviewId)
-                    .put("artifactKind", "scm.issue")
-                    .put("artifactId", 1_000_000_000_000L + i)
+                    .put("itemKind", "scm.issue")
+                    .put("pullRequestId", 1_000_000_000_000L + i)
                     .put("number", i)
                     .put("url", url)
                     .put("state", "CLOSED")
@@ -303,7 +303,7 @@ class MentorTurnEvidenceTest extends BaseUnitTest {
         for (var row : parsed.path("observations").path("recentResults")) {
             assertThat(row.path("resource").asString())
                     .isEqualTo(ResultHistoryContentSource.resourceOf(
-                            UUID.fromString(row.path("practiceResultId").asString())));
+                            UUID.fromString(row.path("resultId").asString())));
         }
         assertThat(MentorTurnEvidence.MAX_RECEIPT_CHARS).isEqualTo(40_000);
         assertThat(Files.readString(

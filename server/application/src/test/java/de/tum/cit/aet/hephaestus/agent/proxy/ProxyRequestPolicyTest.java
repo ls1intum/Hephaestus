@@ -8,11 +8,11 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.catalog.EgressPolicy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
@@ -29,7 +29,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     private EgressPolicy egress;
 
     @Mock
-    private AgentJobRepository jobs;
+    private ReviewJobRepository jobs;
 
     @Mock
     private ChatMessageRepository messages;
@@ -43,19 +43,19 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     private ProxyRequestPolicy policy;
     private final UUID id = UUID.fromString("5f6696f2-1557-4ea1-b3d2-bfc338ae41bc");
     private final LlmModelResolver.ConnectionRef model =
-            new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, 8L, 1L);
+            new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, 8L, 1L);
 
     @BeforeEach
     void setUp() {
         policy = new ProxyRequestPolicy(egress, jobs, messages, reviews, routing);
     }
 
-    private ProxyRouting request(LlmUsageSourceType source) {
+    private ProxyRouting request(UsageSourceType source) {
         return new ProxyRouting(
                 "test",
                 "openai-completions",
                 "https://example.invalid",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 7L,
                 8L,
                 1L,
@@ -66,26 +66,26 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseASourceThatDoesNotBelongToTheAuthenticatedWorkspace() {
-        assertThat(policy.allows(request(LlmUsageSourceType.AGENT_JOB))).isFalse();
+        assertThat(policy.allows(request(UsageSourceType.REVIEW_JOB))).isFalse();
         verify(jobs).findByIdAndWorkspaceId(id, 1L);
         verifyNoInteractions(reviews, routing);
     }
 
     @Test
     void shouldRecheckTheCurrentChoiceOnEveryModelRequest() {
-        var job = new AgentJob();
+        var job = new ReviewJob();
         when(jobs.findByIdAndWorkspaceId(id, 1L)).thenReturn(Optional.of(job));
         when(reviews.allows(job, model)).thenReturn(true, false);
-        assertThat(policy.allows(request(LlmUsageSourceType.AGENT_JOB))).isTrue();
-        assertThat(policy.allows(request(LlmUsageSourceType.AGENT_JOB))).isFalse();
+        assertThat(policy.allows(request(UsageSourceType.REVIEW_JOB))).isTrue();
+        assertThat(policy.allows(request(UsageSourceType.REVIEW_JOB))).isFalse();
     }
 
     @ParameterizedTest
     @EnumSource(
-            value = LlmUsageSourceType.class,
+            value = UsageSourceType.class,
             names = {"PRACTICE_SCRIPT_DECISION", "PRACTICE_SCRIPT_EMBEDDING", "PRACTICE_SCRIPT_RERANKING"})
-    void shouldCheckAPracticeScriptModelAgainstTheReviewedDeveloperWhenItsSlotIsCalled(LlmUsageSourceType source) {
-        var job = new AgentJob();
+    void shouldCheckAPracticeScriptModelAgainstTheReviewedDeveloperWhenItsSlotIsCalled(UsageSourceType source) {
+        var job = new ReviewJob();
         when(jobs.findByIdAndWorkspaceId(id, 1L)).thenReturn(Optional.of(job));
         when(reviews.allows(job, model)).thenReturn(true);
 
@@ -96,7 +96,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
     void shouldUseTheDurableMentorTurnDeveloperNotASuppliedUserId() {
         when(messages.findDeveloperIdByIdAndWorkspaceId(id, 1L)).thenReturn(Optional.of(20L));
         when(routing.allows(1L, 20L, model)).thenReturn(false);
-        assertThat(policy.allows(request(LlmUsageSourceType.MENTOR_TURN))).isFalse();
+        assertThat(policy.allows(request(UsageSourceType.MENTOR_TURN))).isFalse();
         verify(routing).allows(1L, 20L, model);
         verifyNoInteractions(jobs);
     }
@@ -107,7 +107,7 @@ class ProxyRequestPolicyTest extends BaseUnitTest {
                 "test",
                 "openai-completions",
                 "https://example.invalid",
-                FundingSource.INSTANCE,
+                UsageFundingSource.INSTANCE,
                 7L,
                 8L,
                 1L,

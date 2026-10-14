@@ -18,7 +18,7 @@
 		"forceConsistentCasingInFileNames": true,
 		"skipLibCheck": true,
 		"noEmit": true,
-		// A bundled script imports `../lib/…` beside it; the runner imports `./work/practice-scripts/lib/…`
+		// Relative imports resolve beside each staged script, across lib/core and domain kits.
 		// through the link the runtime creates to the toolkit (`PracticeRunnerProfile.setupCommands`).
 		"rootDirs": [
 			"server/application/src/main/resources/practices",
@@ -31,6 +31,7 @@
 	"include": [
 		"server/application/src/main/resources/agent/**/*.ts",
 		"server/application/src/test/resources/agent/**/*.ts",
+		"server/application/src/test/resources/integration/scm/sarif/**/*.ts",
 		"server/application/src/main/resources/practices/scripts/**/*.ts",
 		"docker/agents/practice-scripts/**/*.ts",
 		"docker/agents/pi/**/*.ts"

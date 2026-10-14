@@ -86,7 +86,8 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     @WithMentorUser
     void autoSeedDisabledDoesNotGrantAdminToFirstVisitorOfEmptyMembershipWorkspace() {
         // SECURITY (A5): with auto-seed disabled (the production default), the first authenticated
-        // visitor of a zero-membership workspace must NOT be silently seeded as ADMIN. A non-member,
+        // visitor of a zero-membership workspace must NOT be silently seeded as ADMIN. A
+        // non-member,
         // non-super-admin visitor is forbidden, and no membership row is created.
         User visitor = persistUser("mentor");
         User workspaceOwner = persistUser("empty-membership-owner");
@@ -106,7 +107,7 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
                 .isForbidden()
                 .expectBody(Void.class);
 
-        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(
+        assertThat(workspaceMembershipRepository.findByWorkspace_IdAndAccount_IdIn(
                         workspace.getId(), Set.of(visitor.getId())))
                 .as("auto-seed disabled must not create a membership")
                 .isEmpty();
@@ -115,8 +116,10 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @WithAdminUser
     void instanceSuperAdminWithoutMembershipIsElevatedToAdmin() {
-        // An instance super-admin (APP_ADMIN, app_admin authority) reaches ANY workspace as ADMIN even
-        // without an explicit membership — the GitLab admin model (WorkspaceContextFilter elevation).
+        // An instance super-admin (APP_ADMIN, app_admin authority) reaches ANY workspace as ADMIN
+        // even
+        // without an explicit membership — the GitLab admin model (WorkspaceContextFilter
+        // elevation).
         // Deliberately ADMIN, never OWNER (ownership is member-granted).
         persistUser("admin");
         User workspaceOwner = persistUser("admin-workspace-owner");
@@ -131,8 +134,10 @@ class WorkspaceContextFilterIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @WithAdminUser
     void superAdminElevationDoesNotResurrectSuspendedWorkspace() {
-        // The ACTIVE-status gate runs BEFORE the elevation, so a super-admin (no membership) is still
-        // 404'd on a suspended workspace's scoped routes — elevation never widens access to non-active tenants.
+        // The ACTIVE-status gate runs BEFORE the elevation, so a super-admin (no membership) is
+        // still
+        // 404'd on a suspended workspace's scoped routes — elevation never widens access to
+        // non-active tenants.
         persistUser("admin");
         User owner = persistUser("suspended-elev-owner");
         Workspace workspace = createWorkspace("suspended-elev", "Suspended", "suspendedelev", AccountType.ORG, owner);

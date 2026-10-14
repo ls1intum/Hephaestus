@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import java.io.Serial;
 
 /**
@@ -16,12 +17,12 @@ public class LlmBudgetExhaustedException extends RuntimeException {
     @Serial
     private static final long serialVersionUID = 1L;
 
-    public LlmBudgetExhaustedException(FundingSource fundingSource) {
+    public LlmBudgetExhaustedException(UsageFundingSource fundingSource) {
         super(message(fundingSource));
     }
 
-    private static String message(FundingSource fundingSource) {
-        return fundingSource == FundingSource.WORKSPACE
+    private static String message(UsageFundingSource fundingSource) {
+        return fundingSource == UsageFundingSource.WORKSPACE
                 ? "This workspace has reached its monthly AI cap. Heph pauses until next month, unless a "
                         + "workspace admin raises the cap."
                 : "This workspace has reached its monthly AI budget. Heph pauses until next month, unless "

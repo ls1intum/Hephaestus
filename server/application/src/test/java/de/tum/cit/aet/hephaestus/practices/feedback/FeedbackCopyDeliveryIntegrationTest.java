@@ -1,0 +1,108 @@
+package de.tum.cit.aet.hephaestus.practices.feedback;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
+import de.tum.cit.aet.hephaestus.integration.core.spi.LookupPresence;
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.RepeatedSummaryCheck;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import java.util.Objects;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+class FeedbackCopyDeliveryIntegrationTest extends AbstractFeedbackDeliveryIntegrationTest {
+    @Autowired
+    RepeatedSummaryCheck repeated;
+
+    @Test
+    void shouldRecognizeOnlyConfirmedSummaryWordsForTheSameDeveloperAndWork() {
+        prepare(false);
+        String body = Objects.requireNonNull(current().getBody());
+        assertThat(repeated.repeats(workspace.getId(), itemId, developerId, body))
+                .isFalse();
+        sender.send(workspace.getId(), feedbackId);
+        assertThat(repeated.repeats(workspace.getId(), itemId, developerId, body))
+                .isTrue();
+        assertThat(repeated.repeats(workspace.getId() + 1, itemId, developerId, body))
+                .isFalse();
+        assertThat(repeated.repeats(workspace.getId(), itemId + 1, developerId, body))
+                .isFalse();
+        assertThat(repeated.repeats(workspace.getId(), itemId, developerId + 1, body))
+                .isFalse();
+        assertThat(repeated.repeats(workspace.getId(), itemId, developerId, body + " Add another test."))
+                .isFalse();
+    }
+
+    @Test
+    void shouldNotTreatUnknownSummaryVisibilityAsARepeatedDeliveredNote() {
+        prepare(false);
+        provider.summaryFailure = Failure.AFTER_CREATE;
+        sender.send(workspace.getId(), feedbackId);
+        assertThat(current().getState()).isEqualTo(FeedbackState.UNCONFIRMED);
+        assertThat(current().getDeliveredAt()).isNull();
+        assertThat(repeated.repeats(
+                        workspace.getId(),
+                        itemId,
+                        developerId,
+                        Objects.requireNonNull(current().getBody())))
+                .isFalse();
+    }
+
+    @Test
+    void shouldCommitEveryPhysicalCopyFenceBeforeCreate() {
+        prepare(true);
+        sender.send(workspace.getId(), feedbackId);
+        assertThat(current().getState()).isEqualTo(FeedbackState.DELIVERED);
+        assertThat(current().getDeliveredAt()).isNotNull();
+        assertThat(current().getChecks().keySet())
+                .contains(FeedbackCheckStage.COMPOSITION, FeedbackCheckStage.AUTOMATIC, FeedbackCheckStage.EGRESS);
+        assertThat(provider.summaryCreates).isEqualTo(1);
+        assertThat(provider.noteCreates).isEqualTo(1);
+        assertThat(children()).allSatisfy(copy -> {
+            assertThat(copy.getExternalRef()).isEqualTo(copy.getId().toString());
+            assertThat(copy.getWriteStartedAt()).isNotNull();
+            assertThat(copy.getWriteMarker()).isEqualTo(FeedbackIds.writeMarker(copy.getId()));
+        });
+    }
+
+    @Test
+    void shouldKeepTheFrozenCoordinatesAndIdentityWhenTheProviderUsesAFileNoteFallback() {
+        prepare(true);
+        provider.fallback = true;
+        sender.send(workspace.getId(), feedbackId);
+        var copy = children().get(1);
+        assertThat(copy.getKind()).isEqualTo(FeedbackCopyKind.FILE_NOTE);
+        assertThat(copy.getId()).isEqualTo(FeedbackIds.copy(feedbackId, FeedbackCopyKind.LINE_NOTE, 1));
+        assertThat(copy.getPath()).isEqualTo("src/A.java");
+        assertThat(copy.getStartLine()).isEqualTo(10);
+        assertThat(copy.getEndLine()).isEqualTo(12);
+        assertThat(copy.getSide()).isEqualTo(CitationSide.OLD);
+        assertThat(copy.getWriteMarker()).isEqualTo(FeedbackIds.writeMarker(copy.getId()));
+    }
+
+    @Test
+    void shouldKeepConfirmedSiblingAppearanceWhileAnotherCopyIsUnknown() {
+        prepare(true);
+        provider.noteFailure = Failure.AFTER_CREATE;
+        sender.send(workspace.getId(), feedbackId);
+        var first = current().getDeliveredAt();
+        assertThat(first).isNotNull();
+        assertThat(current().getState()).isEqualTo(FeedbackState.UNCONFIRMED);
+        assertThat(repeated.repeats(
+                        workspace.getId(),
+                        itemId,
+                        developerId,
+                        Objects.requireNonNull(current().getBody())))
+                .isTrue();
+        provider.readback = LookupPresence.UNKNOWN;
+        due();
+        newSender().send(workspace.getId(), feedbackId);
+        assertThat(current().getState()).isEqualTo(FeedbackState.UNCONFIRMED);
+        assertThat(current().getDeliveredAt()).isEqualTo(first);
+        assertThat(provider.summaryCreates).isEqualTo(1);
+        assertThat(provider.noteCreates).isEqualTo(1);
+    }
+}

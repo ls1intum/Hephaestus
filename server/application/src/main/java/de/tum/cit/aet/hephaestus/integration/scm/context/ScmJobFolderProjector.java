@@ -1,8 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.context;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentProvenance;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -33,22 +37,26 @@ public class ScmJobFolderProjector implements WorkspaceScmProjection {
     private final JsonMapper mapper;
     private final PersonDataCopyRecorder personCopies;
     private final IssueCommentProvenance provenance;
+    private final UserRepository users;
 
     public ScmJobFolderProjector(
             ScmJobFolderRepository rows,
             JsonMapper mapper,
             PersonDataCopyRecorder personCopies,
-            IssueCommentProvenance provenance) {
+            IssueCommentProvenance provenance,
+            UserRepository users) {
         this.rows = rows;
         this.mapper = mapper;
         this.personCopies = personCopies;
         this.provenance = provenance;
+        this.users = users;
     }
 
     /**
-     * One query per selected family for the whole repository, each read to its end before the next starts. Records
-     * arrive family by family, each in work-number then row order. Every file holds the same lines in the same order
-     * as when each piece of work was read on its own; only the order in which files are first written differs.
+     * One query per selected family for the whole repository, each read to its end before the next
+     * starts. Records arrive family by family, each in work-number then row order. Every file holds
+     * the same lines in the same order as when each piece of work was read on its own; only the
+     * order in which files are first written differs.
      */
     @Override
     public void forEachRecord(
@@ -99,7 +107,9 @@ public class ScmJobFolderProjector implements WorkspaceScmProjection {
         return (pull ? "pulls/" : "issues/") + number + "/";
     }
 
-    /** Hephaestus's own notes are not part of the work under review, so they never enter the folder. */
+    /**
+     * Hephaestus's own notes are not part of the work under review, so they never enter the folder.
+     */
     private void comments(
             Stream<ScmJobFolderRepository.WorkPart> comments,
             String file,
@@ -142,7 +152,14 @@ public class ScmJobFolderProjector implements WorkspaceScmProjection {
         for (String actor : PERSON_FIELDS) {
             JsonNode id = object.path(actor);
             if (id.isIntegralNumber() && id.asLong() > 0) {
-                personCopies.recordUser(id.asLong());
+                var user = users.findById(id.asLong())
+                        .orElseThrow(() -> new ItemCaptureException(
+                                ItemCaptureCode.CAPTURE_FAILED, "Copied SCM author identity is" + " unavailable"));
+                personCopies.recordIdentity(new PersonCopyIdentity(
+                        user.getProvider().getType().name(),
+                        user.getProvider().getServerUrl(),
+                        Long.toString(user.getNativeId()),
+                        null));
             }
         }
         return object;

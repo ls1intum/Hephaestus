@@ -1,8 +1,9 @@
 // Finds each authored commit subject in the commit record, with its shapes: bare, repeated or cut off.
 // A shape is a place to check, not a lapse.
-import { readCapturedCommits } from "../lib/change.ts";
-import { describeCommitCount, subjectFacts, subjectLeads } from "../lib/commit-subjects.ts";
-import { definePracticeScript, expectKind } from "../lib/practice-script.ts";
+import { readCapturedCommits } from "../kits/scm/change.ts";
+import { describeCommitCount, subjectFacts, subjectLeads } from "../kits/scm/commit-subjects.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	commit:
@@ -12,7 +13,8 @@ export const LABELS = {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
 		const captured = await readCapturedCommits(ctx.evidence);
 		const facts = subjectFacts(captured ?? []);
 		const authored = facts.filter((f) => !f.merge);

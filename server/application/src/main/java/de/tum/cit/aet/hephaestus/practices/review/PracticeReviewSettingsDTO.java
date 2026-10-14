@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.practices.review.dto.WorkspaceReviewScopeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeDeliveryStatus;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -15,13 +17,14 @@ import org.jspecify.annotations.Nullable;
  * <p>Each knob is exposed twice: the <em>effective</em> value (override-or-fleet-default) drives the
  * control, and the raw <em>override</em> (null = inheriting) lets the UI mark inherited fields.
  */
+@JsonInclude(JsonInclude.Include.ALWAYS)
 @Schema(description = "A workspace's practice-review policy: effective values plus raw overrides")
 public record PracticeReviewSettingsDTO(
         @NonNull @Schema(description = "Strong entity tag to send in If-Match when updating this rollout")
         String etag,
 
         @NonNull @Schema(description = "Monotonic rollout revision carried by automatically admitted review jobs")
-        Long revision,
+        String revision,
 
         @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs")
         Boolean deliverToMerged,
@@ -37,23 +40,24 @@ public record PracticeReviewSettingsDTO(
 
         @NonNull
         @Schema(description = "Explicit all-or-selected repository and person coverage. Selected-empty means nobody.")
-        WorkspaceReviewScope reviewScope,
+        WorkspaceReviewScopeDTO reviewScope,
 
         @NonNull @Schema(description = "Whether new external practice feedback may be sent")
         PracticeDeliveryStatus deliveryStatus,
 
-        @NonNull PracticeReviewCoverageSummaryDTO coverageSummary,
+        @NonNull PracticeReviewScopeSummaryDTO scopeSummary,
 
-        @NonNull
-        @Schema(
-                description = "Effective: how much autonomy the system has over practices and groups that hold no "
-                        + "autonomy of their own — the bottom of the practice → group → workspace chain")
-        PracticeAutonomy defaultAutonomy,
+        @NonNull @Schema(description = "The default feedback mode when neither the practice nor its group selects one.")
+        FeedbackMode defaultFeedbackMode,
 
-        @Schema(description = "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies")
-        @Nullable
-        PracticeAutonomy defaultAutonomyOverride,
+        @Schema(description = "Raw override; null inherits APPROVE_FIRST") @Nullable
+        FeedbackMode defaultFeedbackModeOverride,
 
         @NonNull
         @Schema(description = "Repository-root Ant-style generated-path patterns, keyed by monitored repository name")
-        Map<String, List<String>> generatedPaths) {}
+        Map<String, List<String>> generatedPaths) {
+    public PracticeReviewSettingsDTO {
+        generatedPaths = generatedPaths.entrySet().stream()
+                .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> List.copyOf(e.getValue())));
+    }
+}

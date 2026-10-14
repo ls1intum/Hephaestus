@@ -7,11 +7,11 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -30,18 +30,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequiredArgsConstructor
 @Validated
 public class UserViewUsersController {
-    private final ViewedUserService users;
-
-    public record UserViewUserDTO(
-            @NonNull Long userId,
-            @NonNull String login,
-            @Nullable String name,
-            @Nullable Long accountId,
-            @Nullable String accountStatus) {}
+    private final ViewedAccountService users;
 
     @GetMapping
     @Operation(summary = "List workspace users and their linked account status", operationId = "listUserViewUsers")
-    public ResponseEntity<PageResponseDTO<UserViewUserDTO>> list(
+    public ResponseEntity<PageResponseDTO<UserViewAccountDTO>> list(
             WorkspaceContext workspace,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
@@ -50,10 +43,14 @@ public class UserViewUsersController {
                 .body(PageResponseDTO.from(users.list(workspace.id(), PageRequest.of(page, size))));
     }
 
-    @GetMapping("/{userId}")
+    @GetMapping("/{accountId}")
     @UserViewRead
     @Operation(summary = "Confirm access to a workspace user", operationId = "getUserViewUser")
-    public ResponseEntity<UserViewUserDTO> get(WorkspaceContext workspace, @PathVariable Long userId) {
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(users.requireUser(workspace.id(), userId));
+    public ResponseEntity<UserViewAccountDTO> get(
+            WorkspaceContext workspace,
+            @PathVariable @Pattern(regexp = "^[1-9][0-9]*$") @DecimalMax("9223372036854775807") String accountId) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(users.requireAccount(workspace.id(), Long.parseLong(accountId)));
     }
 }

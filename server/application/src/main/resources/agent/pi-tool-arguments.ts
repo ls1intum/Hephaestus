@@ -138,10 +138,10 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 		}
 	}
 	const questions =
-		evidence.undecidability == null ? evidence.undecidability : list(evidence.undecidability);
+		evidence.openQuestions == null ? evidence.openQuestions : list(evidence.openQuestions);
 	// Pi may coerce an empty string, a boolean or a number to null: only explicit absence may omit the list.
 	if (questions === "" || typeof questions === "boolean" || typeof questions === "number") {
-		throw new Error("evidence.undecidability must be a list of open questions or null");
+		throw new Error("evidence.openQuestions must be a list of open questions or null");
 	}
 	return {
 		...result,
@@ -153,7 +153,7 @@ export function prepareResultArguments(args: unknown): Record<string, unknown> {
 			...(questions === undefined
 				? {}
 				: {
-						undecidability: Array.isArray(questions)
+						openQuestions: Array.isArray(questions)
 							? questions.map((raw: unknown) => {
 									const question = object(raw);
 									return isRecord(question) && !Array.isArray(question) && question.citation != null

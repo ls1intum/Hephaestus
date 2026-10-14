@@ -2,10 +2,15 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
+import {
+	type Outcome,
+	OUTCOMES,
+	parseCandidate,
+} from "../../../../../../docker/agents/practice-scripts/lib/core/contract.ts";
 import { folderCitationIndex } from "../../../main/resources/agent/pi-folder-index.ts";
 import {
 	CONVERSATION_THREAD,
-	citationMatchesArtifact,
+	citationMatchesSourceFile,
 	citesReviewedTurn,
 	describeCitationMismatch,
 	MAX_SUMMARY_CHARS,
@@ -14,21 +19,17 @@ import {
 	normalizePracticeSlug,
 	normalizeSubmission,
 	resolveQuote,
+	resolveCapturedText,
 	submissionCitations,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
 	withoutCoordinates,
 } from "../../../main/resources/agent/pi-result-normalize.ts";
-import {
-	type Outcome,
-	OUTCOMES,
-	parseCandidate,
-} from "../../../main/resources/agent/work/practice-scripts/lib/contract.ts";
 
 const DIFF_CITATION = {
 	sourceKind: "scm.pull-request.diff",
-	artifactPath: "inputs/context/diff.patch",
+	sourcePath: "inputs/context/diff.patch",
 	path: "src/Auth.java",
 	side: "NEW",
 	startLine: 10,
@@ -101,7 +102,7 @@ const goodSearch = {
 
 const goodInapplicability = {
 	consulted: ["scm.pull-request.diff"],
-	subject: "error handling around outbound network calls",
+	prerequisite: "error handling around outbound network calls",
 	ruledOutBy: "the change touches only Markdown documentation and makes no network calls",
 };
 
@@ -113,7 +114,7 @@ const UNDECIDABLE = {
 const EXAMPLE = {
 	citation: {
 		sourceKind: "scm.pull-request.core",
-		artifactPath: "inputs/context/metadata.json",
+		sourcePath: "inputs/context/metadata.json",
 		path: "inputs/context/metadata.json",
 		startLine: 2,
 		endLine: 2,
@@ -140,23 +141,22 @@ function resultOf(outcome: Outcome): Record<string, unknown> {
 		case "NOT_MET": {
 			return baseSubmission({
 				citations: [],
-				severity: "CRITICAL",
 				example: EXAMPLE,
-				evidence: { search: goodSearch, undecidability: [question] },
+				evidence: { search: goodSearch, openQuestions: [question] },
 			});
 		}
-		case "NOT_APPLICABLE": {
+		case "DOES_NOT_APPLY": {
 			return baseSubmission({
 				outcome,
 				problems: undefined,
 				evidence: { inapplicability: goodInapplicability },
 			});
 		}
-		case "UNDETERMINED": {
+		case "COULD_NOT_DETERMINE": {
 			return baseSubmission({
 				outcome,
 				problems: undefined,
-				evidence: { search: goodSearch, undecidability: [question] },
+				evidence: { search: goodSearch, openQuestions: [question] },
 			});
 		}
 	}
@@ -169,22 +169,29 @@ void test("each outcome is accepted with every part that it permits", () => {
 		const submission = normalizeSubmission(resultOf(outcome));
 		assert.equal(submission.outcome, outcome);
 		assert.equal("problems" in submission, outcome === "NOT_MET");
-		assert.equal("severity" in submission, outcome === "NOT_MET");
+		assert.equal("severity" in submission, false);
 		assert.equal("example" in submission, outcome === "MET" || outcome === "NOT_MET");
 		assert.deepEqual(
 			Object.keys(submission.evidence).toSorted(),
 			{
 				MET: ["search"],
-				NOT_MET: ["search", "undecidability"],
-				NOT_APPLICABLE: ["inapplicability"],
-				UNDETERMINED: ["search", "undecidability"],
+				NOT_MET: ["openQuestions", "search"],
+				DOES_NOT_APPLY: ["inapplicability"],
+				COULD_NOT_DETERMINE: ["openQuestions", "search"],
 			}[outcome],
 		);
 	}
 });
 
 void test("a normalized submission with host coverage passes the contract for each outcome", () => {
-	const coverage = { source: "host", reads: 1, truncatedReads: 0, failedReads: 0, complete: true };
+	const coverage = {
+		source: "host",
+		reads: 1,
+		truncatedReads: 0,
+		failedReads: 0,
+		receipts: [],
+		complete: true,
+	};
 	for (const outcome of OUTCOMES) {
 		const parsed = parseCandidate({ ...normalizeSubmission(resultOf(outcome)), coverage });
 		assert.deepEqual(parsed.ok ? "ok" : `${parsed.reasonCode}: ${parsed.message}`, "ok", outcome);
@@ -202,17 +209,17 @@ void test("a NOT_MET result lists its problems, and no other outcome has one", (
 		/^a MET result has no problems: a problem makes it NOT_MET$/u,
 	);
 	assert.match(
-		refusal({ ...resultOf("UNDETERMINED"), problems: [problemFixture()] }),
-		/^an? UNDETERMINED result has no problems/u,
+		refusal({ ...resultOf("COULD_NOT_DETERMINE"), problems: [problemFixture()] }),
+		/^an? COULD_NOT_DETERMINE result has no problems/u,
 	);
 	// An empty list on another outcome carries nothing.
-	assert.equal("problems" in normalizeSubmission({ ...resultOf("MET"), problems: [] }), false);
+	assert.throws(() => normalizeSubmission({ ...resultOf("MET"), problems: [] }), /no problems/u);
 });
 
 void test("a NOT_MET result may cite nothing itself; every other outcome cites what it rests on", () => {
 	assert.deepEqual(normalizeSubmission(baseSubmission({ citations: [] })).citations, []);
 	assert.deepEqual(normalizeSubmission(baseSubmission({ citations: undefined })).citations, []);
-	for (const outcome of ["MET", "NOT_APPLICABLE", "UNDETERMINED"] as const) {
+	for (const outcome of ["MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const) {
 		assert.match(
 			refusal({ ...resultOf(outcome), citations: [] }),
 			new RegExp(
@@ -223,19 +230,13 @@ void test("a NOT_MET result may cite nothing itself; every other outcome cites w
 	}
 });
 
-void test("severity is optional on NOT_MET and refused on every other outcome", () => {
-	assert.equal("severity" in normalizeSubmission(baseSubmission()), false);
-	assert.equal(normalizeSubmission(baseSubmission({ severity: "CRITICAL" })).severity, "CRITICAL");
-	assert.equal("severity" in normalizeSubmission(baseSubmission({ severity: null })), false);
-	assert.match(
-		refusal({ ...resultOf("MET"), severity: "MINOR" }),
-		/^severity is permitted only for NOT_MET; a MET result has none/u,
-	);
-	// A word of the scale in another spelling is not that word.
-	assert.match(
-		refusal(baseSubmission({ severity: "major" })),
-		/^invalid severity 'major': one of CRITICAL, MAJOR, MINOR, INFO$/u,
-	);
+void test("result severity is refused on every outcome", () => {
+	for (const outcome of ["MET", "NOT_MET", "DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const) {
+		assert.throws(
+			() => normalizeSubmission({ ...resultOf(outcome), severity: "CRITICAL" }),
+			/unknown|severity/u,
+		);
+	}
 });
 
 void test("each problem names its severity, summary, explanation, citations and basis", () => {
@@ -339,7 +340,7 @@ void test("two problems do not share a key", () => {
 
 void test("an example belongs only to a MET or NOT_MET result", () => {
 	assert.deepEqual(normalizeSubmission(resultOf("MET")).example, EXAMPLE);
-	for (const outcome of ["NOT_APPLICABLE", "UNDETERMINED"] as const) {
+	for (const outcome of ["DOES_NOT_APPLY", "COULD_NOT_DETERMINE"] as const) {
 		assert.match(
 			refusal({ ...resultOf(outcome), example: EXAMPLE }),
 			new RegExp(
@@ -362,35 +363,35 @@ void test("an example belongs only to a MET or NOT_MET result", () => {
 	);
 });
 
-void test("an UNDETERMINED result records each open question it could not settle", () => {
+void test("an COULD_NOT_DETERMINE result records each open question it could not settle", () => {
 	assert.match(
-		refusal({ ...resultOf("UNDETERMINED"), evidence: {} }),
-		/^an UNDETERMINED result must say what it could not settle: evidence\.undecidability lists each open question/u,
+		refusal({ ...resultOf("COULD_NOT_DETERMINE"), evidence: {} }),
+		/^an COULD_NOT_DETERMINE result must say what it could not settle: evidence\.openQuestions lists each open question/u,
 	);
 	assert.match(
-		refusal({ ...resultOf("UNDETERMINED"), evidence: { undecidability: [] } }),
-		/^an UNDETERMINED result must say what it could not settle/u,
+		refusal({ ...resultOf("COULD_NOT_DETERMINE"), evidence: { openQuestions: [] } }),
+		/^an COULD_NOT_DETERMINE result must say what it could not settle/u,
 	);
 	assert.match(
 		refusal({
-			...resultOf("UNDETERMINED"),
-			evidence: { undecidability: [{ openQuestion: "Why?" }] },
+			...resultOf("COULD_NOT_DETERMINE"),
+			evidence: { openQuestions: [{ openQuestion: "Why?" }] },
 		}),
 		/^open question 1: wouldSettleIt is required$/u,
 	);
 	assert.match(
 		refusal({
-			...resultOf("UNDETERMINED"),
-			evidence: { undecidability: [{ ...UNDECIDABLE, citation: { path: "a.ts", startLine: 1 } }] },
+			...resultOf("COULD_NOT_DETERMINE"),
+			evidence: { openQuestions: [{ ...UNDECIDABLE, citation: { path: "a.ts", startLine: 1 } }] },
 		}),
 		/^open question 1 citation: evidence citation sourceKind is required$/u,
 	);
 	// An open question may stand without a citation.
 	assert.deepEqual(
 		normalizeSubmission({
-			...resultOf("UNDETERMINED"),
-			evidence: { undecidability: [UNDECIDABLE] },
-		}).evidence.undecidability,
+			...resultOf("COULD_NOT_DETERMINE"),
+			evidence: { openQuestions: [UNDECIDABLE] },
+		}).evidence.openQuestions,
 		[UNDECIDABLE],
 	);
 });
@@ -398,158 +399,62 @@ void test("an UNDETERMINED result records each open question it could not settle
 void test("the warrants follow the outcome", () => {
 	assert.match(
 		refusal({
-			...resultOf("NOT_APPLICABLE"),
+			...resultOf("DOES_NOT_APPLY"),
 			evidence: { inapplicability: goodInapplicability, search: goodSearch },
 		}),
-		/^evidence\.search is not permitted for NOT_APPLICABLE: a NOT_APPLICABLE result carries evidence\.inapplicability only/u,
+		/^evidence\.search is not permitted for DOES_NOT_APPLY: a DOES_NOT_APPLY result carries evidence\.inapplicability only/u,
 	);
 	assert.match(
 		refusal(baseSubmission({ evidence: { inapplicability: goodInapplicability } })),
-		/^evidence\.inapplicability is permitted only for NOT_APPLICABLE$/u,
+		/^evidence\.inapplicability is permitted only for DOES_NOT_APPLY$/u,
 	);
 	assert.match(
-		refusal({ ...resultOf("MET"), evidence: { undecidability: [UNDECIDABLE] } }),
-		/^evidence\.undecidability is permitted only for NOT_MET or UNDETERMINED$/u,
+		refusal({ ...resultOf("MET"), evidence: { openQuestions: [UNDECIDABLE] } }),
+		/^evidence\.openQuestions is permitted only for NOT_MET or COULD_NOT_DETERMINE$/u,
 	);
 	assert.match(
-		refusal({ ...resultOf("NOT_APPLICABLE"), evidence: {} }),
-		/^a NOT_APPLICABLE result must say why the practice does not apply: evidence\.inapplicability with consulted, subject and ruledOutBy\. If you looked and could not tell, say UNDETERMINED instead$/u,
+		refusal({ ...resultOf("DOES_NOT_APPLY"), evidence: {} }),
+		/^a DOES_NOT_APPLY result must say why the practice does not apply: evidence\.inapplicability with consulted, prerequisite and ruledOutBy\. If you looked and could not tell, say COULD_NOT_DETERMINE instead$/u,
 	);
 	assert.match(
 		refusal({
-			...resultOf("NOT_APPLICABLE"),
+			...resultOf("DOES_NOT_APPLY"),
 			evidence: { inapplicability: { ...goodInapplicability, ruledOutBy: "" } },
 		}),
-		/If you are merely unsure, the answer is UNDETERMINED, not NOT_APPLICABLE$/u,
+		/If you are merely unsure, the answer is COULD_NOT_DETERMINE, not DOES_NOT_APPLY$/u,
 	);
 	assert.match(
-		refusal({ ...resultOf("MET"), evidence: { search: goodSearch, findings: [] } }),
-		/^unknown evidence field\(s\): findings; evidence has only search, inapplicability, undecidability$/u,
+		refusal({ ...resultOf("MET"), evidence: { search: goodSearch, problems: [] } }),
+		/^unknown evidence field\(s\): problems; evidence has only search, inapplicability, openQuestions$/u,
 	);
 });
 
-void test("keys the host binds or measures are dropped, with a note for each", () => {
-	const notes: string[] = [];
-	const submission = normalizeSubmission(
-		baseSubmission({
-			practiceSlug: "writes-focused-pull-requests",
-			revises: null,
-			coverage: { source: "host", reads: 3 },
-		}),
-		notes,
-	);
-	assert.equal("practiceSlug" in submission, false);
-	assert.equal("coverage" in submission, false);
-	assert.deepEqual(notes, [
-		"practiceSlug dropped: the host binds the practice",
-		"revises dropped: the host binds the result to this practice's session",
-		"coverage dropped: coverage is what the host measured from your reads",
-	]);
-});
-
-void test("evidenceRationale is read as the explanation when no explanation is sent", () => {
-	const notes: string[] = [];
-	const { explanation, ...rest } = baseSubmission();
-	assert.equal(
-		normalizeSubmission({ ...rest, evidenceRationale: explanation }, notes).explanation,
-		explanation,
-	);
-	assert.deepEqual(notes, [
-		"evidenceRationale read as explanation, its name in a result; nothing to resend",
-	]);
-	assert.match(
-		refusal(baseSubmission({ evidenceRationale: "Another reason." })),
-		/^evidenceRationale and explanation were both sent/u,
-	);
-});
-
-void test("evidence.citations, the old place, are read as the result's citations", () => {
-	const notes: string[] = [];
-	const { citations, ...rest } = baseSubmission();
-	const submission = normalizeSubmission({ ...rest, evidence: { citations } }, notes);
-	assert.equal(submission.citations.length, 1);
-	assert.deepEqual(submission.evidence, {});
-	assert.deepEqual(notes, [
-		"citations read from under evidence and recorded beside it, where they belong; nothing to resend",
-	]);
-	// A list in both places is not guessed at.
-	assert.match(
-		refusal(baseSubmission({ evidence: { citations } })),
-		/^citations was sent both beside the result and under evidence; send one list, beside the result$/u,
-	);
-});
-
-void test("one open question sent as undecidability is recorded as a list of one", () => {
-	const notes: string[] = [];
-	const submission = normalizeSubmission(
-		{ ...resultOf("UNDETERMINED"), evidence: { undecidability: UNDECIDABLE } },
-		notes,
-	);
-	assert.deepEqual(submission.evidence.undecidability, [UNDECIDABLE]);
-	assert.deepEqual(notes, [
-		"undecidability sent as one open question and recorded as a list of one; nothing to resend",
-	]);
-	// Its loose fields beside the result are one open question too.
-	const loose: string[] = [];
-	assert.deepEqual(
-		normalizeSubmission({ ...resultOf("UNDETERMINED"), evidence: {}, ...UNDECIDABLE }, loose)
-			.evidence.undecidability,
-		[UNDECIDABLE],
-	);
-	assert.deepEqual(loose, [
-		"undecidability{openQuestion, wouldSettleIt} read from where they were sent and recorded under evidence, where they belong; nothing to resend",
-		"undecidability sent as one open question and recorded as a list of one; nothing to resend",
-	]);
-});
-
-void test("a warrant sent beside the result is read from there and named", () => {
-	const notes: string[] = [];
-	const met = normalizeSubmission({ ...resultOf("MET"), evidence: {}, search: goodSearch }, notes);
-	assert.deepEqual(met.evidence.search, goodSearch);
-	assert.equal(
-		notes.at(-1),
-		"search read from where they were sent and recorded under evidence, where they belong; nothing to resend",
-	);
-	// The search fields beside a MET result, with no search wrapper at all.
-	const bare = normalizeSubmission({ ...resultOf("MET"), evidence: {}, ...goodSearch }, notes);
-	assert.deepEqual(bare.evidence.search, goodSearch);
-	assert.equal(
-		notes.at(-1),
-		"search{lookedFor, boundary, consulted} read from where they were sent and recorded under evidence, where they belong; nothing to resend",
-	);
-	// The fields of an inapplicability, sent straight under evidence: its own fields name the branch.
-	const inapplicable = normalizeSubmission(
-		{ ...resultOf("NOT_APPLICABLE"), evidence: { ...goodInapplicability } },
-		notes,
-	);
-	assert.deepEqual(inapplicable.evidence.inapplicability, goodInapplicability);
-	assert.equal(
-		notes.at(-1),
-		"inapplicability{subject, ruledOutBy, consulted} read from where they were sent and recorded under evidence, where they belong; nothing to resend",
-	);
-	// A rehomed branch is still held to its outcome: an inapplicability beside NOT_MET is refused.
-	assert.match(
-		refusal({ ...baseSubmission(), ...goodInapplicability }),
-		/evidence\.inapplicability is permitted only for NOT_APPLICABLE/u,
-	);
-	// A warrant sent in both places is not guessed at.
-	assert.match(
-		refusal({ ...resultOf("MET"), search: goodSearch }),
-		/^search was sent both beside the result and under evidence; send one value$/u,
-	);
-});
-
-void test("loose warrant fields sent in both places are refused without choosing a claim", () => {
-	for (const [field, beside, underEvidence] of [
-		["lookedFor", "a human approval", "a regression test"],
-		["subject", "a review request", "an acceptance check"],
-		["openQuestion", "whether approval is current", "whether a test ran"],
-	] as const) {
-		assert.match(
-			refusal(baseSubmission({ [field]: beside, evidence: { [field]: underEvidence } })),
-			new RegExp(`${field} was sent both beside the result and under evidence`, "u"),
-		);
+void test("retired result fields and loose warrants are refused", () => {
+	for (const fields of [
+		{ practiceSlug: "another" },
+		{ coverage: {} },
+		{ evidenceRationale: "old" },
+		{ search: goodSearch },
+		{ lookedFor: "a handler" },
+		{ openQuestions: UNDECIDABLE },
+	]) {
+		assert.throws(() => normalizeSubmission(baseSubmission(fields)), /unknown.*field/u);
 	}
+	assert.throws(
+		() => normalizeSubmission(baseSubmission({ evidence: { citations: [citationFixture()] } })),
+		/unknown.*field/u,
+	);
+	assert.throws(
+		() =>
+			normalizeSubmission(
+				baseSubmission({
+					outcome: "COULD_NOT_DETERMINE",
+					problems: undefined,
+					evidence: { openQuestions: UNDECIDABLE },
+				}),
+			),
+		/list|array/u,
+	);
 });
 
 void test("explicit null warrants and citation fields record the same evidence as absence", () => {
@@ -560,7 +465,7 @@ void test("explicit null warrants and citation fields record the same evidence a
 			...raw,
 			citations: [citationFixture({ side: null, revision: null, endLine: null, quote: null })],
 			example: null,
-			evidence: { search: null, inapplicability: null, undecidability: null, ...sent },
+			evidence: { search: null, inapplicability: null, openQuestions: null, ...sent },
 		});
 		const { side: _side, ...plain } = DIFF_CITATION;
 		assert.deepEqual(normalized.citations, [{ ...plain, endLine: plain.startLine, quote: "" }]);
@@ -584,7 +489,7 @@ void test("submissionCitations lists the result's, each problem's, the example's
 			],
 			example: { ...EXAMPLE, citation: at("e.ts") },
 			evidence: {
-				undecidability: [UNDECIDABLE, { ...UNDECIDABLE, citation: at("f.ts") }],
+				openQuestions: [UNDECIDABLE, { ...UNDECIDABLE, citation: at("f.ts") }],
 			},
 		}),
 	);
@@ -598,7 +503,7 @@ void test("submissionCitations lists the result's, each problem's, the example's
 		citation.quote = "repaired";
 	}
 	assert.equal(submission.example?.citation.quote, "repaired");
-	assert.equal(submission.evidence.undecidability?.[1]?.citation?.quote, "repaired");
+	assert.equal(submission.evidence.openQuestions?.[1]?.citation?.quote, "repaired");
 });
 
 void test("every problem of a submission is named in one refusal", () => {
@@ -608,13 +513,13 @@ void test("every problem of a submission is named in one refusal", () => {
 		refusal(
 			baseSubmission({ outcome: "PASSED", summary: "Test", explanation: " ", confidence: 3 }),
 		),
-		/^unknown result field\(s\): confidence; a result has only outcome, summary, explanation, citations, problems, severity, example, evidence; also: invalid outcome 'PASSED': one of MET, NOT_MET, NOT_APPLICABLE, UNDETERMINED; also: summary must say what was observed as a short phrase[^;]*; also: explanation is required: say why the evidence supports this outcome$/u,
+		/^result has unknown field\(s\): confidence; it has only outcome, summary, explanation, citations, problems, example, evidence; also: invalid outcome 'PASSED': one of MET, NOT_MET, DOES_NOT_APPLY, COULD_NOT_DETERMINE; also: summary must say what was observed as a short phrase[^;]*; also: explanation is required: say why the evidence supports this outcome$/u,
 	);
 	const many = refusal(
 		baseSubmission({
 			summary: longSummary,
 			explanation: "",
-			citations: [citationFixture({ startLine: 0 }), citationFixture({ artifactPath: "" })],
+			citations: [citationFixture({ startLine: 0 }), citationFixture({ sourcePath: "" })],
 			problems: [problemFixture({ basis: { type: "introduced", head: 4, explanation: "x" } })],
 			example: { citation: EXAMPLE.citation, note: "" },
 		}),
@@ -623,7 +528,7 @@ void test("every problem of a submission is named in one refusal", () => {
 		/^summary must be at most 160 characters; this one is \d+\. Resend the result/u,
 		/; also: explanation is required/u,
 		/; also: citation 1: evidence citation startLine must be a positive integer/u,
-		/; also: citation 2: evidence citation artifactPath is required/u,
+		/; also: citation 2: evidence citation sourcePath is required/u,
 		/; also: problem 1: basis\.head names citation 4/u,
 		/; also: example\.note is required/u,
 	]) {
@@ -644,14 +549,14 @@ void test("a result carries no confidence, and one offered is rejected", () => {
 	for (const confidence of [-1, 4200, "very"]) {
 		assert.match(
 			refusal(baseSubmission({ confidence })),
-			/^unknown result field\(s\): confidence; a result has only outcome, summary, explanation, citations, problems, severity, example, evidence$/u,
+			/^result has unknown field\(s\): confidence; it has only outcome, summary, explanation, citations, problems, example, evidence$/u,
 		);
 	}
-	// A stray key with no value carries nothing: dropped, and said so.
 	for (const confidence of [null, ""]) {
-		const notes: string[] = [];
-		assert.equal("confidence" in normalizeSubmission(baseSubmission({ confidence }), notes), false);
-		assert.deepEqual(notes, ["empty field(s) confidence dropped"]);
+		assert.throws(
+			() => normalizeSubmission(baseSubmission({ confidence })),
+			/unknown.*confidence/u,
+		);
 	}
 });
 
@@ -665,7 +570,7 @@ void test("removed fields and old axes are rejected rather than silently accepte
 	]) {
 		assert.match(
 			refusal(baseSubmission({ [field]: "legacy" })),
-			new RegExp(`^unknown result field\\(s\\): ${field};`, "u"),
+			new RegExp(`^result has unknown field\\(s\\): ${field};`, "u"),
 		);
 	}
 });
@@ -674,7 +579,7 @@ void test("the wire contract rejects outcome aliases and text coerced from numbe
 	for (const outcome of ["met", "NOT-MET", "not met", " MET ", "POSITIVE"]) {
 		assert.match(refusal(baseSubmission({ outcome })), /invalid outcome/u);
 	}
-	assert.match(refusal({ ...resultOf("MET"), severity: "null" }), /severity is permitted only/u);
+	assert.match(refusal({ ...resultOf("MET"), severity: "null" }), /unknown.*severity/u);
 	assert.match(refusal(baseSubmission({ summary: 1234 })), /summary is required/u);
 });
 
@@ -687,7 +592,10 @@ void test("practice slugs normalize to one canonical identity", () => {
 
 void test("a correction to severity or explanation is not an exact retry", () => {
 	const initial = normalizeSubmission(baseSubmission());
-	assert.notDeepEqual(initial, normalizeSubmission(baseSubmission({ severity: "CRITICAL" })));
+	assert.notDeepEqual(
+		initial,
+		normalizeSubmission(baseSubmission({ problems: [problemFixture({ severity: "CRITICAL" })] })),
+	);
 	assert.notDeepEqual(
 		initial,
 		normalizeSubmission(
@@ -776,12 +684,12 @@ void test("a line-number refusal names what was received, and an omitted line as
 	);
 });
 
-void test("citation requires an exact artifact path and quote", () => {
+void test("citation requires an exact sourceFile path and quote", () => {
 	assert.match(
-		refusal(citing(citationFixture({ artifactPath: undefined }))),
-		/artifactPath is required/u,
+		refusal(citing(citationFixture({ sourcePath: undefined }))),
+		/sourcePath is required/u,
 	);
-	// No quote is a citation by coordinates alone; the runner fills it from the artifact.
+	// No quote is a citation by coordinates alone; the runner fills it from the sourceFile.
 	assert.equal(normalizedCitation(citationFixture({ quote: undefined })).quote, "");
 	assert.match(
 		refusal(citing(citationFixture({ quote: "x".repeat(4001) }))),
@@ -789,15 +697,12 @@ void test("citation requires an exact artifact path and quote", () => {
 	);
 });
 
-void test("citation side is present exactly for pull-request diffs", () => {
-	// A diff citation may leave the side out; the runner records the side the text is found on.
-	assert.equal("side" in normalizedCitation(citationFixture({ side: undefined })), false);
-	assert.match(refusal(citing(citationFixture({ side: "BOTH" }))), /side must be OLD or NEW/u);
-	// A side on anything but a quote of the change says nothing: surplus, dropped rather than refused.
+void test("normalization preserves side for source-catalog validation", () => {
 	assert.equal(
-		"side" in normalizedCitation(citationFixture({ sourceKind: "scm.pull-request.core" })),
-		false,
+		normalizedCitation(citationFixture({ sourceKind: "custom.source", side: "NEW" })).side,
+		"NEW",
 	);
+	assert.equal(normalizedCitation(citationFixture({ side: undefined })).side, undefined);
 });
 
 void test("a citation of change.json is refused with what to quote instead", () => {
@@ -810,12 +715,12 @@ void test("a citation of change.json is refused with what to quote instead", () 
 			citing(
 				citationFixture({
 					sourceKind: "scm.repository.tree",
-					artifactPath: "inputs/context/tree.json",
+					sourcePath: "inputs/context/tree.json",
 					side: undefined,
 				}),
 			),
 		),
-		/^citation 1: repository citations must use the captured \.git\/HEAD artifact/u,
+		/^citation 1: repository citations must use the captured \.git\/HEAD sourceFile/u,
 	);
 });
 
@@ -825,14 +730,14 @@ const CHECKOUT_WITNESSES = [
 	["repos/reviewed/.git/hephaestus-captured-refs", "scm.repository.tree"],
 ] as const;
 
-/** The staged sources and artifacts with the reviewed checkout captured beside them. */
+/** The staged sources and sourceFiles with the reviewed checkout captured beside them. */
 function withCheckout(
 	sources: readonly string[],
-	artifacts: readonly (readonly [string, string])[],
+	sourceFiles: readonly (readonly [string, string])[],
 ): [Set<string>, Map<string, string>] {
 	return [
 		new Set([...sources, "scm.repository.tree"]),
-		new Map<string, string>([...artifacts, ...CHECKOUT_WITNESSES]),
+		new Map<string, string>([...sourceFiles, ...CHECKOUT_WITNESSES]),
 	];
 }
 
@@ -847,10 +752,10 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 		/a quote of code needs the captured checkout repos\/reviewed\//u,
 	);
 	// Both witnesses, under the repository tree source, and that source available.
-	const [available, artifacts] = withCheckout(["scm.pull-request.diff"], diff);
-	artifacts.delete("repos/reviewed/.git/hephaestus-captured-refs");
+	const [available, sourceFiles] = withCheckout(["scm.pull-request.diff"], diff);
+	sourceFiles.delete("repos/reviewed/.git/hephaestus-captured-refs");
 	assert.throws(
-		() => validateEvidenceSources(submission, available, artifacts),
+		() => validateEvidenceSources(submission, available, sourceFiles),
 		/needs the captured checkout/u,
 	);
 	assert.throws(
@@ -878,31 +783,29 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 			citing(
 				citationFixture({
 					sourceKind: "scm.repository.tree",
-					artifactPath: "repos/re.viewed/.git/HEAD",
+					sourcePath: "repos/re.viewed/.git/HEAD",
 					side: undefined,
 				}),
 			),
 		),
-		/repository citations must use the captured \.git\/HEAD artifact/u,
+		/repository citations must use the captured \.git\/HEAD sourceFile/u,
 	);
 });
 
 void test("the server's live harnesses stage the checkout a quote of the change is verified against", () => {
 	// LiveWorkRecordsTest pins this index from the harness that stages the live reviews.
-	const { availableSourceKinds, artifactSources } = folderCitationIndex(
-		JSON.parse(
-			readFileSync(new URL("../practice-results/live-manifest.json", import.meta.url), "utf8"),
-		),
+	const { availableSourceKinds, sourceFileSources } = folderCitationIndex(
+		JSON.parse(readFileSync(new URL("contract-v3/live-manifest.json", import.meta.url), "utf8")),
 	);
-	const cited = citationFixture({ artifactPath: "context/change.json", path: "src/cart.ts" });
+	const cited = citationFixture({ sourcePath: "context/change.json", path: "src/cart.ts" });
 	const submission = normalizeSubmission(
 		baseSubmission({ citations: [cited], problems: [problemFixture({ citations: [cited] })] }),
 	);
 	assert.doesNotThrow(() =>
-		validateEvidenceSources(submission, availableSourceKinds, artifactSources),
+		validateEvidenceSources(submission, availableSourceKinds, sourceFileSources),
 	);
 	const withoutCheckout = new Map(
-		[...artifactSources].filter(([, kind]) => kind !== "scm.repository.tree"),
+		[...sourceFileSources].filter(([, kind]) => kind !== "scm.repository.tree"),
 	);
 	assert.throws(
 		() => validateEvidenceSources(submission, availableSourceKinds, withoutCheckout),
@@ -910,7 +813,7 @@ void test("the server's live harnesses stage the checkout a quote of the change 
 	);
 });
 
-void test("a citation must name a source this run staged, and the artifact that source produced", () => {
+void test("a citation must name a source this run staged, and the sourceFile that source produced", () => {
 	const submission = normalizeSubmission(baseSubmission());
 	assert.doesNotThrow(() =>
 		validateEvidenceSources(
@@ -957,9 +860,9 @@ void test("a citation must name a source this run staged, and the artifact that 
 			),
 		/was not staged by 'scm\.pull-request\.diff';/u,
 	);
-	// The change view is derived in the container; a citation of it is told what the artifact is.
+	// The change view is derived in the container; a citation of it is told what the sourceFile is.
 	const derived = normalizeSubmission(baseSubmission());
-	onlyCitation(derived.citations).artifactPath = "work/change/files.json";
+	onlyCitation(derived.citations).sourcePath = "work/change/files.json";
 	assert.throws(
 		() =>
 			validateEvidenceSources(
@@ -967,7 +870,7 @@ void test("a citation must name a source this run staged, and the artifact that 
 				new Set(["scm.pull-request.diff"]),
 				new Map([["inputs/context/diff.patch", "scm.pull-request.diff"]]),
 			),
-		/work\/ is derived here and is not an artifact: quote a changed line from work\/change\/diff\.patch/u,
+		/work\/ is derived here and is not a source file: quote a changed line from work\/change\/diff\.patch/u,
 	);
 });
 
@@ -981,16 +884,16 @@ void test("the sources of every citation are checked, not only the result's", ()
 		/evidence source 'scm\.pull-request\.core' was not available/u,
 	);
 	const inQuestion = normalizeSubmission({
-		...resultOf("UNDETERMINED"),
+		...resultOf("COULD_NOT_DETERMINE"),
 		evidence: {
-			undecidability: [
-				{ ...UNDECIDABLE, citation: citationFixture({ artifactPath: "elsewhere.patch" }) },
+			openQuestions: [
+				{ ...UNDECIDABLE, citation: citationFixture({ sourcePath: "elsewhere.patch" }) },
 			],
 		},
 	});
 	assert.throws(
 		() => validateEvidenceSources(inQuestion, available, staged),
-		/artifact 'elsewhere\.patch' was not staged/u,
+		/sourceFile 'elsewhere\.patch' was not staged/u,
 	);
 });
 
@@ -1009,7 +912,7 @@ void test("an unstaged citation refuses its reference without disclosing every s
 		refused = error;
 	}
 	assert.ok(refused instanceof Error);
-	assert.ok(refused.message.includes(onlyCitation(submission.citations).artifactPath));
+	assert.ok(refused.message.includes(onlyCitation(submission.citations).sourcePath));
 	assert.ok(refused.message.includes("scm.pull-request.diff"));
 	assert.equal(
 		[...sources.keys()].some((path) => refused.message.includes(path)),
@@ -1026,7 +929,7 @@ void test("a path under another checkout keeps its prefix, and no note says othe
 	const citation = normalizeCitation(
 		{
 			sourceKind: "scm.repository.tree",
-			artifactPath: "repos/reviewed/.git/HEAD",
+			sourcePath: "repos/reviewed/.git/HEAD",
 			path: "repos/linked/README.md",
 			startLine: 3,
 			quote: "Run make.",
@@ -1043,7 +946,7 @@ void test("a checkout file named by its workspace path is read at its path insid
 	const citation = normalizeCitation(
 		{
 			sourceKind: "scm.repository.tree",
-			artifactPath: "repos/reviewed/.git/HEAD",
+			sourcePath: "repos/reviewed/.git/HEAD",
 			path: "repos/reviewed/README.md",
 			startLine: 3,
 			quote: "Run make.",
@@ -1060,7 +963,7 @@ void test("a checkout file named by its workspace path is read at its path insid
 void test("historical citations preserve a full revision for trusted admission", () => {
 	const citation = {
 		sourceKind: "scm.repository.tree",
-		artifactPath: "repos/repo/.git/HEAD",
+		sourcePath: "repos/repo/.git/HEAD",
 		path: "deleted.ts",
 		revision: "a".repeat(40),
 		startLine: 3,
@@ -1068,8 +971,8 @@ void test("historical citations preserve a full revision for trusted admission",
 	};
 	assert.equal(normalizeCitation(citation, "").revision, citation.revision);
 	assert.throws(
-		() => normalizeCitation({ ...citation, revision: "HEAD~1" }, "citation 1: "),
-		/^Error: citation 1: revision must be a full commit SHA/u,
+		() => normalizeCitation({ ...citation, revision: "x".repeat(1025) }, "citation 1: "),
+		/^Error: citation 1: revision must be an opaque nonempty version/u,
 	);
 	// Whether a revision applies is decided once the manifest has settled the source, so it is kept
 	// here; the runner drops it from any citation that is not of the repository, with a note.
@@ -1092,7 +995,7 @@ void test("a citation is completed from the manifest and its line numbers read a
 				problemFixture({
 					citations: [
 						{
-							artifactPath: "inputs/context/change.json",
+							sourcePath: "inputs/context/change.json",
 							path: "src/Auth.java",
 							side: "NEW",
 							startLine: "L10",
@@ -1104,11 +1007,11 @@ void test("a citation is completed from the manifest and its line numbers read a
 			],
 		}),
 		notes,
-		(artifact) => staged.get(artifact),
+		(sourceFile) => staged.get(sourceFile),
 	);
 	const [record, change] = submissionCitations(submission);
 	assert.deepEqual(
-		[record?.artifactPath, record?.sourceKind, record?.startLine],
+		[record?.sourcePath, record?.sourceKind, record?.startLine],
 		["inputs/context/metadata.json", "scm.pull-request.core", 3],
 	);
 	assert.deepEqual(
@@ -1116,7 +1019,7 @@ void test("a citation is completed from the manifest and its line numbers read a
 		["scm.pull-request.diff", 10, 12],
 	);
 	assert.deepEqual(notes, [
-		"citation 1: artifactPath filled in as inputs/context/metadata.json, the staged record the path names",
+		"citation 1: sourcePath filled in as inputs/context/metadata.json, the staged record the path names",
 		"citation 1: sourceKind filled in as scm.pull-request.core, the source that staged inputs/context/metadata.json",
 		'citation 1: startLine "[L3]" read as 3',
 		"problem 1 citation 1: sourceKind filled in as scm.pull-request.diff, the source that staged inputs/context/change.json",
@@ -1175,11 +1078,11 @@ void test("citation coordinates are bounded", () => {
 
 void test("normalization preserves nonblank citation path identifiers", () => {
 	const citation = normalizedCitation(
-		citationFixture({ path: " source file ", artifactPath: "inputs/context/ captured file " }),
+		citationFixture({ path: " source file ", sourcePath: "inputs/context/ captured file " }),
 	);
 	assert.equal(citation.path, " source file ");
-	assert.equal(citation.artifactPath, "inputs/context/ captured file ");
-	for (const field of ["path", "artifactPath"]) {
+	assert.equal(citation.sourcePath, "inputs/context/ captured file ");
+	for (const field of ["path", "sourcePath"]) {
 		assert.match(
 			refusal(citing(citationFixture({ [field]: " \t\n" }))),
 			new RegExp(`${field} is required`, "u"),
@@ -1205,9 +1108,9 @@ void test("diff citations bind the quote to the claimed file and side; a wrong l
 	const citation = normalizedCitation();
 	const diff =
 		"diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
-	assert.equal(citationMatchesArtifact(citation, diff), true);
-	assert.equal(citationMatchesArtifact({ ...citation, path: "src/Other.java" }, diff), false);
-	assert.equal(citationMatchesArtifact({ ...citation, side: "OLD" }, diff), false);
+	assert.equal(citationMatchesSourceFile(citation, diff), true);
+	assert.equal(citationMatchesSourceFile({ ...citation, path: "src/Other.java" }, diff), false);
+	assert.equal(citationMatchesSourceFile({ ...citation, side: "OLD" }, diff), false);
 	assert.deepEqual(resolveQuote({ ...citation, startLine: 11, endLine: 12 }, diff), {
 		quote: " insecure();",
 		startLine: 10,
@@ -1256,7 +1159,7 @@ const serializedFields = (values: string[]) =>
 /** A citation of the pull request's title, quoting what the test says it quotes. */
 const cite = (quote: string): NormalizedCitation => ({
 	sourceKind: "scm.pull-request.core",
-	artifactPath: "inputs/context/core.md",
+	sourcePath: "inputs/context/core.md",
 	path: "title",
 	startLine: 1,
 	endLine: 1,
@@ -1308,7 +1211,7 @@ void test("a matching diff quote is recorded as the content its lines carry, mar
 	);
 });
 
-void test("a quote is recorded as the artifact spells it: JSON escapes and non-breaking spaces", () => {
+void test("a quote is recorded as the sourceFile spells it: JSON escapes and non-breaking spaces", () => {
 	const { side: _side, ...plain } = normalizedCitation();
 	const citation = { ...plain, sourceKind: "scm.linked-work-items", startLine: 2, endLine: 2 };
 	const serialized =
@@ -1323,7 +1226,7 @@ void test("a quote is recorded as the artifact spells it: JSON escapes and non-b
 			quote: "- [x] stored in `diagrams/`",
 		},
 	);
-	// A non-breaking space read as a space still records the artifact's own byte.
+	// A non-breaking space read as a space still records the sourceFile's own byte.
 	const nbsp = "* Launch app and open\u00A0`Venues`.\n";
 	const first = { ...citation, startLine: 1, endLine: 1 };
 	assert.deepEqual(resolveQuote({ ...first, quote: "* Launch app and open `Venues`." }, nbsp), {
@@ -1360,7 +1263,7 @@ void test("a quote is recorded as the artifact spells it: JSON escapes and non-b
 void test("spacing reads as spacing only where the quote has some, and line breaks stay line breaks", () => {
 	const line: NormalizedCitation = {
 		sourceKind: "scm.linked-work-items",
-		artifactPath: "inputs/context/issue.json",
+		sourcePath: "inputs/context/issue.json",
 		path: "inputs/context/issue.json",
 		startLine: 1,
 		endLine: 1,
@@ -1438,7 +1341,7 @@ void test("a quote of many indented lines resolves promptly, and so does a near 
 	const quote = ['  "text" : [ {', ...block, "  }, {", ...block, "  } ]"].join("\n");
 	const citation: NormalizedCitation = {
 		sourceKind: "scm.review-threads",
-		artifactPath: "threads.json",
+		sourcePath: "threads.json",
 		path: "threads.json",
 		startLine: 2,
 		endLine: 19,
@@ -1698,35 +1601,35 @@ void test("removed-line citations use old-side coordinates", () => {
 	};
 	const diff =
 		"--- a/src/Auth.java\n+++ b/src/Auth.java\n@@ -8 +8 @@\n[L8] - requireAdmin();\n[L8] + allowAll();\n";
-	assert.equal(citationMatchesArtifact(citation, diff), true);
-	assert.equal(citationMatchesArtifact({ ...citation, side: "NEW" }, diff), false);
+	assert.equal(citationMatchesSourceFile(citation, diff), true);
+	assert.equal(citationMatchesSourceFile({ ...citation, side: "NEW" }, diff), false);
 });
 
 void test("a claim about an earlier review is bound to the staged history like any other citation", () => {
 	const submission = normalizeSubmission(
 		citing({
-			sourceKind: "hephaestus.observation-history",
-			artifactPath: "inputs/history/observations.json",
-			path: "inputs/history/observations.json",
+			sourceKind: "hephaestus.problem-history",
+			sourcePath: "inputs/history/problems.json",
+			path: "inputs/history/problems.json",
 			startLine: 1,
 			endLine: 1,
 			quote: '"recurrenceKey": "rec-1"',
 		}),
 	);
-	const [staged, artifacts] = withCheckout(
-		["scm.pull-request.diff", "hephaestus.observation-history"],
+	const [staged, sourceFiles] = withCheckout(
+		["scm.pull-request.diff", "hephaestus.problem-history"],
 		[
-			["inputs/history/observations.json", "hephaestus.observation-history"],
+			["inputs/history/problems.json", "hephaestus.problem-history"],
 			["inputs/context/diff.patch", "scm.pull-request.diff"],
 		],
 	);
 
-	assert.doesNotThrow(() => validateEvidenceSources(submission, staged, artifacts));
+	assert.doesNotThrow(() => validateEvidenceSources(submission, staged, sourceFiles));
 	const cited = onlyCitation(submission.citations);
-	const bytes = '{"observations":[{"recurrenceKey": "rec-1","title":"Caught and ignored"}]}';
-	assert.equal(citationMatchesArtifact(cited, bytes), true);
+	const bytes = '{"problems":[{"recurrenceKey": "rec-1","title":"Caught and ignored"}]}';
+	assert.equal(citationMatchesSourceFile(cited, bytes), true);
 	const invented = { ...cited, quote: '"recurrenceKey": "invented"' };
-	assert.equal(citationMatchesArtifact(invented, bytes), false);
+	assert.equal(citationMatchesSourceFile(invented, bytes), false);
 	// The refusal shows what the cited lines hold: a body serialized into one JSON line is one line.
 	assert.equal(
 		describeCitationMismatch(invented, bytes),
@@ -1734,7 +1637,7 @@ void test("a claim about an earlier review is bound to the staged history like a
 	);
 	assert.equal(
 		describeCitationMismatch({ ...invented, startLine: 3, endLine: 3 }, `${bytes}\n`),
-		"the artifact has 1 line(s), so there is no [L3]",
+		"the sourceFile has 1 line(s), so there is no [L3]",
 	);
 	// A quote across a serialized body's line breaks is a reading of the escaped form, and resolves to it;
 	// text that is not there at all is refused with how to quote such a line.
@@ -1754,26 +1657,29 @@ void test("a claim about an earlier review is bound to the staged history like a
 	);
 });
 
-void test("a citation rejects typographic substitutions not present in the artifact", () => {
+void test("a citation rejects typographic substitutions not present in the sourceFile", () => {
 	const content = 'Resolve "Connect data between screens" — see the plan';
 	assert.equal(
-		citationMatchesArtifact(cite('Resolve "Connect data between screens"'), content),
+		citationMatchesSourceFile(cite('Resolve "Connect data between screens"'), content),
 		true,
 	);
 	assert.equal(
-		citationMatchesArtifact(cite("Resolve “Connect data between screens”"), content),
+		citationMatchesSourceFile(cite("Resolve “Connect data between screens”"), content),
 		false,
 	);
-	assert.equal(citationMatchesArtifact(cite("see the plan"), content), true);
+	assert.equal(citationMatchesSourceFile(cite("see the plan"), content), true);
 });
 
-void test("a citation rejects invented artifact text", () => {
+void test("a citation rejects invented sourceFile text", () => {
 	const content = 'Resolve "Connect data between screens"';
 	assert.equal(
-		citationMatchesArtifact(cite("Resolve “Disconnect data between screens”"), content),
+		citationMatchesSourceFile(cite("Resolve “Disconnect data between screens”"), content),
 		false,
 	);
-	assert.equal(citationMatchesArtifact(cite("a rationale the author never wrote"), content), false);
+	assert.equal(
+		citationMatchesSourceFile(cite("a rationale the author never wrote"), content),
+		false,
+	);
 });
 
 void test("live practice fixture permits a citation of its planted credential", () => {
@@ -1782,7 +1688,7 @@ void test("live practice fixture permits a citation of its planted credential", 
 		describeCitationMismatch(
 			{
 				sourceKind: "scm.pull-request.diff",
-				artifactPath: "inputs/context/diff.patch",
+				sourcePath: "inputs/context/diff.patch",
 				path: "LoginService.swift",
 				side: "NEW",
 				startLine: 4,
@@ -1798,7 +1704,7 @@ void test("live practice fixture permits a citation of its planted credential", 
 void test("a serialized-source quote at the wrong lines is recorded where it occurs, when that is one place", () => {
 	const citation: NormalizedCitation = {
 		sourceKind: "scm.pull-request.core",
-		artifactPath: "inputs/context/metadata.json",
+		sourcePath: "inputs/context/metadata.json",
 		path: "inputs/context/metadata.json",
 		startLine: 1,
 		endLine: 1,
@@ -1815,9 +1721,9 @@ void test("a serialized-source quote at the wrong lines is recorded where it occ
 		describeCitationMismatch(citation, `${content}  "changed_files" : 1\n`) ?? "",
 		/it occurs at \[L2\], \[L4\] — cite the one you mean/u,
 	);
-	assert.equal(citationMatchesArtifact({ ...citation, startLine: 2, endLine: 2 }, content), true);
+	assert.equal(citationMatchesSourceFile({ ...citation, startLine: 2, endLine: 2 }, content), true);
 	assert.equal(
-		citationMatchesArtifact(
+		citationMatchesSourceFile(
 			{ ...citation, startLine: 2, endLine: 2, quote: '  "changed_files" : 1\n' },
 			content,
 		),
@@ -1873,7 +1779,7 @@ void test("an absence-based MET claim needs exhaustive captured evidence", () =>
 	const submission = normalizeSubmission(resultOf("MET"));
 	assert.throws(
 		() => validateSearchScope(submission, new Set(), new Set(goodSearch.consulted)),
-		/^Error: MET for this practice rests on an absence claim, and the practice declares no source it searches exhaustively, so no search can bound that claim\. Record what the evidence does show: MET from cited evidence, NOT_APPLICABLE when the work gives the practice no occasion, or UNDETERMINED with what would settle it$/u,
+		/^Error: MET for this practice rests on an absence claim, and the practice declares no source it searches exhaustively, so no search can bound that claim\. Record what the evidence does show: MET from cited evidence, DOES_NOT_APPLY when the work gives the practice no applicability, or COULD_NOT_DETERMINE with what would settle it$/u,
 	);
 	assert.throws(
 		() => validateSearchScope(submission, new Set(["unread"]), new Set(goodSearch.consulted)),
@@ -1886,11 +1792,11 @@ void test("an absence-based MET claim needs exhaustive captured evidence", () =>
 	validateSearchScope(submission, new Set(goodSearch.consulted), new Set(goodSearch.consulted));
 });
 
-void test("a NOT_MET or UNDETERMINED search names every exhaustive source it left out", () => {
+void test("a NOT_MET or COULD_NOT_DETERMINE search names every exhaustive source it left out", () => {
 	const available = new Set(["scm.review-threads", "scm.linked-work-items", "scm.issue.core"]);
 	for (const submission of [
 		normalizeSubmission(baseSubmission({ evidence: { search: goodSearch } })),
-		normalizeSubmission(resultOf("UNDETERMINED")),
+		normalizeSubmission(resultOf("COULD_NOT_DETERMINE")),
 	]) {
 		// A search that is not an absence-only MET needs no exhaustive source.
 		assert.doesNotThrow(() => validateSearchScope(submission, new Set(), available));
@@ -1902,7 +1808,7 @@ void test("a NOT_MET or UNDETERMINED search names every exhaustive source it lef
 });
 
 void test("an inapplicability names only sources the run staged", () => {
-	const submission = normalizeSubmission(resultOf("NOT_APPLICABLE"));
+	const submission = normalizeSubmission(resultOf("DOES_NOT_APPLY"));
 	assert.throws(
 		() => validateInapplicabilityScope(submission, new Set()),
 		/^Error: consulted source 'scm\.pull-request\.diff' was not available/u,
@@ -1924,11 +1830,11 @@ const THREAD = `{
   "messages" : [ {
     "ts" : "1700000000.100000",
     "text" : "Can someone look at the {failing} build?",
-    "underReview" : false
+    "accountId" : "42"
   }, {
     "ts" : "1700000000.200000",
     "text" : "It is \\"broken\\". Fix it.",
-    "underReview" : true
+    "accountId" : "9007199254740993"
   } ]
 }
 `;
@@ -1937,7 +1843,7 @@ function threadCitation(line: number): NormalizedCitation {
 	return {
 		...normalizedCitation(),
 		sourceKind: "slack.conversation.thread",
-		artifactPath: CONVERSATION_THREAD,
+		sourcePath: CONVERSATION_THREAD,
 		path: "conversation_thread.json",
 		startLine: line,
 		endLine: line,
@@ -1945,12 +1851,46 @@ function threadCitation(line: number): NormalizedCitation {
 }
 
 void test("a conversation citation counts only inside a turn of the participant under review", () => {
-	assert.equal(citesReviewedTurn([threadCitation(5)], THREAD), false);
-	assert.equal(citesReviewedTurn([threadCitation(9)], THREAD), true);
-	assert.equal(citesReviewedTurn([threadCitation(5), threadCitation(9)], THREAD), true);
+	assert.equal(citesReviewedTurn([threadCitation(5)], THREAD, "9007199254740993"), false);
+	assert.equal(citesReviewedTurn([threadCitation(9)], THREAD, "9007199254740993"), true);
 	assert.equal(
-		citesReviewedTurn([{ ...threadCitation(9), artifactPath: "context/comments.json" }], THREAD),
+		citesReviewedTurn([threadCitation(5), threadCitation(9)], THREAD, "9007199254740993"),
+		true,
+	);
+	assert.equal(
+		citesReviewedTurn(
+			[{ ...threadCitation(9), sourcePath: "context/comments.json" }],
+			THREAD,
+			"9007199254740993",
+		),
 		false,
 	);
-	assert.equal(citesReviewedTurn([threadCitation(9)], "not json"), false);
+	assert.equal(citesReviewedTurn([threadCitation(9)], "not json", "9007199254740993"), false);
+});
+
+void test("logical message text citations use the frozen native account rather than another author", () => {
+	const quote = (index: number) => ({
+		...threadCitation(1),
+		path: `${CONVERSATION_THREAD}#/messages/${index}/text`,
+	});
+	assert.equal(citesReviewedTurn([quote(0)], THREAD, "9007199254740993"), false);
+	assert.equal(citesReviewedTurn([quote(1)], THREAD, "9007199254740993"), true);
+	assert.equal(citesReviewedTurn([quote(1)], THREAD, "42"), false);
+	assert.equal(citesReviewedTurn([quote(0)], THREAD, "42"), true);
+	assert.equal(citesReviewedTurn([quote(1)], THREAD, "7"), false);
+});
+
+void test("a registered logical text resolves plaintext independently of source naming", () => {
+	const citation = {
+		sourceKind: "scm.pull-request.diff",
+		sourcePath: "context/change.json",
+		path: "src/a.ts",
+		side: "NEW" as const,
+		startLine: 2,
+		endLine: 2,
+		quote: "  checked();",
+	};
+	assert.deepEqual(resolveCapturedText(citation, "first\n  checked();\n"), {
+		quote: "  checked();",
+	});
 });

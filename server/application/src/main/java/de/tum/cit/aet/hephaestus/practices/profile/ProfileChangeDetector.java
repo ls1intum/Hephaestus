@@ -1,19 +1,21 @@
 package de.tum.cit.aet.hephaestus.practices.profile;
 
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.profile.dto.ProfileChangeDTO;
+import de.tum.cit.aet.hephaestus.practices.result.StandingScale;
+import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
-import de.tum.cit.aet.hephaestus.practices.result.trend.TrendDirection;
 import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution.Work;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunLookup.Target;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkLabels;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeDirection;
+import de.tum.cit.aet.hephaestus.practices.spi.ProfileChangeType;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -48,23 +50,21 @@ final class ProfileChangeDetector {
             List<PracticeGroupStandingDTO> groupsAfter,
             Map<String, List<Work>> windowWorkByPractice,
             Map<String, Instant> firstObservedAt,
-            Map<UUID, Target> targets) {
+            Map<Long, ItemRefDTO> targets) {
         Map<String, PracticeStandingDTO> earlier = bySlug(before, PracticeStandingDTO::slug);
         Map<String, PracticeGroupStandingDTO> earlierGroups = bySlug(groupsBefore, PracticeGroupStandingDTO::groupSlug);
         List<ProfileChangeDTO> changes = new ArrayList<>();
 
         for (PracticeStandingDTO now : after) {
             List<Work> work = windowWorkByPractice.getOrDefault(now.slug(), List.of());
-            List<ReviewedWorkRefDTO> evidence = refs(work, targets);
+            List<ItemRefDTO> evidence = refs(work, targets);
             Instant at = work.isEmpty() ? window.until() : work.getFirst().at();
             PracticeStandingDTO was = earlier.get(now.slug());
-            PracticeStandingDTO.Standing standingBefore =
-                    was == null ? PracticeStandingDTO.Standing.NOT_OBSERVED : was.standing();
+            PracticeStanding standingBefore = was == null ? PracticeStanding.NOT_OBSERVED : was.standing();
             if (standingBefore != now.standing()
-                    && (PracticeStandingDTO.isVerdict(standingBefore)
-                            || PracticeStandingDTO.isVerdict(now.standing()))) {
+                    && (StandingScale.isVerdict(standingBefore) || StandingScale.isVerdict(now.standing()))) {
                 changes.add(practiceChange(
-                        ProfileChangeDTO.Type.STANDING_MOVED,
+                        ProfileChangeType.STANDING_MOVED,
                         at,
                         now,
                         standingBefore.name(),
@@ -79,9 +79,10 @@ final class ProfileChangeDetector {
             if (directionBefore != null
                     && direction != null
                     && directionBefore != direction
-                    && (directionBefore.isDirectional() || direction.isDirectional())) {
+                    && ((directionBefore == TrendDirection.IMPROVING || directionBefore == TrendDirection.DECLINING)
+                            || (direction == TrendDirection.IMPROVING || direction == TrendDirection.DECLINING))) {
                 changes.add(practiceChange(
-                        ProfileChangeDTO.Type.TREND_TURNED,
+                        ProfileChangeType.TREND_TURNED,
                         at,
                         now,
                         directionBefore.name(),
@@ -91,24 +92,21 @@ final class ProfileChangeDetector {
             }
             Instant first = firstObservedAt.get(now.slug());
             if (first != null && window.contains(first)) {
-                changes.add(
-                        practiceChange(ProfileChangeDTO.Type.FIRST_OBSERVED, first, now, null, null, null, evidence));
+                changes.add(practiceChange(ProfileChangeType.FIRST_RECORDED, first, now, null, null, null, evidence));
             }
         }
 
         Map<String, List<Work>> windowWorkByGroup = windowWorkByGroup(after, windowWorkByPractice);
         for (PracticeGroupStandingDTO now : groupsAfter) {
             PracticeGroupStandingDTO was = earlierGroups.get(now.groupSlug());
-            PracticeGroupStandingDTO.Standing standingBefore =
-                    was == null ? PracticeGroupStandingDTO.Standing.NOT_OBSERVED : was.standing();
+            PracticeStanding standingBefore = was == null ? PracticeStanding.NOT_OBSERVED : was.standing();
             if (standingBefore == now.standing()
-                    || (!PracticeGroupStandingDTO.isVerdict(standingBefore)
-                            && !PracticeGroupStandingDTO.isVerdict(now.standing()))) {
+                    || (!StandingScale.isVerdict(standingBefore) && !StandingScale.isVerdict(now.standing()))) {
                 continue;
             }
             List<Work> work = windowWorkByGroup.getOrDefault(now.groupSlug(), List.of());
             changes.add(new ProfileChangeDTO(
-                    ProfileChangeDTO.Type.GROUP_MOVED,
+                    ProfileChangeType.GROUP_MOVED,
                     work.isEmpty() ? window.until() : work.getFirst().at(),
                     null,
                     null,
@@ -116,8 +114,7 @@ final class ProfileChangeDetector {
                     now.groupName(),
                     standingBefore.name(),
                     now.standing().name(),
-                    direction(
-                            standingBefore.asPracticeStanding(), now.standing().asPracticeStanding()),
+                    direction(standingBefore, now.standing()),
                     null,
                     null,
                     null,
@@ -127,29 +124,29 @@ final class ProfileChangeDetector {
     }
 
     /** Which way a move between two verdicts went, or {@code null} for a move into or out of a silence. */
-    private static ProfileChangeDTO.@Nullable Direction direction(
-            PracticeStandingDTO.Standing from, PracticeStandingDTO.Standing to) {
-        if (!PracticeStandingDTO.isVerdict(from) || !PracticeStandingDTO.isVerdict(to)) {
+    private static @Nullable ProfileChangeDirection direction(PracticeStanding from, PracticeStanding to) {
+        if (!StandingScale.isVerdict(from) || !StandingScale.isVerdict(to)) {
             return null;
         }
-        return to.rank() > from.rank() ? ProfileChangeDTO.Direction.UP : ProfileChangeDTO.Direction.DOWN;
+        return standingRank(to) > standingRank(from) ? ProfileChangeDirection.UP : ProfileChangeDirection.DOWN;
     }
 
     /** The work as the page names it, in the work's order. */
-    static List<ReviewedWorkRefDTO> refs(List<Work> work, Map<UUID, Target> targets) {
+    static List<ItemRefDTO> refs(List<Work> work, Map<Long, ItemRefDTO> targets) {
         return work.stream()
-                .map(ref -> ReviewedWorkLabels.ref(ref.kind(), ref.id(), targets.get(ref.jobId())))
+                .map(ref -> targets.get(ref.itemId()))
+                .filter(Objects::nonNull)
                 .toList();
     }
 
     private static ProfileChangeDTO practiceChange(
-            ProfileChangeDTO.Type type,
+            ProfileChangeType type,
             Instant at,
             PracticeStandingDTO practice,
             @Nullable String from,
             @Nullable String to,
-            ProfileChangeDTO.@Nullable Direction direction,
-            List<ReviewedWorkRefDTO> evidence) {
+            @Nullable ProfileChangeDirection direction,
+            List<ItemRefDTO> evidence) {
         return new ProfileChangeDTO(
                 type,
                 at,
@@ -180,6 +177,15 @@ final class ProfileChangeDetector {
                     (left, right) -> Work.newestFirst(Stream.concat(left.stream(), right.stream())));
         }
         return byGroup;
+    }
+
+    private static int standingRank(PracticeStanding value) {
+        return switch (value) {
+            case DEVELOPING -> 0;
+            case MIXED -> 1;
+            case STRENGTH -> 2;
+            case NOT_OBSERVED, NO_OPPORTUNITY -> -1;
+        };
     }
 
     private static <T> Map<String, T> bySlug(List<T> items, Function<T, String> slug) {

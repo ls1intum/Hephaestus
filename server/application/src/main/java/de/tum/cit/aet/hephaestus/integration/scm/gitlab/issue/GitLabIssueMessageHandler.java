@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabEventType;
@@ -19,20 +19,21 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitLab issue webhook events.
- * <p>
- * Processes both {@code event_type: "issue"} and {@code event_type: "confidential_issue"} payloads.
- * Both arrive on the same NATS subject ({@code object_kind: "issue"}).
- * <p>
- * Confidential issue events are not ingested — an event whose current {@code confidential} flag is set is
- * not (re)stored. In addition, a public → confidential flip purges any snapshot mirrored while the issue
- * was still public via {@link GitLabIssueProcessor#purgeConfidential} (soft-delete tombstone), so a stale
- * public copy of now-restricted data does not linger.
- * <p>
- * Routes to {@link GitLabIssueProcessor} based on the action:
+ *
+ * <p>Processes both {@code event_type: "issue"} and {@code event_type: "confidential_issue"}
+ * payloads. Both arrive on the same NATS subject ({@code object_kind: "issue"}).
+ *
+ * <p>Confidential issue events are not ingested — an event whose current {@code confidential} flag
+ * is set is not (re)stored. In addition, a public → confidential flip purges any snapshot mirrored
+ * while the issue was still public via {@link GitLabIssueProcessor#purgeConfidential} (soft-delete
+ * tombstone), so a stale public copy of now-restricted data does not linger.
+ *
+ * <p>Routes to {@link GitLabIssueProcessor} based on the action:
+ *
  * <ul>
- *   <li>{@code open} / {@code update} → {@link GitLabIssueProcessor#process}</li>
- *   <li>{@code close} → {@link GitLabIssueProcessor#processClosed}</li>
- *   <li>{@code reopen} → {@link GitLabIssueProcessor#processReopened}</li>
+ *   <li>{@code open} / {@code update} → {@link GitLabIssueProcessor#process}
+ *   <li>{@code close} → {@link GitLabIssueProcessor#processClosed}
+ *   <li>{@code reopen} → {@link GitLabIssueProcessor#processReopened}
  * </ul>
  */
 @Component
@@ -84,9 +85,12 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
             return;
         }
 
-        // Confidential issues are never (re)ingested. But an issue that flips public → confidential must
-        // also have any snapshot we mirrored while it was public purged — otherwise a stale public copy of
-        // now-restricted data lingers. Resolve the context first so we know the repository, then tombstone.
+        // Confidential issues are never (re)ingested. But an issue that flips public → confidential
+        // must
+        // also have any snapshot we mirrored while it was public purged — otherwise a stale public
+        // copy of
+        // now-restricted data lingers. Resolve the context first so we know the repository, then
+        // tombstone.
         if (event.isConfidential()) {
             log.debug(
                     "Confidential issue event: purging any public snapshot, iid={}",
@@ -104,7 +108,8 @@ public class GitLabIssueMessageHandler extends AbstractIntegrationMessageHandler
         switch (action) {
             case OPEN -> issueProcessor.process(event, context);
             // UPDATE carries the changes diff — it is the only action GitLab has for a retitling, a
-            // relabelling and a due-date edit alike, so processUpdated reads that diff to tell them apart.
+            // relabelling and a due-date edit alike, so processUpdated reads that diff to tell them
+            // apart.
             case UPDATE -> issueProcessor.processUpdated(event, context);
             case CLOSE -> issueProcessor.processClosed(event, context);
             case REOPEN -> issueProcessor.processReopened(event, context);

@@ -47,27 +47,10 @@ import org.springframework.data.web.PagedModel;
         info =
                 @Info(
                         title = "Hephaestus API",
-                        description = "API documentation for the Hephaestus application server.\n\n"
-                                + "### Money and exact decimals\n\n"
-                                + "Every monetary amount and per-unit rate is a JSON number carrying `format: decimal`. It is an "
-                                + "exact decimal on the server (`BigDecimal`, backed by a `NUMERIC` column) and MUST NOT be parsed "
-                                + "into a binary floating-point type in a language that has an exact decimal one: bind it to "
-                                + "`BigDecimal` / `decimal` / `Decimal`, not to `double`.\n\n"
-                                + "JavaScript has no exact decimal type, so the generated TypeScript client necessarily binds these "
-                                + "to `number` (IEEE-754 binary64). That is lossless for every value this API produces, and the "
-                                + "margin is large: a binary64 round-trips any decimal of at most 15 significant digits exactly "
-                                + "(`DBL_DIG`). Amounts are quantised to 6 decimal places, so they are exact below **$1,000,000,000**; "
-                                + "per-1M-token rates are quantised to 8 places, so they are exact below **$10,000,000** per 1M "
-                                + "tokens; budget caps are quantised to 2 places and their column tops out at $99,999,999.99. Every "
-                                + "reachable value sits orders of magnitude inside those bounds.\n\n"
-                                + "What that margin does NOT license is arithmetic. Totals, remaining budget and cap verdicts are "
-                                + "computed on the server in exact decimal and shipped as fields; a client that re-derives them by "
-                                + "summing rows is accumulating binary rounding error the server does not have. Read the totals, do "
-                                + "not add them up.\n\n"
-                                + "Amounts are USD throughout — the ledger, the caps and the gates all meter in USD, and the "
-                                + "currency is therefore part of the field name (`...Usd`) rather than a per-amount field. Where a "
-                                + "response also carries `FxRateInfo`, that is a display-only estimate in a second currency and is "
-                                + "never an input to a budget decision.",
+                        description = "API documentation for Hephaestus. Changed practice-review bigint ids and "
+                                + "monetary amounts are decimal strings. Monetary fields are USD; clients read "
+                                + "server-computed totals and budget decisions. Existing provider mirror ids retain "
+                                + "their numeric contract. Required nullable response fields are present with null.",
                         version = "0.0.0-development",
                         contact = @Contact(name = "Felix T.J. Dietrich", email = "felixtj.dietrich@tum.de"),
                         license =
@@ -77,7 +60,7 @@ import org.springframework.data.web.PagedModel;
         tags = {
             @Tag(
                     name = "Practice reviews",
-                    description = "Workspace-admin access to review runs, results, and feedback delivery history"),
+                    description = "Workspace-admin access to reviews, results, and feedback delivery history"),
             @Tag(
                     name = "Practice review trace",
                     description =
@@ -100,46 +83,11 @@ public class OpenAPIConfiguration {
      * Domain objects to include even without DTO suffix
      */
     private static final List<String> ALLOWED_DOMAIN_OBJECTS = List.of(
-            "PageableObject",
-            "SortObject",
-            "ProblemDetail",
-            "PageMetadata",
-            "PracticeAutomatedReviewPolicy",
-            // The definition is the shape a practice is authored in, so a client that cannot see it cannot
-            // create one. It has no DTO suffix because it is the domain type the API deliberately exposes.
-            "PracticeDefinition",
-            "PracticeDeliveryBehavior",
-            "PracticeVisual",
-            "PracticeGuide",
-            "PracticeDefinitionField",
-            "PracticeReleaseChoice",
-            "AdoptedBaseSource",
-            "PracticePrecondition",
-            "PracticePreconditionClause",
-            "EvidenceCollection",
-            "PracticeEvidenceRequirement",
-            "PracticeOptionalContextSource",
-            "PracticeInsufficientEvidenceAction",
-            "PracticeEvidenceLimitation",
-            "PracticeAutomatedReviewValidation",
-            "PracticeAutomatedReviewValidationStatus",
-            "PracticeAutomatedReview",
-            "PracticeAutomatedReviewMode",
-            "PracticeEvidenceSufficiency",
-            "EvidenceCompletenessRequirement",
-            "EvidenceFreshnessRequirement",
-            "ReviewClaimCurrentness",
-            "SourceContractVersion",
-            "SourceKind",
-            // The workspace review scope is the shape an admin edits directly on the settings resource; a
-            // client that cannot see it cannot render, let alone change, the scope. Domain type by choice,
-            // like PracticeDefinition: it is the same value the gate reads, not a transport copy of it.
-            "WorkspaceReviewScope",
-            "ReviewRepositoryTarget",
-            "DeliveryPolicyFactsSnapshot",
-            "PracticeFact",
-            "SubjectStatus",
-            "TimeBucketSize");
+            "PageableObject", "SortObject", "ProblemDetail", "PageMetadata",
+            "PracticeDefinition", "ReviewOn", "AppliesWhen", "AppliesWhenClause", "PracticeReads",
+            "PracticeReadSource", "ReviewedBy", "ReviewLimit", "ScanDefinition", "PracticeGuidance",
+            "PracticeVisual", "PracticeGuide", "PracticeDefinitionField", "PracticeReleaseChoice",
+            "SourceContractVersion", "SourceKind", "WorkspaceReviewScope", "ReviewRepositoryTarget", "TimeBucketSize");
 
     /**
      * Zalando's non-standard-but-conventional {@code format} for an exact decimal, which stops a client
@@ -157,7 +105,7 @@ public class OpenAPIConfiguration {
                         .name(UserViewContextHolder.REASON_HEADER)
                         .required(true)
                         .schema(new StringSchema())
-                        .description("Why the administrator views this user: percent-encoded UTF-8, 1–500 characters"));
+                        .description("Why the administrator views this account: percent-encoded UTF-8, 1–500 characters"));
             }
             return operation;
         };
@@ -207,9 +155,33 @@ public class OpenAPIConfiguration {
                 .filter(e -> ALLOWED_DOMAIN_OBJECTS.contains(e.getKey()))
                 .forEach(e -> filteredSchemas.put(e.getKey(), e.getValue()));
 
+        var remaining = new ArrayList<>(filteredSchemas.values());
+        Set<Schema> seen = new HashSet<>();
+        for (int index = 0; index < remaining.size(); index++) {
+            retainReferencedSchemas(remaining.get(index), components.getSchemas(), filteredSchemas, remaining, seen);
+        }
         filteredSchemas.values().forEach(this::removeDtoSuffixFromRefs);
-
         components.setSchemas(filteredSchemas);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private void retainReferencedSchemas(Schema schema, Map<String, Schema> source,
+            Map<String, Schema> retained, List<Schema> pending, Set<Schema> seen) {
+        if (schema == null || !seen.add(schema)) return;
+        String ref = schema.get$ref();
+        if (ref != null && ref.startsWith("#/components/schemas/")) {
+            String original = ref.substring("#/components/schemas/".length());
+            String name = original.endsWith("DTO") ? original.substring(0, original.length() - 3) : original;
+            Schema target = source.get(original);
+            if (target != null && retained.putIfAbsent(name, target) == null) pending.add(target);
+        }
+        Map<String, Schema> properties = schema.getProperties();
+        if (properties != null) properties.values().forEach(child -> retainReferencedSchemas(child, source, retained, pending, seen));
+        retainReferencedSchemas(schema.getItems(), source, retained, pending, seen);
+        retainReferencedSchemas(schema.getNot(), source, retained, pending, seen);
+        Stream.of(schema.getAllOf(), schema.getAnyOf(), schema.getOneOf()).filter(Objects::nonNull)
+                .flatMap(List::stream).forEach(child -> retainReferencedSchemas((Schema) child, source, retained, pending, seen));
+        if (schema.getAdditionalProperties() instanceof Schema child) retainReferencedSchemas(child, source, retained, pending, seen);
     }
 
     /**
@@ -362,6 +334,10 @@ public class OpenAPIConfiguration {
             schema.set$ref(schema.get$ref().substring(0, schema.get$ref().length() - 3));
         }
 
+        if (schema.getDiscriminator() != null && schema.getDiscriminator().getMapping() != null) {
+            schema.getDiscriminator().getMapping().replaceAll((key, ref) -> ref.endsWith("DTO")
+                    ? ref.substring(0, ref.length() - 3) : ref);
+        }
         Map<String, Schema> props = schema.getProperties();
         if (props != null) {
             props.values().forEach(this::removeDtoSuffixFromRefs);

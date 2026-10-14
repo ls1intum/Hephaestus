@@ -12,14 +12,19 @@ import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateRepository;
 import de.tum.cit.aet.hephaestus.core.audit.ConfigAuditEvent;
 import de.tum.cit.aet.hephaestus.core.audit.ConfigAuditEventRepository;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEvent;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -71,7 +76,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         return workspace;
     }
 
-    private void seedEvent(Workspace workspace, LlmUsageJobType type, String cost, YearMonth month, int day) {
+    private void seedEvent(Workspace workspace, String type, String cost, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
@@ -86,14 +91,14 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         // Budgeted spend only counts PRICED + INSTANCE-funded rows — both are the
         // entity defaults, but set them explicitly so this fixture keeps meaning that if the
         // defaults ever change.
-        event.setPricingState(PricingState.PRICED);
-        event.setFundingSource(FundingSource.INSTANCE);
+        event.setPricingState(UsagePricingState.PRICED);
+        event.setFundingSource(UsageFundingSource.INSTANCE);
         event.setOccurredAt(
                 month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
-    private void seedByoEvent(Workspace workspace, LlmUsageJobType type, String cost, YearMonth month, int day) {
+    private void seedByoEvent(Workspace workspace, String type, String cost, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
@@ -102,14 +107,14 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setSourceId(UUID.randomUUID());
         event.setModel("byo-model");
         event.setCostUsd(new BigDecimal(cost));
-        event.setPricingState(PricingState.PRICED);
-        event.setFundingSource(FundingSource.WORKSPACE);
+        event.setPricingState(UsagePricingState.PRICED);
+        event.setFundingSource(UsageFundingSource.WORKSPACE);
         event.setOccurredAt(
                 month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
-    private void seedUnpricedEvent(Workspace workspace, LlmUsageJobType type, YearMonth month, int day) {
+    private void seedUnpricedEvent(Workspace workspace, String type, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
@@ -118,14 +123,14 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setSourceId(UUID.randomUUID());
         event.setModel("no-price-model");
         event.setCostUsd(null);
-        event.setPricingState(PricingState.UNPRICED);
-        event.setFundingSource(FundingSource.INSTANCE);
+        event.setPricingState(UsagePricingState.UNPRICED);
+        event.setFundingSource(UsageFundingSource.INSTANCE);
         event.setOccurredAt(
                 month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
-    private void seedUnpricedByoEvent(Workspace workspace, LlmUsageJobType type, YearMonth month, int day) {
+    private void seedUnpricedByoEvent(Workspace workspace, String type, YearMonth month, int day) {
         LlmUsageEvent event = new LlmUsageEvent();
         event.setId(UUID.randomUUID());
         event.setWorkspace(workspace);
@@ -134,15 +139,15 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         event.setSourceId(UUID.randomUUID());
         event.setModel("byo-no-price-model");
         event.setCostUsd(null);
-        event.setPricingState(PricingState.UNPRICED);
-        event.setFundingSource(FundingSource.WORKSPACE);
+        event.setPricingState(UsagePricingState.UNPRICED);
+        event.setFundingSource(UsageFundingSource.WORKSPACE);
         event.setOccurredAt(
                 month.atDay(day).atStartOfDay(ZoneOffset.UTC).toInstant().plusSeconds(3600));
         usageRepository.save(event);
     }
 
-    private LlmUsageSourceType sourceType(LlmUsageJobType type) {
-        return type == LlmUsageJobType.MENTOR_TURN ? LlmUsageSourceType.MENTOR_TURN : LlmUsageSourceType.AGENT_JOB;
+    private UsageSourceType sourceType(String type) {
+        return type == "MENTOR_TURN" ? UsageSourceType.MENTOR_TURN : UsageSourceType.REVIEW_JOB;
     }
 
     private void connectOwnProvider(Workspace workspace, boolean modelEnabled) {
@@ -202,7 +207,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @WithAdminUser
     void ownProviderIsNotInUseWithoutAnEnabledModelOnAnEnabledConnectionOrAnyOwnProviderCall() {
         Workspace idle = setupWorkspaceWithAdmin("own-provider-idle");
-        seedEvent(idle, LlmUsageJobType.MENTOR_TURN, "1.00", CURRENT, 1);
+        seedEvent(idle, "MENTOR_TURN", "1.00", CURRENT, 1);
         Workspace disabled = setupWorkspaceWithAdmin("own-provider-disabled");
         connectOwnProvider(disabled, false);
         Workspace connectionOff = setupWorkspaceWithAdmin("own-provider-connection-off");
@@ -217,7 +222,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @WithAdminUser
     void aMonthOfConfirmedZeroCostOwnProviderCallsIsInUse() {
         Workspace workspace = setupWorkspaceWithAdmin("own-provider-zero-calls");
-        seedByoEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "0.00", PREVIOUS, 2);
+        seedByoEvent(workspace, "PRACTICE_REVIEW", "0.00", PREVIOUS, 2);
 
         WorkspaceLlmUsageReportDTO report = reportFor(workspace, PREVIOUS);
 
@@ -233,9 +238,9 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         // One job type, one day, mixing all three so a blind SUM(cost_usd) would either merge BYO
         // into the budgeted figure or silently drop the unpriced event's visibility.
         Workspace workspace = setupWorkspaceWithAdmin("usage-breakdown");
-        seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "2.00", CURRENT, 5);
-        seedByoEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "50.00", CURRENT, 5);
-        seedUnpricedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, CURRENT, 5);
+        seedEvent(workspace, "PRACTICE_REVIEW", "2.00", CURRENT, 5);
+        seedByoEvent(workspace, "PRACTICE_REVIEW", "50.00", CURRENT, 5);
+        seedUnpricedEvent(workspace, "PRACTICE_REVIEW", CURRENT, 5);
 
         WorkspaceLlmUsageReportDTO report = webTestClient
                 .get()
@@ -250,7 +255,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         assertThat(report).isNotNull();
         var prReviews = report.byJobType().stream()
-                .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
+                .filter(t -> t.jobType().equals("PRACTICE_REVIEW"))
                 .findFirst()
                 .orElseThrow();
         assertThat(prReviews.instanceTotalCostUsd()).isEqualByComparingTo("2.00");
@@ -272,10 +277,10 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("usage-report");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("5.00"));
         workspaceRepository.save(workspace);
-        seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "1.25", PREVIOUS, 3);
-        seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "0.75", PREVIOUS, 3);
-        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "0.50", PREVIOUS, 12);
-        seedEvent(workspace, LlmUsageJobType.ISSUE_REVIEW, "9.99", CURRENT, 1); // outside requested month
+        seedEvent(workspace, "PRACTICE_REVIEW", "1.25", PREVIOUS, 3);
+        seedEvent(workspace, "PRACTICE_REVIEW", "0.75", PREVIOUS, 3);
+        seedEvent(workspace, "MENTOR_TURN", "0.50", PREVIOUS, 12);
+        seedEvent(workspace, "PRACTICE_REVIEW", "9.99", CURRENT, 1); // outside requested month
 
         WorkspaceLlmUsageReportDTO report = webTestClient
                 .get()
@@ -296,7 +301,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         assertThat(report.instanceBudgetVerdict()).isEqualTo(LlmBudgetVerdict.WITHIN);
         assertThat(report.byJobType()).hasSize(2);
         var prReviews = report.byJobType().stream()
-                .filter(t -> t.jobType() == LlmUsageJobType.PULL_REQUEST_REVIEW)
+                .filter(t -> t.jobType().equals("PRACTICE_REVIEW"))
                 .findFirst()
                 .orElseThrow();
         assertThat(prReviews.instanceTotalCostUsd()).isEqualByComparingTo("2.00");
@@ -316,7 +321,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("usage-over");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
         workspaceRepository.save(workspace);
-        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.00", CURRENT, 1);
+        seedEvent(workspace, "MENTOR_TURN", "1.00", CURRENT, 1);
 
         webTestClient
                 .get()
@@ -347,7 +352,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("usage-unverifiable-capped");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
         workspaceRepository.save(workspace);
-        seedUnpricedEvent(workspace, LlmUsageJobType.MENTOR_TURN, CURRENT, 1);
+        seedUnpricedEvent(workspace, "MENTOR_TURN", CURRENT, 1);
 
         webTestClient
                 .get()
@@ -370,8 +375,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
         workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("10.00"));
         workspaceRepository.save(workspace);
-        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.00", CURRENT, 1);
-        seedByoEvent(workspace, LlmUsageJobType.MENTOR_TURN, "10.00", CURRENT, 1);
+        seedEvent(workspace, "MENTOR_TURN", "1.00", CURRENT, 1);
+        seedByoEvent(workspace, "MENTOR_TURN", "10.00", CURRENT, 1);
 
         webTestClient
                 .get()
@@ -402,7 +407,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("100.00"));
         workspace.setMonthlyByoLlmBudgetUsd(new BigDecimal("100.00"));
         workspaceRepository.save(workspace);
-        seedUnpricedByoEvent(workspace, LlmUsageJobType.MENTOR_TURN, CURRENT, 1);
+        seedUnpricedByoEvent(workspace, "MENTOR_TURN", CURRENT, 1);
 
         webTestClient
                 .get()
@@ -430,8 +435,8 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = setupWorkspaceWithAdmin("usage-paused-past-month");
         workspace.setMonthlyLlmBudgetUsd(new BigDecimal("1.00"));
         workspaceRepository.save(workspace);
-        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.00", CURRENT, 1); // exhausts the CURRENT month
-        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "0.10", PREVIOUS, 1); // PREVIOUS stays well under cap
+        seedEvent(workspace, "MENTOR_TURN", "1.00", CURRENT, 1); // exhausts the CURRENT month
+        seedEvent(workspace, "MENTOR_TURN", "0.10", PREVIOUS, 1); // PREVIOUS stays well under cap
 
         webTestClient
                 .get()
@@ -469,7 +474,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 "usage-instance-admin-org",
                 AccountType.ORG,
                 persistUser("usage-instance-admin-owner"));
-        seedEvent(workspace, LlmUsageJobType.MENTOR_TURN, "1.25", CURRENT, 1);
+        seedEvent(workspace, "MENTOR_TURN", "1.25", CURRENT, 1);
 
         webTestClient
                 .get()
@@ -489,7 +494,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         User admin = persistUser("mentor");
         Workspace ownWorkspace =
                 createWorkspace("usage-own-admin", "Usage own admin", "usage-own-admin-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(ownWorkspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
+        ensureWorkspaceMembership(ownWorkspace, admin, Membership.WorkspaceRole.ADMIN);
         Workspace otherWorkspace = createWorkspace(
                 "usage-other-admin",
                 "Usage other admin",
@@ -649,7 +654,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 "own-provider-budget-boundary-org",
                 AccountType.ORG,
                 admin);
-        ensureWorkspaceMembership(workspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
+        ensureWorkspaceMembership(workspace, admin, Membership.WorkspaceRole.ADMIN);
 
         webTestClient
                 .put()
@@ -684,7 +689,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     @WithAdminUser
     void reportOmitsFxEntirelyWhenNoDisplayCurrencyConfigured() {
         Workspace workspace = setupWorkspaceWithAdmin("usage-no-fx");
-        seedEvent(workspace, LlmUsageJobType.PULL_REQUEST_REVIEW, "1.00", CURRENT, 5);
+        seedEvent(workspace, "PRACTICE_REVIEW", "1.00", CURRENT, 5);
         FxRate rate = new FxRate();
         rate.setRateDate(LocalDate.now(ZoneOffset.UTC));
         rate.setUsdPerEur(new BigDecimal("1.1377"));
@@ -720,7 +725,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         User admin = persistUser("mentor");
         Workspace ownWorkspace =
                 createWorkspace("budget-own-admin", "Budget own admin", "budget-own-admin-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(ownWorkspace, admin, WorkspaceMembership.WorkspaceRole.ADMIN);
+        ensureWorkspaceMembership(ownWorkspace, admin, Membership.WorkspaceRole.ADMIN);
         Workspace otherWorkspace = createWorkspace(
                 "budget-other-admin",
                 "Budget other admin",
@@ -755,7 +760,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace =
                 createWorkspace("budget-member", "Budget member", "budget-member-org", AccountType.ORG, owner);
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .put()
@@ -779,7 +784,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace =
                 createWorkspace("usage-member", "Usage member", "usage-member-org", AccountType.ORG, owner);
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .get()

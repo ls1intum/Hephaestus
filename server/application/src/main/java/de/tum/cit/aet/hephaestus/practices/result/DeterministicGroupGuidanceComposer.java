@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
@@ -18,10 +18,10 @@ final class DeterministicGroupGuidanceComposer {
      * Review criteria never enter this method: {@code whatGoodLooksLike}/{@code whyItMatters} are the
      * catalog's dedicated developer-facing layer.
      */
-    static @Nullable String compose(PracticeGroupStandingDTO.Standing status, List<PracticeStandingDTO> cards) {
+    static @Nullable String compose(PracticeStanding status, List<PracticeStandingDTO> cards) {
         // Without a verdict there is nothing to summarise, and inventing encouragement here would state
         // more than the evidence supports. The surface renders its own reason-specific empty copy.
-        if (!PracticeGroupStandingDTO.isVerdict(status)) {
+        if (!StandingScale.isVerdict(status)) {
             return null;
         }
 
@@ -34,17 +34,17 @@ final class DeterministicGroupGuidanceComposer {
         // negated filter would put a practice with nothing to say on both sides at once and name it as a
         // strength and a gap in the same sentence.
         List<PracticeStandingDTO> verdicts = cards.stream()
-                .filter(card -> PracticeStandingDTO.isVerdict(card.standing()))
+                .filter(card -> StandingScale.isVerdict(card.standing()))
                 .toList();
         // A MIXED practice counts as a strength only with a strength on its card: one problem on a short history
         // reads MIXED (StandingScale), and naming it a strength would claim what no review found.
         List<PracticeStandingDTO> strengths = verdicts.stream()
-                .filter(card -> card.standing() == PracticeStandingDTO.Standing.STRENGTH
-                        || (card.standing() == PracticeStandingDTO.Standing.MIXED
+                .filter(card -> card.standing() == PracticeStanding.STRENGTH
+                        || (card.standing() == PracticeStanding.MIXED
                                 && !card.strengths().isEmpty()))
                 .toList();
         List<PracticeStandingDTO> gaps = verdicts.stream()
-                .filter(card -> card.standing() != PracticeStandingDTO.Standing.STRENGTH)
+                .filter(card -> card.standing() != PracticeStanding.STRENGTH)
                 .toList();
 
         StringBuilder summary = new StringBuilder();

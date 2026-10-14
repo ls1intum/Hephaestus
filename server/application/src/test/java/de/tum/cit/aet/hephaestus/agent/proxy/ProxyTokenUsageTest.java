@@ -19,9 +19,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @ValueSource(strings = {"cache_write_tokens", "created_cache_tokens"})
     void readsSupportedChatCacheWriteFields(String field) throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_tokens_details":{"cached_tokens":20,"%s":30}}}
-                """.formatted(field));
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_tokens_details":{"cached_tokens":20,"%s":30}}}
+            """.formatted(field));
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -30,9 +30,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @ValueSource(strings = {"prompt_cache_hit_tokens", "cached_tokens"})
     void readsSupportedChatCacheReadFields(String field) throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,"%s":20,
-                "prompt_tokens_details":{"created_cache_tokens":30}}}
-                """.formatted(field));
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,"%s":20,
+            "prompt_tokens_details":{"created_cache_tokens":30}}}
+            """.formatted(field));
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -40,10 +40,10 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void nestedChatReadCountTakesPrecedenceOverFallbacks() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_cache_hit_tokens":40,"cached_tokens":50,
-                "prompt_tokens_details":{"cached_tokens":20,"created_cache_tokens":30}}}
-                """);
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_cache_hit_tokens":40,"cached_tokens":50,
+            "prompt_tokens_details":{"cached_tokens":20,"created_cache_tokens":30}}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -51,10 +51,10 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void cacheHitCountTakesPrecedenceOverTopLevelReadCount() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_cache_hit_tokens":20,"cached_tokens":50,
-                "prompt_tokens_details":{"created_cache_tokens":30}}}
-                """);
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_cache_hit_tokens":20,"cached_tokens":50,
+            "prompt_tokens_details":{"created_cache_tokens":30}}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, false)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }
@@ -63,9 +63,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @ValueSource(strings = {"-1", "1.5", "2147483648", "\"20\""})
     void rejectsInvalidChatCacheReadFallback(String value) throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"prompt_tokens":100,"completion_tokens":2,
-                "prompt_cache_hit_tokens":%s,"cached_tokens":20}}
-                """.formatted(value));
+            {"usage":{"prompt_tokens":100,"completion_tokens":2,
+            "prompt_cache_hit_tokens":%s,"cached_tokens":20}}
+            """.formatted(value));
 
         assertThatIllegalArgumentException().isThrownBy(() -> ProxyTokenUsage.from(body, false));
     }
@@ -73,9 +73,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void responsesDoNotReadCompletionsOnlyCacheFields() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"input_tokens":100,"output_tokens":2,
-                "prompt_cache_hit_tokens":20,"cached_tokens":50}}
-                """);
+            {"usage":{"input_tokens":100,"output_tokens":2,
+            "prompt_cache_hit_tokens":20,"cached_tokens":50}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, true)).isEqualTo(new ProxyTokenUsage(100, 2, 0, 0, 0));
     }
@@ -83,9 +83,9 @@ class ProxyTokenUsageTest extends BaseUnitTest {
     @Test
     void readsResponsesCacheWrites() throws Exception {
         var body = MAPPER.readTree("""
-                {"usage":{"input_tokens":100,"output_tokens":2,
-                "input_tokens_details":{"cached_tokens":20,"cache_write_tokens":30}}}
-                """);
+            {"usage":{"input_tokens":100,"output_tokens":2,
+            "input_tokens_details":{"cached_tokens":20,"cache_write_tokens":30}}}
+            """);
 
         assertThat(ProxyTokenUsage.from(body, true)).isEqualTo(new ProxyTokenUsage(50, 2, 0, 20, 30));
     }

@@ -30,9 +30,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Checks GitLab pipeline payloads through persisted merge-request head-check state.
- */
+/** Checks GitLab pipeline payloads through persisted merge-request head-check state. */
 class GitLabPipelineMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
     private static final String PIPELINE_SHA = "bcbb5ec396a2c0f828686f14fac9b80b780504f2";
@@ -99,7 +97,7 @@ class GitLabPipelineMessageHandlerIntegrationTest extends BaseIntegrationTest {
         workspace.setDisplayName("HephaestusTest GitLab");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin("hephaestustest");
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

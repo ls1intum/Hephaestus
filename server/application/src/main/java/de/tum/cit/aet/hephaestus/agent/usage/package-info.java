@@ -7,5 +7,7 @@
  * price is not yet known; {@code unpricedEventCount} states that exclusion once, for both. It counts the
  * runs (or, per practice, the reviews) that have such usage, not the ledger rows.
  */
-@org.jspecify.annotations.NullMarked
+@NullMarked
 package de.tum.cit.aet.hephaestus.agent.usage;
+
+import org.jspecify.annotations.NullMarked;

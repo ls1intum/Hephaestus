@@ -2,10 +2,10 @@ package de.tum.cit.aet.hephaestus.integration.core.conformance;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.IssueArtifactDescriptor;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.PullRequestArtifactDescriptor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueItemDescriptor;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.PullRequestItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.manifest.GitHubManifest;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -30,7 +30,7 @@ class GitHubManifestContractTest extends IntegrationManifestContractTest {
     }
 
     @Override
-    protected List<ArtifactDescriptor> descriptors() {
-        return List.of(new PullRequestArtifactDescriptor(), new IssueArtifactDescriptor());
+    protected List<ItemDescriptor> descriptors() {
+        return List.of(new PullRequestItemDescriptor(), new IssueItemDescriptor());
     }
 }

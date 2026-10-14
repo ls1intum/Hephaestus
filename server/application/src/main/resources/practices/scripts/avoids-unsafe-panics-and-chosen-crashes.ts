@@ -1,23 +1,18 @@
-// Finds the added lines that spell a crash operator that the author wrote, in all languages: a force
+import { blockExtents } from "../kits/scm/declarations.ts";
+import { scm } from "../kits/scm/index.ts";
+import { isTestPath } from "../kits/scm/languages.ts";
+import { occurrences, selectedSources, selectedOccurrences } from "../kits/scm/occurrences.ts";
+// Finds the selected lines that spell a crash operator that the author wrote, in all languages: a force
 // unwrap, `try!`, a force cast or an abort. Each lead tells if the line is inside a preview block or in
 // a test file. A lead matches spelling on one line. It does not know the type of the operand, where the
 // value came from, or what bounds it, so the review decides which leads are lapses. The input practice
 // owns implicit traps, such as a subscript or an integer division. To add a language, add a row.
-import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/bounded-text.ts";
-import { blockExtents, codeLines, isCommentLine } from "../lib/declarations.ts";
-import { isTestPath, languageOf } from "../lib/languages.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type DiffFile,
-	type FileTree,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"crash-operator":
-		"An added line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",
+		"A selected line that spells a crash operator; its facts name the language, the operators, and if it runs in a preview block or a test file.",
 };
 
 // language key -> [label, regex] of crash operators the author writes, matched against the line's code.
@@ -43,7 +38,7 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 		["sys.exit", /\bsys\.exit\s*\(/u],
 		["os._exit", /\bos\._exit\s*\(/u],
 		["raise SystemExit", /\braise\s+SystemExit\b/u],
-		["bare assert in code", /^\s*assert\s+/u],
+		["bare assert in code", /^\s*assert\s+/mu],
 	],
 	go: [
 		["panic(", /\bpanic\s*\(/u],
@@ -91,60 +86,13 @@ const LANG_PATTERNS: Record<string, [string, RegExp][]> = {
 };
 
 // Code that runs only when Xcode renders a preview, never on a user's device.
-const PREVIEW_OPENER = /^\s*(?:#Preview\b|(?:\w+\s+)*struct\s+\w+\s*:\s*PreviewProvider\b)/u;
+const PREVIEW_OPENER = /^\s*(?:#Preview\b|(?:\w+\s+)*struct\s+\w+\s*:\s*PreviewProvider\b)/mu;
 
-/** The new side as far as the hunks show it: context and added lines at their numbers, gaps empty. */
-function newSideOfHunks(file: DiffFile): string {
-	const lines: string[] = [];
-	for (const hunk of file.hunks) {
-		let number = hunk.newStart;
-		for (const line of hunk.lines) {
-			if (line.startsWith("-")) {
-				continue;
-			}
-			while (lines.length < number - 1) {
-				lines.push("");
-			}
-			lines[number - 1] = line.slice(1);
-			number += 1;
-		}
-	}
-	return lines.join("\n");
-}
-
-/** The text of the pinned file, or null when the tree is unknown or does not hold the file as text. */
-async function pinnedText(tree: FileTree | null, path: string): Promise<string | null> {
-	if (tree === null) {
-		return null;
-	}
-	try {
-		const file = await tree.read(path);
-		return file.status === "FOUND" ? file.text : null;
-	} catch {
-		return null;
-	}
-}
-
-/** The lines inside a preview block: read from the pinned file, else from what the hunks show. */
-async function previewLines(
-	tree: FileTree | null,
-	file: DiffFile,
-	language: string,
-): Promise<Set<number>> {
-	const source = (await pinnedText(tree, file.path)) ?? newSideOfHunks(file);
-	const lines = new Set<number>();
-	for (const { start, end } of blockExtents(language, source, PREVIEW_OPENER) ?? []) {
-		for (let line = start; line <= end; line += 1) {
-			lines.add(line);
-		}
-	}
-	return lines;
-}
-
-/** One added line that spells a crash operator, with where it runs. */
+/** One selected line that spells a crash operator, with where it runs. */
 interface CrashLine {
 	path: string;
 	line: number;
+	endLine: number;
 	language: string;
 	operators: string;
 	inPreview: boolean;
@@ -154,42 +102,38 @@ interface CrashLine {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
 		const rows: CrashLine[] = [];
 		const byKind: Record<string, number> = {};
-		for (const [path, df] of requireChange(ctx.files)) {
-			const lang = languageOf(path);
+		for (const file of await selectedSources(ctx, domain.files)) {
+			const lang = file.language;
 			const patterns = lang === null ? undefined : LANG_PATTERNS[lang];
-			if (lang === null || !patterns) {
+			if (lang === null || patterns === undefined) {
 				continue;
 			}
-			const code = codeLines(lang, df.addedLines);
-			const preview =
-				lang === "swift"
-					? await previewLines(ctx.files?.head ?? null, df, lang)
-					: new Set<number>();
-			const testFile = isTestPath(path);
-			for (const [line, content] of df.addedLines) {
-				if (isCommentLine(content, lang)) {
-					continue;
+			const preview = lang === "swift" ? (blockExtents(lang, file.text, PREVIEW_OPENER) ?? []) : [];
+			for (const [kind, test] of patterns) {
+				for (const row of selectedOccurrences(
+					ctx,
+					domain.files,
+					occurrences(file, [{ label: kind, test }]),
+				)) {
+					byKind[kind] = (byKind[kind] ?? 0) + 1;
+					rows.push({
+						path: row.path,
+						line: row.startLine,
+						endLine: row.endLine,
+						language: lang,
+						operators: kind,
+						inPreview: preview.some(
+							(range) => row.startLine >= range.start && row.endLine <= range.end,
+						),
+						testFile: isTestPath(file.path),
+					});
 				}
-				const labels = patterns
-					.filter(([, re]) => re.test(code.get(line) ?? ""))
-					.map(([name]) => name);
-				if (labels.length === 0) {
-					continue;
-				}
-				for (const label of labels) {
-					byKind[label] = (byKind[label] ?? 0) + 1;
-				}
-				rows.push({
-					path,
-					line,
-					language: lang,
-					operators: labels.join(" + "),
-					inPreview: preview.has(line),
-					testFile,
-				});
 			}
 		}
 		// Rows on an ordinary path first, so preview and test rows cannot push them out of the leads.
@@ -201,7 +145,7 @@ export default definePracticeScript({
 			rows.length > 0
 				? [
 						oneLine(
-							`${rows.length} added line(s) spell a crash operator: ${listWithin(kinds, DIRECTION_CHARS - 60)}.`,
+							`${rows.length} selected line(s) spell a crash operator: ${listWithin(kinds, DIRECTION_CHARS - 60)}.`,
 							DIRECTION_CHARS,
 						),
 						`${inPreview} sit inside a preview block and ${inTests} in test files. String-literal text and comments were not scanned.`,
@@ -209,7 +153,11 @@ export default definePracticeScript({
 					]
 				: [];
 		const leads: ReviewLead[] = rows.slice(0, 40).map((row) => ({
-			at: { change: row.path, line: row.line },
+			at: {
+				file: row.path,
+				line: row.line,
+				...(row.endLine === row.line ? {} : { endLine: row.endLine }),
+			},
 			label: LABELS["crash-operator"],
 			facts: {
 				language: row.language,

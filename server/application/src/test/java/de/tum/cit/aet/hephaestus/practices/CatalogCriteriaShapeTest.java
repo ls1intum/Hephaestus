@@ -2,28 +2,27 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Checks the criteria sections and size limits defined in docs/admin/writing-practices.mdx.
+ * Checks the bundled criteria sections and their change or scan instructions.
  */
 class CatalogCriteriaShapeTest extends BaseUnitTest {
 
     /** The section headings, in order; each practice carries all of them. */
-    static final List<String> SECTIONS = List.of(
-            "## The standard", "## Occasion", "## Sources", "## Judge", "## Severity", "## Grounding", "## Defer");
-
-    static final int MAX_CRITERIA_CHARS = 8_000;
+    static final List<String> SECTIONS =
+            List.of("## The standard", "## Sources", "## Judge", "## Severity", "## Grounding", "## Defer");
 
     @Test
     @DisplayName("every bundled practice states its review focus and carries the sections in order")
@@ -31,8 +30,8 @@ class CatalogCriteriaShapeTest extends BaseUnitTest {
         List<String> failures = new ArrayList<>();
         for (JsonNode group : catalogue().path("groups")) {
             for (JsonNode practice : group.path("practices")) {
-                String slug = practice.path("slug").asText();
-                String criteria = practice.path("criteria").asText("");
+                String slug = practice.path("slug").asString();
+                String criteria = practice.path("definition").path("criteria").asString("");
                 if (criteria.indexOf("REVIEW FOCUS:") < 0
                         || criteria.indexOf("REVIEW FOCUS:") > criteria.indexOf("\n## The standard")) {
                     failures.add(slug + ": must state 'REVIEW FOCUS:' before the standard");
@@ -48,9 +47,6 @@ class CatalogCriteriaShapeTest extends BaseUnitTest {
                         last = at;
                     }
                 }
-                if (criteria.length() > MAX_CRITERIA_CHARS) {
-                    failures.add(slug + ": " + criteria.length() + " characters, over " + MAX_CRITERIA_CHARS);
-                }
                 String judge = sectionOf(criteria, "## Judge");
                 for (String outcome : List.of("MET", "NOT_MET")) {
                     if (!Pattern.compile("(?m)^- " + outcome + "(?:[: ]|$)")
@@ -59,11 +55,15 @@ class CatalogCriteriaShapeTest extends BaseUnitTest {
                         failures.add(slug + ": the Judge section does not decide " + outcome);
                     }
                 }
-                if (!judge.contains("UNDETERMINED")) {
-                    failures.add(slug + ": the Judge section does not say when the review is UNDETERMINED");
+                if (!judge.contains("COULD_NOT_DETERMINE")) {
+                    failures.add(slug + ": the Judge section does not say when the review is COULD_NOT_DETERMINE");
                 }
-                if (!(sectionOf(criteria, "## Occasion") + judge).contains("NOT_APPLICABLE")) {
-                    failures.add(slug + ": neither the Occasion nor the Judge section says when it is NOT_APPLICABLE");
+                if (practice.path("definition").path("scan").isNull()) {
+                    assertThat(criteria).as("%s applicability gate", slug).contains("DOES_NOT_APPLY");
+                } else {
+                    assertThat(criteria)
+                            .as("%s scan and change instructions", slug)
+                            .contains("## On a change", "## In a scan");
                 }
             }
         }
@@ -85,7 +85,9 @@ class CatalogCriteriaShapeTest extends BaseUnitTest {
             assertThat(in)
                     .as("practices/default-catalog.json must be on the classpath")
                     .isNotNull();
-            return new ObjectMapper().readTree(new String(in.readAllBytes(), StandardCharsets.UTF_8));
+            return JsonMapper.builder()
+                    .build()
+                    .readTree(new String(Objects.requireNonNull(in).readAllBytes(), StandardCharsets.UTF_8));
         }
     }
 }

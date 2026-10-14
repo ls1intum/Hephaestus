@@ -2,12 +2,24 @@ package de.tum.cit.aet.hephaestus.agent.practice.live;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeScriptInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimePracticeTestData;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,8 +29,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * The inputs the live harnesses stage for a practice program, pinned to {@code practice-results/work-records/}, which
- * {@code lib/contract.test.ts} parses with the runner's own input schema. The live tests do not run in CI, so a work
- * record or a cause they stage in a shape the runner refuses fails here instead.
+ * {@code lib/contract.test.ts} parses with the runner's own input schema. The live tests do not run in CI, so a staged record that the runner refuses fails here instead.
  */
 @Tag("unit")
 class LiveWorkRecordsTest {
@@ -49,8 +60,9 @@ class LiveWorkRecordsTest {
 
     /** {@code pi-result-normalize.spec.ts} checks a quote of the change against this index as the session does. */
     @Test
-    void shouldIndexTheCapturedCheckoutWhenALiveTestStagesAChange() throws IOException {
-        JsonNode manifest = LiveRunnerWorkspace.manifest(LiveRunnerWorkspace.capturedArtifacts());
+    void shouldIndexTheCapturedCheckoutWhenALiveTestStagesAChange() throws Exception {
+        LiveRunnerWorkspace.stageCartChange(workspace);
+        JsonNode manifest = LiveRunnerWorkspace.manifest(workspace, LiveRunnerWorkspace.capturedFiles());
 
         assertThat(manifest)
                 .isEqualTo(pinnedFile(Path.of("src/test/resources/practice-results/live-manifest.json"), manifest));
@@ -66,7 +78,7 @@ class LiveWorkRecordsTest {
         Path repo = workspace.resolve(SandboxLayout.REPO_MOUNT_RELATIVE);
         assertThat(Files.readString(repo.resolve(".git/HEAD")).strip())
                 .isEqualTo(change.path("head_sha").asString());
-        for (String artifact : LiveRunnerWorkspace.capturedArtifacts().keySet()) {
+        for (String artifact : LiveRunnerWorkspace.capturedFiles().keySet()) {
             assertThat(workspace.resolve(artifact)).as(artifact).exists();
         }
         assertThat(Files.readAllLines(repo.resolve("src/cart.ts")))
@@ -78,21 +90,20 @@ class LiveWorkRecordsTest {
                 .exists();
     }
 
-    /** The cause the harness stages beside the program, and the work record it stages under the context. */
+    /** The single canonical v3 inputs file staged by the runtime serializer. */
     private JsonNode staged(String kind, ObjectNode work) throws IOException {
-        Path index = workspace.resolve(SandboxLayout.PRACTICES_PREFIX + "index.json");
-        Files.createDirectories(index.getParent());
-        Files.write(index, MAPPER.writeValueAsBytes(List.of(Map.of("slug", "live-practice", "revisionId", 1))));
-        LiveRunnerWorkspace.stagePracticeInputs(workspace, kind, null);
-        JsonNode cause = MAPPER.readTree(workspace
-                .resolve(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX
-                        + "live-practice"
-                        + SandboxLayout.PRACTICE_SCRIPT_CAUSE_SUFFIX)
-                .toFile());
-        ObjectNode inputs = MAPPER.createObjectNode();
-        inputs.set("cause", cause);
-        inputs.set("work", MAPPER.readTree(LiveWorkRecords.staged(work)));
-        return inputs;
+        var item = new ItemRef(1, 1, new ItemKind(kind), 1L, null, null);
+        var definition = RuntimePracticeTestData.definition(item.kind(), "Live practice", "Review the work.", null);
+        UUID reviewId = UUID.fromString("10000000-0000-4000-8000-000000000001");
+        var pinned =
+                new PinnedPractice(1, 1, definition, "a".repeat(64), new ReviewMethod(1, "b".repeat(64), List.of()));
+        var version = new ItemVersion("fixture:one", null);
+        var assigned = new ReviewAssignmentSnapshot(
+                new ReviewAssignmentId(reviewId, 1, 1), item, version, 1L, "live-practice", pinned);
+        var review = new ReviewSnapshot(
+                reviewId, 1, item, ReviewKind.ITEM, version, ReviewOrigin.REQUEST, 1, List.of(pinned));
+        var staged = new PracticeScriptInputs(MAPPER).stage(review, assigned, work, LiveWorkRecords.AT, null, null);
+        return MAPPER.readTree(staged.values().iterator().next());
     }
 
     private static JsonNode pinned(String name, JsonNode staged) throws IOException {

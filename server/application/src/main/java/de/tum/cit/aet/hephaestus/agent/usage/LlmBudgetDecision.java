@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -15,7 +16,7 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
      *     unattributable call this is the purse actually consulted, which is not always the one the
      *     caller asked about — log lines and metric tags must read it here.
      */
-    public record Block(@Nullable FundingSource purse, LlmBudgetBlockReason reason) {
+    public record Block(@Nullable UsageFundingSource purse, LlmBudgetBlockReason reason) {
         static final Block NONE = new Block(null, LlmBudgetBlockReason.NONE);
 
         public boolean blocked() {
@@ -27,13 +28,13 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
      * An unknown funding source is judged by BOTH caps — it might be either purse, so it may only
      * proceed when neither is blocked. Fail-safe: an unattributable call is not a way around a cap.
      */
-    public Block decideFor(@Nullable FundingSource fundingSource) {
+    public Block decideFor(@Nullable UsageFundingSource fundingSource) {
         if (fundingSource == null) {
             if (instanceFunded != LlmBudgetBlockReason.NONE) {
-                return new Block(FundingSource.INSTANCE, instanceFunded);
+                return new Block(UsageFundingSource.INSTANCE, instanceFunded);
             }
             return workspaceFunded != LlmBudgetBlockReason.NONE
-                    ? new Block(FundingSource.WORKSPACE, workspaceFunded)
+                    ? new Block(UsageFundingSource.WORKSPACE, workspaceFunded)
                     : Block.NONE;
         }
         LlmBudgetBlockReason reason =
@@ -44,11 +45,11 @@ public record LlmBudgetDecision(LlmBudgetBlockReason instanceFunded, LlmBudgetBl
         return reason != LlmBudgetBlockReason.NONE ? new Block(fundingSource, reason) : Block.NONE;
     }
 
-    public LlmBudgetBlockReason forFunding(@Nullable FundingSource fundingSource) {
+    public LlmBudgetBlockReason forFunding(@Nullable UsageFundingSource fundingSource) {
         return decideFor(fundingSource).reason();
     }
 
-    public boolean blocks(@Nullable FundingSource fundingSource) {
+    public boolean blocks(@Nullable UsageFundingSource fundingSource) {
         return decideFor(fundingSource).blocked();
     }
 }

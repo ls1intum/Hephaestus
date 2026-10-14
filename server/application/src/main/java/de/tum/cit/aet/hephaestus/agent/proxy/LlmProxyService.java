@@ -3,13 +3,13 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils;
 import de.tum.cit.aet.hephaestus.core.proxy.ProxyStreamingUtils.UpstreamResult;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -19,6 +19,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.Locale;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,6 +54,7 @@ class LlmProxyService {
     private final LlmModelResolver resolver;
     private final ObjectMapper objectMapper;
     private final ProxyAccounting accounting;
+    private final ScanCallGuard scanCalls;
     private final ProxyRequestPolicy requestPolicy;
     private final Tracer tracer;
 
@@ -114,7 +116,8 @@ class LlmProxyService {
         if (slot == null || protocol == null) {
             return ResponseEntity.status(404).body("Not found");
         }
-        String slotPath = JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH + slot.slot();
+        String slotPath =
+                JobTokenAuthenticationFilter.PRACTICE_SCRIPT_PATH + slot.name().toLowerCase(Locale.ROOT);
         if (!(slotPath + protocol.upstreamPath()).equals(request.getRequestURI())) {
             return ResponseEntity.badRequest().body("This model takes calls on " + slotPath + protocol.upstreamPath());
         }
@@ -144,7 +147,7 @@ class LlmProxyService {
                 body);
     }
 
-    // MODEL_SLOT_CAPS in docker/agents/practice-scripts/lib/contract.ts holds the same caps, so the runner refuses
+    // MODEL_SLOT_CAPS in docker/agents/practice-scripts/lib/core/contract.ts holds the same caps, so the runner refuses
     // first.
     static final int MAX_DECISION_QUESTIONS = 64;
     static final int MAX_EMBEDDING_INPUTS = 64;
@@ -227,6 +230,17 @@ class LlmProxyService {
             HttpHeaders incomingHeaders,
             byte[] body,
             Span span) {
+        var lease = scanCalls.acquire(routing, body);
+        try {
+            return forwardWithinScanBudget(routing, protocol, practiceScript, response, incomingHeaders, body, span);
+        } finally {
+            lease.ifPresent(ScanCallGuard.Lease::close);
+        }
+    }
+
+    private @Nullable ResponseEntity<?> forwardWithinScanBudget(
+            ProxyRouting routing, LlmApiProtocol protocol, @Nullable PracticeScriptCall practiceScript,
+            HttpServletResponse response, HttpHeaders incomingHeaders, byte[] body, Span span) {
         // With no attempt there is no row to accumulate onto, so a served call's tokens would reach
         // neither the ledger nor the cap that reads it.
         ProxyRouting.BilledAttempt attempt = routing.attempt();
@@ -509,8 +523,8 @@ class LlmProxyService {
     }
 
     /** Names WHICH purse stopped the call, because the two have different remedies. */
-    private static String budgetReachedMessage(@Nullable FundingSource fundingSource) {
-        return fundingSource == FundingSource.WORKSPACE
+    private static String budgetReachedMessage(@Nullable UsageFundingSource fundingSource) {
+        return fundingSource == UsageFundingSource.WORKSPACE
                 ? "Own-provider budget reached. Paused until an admin raises the cap or the month rolls over."
                 : "Shared-model budget reached. Paused until an admin raises the budget or the month rolls over.";
     }

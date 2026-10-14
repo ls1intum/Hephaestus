@@ -272,12 +272,12 @@ class PracticeCriteriaCaseStagingIntegrationTest {
     void shouldStopFixtureProcessWhenInterrupted() throws Exception {
         Path pidFile = root.resolve("fixture.pid");
         try (var executor = Executors.newSingleThreadExecutor()) {
-            var command = executor.submit(
-                    () -> PracticeCriteriaCaseFixtures.fixtureCommand(
-                            root,
-                            "node",
-                            "-e",
-                            "require('node:fs').writeFileSync('fixture.pid', String(process.pid)); setInterval(() => {}, 1000);"));
+            var command = executor.submit(() -> PracticeCriteriaCaseFixtures.fixtureCommand(
+                    root,
+                    "node",
+                    "-e",
+                    "require('node:fs').writeFileSync('fixture.pid', String(process.pid)); setInterval(() =>"
+                            + " {}, 1000);"));
             try {
                 await().atMost(5, TimeUnit.SECONDS).until(() -> Files.exists(pidFile) && Files.size(pidFile) > 0);
                 var child = ProcessHandle.of(Long.parseLong(Files.readString(pidFile)))

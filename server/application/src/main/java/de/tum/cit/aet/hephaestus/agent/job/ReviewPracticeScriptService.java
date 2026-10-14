@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobPracticeScriptRunRepository.PracticeNameRow;
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptModelDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeScriptRunDTO;
-import java.util.ArrayList;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewScriptQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import java.util.Comparator;
-import java.util.EnumMap;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -18,87 +18,71 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * What each practice's script did in the review's current attempt, beside the calls to its decision,
- * embedding and reranking models that the proxy counted. The runner's report says what the script did. The proxy's
- * rows say what it called. Neither is spend: the LLM ledger owns spend.
- *
- * <p>Only the attempt's terminal write records runs, so an attempt that has not ended shows none. An earlier attempt is
- * never shown in its place: its scripts did not produce the review's result.
- */
+/** Projects all recorded invocations of a review, using its pinned method for model identity. */
 @Service
+@ConditionalOnServerRole
 @RequiredArgsConstructor
-class ReviewPracticeScriptService {
+@Transactional(readOnly = true)
+public class ReviewPracticeScriptService implements ReviewScriptQuery {
+    private final ScriptUsageRepository usage;
+    private final ScriptRunRepository runs;
+    private final ReviewService reviews;
 
-    private final AgentJobRepository jobs;
-    private final AgentJobPracticeScriptRunRepository runs;
-
-    @Transactional(readOnly = true)
-    public List<ReviewPracticeScriptsDTO> currentAttempt(long workspaceId, UUID jobId) {
-        int attempt = jobs.findByIdAndWorkspaceId(jobId, workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("AgentJob", jobId.toString()))
-                .getRetryCount();
-        List<AgentJobPracticeScriptRun> current = runs.findByWorkspaceIdAndJobIdAndAttempt(workspaceId, jobId, attempt);
-        if (current.isEmpty()) return List.of();
-
-        Map<String, Map<ModelKind, AgentJobPracticeScriptUsage>> usage = new HashMap<>();
-        for (AgentJobPracticeScriptUsage row :
-                runs.findUsageByWorkspaceIdAndJobIdAndAttempt(workspaceId, jobId, attempt)) {
-            usage.computeIfAbsent(row.getId().getPracticeSlug(), slug -> new EnumMap<>(ModelKind.class))
-                    .put(row.modelKind(), row);
-        }
-        Map<String, String> names = runs
-                .findPracticeNamesByWorkspaceId(
-                        workspaceId,
-                        current.stream()
-                                .map(AgentJobPracticeScriptRun::practiceSlug)
-                                .toList())
-                .stream()
-                .collect(Collectors.toMap(PracticeNameRow::getSlug, PracticeNameRow::getName));
-        return current.stream()
-                .map(run -> dto(run, names.get(run.practiceSlug()), usage.getOrDefault(run.practiceSlug(), Map.of())))
-                .sorted(Comparator.comparing(
-                                ReviewPracticeScriptsDTO::practiceName,
-                                Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
-                        .thenComparing(ReviewPracticeScriptsDTO::practiceSlug))
+    @Override
+    public List<PracticeScriptRunDTO> forReview(long workspaceId, UUID reviewId) {
+        var review = reviews.find(workspaceId, reviewId);
+        if (review.isEmpty()) return List.of();
+        var byRun = usage.findForReview(workspaceId, reviewId).stream()
+                .collect(Collectors.groupingBy(row -> new ScriptRun.Id(
+                        row.getId().getJobId(),
+                        row.getId().getAttempt(),
+                        row.getId().getPracticeId())));
+        return runs.findForReview(workspaceId, reviewId).stream()
+                .sorted(Comparator.comparing(ScriptRun::getFinishedAt)
+                        .thenComparingInt(run -> run.getId().getAttempt())
+                        .thenComparingLong(run -> run.getId().getPracticeId()))
+                .map(run -> {
+                    var practice = review.get().practices().stream()
+                            .filter(pinned -> pinned.practiceId() == run.getId().getPracticeId()
+                                    && pinned.practiceVersionId() == run.getPracticeVersionId())
+                            .findFirst();
+                    List<PracticeScriptModelDTO> models = byRun.getOrDefault(run.getId(), List.of()).stream()
+                            .map(usage -> new PracticeScriptModelDTO(
+                                    usage.modelKind(),
+                                    modelId(practice.orElse(null), usage.modelKind()),
+                                    usage.getDataHandlingTier(),
+                                    usage.getCalls(),
+                                    usage.getInputTokens(),
+                                    usage.getOutputTokens(),
+                                    usage.getCacheReadTokens(),
+                                    usage.getCacheWriteTokens()))
+                            .toList();
+                    return new PracticeScriptRunDTO(
+                            run.getId().getJobId(),
+                            run.getId().getAttempt(),
+                            Long.toString(run.getId().getPracticeId()),
+                            Long.toString(run.getPracticeVersionId()),
+                            run.getStatus(),
+                            run.getScriptKind(),
+                            run.getStopReason(),
+                            run.getFinishedAt(),
+                            run.getDurationMs() == null
+                                    ? null
+                                    : run.getDurationMs().longValue(),
+                            run.getError(),
+                            models);
+                })
                 .toList();
     }
 
-    /**
-     * The models that the script declared or called, in the order of their purposes. A model that the script called
-     * has the tier that its calls recorded, so a run that did not finish still shows it. A model that it only
-     * declared has the tier that the run recorded. Either is absent when the attempt had no model for the purpose.
-     */
-    private static ReviewPracticeScriptsDTO dto(
-            AgentJobPracticeScriptRun run,
-            @Nullable String practiceName,
-            Map<ModelKind, AgentJobPracticeScriptUsage> usage) {
-        List<StoredModelUse> declared = ReviewOutcomeLookupAdapter.storedModelUses(run.getModels());
-        List<ReviewPracticeScriptModelDTO> models = new ArrayList<>();
-        for (AgentPurpose purpose : AgentPurpose.practiceScript()) {
-            AgentJobPracticeScriptUsage counted = usage.get(purpose.kind());
-            StoredModelUse use = declared.stream()
-                    .filter(candidate -> candidate.purpose().name().equals(purpose.name()))
-                    .findFirst()
-                    .orElse(null);
-            if (counted != null) {
-                models.add(
-                        new ReviewPracticeScriptModelDTO(purpose, counted.getDataHandlingTier(), counted.getCalls()));
-            } else if (use != null) {
-                models.add(new ReviewPracticeScriptModelDTO(purpose, use.tier(), 0));
-            }
-        }
-        return new ReviewPracticeScriptsDTO(
-                run.practiceSlug(),
-                practiceName,
-                new PracticeScriptRunDTO(
-                        run.getStatus(),
-                        run.getProgramKind(),
-                        run.path(),
-                        run.getStopReason(),
-                        declared.stream().map(StoredModelUse::toDto).toList()),
-                List.copyOf(models),
-                run.getError(),
-                run.getDurationMs());
+    private static @Nullable String modelId(@Nullable PinnedPractice practice, ModelKind kind) {
+        if (practice == null) return null;
+        String slot = kind.name().toLowerCase(Locale.ROOT);
+        return practice.method().models().stream()
+                .filter(model -> model.slot().equals(slot))
+                .map(model -> model.model() == null ? null : model.model().modelId())
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 }

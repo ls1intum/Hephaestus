@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.result.LatestRun;
-import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -21,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Read at request time off the results and never stored, so a re-review that changes what a piece
  * of work's latest run said changes the answer with it. The unit is a piece of reviewed work, bundled as the
  * trend bundles it: one opportunity per piece of work, read off its newest live run
- * ({@link LatestRun#perLiveClaim}), so a pull request reviewed three times is one piece of work, not three. An
+ * with endedAt absent, so a pull request reviewed three times is one piece of work, not three. An
  * opportunity that produced no verdict is skipped rather than counted as either side, exactly as
  * {@link PracticeTrend#cleanWork()} skips it; one that raised a problem starts the count over. The first run of
  * {@link #CLEAN_NEEDED} clean opportunities resolves the feedback, and what came after it does not un-resolve it:
@@ -56,7 +54,7 @@ public record WorkResolution(List<Work> cleanWork, @Nullable Instant resolvedAt,
         }
 
         /** @param horizon the moment before which a result is not an opportunity at all */
-        public static Opportunities of(List<PracticeResult> practiceResults, Instant horizon) {
+        public static Opportunities of(List<ResultView> practiceResults, Instant horizon) {
             return new Opportunities(
                     OpportunityBundler.opportunities(practiceResults, horizon).reversed());
         }
@@ -70,10 +68,7 @@ public record WorkResolution(List<Work> cleanWork, @Nullable Instant resolvedAt,
                     continue;
                 }
                 Work work = new Work(
-                        opportunity.artifactKind(),
-                        opportunity.artifactId(),
-                        opportunity.jobId(),
-                        opportunity.occurredAt());
+                        opportunity.itemKind(), opportunity.itemId(), opportunity.reviewId(), opportunity.occurredAt());
                 if (!opportunity.clean()) {
                     clean.clear();
                     problems.add(work);
@@ -97,22 +92,22 @@ public record WorkResolution(List<Work> cleanWork, @Nullable Instant resolvedAt,
      * reviewed it and when. The job id is what later resolves the label and the link; the rules themselves
      * never need them.
      */
-    public record Work(ArtifactKind kind, long id, UUID jobId, Instant at) {
-        public static Work of(PracticeResult practiceResult) {
+    public record Work(ItemKind kind, long itemId, UUID reviewId, Instant at) {
+        public static Work of(ResultView view) {
             return new Work(
-                    practiceResult.getArtifactKind(),
-                    practiceResult.getArtifactId(),
-                    practiceResult.getAgentJobId(),
-                    practiceResult.getObservedAt());
+                    new ItemKind(view.item().kind()),
+                    view.result().getItemId(),
+                    view.result().getReviewId(),
+                    view.result().getRecordedAt());
         }
 
-        public ReviewedWorkKey key() {
-            return new ReviewedWorkKey(kind, id);
+        public long key() {
+            return itemId;
         }
 
         /** One entry per piece of work, at its newest review, newest first. */
         public static List<Work> newestFirst(Stream<Work> work) {
-            Map<ReviewedWorkKey, Work> byWork = new LinkedHashMap<>();
+            Map<Long, Work> byWork = new LinkedHashMap<>();
             work.forEach(ref ->
                     byWork.merge(ref.key(), ref, (left, right) -> left.at().isAfter(right.at()) ? left : right));
             return byWork.values().stream()

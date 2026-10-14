@@ -4,12 +4,12 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.clea
 import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService.StandingSnapshot.PracticeStandingSnapshot;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.result.trend.TrendProperties;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -29,7 +29,7 @@ class PracticeStandingTest {
     @Test
     void shouldHoldWhenTheOnlySlipIsOlderThanTheStandingWindow() {
         // Four clean in the window of four; the slip before them is history the bar does not reach.
-        assertThat(standing(PracticeStandingDTO.Standing.STRENGTH, trendOf(false, true, true, true, true))
+        assertThat(standing(PracticeStanding.STRENGTH, trendOf(false, true, true, true, true))
                         .isHolding(4))
                 .isTrue();
     }
@@ -37,42 +37,48 @@ class PracticeStandingTest {
     @Test
     void shouldNotHoldWhenAnOpportunityInTheWindowRaisedAProblem() {
         // Three clean of four in the window: a strength carried by weight, not a held one.
-        assertThat(standing(PracticeStandingDTO.Standing.STRENGTH, trendOf(false, true, true, true))
+        assertThat(standing(PracticeStanding.STRENGTH, trendOf(false, true, true, true))
                         .isHolding(4))
                 .isFalse();
     }
 
     @Test
-    void shouldHoldWhenFewerPiecesOfWorkThanTheWindowWereJudged() {
-        // Two pieces of work ever judged, both clean: the bar is what there is, not the window's size.
-        assertThat(standing(PracticeStandingDTO.Standing.STRENGTH, trendOf(true, true))
+    void shouldHoldAfterThreeCleanPiecesOfWorkWithinTheWindow() {
+        // Three clean pieces of work meet the recurring-claim threshold.
+        assertThat(standing(PracticeStanding.STRENGTH, trendOf(true, true, true))
                         .isHolding(4))
                 .isTrue();
     }
 
     @Test
     void shouldNotHoldWhenTheStandingIsBelowStrength() {
-        assertThat(standing(PracticeStandingDTO.Standing.MIXED, trendOf(true, true, true, true))
+        assertThat(standing(PracticeStanding.MIXED, trendOf(true, true, true, true))
                         .isHolding(4))
                 .isFalse();
     }
 
-    private static PracticeStanding standing(PracticeStandingDTO.Standing standing, PracticeTrend trend) {
+    @Test
+    void oneMetResultDoesNotMakeARecurringStrengthClaim() {
+        assertThat(standing(PracticeStanding.STRENGTH, trendOf(true)).isHolding(4))
+                .isFalse();
+    }
+
+    private static PracticeStandingSnapshot standing(PracticeStanding standing, PracticeTrend trend) {
         PracticeStandingDTO dto = new PracticeStandingDTO(
                 SLUG, "Testing", null, null, null, null, standing, List.of(), List.of(), null, null, false);
-        return new PracticeStanding(dto, List.of(), List.of(), trend, null);
+        return new PracticeStandingSnapshot(dto, List.of(), List.of(), trend, null);
     }
 
     /** One review per piece of work, oldest first: {@code true} came back clean, {@code false} raised a problem. */
     private static PracticeTrend trendOf(boolean... cleanOldestFirst) {
-        List<PracticeResult> practiceResults = IntStream.range(0, cleanOldestFirst.length)
-                .mapToObj(index -> practiceResult(index, cleanOldestFirst[index]))
+        List<ResultView> practiceResults = IntStream.range(0, cleanOldestFirst.length)
+                .mapToObj(index -> result(index, cleanOldestFirst[index]))
                 .toList();
         PracticeTrendService trends = new PracticeTrendService(new TrendProperties(), Clock.fixed(NOW, ZoneOffset.UTC));
         return trends.calculatePractice(SLUG, practiceResults, trends.horizon());
     }
 
-    private static PracticeResult practiceResult(int index, boolean isClean) {
+    private static ResultView result(int index, boolean isClean) {
         // Newest last, one day apart, well inside the trend horizon.
         String observedAt = NOW.minus(Duration.ofDays(30L - index)).toString();
         return isClean ? clean(index + 1L, observedAt) : problem(index + 1L, observedAt);

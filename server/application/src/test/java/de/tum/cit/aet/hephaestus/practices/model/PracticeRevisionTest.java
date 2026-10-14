@@ -28,7 +28,7 @@ class PracticeRevisionTest extends BaseUnitTest {
         practice.setWhatGoodLooksLike("A concrete suggestion");
         practice.setGroup(group);
 
-        PracticeRevision revision = new PracticeRevision(practice, 3);
+        PracticeVersion revision = new PracticeVersion(practice, 3);
         // The revision copies the list; a later edit to the practice's signals must not reach it.
         PracticeTestEvidence.configure(practice, ScmSignals.PULL_REQUEST_REVIEWED);
 
@@ -44,11 +44,11 @@ class PracticeRevisionTest extends BaseUnitTest {
         assertThat(revision.getWhatGoodLooksLike()).isEqualTo("A concrete suggestion");
         assertThat(revision)
                 .extracting(
-                        PracticeRevision::getGroupSlug,
-                        PracticeRevision::getGroupName,
-                        PracticeRevision::getGroupDescription,
-                        PracticeRevision::getGroupIcon,
-                        PracticeRevision::getGroupColor)
+                        PracticeVersion::getGroupSlug,
+                        PracticeVersion::getGroupName,
+                        PracticeVersion::getGroupDescription,
+                        PracticeVersion::getGroupIcon,
+                        PracticeVersion::getGroupColor)
                 .containsExactly("review-quality", "Review quality", "Review work", "MessageSquare", "cyan");
         assertThat(revision.getReviewRuleFingerprint()).hasSize(67).startsWith("v5:");
     }

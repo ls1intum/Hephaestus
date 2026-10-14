@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.commit;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.RepositoryRef;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -21,10 +21,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Persists what JGit captured about one commit, one transaction per commit. A commit that is
- * already captured is left alone; otherwise the row is upserted with its values fitted to the column
- * widths, its file changes replaced, and — when the row did not exist before — a
- * {@link ScmDomainEvent.CommitCreated} published for the listeners that fire after commit. One
- * commit's failure is contained here so a walk over thousands of commits reports it and moves on.
+ * already captured is left alone; otherwise the row is upserted with its values fitted to the
+ * column widths, its file changes replaced, and — when the row did not exist before — a {@link
+ * ScmDomainEvent.CommitCreated} published for the listeners that fire after commit. One commit's
+ * failure is contained here so a walk over thousands of commits reports it and moves on.
  */
 @Service
 @Slf4j
@@ -35,9 +35,9 @@ public class CommitDetailsPersister {
     private final ApplicationEventPublisher eventPublisher;
 
     /**
-     * What only the provider adapter knows about the commits it hands over: the web URL scheme, how an
-     * email resolves to a user, and {@code enrichment} — rows only this provider writes, run inside the
-     * commit's transaction once its row exists.
+     * What only the provider adapter knows about the commits it hands over: the web URL scheme, how
+     * an email resolves to a user, and {@code enrichment} — rows only this provider writes, run
+     * inside the commit's transaction once its row exists.
      */
     public record Origin(
             Long scopeId,
@@ -146,7 +146,10 @@ public class CommitDetailsPersister {
         eventPublisher.publishEvent(new ScmDomainEvent.CommitCreated(ScmEventPayload.CommitData.from(commit), context));
     }
 
-    /** Cuts a value to a column width; the provider adapters use it for the payloads they write themselves. */
+    /**
+     * Cuts a value to a column width; the provider adapters use it for the payloads they write
+     * themselves.
+     */
     public static String fit(String value, int length) {
         return value.length() <= length ? value : value.substring(0, length);
     }

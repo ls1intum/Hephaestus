@@ -2,208 +2,123 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
+import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryRef;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewScopeRepositoryDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.WorkspaceReviewScopeDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTarget;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewPersonTargetRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTarget;
-import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewRepositoryTargetRepository;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode;
-import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
+import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeRepositoryRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.EnumSource;
-import org.mockito.Mock;
+import org.springframework.jdbc.core.simple.JdbcClient;
 
 class PracticeReviewCoverageServiceTest extends BaseUnitTest {
-
-    @Mock
-    private RepositoryToMonitorRepository monitors;
-
-    @Mock
-    private WorkspaceMembershipService membershipService;
-
-    @Mock
-    private PracticeReviewRepositoryTargetRepository repositoryTargets;
-
-    @Mock
-    private PracticeReviewPersonTargetRepository people;
-
-    @Mock
-    private PersonProcessingSuppression suppression;
-
-    private PracticeReviewCoverageService service;
-    private Workspace workspace;
+    final RepositoryToMonitorRepository monitors = mock(RepositoryToMonitorRepository.class);
+    final ReviewScopeRepositoryRepository targets = mock(ReviewScopeRepositoryRepository.class);
+    final MonitoredRepositoryQuery indexed = mock(MonitoredRepositoryQuery.class);
+    final JdbcClient jdbc = mock(JdbcClient.class, RETURNS_DEEP_STUBS);
+    final PracticeReviewCoverageService service = new PracticeReviewCoverageService(
+            monitors, targets, mock(PersonProcessingSuppression.class), jdbc, indexed);
+    Workspace workspace;
 
     @BeforeEach
     void setUp() {
-        service =
-                new PracticeReviewCoverageService(monitors, membershipService, repositoryTargets, people, suppression);
         workspace = new Workspace();
         workspace.setId(1L);
+        lenient().when(monitors.findByWorkspaceId(1L)).thenReturn(List.of());
+        lenient().when(targets.findByWorkspaceId(1L)).thenReturn(List.of());
     }
 
     @Test
-    void shouldRetainGeneratedPathsWhenCoverageResetsAndClearOnlyTheRequestedRepository() {
-        var first = monitor(11L, "owner/first");
-        var second = monitor(12L, "group/second");
-        when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(first, second));
-        service.patchGeneratedPaths(
-                workspace, Map.of("owner/first", List.of("generated/**"), "group/second", List.of("client/**")));
-        service.replace(workspace, WorkspaceReviewScope.ALL);
-        assertThat(service.generatedPaths(workspace))
-                .containsEntry("owner/first", List.of("generated/**"))
-                .containsEntry("group/second", List.of("client/**"));
-        service.patchGeneratedPaths(workspace, Map.of("owner/first", List.of()));
-        assertThat(service.generatedPaths(workspace)).containsOnlyKeys("group/second");
+    void emptySelectedScopeAdmitsNoRepositoryOrPerson() {
+        var selected =
+                new WorkspaceReviewScope(ReviewScopeMode.SELECTED, ReviewScopeMode.SELECTED, List.of(), List.of());
+        assertThat(selected.admits(2L, "main", 1L)).isFalse();
     }
 
     @Test
-    void shouldRejectGeneratedPathsForAnotherWorkspaceWithoutChangingAnyRepository() {
-        var local = monitor(11L, "owner/local");
-        when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(local));
-        assertThatThrownBy(() -> service.patchGeneratedPaths(
-                        workspace, Map.of("owner/local", List.of("generated/**"), "other/tenant", List.of("**"))))
-                .isInstanceOf(InvalidReviewCoverageException.class);
-        assertThat(local.getGeneratedPaths()).isEmpty();
-    }
-
-    @Test
-    void shouldRefuseBotSubjectEvenWhenWorkspaceMembershipExists() {
-        lenient().when(membershipService.isPracticeReviewEligible(1L, 8L)).thenReturn(true);
-        var assessment = service.assess(workspace, "owner/repo", "main", new ReviewSubject(8L, false), true);
-        assertThat(assessment.subjectStatus()).isEqualTo(ReviewSubjectStatus.NON_HUMAN);
-        assertThat(assessment.admitted()).isFalse();
-    }
-
-    @Test
-    void selectedRepositoryFromAnotherTenantIsRejected() {
-        when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(monitor(11L, "owner/local")));
-        WorkspaceReviewScope crossTenant = new WorkspaceReviewScope(
-                ReviewRepositoryMode.SELECTED,
-                ReviewPersonMode.ALL_ELIGIBLE,
-                List.of(new ReviewRepositoryTarget("other/tenant", List.of())),
+    void branchRestrictionIsAppliedOnlyToBranchWork() {
+        var selected = new WorkspaceReviewScope(
+                ReviewScopeMode.SELECTED,
+                ReviewScopeMode.ALL,
+                List.of(new ReviewRepositoryTarget(2L, List.of("main"))),
                 List.of());
-
-        assertThatThrownBy(() -> service.replace(workspace, crossTenant))
-                .isInstanceOf(InvalidReviewCoverageException.class)
-                .hasMessageContaining("does not monitor the repository");
+        assertThat(selected.admitsRepository(2L, "feature", true)).isFalse();
+        assertThat(selected.admitsRepository(2L, null, false)).isTrue();
     }
 
     @Test
-    void selectedPersonWithoutThisWorkspaceMembershipIsRejected() {
-        when(monitors.findByWorkspaceId(1L)).thenReturn(List.of());
-        when(membershipService.practiceReviewEligibleUserIds(1L)).thenReturn(Set.of(7L));
-        WorkspaceReviewScope crossTenant = new WorkspaceReviewScope(
-                ReviewRepositoryMode.ALL_MONITORED, ReviewPersonMode.SELECTED, List.of(), List.of(8L));
-
-        assertThatThrownBy(() -> service.replace(workspace, crossTenant))
-                .isInstanceOf(InvalidReviewCoverageException.class)
-                .hasMessageContaining("eligible linked workspace member");
+    void generatedPathsRejectUnknownRepositoryWithoutChangingMonitors() {
+        assertThatThrownBy(() -> service.patchGeneratedPaths(workspace, Map.of("3", List.of("dist/**"))))
+                .isInstanceOf(InvalidReviewScopeException.class);
     }
 
     @Test
-    void missingBotAndNonMemberSubjectsFailClosed() {
-        ReviewSubject human = new ReviewSubject(7L, true);
-        ReviewSubject bot = new ReviewSubject(8L, false);
-
-        assertThat(service.admits(workspace, "owner/repo", "main", null)).isFalse();
-        assertThat(service.admits(workspace, "owner/repo", "main", bot)).isFalse();
-        assertThat(service.admits(workspace, "owner/repo", "main", human)).isFalse();
-        assertThat(service.assessRepositoryless(workspace, null).admitted()).isFalse();
-        assertThat(service.assessRepositoryless(workspace, bot).admitted()).isFalse();
-        assertThat(service.assessRepositoryless(workspace, human).admitted()).isFalse();
-    }
-
-    @ParameterizedTest
-    @EnumSource(ReviewRepositoryMode.class)
-    void shouldCoverRepositorylessWorkOnlyForSelectedLinkedPeople(ReviewRepositoryMode repositoryMode) {
-        workspace.getReviewSettings().applyRollout(repositoryMode, ReviewPersonMode.SELECTED, null);
-        when(membershipService.isPracticeReviewEligible(1L, 8L)).thenReturn(true);
-        when(people.findByWorkspaceId(1L)).thenReturn(List.of(new PracticeReviewPersonTarget(1L, 7L)));
-        when(membershipService.isPracticeReviewEligible(1L, 7L)).thenReturn(true);
-
-        var assessment = service.assessRepositoryless(workspace, new ReviewSubject(7L, true));
-
-        assertThat(assessment.admitted()).isTrue();
-        assertThat(assessment.repositoryMatched()).isNull();
-        assertThat(assessment.branchMatched()).isNull();
-        assertThat(assessment.personMatched()).isTrue();
-        assertThat(service.assessRepositoryless(workspace, new ReviewSubject(8L, true))
-                        .admitted())
-                .isFalse();
-        when(people.findByWorkspaceId(1L)).thenReturn(List.of());
-        assertThat(service.assessRepositoryless(workspace, new ReviewSubject(7L, true))
-                        .admitted())
-                .isFalse();
+    void generatedPathsHaveAReset() {
+        var monitor = new RepositoryToMonitor();
+        monitor.setId(8L);
+        monitor.setNameWithOwner("owner/repo");
+        when(indexed.repositories(1)).thenReturn(Map.of(2L, new MonitoredRepositoryRef(2, 8, "owner/repo")));
+        monitor.setGeneratedPaths(List.of("dist/**"));
+        when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(monitor));
+        service.patchGeneratedPaths(workspace, Map.of("2", List.of()));
+        assertThat(monitor.getGeneratedPaths()).isEmpty();
     }
 
     @Test
-    void shouldKeepRepositoryWorkExcludedWhenAnEmptyRepositorySelectionAllowsRepositorylessWork() {
-        workspace.getReviewSettings().applyRollout(ReviewRepositoryMode.SELECTED, ReviewPersonMode.ALL_ELIGIBLE, null);
-        when(membershipService.isPracticeReviewEligible(1L, 7L)).thenReturn(true);
-
-        var assessment = service.assessRepositoryless(workspace, new ReviewSubject(7L, true));
-
-        assertThat(assessment.admitted()).isTrue();
-        assertThat(assessment.repositoryMatched()).isNull();
-        assertThat(assessment.branchMatched()).isNull();
-        assertThat(assessment.personMatched()).isTrue();
-        assertThat(service.admits(workspace, "owner/repo", "main", new ReviewSubject(7L, true)))
-                .isFalse();
+    void wildcardPatternsAreNormalizedBeforePersistence() {
+        var monitor = new RepositoryToMonitor();
+        monitor.setId(8L);
+        monitor.setNameWithOwner("owner/repo");
+        when(indexed.repositories(1)).thenReturn(Map.of(2L, new MonitoredRepositoryRef(2, 8, "owner/repo")));
+        when(monitors.findByWorkspaceId(1L)).thenReturn(List.of(monitor));
+        service.patchGeneratedPaths(workspace, Map.of("2", List.of("dist/**", "dist/**")));
+        assertThat(monitor.getGeneratedPaths()).containsExactly("dist/**");
     }
 
     @Test
-    void previewDistinguishesWideningFromNarrowingAcrossBothAxes() {
-        workspace.getReviewSettings().applyRollout(ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, null);
-        when(monitors.findByWorkspaceId(1L))
-                .thenReturn(List.of(monitor(11L, "owner/first"), monitor(12L, "owner/second")));
-        when(membershipService.practiceReviewEligibleUserIds(1L)).thenReturn(Set.of(7L, 8L));
-        when(repositoryTargets.findByWorkspaceId(1L))
-                .thenReturn(List.of(new PracticeReviewRepositoryTarget(1L, 11L, List.of("main"))));
-        when(people.findByWorkspaceId(1L)).thenReturn(List.of(new PracticeReviewPersonTarget(1L, 7L)));
-
-        var addRepository = scope(
-                List.of(
-                        new ReviewRepositoryTarget("owner/first", List.of("main")),
-                        new ReviewRepositoryTarget("owner/second", List.of())),
-                List.of(7L));
-        var addBranch =
-                scope(List.of(new ReviewRepositoryTarget("owner/first", List.of("main", "develop"))), List.of(7L));
-        var addPerson = scope(List.of(new ReviewRepositoryTarget("owner/first", List.of("main"))), List.of(7L, 8L));
-        var narrow = scope(List.of(), List.of());
-
-        assertThat(service.preview(workspace, addRepository, 12).widens()).isTrue();
-        assertThat(service.preview(workspace, addBranch, 12).widens()).isTrue();
-        assertThat(service.preview(workspace, addPerson, 12).widens()).isTrue();
-        var narrowed = service.preview(workspace, narrow, 12);
-        assertThat(narrowed.widens()).isFalse();
-        assertThat(narrowed.proposed().coveredRepositories()).isZero();
-        assertThat(narrowed.proposed().coveredPeople()).isZero();
+    void equalProviderRepositoryNamesRemainDifferentNativeSelections() {
+        when(indexed.repositories(1))
+                .thenReturn(Map.of(
+                        2L,
+                        new MonitoredRepositoryRef(2, 8, "owner/repo"),
+                        3L,
+                        new MonitoredRepositoryRef(3, 9, "owner/repo")));
+        var selection = service.fromWire(
+                1,
+                new WorkspaceReviewScopeDTO(
+                        ReviewScopeMode.SELECTED,
+                        ReviewScopeMode.ALL,
+                        List.of(new ReviewScopeRepositoryDTO("3", List.of("main"))),
+                        List.of()));
+        assertThat(selection.repositories()).containsExactly(new ReviewRepositoryTarget(3, List.of("main")));
+        assertThat(selection.admitsRepository(3L, "main", true)).isTrue();
+        assertThat(selection.admitsRepository(2L, "main", true)).isFalse();
     }
 
-    private static WorkspaceReviewScope scope(List<ReviewRepositoryTarget> repositories, List<Long> people) {
-        return new WorkspaceReviewScope(ReviewRepositoryMode.SELECTED, ReviewPersonMode.SELECTED, repositories, people);
-    }
-
-    private static RepositoryToMonitor monitor(long id, String name) {
-        RepositoryToMonitor monitor = new RepositoryToMonitor();
-        monitor.setId(id);
-        monitor.setNameWithOwner(name);
-        return monitor;
+    @Test
+    void anOverflowingScopeIdIsInvalidInput() {
+        assertThatThrownBy(() -> service.fromWire(
+                        1,
+                        new WorkspaceReviewScopeDTO(
+                                ReviewScopeMode.SELECTED,
+                                ReviewScopeMode.ALL,
+                                List.of(new ReviewScopeRepositoryDTO("999999999999999999999999", List.of())),
+                                List.of())))
+                .isInstanceOf(InvalidReviewScopeException.class);
     }
 }

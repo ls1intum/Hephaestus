@@ -1,142 +1,91 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
-import de.tum.cit.aet.hephaestus.practices.ReviewClaimCurrentness;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.result.dto.ObservationDTO;
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeResultCoverageDTO;
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeResultEvidenceDTO;
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeResultExampleDTO;
-import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeResultProvenanceDTO;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewedWorkRefDTO;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackDisagreementDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.dto.ReviewBoundFeedbackDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ProblemDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ResultEvidenceDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.ResultExampleDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
+import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewDeveloperDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.Currentness;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "A result with evidence and linked feedback")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record ReviewResultDetailDTO(
-        @NonNull UUID id,
-        @NonNull UUID agentJobId,
-        @NonNull String practiceSlug,
-        @NonNull String practiceName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID id,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) UUID reviewId,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ItemRefDTO item,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String practiceSlug,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) String practiceName,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ResultOutcome outcome,
 
-        @Schema(description = "Practice group; null when the practice is Unassigned") @Nullable
-        ReviewPracticeGroupDTO group,
-
-        @Schema(description = "Criteria revision selected as of job start, when available") @Nullable
-        Long practiceRevisionId,
-
-        @NonNull ReviewedWorkRefDTO reviewedWork,
-
-        @Schema(description = "Whose work the result is about; null when the identity is no longer resolvable")
-        @Nullable
-        ReviewSubjectDTO subject,
-
-        @Schema(description = "Result text; absent when source access cannot be verified") @Nullable
-        String summary,
-
-        @NonNull @Schema(description = "Result of the practice review")
-        Outcome outcome,
-
-        @Schema(description = "Severity band (null unless outcome is NOT_MET)") @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
         Severity severity,
 
-        @NonNull
-        @Schema(
-                description =
-                        "How the review that recorded it came about: LIVE from the work itself, MANUAL requested by a"
-                                + " person, BACKFILL over work that predates the connection. A recurring sweep records"
-                                + " LIVE.")
-        ResultOrigin origin,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String summary,
 
-        @Schema(
-                description = "Whether access to the result's evidence is withheld",
-                requiredMode = Schema.RequiredMode.REQUIRED)
-        boolean evidenceHidden,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) ReviewOrigin origin,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Instant recordedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) Currentness currentness,
 
-        @Nullable PracticeResultEvidenceDTO evidence,
-        @Nullable String evidenceRationale,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant markedIncorrectAt,
 
-        @NonNull
-        @Schema(description = "The located problems of a NOT_MET result, in display order; empty for any other outcome")
-        List<ObservationDTO> observations,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant acceptedAt,
 
-        @Schema(description = "One place of the work that shows the practice done well; null when none") @Nullable
-        PracticeResultExampleDTO example,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, type = "string", pattern = "^[1-9][0-9]*$") @Nullable
+        String practiceVersionId,
 
-        @Schema(description = "How much of its scope the review read; null for a result recorded before coverage")
-        @Nullable
-        PracticeResultCoverageDTO coverage,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Integer practiceVersionNumber,
 
-        @Schema(description = "Where the result came from: job, attempt, revision and program; null before it was kept")
-        @Nullable
-        PracticeResultProvenanceDTO provenance,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String itemVersion,
 
-        @NonNull ReviewClaimCurrentness claimCurrentness,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        String explanation,
 
-        @Schema(description = "When a later review of the same work superseded this result; null while current")
-        @Nullable
-        Instant supersededAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultEvidenceDTO evidence,
 
-        @NonNull
-        @Schema(
-                description = "Every correction by a workspace admin, newest first; the first is in force while it "
-                        + "has no restoration")
-        List<PracticeResultInvalidationDTO> invalidations,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ProblemDTO> problems,
 
-        @NonNull
-        @Schema(
-                description = "The developer's standing disputes of feedback written from this result, newest"
-                        + " first; empty when nothing about it is disputed")
-        List<FeedbackDisputeDTO> disputes,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultExampleDTO example,
 
-        @NonNull Instant observedAt,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultCoverage coverage,
 
-        @NonNull @Schema(description = "Linked feedback, newest first")
-        List<ReviewBoundFeedbackDTO> feedback) {
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        Instant endedAt,
 
-    public static ReviewResultDetailDTO from(
-            PracticeResult practiceResult,
-            ReviewedWorkRefDTO reviewedWork,
-            @Nullable ReviewSubjectDTO subject,
-            List<ReviewBoundFeedbackDTO> feedback,
-            List<PracticeResultInvalidationDTO> invalidations,
-            List<FeedbackDisputeDTO> disputes,
-            boolean includeEvidence,
-            List<Observation> problems) {
-        var practice = practiceResult.getPractice();
-        var revision = practiceResult.getPracticeRevision();
-        return new ReviewResultDetailDTO(
-                practiceResult.getId(),
-                practiceResult.getAgentJobId(),
-                practice.getSlug(),
-                practice.getName(),
-                practice.getGroup() == null ? null : ReviewPracticeGroupDTO.from(practice.getGroup()),
-                revision == null ? null : revision.getId(),
-                reviewedWork,
-                subject,
-                includeEvidence ? practiceResult.getSummary() : null,
-                practiceResult.getOutcome(),
-                practiceResult.getSeverity(),
-                practiceResult.getOrigin(),
-                !includeEvidence,
-                includeEvidence ? PracticeResultEvidenceDTO.from(practiceResult.getEvidence(), problems) : null,
-                includeEvidence ? practiceResult.getEvidenceRationale() : null,
-                includeEvidence ? problems.stream().map(ObservationDTO::from).toList() : List.of(),
-                includeEvidence ? PracticeResultExampleDTO.from(practiceResult.getExample()) : null,
-                includeEvidence ? PracticeResultCoverageDTO.from(practiceResult.getCoverage()) : null,
-                PracticeResultProvenanceDTO.from(practiceResult.getProvenance()),
-                ReviewClaimCurrentness.of(revision, practice, practiceResult.getSupersededAt()),
-                practiceResult.getSupersededAt(),
-                invalidations,
-                disputes,
-                practiceResult.getObservedAt(),
-                feedback);
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ResultEndReason endReason,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) @Nullable
+        ReviewDeveloperDTO developer,
+
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) int evidenceVersion,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean evidenceHidden,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ResultMarkDTO> marks,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<FeedbackDisagreementDTO> disagreements,
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED) List<ReviewBoundFeedbackDTO> feedback) {
+    public ReviewResultDetailDTO {
+        problems = List.copyOf(problems);
+        marks = List.copyOf(marks);
+        disagreements = List.copyOf(disagreements);
+        feedback = List.copyOf(feedback);
     }
 }

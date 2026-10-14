@@ -163,8 +163,10 @@ class LlmModelServiceTest extends BaseUnitTest {
                 value = {
                     "PRICED, 3.00, NULL, NULL, an input rate and an output rate, a price missing its output rate",
                     "PRICED, -1.00, 2.00, NULL, zero or greater, a negative rate",
-                    "PRICED, 0, 0, NULL, choose No metered API cost, an all-zero price that would bill as verified $0 forever",
-                    "NO_CHARGE, NULL, NULL, NULL, Explain why this model has no metered API cost, a model with no metered API cost and no explanation",
+                    "PRICED, 0, 0, NULL, choose No metered API cost, an all-zero price that would bill as verified $0"
+                            + " forever",
+                    "NO_CHARGE, NULL, NULL, NULL, Explain why this model has no metered API cost, a model with no"
+                            + " metered API cost and no explanation",
                     "UNPRICED, 1.00, NULL, NULL, Clear the rates, rates carried by a model with no price",
                 })
         void updatePriceRejectsAnInvalidRateCombination(

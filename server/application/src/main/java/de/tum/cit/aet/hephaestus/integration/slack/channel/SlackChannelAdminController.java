@@ -71,9 +71,7 @@ public class SlackChannelAdminController {
     @Operation(
             operationId = "registerSlackChannel",
             summary = "Allow-list a Slack channel (lands in PENDING; idempotent on the natural key)")
-    @AuditExempt(
-            reason =
-                    "channel consent state lives on slack_monitored_channel and its history is not recorded anywhere yet")
+    @AuditExempt(reason = "Channel consent transitions are recorded in the dedicated Slack consent audit")
     public ResponseEntity<SlackMonitoredChannelDTO> registerSlackChannel(
             WorkspaceContext workspace, @Valid @RequestBody RegisterSlackChannelRequestDTO request) {
         RegistrationOutcome outcome =
@@ -86,9 +84,7 @@ public class SlackChannelAdminController {
     @Operation(
             operationId = "updateSlackChannelConsent",
             summary = "Transition a Slack channel to a target consent state (activate / pause / resume / revoke)")
-    @AuditExempt(
-            reason =
-                    "channel consent state lives on slack_monitored_channel and its history is not recorded anywhere yet")
+    @AuditExempt(reason = "Channel consent transitions are recorded in the dedicated Slack consent audit")
     public ResponseEntity<SlackMonitoredChannelDTO> updateSlackChannelConsent(
             WorkspaceContext workspace,
             @PathVariable String slackChannelId,

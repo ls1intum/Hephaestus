@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -16,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
+@ConditionalOnServerRole
 @WorkspaceScopedController
 @PreAuthorize("@workspaceSecure.isMember()")
 @RequestMapping("/practices/standings")

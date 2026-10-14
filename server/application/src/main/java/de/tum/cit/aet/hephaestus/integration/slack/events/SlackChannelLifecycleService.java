@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.events;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentService;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -20,6 +21,7 @@ import tools.jackson.databind.JsonNode;
  * the NATS consumer.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackChannelLifecycleService {
 

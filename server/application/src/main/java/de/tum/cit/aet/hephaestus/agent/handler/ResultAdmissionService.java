@@ -1,673 +1,393 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationEligibility;
-import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalDeliveryListener;
-import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportContext;
-import de.tum.cit.aet.hephaestus.agent.handler.inapp.InAppSupportReader;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedResults;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ResultsRefusedException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasis;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewCompositionBasisRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionResponseDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedProblemDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmittedResultDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackResponseDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.ProjectedCitationDTO;
+import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticePreconditionClause;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.result.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
-import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
+import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.JsonNodeFactory;
-import tools.jackson.databind.node.NullNode;
+import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+/** Admission is fenced by workspace, review, job, worker and exact execution attempt. */
 @Service
+@ConditionalOnCaptureRole
 public class ResultAdmissionService {
-
-    private static final Logger log = LoggerFactory.getLogger(ResultAdmissionService.class);
-
-    /** The response key of the IN_APP support read after admission; see {@link InAppSupportContext}. */
-    public static final String IN_APP_SUPPORT_KEY = "inAppSupport";
-
-    /** The response key of the IN_CHAT routing read after admission; see {@link ConversationEligibility}. */
-    public static final String IN_CHAT_ELIGIBILITY_KEY = "inChatEligibility";
-
-    /** The version of the admission wire, request and reply; a body of another version is malformed. */
-    public static final int SCHEMA_VERSION = 2;
-
-    public static final String DIGEST_METADATA_KEY = "observation_admission_digest";
-
-    /** The attempt whose citations the admission verified; a later attempt of the same job only composes. */
-    public static final String ATTEMPT_METADATA_KEY = "observation_admission_attempt";
-
-    public static final String REFUSAL_METADATA_KEY = "observation_admission_refusal";
-
     public static final String INADMISSIBLE_REASON_CODE = "inadmissible_results";
-
-    /** Why an admitted job that lost its run is failed instead of measured again. */
     public static final String INTERRUPTED_AFTER_ADMISSION =
-            "The review was interrupted after its results were admitted. Only a review on the work accepted before the"
-                    + " interruption was saved. The results are kept.";
-
-    static boolean practiceResultsWereRefused(AgentJob job) {
-        return job.getMetadata() != null
-                && !job.getMetadata()
-                        .path(REFUSAL_METADATA_KEY)
-                        .path("reasonCode")
-                        .asString()
-                        .isBlank();
-    }
-
-    static void requireMatchingCompositionDigest(AgentJob job) {
-        String admitted = job.getMetadata() == null
-                ? ""
-                : job.getMetadata().path(DIGEST_METADATA_KEY).asString();
-        String composed = job.getOutput() == null
-                ? ""
-                : job.getOutput().path("feedback").path("admissionDigest").asString();
-        if (admitted.isBlank() || !admitted.equals(composed)) {
-            throw new JobDeliveryException("Feedback was not composed from this job's admitted results");
-        }
-    }
-
-    private final AgentJobRepository jobs;
-    private final PracticeResultRepository practiceResults;
-    private final ObservationRepository observations;
-    private final JobTypeHandlerRegistry handlers;
-    private final JsonMapper mapper;
+            "The review stopped after its results were admitted. The recorded results are kept.";
+    private final ReviewJobRepository jobs;
+    private final ReviewOutputService output;
+    private final AdmittedResultQuery proof;
+    private final ReviewJobAssignments assignments;
+    private final PublicReviewEligibility publicEligibility;
+    private final JobEvidenceFiles files;
+    private final FeedbackStore feedback;
+    private final ReviewHistoryContentSource history;
+    private final ObjectMapper mapper;
     private final TransactionTemplate transactions;
-    private final JobEvidenceFiles evidenceFiles;
-    private final PublicReviewEligibility publicReviewEligibility;
-    private final ReviewHistoryContentSource reviewHistory;
-    private final ObjectProvider<InAppSupportReader> inAppSupportReader;
-    private final ConversationalDeliveryListener conversationLane;
-    private final PullRequestRepository pullRequests;
-    private final ReviewCompositionBasisRepository basisRepository;
-
-    /** Retries join in-flight verification rather than launching duplicate Git operations. */
-    private final ConcurrentHashMap<AdmissionIdentity, Flight> flights = new ConcurrentHashMap<>();
-
-    private record Flight(String digest, CompletableFuture<ObjectNode> outcome) {}
+    private final ReviewCompositionBasisRepository bases;
+    private final FeedbackCompositionContextReader composition;
 
     public ResultAdmissionService(
-            AgentJobRepository jobs,
-            PracticeResultRepository practiceResults,
-            ObservationRepository observations,
-            JobTypeHandlerRegistry handlers,
-            JsonMapper mapper,
-            PlatformTransactionManager transactionManager,
-            JobEvidenceFiles evidenceFiles,
-            PublicReviewEligibility publicReviewEligibility,
-            ReviewHistoryContentSource reviewHistory,
-            ObjectProvider<InAppSupportReader> inAppSupportReader,
-            ConversationalDeliveryListener conversationLane,
-            PullRequestRepository pullRequests,
-            ReviewCompositionBasisRepository basisRepository) {
-        this.conversationLane = conversationLane;
-        this.pullRequests = pullRequests;
-        this.basisRepository = basisRepository;
+            ReviewJobRepository jobs,
+            ReviewOutputService output,
+            AdmittedResultQuery proof,
+            ReviewJobAssignments assignments,
+            PublicReviewEligibility publicEligibility,
+            JobEvidenceFiles files,
+            FeedbackStore feedback,
+            ReviewHistoryContentSource history,
+            ObjectMapper mapper,
+            PlatformTransactionManager manager,
+            ReviewCompositionBasisRepository bases,
+            FeedbackCompositionContextReader composition) {
         this.jobs = jobs;
-        this.practiceResults = practiceResults;
-        this.observations = observations;
-        this.handlers = handlers;
+        this.output = output;
+        this.proof = proof;
+        this.assignments = assignments;
+        this.publicEligibility = publicEligibility;
+        this.files = files;
+        this.feedback = feedback;
+        this.history = history;
         this.mapper = mapper;
-        this.transactions = new TransactionTemplate(transactionManager);
-        this.evidenceFiles = evidenceFiles;
-        this.publicReviewEligibility = publicReviewEligibility;
-        this.reviewHistory = reviewHistory;
-        this.inAppSupportReader = inAppSupportReader;
+        this.transactions = new TransactionTemplate(manager);
+        this.bases = bases;
+        this.composition = composition;
     }
 
-    /**
-     * Admits one attempt's results, {@code {schemaVersion: 2, results: [{practiceSlug, candidate}]}}, whose envelope the
-     * controller checked. The digest is over the whole request, so a retry with the same body joins or replays this
-     * admission and any other body conflicts. Records refusals on the job before rethrowing them.
-     */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public ObjectNode admit(AdmissionIdentity identity, JsonNode submitted) {
-        String digest = ProvenanceDigest.sha256Hex(serializedPayload(submitted));
-        Flight mine = new Flight(digest, new CompletableFuture<>());
-        Flight running = flights.putIfAbsent(identity, mine);
-        if (running != null) {
-            if (!running.digest().equals(digest)) throw new AdmissionConflictException();
-            return join(running);
-        }
-        try {
-            ObjectNode admitted = admitOnce(identity, submitted, digest);
-            evidenceFiles.discardAdmittedAttempt(identity);
-            // Read once the admission has committed, so a failed read cannot undo it. A joined request shares
-            // this dated read; a later retry of the same submission reads again.
-            admitted.set(IN_APP_SUPPORT_KEY, mapper.valueToTree(inAppSupport(identity)));
-            admitted.set(IN_CHAT_ELIGIBILITY_KEY, mapper.valueToTree(inChatEligibility(identity)));
-            mine.outcome().complete(admitted);
-            return admitted;
-        } catch (RuntimeException exception) {
-            mine.outcome().completeExceptionally(exception);
-            throw exception;
-        } finally {
-            flights.remove(identity, mine);
-        }
-    }
-
-    /**
-     * The IN_APP support of the admitted run, for its owning attempt. A lost attempt stays a lost attempt; any other
-     * failure leaves the support unavailable and the admission as committed.
-     */
-    private InAppSupportContext inAppSupport(AdmissionIdentity identity) {
-        try {
-            return evidenceFiles.indexLateRead(
-                    identity,
-                    () -> Objects.requireNonNull(transactions.execute(status -> {
-                        AgentJob job = ownedJob(identity);
-                        InAppSupportReader reader = inAppSupportReader.getIfAvailable();
-                        return reader == null
-                                ? InAppSupportContext.unavailable(Instant.now())
-                                : reader.snapshot(
-                                        job,
-                                        practiceResults.findByAgentJobId(identity.jobId(), identity.workspaceId()));
-                    })),
-                    support -> new JobEvidenceFiles.LateCopies(
-                            support.practices().stream()
-                                    .flatMap(practice -> practice.occurrences().stream())
-                                    .map(InAppSupportContext.Occurrence::practiceResultId)
-                                    .collect(Collectors.toSet()),
-                            Set.of()));
-        } catch (StaleAttemptException lost) {
-            throw lost;
-        } catch (RuntimeException e) {
-            log.warn(
-                    "IN_APP support could not be read after admission: jobId={}, error={}",
-                    identity.jobId(),
-                    e.getClass().getSimpleName());
-            return InAppSupportContext.unavailable(Instant.now());
-        }
-    }
-
-    /**
-     * The IN_CHAT routing of the admitted run, for its owning attempt. It copies nothing from other reviews, so it is
-     * not indexed. A lost attempt stays a lost attempt; any other failure leaves the routing unavailable.
-     */
-    private ConversationEligibility inChatEligibility(AdmissionIdentity identity) {
-        try {
-            return Objects.requireNonNull(transactions.execute(status -> conversationLane.eligibility(
-                    ownedJob(identity), practiceResults.findByAgentJobId(identity.jobId(), identity.workspaceId()))));
-        } catch (StaleAttemptException lost) {
-            throw lost;
-        } catch (RuntimeException e) {
-            log.warn(
-                    "IN_CHAT routing could not be read after admission: jobId={}, error={}",
-                    identity.jobId(),
-                    e.getClass().getSimpleName());
-            return ConversationEligibility.unavailable(Instant.now());
-        }
-    }
-
-    /** A joined retry answers with the first attempt's own exception, not the join's wrapper. */
-    @SuppressWarnings("PMD.PreserveStackTrace")
-    private static ObjectNode join(Flight running) {
-        try {
-            return running.outcome().join();
-        } catch (CompletionException exception) {
-            if (exception.getCause() instanceof RuntimeException cause) throw cause;
-            throw exception;
-        }
-    }
-
-    /**
-     * The work a pull request review was admitted for, exactly as its job recorded it: the pull request row it locks
-     * and the repository and number that row was for. Only the key of a job that names a positive id; it locks a row,
-     * it authorizes nothing.
-     */
-    record ReviewedTarget(
-            long workspaceId,
-            AgentJobType jobType,
-            @Nullable ArtifactKind artifactKind,
-            @Nullable IntegrationKind integrationKind,
-            long pullRequestId,
-            @Nullable JsonNode repositoryId,
-            @Nullable JsonNode repositoryFullName,
-            @Nullable JsonNode pullRequestNumber) {
-
-        static @Nullable ReviewedTarget of(AgentJob job) {
-            JsonNode metadata = job.getMetadata();
-            if (metadata == null || job.getJobType() != AgentJobType.PULL_REQUEST_REVIEW) {
-                return null;
-            }
-            JsonNode id = metadata.get("pull_request_id");
-            if (id == null || !id.isIntegralNumber() || !id.canConvertToLong() || id.asLong() <= 0) {
-                return null;
-            }
-            return new ReviewedTarget(
-                    job.getWorkspace().getId(),
-                    job.getJobType(),
-                    job.getArtifactKind(),
-                    job.getIntegrationKind(),
-                    id.asLong(),
-                    metadata.get("repository_id"),
-                    metadata.get("repository_full_name"),
-                    metadata.get("pr_number"));
-        }
-    }
-
-    private ObjectNode admitOnce(AdmissionIdentity identity, JsonNode submitted, String digest) {
-        AgentJob candidate = Objects.requireNonNull(transactions.execute(status -> ownedJob(identity)));
-        // An attempt that continues an admitted review only composes: it admits nothing, not even a replay.
+    public AdmissionResponseDTO admit(AdmissionIdentity identity, AdmissionRequestDTO request) {
+        String digest = ProvenanceDigest.sha256Hex(mapper.writeValueAsBytes(request));
+        ReviewJob candidate = Objects.requireNonNull(transactions.execute(status -> ownedJob(identity)));
+        requireIdentity(candidate, request.reviewId(), request.jobId(), request.attempt());
         if (isContinuation(candidate)) throw new StaleAttemptException();
-        String existing = admissionDigest(candidate);
-        if (!existing.isBlank()) {
-            return Objects.requireNonNull(transactions.execute(status -> {
-                AgentJob job = ownedJob(identity);
-                if (!digest.equals(admissionDigest(job))) throw new AdmissionConflictException();
-                return response(
-                        job, digest, practiceResults.findByAgentJobId(identity.jobId(), identity.workspaceId()));
-            }));
-        }
-        ReviewedTarget target = ReviewedTarget.of(candidate);
-        PreparedResults prepared;
-        try {
-            prepared = handlers.getHandler(candidate.getJobType()).prepareResults(candidate, submitted.path("results"));
-        } catch (ResultsRefusedException refusal) {
-            recordRefusal(identity, refusal.reasonCode(), refusal.reason(), refusal.verificationFailures());
-            throw refusal;
-        } catch (JobDeliveryException inadmissible) {
-            recordRefusal(
-                    identity,
-                    INADMISSIBLE_REASON_CODE,
-                    String.valueOf(inadmissible.getMessage()),
-                    JsonNodeFactory.instance.arrayNode());
-            throw inadmissible;
-        }
-        // Read from the attempt's own folder before any lock is taken, and kept only with the admission it belongs to.
-        ReviewCompositionBasis basis = originalBasis(identity, digest);
-        try {
-            return Objects.requireNonNull(transactions.execute(status -> {
-                // Copy admission first, as erasure orders it before work and job locks. The inputs read before it are
-                // kept only while their receipt still vouches for them; an erasure after waits, then finds this job.
-                boolean keep = basis != null && evidenceFiles.holdVouchingReceipt(identity, basis.getCopyId());
-                // The work before the job, as every writer that orders against this admission takes them: a
-                // reservation of public feedback, a mirror write, and the coalescer reading the latest running review.
-                // The job is not held while waiting, so the key is the prepared candidate's, checked once it is.
-                if (target != null) pullRequests.lockById(target.pullRequestId());
-                AgentJob job = ownedJob(identity);
-                if (!Objects.equals(target, ReviewedTarget.of(job))) throw new StaleAttemptException();
-                String admitted = admissionDigest(job);
-                if (!admitted.isBlank()) {
-                    if (!digest.equals(admitted)) throw new AdmissionConflictException();
-                } else {
-                    prepared.record(job);
-                    ObjectNode metadata = job.getMetadata() instanceof ObjectNode object
-                            ? object.deepCopy()
-                            : mapper.createObjectNode();
-                    metadata.remove(REFUSAL_METADATA_KEY);
-                    metadata.put(DIGEST_METADATA_KEY, digest);
-                    metadata.put(ATTEMPT_METADATA_KEY, identity.attempt());
-                    job.setMetadata(metadata);
-                    jobs.save(job);
-                    if (keep) {
-                        basisRepository.save(Objects.requireNonNull(basis));
-                    }
-                    jobs.discardRetiredArtifactInventory(
-                            job.getId(), identity.workspaceId(), identity.attempt(), identity.workerId());
-                }
-                return response(
-                        job, digest, practiceResults.findByAgentJobId(identity.jobId(), identity.workspaceId()));
-            }));
-        } catch (ResultsRefusedException refusal) {
-            // The publish transaction rolled back before this separate refusal write.
-            recordRefusal(identity, refusal.reasonCode(), refusal.reason(), refusal.verificationFailures());
-            throw refusal;
-        } catch (JobDeliveryException inadmissible) {
-            recordRefusal(
-                    identity,
-                    INADMISSIBLE_REASON_CODE,
-                    String.valueOf(inadmissible.getMessage()),
-                    JsonNodeFactory.instance.arrayNode());
-            throw inadmissible;
-        }
-    }
-
-    /**
-     * A separately dated communication read: it cannot roll back or replace the admitted assessment. Its rows come
-     * from other reviews, so they are indexed in this attempt's receipt before the sandbox receives them.
-     */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public ObjectNode publicFeedbackHistory(AdmissionIdentity identity) {
-        try {
-            return evidenceFiles.indexLateRead(
-                    identity, () -> readPublicFeedbackHistory(identity), ResultAdmissionService::publicHistoryCopies);
-        } catch (EvidenceFolderPersonDataCatalog.CopyUnavailableException refused) {
-            throw new PublicHistoryRefusedException("Review history copy authority is unavailable", refused);
-        }
-    }
-
-    /** The rows a public history read copies into the job's evidence: its feedback and the results they rest on. */
-    static JobEvidenceFiles.LateCopies publicHistoryCopies(ObjectNode read) {
-        Set<UUID> feedback = new HashSet<>();
-        Set<UUID> basedOn = new HashSet<>();
-        read.path("history").path("feedback").forEach(row -> {
-            if (!row.path("body").isString()) return;
-            feedback.add(UUID.fromString(row.path("id").asString()));
-            row.path("basedOn")
-                    .forEach(support -> basedOn.add(
-                            UUID.fromString(support.path("practiceResultId").asString())));
-        });
-        return new JobEvidenceFiles.LateCopies(basedOn, feedback);
-    }
-
-    private ObjectNode readPublicFeedbackHistory(AdmissionIdentity identity) {
-        return Objects.requireNonNull(transactions.execute(status -> {
-            AgentJob job = ownedJob(identity);
-            if (admissionDigest(job).isBlank()) {
-                throw new PublicHistoryRefusedException("This review's results have not been admitted");
+        PreparedResults prepared = isAdmitted(candidate) ? null : output.prepare(candidate, request);
+        ReviewJob recorded = Objects.requireNonNull(transactions.execute(status -> {
+            ReviewJob owned = ownedJob(identity);
+            requireIdentity(owned, request.reviewId(), request.jobId(), request.attempt());
+            if (isAdmitted(owned)) {
+                if (!digest.equals(owned.getAdmissionDigest())) throw new AdmissionConflictException();
+            } else {
+                Objects.requireNonNull(prepared).record(owned);
+                owned.setAdmissionDigest(digest);
+                owned.setAdmissionAttempt(identity.attempt());
+                jobs.saveAndFlush(owned);
+                retainCompositionInputs(identity, owned, digest);
             }
-            List<PracticeResult> admitted = practiceResults.findByAgentJobId(identity.jobId(), identity.workspaceId());
-            Set<UUID> publicIds = publicReviewEligibility.publicResultIds(job, admitted);
-            PracticeResult speaksToAuthor = admitted.stream()
-                    .filter(practiceResult -> publicIds.contains(practiceResult.getId()))
-                    .findFirst()
-                    .orElseThrow(() ->
-                            new PublicHistoryRefusedException("No admitted result may be spoken about on this work"));
-            ObjectNode history = reviewHistory.publicSameWorkFeedback(
-                    identity.workspaceId(),
-                    speaksToAuthor.getAboutUserId(),
-                    speaksToAuthor.getArtifactKind(),
-                    speaksToAuthor.getArtifactId());
-            ObjectNode root = mapper.createObjectNode();
-            root.put("schemaVersion", 1);
-            root.put("readAt", Instant.now().toString());
-            root.set("history", history);
-            return root;
+            return owned;
+        }));
+        return admittedResponse(recorded);
+    }
+
+    private void retainCompositionInputs(AdmissionIdentity identity, ReviewJob job, String digest) {
+        if (assignments.review(job).kind() != ReviewKind.ITEM) return;
+        var copy = files.completeReceipt(identity).orElse(null);
+        if (copy == null || !files.holdVouchingReceipt(identity, copy)) return;
+        var original = files.originalPublicInputs(identity).orElse(null);
+        if (original == null) return;
+        var basis = new ReviewCompositionBasis();
+        basis.setJobId(job.getId());
+        basis.setWorkspaceId(job.getWorkspaceId());
+        basis.setAdmissionAttempt(job.getAttempt());
+        basis.setAdmissionDigest(digest);
+        basis.setBasisVersion(ReviewCompositionBasis.VERSION);
+        basis.setBasisDigest(ReviewCompositionBasis.digest(original));
+        basis.setCopyId(copy);
+        basis.setExpiresAt(Instant.now().plus(ReviewCompositionBasis.RETENTION));
+        var payload = mapper.createObjectNode();
+        var staged = payload.putObject("files");
+        original.forEach((path, bytes) -> staged.put(path, Base64.getEncoder().encodeToString(bytes)));
+        basis.setPayload(payload);
+        bases.save(basis);
+    }
+
+    public AdmissionResponseDTO admittedResponse(ReviewJob job) {
+        return response(job, false);
+    }
+
+    /** Builds a writer input while the original proof and this capture's privacy fence are held. */
+    public AdmissionResponseDTO capturedAdmissionResponse(ReviewJob job) {
+        return response(job, true);
+    }
+
+    private AdmissionResponseDTO response(ReviewJob job, boolean duringCapture) {
+        if (!isAdmitted(job)) throw new AdmissionConflictException();
+        var admitted = proof.forAttempt(job.getWorkspaceId(), job.getReviewId(), job.getId(), citationAttempt(job));
+        var pinned = assignments.load(job).stream()
+                .collect(Collectors.toMap(a -> a.practice().practiceId(), Function.identity()));
+        Set<UUID> eligible = publicEligibility.publicResultIds(job, admitted);
+        var results = admitted.stream()
+                .map(row -> {
+                    var candidate = row.candidate();
+                    var assignment = Objects.requireNonNull(pinned.get(candidate.practiceId()));
+                    boolean summaryOnly = !assignment.practice().definition().lineNotes();
+                    boolean publicEligible = eligible.contains(row.id());
+                    var problems = row.problems().stream()
+                            .map(problem -> {
+                                var child = problem.candidate();
+                                return new AdmittedProblemDTO(
+                                        problem.id(),
+                                        child.severity(),
+                                        child.summary(),
+                                        row.id(),
+                                        child.position(),
+                                        child.key(),
+                                        child.explanation(),
+                                        projected(child.citations(), !summaryOnly),
+                                        child.basis(),
+                                        child.nextStep(),
+                                        publicEligible);
+                            })
+                            .toList();
+                    ObjectNode evidence = (ObjectNode) mapper.valueToTree(candidate.evidence());
+                    if (candidate.evidence().search() == null) evidence.putNull("search");
+                    if (candidate.evidence().inapplicability() == null) evidence.putNull("inapplicability");
+                    explicitCitationNulls(evidence);
+                    JsonNode example = candidate.example() == null ? null : mapper.valueToTree(candidate.example());
+                    if (example != null) explicitCitationNulls(example);
+                    return new AdmittedResultDTO(
+                            assignment.practiceSlug(),
+                            Long.toString(candidate.itemId()),
+                            row.id(),
+                            candidate.outcome(),
+                            candidate.summary(),
+                            candidate.explanation(),
+                            evidence,
+                            example,
+                            candidate.coverage(),
+                            problems,
+                            summaryOnly,
+                            publicEligible);
+                })
+                .toList();
+        var withheld = new ArrayList<AdmissionResponseDTO.Withheld>();
+        JsonNode capture = job.getCapture();
+        if (capture != null)
+            for (var entry : capture.path("withheld")) {
+                withheld.add(new AdmissionResponseDTO.Withheld(
+                        entry.path("practiceSlug").asString(),
+                        entry.path("itemId").asString(),
+                        entry.path("reason").asString()));
+            }
+        FeedbackCompositionContextReader.Read privateRead = null;
+        if (assignments.review(job).kind() == ReviewKind.ITEM && !admitted.isEmpty()) {
+            if (duringCapture) privateRead = composition.readForCapture(job, admitted);
+            else {
+                var identity = new AdmissionIdentity(
+                        job.getId(), job.getWorkspaceId(), job.getAttempt(), Objects.requireNonNull(job.getWorkerId()));
+                privateRead = files.indexLateRead(
+                        identity,
+                        () -> Objects.requireNonNull(transactions.execute(status -> {
+                            ownedJob(identity);
+                            return composition.read(job, admitted);
+                        })),
+                        read -> new JobEvidenceFiles.LateCopies(read.copies()));
+            }
+        }
+        return new AdmissionResponseDTO(
+                3,
+                job.getReviewId(),
+                job.getId(),
+                citationAttempt(job),
+                Objects.requireNonNull(job.getAdmissionDigest()),
+                results,
+                withheld,
+                privateRead == null ? null : FeedbackCompositionContextReader.page(privateRead),
+                privateRead == null ? null : FeedbackCompositionContextReader.conversation(privateRead));
+    }
+
+    public PrepareFeedbackResponseDTO prepareFeedback(AdmissionIdentity identity, PrepareFeedbackRequestDTO request) {
+        var context = files.indexLateRead(
+                identity,
+                () -> Objects.requireNonNull(transactions.execute(status -> {
+                    var owned = ownedJob(identity);
+                    requireIdentity(owned, request.reviewId(), request.jobId(), request.attempt());
+                    if (!isAdmitted(owned) || assignments.review(owned).kind() != ReviewKind.ITEM)
+                        throw new AdmissionConflictException();
+                    return composition.read(
+                            owned,
+                            proof.forAttempt(
+                                    owned.getWorkspaceId(),
+                                    owned.getReviewId(),
+                                    owned.getId(),
+                                    citationAttempt(owned)));
+                })),
+                read -> new JobEvidenceFiles.LateCopies(read.copies()));
+        return Objects.requireNonNull(transactions.execute(status -> {
+            ReviewJob job = ownedJob(identity);
+            requireIdentity(job, request.reviewId(), request.jobId(), request.attempt());
+            if (!isAdmitted(job) || assignments.review(job).kind() != ReviewKind.ITEM)
+                throw new AdmissionConflictException();
+            var rows = proof.forAttempt(job.getWorkspaceId(), job.getReviewId(), job.getId(), citationAttempt(job));
+            Set<UUID> resultIds = rows.stream().map(row -> row.id()).collect(Collectors.toSet());
+            var allowed = new HashSet<>(resultIds);
+            context.support().stream().map(row -> row.resultId()).forEach(allowed::add);
+            if (!allowed.containsAll(request.basisResultIds())) throw new AdmissionConflictException();
+            var anchors = new LinkedHashMap<UUID, FeedbackAnchor>();
+            for (var row : rows)
+                for (var problem : row.problems()) {
+                    var citations = projected(problem.candidate().citations(), true);
+                    citations.stream()
+                            .filter(ProjectedCitationDTO::anchorable)
+                            .findFirst()
+                            .ifPresent(citation -> anchors.put(
+                                    problem.id(),
+                                    new FeedbackAnchor(
+                                            Objects.requireNonNull(citation.path()),
+                                            citation.startLine(),
+                                            citation.endLine(),
+                                            citation.side())));
+                }
+            var drafts = FeedbackDraftBuilder.build(
+                    job, Set.copyOf(request.basisResultIds()), rows, context.support(), request.composition(), anchors);
+            var prepared = feedback.prepareAll(job.getWorkspaceId(), job.getReviewId(), drafts);
+            for (var draft : drafts) {
+                var receipt = prepared.pieces().stream()
+                        .filter(piece -> piece.feedbackId().equals(draft.id()))
+                        .findFirst()
+                        .orElseThrow();
+                switch (draft.destination()) {
+                    case ON_WORK -> job.setPublicReviewDigest(receipt.packageDigest());
+                    case PRACTICE_PAGE -> job.setPracticePagePreparedAt(receipt.preparedAt());
+                    case CONVERSATION -> job.setConversationPreparedAt(receipt.preparedAt());
+                }
+            }
+            jobs.saveAndFlush(job);
+            return new PrepareFeedbackResponseDTO(
+                    prepared.pieces().stream().map(piece -> piece.feedbackId()).toList(),
+                    prepared.packageDigest(),
+                    prepared.preparedAt());
         }));
     }
 
-    /** The admitted results as the admission answered them, for a writer that continues this review. */
-    @Transactional(readOnly = true)
-    public ObjectNode admittedResponse(AgentJob job) {
-        return response(
-                job,
-                admissionDigest(job),
-                practiceResults.findByAgentJobId(job.getId(), job.getWorkspace().getId()));
+    public PublicFeedbackHistoryDTO publicFeedbackHistory(AdmissionIdentity identity) {
+        var retained = files.indexLateRead(
+                identity,
+                () -> Objects.requireNonNull(transactions.execute(status -> {
+                    var job = ownedJob(identity);
+                    if (!isAdmitted(job) || assignments.review(job).kind() != ReviewKind.ITEM)
+                        throw new PublicHistoryRefusedException("History requires an admitted item review");
+                    return history.publicSameItemFeedback(job, assignments.load(job));
+                })),
+                read -> new JobEvidenceFiles.LateCopies(read.copies()));
+        return retained.response();
     }
 
-    public static boolean isAdmitted(AgentJob job) {
-        return !admissionDigest(job).isBlank();
-    }
-
-    /**
-     * The attempt the admitted citations were verified under. Before admission, and for a job admitted before the
-     * attempt was recorded, that is the current attempt: such a job is never continued under another one.
-     */
-    public static int citationAttempt(AgentJob job) {
-        JsonNode attempt = job.getMetadata() == null ? null : job.getMetadata().get(ATTEMPT_METADATA_KEY);
-        if (!isAdmitted(job) || attempt == null) return job.getRetryCount();
-        // Anything but an earlier or the current attempt was not written by the admission, and verifies nothing.
-        if (!attempt.isIntegralNumber()
-                || !attempt.canConvertToInt()
-                || attempt.asInt() < 0
-                || attempt.asInt() > job.getRetryCount()) return -1;
-        return attempt.asInt();
-    }
-
-    /** Whether this attempt continues an admitted review whose citations an earlier attempt verified. */
-    public static boolean isContinuation(AgentJob job) {
-        int admitted = citationAttempt(job);
-        return isAdmitted(job) && admitted >= 0 && admitted < job.getRetryCount();
-    }
-
-    /**
-     * The original public writer inputs of the admitting attempt, ready to be kept with its admission: only when its
-     * public lane was open, its capture receipt indexes every person the inputs copied, and every captured record
-     * reads back with the bytes the capture recorded. Otherwise nothing is kept, and the review stays unrecoverable
-     * if its writer is lost.
-     */
-    private @Nullable ReviewCompositionBasis originalBasis(AdmissionIdentity identity, String digest) {
-        var receipt = evidenceFiles.completeReceipt(identity);
-        if (receipt.isEmpty()) return null;
-        var files = evidenceFiles.originalPublicInputs(identity).orElse(null);
-        if (files == null) return null;
-        byte[] request = files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH);
-        if (request == null
-                || !mapper.readTree(request)
-                        .path("channels")
-                        .path("IN_CONTEXT")
-                        .path("enabled")
-                        .asBoolean(false)) return null;
-        ObjectNode payload = mapper.createObjectNode();
-        ObjectNode stored = payload.putObject("files");
-        files.forEach((path, bytes) -> stored.put(path, Base64.getEncoder().encodeToString(bytes)));
-        Instant now = Instant.now();
-        var basis = new ReviewCompositionBasis();
-        basis.setJobId(identity.jobId());
-        basis.setWorkspaceId(identity.workspaceId());
-        basis.setAdmissionAttempt(identity.attempt());
-        basis.setAdmissionDigest(digest);
-        basis.setBasisVersion(ReviewCompositionBasis.VERSION);
-        basis.setBasisDigest(ReviewCompositionBasis.digest(files));
-        basis.setCopyId(receipt.get());
-        basis.setByteSize(mapper.writeValueAsBytes(payload).length);
-        basis.setCreatedAt(now);
-        basis.setExpiresAt(now.plus(ReviewCompositionBasis.RETENTION));
-        basis.setPayload(payload);
-        return basis;
-    }
-
-    static String admissionDigest(AgentJob job) {
-        return job.getMetadata() == null
-                ? ""
-                : job.getMetadata().path(DIGEST_METADATA_KEY).asString();
-    }
-
-    /** Persists the refusal under the ownership fence before propagating the verification failure. */
-    public void recordRefusal(
-            AdmissionIdentity identity, String reasonCode, String reason, JsonNode verificationFailures) {
-        transactions.executeWithoutResult(status -> {
-            AgentJob job = ownedJob(identity);
-            ObjectNode metadata =
-                    job.getMetadata() instanceof ObjectNode object ? object.deepCopy() : mapper.createObjectNode();
-            if (!metadata.path(DIGEST_METADATA_KEY).asString().isBlank()) {
-                throw new AdmissionConflictException();
-            }
-            ObjectNode refusal = mapper.createObjectNode();
-            refusal.put("reasonCode", reasonCode);
-            refusal.put("reason", reason);
-            metadata.set(REFUSAL_METADATA_KEY, refusal);
-            metadata.set("citation_verification_failures", verificationFailures.deepCopy());
-            job.setMetadata(metadata);
-            jobs.save(job);
-        });
-    }
-
-    /**
-     * The job locked for this exact owning attempt, in the caller's transaction; any other state is a lost attempt.
-     * Public because a Spring proxy forwards only what it can override.
-     */
-    public AgentJob ownedJob(AdmissionIdentity identity) {
-        AgentJob job = jobs.findByIdWithWorkspaceForUpdate(identity.jobId()).orElseThrow(StaleAttemptException::new);
-        if (job.getStatus() != AgentJobStatus.RUNNING
-                || !job.getWorkspace().getId().equals(identity.workspaceId())
-                || job.getRetryCount() != identity.attempt()
-                || !identity.workerId().equals(job.getWorkerId())) {
-            throw new StaleAttemptException();
-        }
+    public ReviewJob ownedJob(AdmissionIdentity identity) {
+        var job = jobs.findByIdAndWorkspaceIdForUpdate(identity.jobId(), identity.workspaceId())
+                .orElseThrow(StaleAttemptException::new);
+        if (job.getStatus() != ReviewJobStatus.RUNNING
+                || job.getAttempt() != identity.attempt()
+                || !identity.workerId().equals(job.getWorkerId())) throw new StaleAttemptException();
         return job;
     }
 
-    public record AdmissionIdentity(UUID jobId, Long workspaceId, int attempt, String workerId) {}
+    private static void requireIdentity(ReviewJob job, UUID reviewId, UUID jobId, int attempt) {
+        if (!job.getReviewId().equals(reviewId) || !job.getId().equals(jobId) || job.getAttempt() != attempt)
+            throw new StaleAttemptException();
+    }
+
+    public static boolean isAdmitted(ReviewJob job) {
+        return job.getAdmissionAttempt() != null && job.getAdmissionDigest() != null;
+    }
+
+    public static int citationAttempt(ReviewJob job) {
+        return Objects.requireNonNull(job.getAdmissionAttempt());
+    }
+
+    public static boolean isContinuation(ReviewJob job) {
+        return isAdmitted(job) && citationAttempt(job) != job.getAttempt();
+    }
+
+    public record AdmissionIdentity(UUID jobId, long workspaceId, int attempt, String workerId) {}
+
+    private List<ProjectedCitationDTO> projected(List<EvidenceCitation> citations, boolean permitsAnchor) {
+        var projected = new ArrayList<ProjectedCitationDTO>();
+        for (int index = 0; index < citations.size(); index++) {
+            var citation = citations.get(index);
+            boolean anchorable = permitsAnchor && citation.verification() != null && citation.side() != null;
+            projected.add(new ProjectedCitationDTO(
+                    citation.sourceKind().value(),
+                    citation.sourcePath(),
+                    citation.path(),
+                    citation.side(),
+                    citation.revision(),
+                    citation.startLine(),
+                    citation.endLine(),
+                    citation.quote(),
+                    citation.verification(),
+                    index,
+                    anchorable));
+        }
+        return List.copyOf(projected);
+    }
+
+    private static void explicitCitationNulls(JsonNode node) {
+        if (node instanceof ObjectNode object) {
+            if (object.has("sourceKind"))
+                for (String key : List.of(
+                        "sourcePath", "path", "side", "revision", "startLine", "endLine", "quote", "verification")) {
+                    if (!object.has(key)) object.putNull(key);
+                }
+            if (object.has("openQuestion") && !object.has("citation")) object.putNull("citation");
+            object.properties().forEach(entry -> explicitCitationNulls(entry.getValue()));
+        } else if (node.isArray()) node.forEach(ResultAdmissionService::explicitCitationNulls);
+    }
 
     public static class StaleAttemptException extends RuntimeException {
-
         @Serial
         private static final long serialVersionUID = 1L;
-    }
-
-    private byte[] serializedPayload(JsonNode submitted) {
-        try {
-            return mapper.writeValueAsBytes(submitted);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid result payload", e);
-        }
-    }
-
-    private ObjectNode response(AgentJob job, String digest, List<PracticeResult> admitted) {
-        ObjectNode root = mapper.createObjectNode();
-        root.put("schemaVersion", SCHEMA_VERSION);
-        root.put("admissionDigest", digest);
-        ArrayNode rows = root.putArray("results");
-        Set<UUID> publicIds = publicReviewEligibility.publicResultIds(job, admitted);
-        Map<UUID, List<Observation>> problems = new HashMap<>();
-        if (!admitted.isEmpty()) {
-            observations
-                    .findByPracticeResultIds(
-                            job.getWorkspace().getId(),
-                            admitted.stream().map(PracticeResult::getId).toList())
-                    .forEach(problem -> problems.computeIfAbsent(problem.getPracticeResultId(), id -> new ArrayList<>())
-                            .add(problem));
-        }
-        admitted.forEach(result -> rows.add(
-                project(result, problems.getOrDefault(result.getId(), List.of()), publicIds.contains(result.getId()))));
-        JsonNode withheld =
-                job.getMetadata() == null ? null : job.getMetadata().get(ReviewOutputService.WITHHELD_METADATA_KEY);
-        root.set("withheld", withheld != null && withheld.isArray() ? withheld.deepCopy() : mapper.createArrayNode());
-        return root;
-    }
-
-    /**
-     * One admitted result as the runner composes from it: the stored verdict, its citations with their verification and
-     * whether each can carry a line note, its warrants, example and coverage, and its problems. Only a problem's
-     * citation anchors a line note; the result's own citations say whether they could.
-     */
-    private ObjectNode project(PracticeResult practiceResult, List<Observation> problems, boolean publicEligible) {
-        ObjectNode out = mapper.createObjectNode();
-        out.put("practiceResultId", practiceResult.getId().toString());
-        out.put("practiceSlug", practiceResult.getPractice().getSlug());
-        out.put("outcome", practiceResult.getOutcome().name());
-        out.put(
-                "severity",
-                practiceResult.getSeverity() == null
-                        ? null
-                        : practiceResult.getSeverity().name());
-        out.put("summary", practiceResult.getSummary());
-        out.put("explanation", practiceResult.getEvidenceRationale());
-        var revision = practiceResult.getPracticeRevision();
-        boolean summaryOnly = revision != null && revision.getDeliveryBehavior().summaryOnly();
-        out.put("summaryOnly", summaryOnly);
-        // The review on the work is composed from the results marked here and admitted by the same rule.
-        out.put("publicEligible", publicEligible);
-        JsonNode evidence = practiceResult.getEvidence();
-        ArrayNode own = mapper.createArrayNode();
-        ResultCitations.own(evidence, problems).forEach(own::add);
-        out.set("citations", projectedCitations(own, summaryOnly));
-        ObjectNode warrants = out.putObject("evidence");
-        if (evidence != null) {
-            for (String warrant : List.of("search", "inapplicability", "undecidability")) {
-                if (evidence.hasNonNull(warrant)) warrants.set(warrant, evidence.get(warrant));
-            }
-        }
-        out.set("example", practiceResult.getExample() == null ? NullNode.getInstance() : practiceResult.getExample());
-        out.set(
-                "coverage",
-                practiceResult.getCoverage() == null ? NullNode.getInstance() : practiceResult.getCoverage());
-        ArrayNode children = out.putArray("observations");
-        for (Observation problem : problems) {
-            ObjectNode child = children.addObject();
-            child.put("observationId", problem.getId().toString());
-            child.put("position", problem.getPosition());
-            child.put("severity", problem.getSeverity().name());
-            child.put("summary", problem.getSummary());
-            child.put("explanation", problem.getExplanation());
-            child.put("nextStep", problem.getNextStep());
-            child.set("basis", problem.getBasis() == null ? NullNode.getInstance() : problem.getBasis());
-            ArrayNode citations = projectedCitations(problem.getCitations(), summaryOnly);
-            child.set("citations", citations);
-            child.put(
-                    "anchorable",
-                    citations.valueStream().anyMatch(c -> c.path("anchorable").asBoolean()));
-        }
-        return out;
-    }
-
-    /** Each citation with its index and whether a line note may be placed on it. */
-    private ArrayNode projectedCitations(@Nullable JsonNode source, boolean summaryOnly) {
-        ArrayNode citations = mapper.createArrayNode();
-        if (source == null || !source.isArray()) return citations;
-        int index = 0;
-        for (JsonNode citation : source) {
-            ObjectNode copy = citations.addObject();
-            copy.put("index", index++);
-            citation.properties().forEach(entry -> copy.set(entry.getKey(), entry.getValue()));
-            copy.put("anchorable", !summaryOnly && anchorable(citation));
-        }
-        return citations;
-    }
-
-    /** A verified quote of the head side of the change at its exact location. */
-    static boolean anchorable(JsonNode citation) {
-        return PracticePreconditionClause.DIFF_SOURCE
-                        .value()
-                        .equals(citation.path("sourceKind").asString())
-                && citation.path("path").isString()
-                && citation.path("startLine").isIntegralNumber()
-                && "NEW".equals(citation.path("side").asString())
-                && "VERIFIED"
-                        .equals(citation.path("verification").path("status").asString())
-                && "EXACT_LOCATION"
-                        .equals(citation.path("verification").path("scope").asString());
-    }
-
-    public static class PublicHistoryRefusedException extends RuntimeException {
-
-        @Serial
-        private static final long serialVersionUID = 1L;
-
-        public PublicHistoryRefusedException(String reason) {
-            super(reason);
-        }
-
-        public PublicHistoryRefusedException(String reason, Throwable cause) {
-            super(reason, cause);
-        }
     }
 
     public static class AdmissionConflictException extends RuntimeException {
-
         @Serial
         private static final long serialVersionUID = 1L;
+    }
+
+    public static class PublicHistoryRefusedException extends RuntimeException {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        public PublicHistoryRefusedException(String message) {
+            super(message);
+        }
+
+        public PublicHistoryRefusedException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 }

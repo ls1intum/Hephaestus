@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequestreview;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -17,15 +17,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub pull_request_review webhook events.
- * <p>
- * This handler processes reviews on Pull Requests. The webhook includes
- * embedded PR data, which we use to create a stub PR entity if the PR
- * webhook hasn't arrived yet (message ordering issue).
- * <p>
- * <b>Key Design Decision:</b> We use processWithParentCreation to handle the case
- * where the review webhook arrives before the PR webhook. This creates a minimal
- * PR stub from the webhook data, which will be hydrated later by the PR webhook
- * or scheduled sync. This prevents data loss that occurred due to message ordering.
+ *
+ * <p>This handler processes reviews on Pull Requests. The webhook includes embedded PR data, which
+ * we use to create a stub PR entity if the PR webhook hasn't arrived yet (message ordering issue).
+ *
+ * <p><b>Key Design Decision:</b> We use processWithParentCreation to handle the case where the
+ * review webhook arrives before the PR webhook. This creates a minimal PR stub from the webhook
+ * data, which will be hydrated later by the PR webhook or scheduled sync. This prevents data loss
+ * that occurred due to message ordering.
  *
  * @see GitHubPullRequestReviewProcessor#processWithParentCreation
  */
@@ -64,7 +63,7 @@ public class GitHubPullRequestReviewMessageHandler
         }
 
         log.debug(
-                "Received pull_request_review event: action={}, prNumber={}, reviewId={}, repoName={}",
+                "Received pull_request_review event: action={}, prNumber={}, reviewId={}," + " repoName={}",
                 event.action(),
                 prDto.number(),
                 reviewDto.id(),

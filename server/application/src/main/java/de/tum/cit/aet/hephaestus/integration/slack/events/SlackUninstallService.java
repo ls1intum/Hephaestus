@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSlackThreadService;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IntegrationAttentionService;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Handles Slack app removal: mark the connection uninstalled and purge Slack raw + derived data.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 @WorkspaceAgnostic("Resolves the workspace from the Slack team_id in the uninstall payload, not from a scoped read")
 public class SlackUninstallService {
@@ -86,7 +88,8 @@ public class SlackUninstallService {
         // A later reconnect may install a different Slack app; the cached bot user id must not survive teardown.
         messageService.evictBotUserId(workspaceId);
         log.info(
-                "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {} conversation-derived practice rows erased, {} mentor DM threads erased)",
+                "Slack {} for team {} → workspace {} torn down (connection UNINSTALLED, content purged, {}"
+                        + " conversation-derived practice rows erased, {} mentor DM threads erased)",
                 eventType,
                 teamId,
                 workspaceId,

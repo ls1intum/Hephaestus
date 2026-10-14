@@ -1,27 +1,30 @@
+import {
+	scm,
+	addedComments,
+	commentKinds,
+	expectKind,
+	requireChange,
+	type AddedComment,
+	type DiffFile,
+} from "../kits/scm/index.ts";
 // A program that uses every model slot, each optional, to prepare one review. Steps that do not
 // depend on each other start together, so a slow model costs only its own part.
 import {
-	addedComments,
 	agent,
 	classify,
-	commentKinds,
 	cosineSimilarity,
 	definePracticeScript,
 	embedMany,
-	expectKind,
 	generateText,
 	Output,
-	requireChange,
 	rerank,
 	step,
 	z,
-	type AddedComment,
-	type DiffFile,
 	type Facts,
 	type Omission,
 	type PracticeScriptContext,
 	type ReviewLead,
-} from "../lib/practice-script.ts";
+} from "../lib/core/practice-script.ts";
 
 /** The label of each kind of lead, as the reviewer reads it. */
 export const LABELS = {
@@ -68,7 +71,7 @@ const meta = {
 } as const;
 
 /** The program reads the change of a pull request. */
-type Context = PracticeScriptContext<typeof meta.models, "scm.pull_request">;
+type Context = PracticeScriptContext<typeof meta.models>;
 
 /** What one part of the program prepared for the review. */
 interface Part {
@@ -204,8 +207,9 @@ async function declaration(ctx: Context): Promise<Part> {
 export default definePracticeScript({
 	meta,
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
 		const comments = addedComments(change);
 		const untrackedTodos: ReviewLead[] = [];
 		const unmarked: AddedComment[] = [];

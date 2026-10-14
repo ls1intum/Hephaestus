@@ -26,20 +26,23 @@ const RUNNER = path.resolve(
 );
 
 void test("mentor exposes only read and inline-rendering tools", () => {
-	assert.deepEqual(MENTOR_TOOL_NAMES, ["fetch_context", "link_result", "link_observation"]);
+	assert.deepEqual(MENTOR_TOOL_NAMES, [
+		"fetch_context",
+		"link_result",
+		"link_problem",
+		"show_feedback",
+	]);
 });
 
-void test("the protocol is version 2, which links results and observations apart", () => {
-	assert.equal(MENTOR_PROTOCOL_VERSION, 2);
+void test("the protocol is version 3, which names prepared feedback separately", () => {
+	assert.equal(MENTOR_PROTOCOL_VERSION, 3);
 });
 
-void test("fetch_context reads the history of results, not the retired history of observations", () => {
+void test("fetch_context reads the history of results, not the retired history of problems", () => {
 	assert.equal(isFetchContextKey("inputs/context/results_history.json"), true);
-	assert.equal(isFetchContextKey("inputs/context/observations_history.json"), false);
+	assert.equal(isFetchContextKey("inputs/context/problems_history.json"), false);
 	assert.equal(
-		isFetchContextKey(
-			"inputs/context/observations_history/0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c.json",
-		),
+		isFetchContextKey("inputs/context/problems_history/0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c.json"),
 		false,
 	);
 });
@@ -73,6 +76,11 @@ void test("fetch_context admits canonical keys and one item by its canonical id,
 	assert.equal(isFetchContextKey("inputs/context/review_attempts/21.json"), false);
 	assert.equal(isFetchContextKey("inputs/context/review_attempts/conversation/21.json"), false);
 	assert.equal(isFetchContextKey("inputs/context/review_attempts/issue/../user.json"), false);
+	for (const prefix of ["merge_readiness", "review_attempts/issue"]) {
+		assert.equal(isFetchContextKey(`inputs/context/${prefix}/9223372036854775807.json`), true);
+		assert.equal(isFetchContextKey(`inputs/context/${prefix}/0.json`), false);
+		assert.equal(isFetchContextKey(`inputs/context/${prefix}/01.json`), false);
+	}
 });
 
 const SESSIONS_TMPDIR = mkdtempSync(path.join(tmpdir(), "pi-mentor-runner-spec-"));
@@ -292,14 +300,14 @@ async function readError(reader: Reader, id: string): Promise<JsonRpcErrorRespon
 	return frame.error;
 }
 
-void test("hello handshake returns protocolVersion 2", async (t) => {
+void test("hello handshake returns protocolVersion 3", async (t) => {
 	const runner = spawnRunner(t);
 	try {
 		await readReady(runner.reader);
 		runner.send({ jsonrpc: "2.0", id: "h1", method: "hello", params: {} });
 		const result = await readResult(runner.reader, "h1");
 		assert.ok("protocolVersion" in result, "hello must answer with a protocolVersion");
-		assert.equal(result.protocolVersion, 2);
+		assert.equal(result.protocolVersion, 3);
 	} catch (error) {
 		runner.diagnose();
 		throw error;

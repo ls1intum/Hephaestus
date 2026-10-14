@@ -51,7 +51,7 @@ public interface ConversationFeedbackErasure {
      * Hard-delete the {@code chat.conversation_thread} results and feedback that a single person is the <em>subject</em>
      * of within {@code workspaceId} — the derived-content half of a person opt-out or account hard-delete. Feedback is
      * matched on {@code feedback.about_user_id = aboutUserId} and results on
-     * {@code practice_result.about_user_id = aboutUserId} (ADR 0022: the about-user is who the row is filed against, not
+     * {@code result.about_user_id = aboutUserId} (ADR 0022: the about-user is who the row is filed against, not
      * who it is delivered to). Feedback is deleted first so its {@code ON DELETE CASCADE} clears the join/placement/
      * reaction children, then the results. Transactional, idempotent, and strictly scoped to
      * {@code artifact_kind = chat.conversation_thread} + {@code workspaceId} + {@code about_user_id = aboutUserId} — another

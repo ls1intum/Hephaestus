@@ -14,7 +14,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -115,9 +115,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
 
         @Test
         void practiceResultQueriesBindWorkspaceParameter() {
-            assertThat(PracticeResultRepository.class.isAnnotationPresent(WorkspaceAgnostic.class))
+            assertThat(ResultRepository.class.isAnnotationPresent(WorkspaceAgnostic.class))
                     .isFalse();
-            for (Method method : PracticeResultRepository.class.getDeclaredMethods()) {
+            for (Method method : ResultRepository.class.getDeclaredMethods()) {
                 Query query = method.getAnnotation(Query.class);
                 if (query == null) continue;
                 if (method.isAnnotationPresent(WorkspaceAgnostic.class)) continue;
@@ -205,8 +205,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         method,
                                         String.format(
-                                                "MULTI-TENANCY RISK: %s.%s has @Query without workspace filtering. "
-                                                        + "Query: %s... Add to WORKSPACE_AGNOSTIC_METHODS if intentional.",
+                                                "MULTI-TENANCY RISK: %s.%s has @Query without workspace filtering."
+                                                        + " Query: %s... Add to WORKSPACE_AGNOSTIC_METHODS if"
+                                                        + " intentional.",
                                                 repoName,
                                                 method.getName(),
                                                 queryValue.substring(0, Math.min(80, queryValue.length())))));
@@ -405,9 +406,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "SCHEDULED JOB CONTEXT: %s has @Scheduled methods but no workspace "
-                                                        + "iteration dependencies. Add SyncTargetProvider or WorkspaceRepository "
-                                                        + "to iterate workspaces and set context, or add to WORKSPACE_AGNOSTIC_SCHEDULERS if truly system-wide.",
+                                                "SCHEDULED JOB CONTEXT: %s has @Scheduled methods but no workspace"
+                                                    + " iteration dependencies. Add SyncTargetProvider or"
+                                                    + " WorkspaceRepository to iterate workspaces and set context, or"
+                                                    + " add to WORKSPACE_AGNOSTIC_SCHEDULERS if truly system-wide.",
                                                 javaClass.getSimpleName())));
                             }
                         }
@@ -455,8 +457,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         method,
                                         String.format(
-                                                "SCHEDULED JOB BYPASS: %s.%s calls %s without apparent workspace context. "
-                                                        + "Ensure workspace iteration or use workspace-scoped repository methods.",
+                                                "SCHEDULED JOB BYPASS: %s.%s calls %s without apparent workspace"
+                                                        + " context. Ensure workspace iteration or use workspace-scoped"
+                                                        + " repository methods.",
                                                 method.getOwner().getSimpleName(), method.getName(), dangerousCalls)));
                             }
                         }
@@ -551,8 +554,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                     events.add(SimpleConditionEvent.violated(
                                             method,
                                             String.format(
-                                                    "EVENT LISTENER CONTEXT: %s.%s handles %s - verify it carries workspace context. "
-                                                            + "Events should include workspaceId or entity with workspace relationship.",
+                                                    "EVENT LISTENER CONTEXT: %s.%s handles %s - verify it carries"
+                                                            + " workspace context. Events should include workspaceId or"
+                                                            + " entity with workspace relationship.",
                                                     method.getOwner().getSimpleName(),
                                                     method.getName(),
                                                     paramTypeName)));
@@ -578,13 +582,10 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
         static final Set<String> ASYNC_LISTENERS_WITH_PAYLOAD_CONTEXT = Set.of(
                 // ActivityEventListener handles CommentCreated, ReviewSubmitted events which carry full entity graphs
                 "ActivityEventListener",
-                // AgentJobEventListener handles ScmDomainEvent.PullRequest{Created,Ready,Synchronized,
+                // ReviewJobEventListener handles ScmDomainEvent.PullRequest{Created,Ready,Synchronized,
                 // Merged,Closed}/ReviewSubmitted whose EventContext carries the originating repository →
                 // workspaceId is resolved per-event
-                "AgentJobEventListener",
-                // IssueAgentJobEventListener handles ScmDomainEvent.Issue{Created,Labeled} whose EventContext
-                // carries the originating repository → workspaceId is resolved per-event (mirrors the PR listener)
-                "IssueAgentJobEventListener",
+                "ReviewJobEventListener",
                 // GitHubProjectActivityListener handles GitHubProjectEvent payloads whose EventContext
                 // carries scopeId (the originating workspace) — same payload-carries-context contract
                 "GitHubProjectActivityListener");
@@ -633,8 +634,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "ASYNC CONTEXT RISK: %s has @Async event listeners with repository access. "
-                                                        + "Ensure workspace context is propagated via event payload or MDC propagation.",
+                                                "ASYNC CONTEXT RISK: %s has @Async event listeners with repository"
+                                                        + " access. Ensure workspace context is propagated via event"
+                                                        + " payload or MDC propagation.",
                                                 javaClass.getSimpleName())));
                             }
                         }
@@ -704,8 +706,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                     events.add(SimpleConditionEvent.violated(
                                             method,
                                             String.format(
-                                                    "SERVICE WORKSPACE RISK: %s.%s returns a list but has no obvious workspace parameter. "
-                                                            + "Add workspace parameter or document that scoping is applied internally.",
+                                                    "SERVICE WORKSPACE RISK: %s.%s returns a list but has no obvious"
+                                                        + " workspace parameter. Add workspace parameter or document"
+                                                        + " that scoping is applied internally.",
                                                     ownerName, methodName)));
                                 }
                             }
@@ -839,8 +842,9 @@ class MultiTenancyArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         method,
                                         String.format(
-                                                "CONTROLLER CONTEXT: %s.%s is a data endpoint without WorkspaceContext parameter "
-                                                        + "or workspace security annotation. Add WorkspaceContext parameter or appropriate annotation.",
+                                                "CONTROLLER CONTEXT: %s.%s is a data endpoint without WorkspaceContext"
+                                                        + " parameter or workspace security annotation. Add"
+                                                        + " WorkspaceContext parameter or appropriate annotation.",
                                                 controllerName, methodName)));
                             }
                         }

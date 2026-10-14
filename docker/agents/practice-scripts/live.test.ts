@@ -9,20 +9,20 @@ import { cp, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { after, before, test } from "node:test";
 
-import { MODEL_CONCURRENCY } from "./lib/concurrency.ts";
+import { parseDiff } from "./kits/scm/diff-parser.ts";
+import { MODEL_CONCURRENCY } from "./lib/core/concurrency.ts";
 import {
 	PRACTICE_SCRIPT_PRACTICE_HEADER,
 	practiceInputsSchema,
 	type BoundModels,
 	type Candidate,
 	type ReviewOptions,
-} from "./lib/contract.ts";
-import { parseDiff } from "./lib/diff-parser.ts";
-import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/evidence-reader.ts";
-import { isJsonObject } from "./lib/json.ts";
-import { resolveLeads } from "./lib/leads.ts";
-import { hostModels, ModelBudget } from "./lib/models-host.ts";
-import { runPracticeProgram, type ProgramOutcome } from "./lib/program-host.ts";
+} from "./lib/core/contract.ts";
+import { EvidenceReader, noReceipts, type EvidenceSources } from "./lib/core/evidence-reader.ts";
+import { isJsonObject } from "./lib/core/json.ts";
+import { resolveLeads } from "./lib/core/leads.ts";
+import { hostModels, ModelBudget } from "./lib/core/models-host.ts";
+import { runPracticeProgram, type ProgramOutcome } from "./lib/core/program-host.ts";
 import { COMMIT, pullRequestRecord, REVIEWED } from "./run-bundled.ts";
 import { REQUESTED_PULL_REQUEST, stagePracticeScripts } from "./stage.ts";
 import { startStandIn, type StandInRequest } from "./test/proxy-stand-in.ts";
@@ -56,7 +56,7 @@ const EVERY_SLOT = await readFile(path.join(import.meta.dirname, "fixtures/every
  * A program that rates the added comments with a decision model and returns its own result: what it
  * could not settle, with the coverage it claims.
  */
-const DECIDES = `import { addedComments, classify, commentKinds, definePracticeScript, expectKind, requireChange } from "../lib/practice-script.ts";
+const DECIDES = `import { addedComments, classify, commentKinds, definePracticeScript, expectKind, requireChange } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: { models: { decision: "required" } },
@@ -75,12 +75,12 @@ export default definePracticeScript({
 		}
 		const citation = await ctx.files.change.cite(first.at.change, "NEW", first.at.line, first.at.endLine);
 		return {
-			outcome: "UNDETERMINED",
+			outcome: "COULD_NOT_DETERMINE",
 			summary: "The comments were rated, and the practice needs a reviewer",
 			explanation: ratings.size + " of " + comments.length + " added comments were rated.",
 			citations: [citation],
 			evidence: {
-				undecidability: [
+				openQuestions: [
 					{ openQuestion: "Does each rated comment meet the practice?", wouldSettleIt: "A review of the rated comments." },
 				],
 			},
@@ -171,18 +171,18 @@ async function runLive(slug: string, source: string, bound: BoundModels): Promis
 		const sources: EvidenceSources = {
 			repo,
 			headRevision: COMMIT,
-			treeArtifact: "repos/reviewed/.git/HEAD",
+			treeSourceFile: "repos/reviewed/.git/HEAD",
 			contextDir: null,
 			contextReference: "context",
 			change,
 			sourceKindOf: () => undefined,
 		};
-		const { cause } = REQUESTED_PULL_REQUEST;
-		assert.ok(isJsonObject(cause));
+		const { inputs: stagedInputs } = REQUESTED_PULL_REQUEST;
+		assert.ok(isJsonObject(stagedInputs));
 		const inputs = practiceInputsSchema.parse({
-			...cause,
+			...stagedInputs,
 			previous: null,
-			work: pullRequestRecord(),
+			item: pullRequestRecord(),
 		});
 		const script = path.join(practices, `${slug}.ts`);
 		const receipts = noReceipts();
@@ -258,7 +258,7 @@ void test(
 		assert.deepEqual(
 			outcome.models
 				.filter((report) => report.bound)
-				.map((report) => [report.slot, report.notRated]),
+				.map((report) => [report.slot, report.failures]),
 			Object.keys(bound).map((slot) => [slot, {}]),
 			`each bound slot answered every call\n${log}`,
 		);
@@ -282,10 +282,10 @@ void test(
 		assert.equal(outcome.status, "ok", `${outcome.error ?? ""}\n${log}`);
 		assert.equal(requests.filter((r) => r.slot === "decision").length, 1, log);
 		assert.deepEqual(outcome.models, [
-			{ slot: "decision", need: "required", bound: true, notRated: {} },
+			{ slot: "decision", need: "required", bound: true, failures: {} },
 		]);
 		assert.partialDeepStrictEqual(outcome.candidate, {
-			outcome: "UNDETERMINED",
+			outcome: "COULD_NOT_DETERMINE",
 			citations: [{ sourceKind: "scm.pull-request.diff", path: "src/cart.ts", startLine: 2 }],
 			coverage: { source: "claimed", selected: 5, checked: 5, total: 5, complete: true },
 		});

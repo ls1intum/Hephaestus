@@ -1,31 +1,30 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.within;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletion;
 import de.tum.cit.aet.hephaestus.agent.handler.PublicReviewCompletionRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -52,7 +51,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     private WebTestClient webTestClient;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
@@ -83,7 +82,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
         workspace = createWorkspace(
                 "review-timing", "Review timing", "review-timing-org", AccountType.ORG, persistUser("timing-owner"));
         ensureAdminMembership(workspace);
-        ensureWorkspaceMembership(workspace, persistUser("testuser"), WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, persistUser("testuser"), Membership.WorkspaceRole.MEMBER);
         developer = persistUser("timing-developer");
         otherWorkspace = createWorkspace(
                 "other-review-timing",
@@ -110,56 +109,56 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
         long open = pullRequest(3, null);
 
         // Finished before the merge: 120 s waiting, 60 s preparing, 300 s with the model, 60 s until delivered.
-        AgentJob onTime = review(workspace, mergedEarly, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob onTime = review(workspace, mergedEarly, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(onTime, "2026-03-10T10:02:00Z", "2026-03-10T10:03:00Z", "2026-03-10T10:08:00Z");
         feedback(workspace, onTime, "2026-03-10T10:08:30Z", "2026-03-10T10:09:00Z", null);
         feedback(workspace, onTime, "2026-03-10T10:08:30Z", "2026-03-10T10:30:00Z", null);
         // Started by the merge, so it finished after it: 240 s waiting, 60 s preparing, 600 s with the model.
-        AgentJob afterMerge = review(workspace, mergedThenReviewed, "2026-03-10T11:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob afterMerge = review(workspace, mergedThenReviewed, "2026-03-10T11:00:00Z", ReviewJobStatus.COMPLETED);
         times(afterMerge, "2026-03-10T11:04:00Z", "2026-03-10T11:05:00Z", "2026-03-10T11:15:00Z");
-        signal(workspace, mergedThenReviewed, ScmSignals.PULL_REQUEST_MERGED.value(), afterMerge);
-        feedback(workspace, afterMerge, "2026-03-10T11:16:00Z", null, FeedbackSuppressionReason.ARTIFACT_MERGED);
+        signal(workspace, mergedThenReviewed, ScmItemEvents.PULL_REQUEST_MERGED.value(), afterMerge);
+        feedback(workspace, afterMerge, "2026-03-10T11:16:00Z", null, FeedbackStopReason.ARTIFACT_MERGED);
         // Its developer opened the practice page card a day later, and was shown it in a conversation after that.
-        feedback(workspace, onTime, FeedbackChannel.IN_APP, "2026-03-10T10:08:30Z", "2026-03-11T10:08:00Z", null);
-        feedback(workspace, onTime, FeedbackChannel.IN_CHAT, "2026-03-10T10:08:30Z", "2026-03-12T10:08:00Z", null);
+        feedback(workspace, onTime, FeedbackDestination.IN_APP, "2026-03-10T10:08:30Z", "2026-03-11T10:08:00Z", null);
+        feedback(workspace, onTime, FeedbackDestination.IN_CHAT, "2026-03-10T10:08:30Z", "2026-03-12T10:08:00Z", null);
         // Started before the merge and finished after it, without reaching the model: 0 s waiting.
-        AgentJob late = review(workspace, mergedEarly, "2026-03-10T10:15:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob late = review(workspace, mergedEarly, "2026-03-10T10:15:00Z", ReviewJobStatus.COMPLETED);
         times(late, "2026-03-10T10:15:00Z", null, "2026-03-10T10:25:00Z");
-        signal(workspace, mergedEarly, ScmSignals.PULL_REQUEST_OPENED.value(), late);
+        signal(workspace, mergedEarly, ScmItemEvents.PULL_REQUEST_OPENED.value(), late);
         // Posted on the work only after an admin approved it: a person's wait, so it is not timed as posted.
         Feedback waitedForApproval = feedback(
-                workspace, late, FeedbackChannel.IN_CONTEXT, "2026-03-10T10:25:00Z", "2026-03-10T12:00:00Z", null);
+                workspace, late, FeedbackDestination.IN_CONTEXT, "2026-03-10T10:25:00Z", "2026-03-10T12:00:00Z", null);
         approved(workspace, waitedForApproval, "2026-03-10T11:59:00Z");
         // An open pull request, never finished after a merge.
-        review(workspace, open, "2026-03-11T00:00:00Z", AgentJobStatus.RUNNING);
+        review(workspace, open, "2026-03-11T00:00:00Z", ReviewJobStatus.RUNNING);
         // Queued since March; queued for budget; queued just now: one of each.
-        review(workspace, open, "2026-03-12T00:00:00Z", AgentJobStatus.QUEUED);
-        AgentJob held = review(workspace, open, "2026-03-12T01:00:00Z", AgentJobStatus.QUEUED);
-        held.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
-        jobRepository.save(held);
-        review(workspace, open, Instant.now().toString(), AgentJobStatus.QUEUED);
+        review(workspace, open, "2026-03-12T00:00:00Z", ReviewJobStatus.QUEUED);
+        ReviewJob held = review(workspace, open, "2026-03-12T01:00:00Z", ReviewJobStatus.QUEUED);
+        held.setHoldReason(ReviewJob.HOLD_REASON_BUDGET);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, held));
+        review(workspace, open, Instant.now().toString(), ReviewJobStatus.QUEUED);
         // Requested in the range but requeued a minute ago: it has waited a minute, not since March.
-        AgentJob requeued = review(workspace, open, "2026-03-12T02:00:00Z", AgentJobStatus.QUEUED);
+        ReviewJob requeued = review(workspace, open, "2026-03-12T02:00:00Z", ReviewJobStatus.QUEUED);
         requeued.setAvailableAt(Instant.now().minusSeconds(60));
-        jobRepository.save(requeued);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, requeued));
         // Cancelled after the merge: it never could post, so it did not come late.
-        AgentJob cancelled = review(workspace, mergedEarly, "2026-03-10T10:16:00Z", AgentJobStatus.CANCELLED);
+        ReviewJob cancelled = review(workspace, mergedEarly, "2026-03-10T10:16:00Z", ReviewJobStatus.CANCELLED);
         cancelled.setCompletedAt(Instant.parse("2026-03-10T10:40:00Z"));
-        jobRepository.save(cancelled);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, cancelled));
 
         // Outside the range, another purpose, another workspace: none of them is measured or counted as late.
-        AgentJob before = review(workspace, mergedEarly, "2026-03-09T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob before = review(workspace, mergedEarly, "2026-03-09T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(before, "2026-03-09T12:00:00Z", "2026-03-09T13:00:00Z", "2026-03-11T00:00:00Z");
-        AgentJob mentor = review(workspace, mergedEarly, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob mentor = review(workspace, mergedEarly, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(mentor, "2026-03-10T12:00:00Z", "2026-03-10T13:00:00Z", "2026-03-10T14:00:00Z");
-        mentor.setPurpose(AgentPurpose.MENTOR);
-        jobRepository.save(mentor);
-        AgentJob elsewhere = review(otherWorkspace, mergedEarly, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, mentor));
+        ReviewJob elsewhere = review(otherWorkspace, mergedEarly, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(elsewhere, "2026-03-10T12:00:00Z", "2026-03-10T13:00:00Z", "2026-03-10T14:00:00Z");
-        signal(otherWorkspace, mergedEarly, ScmSignals.PULL_REQUEST_MERGED.value(), elsewhere);
-        review(otherWorkspace, open, "2026-03-12T00:00:00Z", AgentJobStatus.QUEUED);
-        feedback(otherWorkspace, elsewhere, "2026-03-10T14:00:00Z", null, FeedbackSuppressionReason.ARTIFACT_MERGED);
-        feedback(workspace, before, "2026-03-09T14:00:00Z", null, FeedbackSuppressionReason.ARTIFACT_MERGED);
+        signal(otherWorkspace, mergedEarly, ScmItemEvents.PULL_REQUEST_MERGED.value(), elsewhere);
+        review(otherWorkspace, open, "2026-03-12T00:00:00Z", ReviewJobStatus.QUEUED);
+        feedback(otherWorkspace, elsewhere, "2026-03-10T14:00:00Z", null, FeedbackStopReason.ARTIFACT_MERGED);
+        feedback(workspace, before, "2026-03-09T14:00:00Z", null, FeedbackStopReason.ARTIFACT_MERGED);
 
         PracticeReviewTimingDTO timing = timing();
 
@@ -208,7 +207,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
         assertThat(row(rows, cancelled).path("finishedAfterMerge").asBoolean())
                 .as("a cancelled review never finished late")
                 .isFalse();
-        assertThat(row(rows, held).path("holdReason").asString()).isEqualTo(AgentJob.HOLD_REASON_BUDGET);
+        assertThat(row(rows, held).path("holdReason").asString()).isEqualTo(ReviewJob.HOLD_REASON_BUDGET);
         assertThat(row(rows, onTime).has("holdReason")).isFalse();
         assertThat(row(rows, onTime).path("reviewsOnWork").asInt())
                 .as("on the early-merged pull request: onTime, late and cancelled in the range, and the one before")
@@ -262,20 +261,20 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     @WithAdminUser
     void shouldMeasureEarlyPostingWhilePrivateCompositionStillRunsAndKeepWholeRunTimingSeparate() {
         long work = pullRequest(9, null);
-        AgentJob running = review(workspace, work, "2026-03-10T10:00:00Z", AgentJobStatus.RUNNING);
+        ReviewJob running = review(workspace, work, "2026-03-10T10:00:00Z", ReviewJobStatus.RUNNING);
         running.setStartedAt(Instant.parse("2026-03-10T10:01:00Z"));
         running.setExecutionStartedAt(Instant.parse("2026-03-10T10:02:00Z"));
-        jobRepository.save(running);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, running));
         accepted(running, "2026-03-10T10:06:00Z");
         feedback(workspace, running, "2026-03-10T10:06:00Z", "2026-03-10T10:07:00Z", null);
 
         // Acceptance alone is not delivery, and a human approval wait is not the review's time.
-        AgentJob quiet = review(workspace, work, "2026-03-10T11:00:00Z", AgentJobStatus.RUNNING);
+        ReviewJob quiet = review(workspace, work, "2026-03-10T11:00:00Z", ReviewJobStatus.RUNNING);
         accepted(quiet, "2026-03-10T11:06:00Z");
-        AgentJob approval = review(workspace, work, "2026-03-10T12:00:00Z", AgentJobStatus.RUNNING);
+        ReviewJob approval = review(workspace, work, "2026-03-10T12:00:00Z", ReviewJobStatus.RUNNING);
         accepted(approval, "2026-03-10T12:06:00Z");
         Feedback approvedFeedback = feedback(
-                workspace, approval, FeedbackChannel.IN_CONTEXT, "2026-03-10T12:06:00Z", "2026-03-10T12:10:00Z", null);
+                workspace, approval, FeedbackDestination.IN_CONTEXT, "2026-03-10T12:06:00Z", "2026-03-10T12:10:00Z", null);
         approved(workspace, approvedFeedback, "2026-03-10T12:09:00Z");
 
         PracticeReviewTimingDTO early = timing();
@@ -286,9 +285,9 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
         assertThat(early.model()).isEqualTo(new ReviewStageTimingDTO(0L, null, null));
         assertThat(early.finished()).isEqualTo(new ReviewStageTimingDTO(0L, null, null));
 
-        running.setStatus(AgentJobStatus.COMPLETED);
+        running.setStatus(ReviewJobStatus.COMPLETED);
         running.setCompletedAt(Instant.parse("2026-03-10T10:32:00Z"));
-        jobRepository.save(running);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, running));
         PracticeReviewTimingDTO finished = timing();
         assertThat(finished.total()).isEqualTo(early.total());
         assertThat(finished.posted()).isEqualTo(early.posted());
@@ -299,7 +298,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .isEqualTo(new ReviewTimeSharesDTO(0.0, 60 / 1920.0, 60 / 1920.0, 1800 / 1920.0, 0.0, null));
     }
 
-    private void accepted(AgentJob job, String acceptedAt) {
+    private void accepted(ReviewJob job, String acceptedAt) {
         PublicReviewCompletion completion = new PublicReviewCompletion();
         completion.setJobId(job.getId());
         completion.setWorkspaceId(workspace.getId());
@@ -324,16 +323,16 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
         long pullRequest = pullRequest(4, null);
         // Opened at 09:58, asked for at 10:00: 120 s until asked, 60 s waiting, 60 s preparing, 480 s with the
         // model, 60 s until posted.
-        AgentJob started = review(workspace, pullRequest, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob started = review(workspace, pullRequest, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(started, "2026-03-10T10:01:00Z", "2026-03-10T10:02:00Z", "2026-03-10T10:10:00Z");
-        signal(workspace, pullRequest, ScmSignals.PULL_REQUEST_OPENED.value(), started, "2026-03-10T09:58:00Z");
+        signal(workspace, pullRequest, ScmItemEvents.PULL_REQUEST_OPENED.value(), started, "2026-03-10T09:58:00Z");
         // A later moment folded into the same review does not move its start.
-        signal(workspace, pullRequest, ScmSignals.PULL_REQUEST_SYNCHRONIZED.value(), started, "2026-03-10T09:59:00Z");
+        signal(workspace, pullRequest, ScmItemEvents.PULL_REQUEST_SYNCHRONIZED.value(), started, "2026-03-10T09:59:00Z");
         feedback(workspace, started, "2026-03-10T10:10:30Z", "2026-03-10T10:11:00Z", null);
         // Asked for by hand: its only moment came after the request, so it waited nothing to be asked for.
-        AgentJob byHand = review(workspace, pullRequest, "2026-03-10T11:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob byHand = review(workspace, pullRequest, "2026-03-10T11:00:00Z", ReviewJobStatus.COMPLETED);
         times(byHand, "2026-03-10T11:00:00Z", "2026-03-10T11:01:00Z", "2026-03-10T11:05:00Z");
-        signal(workspace, pullRequest, ScmSignals.PULL_REQUEST_SYNCHRONIZED.value(), byHand, "2026-03-10T11:30:00Z");
+        signal(workspace, pullRequest, ScmItemEvents.PULL_REQUEST_SYNCHRONIZED.value(), byHand, "2026-03-10T11:30:00Z");
 
         PracticeReviewTimingDTO timing = timing();
 
@@ -360,11 +359,11 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     void shouldCountTheRunOfAReviewWithoutAnExecutionStartAsUnsplit() {
         long pullRequest = pullRequest(8, null);
         // 60 s waiting, 60 s preparing, 240 s with the model, 60 s until posted: 420 s.
-        AgentJob split = review(workspace, pullRequest, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob split = review(workspace, pullRequest, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(split, "2026-03-10T10:01:00Z", "2026-03-10T10:02:00Z", "2026-03-10T10:06:00Z");
         feedback(workspace, split, "2026-03-10T10:06:30Z", "2026-03-10T10:07:00Z", null);
         // 120 s waiting, a run of 480 s that cannot be split, 60 s until posted: 660 s.
-        AgentJob unsplit = review(workspace, pullRequest, "2026-03-10T11:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob unsplit = review(workspace, pullRequest, "2026-03-10T11:00:00Z", ReviewJobStatus.COMPLETED);
         times(unsplit, "2026-03-10T11:02:00Z", null, "2026-03-10T11:10:00Z");
         feedback(workspace, unsplit, "2026-03-10T11:10:30Z", "2026-03-10T11:11:00Z", null);
 
@@ -401,12 +400,12 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     @WithAdminUser
     void shouldNotCountTheWorksLastUpdateAsTimeUntilABackfillWasAskedFor() {
         long pullRequest = pullRequest(6, null);
-        AgentJob backfilled = review(workspace, pullRequest, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob backfilled = review(workspace, pullRequest, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(backfilled, "2026-03-10T10:01:00Z", "2026-03-10T10:02:00Z", "2026-03-10T10:10:00Z");
         signal(
                 workspace,
                 pullRequest,
-                ScmSignals.PULL_REQUEST_OPENED.value(),
+                ScmItemEvents.PULL_REQUEST_OPENED.value(),
                 backfilled,
                 "2026-03-01T12:00:00Z",
                 "BACKFILL");
@@ -425,12 +424,12 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     @WithAdminUser
     void shouldMeasureNoTimeUntilAskedWhenSomeoneRequestedTheReview() {
         long pullRequest = pullRequest(7, null);
-        AgentJob requested = review(workspace, pullRequest, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob requested = review(workspace, pullRequest, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(requested, "2026-03-10T10:01:00Z", "2026-03-10T10:02:00Z", "2026-03-10T10:10:00Z");
         signal(
                 workspace,
                 pullRequest,
-                ScmSignals.PULL_REQUEST_SYNCHRONIZED.value(),
+                ScmItemEvents.PULL_REQUEST_SYNCHRONIZED.value(),
                 requested,
                 "2026-03-10T09:59:59.950Z",
                 "MANUAL");
@@ -450,11 +449,11 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     @WithAdminUser
     void shouldCountAndMeasureAllTimeFromTheWorkspacesFirstReview() {
         long pullRequest = pullRequest(5, null);
-        AgentJob first = review(workspace, pullRequest, "2024-01-15T09:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob first = review(workspace, pullRequest, "2024-01-15T09:00:00Z", ReviewJobStatus.COMPLETED);
         times(first, "2024-01-15T09:01:00Z", "2024-01-15T09:02:00Z", "2024-01-15T09:10:00Z");
-        AgentJob latest = review(workspace, pullRequest, "2026-03-10T10:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob latest = review(workspace, pullRequest, "2026-03-10T10:00:00Z", ReviewJobStatus.COMPLETED);
         times(latest, "2026-03-10T10:01:00Z", "2026-03-10T10:02:00Z", "2026-03-10T10:06:00Z");
-        review(otherWorkspace, pullRequest, "2023-05-01T00:00:00Z", AgentJobStatus.COMPLETED);
+        review(otherWorkspace, pullRequest, "2023-05-01T00:00:00Z", ReviewJobStatus.COMPLETED);
 
         webTestClient
                 .get()
@@ -616,7 +615,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
         return ids;
     }
 
-    private static JsonNode row(Map<String, JsonNode> rows, AgentJob job) {
+    private static JsonNode row(Map<String, JsonNode> rows, ReviewJob job) {
         return Objects.requireNonNull(rows.get(job.getId().toString()));
     }
 
@@ -686,23 +685,23 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
     }
 
     /** {@code createdAt} is only defaulted when unset, so a review can be seeded at a chosen instant. */
-    private AgentJob review(Workspace target, long pullRequestId, String createdAt, AgentJobStatus status) {
-        AgentJob job = new AgentJob();
-        job.setWorkspace(target);
-        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+    private ReviewJob review(Workspace target, long pullRequestId, String createdAt, ReviewJobStatus status) {
+        ReviewJob job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, (target).getId());
+
+
         job.setMetadata(objectMapper.valueToTree(Map.of("pull_request_id", pullRequestId)));
         job.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
-        job.setCreatedAt(Instant.parse(createdAt));
+        job.setAvailableAt(Instant.parse(createdAt));
         job.setStatus(status);
-        return jobRepository.save(job);
+        return jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, job));
     }
 
-    private void times(AgentJob job, String startedAt, @Nullable String executionStartedAt, String completedAt) {
+    private void times(ReviewJob job, String startedAt, @Nullable String executionStartedAt, String completedAt) {
         job.setStartedAt(Instant.parse(startedAt));
         job.setExecutionStartedAt(executionStartedAt == null ? null : Instant.parse(executionStartedAt));
         job.setCompletedAt(Instant.parse(completedAt));
-        jobRepository.save(job);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbcTemplate, job));
     }
 
     /** An admin approved this feedback before it was posted, so its wait was a person's. */
@@ -719,13 +718,13 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
                 Timestamp.from(Instant.parse(decidedAt)));
     }
 
-    private void signal(Workspace target, long pullRequestId, String signalName, AgentJob job) {
+    private void signal(Workspace target, long pullRequestId, String signalName, ReviewJob job) {
         signal(target, pullRequestId, signalName, job, null);
     }
 
     /** A moment on the pull request that names the job, at {@code occurredAt}, or now when null. */
     private void signal(
-            Workspace target, long pullRequestId, String signalName, AgentJob job, @Nullable String occurredAt) {
+            Workspace target, long pullRequestId, String signalName, ReviewJob job, @Nullable String occurredAt) {
         signal(target, pullRequestId, signalName, job, occurredAt, "EVENT");
     }
 
@@ -733,7 +732,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
             Workspace target,
             long pullRequestId,
             String signalName,
-            AgentJob job,
+            ReviewJob job,
             @Nullable String occurredAt,
             String discoveredVia) {
         Timestamp at = Timestamp.from(occurredAt == null ? Instant.now() : Instant.parse(occurredAt));
@@ -745,7 +744,7 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
                 """,
                 UUID.randomUUID(),
                 target.getId(),
-                ArtifactKinds.PULL_REQUEST.value(),
+                "scm.pull_request".value(),
                 pullRequestId,
                 signalName,
                 "rev-" + UUID.randomUUID(),
@@ -756,24 +755,24 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     private void feedback(
             Workspace target,
-            AgentJob job,
+            ReviewJob job,
             String createdAt,
             @Nullable String deliveredAt,
-            @Nullable FeedbackSuppressionReason withheld) {
-        feedback(target, job, FeedbackChannel.IN_CONTEXT, createdAt, deliveredAt, withheld);
+            @Nullable FeedbackStopReason withheld) {
+        feedback(target, job, FeedbackDestination.IN_CONTEXT, createdAt, deliveredAt, withheld);
     }
 
     private Feedback feedback(
             Workspace target,
-            AgentJob job,
-            FeedbackChannel channel,
+            ReviewJob job,
+            FeedbackDestination channel,
             String createdAt,
             @Nullable String deliveredAt,
-            @Nullable FeedbackSuppressionReason withheld) {
+            @Nullable FeedbackStopReason withheld) {
         return feedbackRepository.save(Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(target.getId())
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .itemKind("scm.pull_request")
                 .artifactId(7L)
                 .recipientUserId(developer.getId())
                 .aboutUserId(developer.getId())
@@ -781,10 +780,10 @@ class PracticeReviewTimingIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .position(nextPosition++)
                 .deliveryState(
                         withheld != null
-                                ? FeedbackDeliveryState.SUPPRESSED
+                                ? FeedbackState.SUPPRESSED
                                 : deliveredAt != null
-                                        ? FeedbackDeliveryState.DELIVERED
-                                        : FeedbackDeliveryState.PREPARED)
+                                        ? FeedbackState.DELIVERED
+                                        : FeedbackState.PREPARED)
                 .suppressionReason(withheld)
                 .body("Feedback")
                 .source(FeedbackSource.AGENT)

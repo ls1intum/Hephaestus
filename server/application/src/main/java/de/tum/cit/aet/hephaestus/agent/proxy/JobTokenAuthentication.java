@@ -6,7 +6,7 @@ import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 /**
- * A validated proxy-scoped bearer token — either an {@code AgentJob}'s job token or a mentor session's
+ * A validated proxy-scoped bearer token — either an {@code ReviewJob}'s job token or a mentor session's
  * registry-minted token. The resolved {@link ProxyRouting} is the principal. Each scope becomes a
  * {@code SCOPE_} authority, the form that {@code OAuth2AuthorizationManagers.hasScope} checks.
  */

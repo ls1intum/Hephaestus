@@ -1,0 +1,426 @@
+package de.tum.cit.aet.hephaestus.practices.review;
+
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
+import de.tum.cit.aet.hephaestus.practices.review.model.Review;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
+import de.tum.cit.aet.hephaestus.practices.review.model.ReviewPractice;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
+import de.tum.cit.aet.hephaestus.practices.spi.BoundModelSlot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCancellationRequested;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequest;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRequested;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+
+@Service
+@ConditionalOnServerRole
+@RequiredArgsConstructor
+public class ReviewServiceImpl implements ReviewService {
+    private final ReviewRepository reviews;
+    private final ReviewPracticeRepository assignments;
+    private final ReviewItemRepository memberships;
+    private final PracticeRepository practices;
+    private final ReviewSnapshotQueryService snapshots;
+    private final WorkspaceRepository workspaces;
+    private final ProductItemQuery items;
+    private final PracticeReviewCoverageService coverage;
+    private final ReviewGate gate;
+    private final AccountIdentityQuery identities;
+    private final ReviewModelBindings bindings;
+    private final ReviewBudget budget;
+    private final ReviewRuntimeQuery runtime;
+    private final JdbcClient jdbc;
+    private final JsonMapper json;
+    private final Clock clock;
+    private final ApplicationEventPublisher events;
+    private final ScanReportService reports;
+
+    @Override
+    @Transactional
+    public UUID request(ReviewRequest request) {
+        validate(request);
+        if (request.requestKey() != null) {
+            var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
+            if (existing.isPresent()) {
+                if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This request key has a different body.");
+                return existing.orElseThrow().getId();
+            }
+        }
+        var workspace = workspaces.findByIdForUpdate(request.workspaceId()).orElseThrow();
+        if (request.requestKey() != null) {
+            var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
+            if (existing.isPresent()) {
+                if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "This request key has a different body.");
+                return existing.orElseThrow().getId();
+            }
+        }
+        if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE)
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "The workspace is inactive.");
+        if (request.kind() == ReviewKind.SCAN
+                && reviews.existsByWorkspaceIdAndKindAndStatusIn(
+                        request.workspaceId(), ReviewKind.SCAN, List.of(ReviewStatus.QUEUED, ReviewStatus.RUNNING)))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "A scan is already active in this workspace.");
+        if (!budget.canRequest(request.workspaceId(), request.kind(), request.budgetUsd()))
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "The review budget is unavailable.");
+        var ref = items.require(request.workspaceId(), request.itemId());
+        var pinned = items.pin(ref, request.version());
+        var now = clock.instant();
+        Instant ordered = now;
+        ItemEventName event = null;
+        if (request.eventId() != null) {
+            var fact = jdbc.sql("SELECT name,occurred_at,item_version FROM item_event WHERE workspace_id=:ws AND"
+                            + " item_id=:item AND id=:id")
+                    .param("ws", request.workspaceId())
+                    .param("item", request.itemId())
+                    .param("id", request.eventId())
+                    .query((rs, n) -> new EventFact(
+                            new ItemEventName(rs.getString("name")),
+                            rs.getObject("occurred_at", OffsetDateTime.class).toInstant(),
+                            rs.getString("item_version")))
+                    .single();
+            if (!pinned.version().value().equals(fact.version()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "The event version does not match the review.");
+            event = fact.name();
+            ordered = fact.at();
+        }
+        List<Practice> selected;
+        if (request.kind() == ReviewKind.SCAN) {
+            if (!coverage.admitsRepositoryItem(workspace, ref.itemId()))
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "The repository is outside the review scope.");
+            if (!ref.kind().value().equals("scm.repository"))
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_CONTENT, "Select a repository for a scan.");
+            selected = practices.findByWorkspaceId(request.workspaceId()).stream()
+                    .filter(p -> {
+                        var d = json.convertValue(p.getCurrentVersion().getDefinition(), PracticeDefinition.class);
+                        return d.scan() != null && d.reviewedBy().by() == ReviewedByKind.HEPHAESTUS;
+                    })
+                    .filter(p -> request.practiceIds().isEmpty()
+                            || request.practiceIds().contains(p.getId()))
+                    .sorted(Comparator.comparing(Practice::getId))
+                    .toList();
+        } else {
+            var decision = gate.evaluate(workspace, pinned, request.origin(), event, request.practiceIds());
+            if (!(decision instanceof GateDecision.Run run))
+                throw new ResponseStatusException(
+                        HttpStatus.UNPROCESSABLE_CONTENT, "No practice can review this item.");
+            selected = run.matchedPractices();
+        }
+        if (selected.isEmpty()
+                || (!request.practiceIds().isEmpty()
+                        && (selected.size() != request.practiceIds().size()
+                                || !selected.stream()
+                                        .map(Practice::getId)
+                                        .toList()
+                                        .containsAll(request.practiceIds()))))
+            throw new ResponseStatusException(
+                    HttpStatus.UNPROCESSABLE_CONTENT, "Select eligible practices from this workspace.");
+        var planned = selected.stream()
+                .map(p -> selection(workspace, p, request.kind(), pinned))
+                .toList();
+        var developers = new ArrayList<@Nullable Long>();
+        for (var plan : planned) {
+            if (plan.reason() == null)
+                developers.add(plan.roles().size() == 1 ? plan.roles().getFirst() : null);
+        }
+        var models = bindings.models(request.workspaceId(), developers).stream()
+                .sorted(Comparator.comparing(BoundModelSlot::slot))
+                .toList();
+        if (models.size() != 5
+                || !models.stream()
+                        .map(BoundModelSlot::slot)
+                        .sorted()
+                        .toList()
+                        .equals(List.of("chat", "decision", "embedding", "reranking", "review")))
+            throw new IllegalStateException("The review method must contain the five frozen slots.");
+        if (models.stream()
+                        .filter(slot -> slot.slot().equals("review"))
+                        .findFirst()
+                        .orElseThrow()
+                        .model()
+                == null)
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "The review model is unavailable.");
+        var digest = jdbc.sql("SELECT review_model_digest(CAST(:models AS jsonb))")
+                .param("models", json.writeValueAsString(models))
+                .query(String.class)
+                .single();
+        var method = new ReviewMethod(1, digest, models);
+        ObjectNode checks = json.createObjectNode();
+        checks.put("reuse", request.reuse());
+        if (request.kind() == ReviewKind.SCAN) {
+            var branch = pinned.state().get("defaultBranch");
+            if (branch == null || branch.isBlank())
+                throw new ResponseStatusException(
+                        HttpStatus.SERVICE_UNAVAILABLE, "The repository default branch is unavailable.");
+            checks.put("ref", branch);
+        }
+        var review = reviews.save(Review.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(request.workspaceId())
+                .itemId(request.itemId())
+                .kind(request.kind())
+                .itemVersion(pinned.version().value())
+                .baseVersion(pinned.version().baseVersion())
+                .origin(request.origin())
+                .eventId(request.eventId())
+                .batchId(request.batchId())
+                .requestedById(request.requestedById())
+                .budgetUsd(request.budgetUsd())
+                .requestKey(request.requestKey())
+                .requestDigest(request.requestDigest())
+                .rolloutRevision(workspace.getReviewSettings().getRolloutRevision())
+                .orderedAt(ordered)
+                .createdAt(now)
+                .checks(checks)
+                .build());
+        for (var plan : planned) {
+            var practice = plan.practice();
+            var version = plan.version();
+            var assignment = assignments.save(ReviewPractice.builder()
+                    .reviewId(review.getId())
+                    .workspaceId(request.workspaceId())
+                    .practiceId(practice.getId())
+                    .practiceVersionId(version.getId())
+                    .method(method)
+                    .status(ReviewPracticeStatus.READY)
+                    .build());
+            if (request.kind() == ReviewKind.ITEM) {
+                var roles = plan.roles();
+                var detail = json.createObjectNode();
+                if (roles.size() == 1) detail.put("developerId", roles.getFirst());
+                else detail.putNull("developerId");
+                var reason = plan.reason();
+                memberships.save(ReviewItem.builder()
+                        .workspaceId(request.workspaceId())
+                        .reviewId(review.getId())
+                        .practiceId(practice.getId())
+                        .itemId(request.itemId())
+                        .itemVersion(pinned.version().value())
+                        .state(reason == null ? ReviewItemState.LISTED : ReviewItemState.WITHHELD)
+                        .reason(reason)
+                        .detail(detail)
+                        .build());
+                assignment.setItemsListed(1);
+                assignment.setListingComplete(true);
+                if (reason != null) {
+                    assignment.setStatus(ReviewPracticeStatus.WITHHELD);
+                    assignment.setReason(reason);
+                }
+            }
+        }
+        if (request.kind() == ReviewKind.ITEM
+                && memberships
+                        .findByWorkspaceIdAndReviewIdOrderByPracticeIdAscItemIdAsc(
+                                request.workspaceId(), review.getId())
+                        .stream()
+                        .allMatch(m -> m.getState() == ReviewItemState.WITHHELD)) {
+            review.setStatus(ReviewStatus.PARTIAL);
+            review.setStopReason(ReviewStopReason.READINESS_REFUSED);
+            review.setCompletedAt(now);
+        } else events.publishEvent(new ReviewRequested(review.getId(), request.workspaceId()));
+        return review.getId();
+    }
+
+    private SelectedPractice selection(Workspace workspace, Practice practice, ReviewKind kind, ItemSnapshot pinned) {
+        var version = practice.getCurrentVersion();
+        var definition = json.convertValue(version.getDefinition(), PracticeDefinition.class);
+        if (kind == ReviewKind.SCAN) return new SelectedPractice(practice, version, List.of(), null);
+        var roles = resolveRole(workspace.getId(), definition, pinned);
+        String reason = definition.about() == null
+                ? null
+                : roles.isEmpty() ? "ROLE_UNAVAILABLE" : roles.size() > 1 ? "ROLE_AMBIGUOUS" : null;
+        if (reason == null
+                && !coverage.admits(
+                        workspace,
+                        coverage.repositoryItemId(
+                                workspace.getId(), pinned.item().itemId()),
+                        pinned.state().get("baseBranch"),
+                        roles.size() == 1 ? roles.getFirst() : null,
+                        pinned.item().kind().value().equals("scm.pull_request")
+                                || pinned.item().kind().value().equals("scm.pull_request_review")))
+            reason = "OUTSIDE_REVIEW_SCOPE";
+        return new SelectedPractice(practice, version, roles, reason);
+    }
+
+    private record SelectedPractice(
+            Practice practice,
+            PracticeVersion version,
+            List<Long> roles,
+            @Nullable String reason) {}
+
+    private List<Long> resolveRole(long workspaceId, PracticeDefinition definition, ItemSnapshot snapshot) {
+        if (definition.about() == null) return List.of();
+        var eligible = coverage.eligibleAccountIds(workspaceId);
+        return snapshot.roles().stream()
+                .filter(r -> r.human() && r.role() == definition.about())
+                .map(r -> identities.resolveAccountId(
+                        r.identity().providerId(),
+                        r.identity().subject(),
+                        r.identity().teamId()))
+                .flatMap(Optional::stream)
+                .filter(eligible::contains)
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<ReviewSnapshot> find(long workspaceId, UUID reviewId) {
+        return snapshots.find(workspaceId, reviewId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<Instant> publicReviewedAt(long workspaceId, UUID reviewId) {
+        return snapshots.publicReviewedAt(workspaceId, reviewId);
+    }
+
+    @Override
+    @Transactional
+    public boolean start(long workspaceId, UUID reviewId) {
+        var review = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
+        if (review.getStatus() != ReviewStatus.QUEUED
+                || review.getChecks().path("cancellationRequested").asBoolean()) return false;
+        review.setStatus(ReviewStatus.RUNNING);
+        var checks = (ObjectNode) review.getChecks().deepCopy();
+        checks.put("startedAt", clock.instant().toString());
+        review.setChecks(checks);
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public void complete(long workspaceId, UUID reviewId, ReviewCompletion completion) {
+        var review = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
+        if (terminal(review.getStatus())) return;
+        if (!terminal(completion.status()))
+            throw new IllegalArgumentException("Completion requires a terminal status.");
+        if (runtime.runtime(workspaceId, reviewId).stream()
+                .flatMap(r -> r.jobs().stream())
+                .anyMatch(j -> j.status() == ReviewJobStatus.RUNNING || j.status() == ReviewJobStatus.QUEUED))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "The active invocation must settle before closure.");
+        boolean incomplete = (review.getKind() == ReviewKind.SCAN
+                        && (review.getInventoryReceipt() == null
+                                || !review.getInventoryReceipt()
+                                        .path("complete")
+                                        .asBoolean()
+                                || assignments
+                                        .findByWorkspaceIdAndReviewIdOrderByPracticeIdAsc(workspaceId, reviewId)
+                                        .stream()
+                                        .anyMatch(p -> !Boolean.TRUE.equals(p.getListingComplete()))))
+                || jdbc.sql("SELECT EXISTS(SELECT 1 FROM review_item WHERE workspace_id=:ws AND review_id=:id AND"
+                                + " state IN ('WITHHELD','LISTED'))")
+                        .param("ws", workspaceId)
+                        .param("id", reviewId)
+                        .query(Boolean.class)
+                        .single();
+        var status = review.getChecks().path("cancellationRequested").asBoolean()
+                ? ReviewStatus.CANCELLED
+                : completion.status() == ReviewStatus.COMPLETE && incomplete
+                        ? ReviewStatus.PARTIAL
+                        : completion.status();
+        review.setStatus(status);
+        review.setStopReason(
+                status == ReviewStatus.COMPLETE
+                        ? null
+                        : status == ReviewStatus.CANCELLED
+                                ? ReviewStopReason.CANCELLED
+                                : completion.reason() == null
+                                        ? ReviewStopReason.EXECUTION_INCOMPLETE
+                                        : completion.reason());
+        review.setCompletedAt(completion.completedAt());
+        for (var assignment : assignments.lockAssignments(workspaceId, reviewId))
+            if (assignment.getStatus() != ReviewPracticeStatus.WITHHELD
+                    && assignment.getStatus() != ReviewPracticeStatus.FAILED)
+                assignment.setStatus(ReviewPracticeStatus.DONE);
+        if (review.getKind() == ReviewKind.SCAN) reports.freeze(workspaceId, reviewId);
+    }
+
+    @Override
+    @Transactional
+    public boolean cancel(long workspaceId, UUID reviewId, @Nullable String reason) {
+        var review = reviews.lockByIdAndWorkspaceId(reviewId, workspaceId).orElseThrow();
+        if (terminal(review.getStatus())) return false;
+        if (review.getChecks().path("cancellationRequested").asBoolean()) return true;
+        var checks = (ObjectNode) review.getChecks().deepCopy();
+        checks.put("cancellationRequested", true);
+        checks.put("cancellationReason", reason == null ? "CANCELLED_BY_ADMIN" : reason);
+        review.setChecks(checks);
+        events.publishEvent(
+                new ReviewCancellationRequested(reviewId, workspaceId, reason == null ? "CANCELLED_BY_ADMIN" : reason));
+        if (runtime.runtime(workspaceId, reviewId).stream()
+                .flatMap(r -> r.jobs().stream())
+                .noneMatch(j -> j.status() == ReviewJobStatus.RUNNING || j.status() == ReviewJobStatus.QUEUED)) {
+            review.setStatus(ReviewStatus.CANCELLED);
+            review.setStopReason(ReviewStopReason.CANCELLED);
+            review.setCompletedAt(clock.instant());
+            if (review.getKind() == ReviewKind.SCAN) reports.freeze(workspaceId, reviewId);
+        }
+        return true;
+    }
+
+    public static boolean terminal(ReviewStatus status) {
+        return status != ReviewStatus.QUEUED && status != ReviewStatus.RUNNING;
+    }
+
+    private static void validate(ReviewRequest r) {
+        if (r.workspaceId() <= 0
+                || r.itemId() <= 0
+                || r.practiceIds().stream().distinct().count()
+                        != r.practiceIds().size())
+            throw new IllegalArgumentException("Use positive item ids and distinct practices.");
+        if ((r.origin() == ReviewOrigin.EVENT && r.eventId() == null)
+                || (r.origin() == ReviewOrigin.REQUEST && r.requestedById() == null)
+                || ((r.origin() == ReviewOrigin.SCHEDULE || r.origin() == ReviewOrigin.BACKFILL)
+                        && r.batchId() == null))
+            throw new IllegalArgumentException("The review origin requires its recorded link.");
+        if (r.kind() == ReviewKind.SCAN && (r.requestKey() == null || r.requestDigest() == null))
+            throw new IllegalArgumentException("A scan requires its request key and digest.");
+    }
+
+    private record EventFact(
+            ItemEventName name, Instant at, @Nullable String version) {}
+}

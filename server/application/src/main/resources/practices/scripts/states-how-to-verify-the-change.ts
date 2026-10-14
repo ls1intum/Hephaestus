@@ -1,21 +1,16 @@
-// Tells what kind of change this is, where text that tells how to verify it can be, and which added
-// lines keep an Xcode placeholder or read a secret. The criteria's occasion gate needs these facts
-// first: a small model often judges a diagram or an introduction as a change without instructions.
-import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type DiffFile,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
 	withoutHtmlComments,
-} from "../lib/references.ts";
-import { readLinkedWorkItemCapture } from "../lib/review.ts";
+} from "../kits/scm/references.ts";
+import { readLinkedWorkItemCapture } from "../kits/scm/review.ts";
+// Tells what kind of change this is, where text that tells how to verify it can be, and which added
+// lines keep an Xcode placeholder or read a secret. The criteria's applicability gate needs these facts
+// first: a small model often judges a diagram or an introduction as a change without instructions.
+import { DIRECTION_CHARS, listWithin, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"xcode-placeholder": "An added line that keeps an Xcode placeholder token.",
@@ -95,9 +90,10 @@ function listed(opening: string, items: readonly string[], separator = ", "): st
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const { work } = ctx;
-		const change = requireChange(ctx.files);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const { item: record } = domain;
+		const change = requireChange(domain.files);
 		const paths = [...change.keys()];
 		// A move, a rename or a binary file changes no line; an image among them is still content.
 		const unchanged = [...change.values()]
@@ -144,7 +140,7 @@ export default definePracticeScript({
 				(SECRET_NAME.test(line.trim()) || /\.xcconfig$|\.env\b/iu.test(line.trim())),
 		);
 
-		const body = work.body ?? "";
+		const body = record.body ?? "";
 		const testing = testingSection(body);
 		const screenshots = body.match(SCREENSHOT)?.length ?? 0;
 		// Only the author's own words adopt an issue: a closing keyword in their prose, the title, the
@@ -164,18 +160,18 @@ export default definePracticeScript({
 				.map((item) => item.number),
 		);
 		name("closing keyword in the description", closingReferences(body));
-		name("title", issueNumberReferences(work.title ?? ""));
-		name("branch", branchIssueReferences(work.source_branch));
+		name("title", issueNumberReferences(record.title ?? ""));
+		name("branch", branchIssueReferences(record.source_branch));
 
 		const directions: string[] = [];
 		if (paths.length === 0 || addedLines + removedLines === 0) {
 			directions.push(
-				"The pinned range changes no lines: an empty diff is one of the kinds the criteria's Occasion section names; cite it through metadata.json changed_files or work/change/files.json.",
+				"The pinned range changes no lines: an empty diff is one of the kinds the criteria's applicability section names; cite it through metadata.json changed_files or work/change/files.json.",
 			);
 		} else if (kinds.code === 0 && kinds.tests === 0 && kinds.projectConfig === 0) {
 			directions.push(
 				`No code, test or project-configuration file has line changes; the change is ${kinds.images} image(s), ${kinds.diagramFiles} diagram file(s) and ${kinds.prose} prose file(s).`,
-				"Read the prose hunks: if they add setup or run instructions the change is material; if they add an introduction, a glossary, user stories or a diagram's embedding, it is one of the kinds the criteria's Occasion section names.",
+				"Read the prose hunks: if they add setup or run instructions the change is material; if they add an introduction, a glossary, user stories or a diagram's embedding, it is one of the kinds the criteria's applicability section names.",
 			);
 		} else {
 			directions.push(

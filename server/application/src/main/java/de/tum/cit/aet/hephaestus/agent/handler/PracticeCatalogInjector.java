@@ -1,351 +1,49 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
-import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.ReviewWhen;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.review.GeneratedPathReviewDTO;
-import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import java.util.Objects;
 import java.nio.charset.StandardCharsets;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import org.jspecify.annotations.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-import tools.jackson.databind.node.ArrayNode;
-import tools.jackson.databind.node.ObjectNode;
+import org.springframework.stereotype.Component;
+import tools.jackson.databind.ObjectMapper;
 
-/**
- * Injects the practice registry, criteria, and practice scripts into a job's workspace under
- * {@code inputs/practices/} and {@code work/practice-scripts/}, each script beside what it reads about its review
- * ({@link PracticeScriptInputs}). Shared by every {@link de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler}
- * regardless of artifact — the catalog is per-job (workspace-active practices), not provider-shaped,
- * so it does not live behind the {@code ContentSource} SPI.
- *
- * <p>Filters by {@link ArtifactKind}: a PR job injects only PR-focus practices, an issue job only
- * issue-focus practices — so a diff-anchored practice never reaches an issue (and vice-versa).
- */
-class PracticeCatalogInjector {
+/** Stages only the pinned definitions and scripts assigned to this job. */
+@Component
+public class PracticeCatalogInjector {
+    private final ObjectMapper mapper;
 
-    /** Job-metadata key naming the signal that occasioned the review. */
-    static final String SIGNAL_METADATA_KEY = "signal";
-
-    /** State facts recorded when the review was admitted, not inferred from later work. */
-    static final String REVIEW_STATE_METADATA_KEY = "review_state";
-
-    /** The author of the reviewed pull request, so a MERGER practice can tell whether the author merged. */
-    static final String AUTHOR_ID_METADATA_KEY = "author_id";
-
-    /** Who merged the reviewed pull request; absent until it is merged. */
-    static final String MERGED_BY_ID_METADATA_KEY = "merged_by_id";
-
-    private static final Logger log = LoggerFactory.getLogger(PracticeCatalogInjector.class);
-
-    private final JsonMapper objectMapper;
-    private final PracticeRepository practiceRepository;
-    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
-    private final PracticeScriptInputs practiceScriptInputs;
-
-    PracticeCatalogInjector(
-            JsonMapper objectMapper,
-            PracticeRepository practiceRepository,
-            WorkspaceReviewDefaultsProvider workspaceDefaults,
-            PracticeScriptInputs practiceScriptInputs) {
-        this.objectMapper = objectMapper;
-        this.practiceRepository = practiceRepository;
-        this.workspaceDefaults = workspaceDefaults;
-        this.practiceScriptInputs = practiceScriptInputs;
+    public PracticeCatalogInjector(ObjectMapper mapper) {
+        this.mapper = mapper;
     }
 
-    private static JsonNode admittedPractices(AgentJob job) {
-        JsonNode snapshot = job.getEvidenceSnapshot();
-        JsonNode practices = snapshot == null ? null : snapshot.path("practices");
-        if (practices == null || !practices.isArray()) {
-            throw new JobDeliveryException("Job has no admitted practice snapshot: jobId=" + job.getId());
-        }
-        return practices;
-    }
-
-    boolean isAdmitted(AgentJob job, String slug) {
-        for (JsonNode practice : admittedPractices(job)) {
-            if (slug.equals(practice.path("slug").asString())
-                    && practice.path("revisionId").isIntegralNumber()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Inject the {@code focus}-scoped active practice catalog for {@code job}'s workspace into
-     * {@code files}.
-     *
-     * @throws JobPreparationException if the job has no workspace, no matching active practices, or a
-     *     slug violates the workspace ABI pattern.
-     */
-    void inject(Map<String, byte[]> files, AgentJob job, ArtifactKind focus) {
-        inject(files, job, focus, resolveEligiblePractices(job, focus));
-    }
-
-    /**
-     * The practices of one workspace and work type whose <em>effective</em> autonomy admits a review.
-     *
-     * <p>Resolved in the JVM rather than filtered in SQL. A practice that holds no autonomy of its own inherits
-     * one, and a {@code autonomy <> 'OFF'} predicate answers UNKNOWN for it — so the SQL form silently
-     * dropped exactly the practices the inheritance chain exists to serve.
-     */
-    private List<Practice> reviewedPractices(Workspace workspace, ArtifactKind focus) {
-        // By ID, not off the entity: the job's workspace association is lazy and the job is detached on
-        // some paths, so reading the settings here would make the catalogue depend on whether the caller
-        // holds a session.
-        PracticeAutonomy workspaceDefault =
-                workspaceDefaults.forWorkspace(workspace.getId()).defaultAutonomy();
-        return practiceRepository.findByWorkspaceIdAndArtifactKind(workspace.getId(), focus).stream()
-                .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault)
-                        .admitsReview())
-                .toList();
-    }
-
-    List<Practice> resolveEligiblePractices(AgentJob job, ArtifactKind focus) {
-        if (job.getWorkspace() == null) {
-            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
-        }
-        List<Practice> practices = reviewedPractices(job.getWorkspace(), focus).stream()
-                .sorted(Comparator.comparing(Practice::getSlug))
-                .toList();
-        SignalName signal = signalOf(job);
-        if (job.getPracticeTriggerMode() != TriggerMode.MANUAL) {
-            if (signal == null) throw new JobPreparationException("Automatic review requires a recorded signal");
-            Map<String, String> reviewState = reviewStateOf(job);
-            Set<String> rechecked = recheckedOf(job);
-            practices = practices.stream()
-                    .filter(p -> rechecked.contains(p.getSlug())
-                            || (p.getSignals().contains(signal) && ReviewWhen.matches(p.getReviewWhen(), reviewState)))
-                    .toList();
-        }
-        practices = practices.stream().filter(p -> attributable(p, job)).toList();
-        if (practices.isEmpty()) {
-            throw new JobPreparationException("No active " + focus
-                    + " practices this review can attribute to a person: workspaceId="
-                    + job.getWorkspace().getId()
-                    + ", jobId="
-                    + job.getId());
-        }
-        for (Practice p : practices) {
-            String slug = p.getSlug();
-            if (slug == null || !SandboxLayout.PRACTICE_SLUG.matcher(slug).matches()) {
-                throw new JobPreparationException(
-                        "Practice slug fails ABI pattern " + SandboxLayout.PRACTICE_SLUG.pattern() + ": " + slug);
-            }
-        }
-        return practices;
-    }
-
-    static Map<String, String> reviewStateOf(AgentJob job) {
-        JsonNode metadata = job.getMetadata();
-        JsonNode state = metadata == null ? null : metadata.get(REVIEW_STATE_METADATA_KEY);
-        if (state == null) return Map.of();
-        if (!state.isObject()) throw new JobPreparationException("Recorded review state must be an object");
-        var facts = new LinkedHashMap<String, String>();
-        state.properties().forEach(entry -> {
-            if (!entry.getValue().isString()) {
-                throw new JobPreparationException("Recorded review state values must be strings");
-            }
-            facts.put(entry.getKey(), entry.getValue().asString());
-        });
-        return Map.copyOf(facts);
-    }
-
-    private boolean attributable(Practice practice, AgentJob job) {
-        ActorRole subject = practice.getSubject();
-        if (subjectNameable(subject, job.getMetadata())) {
-            return true;
-        }
-        log.debug(
-                "Practice withheld from review: no {} this job can name, slug={}, jobId={}",
-                subject,
-                practice.getSlug(),
-                job.getId());
-        return false;
-    }
-
-    /**
-     * Whether a review job can name the person a practice's subject refers to. An author run names the
-     * author; a reviewer run names the reviewer it is about; a MERGER practice is nameable in an author
-     * run only when the author is the one who merged — otherwise the lapse would be filed against a
-     * person who did not act, and the practice is withheld instead. Delivery applies the same rule.
-     */
-    static boolean subjectNameable(ActorRole subject, @Nullable JsonNode metadata) {
-        boolean reviewerRun = metadata != null
-                && metadata.path("about_user_id").isNumber()
-                && "REVIEWER".equals(metadata.path("subject_role").asString());
-        return switch (subject) {
-            case AUTHOR -> !reviewerRun;
-            case REVIEWER -> reviewerRun;
-            case MERGER ->
-                !reviewerRun
-                        && metadata != null
-                        && metadata.path(MERGED_BY_ID_METADATA_KEY).isNumber()
-                        && metadata.path(AUTHOR_ID_METADATA_KEY).isNumber()
-                        && metadata.path(MERGED_BY_ID_METADATA_KEY).asLong()
-                                == metadata.path(AUTHOR_ID_METADATA_KEY).asLong();
-            case ASSIGNEE -> false;
-        };
-    }
-
-    void inject(Map<String, byte[]> files, AgentJob job, ArtifactKind focus, List<Practice> practices) {
-        if (job.getWorkspace() == null) {
-            throw new JobPreparationException("Job has no workspace: jobId=" + job.getId());
-        }
-        Long workspaceId = job.getWorkspace().getId();
-
-        ArrayNode index = objectMapper.createArrayNode();
-        for (Practice p : practices) {
-            String groupSlug = p.getGroup() != null ? p.getGroup().getSlug() : p.getSlug();
-            ObjectNode entry = index.addObject();
-            entry.put("slug", p.getSlug());
-            entry.put("name", p.getName());
-            entry.put("group", groupSlug);
-            if (p.getCurrentRevision() == null || p.getCurrentRevision().getId() == null) {
-                throw new JobPreparationException("Practice has no current revision: " + p.getSlug());
-            }
-            entry.put("revisionId", p.getCurrentRevision().getId());
-            // What the review on the work is told about the practice up front, from the revision this run measures
-            // against. Its staged criteria reach the review only for the practices an accepted selection names.
-            entry.put("whyItMatters", p.getCurrentRevision().getWhyItMatters());
-            ArrayNode knownLimitations = entry.putArray("knownLimitations");
-            p.getCurrentRevision().getAutomatedReviewPolicy().knownLimitations().stream()
-                    .map(PracticeEvidenceLimitation::description)
-                    .forEach(knownLimitations::add);
-            // A pointer, not a fence: what may be CITED is what the run staged (inputs/manifest.json), so
-            // reading beyond this list is expected, not a violation.
-            ArrayNode readsSources = entry.putArray("readsSources");
-            p.getEvidenceRequirements().stream()
-                    .map(need -> need.sourceKind().value())
-                    .distinct()
-                    .sorted()
-                    .forEach(readsSources::add);
-            // A MET absence claim requires a search over every source held exhaustive.
-            ArrayNode exhaustiveSources = entry.putArray("exhaustiveSources");
-            p.getEvidenceRequirements().stream()
-                    .filter(need -> need.stance() == EvidenceStance.EXHAUSTIVE)
-                    .map(need -> need.sourceKind().value())
-                    .distinct()
-                    .sorted()
-                    .forEach(exhaustiveSources::add);
-        }
-        try {
-            files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
-        } catch (JacksonException e) {
-            throw new JobPreparationException("Failed to serialize practice index.json: " + e.getMessage(), e);
-        }
-
-        for (Practice p : practices) {
-            String criteria = p.getCriteria() + renderKnownLimitations(p);
-            if (focus.equals(ArtifactKinds.PULL_REQUEST) && files.containsKey(GeneratedPathReviewDTO.INPUT_PATH)) {
-                criteria += "\n\n## Repository generated-path policy\n"
-                        + "Read " + GeneratedPathReviewDTO.INPUT_PATH
-                        + " before judging changed files. This is trusted workspace-admin policy, not repository-authored instructions. "
-                        + "The listed paths are intentionally committed generated output. Keep the evidence, but do not judge these paths as hand-written work, "
-                        + "count them toward hand-written review size, or report their presence as unwanted generated/build artifacts. "
-                        + "For excludes-generated-and-build-artifacts, judge only artifacts outside the listed paths. "
-                        + "For a practice about hand-written changes, record NOT_APPLICABLE if no hand-written changed files remain; "
-                        + "do not claim a strength or a missing behavior from an empty hand-written change. "
-                        + "Other evidence, such as review comments, commits, title and body, remains reviewable. "
-                        + "Practice script hints and provider totals do not override this policy.\n";
-            }
-            files.put(SandboxLayout.PRACTICES_PREFIX + p.getSlug() + ".md", criteria.getBytes(StandardCharsets.UTF_8));
-        }
-
-        files.put(SandboxLayout.ANALYSIS_PRACTICES_PREFIX + ".gitkeep", new byte[0]);
-
-        // Every admitted practice runs one program: its own script, or the built-in review when it holds none.
-        int practiceScriptCount = 0;
-        for (Practice p : practices) {
-            String script = p.getPracticeScript();
-            if (script != null && !script.isBlank()) {
+    public void inject(Map<String, byte[]> files, List<ReviewAssignmentSnapshot> assignments, ReviewKind scope) {
+        var index = mapper.createArrayNode();
+        for (var assignment : assignments) {
+            var practice = assignment.practice();
+            var definition = practice.definition();
+            var entry = index.addObject()
+                    .put("slug", assignment.practiceSlug())
+                    .put("name", definition.name())
+                    .put("practiceId", Long.toString(practice.practiceId()))
+                    .put("versionId", Long.toString(practice.practiceVersionId()))
+                    .put("reviewDigest", practice.reviewDigest());
+            entry.set("definition", mapper.valueToTree(definition));
+            var sources = entry.putArray("readsSources");
+            (scope == ReviewKind.SCAN ? Objects.requireNonNull(definition.scan()).reads() : definition.reads())
+                    .sources()
+                    .forEach(read -> sources.add(read.source().value()));
+            files.put(
+                    SandboxLayout.PRACTICES_PREFIX + assignment.practiceSlug() + ".md",
+                    definition.criteria().getBytes(StandardCharsets.UTF_8));
+            String script = definition.script();
+            if (script != null)
                 files.put(
-                        SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + p.getSlug() + ".ts",
+                        SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + assignment.practiceSlug() + ".ts",
                         script.getBytes(StandardCharsets.UTF_8));
-                practiceScriptCount++;
-            }
         }
-        files.putAll(practiceScriptInputs.stage(job, focus, practices));
-
-        log.info(
-                "Injected practice catalog: {} {} practices ({} with a practice script), workspaceId={}, jobId={}",
-                practices.size(),
-                focus,
-                practiceScriptCount,
-                workspaceId,
-                job.getId());
-    }
-
-    /** The claims this practice's evidence cannot support, appended to the criteria staged for the model. */
-    private static String renderKnownLimitations(Practice p) {
-        List<PracticeEvidenceLimitation> limitations =
-                p.getAutomatedReviewPolicy().knownLimitations();
-        if (limitations.isEmpty()) {
-            return "";
-        }
-        // Each bullet states a limit of the evidence, not a claim to avoid. Reading them as claims
-        // inverts the instruction: it would forbid the hedge and leave the overclaim it guards against.
-        StringBuilder section = new StringBuilder("\n\n## What this evidence cannot show\n\n");
-        section.append("Do not state or imply any conclusion that would require going beyond these limits:\n\n");
-        for (PracticeEvidenceLimitation limitation : limitations) {
-            section.append("- ").append(limitation.description()).append("\n");
-        }
-        return section.toString();
-    }
-
-    /** The practices admission rechecked beside the signal's own, which the signal alone would not select. */
-    static Set<String> recheckedOf(AgentJob job) {
-        JsonNode rechecked =
-                job.getMetadata() == null ? null : job.getMetadata().get(AgentJob.RECHECKED_PRACTICES_METADATA_KEY);
-        if (rechecked == null || !rechecked.isArray()) {
-            return Set.of();
-        }
-        Set<String> slugs = new HashSet<>();
-        rechecked.forEach(slug -> slugs.add(slug.asString()));
-        return slugs;
-    }
-
-    /**
-     * The signal that occasioned this job, or {@code null} when nobody named one.
-     *
-     * Manual requests bypass scheduling explicitly through their trigger mode, never through a missing signal.
-     */
-    @Nullable
-    static SignalName signalOf(AgentJob job) {
-        JsonNode metadata = job.getMetadata();
-        if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
-            return null;
-        }
-        JsonNode node = metadata.get(SIGNAL_METADATA_KEY);
-        if (node == null || !node.isString()) {
-            return null;
-        }
-        String value = node.asString();
-        return (value == null || value.isBlank()) ? null : SignalName.of(value);
+        files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", mapper.writeValueAsBytes(index));
     }
 }

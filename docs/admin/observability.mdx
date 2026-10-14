@@ -134,7 +134,7 @@ groups:
         annotations:
           summary: LLM budget admission refused work
       - alert: HephaestusAgentJobsFailing
-        expr: sum(increase(agent_job_total{job="hephaestus",outcome=~"failed|timed_out"}[15m])) >= 3
+        expr: sum(increase(review_job_total{job="hephaestus",outcome=~"failed|timed_out"}[15m])) >= 3
         labels:
           severity: warning
         annotations:
@@ -223,10 +223,10 @@ Delivery is optional. Jobs that do not complete successfully may have no deliver
 
 ## Agent-job metrics
 
-| Prometheus name              | Type      | Labels    | Meaning                                                         |
-| ---------------------------- | --------- | --------- | --------------------------------------------------------------- |
-| `agent_job_total`            | Counter   | `outcome` | Committed terminal transitions                                  |
-| `agent_job_duration_seconds` | Histogram | `phase`   | Queue, execution-attempt, delivery-attempt, and total durations |
+| Prometheus name               | Type      | Labels    | Meaning                                                         |
+| ----------------------------- | --------- | --------- | --------------------------------------------------------------- |
+| `review_job_total`            | Counter   | `outcome` | Committed terminal transitions                                  |
+| `review_job_duration_seconds` | Histogram | `phase`   | Queue, execution-attempt, delivery-attempt, and total durations |
 
 `outcome` is one of `completed`, `failed`, `timed_out`, or `cancelled`. `phase` is one of `queue`,
 `execution`, `delivery`, or `total`. Identifiers, model and provider names, worker IDs, and exception text are not
@@ -380,7 +380,7 @@ A trace ID is not proof of export. Sampling, exporter errors, collector retentio
 process termination can all leave partial coverage. A trace describes when calls happened and how
 they ended. It is not a record of what a review read or said.
 
-Durable review records retain admitted results, their observations and citation verdicts, not raw inputs,
+Durable review records retain admitted results, their problems and citation verdicts, not raw inputs,
 model requests or session transcripts. `AGENT_PAYLOAD_RETENTION` strips diagnostic job output.
 The worker can separately retain bounded debug session transcripts. The
 [retention decision](https://github.com/hephaestus-build/Hephaestus/blob/main/docs/decisions/0041-compose-1x-kubernetes-2.md#update--2026-10-09-debug-transcripts)

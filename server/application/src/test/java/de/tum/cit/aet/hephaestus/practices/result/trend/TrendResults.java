@@ -1,76 +1,52 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewTestData;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * The results the trend and standing tests read: one piece of work a practice reviewed, and what it made
- * of it. A pull request unless a test says otherwise, and a run of its own unless the test names one, so a
- * test spells out only the facts it asserts on.
- */
 public final class TrendResults {
-
     private TrendResults() {}
 
-    /** The practice was demonstrated on this piece of work. */
-    public static PracticeResult clean(long artifactId, String observedAt) {
-        return judged(artifactId, observedAt, Outcome.MET);
+    public static ResultView clean(long itemId, String at) {
+        return judged(itemId, at, ResultOutcome.MET);
     }
 
-    /** {@link #clean} on a kind other than a pull request. */
-    public static PracticeResult clean(long artifactId, String observedAt, ArtifactKind kind) {
-        return practiceResult(artifactId, UUID.randomUUID(), observedAt, kind, Outcome.MET);
+    public static ResultView clean(long itemId, String at, ItemKind kind) {
+        return result(itemId, UUID.randomUUID(), at, kind, ResultOutcome.MET);
     }
 
-    /** {@link #clean} on a named run. */
-    public static PracticeResult clean(long artifactId, UUID jobId, String observedAt) {
-        return practiceResult(artifactId, jobId, observedAt, ArtifactKinds.PULL_REQUEST, Outcome.MET);
+    public static ResultView clean(long itemId, UUID reviewId, String at) {
+        return judged(itemId, reviewId, at, ResultOutcome.MET);
     }
 
-    /** The practice was there to judge and was judged: {@code BAD} is a problem in what was done. */
-    public static PracticeResult judged(long artifactId, String observedAt, Outcome outcome) {
-        return judged(artifactId, UUID.randomUUID(), observedAt, outcome);
+    public static ResultView judged(long itemId, String at, ResultOutcome outcome) {
+        return judged(itemId, UUID.randomUUID(), at, outcome);
     }
 
-    /** {@link #judged} on a named run. */
-    public static PracticeResult judged(long artifactId, UUID jobId, String observedAt, Outcome outcome) {
-        return practiceResult(artifactId, jobId, observedAt, ArtifactKinds.PULL_REQUEST, outcome);
+    public static ResultView judged(long itemId, UUID reviewId, String at, ResultOutcome outcome) {
+        return result(itemId, reviewId, at, new ItemKind("scm.pull_request"), outcome);
     }
 
-    /** The practice was missing from this piece of work. */
-    public static PracticeResult problem(long artifactId, String observedAt) {
-        return problem(artifactId, UUID.randomUUID(), observedAt);
+    public static ResultView problem(long itemId, String at) {
+        return judged(itemId, at, ResultOutcome.NOT_MET);
     }
 
-    /** {@link #problem} on a named run. */
-    public static PracticeResult problem(long artifactId, UUID jobId, String observedAt) {
-        return practiceResult(artifactId, jobId, observedAt, ArtifactKinds.PULL_REQUEST, Outcome.NOT_MET);
+    public static ResultView problem(long itemId, UUID reviewId, String at) {
+        return judged(itemId, reviewId, at, ResultOutcome.NOT_MET);
     }
 
-    /** The practice looked at this piece of work and found nothing to judge. */
-    public static PracticeResult noVerdict(long artifactId, String observedAt) {
-        return noVerdict(artifactId, UUID.randomUUID(), observedAt);
+    public static ResultView noVerdict(long itemId, String at) {
+        return judged(itemId, at, ResultOutcome.DOES_NOT_APPLY);
     }
 
-    /** {@link #noVerdict} on a named run. */
-    public static PracticeResult noVerdict(long artifactId, UUID jobId, String observedAt) {
-        return practiceResult(artifactId, jobId, observedAt, ArtifactKinds.PULL_REQUEST, Outcome.NOT_APPLICABLE);
+    public static ResultView noVerdict(long itemId, UUID reviewId, String at) {
+        return judged(itemId, reviewId, at, ResultOutcome.DOES_NOT_APPLY);
     }
 
-    private static PracticeResult practiceResult(
-            long artifactId, UUID jobId, String observedAt, ArtifactKind kind, Outcome outcome) {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(UUID.randomUUID())
-                .agentJobId(jobId)
-                .artifactKind(kind)
-                .artifactId(artifactId)
-                .outcome(outcome)
-                .observedAt(Instant.parse(observedAt))
-                .build();
+    private static ResultView result(long itemId, UUID reviewId, String at, ItemKind kind, ResultOutcome outcome) {
+        return ReviewTestData.view(itemId, reviewId, Instant.parse(at), kind, outcome);
     }
 }

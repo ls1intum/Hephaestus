@@ -28,8 +28,8 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for GitHubInstallationRepositoriesMessageHandler.
- * <p>
- * Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
+ *
+ * <p>Tests use JSON fixtures parsed directly into DTOs using JSON fixtures for complete isolation.
  */
 class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -85,7 +85,7 @@ class GitHubInstallationRepositoriesMessageHandlerIntegrationTest extends BaseIn
         Workspace saved = WorkspaceTestFixtures.persistInstallationWorkspace(
                 workspaceRepository, connectionRepository, builder, installationId);
         saved.setPublicActivityEnabled(true);
-        saved.setOrganization(org);
+        saved.setOrganizationId(org.getId());
         workspaceRepository.save(saved);
     }
 

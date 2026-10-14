@@ -6,13 +6,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussion.DiscussionRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.discussioncomment.DiscussionCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.github.discussioncomment.dto.GitHubDiscussionCommentEventDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -31,15 +31,15 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Integration tests for GitHubDiscussionCommentMessageHandler.
- * <p>
- * Tests the full webhook handling flow using JSON fixtures parsed directly
- * into DTOs for complete isolation. The comment handler processes the parent
- * discussion first (via GitHubDiscussionProcessor.process()) before processing
- * the comment itself, so no manual Discussion setup is needed.
- * <p>
- * Note: This test class does NOT use @Transactional because the processing
- * chain calls GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation.
- * Having @Transactional here would cause connection pool deadlocks.
+ *
+ * <p>Tests the full webhook handling flow using JSON fixtures parsed directly into DTOs for
+ * complete isolation. The comment handler processes the parent discussion first (via
+ * GitHubDiscussionProcessor.process()) before processing the comment itself, so no manual
+ * Discussion setup is needed.
+ *
+ * <p>Note: This test class does NOT use @Transactional because the processing chain calls
+ * GitHubUserProcessor.findOrCreate() which uses REQUIRES_NEW propagation. Having @Transactional
+ * here would cause connection pool deadlocks.
  */
 class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
@@ -140,7 +140,7 @@ class GitHubDiscussionCommentMessageHandlerIntegrationTest extends BaseIntegrati
         workspace.setDisplayName("Hephaestus Test");
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.setPublicActivityEnabled(true);
-        workspace.setOrganization(org);
+        workspace.setOrganizationId(org.getId());
         workspace.setAccountLogin(FIXTURE_ORG_LOGIN);
         workspace.setAccountType(AccountType.ORG);
         workspaceRepository.save(workspace);

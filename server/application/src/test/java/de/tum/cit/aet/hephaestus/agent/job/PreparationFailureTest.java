@@ -99,8 +99,8 @@ class PreparationFailureTest {
         assertThat(database.getCause()).isInstanceOf(EvidenceCollectionException.class);
         assertThat(ioFailure.message()).doesNotContain(privateText);
         assertThat(databaseFailure.message()).doesNotContain(privateText);
-        assertThat(AgentJobExecutor.isRetryableExecutionFailure(io)).isFalse();
-        assertThat(AgentJobExecutor.isRetryableExecutionFailure(database)).isFalse();
+        assertThat(ReviewJobExecutor.isRetryableExecutionFailure(io)).isFalse();
+        assertThat(ReviewJobExecutor.isRetryableExecutionFailure(database)).isFalse();
     }
 
     @Test

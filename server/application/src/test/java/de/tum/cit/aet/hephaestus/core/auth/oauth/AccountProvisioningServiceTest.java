@@ -14,12 +14,13 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProvider.ProviderType;
 import de.tum.cit.aet.hephaestus.core.auth.provider.LoginProviderRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.event.AccountSecurityChangedEvent;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataWriteFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
@@ -30,7 +31,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -53,13 +53,14 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     private static final long PROVIDER_ID = 5L;
 
     private AccountRepository accountRepository;
-    private IdentityLinkRepository identityLinkRepository;
+    private IdentityRepository identityRepository;
     private VerifiedEmailResolver verifiedEmailResolver;
     private AccountJitCreator accountJitCreator;
     private AdminBootstrapPolicy adminBootstrapPolicy;
     private LoginProviderRepository loginProviderRepository;
     private GitProviderRegistry gitProviderRegistry;
     private final PersonDataWriteFence writeFence = mock(PersonDataWriteFence.class);
+    private final PeopleRegistry people = mock(PeopleRegistry.class);
     private AccountProvisioningService service;
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
 
@@ -68,7 +69,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         lenient().when(writeFence.holdForWrite(any())).thenReturn(true);
         accountRepository = mock(AccountRepository.class);
         lenient().when(accountRepository.lockStatusForUpdate(anyLong())).thenReturn(Optional.of("ACTIVE"));
-        identityLinkRepository = mock(IdentityLinkRepository.class);
+        identityRepository = mock(IdentityRepository.class);
         gitProviderRegistry = mock(GitProviderRegistry.class);
         verifiedEmailResolver = mock(VerifiedEmailResolver.class);
         accountJitCreator = mock(AccountJitCreator.class);
@@ -89,7 +90,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         });
         service = new AccountProvisioningService(
                 accountRepository,
-                identityLinkRepository,
+                identityRepository,
                 gitProviderRegistry,
                 loginProviderRepository,
                 verifiedEmailResolver,
@@ -97,7 +98,8 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 adminBootstrapPolicy,
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 events,
-                writeFence);
+                writeFence,
+                people);
     }
 
     @Test
@@ -112,7 +114,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                         exception -> assertThat(exception.getError().getErrorCode())
                                 .isEqualTo("identity_processing_suppressed"));
 
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
         verify(accountRepository, never()).findById(anyLong());
         verify(accountJitCreator, never()).create(any(), any());
     }
@@ -126,7 +128,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 .isInstanceOf(LinkOnlyProviderLoginException.class);
 
         verify(accountJitCreator, never()).create(any(), any());
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 
     @Test
@@ -138,7 +140,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("team_id");
 
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 
     @Test
@@ -150,12 +152,13 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 .isInstanceOf(LinkOnlyProviderLoginException.class);
 
         verify(accountJitCreator, never()).create(any(), any());
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 
     @Test
     void outlineLink_withoutTeamId_failsClosed() {
-        // An Outline user UUID is only unique within its team; a null team_id would alias identities
+        // An Outline user UUID is only unique within its team; a null team_id would alias
+        // identities
         // across tenants of a shared instance — the guard must fail closed, exactly like Slack.
         useOutlineProvider();
 
@@ -164,16 +167,18 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("team_id");
 
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 
     @Test
     void outlineLink_withFlatTeamId_bindsToCurrentAccountWithTeamKey() {
         useOutlineProvider();
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("0aa1bb2c-user"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("0aa1bb2c-user"), any()))
                 .thenReturn(Optional.empty());
         when(accountRepository.findById(42L)).thenReturn(Optional.of(accountWithId(42L)));
-        // The flat "team_id" attribute OutlineAuthInfoUserService emits (flattened from data.team.id).
+        afterVerifiedClaim("0aa1bb2c-user", "9ff8ee7d-team");
+        // The flat "team_id" attribute OutlineAuthInfoUserService emits (flattened from
+        // data.team.id).
         OAuth2User outlinePrincipal = new DefaultOAuth2User(
                 List.of(new SimpleGrantedAuthority("ROLE_USER")),
                 Map.of("id", "0aa1bb2c-user", "name", "Ada", "team_id", "9ff8ee7d-team"),
@@ -184,16 +189,16 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
         assertThat(result.account().getId()).isEqualTo(42L);
         assertThat(result.identityLinked()).isTrue();
-        ArgumentCaptor<IdentityLink> saved = ArgumentCaptor.forClass(IdentityLink.class);
-        verify(identityLinkRepository).save(saved.capture());
-        assertThat(saved.getValue().getSubject()).isEqualTo("0aa1bb2c-user");
-        assertThat(saved.getValue().getTeamId()).isEqualTo("9ff8ee7d-team");
-        assertThat(saved.getValue().getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.MANUAL_LINK);
+        ArgumentCaptor<Identity> saved = ArgumentCaptor.forClass(Identity.class);
+        verify(identityRepository).save(saved.capture());
+        assertThat(saved.getValue().getProviderUserKey()).isEqualTo("0aa1bb2c-user");
+        assertThat(saved.getValue().getTeamKey()).isEqualTo("9ff8ee7d-team");
+        assertThat(saved.getValue().getLinkedVia()).isEqualTo(Identity.LinkedVia.MANUAL);
     }
 
     @Test
     void jitCreate_whenOnBootstrapAllowlist_promotesToAppAdmin() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
@@ -211,7 +216,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
     @Test
     void jitCreate_whenNotOnBootstrapAllowlist_staysUser() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
@@ -244,12 +249,21 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         when(loginProviderRepository.findByRegistrationId("outline")).thenReturn(Optional.of(outlineProvider));
     }
 
-    private static IdentityLink linkOn(Account account) {
-        IdentityLink link = new IdentityLink();
+    private static Identity linkOn(Account account) {
+        Identity link = new Identity();
         link.setAccount(account);
         link.setProviderId(PROVIDER_ID);
-        link.setSubject("sub-1");
+        link.setProviderUserKey("sub-1");
         return link;
+    }
+
+    private void afterVerifiedClaim(String subject, String team) {
+        var identity = linkOn(accountWithId(42L));
+        identity.setProviderUserKey(subject);
+        identity.setTeamKey(team);
+        when(people.ensureHuman(any(), any())).thenReturn(52L);
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq(subject), any()))
+                .thenReturn(Optional.empty(), Optional.of(identity));
     }
 
     private static Account accountWithId(long id) {
@@ -260,7 +274,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
     @Test
     void jitCreate_verifiedEmail_stampsVerifiedAt() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
@@ -275,7 +289,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
     @Test
     void jitCreate_unverifiedEmail_leavesVerifiedAtNull() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", false));
@@ -289,18 +303,13 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void jitCreate_whenConstraintLost_readsAfterConflictAndReturnsWinner() {
+    void shouldReuseTheAccountResolvedBySerializedJitCreationWhenRosterClaimWins() {
         Account winner = accountWithId(7L);
-        // First lookup (pre-create) misses; the post-conflict re-read returns the winner's link.
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
-                .thenReturn(Optional.empty())
-                .thenReturn(Optional.of(linkOn(winner)));
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+                .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
-        doThrow(new DataIntegrityViolationException(
-                        "duplicate key value violates uq_identity_link_provider_subject_team"))
-                .when(accountJitCreator)
-                .create(any(), any());
+        when(accountJitCreator.create(any(), any())).thenReturn(winner);
 
         var result =
                 service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.login(null, null));
@@ -311,88 +320,82 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     }
 
     @Test
-    void jitCreate_whenConstraintLostButNoWinnerVisible_failsClosed() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+    void shouldPropagatePersistenceFailureWithoutInventingAConcurrentWinner() {
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
-        doThrow(new DataIntegrityViolationException("duplicate key"))
+        doThrow(new DataIntegrityViolationException("invalid persisted identity"))
                 .when(accountJitCreator)
                 .create(any(), any());
 
         assertThatThrownBy(() -> service.resolveOrProvision(
                         "github", "sub-1", principal(), AuthIntentCookie.Intent.login(null, null)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("lost the race");
+                .isInstanceOf(DataIntegrityViolationException.class)
+                .hasMessageContaining("invalid persisted identity");
     }
 
     @Test
-    void returningLogin_wiresTheLinkToTheUserSyncedSinceTheLastSignIn() {
-        existingLink(null);
-        when(gitProviderRegistry.findActorId(PROVIDER_ID, "777")).thenReturn(Optional.of(555L));
+    void shouldUseExactAccountOwnershipWhenTheProviderProfileChanges() {
+        existingLink();
 
         service.resolveOrProvision("github", "777", principal(), AuthIntentCookie.Intent.login(null, null));
 
-        verify(identityLinkRepository).linkExternalActorIfAbsent(31L, 555L);
+        verify(identityRepository).touchLastLogin(31L, NOW);
     }
 
     @Test
     void returningLoginDoesNotUpdateADeletingAccount() {
-        existingLink(null);
+        existingLink();
         when(accountRepository.lockStatusForUpdate(9L)).thenReturn(Optional.of("DELETING"));
 
         assertThatThrownBy(() -> service.resolveOrProvision(
                         "github", "777", principal(), AuthIntentCookie.Intent.login(null, null)))
                 .isInstanceOf(OAuth2AuthenticationException.class);
 
-        verify(identityLinkRepository, never()).touchLastLogin(anyLong(), any());
-        verify(identityLinkRepository, never()).linkExternalActorIfAbsent(anyLong(), anyLong());
+        verify(identityRepository, never()).touchLastLogin(anyLong(), any());
         verify(accountRepository, never()).save(any());
     }
 
     @Test
-    void returningLogin_leavesAWiredLinkAlone() {
-        existingLink(555L);
+    void shouldNotReadProviderMirrorsWhenReturningAnOwnedAccount() {
+        existingLink();
 
         service.resolveOrProvision("github", "777", principal(), AuthIntentCookie.Intent.login(null, null));
 
         verify(gitProviderRegistry, never()).findActorId(anyLong(), any());
-        verify(identityLinkRepository, never()).linkExternalActorIfAbsent(anyLong(), anyLong());
     }
 
-    private IdentityLink existingLink(@Nullable Long externalActorId) {
+    private Identity existingLink() {
         Account account = new Account("Existing");
         account.setId(9L);
-        IdentityLink link = new IdentityLink();
+        Identity link = new Identity();
         link.setId(31L);
         link.setAccount(account);
-        link.setExternalActorId(externalActorId);
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("777"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("777"), any()))
                 .thenReturn(Optional.of(link));
         return link;
     }
 
     @Test
-    void newLink_carriesTheSyncedUserBeforeItIsSaved() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("777"), any()))
+    void shouldPersistOnlyTheExactIdentityKeyWhenSignInCreatesAnAccount() {
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("777"), any()))
                 .thenReturn(Optional.empty());
-        when(gitProviderRegistry.findActorId(PROVIDER_ID, "777")).thenReturn(Optional.of(555L));
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
 
         service.resolveOrProvision("github", "777", principal(), AuthIntentCookie.Intent.login(null, null));
 
-        var link = ArgumentCaptor.forClass(IdentityLink.class);
+        var link = ArgumentCaptor.forClass(Identity.class);
         verify(accountJitCreator).create(any(), link.capture());
-        assertThat(link.getValue().getExternalActorId()).isEqualTo(555L);
-        verify(identityLinkRepository, never()).linkExternalActorIfAbsent(anyLong(), anyLong());
     }
 
     @Test
     void link_bindsToCurrentAccount() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
         when(accountRepository.findById(42L)).thenReturn(Optional.of(accountWithId(42L)));
+        afterVerifiedClaim("sub-1", "");
 
         var result =
                 service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.link(42L, null));
@@ -401,9 +404,9 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         assertThat(result.identityLinked())
                 .as("attaching a new identity is an identity-link")
                 .isTrue();
-        ArgumentCaptor<IdentityLink> saved = ArgumentCaptor.forClass(IdentityLink.class);
-        verify(identityLinkRepository).save(saved.capture());
-        assertThat(saved.getValue().getLinkedVia()).isEqualTo(IdentityLink.LinkedVia.MANUAL_LINK);
+        ArgumentCaptor<Identity> saved = ArgumentCaptor.forClass(Identity.class);
+        verify(identityRepository).save(saved.capture());
+        assertThat(saved.getValue().getLinkedVia()).isEqualTo(Identity.LinkedVia.MANUAL);
         assertThat(saved.getValue().getAccount().getId()).isEqualTo(42L);
         verify(events)
                 .publishEvent(
@@ -413,8 +416,9 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
     @Test
     void link_rejectsWhenIdentityAlreadyLinkedElsewhere() {
-        // The incoming identity is already an ACTIVE link on account 99; operator is linking into 42.
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        // The incoming identity is already an ACTIVE link on account 99; operator is linking into
+        // 42.
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.of(linkOn(accountWithId(99L))));
 
         assertThatThrownBy(() -> service.resolveOrProvision(
@@ -422,29 +426,30 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 .isInstanceOf(AccountLinkConflictException.class)
                 .hasMessageContaining("already linked to a different account");
 
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 
     @Test
     void link_idempotentWhenAlreadyLinkedToSameAccount() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.of(linkOn(accountWithId(42L))));
 
         var result =
                 service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.link(42L, null));
 
         assertThat(result.account().getId()).isEqualTo(42L);
-        // Re-affirming an already-linked identity persists NO new link, so it must NOT report a link
+        // Re-affirming an already-linked identity persists NO new link, so it must NOT report a
+        // link
         // (the handler would otherwise audit a phantom IDENTITY_LINKED for what is really a login).
         assertThat(result.identityLinked()).isFalse();
-        verify(identityLinkRepository).touchLastLogin(any(), any());
+        verify(identityRepository).touchLastLogin(any(), any());
         verify(events, never()).publishEvent(any(AccountSecurityChangedEvent.class));
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 
     @Test
     void link_nullBinding_failsClosed() {
-        when(identityLinkRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
+        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.resolveOrProvision(
@@ -462,6 +467,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         assertThatThrownBy(() -> service.resolveOrProvision("github", "42", mock(OAuth2User.class), null))
                 .isInstanceOf(OAuth2AuthenticationException.class);
         verify(accountJitCreator, never()).create(any(), any());
-        verify(identityLinkRepository, never()).save(any());
+        verify(identityRepository, never()).save(any());
     }
 }

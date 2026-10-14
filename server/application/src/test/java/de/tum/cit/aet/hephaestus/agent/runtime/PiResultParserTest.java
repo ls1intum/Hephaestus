@@ -78,7 +78,8 @@ class PiResultParserTest extends BaseUnitTest {
     void shouldAssembleTheAdmissionBodyWhenOnlyTheReviewStateIsLeft() {
         String reviewState = """
             {"schemaVersion":2,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",\
-            "explanation":"r","citations":[]}}]}""";
+            "explanation":"r","citations":[]}}]}\
+            """;
         var result = parser.parse(new SandboxResult(
                 1,
                 Map.of("review-state.json", reviewState.getBytes(StandardCharsets.UTF_8)),
@@ -99,10 +100,11 @@ class PiResultParserTest extends BaseUnitTest {
     void keepsNativeJsonExactly() {
         // As JSON.stringify writes it: escaped quotes, a backslash pair before a Swift interpolation, a newline.
         String nativeJson = """
-                {"schemaVersion":2,"results":[{"practiceSlug":"silent-failure","candidate":{"outcome":"NOT_MET",\
-                "summary":"Catch says \\"ok\\"","explanation":"print(\\"Error: \\\\(error)\\")\\nC:\\\\temp",\
-                "citations":[],"problems":[{"severity":"MAJOR","summary":"s","explanation":"e",\
-                "citations":[{"path":"App/Weather.swift","quote":"Text(\\"\\\\(weather.temp)°\\")"}]}]}}]}""";
+            {"schemaVersion":2,"results":[{"practiceSlug":"silent-failure","candidate":{"outcome":"NOT_MET",\
+            "summary":"Catch says \\"ok\\"","explanation":"print(\\"Error: \\\\(error)\\")\\nC:\\\\temp",\
+            "citations":[],"problems":[{"severity":"MAJOR","summary":"s","explanation":"e",\
+            "citations":[{"path":"App/Weather.swift","quote":"Text(\\"\\\\(weather.temp)°\\")"}]}]}}]}\
+            """;
 
         var result = parser.parse(new SandboxResult(
                 0, Map.of("result.json", nativeJson.getBytes(UTF_8)), "done", false, Duration.ofSeconds(10)));
@@ -137,7 +139,8 @@ class PiResultParserTest extends BaseUnitTest {
     void malformedResultKeepsOtherArtifacts() {
         String reviewState = """
             {"schemaVersion":2,"results":[{"practiceSlug":"x","candidate":{"outcome":"MET","summary":"t",
-            "explanation":"r","citations":[]}}]}""";
+            "explanation":"r","citations":[]}}]}\
+            """;
         var result = parser.parse(new SandboxResult(
                 0,
                 Map.of(
@@ -213,12 +216,12 @@ class PiResultParserTest extends BaseUnitTest {
     @Test
     void surfacesPerRunPracticeCoverageAndRecordsItsRatio() {
         String coverage = """
-                {"eligible":4,"evaluated":2,"outcomes":[
-                  {"practiceSlug":"a","outcome":"EVALUATED"},
-                  {"practiceSlug":"b","outcome":"NOT_REACHED"},
-                  {"practiceSlug":"c","outcome":"EVALUATED"},
-                  {"practiceSlug":"d","outcome":"NOT_REACHED"}]}
-                """;
+            {"eligible":4,"evaluated":2,"outcomes":[
+              {"practiceSlug":"a","outcome":"EVALUATED"},
+              {"practiceSlug":"b","outcome":"NOT_REACHED"},
+              {"practiceSlug":"c","outcome":"EVALUATED"},
+              {"practiceSlug":"d","outcome":"NOT_REACHED"}]}
+            """;
 
         var result = parser.parse(new SandboxResult(
                 1,

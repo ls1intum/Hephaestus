@@ -2,8 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -12,6 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderTyp
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.AuthorAssociation;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -36,14 +41,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabHeadPi
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestReadinessReader;
 import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -77,6 +77,11 @@ import tools.jackson.databind.ObjectMapper;
 
 /** What Heph reads before merge advice, against a real schema: the staged MR !1 and its neighbours. */
 class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewIntegrationTest {
+    @Autowired
+    private ItemWriter retainedItems;
+
+    @Autowired
+    private AccountRepository retainedAccounts;
 
     private static final String INSTANCE = "https://gitlab.course.example";
     private static final String HEAD = "a".repeat(40);
@@ -116,7 +121,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
     private PullRequestReviewCommentRepository reviewCommentRepository;
 
     @Autowired
-    private FeedbackPlacementRepository placementRepository;
+    private FeedbackCopyRepository placementRepository;
 
     @Autowired
     private MentorContextQueryRepository queryRepository;
@@ -430,9 +435,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
 
         ((MergeReadinessContentSource) transactional.getProxy())
                 .contribute(
-                        new ContextRequest.MentorChatRequest(
-                                workspace.getId(), student.getId(), UUID.randomUUID(), null),
-                        files);
+                        new MentorContextRequest(workspace.getId(), student.getId(), UUID.randomUUID(), null), files);
 
         assertThat(pages.get()).isEqualTo(2);
         JsonNode entry = objectMapper
@@ -844,8 +847,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
 
     private JsonNode payload(long workspaceId, long developerId) {
         Map<String, byte[]> files = new HashMap<>();
-        source.contribute(
-                new ContextRequest.MentorChatRequest(workspaceId, developerId, UUID.randomUUID(), null), files);
+        source.contribute(new MentorContextRequest(workspaceId, developerId, UUID.randomUUID(), null), files);
         return objectMapper.readTree(Objects.requireNonNull(files.get(MergeReadinessContentSource.OUTPUT_KEY)));
     }
 
@@ -1019,29 +1021,18 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
 
     /** What the delivery ledger records when Hephaestus posts {@code refs} as feedback on {@code mr}. */
     private void posted(PullRequest mr, String... refs) {
-        AgentJob job = persistPullRequestReview(workspace, mr.getNumber(), NOW);
-        Feedback feedback = feedbackRepository.save(Feedback.builder()
-                .agentJobId(job.getId())
-                .workspaceId(workspace.getId())
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(mr.getId())
-                .recipientUserId(student.getId())
-                .aboutUserId(student.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
-                .position(0)
-                .deliveryState(FeedbackDeliveryState.DELIVERED)
-                .body("feedback")
-                .source(FeedbackSource.AGENT)
-                .createdAt(NOW)
-                .deliveredAt(NOW)
-                .build());
+        long accountId = Objects.requireNonNull(retainedAccounts
+                .saveAndFlush(new Account("Retained feedback recipient"))
+                .getId());
+        var item = retainedItems.upsert(
+                new ItemRegistration(workspace.getId(), new ItemKind("scm.pull_request"), mr.getId(), null, null));
+        var feedback = RetainedFeedbackTestData.onWork(
+                jdbcTemplate, feedbackRepository, item, accountId, FeedbackState.DELIVERED);
+        int position = 0;
         for (String ref : refs) {
-            placementRepository.save(FeedbackPlacement.builder()
-                    .feedback(feedback)
-                    .placementType(PlacementType.INLINE)
-                    .postedCommentRef(ref)
-                    .createdAt(NOW)
-                    .build());
+            var copy = RetainedFeedbackTestData.posted(feedback, FeedbackCopyKind.LINE_NOTE, ref, null);
+            copy.setPosition(position++);
+            placementRepository.saveAndFlush(copy);
         }
     }
 

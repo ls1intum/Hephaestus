@@ -1,14 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.practices.result.ReviewedWorkKey;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.spi.TrendDirection;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 
@@ -34,7 +33,7 @@ final class GroupTrendAggregator {
         List<EvidenceOpportunity> trail = mergedTrail(practiceTrends, properties.getBundleSize());
         // Over every practice that joined, compared or not: each one votes in the group's standing.
         int standingWork = distinctOpportunityCount(practiceTrends, TrendBundle.CURRENT);
-        Set<ReviewedWorkKey> reviewedWork = reviewedWork(practiceTrends);
+        Map<Long, ItemKind> reviewedWork = reviewedWork(practiceTrends);
         if (comparable.isEmpty()) {
             int previous = distinctOpportunityCount(practiceTrends, TrendBundle.PREVIOUS);
             int missing = practiceTrends.stream()
@@ -140,15 +139,15 @@ final class GroupTrendAggregator {
      * two: an artifact that is current evidence for any practice is current evidence for the group.
      */
     private static List<EvidenceOpportunity> mergedTrail(Collection<PracticeTrend> trends, int bundleSize) {
-        Map<ReviewedWorkKey, EvidenceOpportunity> combined = new LinkedHashMap<>();
+        Map<Long, EvidenceOpportunity> combined = new LinkedHashMap<>();
         for (PracticeTrend trend : trends) {
             for (EvidenceOpportunity opportunity : trend.opportunities()) {
                 combined.merge(opportunity.key(), opportunity, (left, right) -> {
                     EvidenceOpportunity newer = left.occurredAt().isAfter(right.occurredAt()) ? left : right;
                     return new EvidenceOpportunity(
-                            left.artifactKind(),
-                            left.artifactId(),
-                            newer.jobId(),
+                            left.itemKind(),
+                            left.itemId(),
+                            newer.reviewId(),
                             newer.occurredAt(),
                             left.outcomes().plus(right.outcomes()),
                             strongerBundle(left.bundle(), right.bundle()));
@@ -185,9 +184,9 @@ final class GroupTrendAggregator {
     }
 
     /** Every piece of work any of the practices reached a verdict on, once however many practices did. */
-    private static Set<ReviewedWorkKey> reviewedWork(Collection<PracticeTrend> trends) {
-        Set<ReviewedWorkKey> work = new LinkedHashSet<>();
-        trends.forEach(trend -> work.addAll(trend.reviewedWork()));
+    private static Map<Long, ItemKind> reviewedWork(Collection<PracticeTrend> trends) {
+        Map<Long, ItemKind> work = new LinkedHashMap<>();
+        trends.forEach(trend -> work.putAll(trend.reviewedWork()));
         return work;
     }
 

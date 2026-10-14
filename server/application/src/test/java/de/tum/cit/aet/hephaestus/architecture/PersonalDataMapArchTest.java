@@ -59,14 +59,12 @@ class PersonalDataMapArchTest {
      */
     private static final Set<String> NOT_PERSONAL_DATA = Set.of(
             // What each practice script of a job did: a status, counts and model slots, no content or person.
-            "agent_job_practice_script_run",
-            // A job's token counters, like the token columns agent_job keeps after a person's erasure.
-            "agent_job_practice_script_usage",
+            "review_job_script_run",
+            // A job's token counters, like the token columns review_job keeps after a person's erasure.
+            "review_job_script_usage",
             "commit_pull_request",
             "connection",
             "connection_activity",
-            "curated_group_override",
-            "curated_practice_override",
             "discussion_category",
             "discussion_label",
             "fx_rate",
@@ -82,10 +80,9 @@ class PersonalDataMapArchTest {
             "llm_model_workspace_grant",
             "login_provider",
             "practice",
-            "practice_catalog_installation",
+            "catalog_entry",
             "practice_group",
-            "practice_review_repository_target",
-            "practice_revision",
+            "review_scope_repository",
             "project_field",
             "pull_request_closing_issue",
             "pull_request_requested_team",

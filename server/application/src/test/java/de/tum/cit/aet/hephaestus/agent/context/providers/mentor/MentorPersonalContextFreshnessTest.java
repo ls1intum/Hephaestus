@@ -6,8 +6,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -54,7 +54,7 @@ class MentorPersonalContextFreshnessTest extends BaseUnitTest {
         var original = new User();
         original.setLogin("PROFILE-BEFORE-ERASURE");
         when(users.findById(2L)).thenReturn(Optional.of(original));
-        var request = new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID());
+        var request = new MentorContextRequest(1L, 2L, UUID.randomUUID(), null);
         var first = new HashMap<String, byte[]>();
         source.contribute(request, first);
         assertThat(first).hasSize(1);

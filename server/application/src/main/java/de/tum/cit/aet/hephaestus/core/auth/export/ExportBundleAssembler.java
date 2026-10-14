@@ -6,10 +6,10 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountFeatureRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountAiChoiceExport;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
 import de.tum.cit.aet.hephaestus.core.auth.spi.NotificationPreferencesExportQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationQuery;
@@ -34,7 +34,7 @@ public class ExportBundleAssembler {
     private final AccountService accountService;
     private final AccountFeatureRepository accountFeatureRepository;
     private final AuthEventRepository authEventRepository;
-    private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
+    private final AccountMembershipQuery workspaceMembershipQuery;
     private final AccountPreferencesQuery preferencesQuery;
     private final GitProviderRegistry gitProviderRegistry;
     private final Clock clock;
@@ -46,7 +46,7 @@ public class ExportBundleAssembler {
             AccountService accountService,
             AccountFeatureRepository accountFeatureRepository,
             AuthEventRepository authEventRepository,
-            AccountWorkspaceMembershipQuery workspaceMembershipQuery,
+            AccountMembershipQuery workspaceMembershipQuery,
             AccountPreferencesQuery preferencesQuery,
             GitProviderRegistry gitProviderRegistry,
             Clock clock,
@@ -68,23 +68,23 @@ public class ExportBundleAssembler {
     @Transactional(readOnly = true)
     public ExportBundle assemble(Long accountId) {
         Account account = accountService.requireById(accountId);
-        List<IdentityLink> identities = accountService.activeIdentities(accountId);
+        List<Identity> identities = accountService.activeIdentities(accountId);
 
         ExportBundle.Profile profile = new ExportBundle.Profile(
                 Objects.requireNonNull(account.getId()),
                 account.getDisplayName(),
                 account.getPrimaryEmail(),
-                // appRole deliberately not disclosed here — see ExportBundle.Profile (Art. 20(1) scope).
+                // appRole deliberately not disclosed here — see ExportBundle.Profile (Art.
+                // 20(1) scope).
                 account.getStatus().name(),
                 Objects.requireNonNull(account.getCreatedAt()));
 
         List<ExportBundle.Identity> identityViews =
                 identities.stream().map(this::toIdentity).toList();
 
-        List<ExportBundle.WorkspaceMembership> memberships =
-                workspaceMembershipQuery.membershipsForAccount(accountId).stream()
-                        .map(m -> new ExportBundle.WorkspaceMembership(m.workspaceSlug(), m.workspaceName(), m.role()))
-                        .toList();
+        List<ExportBundle.Membership> memberships = workspaceMembershipQuery.membershipsForAccount(accountId).stream()
+                .map(m -> new ExportBundle.Membership(m.workspaceSlug(), m.workspaceName(), m.role()))
+                .toList();
 
         List<String> featureFlags = accountFeatureRepository.findFlagsByAccountId(accountId);
 
@@ -104,7 +104,8 @@ public class ExportBundleAssembler {
                 .minusMonths(AUTH_EVENT_WINDOW_MONTHS)
                 .toInstant();
         List<ExportBundle.AuthEvent> authEvents = authEventRepository.findByAccountSince(accountId, since).stream()
-                // Operator-authored impersonation records remain in the audit log, not the portable bundle.
+                // Operator-authored impersonation records remain in the audit log, not the
+                // portable bundle.
                 .filter(e -> !isImpersonationEvent(e))
                 .map(ExportBundleAssembler::toAuthEvent)
                 .toList();
@@ -122,14 +123,17 @@ public class ExportBundleAssembler {
                 notificationPreferences.preferences(accountId));
     }
 
-    private ExportBundle.Identity toIdentity(IdentityLink il) {
+    private ExportBundle.Identity toIdentity(Identity il) {
         String provider = gitProviderRegistry.providerTypeName(il.getProviderId());
+        var profile = gitProviderRegistry
+                .profile(il.getProviderId(), il.getProviderUserKey(), il.getTeamKey())
+                .orElse(null);
         return new ExportBundle.Identity(
                 provider,
-                il.getSubject(),
-                il.getUsernameAtSignup(),
-                il.getEmailAtSignup(),
-                il.getDisplayName(),
+                il.getProviderUserKey(),
+                profile == null ? null : profile.login(),
+                null,
+                profile == null ? null : profile.displayName(),
                 il.getLinkedAt(),
                 il.getLastLoginAt());
     }
@@ -144,7 +148,10 @@ public class ExportBundleAssembler {
                 e.getUserAgent());
     }
 
-    /** Impersonation events are operator-authored records about the subject; excluded under Art. 20(4). */
+    /**
+     * Impersonation events are operator-authored records about the subject; excluded under Art.
+     * 20(4).
+     */
     private static boolean isImpersonationEvent(AuthEvent e) {
         AuthEvent.EventType t = e.getEventType();
         return (t == AuthEvent.EventType.IMPERSONATION_BEGIN || t == AuthEvent.EventType.IMPERSONATION_END);

@@ -1,23 +1,18 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
+import de.tum.cit.aet.hephaestus.practices.ClosedPracticeInput;
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "A practice's position in the catalog")
+@JsonInclude(JsonInclude.Include.ALWAYS)
 public record PlacePracticeRequestDTO(
-        @Schema(
-                description = "Destination group slug; omit to place the practice in Unassigned",
-                example = "review-ready-work")
-        @Nullable
+        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @JsonProperty(required = true) @Nullable
         String groupSlug,
 
-        @JsonProperty(required = true)
-        @NonNull
-        @NotNull(message = "position is required")
-        @Min(value = 0, message = "position must be zero or greater")
-        @Schema(description = "Zero-based position in the destination", example = "1")
-        Integer position) {}
+        @JsonProperty(required = true) @JsonSetter(nulls = Nulls.FAIL)
+        int position)
+        implements ClosedPracticeInput {}

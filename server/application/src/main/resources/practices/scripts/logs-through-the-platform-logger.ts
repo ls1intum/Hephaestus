@@ -1,15 +1,11 @@
+import { scm } from "../kits/scm/index.ts";
+import { countLabel, scanOccurrences, type SourcePattern } from "../kits/scm/source-scan.ts";
 // Finds the print-style calls and the logger calls that the change adds in application code, for
 // each language. It also tells if a bounded search of the checkout finds a logger. The shapes of each
 // language follow the criteria. The review decides from the file if a print is the output of the
 // program, such as a CLI or a script, or a diagnostic that ships.
-import { DIRECTION_CHARS, factsOf, noMatchDirections, oneLine } from "../lib/bounded-text.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
-import { countLabel, scanAddedLines, type SourcePattern } from "../lib/source-scan.ts";
+import { DIRECTION_CHARS, factsOf, noMatchDirections, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 interface Shapes {
 	print: SourcePattern[];
@@ -89,36 +85,38 @@ const TOOL_PATH =
 const LISTED = 40;
 
 export const LABELS = {
-	"print-call": "An added print-style call, such as print, println, console.log or System.out.",
+	"print-call": "A selected print-style call, such as print, println, console.log or System.out.",
 	"logger-call":
-		"An added call to a logger, such as Logger, os_log, NSLog, android.util.Log or logging.",
+		"A selected call to a logger, such as Logger, os_log, NSLog, android.util.Log or logging.",
 };
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
-		const tree = ctx.files?.head ?? null;
+		const domain = scm(ctx);
+		if (domain.kind !== "scm.pull_request" && domain.kind !== "scm.file") {
+			throw new Error("this practice requires SCM source files");
+		}
+		const tree = domain.files?.head ?? null;
 		const leads: ReviewLead[] = [];
 		let prints = 0;
 		let loggers = 0;
 		let filesScanned = 0;
-		let linesAdded = 0;
+		let linesSelected = 0;
 		for (const [language, shapes] of Object.entries(DIAGNOSTICS)) {
-			const scan = await scanAddedLines(tree, change, {
+			const scan = await scanOccurrences(ctx, domain.files, {
 				languages: [language],
 				patterns: [...shapes.print, ...shapes.logger],
 				maxHints: LISTED,
 			});
 			filesScanned += scan.filesScanned;
-			linesAdded += scan.linesAdded;
+			linesSelected += scan.linesSelected;
 			prints += shapes.print.reduce((sum, [label]) => sum + countLabel(scan, label), 0);
 			loggers += shapes.logger.reduce((sum, [label]) => sum + countLabel(scan, label), 0);
 			for (const hint of scan.hints) {
 				const isPrint = shapes.print.some(([label]) => label === hint.pattern);
 				leads.push({
-					at: { change: hint.file, line: hint.line },
+					at: { file: hint.file, line: hint.line, endLine: hint.endLine },
 					label: isPrint ? LABELS["print-call"] : LABELS["logger-call"],
 					facts: factsOf({
 						language,
@@ -144,32 +142,32 @@ export default definePracticeScript({
 		const directions: string[] =
 			prints + loggers > listed.length
 				? [
-						`${String(prints + loggers)} diagnostic line(s) added; ${String(listed.length)} are listed. The counts by kind cover every line; the tool-path count covers only the listed rows.`,
+						`${String(prints + loggers)} diagnostic line(s) selected; ${String(listed.length)} are listed. The counts by kind cover every line; the tool-path count covers only the listed rows.`,
 					]
 				: [];
 		if (prints > 0) {
 			directions.push(
 				oneLine(
-					`${String(prints)} print-style call(s) added (${String(printsInToolPaths)} listed under a tool or script path) against ${String(loggers)} logger call(s); ${existing.length > 0 ? `the checkout matches a logger (${existing[0]?.file ?? ""})` : "a bounded search of the checkout matched no logger definition, which does not show there is none"}.`,
+					`${String(prints)} print-style call(s) selected (${String(printsInToolPaths)} listed under a tool or script path) against ${String(loggers)} logger call(s); ${existing.length > 0 ? `the checkout matches a logger (${existing[0]?.file ?? ""})` : "a bounded search of the checkout matched no logger definition, which does not show there is none"}.`,
 					DIRECTION_CHARS,
 				),
 				"Read each print's file to decide whether it is the program's output, a DEBUG-only block or a shipped diagnostic.",
 			);
 		} else if (loggers > 0) {
-			directions.push(`${String(loggers)} logger call(s) added and no print-style call.`);
+			directions.push(`${String(loggers)} logger call(s) selected and no print-style call.`);
 		}
 		if (listed.length === 0) {
-			directions.push(...noMatchDirections(linesAdded, filesScanned));
+			directions.push(...noMatchDirections(linesSelected, filesScanned));
 		}
 		return ctx.review({
 			leads: listed,
 			facts: {
-				printsAdded: prints,
-				loggerCallsAdded: loggers,
+				printsSelected: prints,
+				loggerCallsSelected: loggers,
 				printsInToolPaths,
 				checkoutHasLogger: existing.length > 0 ? 1 : 0,
 				filesScanned,
-				linesAdded,
+				linesSelected,
 			},
 			directions,
 		});

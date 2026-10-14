@@ -59,9 +59,11 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
     /** The parser records no run from a report of another version, so the runner must write the one it reads. */
     @Test
     void shouldWriteTheExecutionReportVersionTheServerReads() throws IOException {
-        Path contract = Path.of("../../docker/agents/practice-scripts/lib/contract.ts");
+        Path contract = Path.of("../../docker/agents/practice-scripts/lib/core/contract.ts");
         assertThat(Files.readString(
-                        Files.exists(contract) ? contract : Path.of("docker/agents/practice-scripts/lib/contract.ts")))
+                        Files.exists(contract)
+                                ? contract
+                                : Path.of("docker/agents/practice-scripts/lib/core/contract.ts")))
                 .contains("EXECUTION_REPORT_SCHEMA_VERSION = " + PiResultParser.PRACTICE_SCRIPT_REPORT_VERSION + ";");
     }
 

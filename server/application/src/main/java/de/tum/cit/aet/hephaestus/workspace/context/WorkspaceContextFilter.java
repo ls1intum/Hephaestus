@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.workspace.context;
 
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.core.auth.AuthProperties;
+import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry.ActorProfile;
 import de.tum.cit.aet.hephaestus.core.auth.spi.WorkspaceElevationAudit;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.security.CurrentScmIdentityHolder;
@@ -10,15 +11,12 @@ import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
 import de.tum.cit.aet.hephaestus.core.security.WorkspaceElevationContext;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.workspace.CurrentAccountUsers;
+import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
+import de.tum.cit.aet.hephaestus.workspace.MembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceSlugHistoryRepository;
 import jakarta.servlet.Filter;
@@ -49,8 +47,8 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * Scopes slugged workspace routes after authentication. Inactive workspaces are hidden except
- * on lifecycle routes that must inspect or change their status.
+ * Scopes slugged workspace routes after authentication. Inactive workspaces are hidden except on
+ * lifecycle routes that must inspect or change their status.
  */
 @ConditionalOnServerRole
 @Component
@@ -65,10 +63,9 @@ public class WorkspaceContextFilter implements Filter {
     private static final Pattern WORKSPACE_PATH_PATTERN = Pattern.compile("^/workspaces/([a-z0-9-]{1,64})(/.*)?$");
 
     private final WorkspaceRepository workspaceRepository;
-    private final WorkspaceMembershipRepository workspaceMembershipRepository;
+    private final MembershipRepository workspaceMembershipRepository;
     private final CurrentAccountUsers currentAccountUsers;
-    private final UserRepository userRepository;
-    private final WorkspaceMembershipAutoSeeder membershipAutoSeeder;
+    private final MembershipAutoSeeder membershipAutoSeeder;
     private final WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository;
     private final ConnectionService connectionService;
     private final ObjectMapper objectMapper;
@@ -78,10 +75,9 @@ public class WorkspaceContextFilter implements Filter {
 
     public WorkspaceContextFilter(
             WorkspaceRepository workspaceRepository,
-            WorkspaceMembershipRepository workspaceMembershipRepository,
+            MembershipRepository workspaceMembershipRepository,
             CurrentAccountUsers currentAccountUsers,
-            UserRepository userRepository,
-            WorkspaceMembershipAutoSeeder membershipAutoSeeder,
+            MembershipAutoSeeder membershipAutoSeeder,
             WorkspaceSlugHistoryRepository workspaceSlugHistoryRepository,
             ConnectionService connectionService,
             ObjectMapper objectMapper,
@@ -91,7 +87,6 @@ public class WorkspaceContextFilter implements Filter {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipRepository = workspaceMembershipRepository;
         this.currentAccountUsers = currentAccountUsers;
-        this.userRepository = userRepository;
         this.membershipAutoSeeder = membershipAutoSeeder;
         this.workspaceSlugHistoryRepository = workspaceSlugHistoryRepository;
         this.connectionService = connectionService;
@@ -122,7 +117,8 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         if (!path.startsWith("/workspaces/")) {
-            // Not a workspace-scoped path, continue without context (allows /workspaces root endpoints)
+            // Not a workspace-scoped path, continue without context (allows /workspaces root
+            // endpoints)
             chain.doFilter(request, response);
             return;
         }
@@ -160,7 +156,7 @@ public class WorkspaceContextFilter implements Filter {
 
             if (workspace.getStatus() != WorkspaceStatus.ACTIVE && !allowNonActive) {
                 log.debug(
-                        "Denied workspace access: reason=nonActiveStatus, workspaceSlug={}, status={}",
+                        "Denied workspace access: reason=nonActiveStatus, workspaceSlug={}," + " status={}",
                         safeSlug,
                         workspace.getStatus());
                 sendWorkspaceNotFoundError(httpResponse, slug);
@@ -168,16 +164,15 @@ public class WorkspaceContextFilter implements Filter {
             }
 
             var viewed = UserViewContextHolder.get();
-            var currentUsers = viewed == null
-                    ? currentAccountUsers.resolve()
-                    : userRepository.findById(viewed.userId()).stream().toList();
+            var currentUsers =
+                    viewed == null ? currentAccountUsers.resolve() : currentAccountUsers.resolve(viewed.accountId());
             MembershipResolution membership = fetchUserRoles(workspace, currentUsers, viewed == null);
             Set<WorkspaceRole> roles = membership.roles();
 
             // Instance admins may enter without membership, but elevation never grants ownership.
             if (roles.isEmpty() && SecurityUtils.isSuperAdmin()) {
                 log.info(
-                        "Granted workspace access via instance-admin elevation: accountId={}, workspaceSlug={}",
+                        "Granted workspace access via instance-admin elevation: accountId={}," + " workspaceSlug={}",
                         SecurityUtils.getCurrentAccountId().orElse(null),
                         safeSlug);
                 roles = Set.of(WorkspaceRole.ADMIN);
@@ -192,7 +187,7 @@ public class WorkspaceContextFilter implements Filter {
                     sendWorkspaceUnauthorizedError(httpResponse, slug);
                 } else {
                     log.debug("Denied workspace access: reason=notMember, workspaceSlug={}", safeSlug);
-                    sendWorkspaceMembershipForbiddenError(httpResponse, slug);
+                    sendMembershipForbiddenError(httpResponse, slug);
                 }
                 return;
             }
@@ -209,10 +204,11 @@ public class WorkspaceContextFilter implements Filter {
 
             WorkspaceContextHolder.setContext(context);
 
-            // Pin the verified actor id; a session's display login may belong to a different provider.
+            // Pin the verified actor id; a session's display login may belong to a different
+            // provider.
             resolveWorkspaceIdentity(workspace, currentUsers, membership.memberUserIds())
-                    .ifPresent(user -> CurrentScmIdentityHolder.set(
-                            Objects.requireNonNull(user.getId()), user.getLogin(), membership.memberUserIds()));
+                    .ifPresent(user ->
+                            CurrentScmIdentityHolder.set(user.actorId(), user.login(), membership.memberUserIds()));
 
             log.debug(
                     "Set workspace context: workspaceSlug={}, workspaceId={}, roles={}",
@@ -228,75 +224,44 @@ public class WorkspaceContextFilter implements Filter {
         }
     }
 
-    /** Roles and eligible actor ids from one membership read, shared by authorization and identity pinning. */
+    /**
+     * Roles and eligible actor ids from one membership read, shared by authorization and identity
+     * pinning.
+     */
     private record MembershipResolution(Set<WorkspaceRole> roles, Set<Long> memberUserIds) {
         static final MembershipResolution EMPTY = new MembershipResolution(Set.of(), Set.of());
     }
 
-    /** Chooses the member actor that speaks for the account here, independently of role strength. */
-    private Optional<User> resolveWorkspaceIdentity(Workspace workspace, List<User> users, Set<Long> memberUserIds) {
-        List<User> members = users.stream()
-                .filter(u -> u != null && memberUserIds.contains(u.getId()))
+    /**
+     * Chooses the member actor that speaks for the account here, independently of role strength.
+     */
+    private Optional<ActorProfile> resolveWorkspaceIdentity(
+            Workspace workspace, List<ActorProfile> users, Set<Long> memberUserIds) {
+        List<ActorProfile> members = users.stream()
+                .filter(u -> u != null && memberUserIds.contains(u.actorId()))
                 .toList();
         return actorSelector
-                .select(workspace.getId(), members.stream().map(User::getId).toList())
-                .flatMap(
-                        id -> members.stream().filter(u -> id.equals(u.getId())).findFirst());
+                .select(
+                        workspace.getId(),
+                        members.stream().map(ActorProfile::actorId).toList())
+                .flatMap(id -> members.stream().filter(u -> id == u.actorId()).findFirst());
     }
 
-    private MembershipResolution fetchUserRoles(Workspace workspace, Collection<User> users, boolean maySeed) {
-        try {
-            Set<Long> userIds = users.stream()
-                    .filter(u -> u != null && u.getId() != null)
-                    .map(User::getId)
-                    .collect(Collectors.toSet());
-            if (userIds.isEmpty()) {
-                log.debug("Skipped role fetch: reason=noAuthenticatedUser");
-                return MembershipResolution.EMPTY;
-            }
-
-            var memberships = workspaceMembershipRepository.findByWorkspace_IdAndUser_IdIn(workspace.getId(), userIds);
-            Set<WorkspaceRole> roles = memberships.stream()
-                    .map(WorkspaceMembership::getRole)
-                    .filter(role -> role != null)
-                    .collect(Collectors.toSet());
-            Set<Long> memberUserIds = memberships.stream()
-                    .map(membership -> membership.getId().getUserId())
-                    .collect(Collectors.toSet());
-
-            if (!roles.isEmpty()) {
-                log.debug("Resolved user roles: roles={}", roles);
-                return new MembershipResolution(roles, memberUserIds);
-            }
-
-            if (!maySeed) {
-                return MembershipResolution.EMPTY;
-            }
-
-            try {
-                Optional<WorkspaceMembership> seeded = membershipAutoSeeder.seedFirstUserWhenEmpty(workspace, users);
-                if (seeded.isPresent()) {
-                    WorkspaceMembership created = seeded.get();
-                    log.info(
-                            "Auto-added user to workspace: workspaceSlug={}, role={}",
-                            LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                            created.getRole());
-                    return new MembershipResolution(
-                            Set.of(created.getRole()), Set.of(created.getId().getUserId()));
-                }
-            } catch (IllegalArgumentException ex) {
-                log.debug(
-                        "Skipped membership auto-add: workspaceSlug={}",
-                        LoggingUtils.sanitizeForLog(workspace.getWorkspaceSlug()),
-                        ex);
-            }
-
-            log.debug("Returning empty roles: reason=noMembership, workspaceId={}", workspace.getId());
-            return MembershipResolution.EMPTY;
-        } catch (Exception e) {
-            log.warn("Failed to fetch user roles: workspaceId={}", workspace.getId(), e);
-            return MembershipResolution.EMPTY;
-        }
+    private MembershipResolution fetchUserRoles(Workspace workspace, Collection<ActorProfile> users, boolean maySeed) {
+        var viewed = UserViewContextHolder.get();
+        Long accountId =
+                viewed == null ? SecurityUtils.getCurrentAccountId().orElse(null) : Long.valueOf(viewed.accountId());
+        if (accountId == null) return MembershipResolution.EMPTY;
+        var member = workspaceMembershipRepository
+                .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId)
+                .filter(candidate -> candidate.getLeftAt() == null);
+        if (member.isEmpty() && maySeed) member = membershipAutoSeeder.seedFirstUserWhenEmpty(workspace, users);
+        if (member.isEmpty()) return MembershipResolution.EMPTY;
+        Set<Long> actorIds = users.stream()
+                .map(ActorProfile::actorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        return new MembershipResolution(Set.of(member.get().getRole()), actorIds);
     }
 
     private boolean handleSlugRedirect(
@@ -318,15 +283,14 @@ public class WorkspaceContextFilter implements Filter {
         }
 
         // Avoid leaking workspace existence when the user lacks membership.
-        // Checked across all of the account's linked identities (same union semantics as access control).
-        Set<Long> currentUserIds = currentAccountUsers.resolve().stream()
-                .filter(u -> u != null && u.getId() != null)
-                .map(User::getId)
-                .collect(Collectors.toSet());
-        boolean hasMembership = !currentUserIds.isEmpty()
-                && !workspaceMembershipRepository
-                        .findByWorkspace_IdAndUser_IdIn(workspace.getId(), currentUserIds)
-                        .isEmpty();
+        // Checked across all of the account's linked identities (same union semantics as access
+        // control).
+        var accountId = SecurityUtils.getCurrentAccountId().orElse(null);
+        boolean hasMembership = accountId != null
+                && workspaceMembershipRepository
+                        .findByWorkspace_IdAndAccount_Id(workspace.getId(), accountId)
+                        .filter(member -> member.getLeftAt() == null)
+                        .isPresent();
 
         if (!hasMembership) {
             return false;
@@ -371,13 +335,13 @@ public class WorkspaceContextFilter implements Filter {
                 "errors",
                 Map.of(
                         "workspaceSlug",
-                        "The workspace path must contain a lowercase slug with at most 64 characters."));
+                        "The workspace path must contain a lowercase slug with at most 64" + " characters."));
         response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
         response.getWriter().write(objectMapper.writeValueAsString(problem));
     }
 
-    private void sendWorkspaceMembershipForbiddenError(HttpServletResponse response, String slug) throws IOException {
+    private void sendMembershipForbiddenError(HttpServletResponse response, String slug) throws IOException {
         ProblemDetail problem = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
         problem.setTitle("Membership required");
         problem.setDetail("To access this resource, you must be a member of workspace " + slug + ".");

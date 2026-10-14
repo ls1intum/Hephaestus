@@ -1,18 +1,17 @@
 package de.tum.cit.aet.hephaestus.integration.slack.preferences;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
-import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackParticipantConsentRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackParticipantConsentService;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackPersonErasureService;
-import de.tum.cit.aet.hephaestus.integration.slack.mentor.SlackMentorIdentityResolver;
 import de.tum.cit.aet.hephaestus.workspace.spi.WorkspaceSummaryQuery;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -31,32 +30,31 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackUserPreferencesService {
 
     static final String SLACK_SERVER_URL = "https://slack.com";
 
     private final AccountIdentityQuery accountIdentityQuery;
-    private final AccountWorkspaceMembershipQuery membershipQuery;
+    private final AccountMembershipQuery membershipQuery;
     private final GitProviderRegistry gitProviderRegistry;
-    private final ConnectionRepository connectionRepository;
+    private final ConnectionService connectionRepository;
     private final SlackParticipantConsentRepository participantConsentRepository;
     private final SlackMonitoredChannelRepository monitoredChannelRepository;
     private final SlackParticipantConsentService participantConsentService;
     private final SlackPersonErasureService erasureService;
-    private final SlackMentorIdentityResolver identityResolver;
     private final WorkspaceSummaryQuery workspaceSummaryQuery;
 
     public SlackUserPreferencesService(
             AccountIdentityQuery accountIdentityQuery,
-            AccountWorkspaceMembershipQuery membershipQuery,
+            AccountMembershipQuery membershipQuery,
             GitProviderRegistry gitProviderRegistry,
-            ConnectionRepository connectionRepository,
+            ConnectionService connectionRepository,
             SlackParticipantConsentRepository participantConsentRepository,
             SlackMonitoredChannelRepository monitoredChannelRepository,
             SlackParticipantConsentService participantConsentService,
             SlackPersonErasureService erasureService,
-            SlackMentorIdentityResolver identityResolver,
             WorkspaceSummaryQuery workspaceSummaryQuery) {
         this.accountIdentityQuery = accountIdentityQuery;
         this.membershipQuery = membershipQuery;
@@ -66,15 +64,14 @@ public class SlackUserPreferencesService {
         this.monitoredChannelRepository = monitoredChannelRepository;
         this.participantConsentService = participantConsentService;
         this.erasureService = erasureService;
-        this.identityResolver = identityResolver;
         this.workspaceSummaryQuery = workspaceSummaryQuery;
     }
 
     @Transactional(readOnly = true)
     public SlackUserPreferencesDTO listForAccount(long accountId) {
         long slackProviderId = slackProviderId();
-        List<AccountIdentityQuery.IdentityLinkView> links = accountIdentityQuery.activeLinksForAccount(accountId);
-        Map<String, AccountIdentityQuery.IdentityLinkView> slackLinksByTeam = slackLinksByTeam(links, slackProviderId);
+        List<AccountIdentityQuery.IdentityView> links = accountIdentityQuery.activeLinksForAccount(accountId);
+        Map<String, AccountIdentityQuery.IdentityView> slackLinksByTeam = slackLinksByTeam(links, slackProviderId);
         if (slackLinksByTeam.isEmpty()) {
             return new SlackUserPreferencesDTO(List.of());
         }
@@ -84,10 +81,8 @@ public class SlackUserPreferencesService {
             return new SlackUserPreferencesDTO(List.of());
         }
 
-        List<SlackUserWorkspacePreferencesDTO> workspaces = connectionRepository
-                .findAllByKindAndInstanceKeyInAndState(
-                        IntegrationKind.SLACK, slackLinksByTeam.keySet(), IntegrationState.ACTIVE)
-                .stream()
+        List<SlackUserWorkspacePreferencesDTO> workspaces = workspaceIds.stream()
+                .flatMap(workspaceId -> connectionRepository.findActive(workspaceId, IntegrationKind.SLACK).stream())
                 .filter(connection -> hasText(connection.getInstanceKey()))
                 .filter(connection -> slackLinksByTeam.containsKey(Objects.requireNonNull(connection.getInstanceKey())))
                 .filter(connection -> workspaceIds.contains(connection.toRef().workspaceId()))
@@ -104,8 +99,7 @@ public class SlackUserPreferencesService {
     public SlackUserWorkspacePreferencesDTO updateChannelMessagesAllowed(
             long workspaceId, long accountId, boolean channelMessagesAllowed) {
         Connection connection = connectionRepository
-                .findFirstByWorkspaceIdAndKindAndStateOrderByCreatedAtDesc(
-                        workspaceId, IntegrationKind.SLACK, IntegrationState.ACTIVE)
+                .findActive(workspaceId, IntegrationKind.SLACK)
                 .orElseThrow(() -> notFound("Slack is not connected for this workspace."));
         String teamId = connection.getInstanceKey();
         if (!hasText(teamId)) {
@@ -113,33 +107,30 @@ public class SlackUserPreferencesService {
         }
         String requiredTeamId = Objects.requireNonNull(teamId);
 
-        AccountIdentityQuery.IdentityLinkView slackLink = accountIdentityQuery.activeLinksForAccount(accountId).stream()
-                .filter(link -> Objects.equals(link.gitProviderId(), slackProviderId()))
-                .filter(link -> Objects.equals(link.teamId(), requiredTeamId))
-                .filter(link -> hasText(link.subject()))
+        AccountIdentityQuery.IdentityView slackLink = accountIdentityQuery.activeLinksForAccount(accountId).stream()
+                .filter(link -> Objects.equals(link.providerId(), slackProviderId()))
+                .filter(link -> Objects.equals(link.teamKey(), requiredTeamId))
+                .filter(link -> hasText(link.providerUserKey()))
                 .findFirst()
                 .orElseThrow(() -> notFound("Slack account is not linked for this workspace."));
 
         if (channelMessagesAllowed) {
-            participantConsentService.recordChannelMessageOptIn(workspaceId, slackLink.subject());
+            participantConsentService.recordChannelMessageOptIn(workspaceId, slackLink.providerUserKey());
         } else {
-            participantConsentService.recordChannelMessageOptOut(workspaceId, slackLink.subject());
-            Long memberId = identityResolver
-                    .resolveMemberId(workspaceId, teamId, slackLink.subject())
-                    .orElse(null);
-            erasureService.erasePerson(workspaceId, memberId, slackLink.subject());
+            participantConsentService.recordChannelMessageOptOut(workspaceId, slackLink.providerUserKey());
+            erasureService.erasePerson(workspaceId, accountId, slackLink.providerUserKey());
         }
         return toDto(connection, slackLink, channelMessagesAllowed)
                 .orElseThrow(() -> notFound("Workspace is not available."));
     }
 
-    private Map<String, AccountIdentityQuery.IdentityLinkView> slackLinksByTeam(
-            List<AccountIdentityQuery.IdentityLinkView> links, long slackProviderId) {
+    private Map<String, AccountIdentityQuery.IdentityView> slackLinksByTeam(
+            List<AccountIdentityQuery.IdentityView> links, long slackProviderId) {
         return links.stream()
-                .filter(link -> Objects.equals(link.gitProviderId(), slackProviderId))
-                .filter(link -> hasText(link.teamId()))
+                .filter(link -> Objects.equals(link.providerId(), slackProviderId))
+                .filter(link -> hasText(link.teamKey()))
                 .collect(Collectors.toMap(
-                        link -> Objects.requireNonNull(link.teamId()),
+                        link -> Objects.requireNonNull(link.teamKey()),
                         Function.identity(),
                         (first, ignored) -> first,
                         LinkedHashMap::new));
@@ -147,14 +138,14 @@ public class SlackUserPreferencesService {
 
     private Set<Long> accessibleWorkspaceIds(long accountId) {
         return membershipQuery.membershipsForAccount(accountId).stream()
-                .map(AccountWorkspaceMembershipQuery.WorkspaceMembershipView::workspaceId)
+                .map(AccountMembershipQuery.MembershipView::workspaceId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
     }
 
     private Optional<SlackUserWorkspacePreferencesDTO> toDto(
             Connection connection,
-            AccountIdentityQuery.IdentityLinkView slackLink,
+            AccountIdentityQuery.IdentityView slackLink,
             @Nullable Boolean channelMessagesAllowed) {
         long workspaceId = connection.toRef().workspaceId();
         return workspaceSummaryQuery
@@ -164,11 +155,11 @@ public class SlackUserPreferencesService {
 
     private SlackUserWorkspacePreferencesDTO toDto(
             Connection connection,
-            AccountIdentityQuery.IdentityLinkView slackLink,
+            AccountIdentityQuery.IdentityView slackLink,
             @Nullable Boolean channelMessagesAllowed,
             WorkspaceSummaryQuery.WorkspaceSummary workspace) {
         long workspaceId = workspace.id();
-        String slackUserId = slackLink.subject();
+        String slackUserId = slackLink.providerUserKey();
         boolean allowed = channelMessagesAllowed != null
                 ? channelMessagesAllowed
                 : !participantConsentRepository.existsByWorkspaceIdAndSlackUserIdAndIngestionOptedOutTrue(
@@ -179,7 +170,7 @@ public class SlackUserPreferencesService {
                 Objects.requireNonNull(connection.getInstanceKey()),
                 connection.getDisplayName(),
                 slackUserId,
-                slackLink.displayName() != null ? slackLink.displayName() : slackLink.usernameAtSignup(),
+                null,
                 allowed,
                 monitoredChannelRepository.countByWorkspaceIdAndConsentState(workspaceId, ConsentState.ACTIVE));
     }

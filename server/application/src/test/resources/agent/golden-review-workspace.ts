@@ -54,7 +54,7 @@ export const GOLDEN_RECORD = {
 	source_branch: "login",
 	target_branch: "main",
 	commit_sha: "a".repeat(40),
-	subject_role: "AUTHOR",
+	about_role: "AUTHOR",
 	title: "Add login",
 	is_draft: false,
 	is_merged: false,
@@ -65,18 +65,31 @@ export const GOLDEN_RECORD = {
 	assignees: [],
 };
 
-/** The cause of the review in the server's current form: with the practice revision and the authored scope. */
-export const GOLDEN_CAUSE = {
+/** The frozen v3 inputs used by the runner prompt tests. */
+export const GOLDEN_INPUTS = {
+	contractVersion: 3,
 	kind: "scm.pull_request",
-	subject: { role: "AUTHOR" },
-	practice: { revisionId: 7 },
-	scope: { key: "scm.pull_request:3:AUTHOR", mode: "change", description: "the reviewed change" },
-	cause: {
-		type: "requested",
-		origin: "MANUAL",
-		state: { draftStatus: "NOT_DRAFT", state: "OPEN" },
-		admittedAt: "2026-01-01T00:00:00Z",
+	item: GOLDEN_RECORD,
+	about: { role: "AUTHOR", developerId: "1" },
+	practice: {
+		id: "1",
+		versionId: "7",
+		reviewDigest: "v6:golden",
+		slug: "test-practice",
+		criteria: "Added authentication calls use checked(), not insecure().",
 	},
+	scope: {
+		kind: "ITEM",
+		item: { id: "3", kind: "scm.pull_request" },
+		version: "a".repeat(40),
+		baseVersion: "b".repeat(40),
+	},
+	review: {
+		id: "11111111-1111-4111-8111-111111111111",
+		origin: "REQUEST",
+		startedAt: "2026-01-01T00:00:00Z",
+	},
+	previous: null,
 };
 
 /** Where the staged programs and their inputs live, as `task.json#practiceScripts` names it. */
@@ -113,7 +126,7 @@ export function stageGoldenWorkspace(
 	mkdirSync(nodePath.join(cwd, "repos/primary/.git"), { recursive: true });
 	write(
 		"catalog/practices/test-practice.md",
-		"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n\n## Occasion\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.\n",
+		"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n\n## applicability\nAn authentication call was added.\n\n## Judge\nMET for checked(); NOT_MET for insecure().\n\n## Severity\nMAJOR for an added insecure() call.\n\n## Defer\nOther code is outside this practice.\n",
 	);
 	write(
 		"catalog/practices/index.json",
@@ -123,30 +136,31 @@ export function stageGoldenWorkspace(
 				group: "security",
 				readsSources: ["scm.pull-request.core", "scm.pull-request.diff"],
 				exhaustiveSources: ["scm.pull-request.diff"],
-				revisionId: 7,
+				versionId: "7",
 			},
 		]),
 	);
-	write(`${PRACTICES_DIR}/test-practice.cause.json`, JSON.stringify(GOLDEN_CAUSE));
-	write(`${PRACTICES_DIR}/test-practice.previous.json`, "null");
+	write(`${PRACTICES_DIR}/test-practice.inputs.json`, JSON.stringify(GOLDEN_INPUTS));
 	write(
 		"evidence/manifest.json",
 		JSON.stringify({
-			artifactKind: "scm.pull_request",
-			artifacts: [
-				{ kind: "scm.pull-request.core", artifact: { path: "evidence/metadata.json" } },
-				{ kind: "scm.pull-request.diff", artifact: { path: "evidence/change.json" } },
+			itemKind: "scm.pull_request",
+			files: [
+				{ kind: "scm.pull-request.core", file: { path: "evidence/metadata.json" } },
+				{ kind: "scm.pull-request.diff", file: { path: "evidence/change.json" } },
 			],
 			sources: [
 				{
 					kind: "scm.pull-request.core",
+					citation: { side: "FORBIDDEN", revision: "FORBIDDEN" },
 					state: { availability: "AVAILABLE" },
-					artifacts: [{ path: "evidence/metadata.json" }],
+					files: [{ path: "evidence/metadata.json" }],
 				},
 				{
 					kind: "scm.pull-request.diff",
+					citation: { side: "REQUIRED", revision: "OPTIONAL" },
 					state: { availability: "AVAILABLE" },
-					artifacts: [{ path: "evidence/change.json" }],
+					files: [{ path: "evidence/change.json" }],
 				},
 			],
 		}),
@@ -159,6 +173,10 @@ export function stageGoldenWorkspace(
 		"task.json",
 		JSON.stringify({
 			schemaVersion,
+			reviewId: GOLDEN_INPUTS.review.id,
+			jobId: "22222222-2222-4222-8222-222222222222",
+			attempt: 1,
+			workspaceId: "1",
 			contextRoot: "evidence",
 			repositoryRoot: "repos/primary",
 			manifest: "evidence/manifest.json",

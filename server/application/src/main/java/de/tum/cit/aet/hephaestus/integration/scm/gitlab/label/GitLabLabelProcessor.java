@@ -1,13 +1,13 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.label;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.LabelIdUtils;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.LabelRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.label.dto.GitLabLabelDTO;
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -23,13 +23,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitLab labels.
- * <p>
- * Converts {@link GitLabLabelDTO} to {@link Label} entities, persists them, and publishes
- * domain events. Mirrors the {@link de.tum.cit.aet.hephaestus.integration.scm.github.label.GitHubLabelProcessor}
- * pattern with GitLab-specific field mapping ({@code title} &rarr; {@code name}).
- * <p>
- * Uses deterministic negative IDs via {@link LabelIdUtils} since GitLab group-level labels
- * share the same global ID across all projects but are stored per-repository in the database.
+ *
+ * <p>Converts {@link GitLabLabelDTO} to {@link Label} entities, persists them, and publishes domain
+ * events. Mirrors the {@link
+ * de.tum.cit.aet.hephaestus.integration.scm.github.label.GitHubLabelProcessor} pattern with
+ * GitLab-specific field mapping ({@code title} &rarr; {@code name}).
+ *
+ * <p>Uses deterministic negative IDs via {@link LabelIdUtils} since GitLab group-level labels share
+ * the same global ID across all projects but are stored per-repository in the database.
  */
 @Service
 public class GitLabLabelProcessor {
@@ -46,13 +47,13 @@ public class GitLabLabelProcessor {
 
     /**
      * Processes a GitLab label DTO and persists it as a Label entity.
-     * <p>
-     * Lookup is always by (repository_id, name) — the unique constraint.
-     * For new labels, a deterministic negative ID is generated from (repositoryId, title).
      *
-     * @param dto        the GitLab label DTO
+     * <p>Lookup is always by (repository_id, name) — the unique constraint. For new labels, a
+     * deterministic negative ID is generated from (repositoryId, title).
+     *
+     * @param dto the GitLab label DTO
      * @param repository the repository this label belongs to
-     * @param context    processing context with scope information
+     * @param context processing context with scope information
      * @return the persisted Label entity, or null if the DTO is invalid
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)

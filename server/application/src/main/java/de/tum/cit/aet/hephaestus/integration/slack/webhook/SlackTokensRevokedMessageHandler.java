@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.slack.webhook;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.slack.events.SlackUninstallService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +19,7 @@ import tools.jackson.databind.JsonNode;
  * revoked; user-token-only revocations are a no-op here (no user tokens are stored).
  */
 @Component
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true")
 public class SlackTokensRevokedMessageHandler extends AbstractSlackEnvelopeHandler {
 

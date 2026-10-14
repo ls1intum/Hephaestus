@@ -12,7 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorSandboxPreparer;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRequest;
@@ -80,7 +80,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @EnumSource(MentorRefusal.class)
     void shouldReplyWithTheReasonAndStartNothingWhenAdmissionRefusesTheMember(MentorRefusal refusal) {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(identityResolver.resolveActiveMemberId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
+        when(identityResolver.resolveActiveAccountId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
         when(mentorTurnRunner.refusal(WORKSPACE, 314L)).thenReturn(Optional.of(refusal));
 
         service().handleDm(TEAM, CHANNEL, USER, "Can you review my work?", "100.1", "100.1");
@@ -94,7 +94,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Test
     void shouldPrepareTheSandboxOfALinkedDeveloperWhoOpensTheApp() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(identityResolver.resolveActiveMemberId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
+        when(identityResolver.resolveActiveAccountId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
 
         service().prepare(TEAM, USER);
 
@@ -105,7 +105,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Test
     void shouldPrepareNothingForAnUnlinkedSlackUser() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(identityResolver.resolveActiveMemberId(WORKSPACE, TEAM, USER)).thenReturn(Optional.empty());
+        when(identityResolver.resolveActiveAccountId(WORKSPACE, TEAM, USER)).thenReturn(Optional.empty());
 
         service().prepare(TEAM, USER);
 
@@ -138,7 +138,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Test
     void shouldStartATurnForAnAdmittedMemberWhenHephIsReady() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(identityResolver.resolveActiveMemberId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
+        when(identityResolver.resolveActiveAccountId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
         UUID threadId = UUID.randomUUID();
         when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, 314L))
                 .thenReturn(threadId);
@@ -182,7 +182,7 @@ class SlackMentorServiceTest extends BaseUnitTest {
     @Test
     void unlinkedMember_getsSelfServeAccountLinkCta() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(identityResolver.resolveActiveMemberId(WORKSPACE, TEAM, USER)).thenReturn(Optional.empty());
+        when(identityResolver.resolveActiveAccountId(WORKSPACE, TEAM, USER)).thenReturn(Optional.empty());
         when(onboardingService.linkCtaBlocks()).thenReturn(List.of());
 
         SlackMentorService service = service();
@@ -195,15 +195,15 @@ class SlackMentorServiceTest extends BaseUnitTest {
                         eq(CHANNEL),
                         eq("100.1"),
                         eq(List.of()),
-                        eq(
-                                "Heph cannot reply yet. Check that your Hephaestus account is active, linked to Slack, and a member of this workspace."));
+                        eq("Heph cannot reply yet. Check that your Hephaestus account is active, linked to Slack,"
+                                + " and a member of this workspace."));
         verify(mentorTurnRunner, never()).run(any(), any(), anyLong());
     }
 
     @Test
     void linkedMemberMessages_runMentorTurnsWithoutSlackSpecificQuota() {
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(WORKSPACE));
-        when(identityResolver.resolveActiveMemberId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
+        when(identityResolver.resolveActiveAccountId(WORKSPACE, TEAM, USER)).thenReturn(Optional.of(314L));
         UUID threadId = UUID.randomUUID();
         when(threadLinker.findOrCreateThread(WORKSPACE, TEAM, CHANNEL, "100.1", USER, 314L))
                 .thenReturn(threadId);

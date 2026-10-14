@@ -1,22 +1,23 @@
-// Finds where the pull request names an issue: the provider's closing links, the title, the body and
-// the source branch. It looks up each reference in the project inventory and the linked items, in the
-// repository that the reference names. When the pull request names no issue, it tells what the
-// inventory holds. The review decides if a reference is a link.
-import { DIRECTION_CHARS, factsOf, listWithin, oneLine } from "../lib/bounded-text.ts";
 import {
 	isOpenState,
 	readProjectInventory,
 	repositoryIssues,
 	type InventoryItem,
-} from "../lib/context.ts";
-import { definePracticeScript, expectKind, type ReviewLead } from "../lib/practice-script.ts";
+} from "../kits/scm/context.ts";
+import { scm, expectKind } from "../kits/scm/index.ts";
 import {
 	branchIssueReferences,
 	closingReferences,
 	issueNumberReferences,
 	withoutHtmlComments,
-} from "../lib/references.ts";
-import { readLinkedWorkItems } from "../lib/review.ts";
+} from "../kits/scm/references.ts";
+import { readLinkedWorkItems } from "../kits/scm/review.ts";
+// Finds where the pull request names an issue: the provider's closing links, the title, the body and
+// the source branch. It looks up each reference in the project inventory and the linked items, in the
+// repository that the reference names. When the pull request names no issue, it tells what the
+// inventory holds. The review decides if a reference is a link.
+import { DIRECTION_CHARS, factsOf, listWithin, oneLine } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"closing-reference":
@@ -41,15 +42,16 @@ const byNumber = (rows: InventoryItem[] | null) =>
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const { work } = ctx;
-		const focal = work.repository_full_name;
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const { item: metadata } = domain;
+		const focal = metadata.repository_full_name;
 		const linked = await readLinkedWorkItems(ctx.evidence);
 		const inventory = await readProjectInventory(ctx.evidence);
 		// A plain #N is the admitted repository's, by its id; a qualified path names a repository of the
 		// same provider. A full name alone is unique only within one provider, so no id leaves the scope
 		// unknown.
-		const { repository_id: repositoryId, provider_id: providerId } = work;
+		const { repository_id: repositoryId, provider_id: providerId } = metadata;
 		const focalIssues = repositoryIssues(
 			inventory,
 			repositoryId === undefined ? null : { repositoryId },
@@ -146,9 +148,9 @@ export default definePracticeScript({
 				issue === undefined ? "unknown" : true,
 			);
 		}
-		const title = work.title ?? "";
-		const body = work.body ?? "";
-		const branch = work.source_branch;
+		const title = metadata.title ?? "";
+		const body = metadata.body ?? "";
+		const branch = metadata.source_branch;
 		const titleWhere = "metadata.json (title)";
 		const descriptionWhere = "description.md";
 		add("metadata.json", titleWhere, issueNumberReferences(unqualified(title)), false);
@@ -201,7 +203,7 @@ export default definePracticeScript({
 		} else {
 			directions.push(
 				`No #number, closing keyword or branch number in the title, body or branch (${branch}); ${linked === null ? "linked_work_items.json was not captured" : `${String(linked.length)} linked work item(s) captured`}.`,
-				`Read commits.json for a reference in history, then the inventory (${held("not captured", `${String(facts.inventoryIssues)} issues, ${String(facts.inventoryOpenIssues)} open, in ${focal}`)}) for an open issue that plainly describes this work.`,
+				`Read commits.json for a reference in history, then the inventory (${held("not captured", `${String(facts.inventoryIssues)} issues, ${String(facts.inventoryOpenIssues)} open, in ${focal}`)}) for an open issue that plainly describes this item.`,
 			);
 		}
 		return ctx.review({

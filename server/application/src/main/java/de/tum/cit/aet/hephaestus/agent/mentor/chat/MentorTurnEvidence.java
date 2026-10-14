@@ -25,11 +25,11 @@ final class MentorTurnEvidence {
 
     private static final int MAX_SOURCE_CHARS = 12_000;
     private static final List<String> WORK_FIELDS =
-            List.of("artifactId", "resource", "reviewsResource", "number", "url", "state", "isDraft");
+            List.of("pullRequestId", "resource", "reviewsResource", "number", "url", "state", "isDraft");
     private static final List<String> ATTEMPT_FIELDS = List.of(
             "reviewId",
-            "artifactKind",
-            "artifactId",
+            "itemKind",
+            "pullRequestId",
             "number",
             "url",
             "state",
@@ -39,7 +39,7 @@ final class MentorTurnEvidence {
             "createdAt",
             "completedAt");
     private static final List<String> READINESS_FIELDS = List.of(
-            "artifactId",
+            "pullRequestId",
             "resource",
             "number",
             "url",
@@ -61,7 +61,7 @@ final class MentorTurnEvidence {
             "checksObservedAt",
             "latestReviewsStatus");
     private static final List<String> RESULT_FIELDS = List.of(
-            "practiceResultId",
+            "resultId",
             "resource",
             "reviewId",
             "origin",
@@ -69,8 +69,8 @@ final class MentorTurnEvidence {
             "outcome",
             "severity",
             "observedAt",
-            "artifactKind",
-            "artifactId",
+            "itemKind",
+            "pullRequestId",
             "reviewedWork");
 
     private MentorTurnEvidence() {}
@@ -86,7 +86,7 @@ final class MentorTurnEvidence {
         List<String> practiceResultLists = List.of("recentResults", "abstentions", "earlierResults");
         ObjectNode practiceResults =
                 source(mapper, inputs, ResultHistoryContentSource.OUTPUT_KEY, practiceResultLists, RESULT_FIELDS);
-        receipt.set("observations", practiceResults);
+        receipt.set("results", practiceResults);
 
         List<String> workLists = List.of("pullRequests", "issues");
         ObjectNode authored =

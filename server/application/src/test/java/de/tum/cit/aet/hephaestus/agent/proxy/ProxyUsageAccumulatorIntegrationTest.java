@@ -7,14 +7,13 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobLlmUsage;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLlmUsage;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -41,7 +40,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -50,14 +49,13 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         return MAPPER.readTree(body);
     }
 
-    private AgentJob persistedJob(String slug) {
+    private ReviewJob persistedJob(String slug) {
         User owner = persistUser(slug + "-owner");
         Workspace workspace = createWorkspace(slug, "Proxy " + slug, slug + "-org", AccountType.ORG, owner);
-        AgentJob job = new AgentJob();
-        job.setWorkspace(workspace);
-        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        job.setStatus(AgentJobStatus.RUNNING);
+        ReviewJob job = new ReviewJob();
+        RuntimeJobTestData.initialize(job, (workspace).getId());
+
+        job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(MAPPER.createObjectNode());
         job.prePersist();
         return jobRepository.saveAndFlush(job);
@@ -68,7 +66,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
                 jobId == null
                         ? null
                         : new ProxyRouting.BilledAttempt(
-                                LlmUsageSourceType.AGENT_JOB, jobId, 0, BigDecimal.ZERO, "worker-1"),
+                                UsageSourceType.REVIEW_JOB, jobId, 0, BigDecimal.ZERO, "worker-1"),
                 body,
                 responsesProtocol);
     }
@@ -87,14 +85,14 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
                 tx -> accumulator.accumulate(attempt, ProxyTokenUsage.from(body, responsesProtocol)));
     }
 
-    private AgentJobLlmUsage usageOf(AgentJob job) {
+    private ReviewJobLlmUsage usageOf(ReviewJob job) {
         return jobRepository.findLlmUsageById(job.getId()).orElseThrow();
     }
 
     @Test
     @DisplayName("successive calls add onto the row rather than replacing it")
     void repeatedCallsAccumulateOntoTheSameRow() {
-        AgentJob job = persistedJob("proxy-usage-adds");
+        ReviewJob job = persistedJob("proxy-usage-adds");
         String body = "{\"usage\":{\"prompt_tokens\":30,\"completion_tokens\":10,"
                 + "\"prompt_tokens_details\":{\"cached_tokens\":5,\"cache_write_tokens\":7},"
                 + "\"completion_tokens_details\":{\"reasoning_tokens\":2}}}";
@@ -103,7 +101,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         accumulate(job.getId(), json(body), false);
         accumulate(job.getId(), json(body), false);
 
-        AgentJobLlmUsage usage = usageOf(job);
+        ReviewJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isEqualTo(3);
         assertThat(usage.inputTokens()).isEqualTo(54); // 3 × (30 − 5 − 7)
         assertThat(usage.cacheReadTokens()).isEqualTo(15);
@@ -115,11 +113,11 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @Test
     @DisplayName("a response with no usage block leaves the row at zero")
     void missingUsageBlockRecordsNothing() {
-        AgentJob job = persistedJob("proxy-usage-no-block");
+        ReviewJob job = persistedJob("proxy-usage-no-block");
 
         accumulate(job.getId(), json("{\"choices\":[]}"), false);
 
-        AgentJobLlmUsage usage = usageOf(job);
+        ReviewJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isZero();
         assertThat(usage.inputTokens()).isZero();
     }
@@ -127,7 +125,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @Test
     @DisplayName("the mentor route (no billing target) touches no row")
     void nullJobIdIsANoOp() {
-        AgentJob job = persistedJob("proxy-usage-null-target");
+        ReviewJob job = persistedJob("proxy-usage-null-target");
 
         accumulate(null, json("{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":0}}"), false);
 
@@ -136,16 +134,16 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
 
     /**
      * Attempt 0 dispatches a provider call. While it waits, its worker's heartbeat goes stale and orphan
-     * recovery requeues the job — bumping {@code retry_count} and zeroing these counters — after which a
+     * recovery requeues the job — bumping {@code attempt} and zeroing these counters — after which a
      * sibling claims it as attempt 1. The original worker was never dead: its response arrives and it
      * accumulates, onto counters that now belong to attempt 1 and its price and funding source.
      */
     @Test
     @DisplayName("a late call from a superseded attempt is dropped, not billed to the attempt that now owns the row")
     void lateWriteFromASupersededAttemptDoesNotLandOnTheNewAttempt() {
-        AgentJob job = persistedJob("proxy-usage-superseded");
-        ProxyRouting.BilledAttempt attemptZero = new ProxyRouting.BilledAttempt(
-                LlmUsageSourceType.AGENT_JOB, job.getId(), 0, BigDecimal.ZERO, "worker-1");
+        ReviewJob job = persistedJob("proxy-usage-superseded");
+        ProxyRouting.BilledAttempt attemptZero =
+                new ProxyRouting.BilledAttempt(UsageSourceType.REVIEW_JOB, job.getId(), 0, BigDecimal.ZERO, "worker-1");
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         ProxyUsageAccumulator accumulator = new ProxyUsageAccumulator(jobRepository, registry);
 
@@ -154,7 +152,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         accumulateAs(
                 accumulator, attemptZero, json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":9}}"), false);
 
-        AgentJobLlmUsage usage = usageOf(job);
+        ReviewJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isZero();
         assertThat(usage.inputTokens()).isZero();
         assertThat(usage.outputTokens()).isZero();
@@ -165,16 +163,15 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @Test
     @DisplayName("the attempt that still owns the row is accumulated onto as before")
     void theOwningAttemptStillAccumulates() {
-        AgentJob job = persistedJob("proxy-usage-owning-attempt");
+        ReviewJob job = persistedJob("proxy-usage-owning-attempt");
         requeueTo(job, 1);
 
         accumulateAs(
-                new ProxyRouting.BilledAttempt(
-                        LlmUsageSourceType.AGENT_JOB, job.getId(), 1, BigDecimal.ZERO, "worker-1"),
+                new ProxyRouting.BilledAttempt(UsageSourceType.REVIEW_JOB, job.getId(), 1, BigDecimal.ZERO, "worker-1"),
                 json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":9}}"),
                 false);
 
-        AgentJobLlmUsage usage = usageOf(job);
+        ReviewJobLlmUsage usage = usageOf(job);
         assertThat(usage.totalCalls()).isEqualTo(1);
         assertThat(usage.inputTokens()).isEqualTo(25);
         assertThat(usage.outputTokens()).isEqualTo(9);
@@ -183,27 +180,27 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @Test
     @DisplayName("a call that lands after the job went terminal does not corrupt the final totals")
     void lateWriteAfterTerminalIsDropped() {
-        AgentJob job = persistedJob("proxy-usage-after-terminal");
-        job.setStatus(AgentJobStatus.COMPLETED);
-        job.setLlmTotalInputTokens(500);
-        job.setLlmTotalCalls(4);
+        ReviewJob job = persistedJob("proxy-usage-after-terminal");
+        job.setStatus(ReviewJobStatus.COMPLETED);
+        job.setLlmInputTokens(500);
+        job.setLlmCalls(4);
         jobRepository.saveAndFlush(job);
 
         accumulate(job.getId(), json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":0}}"), false);
 
-        AgentJobLlmUsage usage = usageOf(job);
+        ReviewJobLlmUsage usage = usageOf(job);
         assertThat(usage.inputTokens()).isEqualTo(500);
         assertThat(usage.totalCalls()).isEqualTo(4);
     }
 
-    /** Reproduces what {@code AgentJobRepository#requeueOrphan} does to the row, then re-claims it. */
-    private void requeueTo(AgentJob job, int attempt) {
-        job.setRetryCount(attempt);
-        job.setStatus(AgentJobStatus.RUNNING);
-        job.setLlmTotalCalls(0);
-        job.setLlmTotalInputTokens(0);
-        job.setLlmTotalOutputTokens(0);
-        job.setLlmTotalReasoningTokens(0);
+    /** Reproduces what {@code ReviewJobRepository#requeueOrphan} does to the row, then re-claims it. */
+    private void requeueTo(ReviewJob job, int attempt) {
+        job.setAttempt(attempt);
+        job.setStatus(ReviewJobStatus.RUNNING);
+        job.setLlmCalls(0);
+        job.setLlmInputTokens(0);
+        job.setLlmOutputTokens(0);
+        job.setLlmReasoningTokens(0);
         job.setLlmCacheReadTokens(0);
         job.setLlmCacheWriteTokens(0);
         jobRepository.saveAndFlush(job);
@@ -213,7 +210,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
     @Test
     @DisplayName("a failed write is swallowed, but counted so the under-billing is visible")
     void failedAccumulationIsCountedNotSilent() {
-        AgentJobRepository failing = mock(AgentJobRepository.class);
+        ReviewJobRepository failing = mock(ReviewJobRepository.class);
         when(failing.accumulateLlmUsage(any(), anyInt(), any()))
                 .thenThrow(new IllegalStateException("connection reset"));
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
@@ -221,7 +218,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
 
         assertThatCode(() -> accumulator.accumulate(
                         new ProxyRouting.BilledAttempt(
-                                LlmUsageSourceType.AGENT_JOB, UUID.randomUUID(), 0, BigDecimal.ZERO, "worker-1"),
+                                UsageSourceType.REVIEW_JOB, UUID.randomUUID(), 0, BigDecimal.ZERO, "worker-1"),
                         ProxyTokenUsage.from(
                                 json("{\"usage\":{\"prompt_tokens\":10,\"completion_tokens\":0}}"), false)))
                 .doesNotThrowAnyException();

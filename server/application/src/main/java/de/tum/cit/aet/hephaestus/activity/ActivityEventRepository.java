@@ -57,8 +57,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
         SELECT :id, :eventKey, :eventType, :occurredAt, :actorId,
             :workspaceId, :repositoryId, :targetType, :targetId, CURRENT_TIMESTAMP
         WHERE NOT EXISTS (
-            SELECT 1 FROM person_suppression s JOIN "user" u
-              ON u.provider_id=s.provider_id AND u.native_id::text=s.subject
+            SELECT 1 FROM identity_restriction s JOIN "user" u
+              ON u.provider_id=s.provider_id AND s.kind='ERASED' AND u.native_id::text=s.provider_user_key
             WHERE u.id=:actorId AND s.team_key=''
         )
         ON CONFLICT (workspace_id, event_key) DO NOTHING
@@ -91,8 +91,8 @@ public interface ActivityEventRepository extends JpaRepository<ActivityEvent, UU
           AND activity_event.target_id = gc.id
           AND gc.author_id IN (:authorIds)
           AND gc.repository_id = :repositoryId
-          AND NOT EXISTS (SELECT 1 FROM person_suppression s JOIN "user" u
-            ON u.provider_id=s.provider_id AND u.native_id::text=s.subject
+          AND NOT EXISTS (SELECT 1 FROM identity_restriction s JOIN "user" u
+            ON u.provider_id=s.provider_id AND s.kind='ERASED' AND u.native_id::text=s.provider_user_key
             WHERE u.id=gc.author_id AND s.team_key='')
         """, nativeQuery = true)
     int backfillCommitActors(@Param("repositoryId") Long repositoryId, @Param("authorIds") List<Long> authorIds);

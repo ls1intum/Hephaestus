@@ -1,18 +1,13 @@
+import { isCommentLine } from "../kits/scm/declarations.ts";
+import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index.ts";
+import { languageOf } from "../kits/scm/languages.ts";
 // Finds two facts that a hunk alone does not show: if a manifest of the repository declares a library
 // or framework product, and if each declaration that the change adds is exported or internal. Neither
 // fact settles the public surface. An app without a library product can still expose an HTTP,
 // configuration or wire contract to other consumers, which the review investigates. A Swift
 // declaration without a modifier is internal, not public. To add a language, add a row.
-import { noMatchDirections } from "../lib/bounded-text.ts";
-import { isCommentLine } from "../lib/declarations.ts";
-import { languageOf } from "../lib/languages.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type FileTree,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { noMatchDirections } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"public-declaration":
@@ -23,7 +18,7 @@ export const LABELS = {
 
 // ── (1) Public-product manifest scan ──────────────────────────────────────────────────────────────────────
 // Each manifest filename maps to a predicate over its raw text that answers "does this declare a consumable
-// library/framework product?". One row per ecosystem; the predicate stays neutral (a structural test, no observation).
+// library/framework product?". One row per ecosystem; the predicate stays neutral (a structural test, no problem).
 const PRODUCT_MANIFESTS: [RegExp, (text: string) => boolean][] = [
 	// Swift Package Manager: a `.library(...)` product.
 	[/(?:^|\/)Package\.swift$/u, (t) => /\.library\s*\(/u.test(t)],
@@ -33,7 +28,7 @@ const PRODUCT_MANIFESTS: [RegExp, (text: string) => boolean][] = [
 		(t) =>
 			!/"private"\s*:\s*true/u.test(t) && /"(?:main|module|exports|types|typings)"\s*:/u.test(t),
 	],
-	// Maven: packaged as a real artifact (jar/etc.), not an aggregator pom.
+	// Maven: packaged as a distributable package (jar/etc.), not an aggregator pom.
 	[/(?:^|\/)pom\.xml$/u, (t) => !/<packaging>\s*pom\s*<\/packaging>/u.test(t)],
 	// Gradle: applies the java-library plugin or a publishing plugin.
 	[
@@ -120,9 +115,10 @@ async function declaresPublicProduct(tree: FileTree): Promise<boolean> {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const change = requireChange(ctx.files);
-		const head = ctx.files?.head ?? null;
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const change = requireChange(domain.files);
+		const head = domain.files?.head ?? null;
 		const hasPublicProduct = head !== null && (await declaresPublicProduct(head));
 
 		// (2) Classify each declaration ADDED in the diff as public (exported) or internal.
@@ -168,7 +164,7 @@ export default definePracticeScript({
 		const directions: string[] = [];
 		if (!hasPublicProduct) {
 			directions.push(
-				"No public library/framework product was detected in the repo manifests (no SwiftPM .library, non-private package.json entry, publishable Maven/Gradle artifact, distributable Python package, or Go module).",
+				"No public library/framework product was detected in the repo manifests (no SwiftPM .library, non-private package.json entry, publishable Maven/Gradle package, distributable Python package, or Go module).",
 				"Investigate whether this repo exposes any public API surface a consumer depends on before deciding documentation was owed.",
 			);
 		}

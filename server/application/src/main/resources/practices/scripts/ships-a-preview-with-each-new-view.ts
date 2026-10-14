@@ -1,14 +1,10 @@
+import { isCommentLine } from "../kits/scm/declarations.ts";
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
+import { isTestPath, languageOf } from "../kits/scm/languages.ts";
 // Finds the view types that the change declares and the previews that it adds, in each Swift file.
 // The review pairs them, and reads if the data of each preview is representative.
-import { factsOf } from "../lib/bounded-text.ts";
-import { isCommentLine } from "../lib/declarations.ts";
-import { isTestPath, languageOf } from "../lib/languages.ts";
-import {
-	definePracticeScript,
-	expectKind,
-	requireChange,
-	type ReviewLead,
-} from "../lib/practice-script.ts";
+import { factsOf } from "../lib/core/bounded-text.ts";
+import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
 
 const VIEW_DECLARATION =
 	/^\s*(?:@\w+\s+)*(?:(?:public|private|fileprivate|internal)\s+)?struct\s+(?<name>[A-Za-z_]\w*)\s*(?:<[^>]*>)?\s*:\s*[^{]*\bView\b/u;
@@ -22,12 +18,13 @@ export const LABELS = {
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
 		const leads: ReviewLead[] = [];
 		let newViews = 0;
 		let previewsAdded = 0;
 		let filesWithNewViewAndNoPreview = 0;
-		for (const [path, df] of requireChange(ctx.files)) {
+		for (const [path, df] of requireChange(domain.files)) {
 			if (languageOf(path) !== "swift" || isTestPath(path)) {
 				continue;
 			}

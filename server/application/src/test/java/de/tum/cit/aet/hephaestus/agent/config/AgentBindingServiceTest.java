@@ -164,7 +164,8 @@ class AgentBindingServiceTest extends BaseUnitTest {
         "MENTOR, COHERE_RERANK, This is a reranking model. Choose a chat model here.",
         "PRACTICE_EMBEDDING, OPENAI_COMPLETIONS, This is a chat model. Choose an embedding model here.",
         "PRACTICE_RERANKING, OPENAI_EMBEDDINGS, This is an embedding model. Choose a reranking model here.",
-        "PRACTICE_DECISION, OPENAI_RESPONSES, This is a chat model. Choose a decision model or a chat completions model here."
+        "PRACTICE_DECISION, OPENAI_RESPONSES, This is a chat model. Choose a decision model or a chat completions"
+                + " model here."
     })
     void upsertRejectsAModelWhenItsKindDoesNotFitThePurpose(
             AgentPurpose purpose, LlmApiProtocol apiProtocol, String message) {

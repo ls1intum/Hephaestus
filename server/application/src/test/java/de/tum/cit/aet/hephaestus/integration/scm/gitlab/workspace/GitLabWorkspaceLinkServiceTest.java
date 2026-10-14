@@ -22,14 +22,15 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * Who may rewrite a shared project's rows from its own reading of GitLab: the workspace that owns the project's group
- * on its connected instance, and still monitors that very project.
+ * Who may rewrite a shared project's rows from its own reading of GitLab: the workspace that owns
+ * the project's group on its connected instance, and still monitors that very project.
  */
 class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
@@ -77,7 +78,7 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
         project.setProvider(gitLab);
 
         Workspace owner = workspace(OWNER);
-        owner.setOrganization(group);
+        owner.setOrganizationId(group.getId());
         Workspace second = workspace(SECOND);
         lenient().when(workspaceRepository.findById(OWNER)).thenReturn(Optional.of(owner));
         lenient().when(workspaceRepository.findById(SECOND)).thenReturn(Optional.of(second));
@@ -97,7 +98,7 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
         assertThat(service.mayWriteRepository(OWNER, project)).isTrue();
         assertThat(service.mayWriteRepository(SECOND, project))
-                .as("a second workspace on the same group reads it with its own, possibly narrower, credentials")
+                .as("a second workspace on the same group reads it with its own, possibly" + " narrower, credentials")
                 .isFalse();
     }
 
@@ -123,7 +124,10 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
         service.link(second);
 
-        assertThat(second.getOrganization()).isSameAs(onOtherInstance);
+        assertThat(organizationRepository
+                        .findById(Objects.requireNonNull(second.getOrganizationId()))
+                        .orElseThrow())
+                .isSameAs(onOtherInstance);
     }
 
     @Test
@@ -133,7 +137,10 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
         service.link(second);
 
-        assertThat(second.getOrganization()).isNull();
+        assertThat(organizationRepository
+                        .findById(Objects.requireNonNull(second.getOrganizationId()))
+                        .orElseThrow())
+                .isNull();
         verify(organizationRepository, never()).findByLoginIgnoreCaseAndProviderId(any(), anyLong());
     }
 

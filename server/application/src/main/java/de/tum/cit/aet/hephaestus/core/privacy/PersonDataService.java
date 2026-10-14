@@ -19,6 +19,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
@@ -42,7 +43,7 @@ public class PersonDataService {
     private final PersonDataRegistry registry;
     private final List<PersonEvidenceErasure> evidenceStores;
     private final PersonDataRequestRepository requests;
-    private final PersonSuppressionService suppression;
+    private final IdentityRestrictionService suppression;
     private final PersonDataWriteFence writeFence;
     private final PersonDataCopyFence copyFence;
     private final IssuedJwtRepository issuedTokens;
@@ -94,7 +95,8 @@ public class PersonDataService {
     @Transactional
     public void requestErasure(UUID id, long administratorId, boolean externalCopiesRemoved) {
         // Acquire global admission, native keys and accounts before the request row.
-        // The unlocked snapshot contains only the immutable admission scope; revalidate after locking.
+        // The unlocked snapshot contains only the immutable admission scope; revalidate after
+        // locking.
         var admission = jdbc.query(
                 "SELECT state,scope_json FROM person_data_request WHERE id=?",
                 (rs, row) -> new ErasureAdmission(Objects.requireNonNull(rs.getString(1)), rs.getString(2)),
@@ -128,7 +130,9 @@ public class PersonDataService {
         requireExternalRemoval(selected, externalCopiesRemoved);
         if (person.accountId() != null) {
             Boolean busy = jdbc.queryForObject(
-                    "SELECT EXISTS(SELECT 1 FROM person_data_request WHERE id<>? AND state IN ('ERASING','FAILED') AND scope_json IS NOT NULL AND (scope_json::jsonb)->>'accountId'=?)",
+                    "SELECT EXISTS(SELECT 1 FROM person_data_request WHERE id<>? AND state"
+                            + " IN ('ERASING','FAILED') AND scope_json IS NOT NULL AND"
+                            + " (scope_json::jsonb)->>'accountId'=?)",
                     Boolean.class,
                     id,
                     person.accountId().toString());
@@ -139,7 +143,8 @@ public class PersonDataService {
         suppression.suppress(person, id);
         if (person.accountId() != null) {
             jdbc.update(
-                    "UPDATE account SET status='DELETING',deleted_at=CURRENT_TIMESTAMP WHERE id=? AND status<>'DELETED'",
+                    "UPDATE account SET status='DELETING',deleted_at=CURRENT_TIMESTAMP WHERE id=?"
+                            + " AND status<>'DELETED'",
                     person.accountId());
             issuedTokens.revokeAllForAccount(
                     person.accountId(), Instant.now(), IssuedJwt.RevokedReason.ACCOUNT_DELETED);
@@ -155,12 +160,62 @@ public class PersonDataService {
         // Lock both accounts in one order. Concurrent requests must not erase each other's
         // administrators after both have accepted a token validated before either erasure.
         List<Boolean> eligible = jdbc.query(
-                "SELECT id,(status='ACTIVE' AND app_role='APP_ADMIN') FROM account WHERE id IN (?,?) ORDER BY id FOR UPDATE",
+                "SELECT id,(status='ACTIVE' AND app_role='APP_ADMIN') FROM account WHERE id"
+                        + " IN (?,?) ORDER BY id FOR UPDATE",
                 (rs, row) -> rs.getLong(1) == administratorId && rs.getBoolean(2),
                 administratorId,
                 Objects.requireNonNullElse(personAccountId, -1L));
         if (!eligible.contains(true))
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "An active instance admin must authorize erasure.");
+    }
+
+    /**
+     * Account deletion uses the same frozen store inventory and physical-copy custody as admin
+     * erasure.
+     */
+    public void eraseForAccount(long accountId) {
+        TransactionTemplate tx = new TransactionTemplate(transactions);
+        UUID requestId = tx.execute(status -> {
+            PersonScope person = withEvidenceJobs(resolver.resolve(accountId, List.of()));
+            copyFence.holdForErasure();
+            writeFence.holdForErasure(person.identities());
+            var accountStatus =
+                    jdbc.queryForObject("SELECT status FROM account WHERE id=? FOR UPDATE", String.class, accountId);
+            if ("DELETED".equals(accountStatus)) return null;
+            var active = jdbc.query(
+                    """
+                    SELECT id FROM person_data_request WHERE state IN ('ERASING','FAILED')
+                    AND scope_json IS NOT NULL AND (scope_json::jsonb)->>'accountId'=?
+                    ORDER BY created_at FOR UPDATE
+                    """, (rs, row) -> Objects.requireNonNull(rs.getObject(1, UUID.class)), Long.toString(accountId));
+            if (!active.isEmpty()) return active.getFirst();
+            var request = new PersonDataRequest();
+            request.setScopeJson(mapper.writeValueAsString(person));
+            var selected = registry.select(person);
+            request.setSelectionsJson(mapper.writeValueAsString(selected));
+            request.setCountsJson(mapper.writeValueAsString(registry.counts(selected)));
+            request.setState(PersonDataRequest.State.ERASING);
+            requests.saveAndFlush(request);
+            suppression.suppress(person, request.getId());
+            jdbc.update(
+                    "UPDATE account SET"
+                            + " status='DELETING',deleted_at=COALESCE(deleted_at,CURRENT_TIMESTAMP)"
+                            + " WHERE id=?",
+                    accountId);
+            issuedTokens.revokeAllForAccount(accountId, Instant.now(), IssuedJwt.RevokedReason.ACCOUNT_DELETED);
+            if (!deliveries(selected).isEmpty()) {
+                request.setState(PersonDataRequest.State.FAILED);
+                request.setFailureCode("EXTERNAL_COPIES_REQUIRE_REMOVAL");
+                requests.saveAndFlush(request);
+            }
+            return request.getId();
+        });
+        if (requestId == null) return;
+        run(requestId);
+        var state = Objects.requireNonNull(
+                tx.execute(status -> requests.findById(requestId).orElseThrow().getState()));
+        if (state != PersonDataRequest.State.COMPLETE)
+            throw new IllegalStateException("Account erasure has unfinished copy or store custody: " + requestId);
     }
 
     public void run(UUID id) {
@@ -222,15 +277,16 @@ public class PersonDataService {
 
     @Transactional
     public void expirePreviews() {
-        jdbc.update(
-                "UPDATE person_data_request SET state='EXPIRED',scope_json=NULL,selections_json=NULL WHERE state='PREVIEW' AND expires_at<CURRENT_TIMESTAMP");
+        jdbc.update("UPDATE person_data_request SET"
+                + " state='EXPIRED',scope_json=NULL,selections_json=NULL WHERE state='PREVIEW'"
+                + " AND expires_at<CURRENT_TIMESTAMP");
     }
 
     private void requireExternalRemoval(Map<String, PersonDataSelection> selected, boolean externalCopiesRemoved) {
         if (!externalCopiesRemoved && !deliveries(selected).isEmpty())
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Use the un-deliver runbook to remove the provider feedback. Then confirm the removal.");
+                    "Use the un-deliver runbook to remove the provider feedback. Then confirm the" + " removal.");
     }
 
     private void requireUnchanged(PersonDataRequest r, Map<String, PersonDataSelection> selected) {
@@ -241,8 +297,9 @@ public class PersonDataService {
     }
 
     private PersonScope withEvidenceJobs(PersonScope resolved) {
-        var derivedJobs = evidenceStores.stream()
-                .flatMap(store -> store.jobsContaining(resolved).stream())
+        var derivedJobs = Stream.concat(
+                        resolved.derivedJobIds().stream(),
+                        evidenceStores.stream().flatMap(store -> store.jobsContaining(resolved).stream()))
                 .distinct()
                 .sorted()
                 .toList();
@@ -268,14 +325,22 @@ public class PersonDataService {
 
     private @Nullable PersonDataRequest lockAdmittedErasure(UUID id) {
         var actors = jdbc.query(
-                "SELECT administrator_account_id,scope_json FROM person_data_request WHERE id=? AND state='ERASING'",
+                "SELECT administrator_account_id,scope_json FROM person_data_request WHERE"
+                        + " id=? AND state='ERASING'",
                 (rs, row) -> new StepAdmission(rs.getObject(1, Long.class), rs.getString(2)),
                 id);
         if (actors.isEmpty()) return null;
         var actor = actors.getFirst();
         var person = mapper.readValue(Objects.requireNonNull(actor.scopeJson()), PersonScope.class);
-        requireActiveAdministratorAndLockAccount(
-                Objects.requireNonNull(actor.administratorAccountId()), person.accountId());
+        if (actor.administratorAccountId() != null) {
+            requireActiveAdministratorAndLockAccount(actor.administratorAccountId(), person.accountId());
+        } else {
+            long accountId = Objects.requireNonNull(person.accountId());
+            var accountStatus =
+                    jdbc.queryForObject("SELECT status FROM account WHERE id=? FOR UPDATE", String.class, accountId);
+            if (!"DELETING".equals(accountStatus) && !"DELETED".equals(accountStatus))
+                throw new IllegalStateException("Account deletion admission is no longer valid");
+        }
         PersonDataRequest request = requests.lock(id).orElseThrow(() -> notFound());
         if (request.getState() != PersonDataRequest.State.ERASING) return null;
         if (!Objects.equals(request.getAdministratorAccountId(), actor.administratorAccountId())
@@ -309,6 +374,7 @@ public class PersonDataService {
     private static ResponseStatusException notFound() {
         return new ResponseStatusException(
                 HttpStatus.NOT_FOUND,
-                "We could not find that request. It may have been deleted. Reload the page to see what is current.");
+                "We could not find that request. It may have been deleted. Reload the page to see"
+                        + " what is current.");
     }
 }

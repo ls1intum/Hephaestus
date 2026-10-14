@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/lib/types.ts";
+import type { DiffFile } from "../../../../../../docker/agents/practice-scripts/kits/scm/types.ts";
 import {
 	leadKeys,
 	runBundled,
+	runBundledProgram,
 } from "../../../../../../docker/agents/practice-scripts/run-bundled.ts";
 
 const view = `import SwiftUI
@@ -50,22 +51,24 @@ void test("an I/O call is placed in the type that encloses it: the view's counts
 	assert.deepEqual(
 		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts?.enclosing]),
 		[
-			[{ change: "App/EventList.swift", line: 8 }, "urlsession-request", "struct EventList"],
-			[{ change: "App/EventList.swift", line: 9 }, "json-coding", "struct EventList"],
+			[
+				{ file: "App/EventList.swift", line: 8, endLine: 8 },
+				"urlsession-request",
+				"struct EventList",
+			],
+			[{ file: "App/EventList.swift", line: 9, endLine: 9 }, "json-coding", "struct EventList"],
 		],
 	);
 	assert.equal(result.facts?.ioCallsInViews, 2);
-	assert.equal(result.facts.filesWithoutCheckout, 0);
+	assert.equal(result.facts.filesWithUnknownLocation, 0);
 });
 
-void test("without a checkout the placing is unknown, and the lead is still reported", async () => {
-	const result = await runBundled("keeps-views-free-of-networking-and-persistence", {
+void test("an unavailable pinned file withholds the scan input instead of claiming unknown placement", async () => {
+	const result = await runBundledProgram("keeps-views-free-of-networking-and-persistence", {
+		repo: {},
 		change: new Map([whole("App/EventList.swift", view)]),
 	});
-	assert.equal(result.facts?.filesWithoutCheckout, 1);
-	assert.ok((result.leads ?? []).every((lead) => lead.facts?.enclosing === "unknown"));
-	// The store's call is a candidate too when nothing says which type it lies in.
-	assert.equal(result.leads?.length, 3);
+	assert.ok("error" in result.outcome);
 });
 
 void test("a new view without a preview is counted per file, a preview elsewhere in the change is a lead", async () => {
@@ -201,8 +204,8 @@ void test("a custom font given a size scales, one given a fixed size does not, a
 		],
 	);
 	const said = result.directions?.join("\n") ?? "";
-	assert.match(said, /^1 custom font\(s\) with fixedSize: added/mu);
-	assert.match(said, /^1 system font\(s\) with a point size added/mu);
+	assert.match(said, /^1 custom font\(s\) with fixedSize: selected/mu);
+	assert.match(said, /^1 system font\(s\) with a point size selected/mu);
 	assert.doesNotMatch(said, /scaled only with relativeTo/u);
 });
 
@@ -216,14 +219,14 @@ void test("rows beyond the cap are counted by kind and said to be unlisted", asy
 	});
 	assert.equal(result.leads?.length, 60);
 	assert.equal(result.facts?.symbolImages, 65);
-	assert.equal(result.facts.interfaceLinesAdded, 65);
+	assert.equal(result.facts.interfaceLinesSelected, 65);
 	assert.match(
 		result.directions?.[0] ?? "",
-		/^65 matching added line\(s\); the first 60 are listed and 5 are not\./u,
+		/^65 matching occurrence\(s\); the first 60 are listed and 5 are not\./u,
 	);
 });
 
-void test("detached work needs no written reason, and default isolation text is a lead per target, never the project's", async () => {
+void test("detached item needs no written reason, and default isolation text is a lead per target, never the project's", async () => {
 	const slug = "uses-structured-concurrency-safely";
 	const keyOf = await leadKeys(slug);
 	const source = [
@@ -239,7 +242,7 @@ void test("detached work needs no written reason, and default isolation text is 
 	const said = (plain.directions ?? []).join("\n");
 	assert.match(said, /no written reason is required/u);
 	assert.doesNotMatch(said, /stated reason|whether \.task was available/u);
-	assert.match(said, /missing @MainActor on an added line does not by itself/u);
+	assert.match(said, /missing @MainActor on a selected line does not by itself/u);
 	assert.match(said, /leaves the module's default unknown rather than nonisolated/u);
 	assert.match(said, /Check the SDK before relying on inherited SwiftUI View isolation/u);
 	assert.match(said, /Swallowed failures belong to handles-errors-instead-of-swallowing-them/u);
@@ -342,14 +345,14 @@ void test("a change with no reference anywhere says what it scanned and what the
 		},
 	};
 	const reviewed = { repository_id: 1, provider_id: 1 };
-	// The server stages the record of the work and its description beside the inventory; the leads cite them.
-	const run = async (work: { title: string; body: string; source_branch: string }) =>
+	// The server stages the record of the item and its description beside the inventory; the leads cite them.
+	const run = async (item: { title: string; body: string; source_branch: string }) =>
 		runBundled(slug, {
-			work: { ...reviewed, ...work },
+			item: { ...reviewed, ...item },
 			context: {
 				...context,
-				"metadata.json": { ...reviewed, ...work },
-				"description.md": work.body,
+				"metadata.json": { ...reviewed, ...item },
+				"description.md": item.body,
 			},
 		});
 	const result = await run({
@@ -373,6 +376,15 @@ void test("a change with no reference anywhere says what it scanned and what the
 void test("native platform logging is a logger and standard output a print, a print under a scripts path is marked as tool output", async () => {
 	const result = await runBundled("logs-through-the-platform-logger", {
 		repo: {
+			"App/Store.swift":
+				'final class Store {\n    func load() {\n        print("loading")\n        logger.info("loaded")\n        NSLog("loaded %d", count)\n    }\n}\n',
+			"App/Sync.m":
+				'- (void)sync {\n    NSLog(@"synced %@", name);\n    os_log_error(OS_LOG_DEFAULT, "sync failed");\n    printf("synced");\n}\n',
+			"app/src/main/java/com/example/Feed.kt":
+				'class Feed {\n    fun load() {\n        Log.d("Feed", "loaded")\n        println("loaded")\n    }\n}\n',
+			"app/src/main/java/com/example/Cache.java":
+				'class Cache {\n    void evict() {\n        Log.w(TAG, "evicted");\n        System.out.println("evicted");\n    }\n}\n',
+			"scripts/report.py": 'print("done")\n',
 			"App/Log.swift": 'import OSLog\nlet logger = Logger(subsystem: "app", category: "app")\n',
 		},
 		change: new Map([
@@ -397,12 +409,12 @@ void test("native platform logging is a logger and standard output a print, a pr
 	});
 	const keyOf = await leadKeys("logs-through-the-platform-logger");
 	assert.deepEqual(result.facts, {
-		printsAdded: 5,
-		loggerCallsAdded: 6,
+		printsSelected: 5,
+		loggerCallsSelected: 6,
 		printsInToolPaths: 1,
 		checkoutHasLogger: 1,
 		filesScanned: 5,
-		linesAdded: 30,
+		linesSelected: 30,
 	});
 	assert.deepEqual(
 		(result.leads ?? []).map((lead) => [
@@ -443,10 +455,10 @@ void test("a print in another language beyond the shared row cap is counted but 
 			(lead) => keyOf(lead.label) === "print-call" && lead.facts?.language === "swift",
 		),
 	);
-	assert.equal(result.facts?.printsAdded, 41);
+	assert.equal(result.facts?.printsSelected, 41);
 	// The script's own print is past the 40 leads returned, so no listed lead is under a tool path.
 	assert.equal(result.facts.printsInToolPaths, 0);
-	assert.match(result.directions?.[0] ?? "", /^41 diagnostic line\(s\) added; 40 are listed\./u);
+	assert.match(result.directions?.[0] ?? "", /^41 diagnostic line\(s\) selected; 40 are listed\./u);
 	assert.match(result.directions?.[1] ?? "", /\(0 listed under a tool or script path\)/u);
 });
 

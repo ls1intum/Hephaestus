@@ -24,9 +24,9 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     /**
      * Pessimistic lock, for a read whose value is about to be snapshotted and mutated (the audited
      * AI-settings writes). Without it the before-snapshot and the write are not serialized: two
-     * concurrent admin PATCHes both read the same prior state, Hibernate's full-column UPDATE makes the
-     * later one silently revert the earlier's field, and the audit trail ends up asserting a transition
-     * that never survived — with no row for the write that undid it.
+     * concurrent admin PATCHes both read the same prior state, Hibernate's full-column UPDATE makes
+     * the later one silently revert the earlier's field, and the audit trail ends up asserting a
+     * transition that never survived — with no row for the write that undid it.
      */
     @WorkspaceAgnostic("Locking read of the tenant root itself, by its own id")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -35,9 +35,9 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByIdForUpdate(@Param("id") Long id);
 
     /**
-     * {@link #findByIdForUpdate} for a caller that only has the slug. One locking query, not a lookup
-     * followed by a locking read: the second call returns the persistence context's existing instance
-     * without refreshing it, leaving the caller holding exactly the pre-lock state.
+     * {@link #findByIdForUpdate} for a caller that only has the slug. One locking query, not a
+     * lookup followed by a locking read: the second call returns the persistence context's existing
+     * instance without refreshing it, leaving the caller holding exactly the pre-lock state.
      */
     @WorkspaceAgnostic("Locking read of the tenant root itself, by its own slug")
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -46,10 +46,11 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findByWorkspaceSlugForUpdate(@Param("slug") String slug);
 
     /**
-     * Reverse-lookup a workspace by its GitHub App installation id, through the {@code Connection} whose
-     * {@code kind='GITHUB'} and {@code instance_key=installationId}. At most one connection holds an installation
-     * ({@code uq_connection_one_github_installation}); uninstalled ones stay as history, so the holder wins and
-     * otherwise the latest to have held it — which a provider uninstall that follows a disconnect still finds.
+     * Reverse-lookup a workspace by its GitHub App installation id, through the {@code Connection}
+     * whose {@code kind='GITHUB'} and {@code instance_key=installationId}. At most one connection
+     * holds an installation ({@code uq_connection_one_github_installation}); uninstalled ones stay
+     * as history, so the holder wins and otherwise the latest to have held it — which a provider
+     * uninstall that follows a disconnect still finds.
      */
     default Optional<Workspace> findByInstallationId(Long installationId) {
         if (installationId == null) {
@@ -89,25 +90,15 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
 
     Optional<Workspace> findByRepositoriesToMonitor_NameWithOwner(String nameWithOwner);
 
-    Optional<Workspace> findByOrganization_Login(String login);
-
-    Optional<Workspace> findByOrganization_Id(Long organizationId);
+    Optional<Workspace> findByOrganizationId(Long organizationId);
 
     /**
-     * The provider id of the workspace's synced {@code Organization} — the {@code provider_id} its
-     * teams are stamped with at sync time (see {@link WorkspaceTeamScopeResolver}). Empty when there
-     * is no synced organization. A scalar projection, so it works on a detached workspace without
-     * initializing the lazy {@code organization} association.
+     * The workspace's group and repository selection as stored. A scalar projection, so it is read
+     * from the database even when this transaction already manages a Workspace loaded before a lock
+     * was taken.
      */
-    @Query("SELECT w.organization.provider.id FROM Workspace w WHERE w.id = :workspaceId")
-    Optional<Long> findOrganizationProviderIdByWorkspaceId(@Param("workspaceId") Long workspaceId);
-
-    /**
-     * The workspace's group and repository selection as stored. A scalar projection, so it is read from the database
-     * even when this transaction already manages a Workspace loaded before a lock was taken.
-     */
-    @Query(
-            "SELECT w.accountLogin AS accountLogin, w.repositorySelection AS repositorySelection FROM Workspace w WHERE w.id = :id")
+    @Query("SELECT w.accountLogin AS accountLogin, w.repositorySelection AS repositorySelection"
+            + " FROM Workspace w WHERE w.id = :id")
     Optional<MonitorPolicy> findMonitorPolicy(@Param("id") Long id);
 
     interface MonitorPolicy {
@@ -135,21 +126,21 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     boolean existsByIdAndOrganizationId(Long id, Long organizationId);
 
     /**
-     * Org-tier orphan check for {@link ScmWorkspaceContentEraser}: how many workspaces OTHER than
-     * {@code excludedWorkspaceId} are still bound to this organization and not already purged.
-     * A non-zero count would mean another tenant still holds a lawful basis for the org-tier mirror
-     * ({@code team}, {@code team_membership}, {@code organization_membership}), so it must survive
-     * the erasing workspace.
+     * Org-tier orphan check for the SCM mirror eraser: how many workspaces OTHER than {@code
+     * excludedWorkspaceId} are still bound to this organization and not already purged. A non-zero
+     * count would mean another tenant still holds a lawful basis for the org-tier mirror ({@code
+     * team}, {@code team_membership}, {@code organization_membership}), so it must survive the
+     * erasing workspace.
      *
-     * <p><b>Defensive only.</b> Unlike {@code repository}, which many workspaces genuinely share, the
-     * organization binding is exclusive: {@code Workspace.organization} is a {@code @OneToOne} over a
-     * {@code unique = true} {@code organization_id} column, so an organization backs at most one
-     * workspace and this count is always 0 in production. It is kept so
-     * {@link ScmWorkspaceContentEraser} stays correct if that 1:1 mapping is ever relaxed.
+     * <p><b>Defensive only.</b> Unlike {@code repository}, which many workspaces genuinely share,
+     * the organization binding is exclusive: {@code Workspace.organizationId} is a
+     * {@code @OneToOne} over a {@code unique = true} {@code organization_id} column, so an
+     * organization backs at most one workspace and this count is always 0 in production. It is kept
+     * so the SCM mirror eraser stays correct if that 1:1 mapping is ever relaxed.
      */
     @Query("""
         SELECT COUNT(w) FROM Workspace w
-        WHERE w.organization.id = :organizationId
+        WHERE w.organizationId = :organizationId
           AND w.id <> :excludedWorkspaceId
           AND w.status <> de.tum.cit.aet.hephaestus.workspace.Workspace.WorkspaceStatus.PURGED
         """)
@@ -167,19 +158,19 @@ public interface WorkspaceRepository extends JpaRepository<Workspace, Long> {
     Optional<Workspace> findPublicActivityWorkspace(@Param("slug") String slug);
 
     /**
-     * Resolves the workspace id from a repository id via the {@code RepositoryToMonitor} join.
-     * Used by mentor-cache invalidation: domain events carry {@code repositoryId} but mentor
-     * caches key on {@code workspaceId}.
+     * Resolves the workspace id from a repository id via the {@code RepositoryToMonitor} join. Used
+     * by mentor-cache invalidation: domain events carry {@code repositoryId} but mentor caches key
+     * on {@code workspaceId}.
      *
      * <p>The join is on {@code nameWithOwner} (no FK from {@code RepositoryToMonitor} to {@code
-     * Repository}), and {@code repository_to_monitor.name_with_owner} has no unique constraint, so two
-     * monitors that share a {@code nameWithOwner} would yield more than one row. Rather than assert a
-     * cardinality the schema does not enforce — which would surface as an uncaught
-     * {@code IncorrectResultSizeDataAccessException} inside the async invalidation listener — this picks
+     * Repository}), and {@code repository_to_monitor.name_with_owner} has no unique constraint, so
+     * two monitors that share a {@code nameWithOwner} would yield more than one row. Rather than
+     * assert a cardinality the schema does not enforce — which would surface as an uncaught {@code
+     * IncorrectResultSizeDataAccessException} inside the async invalidation listener — this picks
      * the lowest workspace id deterministically and caps the result to one row.
      *
-     * @return the resolved workspace id, or {@code Optional.empty()} if the repository is not monitored
-     *         anywhere
+     * @return the resolved workspace id, or {@code Optional.empty()} if the repository is not
+     *     monitored anywhere
      */
     default Optional<Long> findWorkspaceIdByRepositoryId(Long repositoryId) {
         List<Long> ids = findWorkspaceIdsByRepositoryId(repositoryId, PageRequest.of(0, 1));

@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -20,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issuecomment.GitLabIssueCommentProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequestreviewcomment.GitLabPullRequestReviewCommentProcessor;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -113,16 +113,16 @@ class GitLabDetachedSyncIntegrationTest extends BaseIntegrationTest {
         long providerId = Objects.requireNonNull(provider.getId());
         long repositoryId =
                 Objects.requireNonNull(jdbc.queryForObject("""
-                INSERT INTO repository(native_id,provider_id,name,name_with_owner,has_discussions_enabled,is_private,is_archived,is_disabled,html_url,pushed_at,visibility,default_branch)
-                VALUES (1,?,'repo',?,false,false,false,false,'https://example.com/repo',now(),'PUBLIC','main') RETURNING id
-                """, Long.class, provider.getId(), "detached/" + unique));
+                    INSERT INTO repository(native_id,provider_id,name,name_with_owner,has_discussions_enabled,is_private,is_archived,is_disabled,html_url,pushed_at,visibility,default_branch)
+                    VALUES (1,?,'repo',?,false,false,false,false,'https://example.com/repo',now(),'PUBLIC','main') RETURNING id
+                    """, Long.class, provider.getId(), "detached/" + unique));
         long authorId = Objects.requireNonNull(jdbc.queryForObject(
-                "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES (2,?,?,'USER') RETURNING id",
+                "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES" + " (2,?,?,'USER') RETURNING id",
                 Long.class,
                 provider.getId(),
                 "reviewer-" + unique));
         long ownerId = Objects.requireNonNull(jdbc.queryForObject(
-                "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES (4,?,?,'USER') RETURNING id",
+                "INSERT INTO \"user\"(native_id,provider_id,login,type) VALUES" + " (4,?,?,'USER') RETURNING id",
                 Long.class,
                 providerId,
                 "owner-" + unique));

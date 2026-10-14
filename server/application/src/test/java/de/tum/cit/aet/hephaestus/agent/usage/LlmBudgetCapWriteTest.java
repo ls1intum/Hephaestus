@@ -6,11 +6,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.fx.FxRateLookup;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmUsageEventRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -47,7 +48,7 @@ class LlmBudgetCapWriteTest extends BaseUnitTest {
     private ConfigAuditPort configAudit;
 
     @Mock
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Mock
     private FxRateLookup fxRateLookup;

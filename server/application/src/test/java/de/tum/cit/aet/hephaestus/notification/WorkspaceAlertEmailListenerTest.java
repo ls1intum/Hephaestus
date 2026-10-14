@@ -8,7 +8,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountContactQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IntegrationAttentionService;
 import de.tum.cit.aet.hephaestus.integration.core.events.IntegrationAttentionChangedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
@@ -36,7 +36,7 @@ import org.mockito.ArgumentCaptor;
 class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
     private static final Instant NOW = Instant.parse("2026-09-13T12:00:00Z");
     private final IntegrationAttentionService attention = mock(IntegrationAttentionService.class);
-    private final AccountWorkspaceMembershipQuery memberships = mock(AccountWorkspaceMembershipQuery.class);
+    private final AccountMembershipQuery memberships = mock(AccountMembershipQuery.class);
     private final AccountContactQuery contacts = mock(AccountContactQuery.class);
     private final NotificationSubscriptionService subscriptions = mock(NotificationSubscriptionService.class);
     private final EmailRenderer renderer = EmailTestSupport.renderer();
@@ -78,7 +78,7 @@ class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
                 .thenReturn(Optional.of("token"));
         when(contacts.activeVerifiedPrimaryEmail(42L)).thenReturn(Optional.of("admin@example.org"));
         when(memberships.membershipsForAccount(42L))
-                .thenReturn(List.of(new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
                         8L, "other", "Other", "ADMIN", 501L)));
         listener.on(new WorkspaceAlertEmailRequested(change, 42L));
         verify(metrics).record(EmailKind.WORKSPACE_ALERT, EmailDeliveryResult.Outcome.NO_RECIPIENT);
@@ -92,7 +92,7 @@ class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
                 .thenReturn(Optional.of("token"));
         when(contacts.activeVerifiedPrimaryEmail(42L)).thenReturn(Optional.of("admin@example.org"));
         when(memberships.membershipsForAccount(42L))
-                .thenReturn(List.of(new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
                         7L, "owned", "Owned", "OWNER", 501L)));
         when(links.url("token")).thenReturn("https://example.org/unsubscribe/token");
         when(links.confirmationUrl("token")).thenReturn("https://example.org/unsubscribe/token/confirm");
@@ -124,7 +124,7 @@ class WorkspaceAlertEmailListenerTest extends BaseUnitTest {
                 .thenReturn(Optional.of("token"));
         when(contacts.activeVerifiedPrimaryEmail(42L)).thenReturn(Optional.of("admin@example.org"));
         when(memberships.membershipsForAccount(42L))
-                .thenReturn(List.of(new AccountWorkspaceMembershipQuery.WorkspaceMembershipView(
+                .thenReturn(List.of(new AccountMembershipQuery.MembershipView(
                         7L, "owned", "Owned", "ADMIN", 501L)));
         when(links.url("token")).thenReturn("https://example.org/unsubscribe/token");
         when(links.confirmationUrl("token")).thenReturn("https://example.org/unsubscribe/token/confirm");

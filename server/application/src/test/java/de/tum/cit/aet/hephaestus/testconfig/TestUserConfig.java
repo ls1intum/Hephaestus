@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
@@ -20,7 +20,7 @@ public class TestUserConfig {
             UserRepository userRepository,
             IdentityProviderRepository gitProviderRepository,
             AccountRepository accounts,
-            IdentityLinkRepository identities) {
+            IdentityRepository identities) {
         return args -> {
             IdentityProvider provider = gitProviderRepository
                     .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -35,7 +35,7 @@ public class TestUserConfig {
     private void seed(
             UserRepository repo,
             AccountRepository accounts,
-            IdentityLinkRepository identities,
+            IdentityRepository identities,
             String login,
             long userId,
             IdentityProvider provider) {

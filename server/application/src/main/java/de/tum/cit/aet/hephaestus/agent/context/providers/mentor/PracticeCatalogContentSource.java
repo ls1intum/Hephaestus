@@ -1,122 +1,55 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
-import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
-import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
+import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.mentor.spi.MentorPracticeQuery;
 import de.tum.cit.aet.hephaestus.practices.PracticeGuidanceRules;
-import de.tum.cit.aet.hephaestus.practices.PracticeGuide;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeVisual;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
-import de.tum.cit.aet.hephaestus.practices.model.ResultOrigin;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Materialises {@code inputs/context/practice_catalog.json} for {@link MentorChatRequest}.
- *
- * <p>Lists workspace practices with criteria and developer guidance so the mentor agent can talk about specific
- * coding standards that apply to the user's contributions, in the words the practice panel uses. Independent of
- * {@code developerId} — every member of a workspace sees the same practice catalog, so the cache key is just
- * the workspace.
- *
- * <p><b>Freshness is TTL-bounded only.</b> The {@code mentor_practice_context} cache has no
- * event-driven invalidation: there is no Practice-change domain event to hang an eviction off. An
- * admin edit to a practice (criteria text, activate/deactivate, rename, group reassignment) is
- * picked up only after the entry expires (MENTOR_CONTEXT_TTL, see {@code CacheConfig}). This is an
- * accepted limit — the catalog is low-churn admin data and a few minutes of staleness in mentor
- * chat is harmless — not an oversight; wire a Practice-change event into the invalidator if that
- * window ever needs to close.
- */
 @Component
 @RequiredArgsConstructor
 public class PracticeCatalogContentSource implements ContentSource {
-
-    /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";
-
-    private static final String CACHE_NAME = "mentor_practice_context";
-
-    private final PracticeRepository practiceRepository;
-    private final WorkspaceRepository workspaceRepository;
+    private final MentorPracticeQuery practices;
     private final ObjectMapper objectMapper;
-    private final CacheManager cacheManager;
 
     @Override
-    public boolean supports(ContextRequest request) {
-        return request instanceof MentorChatRequest;
+    public boolean supports(MentorContextRequest request) {
+        return true;
     }
 
-    @Override
-    public boolean required() {
-        return false;
-    }
-
-    /** Tx-on-contribute / not-on-buildPayload AOP convention documented at {@link MentorContextKeys}. */
     @Override
     @Transactional(readOnly = true)
-    public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        MentorChatRequest req = (MentorChatRequest) request;
-        Long key = req.workspaceId();
-        Cache cache = cacheManager.getCache(CACHE_NAME);
-        // Atomic compute-if-absent closes the get/build/put race on invalidation events.
-        ObjectNode payload = (cache != null)
-                ? cache.get(key, () -> buildPayload(req.workspaceId()))
-                : buildPayload(req.workspaceId());
-        try {
-            files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(payload));
-        } catch (JacksonException e) {
-            throw new IllegalStateException("Failed to serialize practice catalog context", e);
-        }
+    public void contribute(MentorContextRequest request, Map<String, byte[]> files) {
+        files.put(OUTPUT_KEY, objectMapper.writeValueAsBytes(buildPayload(request.workspaceId())));
     }
 
-    /** Pure function of (workspaceId). Callers cache through {@link CacheManager}. */
     public ObjectNode buildPayload(Long workspaceId) {
-        Workspace workspace = workspaceRepository
-                .findById(workspaceId)
-                .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
-
-        // Resolve effective autonomy through the practice, group and workspace. OFF practices
-        // are excluded; HUMAN_APPROVAL allows the on-demand conversation channel.
-        WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
-        List<Practice> practices = practiceRepository.findByWorkspaceId(workspaceId).stream()
-                .filter(p -> PracticeAutonomyPolicy.delivers(
-                        ResultOrigin.LIVE,
-                        AutonomyResolver.effectiveAutonomyOf(p, defaults.defaultAutonomy()),
-                        FeedbackChannel.IN_CHAT))
-                .toList();
-
-        ObjectNode root = objectMapper.createObjectNode();
-        root.putObject("workspace").put("slug", workspace.getWorkspaceSlug());
-
-        ArrayNode arr = root.putArray("practices");
-        for (Practice practice : practices) {
-            ObjectNode node = arr.addObject();
-            node.put("slug", practice.getSlug());
-            node.put("displayName", practice.getName());
-            node.put("criteria", practice.getCriteria());
-            node.put("whyItMatters", practice.getWhyItMatters());
-            node.put("whatGoodLooksLike", practice.getWhatGoodLooksLike());
-            PracticeVisual visual = practice.getVisual();
-            node.put("visualDescription", visual == null ? null : visual.alt());
-            PracticeGuide guide = practice.getGuide();
-            node.put("guide", guide == null ? null : PracticeGuidanceRules.describeFigures(guide.markdown()));
+        var root = objectMapper.createObjectNode();
+        var rows = root.putArray("practices");
+        for (var entry : practices.current(workspaceId)) {
+            var definition = entry.definition();
+            var guidance = definition.guidance();
+            rows.addObject()
+                    .put("slug", entry.slug())
+                    .put("displayName", definition.name())
+                    .put("criteria", definition.criteria())
+                    .put("whyItMatters", guidance.whyItMatters())
+                    .put("whatGoodLooksLike", guidance.whatGoodLooksLike())
+                    .put(
+                            "visualDescription",
+                            guidance.visual() == null ? null : guidance.visual().alt())
+                    .put(
+                            "guide",
+                            guidance.guide() == null
+                                    ? null
+                                    : PracticeGuidanceRules.describeFigures(
+                                            guidance.guide().markdown()));
         }
         return root;
     }

@@ -2,11 +2,12 @@ package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -26,7 +27,7 @@ class PracticeScriptCapsSyncTest extends BaseUnitTest {
     @Test
     void shouldCapEachPracticeScriptCallInTheRunnerAsTheProxyDoes() throws IOException {
         Matcher caps =
-                CAPS.matcher(Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/contract.ts")));
+                CAPS.matcher(Files.readString(resolveRepoFile("docker/agents/practice-scripts/lib/core/contract.ts")));
         assertThat(caps.find()).as("contract.ts declares MODEL_SLOT_CAPS").isTrue();
         Map<String, Integer> runner = CAP.matcher(caps.group(1))
                 .results()
@@ -36,9 +37,9 @@ class PracticeScriptCapsSyncTest extends BaseUnitTest {
 
         assertThat(runner)
                 .containsExactlyInAnyOrderEntriesOf(Map.of(
-                        ModelKind.DECISION.slot(), LlmProxyService.MAX_DECISION_QUESTIONS,
-                        ModelKind.EMBEDDING.slot(), LlmProxyService.MAX_EMBEDDING_INPUTS,
-                        ModelKind.RERANKING.slot(), LlmProxyService.MAX_RERANK_DOCUMENTS));
+                        ModelKind.DECISION.name().toLowerCase(Locale.ROOT), LlmProxyService.MAX_DECISION_QUESTIONS,
+                        ModelKind.EMBEDDING.name().toLowerCase(Locale.ROOT), LlmProxyService.MAX_EMBEDDING_INPUTS,
+                        ModelKind.RERANKING.name().toLowerCase(Locale.ROOT), LlmProxyService.MAX_RERANK_DOCUMENTS));
     }
 
     private static Path resolveRepoFile(String relativePath) {

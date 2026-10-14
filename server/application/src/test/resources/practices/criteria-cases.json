@@ -2,7 +2,7 @@
 	{
 		"id": "fixed-url",
 		"expected": {
-			"handles-errors-instead-of-swallowing-them": "NOT_APPLICABLE"
+			"handles-errors-instead-of-swallowing-them": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/Loader.swift": "import Foundation\nfunc endpoint() -> URL? {\n    guard let url = URL(string: \"https://example.org/items\") else { return nil }\n    return url\n}\n"
@@ -35,7 +35,7 @@
 	{
 		"id": "guaranteed-location-update-only",
 		"expected": {
-			"handles-errors-instead-of-swallowing-them": "NOT_APPLICABLE"
+			"handles-errors-instead-of-swallowing-them": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/LocationManager.swift": "import CoreLocation\nimport Observation\n@Observable final class LocationManager: NSObject, CLLocationManagerDelegate {\n    var location: CLLocation?\n    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {\n        guard let latest = locations.last else { return }\n        location = latest\n    }\n}\n"
@@ -126,7 +126,7 @@
 	{
 		"id": "in-memory-class-without-architectural-decision",
 		"expected": {
-			"records-significant-decisions-with-rationale": "NOT_APPLICABLE"
+			"records-significant-decisions-with-rationale": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/description.md": "Add an in-memory note draft model.\n",
@@ -162,7 +162,7 @@
 		"id": "dependency-label",
 		"expected": {
 			"changes-dependencies-deliberately": "NOT_MET",
-			"records-significant-decisions-with-rationale": "NOT_APPLICABLE"
+			"records-significant-decisions-with-rationale": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/description.md": "Add format-kit dependency.\n",
@@ -175,7 +175,7 @@
 		"id": "dependency-reason",
 		"expected": {
 			"changes-dependencies-deliberately": "MET",
-			"records-significant-decisions-with-rationale": "NOT_APPLICABLE"
+			"records-significant-decisions-with-rationale": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/description.md": "Use format-kit to format dates consistently across report exports. This project does not commit a lockfile.\n",
@@ -227,7 +227,7 @@
 	{
 		"id": "existing-stack-use-only",
 		"expected": {
-			"records-significant-decisions-with-rationale": "NOT_APPLICABLE"
+			"records-significant-decisions-with-rationale": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/description.md": "Show the saved notes in a list.\n",
@@ -462,7 +462,7 @@
 		"id": "credential-print",
 		"expected": {
 			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_MET",
-			"logs-through-the-platform-logger": "NOT_APPLICABLE",
+			"logs-through-the-platform-logger": "DOES_NOT_APPLY",
 			"leaves-the-code-clean-with-intent-revealing-comments": "MET"
 		},
 		"files": {
@@ -535,7 +535,7 @@
 	{
 		"id": "approval-current-bot-only-history-incomplete",
 		"expected": {
-			"merges-only-after-approval": "UNDETERMINED"
+			"merges-only-after-approval": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": []}\n",
@@ -548,7 +548,7 @@
 	{
 		"id": "approval-undated-after-unavailable-native-read",
 		"expected": {
-			"merges-only-after-approval": "UNDETERMINED"
+			"merges-only-after-approval": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": []}\n",
@@ -750,7 +750,7 @@
 	{
 		"id": "closed-issue-vague-activity",
 		"expected": {
-			"closed-issue-outcome-recorded": "NOT_APPLICABLE"
+			"closed-issue-outcome-recorded": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"CLOSED\", \"state_reason\": \"completed\", \"title\": \"Rework of UML\", \"body\": \"\"}\n",
@@ -850,7 +850,7 @@
 	{
 		"id": "outcome-mere-mention",
 		"expected": {
-			"merge-confirms-the-linked-issue-outcome": "NOT_APPLICABLE"
+			"merge-confirms-the-linked-issue-outcome": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/metadata.json": "{\"author\": \"author\", \"title\": \"Speed up search indexing\", \"body\": \"Speeds up search indexing. #12 plans filters for the same screen.\\n\", \"source_branch\": \"faster-index\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\"}\n",
@@ -892,7 +892,7 @@
 	{
 		"id": "labelled-drawing-only",
 		"expected": {
-			"leaves-the-code-clean-with-intent-revealing-comments": "NOT_APPLICABLE"
+			"leaves-the-code-clean-with-intent-revealing-comments": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/Assets/badge.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 24 24\">\n  <!-- Outer ring of the badge -->\n  <circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"none\" stroke=\"#2E7D32\" stroke-width=\"2\"/>\n  <!-- Leaf mark in the centre -->\n  <path d=\"M12 6c-3 3-3 9 0 12 3-3 3-9 0-12z\" fill=\"#2E7D32\"/>\n</svg>\n"
@@ -1015,7 +1015,7 @@
 	{
 		"id": "navigation-only-removal",
 		"expected": {
-			"records-significant-decisions-with-rationale": "NOT_APPLICABLE"
+			"records-significant-decisions-with-rationale": "DOES_NOT_APPLY"
 		},
 		"baseFiles": {
 			"repo/App/ContentView.swift": "import SwiftUI\n\nstruct ContentView: View {\n    var body: some View {\n        TabView {\n            Text(\"Trip planner\")\n                .tabItem { Label(\"Plan\", systemImage: \"map\") }\n            Text(\"About the trip planner\")\n                .tabItem { Label(\"About\", systemImage: \"info.circle\") }\n        }\n    }\n}\n"
@@ -1092,7 +1092,7 @@
 	{
 		"id": "large-work-with-unknown-child-rollup",
 		"expected": {
-			"breaks-large-work-into-trackable-subtasks": "UNDETERMINED"
+			"breaks-large-work-into-trackable-subtasks": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/description.md": "Current scope decision: deliver the CSV audit download and the rotating service-status banner. Drop the XML archive. The remaining outputs can ship and be assigned independently.\n\n## Current checks\n\n- [ ] The CSV download contains column headers.\n- [ ] The banner rotates through published service notices.\n\n## Earlier proposal retained for history\n\nAdd a CSV audit download, a service-status banner and an XML archive.\n",
@@ -1131,7 +1131,7 @@
 	{
 		"id": "single-deliverable-with-unknown-child-rollup",
 		"expected": {
-			"breaks-large-work-into-trackable-subtasks": "NOT_APPLICABLE"
+			"breaks-large-work-into-trackable-subtasks": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/description.md": "Fix the date picker so it accepts February 29 in a leap year.\n",
@@ -1144,8 +1144,8 @@
 	{
 		"id": "issue-withdrawn-requirements-retained",
 		"expected": {
-			"breaks-large-work-into-trackable-subtasks": "NOT_APPLICABLE",
-			"issue-scoped-to-single-concern": "NOT_APPLICABLE"
+			"breaks-large-work-into-trackable-subtasks": "DOES_NOT_APPLY",
+			"issue-scoped-to-single-concern": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/metadata.json": "{\"title\": \"CSV audit download, service-status banner and XML archive\", \"state\": \"OPEN\", \"state_reason\": null, \"labels\": [\"type::Task\"], \"body\": \"Current scope decision: this work is withdrawn. No CSV audit download, service-status banner or XML archive is requested. The earlier proposal below is retained as history.\\n\\n## Earlier proposal retained for history\\n\\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\\n\\n## Earlier checks\\n\\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\\n\"}\n",
@@ -1159,7 +1159,7 @@
 	{
 		"id": "issue-partially-withdrawn-requirements",
 		"expected": {
-			"breaks-large-work-into-trackable-subtasks": "UNDETERMINED",
+			"breaks-large-work-into-trackable-subtasks": "COULD_NOT_DETERMINE",
 			"issue-scoped-to-single-concern": "NOT_MET",
 			"issue-has-checkable-outcome": "MET",
 			"issue-states-an-actionable-problem": "MET"
@@ -1179,8 +1179,8 @@
 	{
 		"id": "issue-conflicting-current-scope",
 		"expected": {
-			"breaks-large-work-into-trackable-subtasks": "UNDETERMINED",
-			"issue-scoped-to-single-concern": "UNDETERMINED"
+			"breaks-large-work-into-trackable-subtasks": "COULD_NOT_DETERMINE",
+			"issue-scoped-to-single-concern": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"title\": \"CSV audit download, service-status banner and XML archive\", \"state\": \"OPEN\", \"state_reason\": null, \"labels\": [\"type::Task\"], \"body\": \"## Current scope decision\\n\\nNo CSV audit download, service-status banner or XML archive is requested. This work is withdrawn.\\n\\n## Current delivery requirement\\n\\nDeliver the CSV audit download, service-status banner and XML archive. All three remain requested.\\n\\n## Earlier proposal retained for history\\n\\nAdd a CSV audit download, a rotating service-status banner and an XML archive. Each can ship independently.\\n\\n## Earlier checks\\n\\nThe CSV download opens with column headers. The banner rotates through published service notices. The XML archive opens as XML.\\n\"}\n",
@@ -1194,7 +1194,7 @@
 	{
 		"id": "issue-request-withdrawn-in-authored-discussion",
 		"expected": {
-			"issue-scoped-to-single-concern": "NOT_APPLICABLE"
+			"issue-scoped-to-single-concern": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"context/metadata.json": "{\"title\": \"CSV audit download and service-status banner\", \"state\": \"OPEN\", \"labels\": [\"type::Task\"], \"author\": \"developer\", \"author_id\": 41, \"body\": \"Current request: add a CSV audit download and a rotating service-status banner. The two outputs can ship and be assigned independently.\\n\\nThe CSV download contains column headers and one row per audit record. The banner rotates through published service notices.\\n\", \"sub_issues_total\": null, \"sub_issues_completed\": null}\n",
@@ -1291,7 +1291,7 @@
 	{
 		"id": "approval-beside-other-request-of-unknown-time",
 		"expected": {
-			"merges-only-after-approval": "UNDETERMINED"
+			"merges-only-after-approval": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": [], \"pr_url\": \"https://github.com/course/app/pull/7\"}\n",
@@ -1320,7 +1320,7 @@
 	{
 		"id": "approval-beside-dismissed-decision-of-unknown-state",
 		"expected": {
-			"merges-only-after-approval": "UNDETERMINED"
+			"merges-only-after-approval": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"author\": \"author\", \"assignees\": [], \"pr_url\": \"https://github.com/course/app/pull/7\"}\n",
@@ -1333,7 +1333,7 @@
 	{
 		"id": "dependency-import-without-declaration-edit",
 		"expected": {
-			"changes-dependencies-deliberately": "NOT_APPLICABLE"
+			"changes-dependencies-deliberately": "DOES_NOT_APPLY"
 		},
 		"baseFiles": {
 			"repo/build.gradle": "plugins {\n    id 'java'\n}\n\nrepositories {\n    mavenCentral()\n}\n\ndependencies {\n    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'\n}\n",
@@ -1391,7 +1391,7 @@
 	{
 		"id": "debounce-cancellation-only",
 		"expected": {
-			"handles-errors-instead-of-swallowing-them": "NOT_APPLICABLE"
+			"handles-errors-instead-of-swallowing-them": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/Sources/DraftEditor.swift": "import SwiftUI\n\n@MainActor @Observable\nfinal class DraftModel {\n    var text = \"\"\n    private(set) var wordCount = 0\n\n    func textChanged() async {\n        try? await Task.sleep(for: .milliseconds(400))\n        guard !Task.isCancelled else { return }\n        wordCount = text.split(whereSeparator: \\.isWhitespace).count\n    }\n}\n\nstruct DraftEditor: View {\n    @State private var model = DraftModel()\n\n    var body: some View {\n        VStack(alignment: .leading) {\n            TextEditor(text: $model.text)\n            Text(\"\\(model.wordCount) words\").font(.footnote)\n        }\n        .task(id: model.text) { await model.textChanged() }\n    }\n}\n"
@@ -1496,7 +1496,7 @@
 	{
 		"id": "loop-other-reviewer-replacement-of-unknown-time",
 		"expected": {
-			"merged-past-unresolved-review-threads": "UNDETERMINED"
+			"merged-past-unresolved-review-threads": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"author\": \"author\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"pr_url\": \"https://gitlab.example.org/course/app/-/merge_requests/7\"}\n",
@@ -1510,7 +1510,7 @@
 	{
 		"id": "loop-undated-latest-approval-and-resolution",
 		"expected": {
-			"merged-past-unresolved-review-threads": "UNDETERMINED"
+			"merged-past-unresolved-review-threads": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"context/metadata.json": "{\"author\": \"author\", \"state\": \"MERGED\", \"is_merged\": true, \"merged_at\": \"2026-10-05T12:00:00Z\", \"merged_by\": \"author\", \"pr_url\": \"https://github.com/course/app/pull/7\"}\n",
@@ -1597,7 +1597,7 @@
 	{
 		"id": "published-shared-api-key",
 		"expected": {
-			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_APPLICABLE"
+			"avoids-insecure-defaults-and-over-broad-permissions": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/Endpoint.swift": "import Foundation\nlet apiKey = \"shared-public-demo\"\nlet endpoint = URL(string: \"https://sports.example/api/\\(apiKey)/events\")\n",
@@ -1651,7 +1651,7 @@
 	{
 		"id": "opaque-api-key-authority",
 		"expected": {
-			"avoids-insecure-defaults-and-over-broad-permissions": "UNDETERMINED"
+			"avoids-insecure-defaults-and-over-broad-permissions": "COULD_NOT_DETERMINE"
 		},
 		"files": {
 			"repo/Endpoint.swift": "import Foundation\nlet apiKey = \"unclassified-service-value\"\nlet endpoint = URL(string: \"https://service.example/api/\\(apiKey)/items\")\n"
@@ -1662,7 +1662,7 @@
 	{
 		"id": "nonfunctional-credential-placeholder",
 		"expected": {
-			"avoids-insecure-defaults-and-over-broad-permissions": "NOT_APPLICABLE"
+			"avoids-insecure-defaults-and-over-broad-permissions": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/docs/setup.md": "# Setup\nAPI_KEY=YOUR_PRIVATE_KEY_HERE is a nonfunctional placeholder. The provider rejects it. Obtain your own private key and pass it through the environment; do not commit that key.\n"
@@ -1699,7 +1699,7 @@
 	{
 		"id": "optional-selection-absent",
 		"expected": {
-			"handles-errors-instead-of-swallowing-them": "NOT_APPLICABLE"
+			"handles-errors-instead-of-swallowing-them": "DOES_NOT_APPLY"
 		},
 		"files": {
 			"repo/Selection.swift": "final class Selection {\n    private(set) var selected: String?\n    // Selecting from an empty list leaves no selection.\n    func chooseFirst(from items: [String]) {\n        selected = nil\n        guard let first = items.first else { return }\n        selected = first\n    }\n}\n"

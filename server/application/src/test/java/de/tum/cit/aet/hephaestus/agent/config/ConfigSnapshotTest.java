@@ -6,12 +6,12 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ModelKind;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
@@ -65,7 +65,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
                         8192,
                         null));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, null, null));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, null, null));
     }
 
     @Nested
@@ -78,13 +78,12 @@ class ConfigSnapshotTest extends BaseUnitTest {
             ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
 
             assertThat(snapshot.schemaVersion()).isEqualTo(ConfigSnapshot.SCHEMA_VERSION);
-            assertThat(snapshot.modelVersion()).isNull(); // the catalog model carries the identity
             assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
             assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
             assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
             assertThat(snapshot.contextWindow()).isEqualTo(200000);
             assertThat(snapshot.maxOutputTokens()).isEqualTo(8192);
-            assertThat(snapshot.connectionScope()).isEqualTo(FundingSource.INSTANCE);
+            assertThat(snapshot.connectionScope()).isEqualTo(UsageFundingSource.INSTANCE);
             assertThat(snapshot.connectionId()).isEqualTo(7L);
             assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
             assertThat(snapshot.allowInternet()).isFalse();
@@ -98,7 +97,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
                 .thenReturn(new ResolvedLlmModel(
                         "https://api.openai.com", "openai-completions", "gpt-5", null, null, ReasoningEffort.XHIGH));
         when(resolver.connectionRef(binding))
-                .thenReturn(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, null, null));
+                .thenReturn(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, null, null));
 
         ConfigSnapshot snapshot = ConfigSnapshot.from(binding, resolver);
         ConfigSnapshot roundTripped = ConfigSnapshot.fromJson(snapshot.toJson(OBJECT_MAPPER), OBJECT_MAPPER);
@@ -159,7 +158,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     "openai-embeddings",
                     "https://api.openai.com/v1",
                     "text-embedding-3-small",
-                    FundingSource.WORKSPACE,
+                    UsageFundingSource.WORKSPACE,
                     8L,
                     21L,
                     1L,
@@ -170,7 +169,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
                             "openai-completions",
                             "https://gpu.example.com/v1",
                             "gpt-oss-20b",
-                            FundingSource.INSTANCE,
+                            UsageFundingSource.INSTANCE,
                             9L,
                             22L,
                             1L,
@@ -213,7 +212,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     "cohere-rerank",
                     "https://api.cohere.com/v2",
                     "rerank-v3.5",
-                    FundingSource.WORKSPACE,
+                    UsageFundingSource.WORKSPACE,
                     8L,
                     23L,
                     1L,
@@ -308,101 +307,17 @@ class ConfigSnapshotTest extends BaseUnitTest {
             ConfigSnapshot deserialized = ConfigSnapshot.fromJson(json, OBJECT_MAPPER);
             assertThat(deserialized).isEqualTo(original);
         }
-
-        @Test
-        void shouldDeserializeV4SnapshotStillCarryingTheDroppedConfigFields() {
-            // A stored v4 agent_job.config_snapshot froze configId/configName, which v5 dropped. Such a row
-            // must read through the CURRENT shape with the two dead keys ignored — not the pre-v4 translation, which
-            // would null the
-            // connection identity and leave an in-flight job unroutable at the proxy.
-            String v4 = "{\"schemaVersion\":4,\"configId\":42,\"configName\":\"practice-review\","
-                    + "\"apiProtocol\":\"openai-completions\",\"baseUrl\":\"https://gpu.example.com/v1\","
-                    + "\"upstreamModelId\":\"gpt-oss-120b\",\"modelVersion\":\"2025-05-01\","
-                    + "\"contextWindow\":128000,\"maxOutputTokens\":4096,\"supportsReasoning\":true,"
-                    + "\"connectionScope\":\"WORKSPACE\",\"connectionId\":7,\"modelId\":20,\"workspaceId\":1,"
-                    + "\"timeoutSeconds\":900,\"allowInternet\":true,\"priceSnapshot\":null}";
-            JsonNode node = OBJECT_MAPPER.readTree(v4);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
-
-            // The connection identity survives — proof the direct read ran, not fromLegacyJson.
-            assertThat(snapshot.connectionScope()).isEqualTo(FundingSource.WORKSPACE);
-            assertThat(snapshot.connectionId()).isEqualTo(7L);
-            assertThat(snapshot.modelId()).isEqualTo(20L);
-            assertThat(snapshot.workspaceId()).isEqualTo(1L);
-            assertThat(snapshot.schemaVersion()).isEqualTo(4);
-            assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
-            assertThat(snapshot.baseUrl()).isEqualTo("https://gpu.example.com/v1");
-            assertThat(snapshot.upstreamModelId()).isEqualTo("gpt-oss-120b");
-            assertThat(snapshot.modelVersion()).isEqualTo("2025-05-01");
-            assertThat(snapshot.contextWindow()).isEqualTo(128000);
-            assertThat(snapshot.maxOutputTokens()).isEqualTo(4096);
-            // A v4 snapshot of a reasoning model ran at Pi's default thinking level, which sends medium.
-            assertThat(snapshot.reasoningEffort()).isEqualTo(ReasoningEffort.MEDIUM);
-            assertThat(snapshot.timeoutSeconds()).isEqualTo(900);
-            assertThat(snapshot.allowInternet()).isTrue();
-        }
-
-        @Test
-        void shouldDeserializeLegacyV3Snapshot() {
-            // An in-flight job dispatched before the v4 deploy still needs a usable
-            // apiProtocol/baseUrl/upstreamModelId, so fromJson must translate rather than default-null.
-            String legacy = "{\"schemaVersion\":3,\"configId\":42,\"configName\":\"legacy\","
-                    + "\"llmProvider\":\"ANTHROPIC\",\"credentialMode\":\"PROXY\","
-                    + "\"modelName\":\"claude-sonnet-4-20250514\","
-                    + "\"modelVersion\":null,\"llmBaseUrl\":null,\"timeoutSeconds\":600,\"allowInternet\":false}";
-            JsonNode node = OBJECT_MAPPER.readTree(legacy);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
-
-            assertThat(snapshot.apiProtocol()).isEqualTo("anthropic-messages");
-            assertThat(snapshot.baseUrl()).isEqualTo("https://api.anthropic.com");
-            assertThat(snapshot.upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
-            assertThat(snapshot.timeoutSeconds()).isEqualTo(600);
-            assertThat(snapshot.connectionScope()).isNull();
-            assertThat(snapshot.connectionId()).isNull();
-        }
-
-        @Test
-        void shouldDeserializeLegacyV3SnapshotWithExplicitBaseUrl() {
-            String legacy = "{\"schemaVersion\":3,\"configId\":9,\"configName\":\"gateway\","
-                    + "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"API_KEY\","
-                    + "\"modelName\":\"gpt-oss-120b\",\"llmBaseUrl\":\"https://gpu.example.com\","
-                    + "\"timeoutSeconds\":300,\"allowInternet\":true}";
-            JsonNode node = OBJECT_MAPPER.readTree(legacy);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
-
-            assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
-            assertThat(snapshot.baseUrl()).isEqualTo("https://gpu.example.com");
-            assertThat(snapshot.upstreamModelId()).isEqualTo("gpt-oss-120b");
-        }
-
-        @Test
-        void shouldDeserializeV1WithoutSchemaVersion() {
-            // Earliest snapshot shape predates the schemaVersion guard. fromJson reads
-            // missing schemaVersion as 0 (< v4), so v1 rows are translated via the pre-v4 path.
-            String v1 = "{\"configId\":7,\"configName\":\"v1\",\"agentType\":\"OPENCODE\","
-                    + "\"llmProvider\":\"OPENAI\",\"credentialMode\":\"PROXY\","
-                    + "\"modelName\":\"gpt-4o-mini\",\"timeoutSeconds\":300,\"allowInternet\":false}";
-            JsonNode node = OBJECT_MAPPER.readTree(v1);
-
-            ConfigSnapshot snapshot = ConfigSnapshot.fromJson(node, OBJECT_MAPPER);
-
-            assertThat(snapshot.apiProtocol()).isEqualTo("openai-completions");
-            assertThat(snapshot.upstreamModelId()).isEqualTo("gpt-4o-mini");
-        }
     }
 
     @Test
-    void shouldOfferTheReviewModelAsThePracticeScriptChatModelWhenOtherKindsAreBound() {
+    void shouldKeepTheChatSlotAbsentUnlessExplicitlyBound() {
         WorkspaceAgentBinding binding = createBinding();
         stubResolver(binding);
         var embedding = new FrozenModel(
                 "openai-embeddings",
                 "https://api.openai.com/v1",
                 "text-embedding-3-small",
-                FundingSource.WORKSPACE,
+                UsageFundingSource.WORKSPACE,
                 8L,
                 21L,
                 1L,
@@ -413,11 +328,10 @@ class ConfigSnapshotTest extends BaseUnitTest {
         ConfigSnapshot snapshot =
                 ConfigSnapshot.from(binding, resolver).withPracticeScript(Map.of(ModelKind.EMBEDDING, embedding));
 
-        assertThat(snapshot.practiceScriptModels())
-                .containsOnly(Map.entry(ModelKind.CHAT, snapshot.model()), Map.entry(ModelKind.EMBEDDING, embedding));
+        assertThat(snapshot.practiceScriptModels()).containsOnly(Map.entry(ModelKind.EMBEDDING, embedding));
         assertThat(snapshot.model().upstreamModelId()).isEqualTo("claude-sonnet-4-20250514");
         assertThat(snapshot.model().connectionRef())
-                .isEqualTo(new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 7L, null, null));
+                .isEqualTo(new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 7L, null, null));
     }
 
     @Nested
@@ -429,7 +343,6 @@ class ConfigSnapshotTest extends BaseUnitTest {
                     apiProtocol,
                     baseUrl,
                     "gpt",
-                    null,
                     null,
                     null,
                     null,

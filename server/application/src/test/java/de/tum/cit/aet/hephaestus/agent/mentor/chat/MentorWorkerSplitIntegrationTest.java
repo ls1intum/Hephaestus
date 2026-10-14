@@ -21,10 +21,10 @@ import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.usage.AdmittedLlmModel;
-import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
-import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
-import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
+import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.WorkerSessionRegistry;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.worker.protocol.CapacityReport;
@@ -40,8 +40,8 @@ import de.tum.cit.aet.hephaestus.testconfig.TestMentorWorker;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -121,7 +121,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
     void configureTurn() {
         developer = persistUser("mentor");
         workspace = createWorkspace("worker-mentor", "Worker Mentor", "worker-mentor", AccountType.ORG, developer);
-        ensureWorkspaceMembership(workspace, developer, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, developer, Membership.WorkspaceRole.MEMBER);
         var binding = new WorkspaceAgentBinding();
         binding.setPurpose(AgentPurpose.MENTOR);
         binding.setEnabled(true);
@@ -132,9 +132,16 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
                 .thenReturn(new AdmittedLlmModel(
                         new ResolvedLlmModel(
                                 "https://upstream.example/v1", "openai-completions", "test-model", null, null, null),
-                        new LlmModelResolver.ConnectionRef(FundingSource.INSTANCE, 1L, 2L, workspace.getId()),
+                        new LlmModelResolver.ConnectionRef(UsageFundingSource.INSTANCE, 1L, 2L, workspace.getId()),
                         new LlmPriceSnapshot(
-                                FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)));
+                                UsageFundingSource.INSTANCE,
+                                UsagePricingState.NO_CHARGE,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null,
+                                null)));
         when(contextBuilder.build(any()))
                 .thenReturn(Map.of("inputs/context/results_history.json", "[]".getBytes(StandardCharsets.UTF_8)));
         doAnswer(invocation -> {

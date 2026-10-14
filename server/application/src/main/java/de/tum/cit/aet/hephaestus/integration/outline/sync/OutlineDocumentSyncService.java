@@ -1,12 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
-import de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
-import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FoundBy;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncPhase;
@@ -24,7 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.Sy
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
-import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder;
+import de.tum.cit.aet.hephaestus.integration.outline.item.OutlineDocumentEventRecorder;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,7 +40,6 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -74,6 +72,7 @@ import org.springframework.stereotype.Service;
  * obey. Archived documents are never tombstoned — see {@link #syncArchivedDocuments}.
  */
 @Service
+@ConditionalOnServerRole
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
 public class OutlineDocumentSyncService {
 
@@ -98,10 +97,7 @@ public class OutlineDocumentSyncService {
     private final OutlineProperties properties;
     private final OutlineMirrorWriter mirrorWriter;
     private final OutlineMirrorRetentionService retention;
-    private final OutlineDocumentSignalRecorder signalRecorder;
-
-    /** Optional because the agent subsystem is absent in the worker and webhook roles. */
-    private final ObjectProvider<DocumentReviewTrigger> reviewTrigger;
+    private final OutlineDocumentEventRecorder eventRecorder;
 
     public OutlineDocumentSyncService(
             ConnectionService connectionService,
@@ -112,8 +108,7 @@ public class OutlineDocumentSyncService {
             OutlineProperties properties,
             OutlineMirrorWriter mirrorWriter,
             OutlineMirrorRetentionService retention,
-            OutlineDocumentSignalRecorder signalRecorder,
-            ObjectProvider<DocumentReviewTrigger> reviewTrigger) {
+            OutlineDocumentEventRecorder eventRecorder) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
         this.documentRepository = documentRepository;
@@ -122,8 +117,7 @@ public class OutlineDocumentSyncService {
         this.properties = properties;
         this.mirrorWriter = mirrorWriter;
         this.retention = retention;
-        this.signalRecorder = signalRecorder;
-        this.reviewTrigger = reviewTrigger;
+        this.eventRecorder = eventRecorder;
     }
 
     /**
@@ -136,26 +130,8 @@ public class OutlineDocumentSyncService {
             @Nullable OutlineDocumentSnapshot document,
             String eventName,
             Instant occurredAt,
-            DiscoveredVia discoveredVia) {
-        Optional<SignalKey> recorded =
-                signalRecorder.record(workspaceId, document, eventName, occurredAt, discoveredVia);
-        if (recorded.isEmpty()) {
-            return;
-        }
-        DocumentReviewTrigger trigger = reviewTrigger.getIfAvailable();
-        if (trigger == null) {
-            log.debug("No document review trigger on this node; signal recorded only: workspaceId={}", workspaceId);
-            return;
-        }
-        try {
-            trigger.onDocumentSignal(recorded.get(), discoveredVia);
-        } catch (RuntimeException e) {
-            log.warn(
-                    "Offering a document signal for review failed (signal recorded): workspaceId={}, signal={}",
-                    workspaceId,
-                    recorded.get().signalName(),
-                    e);
-        }
+            FoundBy foundBy) {
+        eventRecorder.record(workspaceId, document, eventName, occurredAt, foundBy);
     }
 
     /**
@@ -386,9 +362,9 @@ public class OutlineDocumentSyncService {
         if (ARCHIVE_EVENT.equals(eventName)) {
             Instant archivedAt = Instant.now();
             mirrored.filter(d -> !d.isDeleted()).ifPresent(d -> {
-                mirrorWriter.updateDocument(
+                var archived = mirrorWriter.updateDocument(
                         workspaceId, ctx.connectionId(), documentId, doc -> doc.setArchivedAt(archivedAt));
-                recordAndOffer(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
+                recordAndOffer(workspaceId, archived, eventName, archivedAt, FoundBy.WEBHOOK);
             });
             return;
         }
@@ -424,8 +400,7 @@ public class OutlineDocumentSyncService {
             // the document's hash, and the whole point of this signal is that the content just changed.
             documentRepository
                     .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
-                    .ifPresent(
-                            refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT));
+                    .ifPresent(refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, FoundBy.WEBHOOK));
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }

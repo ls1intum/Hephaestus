@@ -20,23 +20,26 @@ import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed
- * by pg_partman (create-ahead + 12-month retention, oldest dropped).
+ * Append-only auth-event log. Monthly RANGE-partitioned on {@code occurred_at} and self-managed by
+ * pg_partman (create-ahead + 12-month retention, oldest dropped).
  *
  * <h2>Append-only</h2>
+ *
  * Storage-layer append-only is enforced in prod by the {@code trg_auth_event_block_mutation} BEFORE
- * UPDATE OR DELETE trigger (RAISES EXCEPTION) plus a {@code REVOKE UPDATE, DELETE, TRUNCATE} guardrail —
- * the only permitted mutation is the GDPR Art. 17 redaction that NULLs ip_inet/user_agent/details. A
- * superuser bypasses the trigger, but the app never connects as superuser. {@link AuthEventWriter} only
- * INSERTs; partition retention is the only deletion. Backups + WAL archive provide forensic recovery.
+ * UPDATE OR DELETE trigger (RAISES EXCEPTION) plus a {@code REVOKE UPDATE, DELETE, TRUNCATE}
+ * guardrail — the only permitted mutation is the GDPR Art. 17 redaction that NULLs
+ * ip_inet/user_agent/details. A superuser bypasses the trigger, but the app never connects as
+ * superuser. {@link AuthEventWriter} only INSERTs; partition retention is the only deletion.
+ * Backups + WAL archive provide forensic recovery.
  *
  * <h2>IP retention</h2>
+ *
  * {@code ip_inet} is stored verbatim for the audit-partition window (12 months) as a security
  * measure (legitimate interest) and dropped when its monthly partition is retired. There is no
  * separate truncation job today.
  *
- * <p>Composite PK {@code (id, occurred_at)} because partitioned tables in Postgres require
- * the partition key in every unique index.
+ * <p>Composite PK {@code (id, occurred_at)} because partitioned tables in Postgres require the
+ * partition key in every unique index.
  */
 @Entity
 @Table(name = "auth_event")
@@ -52,9 +55,12 @@ public class AuthEvent {
     private Long accountId;
 
     /** The SCM user a {@code USER_VIEW} disclosed, who may have no account. */
-    @Column(name = "viewed_user_id")
+    @Column(name = "viewed_actor_id")
     @Nullable
-    private Long viewedUserId;
+    private Long viewedActorId;
+
+    @Column(name = "viewed_account_id")
+    private @Nullable Long viewedAccountId;
 
     @Column(name = "acting_account_id")
     @Nullable
@@ -80,14 +86,18 @@ public class AuthEvent {
     @Nullable
     private Long workspaceId;
 
-    @Column(name = "identity_link_id")
+    @Column(name = "identity_id")
     @Nullable
-    private Long identityLinkId;
+    private Long identityId;
 
-    // Bind the String through the INET JDBC type (see IssuedJwt.ipInet) — otherwise Hibernate emits a
-    // varchar and the insert fails against the `inet` column. Nullable for two reasons: the GDPR Art. 17
-    // sweep redacts the IP to NULL on erasure (AccountPurger#anonymizeAuditRows), and off-request writes
-    // store NULL (AuthEventWriter#captureIp returns null when there is no HttpServletRequest — no sentinel).
+    // Bind the String through the INET JDBC type (see IssuedJwt.ipInet) — otherwise Hibernate emits
+    // a
+    // varchar and the insert fails against the `inet` column. Nullable for two reasons: the GDPR
+    // Art. 17
+    // sweep redacts the IP to NULL on erasure (AccountPurger#anonymizeAuditRows), and off-request
+    // writes
+    // store NULL (AuthEventWriter#captureIp returns null when there is no HttpServletRequest — no
+    // sentinel).
     @Column(name = "ip_inet", columnDefinition = "inet")
     @JdbcTypeCode(SqlTypes.INET)
     @Nullable
@@ -103,9 +113,9 @@ public class AuthEvent {
     private String details;
 
     /**
-     * Whether the request that produced this event reached its workspace on instance-admin authority
-     * rather than membership. Derived by {@link AuthEventLogger} from
-     * {@code WorkspaceElevationContext}, never supplied by the producer. {@code false} on every row
+     * Whether the request that produced this event reached its workspace on instance-admin
+     * authority rather than membership. Derived by {@link AuthEventLogger} from {@code
+     * WorkspaceElevationContext}, never supplied by the producer. {@code false} on every row
      * written before elevation was recorded, so a false here is "not known to be elevated", not
      * "known to be a member".
      */
@@ -159,10 +169,9 @@ public class AuthEvent {
     }
 
     /**
-     * Factory used by {@link AuthEventWriter} — the only sanctioned construction path.
-     * Keeps the entity {@code @Getter}-only (append-only invariant). Business fields come
-     * via the {@link AuthEventData} parameter object; request-derived metadata is supplied
-     * directly.
+     * Factory used by {@link AuthEventWriter} — the only sanctioned construction path. Keeps the
+     * entity {@code @Getter}-only (append-only invariant). Business fields come via the {@link
+     * AuthEventData} parameter object; request-derived metadata is supplied directly.
      */
     public static AuthEvent create(
             AuthEventData data, Long id, Instant occurredAt, @Nullable String ipInet, @Nullable String userAgent) {
@@ -171,12 +180,13 @@ public class AuthEvent {
         e.eventType = data.type();
         e.result = data.result();
         e.accountId = data.accountId();
-        e.viewedUserId = data.viewedUserId();
+        e.viewedActorId = data.viewedActorId();
+        e.viewedAccountId = data.viewedAccountId();
         e.actingAccountId = data.actingAccountId();
         e.failureReason = data.failureReason();
         e.providerId = data.gitProviderId();
         e.workspaceId = data.workspaceId();
-        e.identityLinkId = data.identityLinkId();
+        e.identityId = data.identityId();
         e.ipInet = ipInet;
         e.userAgent = userAgent;
         e.details = data.details();

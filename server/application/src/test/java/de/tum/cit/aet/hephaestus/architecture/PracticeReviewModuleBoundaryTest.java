@@ -2,54 +2,37 @@ package de.tum.cit.aet.hephaestus.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static de.tum.cit.aet.hephaestus.architecture.HephaestusArchitectureTest.classes;
-import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
+/** Product reviews consume neutral ports. Domain and provider code own source-specific work. */
 @Tag("architecture")
 class PracticeReviewModuleBoundaryTest {
-
     @Test
-    void shouldKeepScmPersistenceOutOfResultAdmission() {
-        noClasses()
-                .that()
-                .haveSimpleName("ReviewOutputService")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                        "..integration.scm.domain..", "..integration.scm.github..", "..integration.scm.gitlab..")
-                .because("result admission reads live SCM identity through ReviewTargetQuery")
+    void shouldKeepDomainAndProviderTypesOutOfCoreProducts() {
+        noClasses().that().resideInAnyPackage("..core..", "..workspace..", "..practices..",
+                        "..agent..", "..evidence..", "..mentor..", "..integration.core..")
+                .should().dependOnClassesThat().resideInAnyPackage("..integration.scm..",
+                        "..integration.chat..", "..integration.docs..", "..integration.slack..", "..integration.outline..")
+                .because("domain adapters resolve provider identity and evidence through neutral ports")
                 .check(classes);
     }
 
     @Test
-    void shouldKeepReviewTargetContractFreeOfPersistenceAndOrchestration() {
-        noClasses()
-                .that()
-                .haveNameMatching(".*\\.ReviewTargetQuery(\\$.*)?")
-                .should()
-                .dependOnClassesThat()
-                .resideInAnyPackage(
-                        "jakarta.persistence..", "org.springframework..", "..integration.scm.domain..", "..agent..")
+    void shouldKeepSharedReviewPortsFreeOfPersistenceAndOrchestration() {
+        noClasses().that().resideInAPackage("..practices.spi..")
+                .should().dependOnClassesThat().resideInAnyPackage("jakarta.persistence..",
+                        "org.springframework..", "..agent..", "..integration.scm..",
+                        "..integration.slack..", "..integration.outline..")
                 .check(classes);
     }
 
     @Test
-    void shouldRecordAgentDependenciesUsingModulith() {
-        var modules = ModulithVerificationTest.applicationModules();
-        var agent = modules.getModuleByName("agent").orElseThrow();
-        assertThat(agent.getDirectDependencies(modules)
-                        .uniqueModules()
-                        .map(module -> module.getIdentifier().toString()))
-                .containsExactlyInAnyOrder(
-                        "config",
-                        "core",
-                        "evidence",
-                        "integration.core",
-                        "integration.scm",
-                        "mentor",
-                        "practices",
-                        "workspace");
+    void shouldKeepProductProofIndependentOfRetainedJobs() {
+        noClasses().that().haveNameMatching(".*\\.(Result|Feedback)")
+                .should().dependOnClassesThat().resideInAPackage("..agent..")
+                .because("results and feedback retain their review after runtime jobs expire")
+                .check(classes);
     }
 }

@@ -1,29 +1,28 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.time.TimeBucketSize;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResultInvalidation;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultInvalidationRepository;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ResultMark;
+import de.tum.cit.aet.hephaestus.practices.result.ResultMarkRepository;
+import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewPracticeGroupDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -31,7 +30,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.Membership;
 import java.lang.reflect.RecordComponent;
 import java.time.Instant;
 import java.util.HashMap;
@@ -56,7 +55,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     private WebTestClient webTestClient;
 
     @Autowired
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Autowired
     private PracticeRepository practiceRepository;
@@ -65,16 +64,16 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     private PracticeGroupRepository groupRepository;
 
     @Autowired
-    private PracticeResultRepository practiceResultRepository;
+    private ResultRepository practiceResultRepository;
 
     @Autowired
-    private PracticeResultInvalidationRepository invalidationRepository;
+    private ResultMarkRepository invalidationRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -93,9 +92,9 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                 AccountType.ORG,
                 persistUser("review-overview-owner"));
         ensureAdminMembership(workspace);
-        ensureWorkspaceMembership(workspace, persistUser("testuser"), WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, persistUser("testuser"), Membership.WorkspaceRole.MEMBER);
         subject = persistUser("review-overview-subject");
-        ensureWorkspaceMembership(workspace, subject, WorkspaceMembership.WorkspaceRole.MEMBER);
+        ensureWorkspaceMembership(workspace, subject, Membership.WorkspaceRole.MEMBER);
 
         otherWorkspace = createWorkspace(
                 "other-review-overview",
@@ -114,17 +113,17 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
         Practice older = persistPractice(workspace, null, "older", "Older");
         persistPractice(workspace, null, "idle", "Idle");
 
-        AgentJob review = persistReviewAt(workspace, "2026-03-10T01:00:00Z", AgentJobStatus.COMPLETED);
-        persistReviewAt(workspace, "2026-03-10T05:00:00Z", AgentJobStatus.FAILED);
-        persistReviewAt(workspace, "2026-03-11T00:00:00Z", AgentJobStatus.RUNNING);
-        persistReviewAt(workspace, "2026-03-12T08:00:00Z", AgentJobStatus.QUEUED);
+        ReviewJob review = persistReviewAt(workspace, "2026-03-10T01:00:00Z", ReviewJobStatus.COMPLETED);
+        persistReviewAt(workspace, "2026-03-10T05:00:00Z", ReviewJobStatus.FAILED);
+        persistReviewAt(workspace, "2026-03-11T00:00:00Z", ReviewJobStatus.RUNNING);
+        persistReviewAt(workspace, "2026-03-12T08:00:00Z", ReviewJobStatus.QUEUED);
         // Outside the half-open range, another purpose, another workspace: none of them count.
-        persistReviewAt(workspace, "2026-03-09T23:59:59Z", AgentJobStatus.COMPLETED);
-        persistReviewAt(workspace, TO, AgentJobStatus.COMPLETED);
-        AgentJob mentorTurn = persistReviewAt(workspace, "2026-03-11T00:00:00Z", AgentJobStatus.COMPLETED);
-        mentorTurn.setPurpose(AgentPurpose.MENTOR);
+        persistReviewAt(workspace, "2026-03-09T23:59:59Z", ReviewJobStatus.COMPLETED);
+        persistReviewAt(workspace, TO, ReviewJobStatus.COMPLETED);
+        ReviewJob mentorTurn = persistReviewAt(workspace, "2026-03-11T00:00:00Z", ReviewJobStatus.COMPLETED);
+
         jobRepository.save(mentorTurn);
-        AgentJob elsewhere = persistReviewAt(otherWorkspace, "2026-03-11T00:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob elsewhere = persistReviewAt(otherWorkspace, "2026-03-11T00:00:00Z", ReviewJobStatus.COMPLETED);
 
         UUID problem = observe(review, described, "2026-03-10T02:00:00Z", "NOT_MET");
         UUID strength = observe(review, described, "2026-03-11T02:00:00Z", "MET");
@@ -139,27 +138,27 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
                 "NOT_MET");
 
         invalidate(problem);
-        PracticeResultInvalidation restored = invalidate(strength);
+        ResultMark restored = invalidate(strength);
         restored.restore(1L, "It was right after all", Instant.parse("2026-03-12T00:00:00Z"));
         invalidationRepository.save(restored);
 
         // One piece of feedback fusing two results of one practice counts once for it; one bound to two
         // practices counts once for each.
         UUID proposed =
-                persistFeedback(workspace, review, "2026-03-10T03:00:00Z", FeedbackDeliveryState.AWAITING_APPROVAL);
+                persistFeedback(workspace, review, "2026-03-10T03:00:00Z", FeedbackState.AWAITING_APPROVAL);
         bind(proposed, problem);
         bind(proposed, strength);
-        UUID delivered = persistFeedback(workspace, review, "2026-03-12T03:00:00Z", FeedbackDeliveryState.DELIVERED);
+        UUID delivered = persistFeedback(workspace, review, "2026-03-12T03:00:00Z", FeedbackState.DELIVERED);
         bind(delivered, strength);
         bind(delivered, undetermined);
         bind(
-                persistFeedback(workspace, review, "2026-03-11T05:00:00Z", FeedbackDeliveryState.PARTIALLY_DELIVERED),
+                persistFeedback(workspace, review, "2026-03-11T05:00:00Z", FeedbackState.PARTIALLY_DELIVERED),
                 strength);
-        persistFeedback(workspace, review, "2026-03-12T04:00:00Z", FeedbackDeliveryState.PARTIALLY_FAILED);
-        persistFeedback(workspace, review, "2026-03-11T04:00:00Z", FeedbackDeliveryState.DISCARDED);
-        bind(persistFeedback(workspace, review, "2026-03-11T06:00:00Z", FeedbackDeliveryState.PREPARED), beforeRange);
-        bind(persistFeedback(workspace, review, "2026-03-09T12:00:00Z", FeedbackDeliveryState.PREPARED), problem);
-        persistFeedback(otherWorkspace, elsewhere, "2026-03-11T04:00:00Z", FeedbackDeliveryState.DELIVERED);
+        persistFeedback(workspace, review, "2026-03-12T04:00:00Z", FeedbackState.PARTIALLY_FAILED);
+        persistFeedback(workspace, review, "2026-03-11T04:00:00Z", FeedbackState.DISCARDED);
+        bind(persistFeedback(workspace, review, "2026-03-11T06:00:00Z", FeedbackState.PREPARED), beforeRange);
+        bind(persistFeedback(workspace, review, "2026-03-09T12:00:00Z", FeedbackState.PREPARED), problem);
+        persistFeedback(otherWorkspace, elsewhere, "2026-03-11T04:00:00Z", FeedbackState.DELIVERED);
 
         PracticeReviewOverviewDTO overview = overview(FROM, TO, "UTC");
 
@@ -222,9 +221,9 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @WithAdminUser
     void shouldCountEveryDeliveryStateOnceWhenEachHasOnePieceOfFeedback() {
-        AgentJob review = persistReviewAt(workspace, "2026-03-10T01:00:00Z", AgentJobStatus.COMPLETED);
+        ReviewJob review = persistReviewAt(workspace, "2026-03-10T01:00:00Z", ReviewJobStatus.COMPLETED);
         Map<String, Long> expected = new HashMap<>();
-        for (FeedbackDeliveryState state : FeedbackDeliveryState.values()) {
+        for (FeedbackState state : FeedbackState.values()) {
             persistFeedback(workspace, review, "2026-03-11T00:00:00Z", state);
             expected.put(camelCase(state.name()), 1L);
         }
@@ -244,7 +243,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     @Test
     @WithAdminUser
     void shouldStartBucketsAtMidnightInTheZoneWhenAZoneIsGiven() {
-        persistReviewAt(workspace, "2026-03-10T23:30:00Z", AgentJobStatus.COMPLETED);
+        persistReviewAt(workspace, "2026-03-10T23:30:00Z", ReviewJobStatus.COMPLETED);
 
         PracticeReviewOverviewDTO overview = overview(FROM, TO, "Europe/Berlin");
 
@@ -326,7 +325,7 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
 
     private PracticeGroup persistGroup(Workspace targetWorkspace, String slug, String name) {
         PracticeGroup result = new PracticeGroup();
-        result.setWorkspace(targetWorkspace);
+        RuntimeJobTestData.initialize(result, (targetWorkspace).getId());
         result.setSlug(slug);
         result.setName(name);
         return groupRepository.save(result);
@@ -336,39 +335,39 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
             Workspace targetWorkspace, @Nullable PracticeGroup group, String slug, String name) {
         Practice result = new Practice();
         result.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
-        result.setWorkspace(targetWorkspace);
+        RuntimeJobTestData.initialize(result, (targetWorkspace).getId());
         result.setSlug(slug);
         result.setName(name);
         result.setGroup(group);
         result.setCriteria("Review the change");
-        PracticeTestEvidence.configure(result, ScmSignals.PULL_REQUEST_OPENED);
-        result.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        PracticeTestEvidence.configure(result, ScmItemEvents.PULL_REQUEST_OPENED);
+        result.setAutonomy(FeedbackMode.AUTOMATIC);
         return practiceRepository.save(result);
     }
 
     /** {@code createdAt} is only defaulted when unset, so a review can be seeded at a chosen instant. */
-    private AgentJob persistReviewAt(Workspace targetWorkspace, String createdAt, AgentJobStatus status) {
-        AgentJob result = new AgentJob();
-        result.setWorkspace(targetWorkspace);
-        result.setPurpose(AgentPurpose.PRACTICE_REVIEW);
-        result.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+    private ReviewJob persistReviewAt(Workspace targetWorkspace, String createdAt, ReviewJobStatus status) {
+        ReviewJob result = new ReviewJob();
+        RuntimeJobTestData.initialize(result, (targetWorkspace).getId());
+
+
         result.setConfigSnapshot(objectMapper.valueToTree(Map.of("model", "test")));
-        result.setCreatedAt(Instant.parse(createdAt));
+        result.setAvailableAt(Instant.parse(createdAt));
         result.setStatus(status);
         return jobRepository.save(result);
     }
 
     /** A recorded result for this practice. */
-    private UUID observe(AgentJob job, Practice practice, String observedAt, String outcome) {
+    private UUID observe(ReviewJob job, Practice practice, String observedAt, String outcome) {
         UUID id = UUID.randomUUID();
         practiceResultRepository.insertIfAbsent(
                 id,
                 "overview-" + id,
                 job.getId(),
-                job.getWorkspace().getId(),
+                job.getWorkspaceId(),
                 practice.getId(),
                 null,
-                ArtifactKinds.PULL_REQUEST.value(),
+                "scm.pull_request".value(),
                 7L,
                 subject.getId(),
                 "Observed " + id,
@@ -385,8 +384,8 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
         return id;
     }
 
-    private PracticeResultInvalidation invalidate(UUID practiceResultId) {
-        return invalidationRepository.save(new PracticeResultInvalidation(
+    private ResultMark invalidate(UUID practiceResultId) {
+        return invalidationRepository.save(new ResultMark(
                 practiceResultRepository
                         .findByIdAndWorkspaceId(practiceResultId, workspace.getId())
                         .orElseThrow(),
@@ -396,22 +395,22 @@ class PracticeReviewOverviewIntegrationTest extends AbstractWorkspaceIntegration
     }
 
     private UUID persistFeedback(
-            Workspace targetWorkspace, AgentJob job, String createdAt, FeedbackDeliveryState state) {
+            Workspace targetWorkspace, ReviewJob job, String createdAt, FeedbackState state) {
         return feedbackRepository
                 .save(Feedback.builder()
                         .agentJobId(job.getId())
                         .workspaceId(targetWorkspace.getId())
-                        .artifactKind(ArtifactKinds.PULL_REQUEST)
+                        .itemKind("scm.pull_request")
                         .artifactId(7L)
                         .recipientUserId(subject.getId())
                         .aboutUserId(subject.getId())
-                        .channel(FeedbackChannel.IN_CONTEXT)
+                        .channel(FeedbackDestination.IN_CONTEXT)
                         .position(nextPosition++)
                         .deliveryState(state)
                         .body("Feedback")
                         .source(FeedbackSource.AGENT)
                         .createdAt(Instant.parse(createdAt))
-                        .deliveredAt(state == FeedbackDeliveryState.DELIVERED ? Instant.parse(createdAt) : null)
+                        .deliveredAt(state == FeedbackState.DELIVERED ? Instant.parse(createdAt) : null)
                         .build())
                 .getId();
     }

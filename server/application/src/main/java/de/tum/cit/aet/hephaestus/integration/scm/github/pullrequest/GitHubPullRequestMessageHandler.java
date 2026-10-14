@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.pullrequest;
 import static de.tum.cit.aet.hephaestus.core.LoggingUtils.sanitizeForLog;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
@@ -18,9 +18,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * Handles all GitHub pull request webhook events.
- */
+/** Handles all GitHub pull request webhook events. */
 @Component
 public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageHandler<GitHubPullRequestEventDTO> {
 
@@ -50,9 +48,9 @@ public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageH
     }
 
     /**
-     * The event's own view is stored in the short transaction; then, for the actions that change what
-     * only GraphQL carries, the pull request is read again outside it, so the GraphQL round trip holds
-     * no database connection.
+     * The event's own view is stored in the short transaction; then, for the actions that change
+     * what only GraphQL carries, the pull request is read again outside it, so the GraphQL round
+     * trip holds no database connection.
      */
     @Override
     protected void dispatchEvent(GitHubPullRequestEventDTO event, Instant arrivedAt) {
@@ -64,7 +62,9 @@ public class GitHubPullRequestMessageHandler extends AbstractIntegrationMessageH
         }
     }
 
-    /** The actions after which the closing references, the rollup or the decision may have moved. */
+    /**
+     * The actions after which the closing references, the rollup or the decision may have moved.
+     */
     static boolean refreshesAfter(GitHubEventAction.PullRequest action) {
         return switch (action) {
             case OPENED, EDITED, SYNCHRONIZE, CLOSED, REOPENED -> true;

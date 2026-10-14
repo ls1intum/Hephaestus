@@ -8,43 +8,43 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Unified context for processing git provider data from any source (sync or webhook).
- * <p>
- * This context carries all the information needed to process data consistently,
- * regardless of whether it came from a scheduled GraphQL sync or a webhook
- * event.
+ *
+ * <p>This context carries all the information needed to process data consistently, regardless of
+ * whether it came from a scheduled GraphQL sync or a webhook event.
  *
  * <h2>Transaction Requirements</h2>
- * <p>
- * <b>Important:</b> The {@code repository} field contains a JPA entity reference.
- * This context MUST only be used within an active transaction/session. Accessing
- * lazy-loaded relationships outside a transaction will cause
- * {@code LazyInitializationException}.
- * <p>
- * For event publishing across transaction boundaries, use
- * {@link de.tum.cit.aet.hephaestus.integration.core.events.EventContext#from(ProcessingContext)}
- * to create an immutable, serializable context that is safe for async handling.
+ *
+ * <p><b>Important:</b> The {@code repository} field contains a JPA entity reference. This context
+ * MUST only be used within an active transaction/session. Accessing lazy-loaded relationships
+ * outside a transaction will cause {@code LazyInitializationException}.
+ *
+ * <p>For event publishing across transaction boundaries, use {@link
+ * de.tum.cit.aet.hephaestus.integration.scm.events.EventContext#from(ProcessingContext)} to create
+ * an immutable, serializable context that is safe for async handling.
  *
  * <h2>Future ETL Extraction</h2>
- * <p>
- * When extracting integration.scm as a standalone ETL component, this record should
- * be refactored to remove the JPA entity dependency. Consider:
+ *
+ * <p>When extracting integration.scm as a standalone ETL component, this record should be
+ * refactored to remove the JPA entity dependency. Consider:
+ *
  * <ul>
- *   <li>Replace {@code Repository} with a {@code RepositoryRef} or ID reference</li>
- *   <li>Create separate contexts for sync vs. event publishing</li>
+ *   <li>Replace {@code Repository} with a {@code RepositoryRef} or ID reference
+ *   <li>Create separate contexts for sync vs. event publishing
  * </ul>
  *
- * @param scopeId        The scope this data belongs to
- * @param repository     The repository being processed (JPA entity - transaction required)
- * @param provider       The git provider instance (e.g., github.com, gitlab.lrz.de)
- * @param observedAt     When Hephaestus received what is processed: when JetStream stored the webhook, or when a
- *                       sync asked for the page. Pull and merge request processing sets it ({@link #withObservedAt})
- *                       and compares it; a payload it handles outside a delivery is observed when it is handled, as
- *                       a core NATS message is. Other contexts carry the time they were made, which nothing compares.
- * @param correlationId  Unique ID for distributed tracing - correlates all log
- *                       entries and events from a single webhook or sync operation
- * @param webhookAction  The webhook action (e.g. "opened", "closed") if from webhook
- * @param source         Whether data came from sync or webhook
- * @param actorUserId    Local user ID of the webhook sender, not the issue author; absent for sync
+ * @param scopeId The scope this data belongs to
+ * @param repository The repository being processed (JPA entity - transaction required)
+ * @param provider The git provider instance (e.g., github.com, gitlab.lrz.de)
+ * @param observedAt When Hephaestus received what is processed: when JetStream stored the webhook,
+ *     or when a sync asked for the page. Pull and merge request processing sets it ({@link
+ *     #withObservedAt}) and compares it; a payload it handles outside a delivery is observed when
+ *     it is handled, as a core NATS message is. Other contexts carry the time they were made, which
+ *     nothing compares.
+ * @param correlationId Unique ID for distributed tracing - correlates all log entries and events
+ *     from a single webhook or sync operation
+ * @param webhookAction The webhook action (e.g. "opened", "closed") if from webhook
+ * @param source Whether data came from sync or webhook
+ * @param actorUserId Local user ID of the webhook sender, not the issue author; absent for sync
  */
 public record ProcessingContext(
         @Nullable Long scopeId,
@@ -77,16 +77,13 @@ public record ProcessingContext(
         return new ProcessingContext(
                 scopeId, repository, provider, observedAt, correlationId, webhookAction, source, actorUserId);
     }
-    /**
-     * Returns the provider's database ID for use in upsert queries.
-     */
+
+    /** Returns the provider's database ID for use in upsert queries. */
     public @Nullable Long providerId() {
         return provider != null ? provider.getId() : null;
     }
 
-    /**
-     * Creates a context for scheduled sync operations.
-     */
+    /** Creates a context for scheduled sync operations. */
     public static ProcessingContext forSync(@Nullable Long scopeId, @Nullable Repository repository) {
         return new ProcessingContext(
                 scopeId,
@@ -99,17 +96,15 @@ public record ProcessingContext(
     }
 
     /**
-     * Creates a context for sync operations that are not repository-scoped
-     * (e.g., organization-level project sync, team sync).
+     * Creates a context for sync operations that are not repository-scoped (e.g.,
+     * organization-level project sync, team sync).
      */
     public static ProcessingContext forSync(@Nullable Long scopeId, IdentityProvider provider) {
         return new ProcessingContext(
                 scopeId, null, provider, Instant.now(), UUID.randomUUID().toString(), null, DataSource.GRAPHQL_SYNC);
     }
 
-    /**
-     * Creates a context for webhook event processing.
-     */
+    /** Creates a context for webhook event processing. */
     public static ProcessingContext forWebhook(@Nullable Long scopeId, Repository repository, String action) {
         return new ProcessingContext(
                 scopeId,
@@ -122,24 +117,20 @@ public record ProcessingContext(
     }
 
     /**
-     * Creates a context for webhook events that are not repository-scoped
-     * (e.g., organization-level project events).
+     * Creates a context for webhook events that are not repository-scoped (e.g., organization-level
+     * project events).
      */
     public static ProcessingContext forWebhook(@Nullable Long scopeId, IdentityProvider provider, String action) {
         return new ProcessingContext(
                 scopeId, null, provider, Instant.now(), UUID.randomUUID().toString(), action, DataSource.WEBHOOK);
     }
 
-    /**
-     * Checks if this processing was triggered by a webhook.
-     */
+    /** Checks if this processing was triggered by a webhook. */
     public boolean isWebhook() {
         return source == DataSource.WEBHOOK;
     }
 
-    /**
-     * Checks if this processing was triggered by a scheduled sync.
-     */
+    /** Checks if this processing was triggered by a scheduled sync. */
     public boolean isSync() {
         return source == DataSource.GRAPHQL_SYNC;
     }

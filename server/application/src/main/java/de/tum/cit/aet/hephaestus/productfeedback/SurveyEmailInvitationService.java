@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.productfeedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.productfeedback.notification.SurveyEmailDelivery;
@@ -35,7 +35,7 @@ class SurveyEmailInvitationService implements SurveyEmailInvitations {
     private final SurveyService surveyService;
     private final SurveyEmailInvitationRepository invitations;
     private final SurveyEmailDelivery delivery;
-    private final AccountWorkspaceMembershipQuery memberships;
+    private final AccountMembershipQuery memberships;
     private final Clock clock;
 
     @Transactional(readOnly = true)
@@ -112,7 +112,7 @@ class SurveyEmailInvitationService implements SurveyEmailInvitations {
         Survey survey = surveys.findById(surveyId).orElse(null);
         if (survey == null) return Optional.empty();
         return memberships.membershipsForAccount(accountId).stream()
-                .sorted(Comparator.comparing(AccountWorkspaceMembershipQuery.WorkspaceMembershipView::workspaceId))
+                .sorted(Comparator.comparing(AccountMembershipQuery.MembershipView::workspaceId))
                 .filter(workspace -> surveyService.isEligibleForEmail(surveyId, workspace.workspaceId(), accountId))
                 .findFirst()
                 .map(workspace ->

@@ -38,7 +38,7 @@ class AgentsPathDispatchIntegrationTest extends AbstractWorkspaceIntegrationTest
     void jobsSegmentOutranksThePurposeTemplate() {
         Workspace workspace = setupWorkspace();
 
-        // A paginated envelope can only have come from AgentJobController; the binding controller
+        // A paginated envelope can only have come from ReviewJobController; the binding controller
         // returns a bare array.
         webTestClient
                 .get()

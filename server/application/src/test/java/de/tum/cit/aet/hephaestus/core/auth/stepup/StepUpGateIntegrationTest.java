@@ -29,8 +29,8 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * carrying (or missing) {@code auth_time}, decoded by the production decoder, converted into the
  * authorization-code factor authority the authorization rule reads.
  *
- * <p>The bearer path is deliberate: an API client that never loads the SPA must be refused identically,
- * so the gate cannot be a property of the dialog.
+ * <p>The bearer path is deliberate: an API client that never loads the SPA must be refused
+ * identically, so the gate cannot be a property of the dialog.
  */
 class StepUpGateIntegrationTest extends RealAuthIntegrationTest {
 
@@ -176,7 +176,7 @@ class StepUpGateIntegrationTest extends RealAuthIntegrationTest {
                 .uri("/workspaces/stale-user-view/practices/standings")
                 .headers(h -> h.setBearerAuth(tokenFor(admin, staleSignIn())))
                 .header("X-User-View-Workspace", "stale-user-view")
-                .header("X-User-View-User", "99")
+                .header("X-User-View-Account", "99")
                 .header("X-User-View-Reason", "Support")
                 .exchange()
                 .expectStatus()
@@ -191,7 +191,7 @@ class StepUpGateIntegrationTest extends RealAuthIntegrationTest {
                 .singleElement()
                 .satisfies(event -> {
                     assertThat(event.getResult()).isEqualTo(AuthEvent.Result.FAILURE);
-                    assertThat(event.getViewedUserId()).isNull();
+                    assertThat(event.getViewedActorId()).isNull();
                     assertThat(event.getFailureReason()).isEqualTo(StepUpRequiredException.CODE);
                 });
     }

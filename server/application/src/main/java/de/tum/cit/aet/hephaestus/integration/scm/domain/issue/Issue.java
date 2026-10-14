@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.BaseGitServiceEntity;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
@@ -30,7 +29,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -58,24 +56,9 @@ import org.jspecify.annotations.Nullable;
 @ToString(callSuper = true)
 public class Issue extends BaseGitServiceEntity {
 
-    /** Changes on every reviewable issue transition, even when content returns to an earlier state. */
-    @Nullable
-    @Column(name = "review_snapshot_id", insertable = false, updatable = false)
-    private UUID reviewSnapshotId;
-
-    @Nullable
-    @Column(name = "review_snapshot_digest", length = 128, insertable = false, updatable = false)
-    private String reviewSnapshotDigest;
-
     /** Categorical scheduling facts recorded by the SCM mirror; absent state remains unknown. */
     public Map<String, String> reviewState() {
         return state == null ? Map.of() : Map.of("state", state.name());
-    }
-
-    public ReviewSubject reviewSubject() {
-        return author == null
-                ? ReviewSubject.MISSING
-                : new ReviewSubject(author.getId(), author.getType() == User.Type.USER);
     }
 
     private int number;
@@ -106,12 +89,12 @@ public class Issue extends BaseGitServiceEntity {
 
     /**
      * Timestamp of the last successful sync for this issue/PR and its associated data.
-     * <p>
-     * This is ETL infrastructure used by the sync engine to track when this issue
-     * (and its comments) or pull request (and its reviews, review comments) was last
-     * synchronized via GraphQL. Used to implement incremental sync and detect stale data.
-     * <p>
-     * Updated by the GitHub sync processors after successfully syncing all related entities.
+     *
+     * <p>This is ETL infrastructure used by the sync engine to track when this issue (and its
+     * comments) or pull request (and its reviews, review comments) was last synchronized via
+     * GraphQL. Used to implement incremental sync and detect stale data.
+     *
+     * <p>Updated by the GitHub sync processors after successfully syncing all related entities.
      */
     private @Nullable Instant lastSyncAt;
 
@@ -119,17 +102,16 @@ public class Issue extends BaseGitServiceEntity {
      * Tombstone: when set, this issue/pull request no longer exists upstream.
      *
      * <p>Written by the {@code RECONCILIATION} deletion sweep (which set-differences the full
-     * upstream number set against the local rows) and by the {@code issues.transferred} webhook.
-     * A tombstone rather than a row deletion because {@code feedback.artifact_id},
-     * {@code practice_result.artifact_id} (NOT NULL) and {@code activity_event.target_id} point at
-     * this row by bare id with no foreign key — a hard delete would orphan them silently rather
-     * than fail loudly. Keeping the row keeps those lookups resolvable.
+     * upstream number set against the local rows) and by the {@code issues.transferred} webhook. A
+     * tombstone rather than a row deletion because the workspace item index retains this mirror's
+     * source id and activity events retain their target id. Keeping the row keeps those historical
+     * references resolvable.
      *
      * <p>Deliberately reversible: the sweep infers deletion from <em>absence</em> from a listing,
      * which is fallible in a way an explicit webhook event is not. {@code upsertCore} clears this
-     * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned
-     * — is resurrected by the next ordinary sync with no operator intervention. That is why a
-     * pending signal re-offered while this is set is held rather than retired.
+     * back to {@code null}, so an item that reappears upstream — or one a faulty sweep tombstoned —
+     * is resurrected by the next ordinary sync with no operator intervention. That is why a pending
+     * item event re-offered while this is set is held rather than retired.
      *
      * <p>Which surfaces filter and which deliberately do not, and why there is no entity-level
      * {@code @SQLRestriction}, is decided in ADR 0024 § which reads honour a drift tombstone.
@@ -183,8 +165,8 @@ public class Issue extends BaseGitServiceEntity {
     }
 
     /**
-     * The parent issue if this is a sub-issue. Null if this is a top-level issue.
-     * Maps to GitHub's Issue.parent GraphQL field.
+     * The parent issue if this is a sub-issue. Null if this is a top-level issue. Maps to GitHub's
+     * Issue.parent GraphQL field.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_issue_id")
@@ -192,37 +174,34 @@ public class Issue extends BaseGitServiceEntity {
     private @Nullable Issue parentIssue;
 
     /**
-     * Sub-issues of this issue. Empty if this issue has no children.
-     * Maps to GitHub's Issue.subIssues GraphQL connection.
+     * Sub-issues of this issue. Empty if this issue has no children. Maps to GitHub's
+     * Issue.subIssues GraphQL connection.
      */
     @OneToMany(mappedBy = "parentIssue")
     @ToString.Exclude
     private Set<Issue> subIssues = new HashSet<>();
 
     /**
-     * Total number of sub-issues (from GitHub's sub_issues_summary.total).
-     * This is a denormalized count for efficient querying without loading all
-     * sub-issues.
+     * Total number of sub-issues (from GitHub's sub_issues_summary.total). This is a denormalized
+     * count for efficient querying without loading all sub-issues.
      */
     private Integer subIssuesTotal;
 
     /**
-     * Number of completed sub-issues (from GitHub's sub_issues_summary.completed).
-     * A sub-issue is considered completed when its state is CLOSED.
+     * Number of completed sub-issues (from GitHub's sub_issues_summary.completed). A sub-issue is
+     * considered completed when its state is CLOSED.
      */
     private Integer subIssuesCompleted;
 
     /**
-     * Percentage of sub-issues completed (from GitHub's
-     * sub_issues_summary.percent_completed).
+     * Percentage of sub-issues completed (from GitHub's sub_issues_summary.percent_completed).
      * Value between 0 and 100. Null if no sub-issues exist.
      */
     private Integer subIssuesPercentCompleted;
 
     /**
-     * The issue type (category) for this issue.
-     * Managed at the organization level in GitHub.
-     * Maps to GitHub's Issue.issueType GraphQL field.
+     * The issue type (category) for this issue. Managed at the organization level in GitHub. Maps
+     * to GitHub's Issue.issueType GraphQL field.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "issue_type_id")
@@ -230,9 +209,9 @@ public class Issue extends BaseGitServiceEntity {
     private @Nullable IssueType issueType;
 
     /**
-     * Issues that block this issue from being worked on or completed.
-     * Maps to GitHub's Issue.blockedBy GraphQL connection.
-     * When this issue is blocked, blockedBy contains the blockers.
+     * Issues that block this issue from being worked on or completed. Maps to GitHub's
+     * Issue.blockedBy GraphQL connection. When this issue is blocked, blockedBy contains the
+     * blockers.
      */
     @ManyToMany
     @JoinTable(
@@ -243,9 +222,8 @@ public class Issue extends BaseGitServiceEntity {
     private Set<Issue> blockedBy = new HashSet<>();
 
     /**
-     * Issues that this issue is blocking.
-     * Maps to GitHub's Issue.blocking GraphQL connection.
-     * When this issue blocks others, blocking contains the blocked issues.
+     * Issues that this issue is blocking. Maps to GitHub's Issue.blocking GraphQL connection. When
+     * this issue blocks others, blocking contains the blocked issues.
      */
     @ManyToMany(mappedBy = "blockedBy")
     @ToString.Exclude
@@ -261,7 +239,9 @@ public class Issue extends BaseGitServiceEntity {
     /**
      * Reason for the issue's current state. Maps to GitHub GraphQL IssueClosedStateReason.
      *
-     * @see <a href="https://docs.github.com/en/graphql/reference/enums#issueclosedstatereason">GitHub IssueClosedStateReason</a>
+     * @see <a
+     *     href="https://docs.github.com/en/graphql/reference/enums#issueclosedstatereason">GitHub
+     *     IssueClosedStateReason</a>
      */
     public enum StateReason {
         /** Issue was completed/resolved. */

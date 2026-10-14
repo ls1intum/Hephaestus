@@ -4,432 +4,76 @@ title: Writing effective practices
 description: Define evidence-bounded review criteria and check them against realistic cases before adoption.
 ---
 
-A useful practice helps a developer make a specific decision about their work.
-Its review criteria must explain **when the expectation matters, what can be observed, and what would justify feedback**.
-A memorable name or a long checklist is not sufficient.
-
-Use this guide to create a custom practice or adapt a catalog entry.
-The [Practice Catalog guide](./practice-catalog) explains adoption and updates.
-
-## Start with one expectation
-
-The review schedule is separate from whether an expectation applies.
-A merge event can start a review without every practice applying to that change.
-An author's reply is not a reviewer's comment.
-A plan in an issue does not prove that a change shipped.
-
-1. Choose an observable way of working, such as an explanation of a consequential design decision.
-2. Avoid personality judgments such as “is careful.”
-3. Avoid whole-system promises such as “writes correct software.”
-4. State whom the expectation concerns and which work the review covers.
-5. Separate the fields in the editor.
-
-The fields have different purposes:
-
-- **What to look for** contains every criterion needed for the judgment.
-  This includes applicability, evidence, sufficient and insufficient behavior, uncertainty, and severity.
-- **Why it matters** explains the practical benefit without a guaranteed outcome.
-- **What good looks like** gives a realistic example.
-  If an example introduces a requirement, also state it in **What to look for**.
-  Explanatory guidance does not change review criteria.
-- **Visual** and **Guide** are optional.
-  They add a picture and a longer explanation for the developer.
-  [Add a visual and a guide](#add-a-visual-and-a-guide) explains them.
-
-**Person this practice judges** is the relation to the reviewed work, not the person who wrote the criteria.
-Available relations depend on the kind of work.
-
-1. For a practice about a reviewer's comments, select **reviewer**.
-   If **author** stays selected, the practice attributes that conduct to the pull-request author.
-
-**Only review when** is an optional mechanical gate, separate from review criteria.
-An empty gate applies the practice to all work of the selected kind.
-
-1. To apply a practice only to changed Swift files, enter:
-
-```json
-{
- "skipReason": "the change touches no Swift source file",
- "anyOf": [{ "changedPathMatches": ["**/*.swift"] }]
-}
-```
-
-`anyOf` is a list of alternatives.
-Each clause uses exactly one of `changedPathMatches`, `diffContains`, or `evidenceHasItems`.
-The explanation in `skipReason` appears when complete evidence proves that no alternative is present.
-A saved name or text change leaves the gate and the person judged unchanged.
-
-1. Clear the field only when the practice must apply to all work.
-
-A gate must be a necessary condition for applicability.
-A keyword list that misses unfamiliar APIs or file names cannot establish the absence of relevant behavior.
-
-1. Leave such a gate empty.
-2. Let the review criteria determine applicability from the complete captured evidence.
-
-## Write the review criteria
-
-Use these questions to organize a draft.
-They are not mandatory headings or a word-count target.
-
-| Decision      | What the author must make clear                                                                              |
-| ------------- | ------------------------------------------------------------------------------------------------------------ |
-| Applicability | What fact makes this expectation relevant? Which ordinary cases are outside it?                              |
-| Standard      | What observable requirements must the reviewed work meet?                                                    |
-| Evidence      | Which captured sources can establish each claim? Who authored them, and when?                                |
-| Conformance   | What evidence establishes the complete standard or a material problem?                                       |
-| Absence       | What complete, bounded search justifies a claim of missing required behavior or absence of harmful behavior? |
-| Uncertainty   | What unresolved question prevents a judgment, even with the required evidence captured?                      |
-| Consequence   | Why does each observation (a problem) matter? What consequence justifies its severity?                       |
-| Feedback      | What specific change could the developer make? When would no corrective feedback be useful?                  |
-
-1. Prefer “identify a material decision whose rationale the reviewer needs” to a keyword test for “because.”
-2. Prefer the consequence of a missing check to a criterion that makes every missing heading MAJOR.
-3. If a threshold represents a team policy, identify that policy and its exceptions.
-4. Do not present a convenient number as a universal engineering standard.
-
-### One outcome against the standard
-
-Use one outcome for conformance within the recorded evidence boundary:
-
-| Outcome          | Example for verification guidance on a persistence change                                                           |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `MET`            | Complete instructions save a setting, restart the app, and check the saved value without destruction of that value. |
-| `NOT_MET`        | A required restart check is missing, or the instructions claim an in-memory preview proves persistence.             |
-| `NOT_APPLICABLE` | The work has no material behavior that requires this verification.                                                  |
-| `UNDETERMINED`   | Adequate captured evidence contains an unresolved conflict about the required behavior.                             |
-
-The UI shows these outcomes as **Met**, **Not met**, **Does not apply**, and **Could not determine**.
-A `NOT_MET` result records one or more observations.
-Each observation is one problem at a place in the work, with a summary, an explanation, and verified citations.
-An `UNDETERMINED` result records one or more open questions, each with what would settle it.
-A `NOT_MET` result can also record open questions.
-A `MET` or `NOT_MET` result can show one example from the work that shows the practice done well.
-
-One useful instruction alone does not establish conformance to the complete standard.
-Absence claims need a complete bounded search.
-A missing optional improvement is not a problem, and the review never records it.
-If required capture fails, the review creates no result.
-This is not uncertainty about the developer's work.
-
-1. Do not count inadequate instructions and their missing part as separate problems when both need the same correction.
-
-Severity applies only to `NOT_MET`.
-The severities are **Critical**, **Major**, **Minor**, and **Trivial** (`INFO`), from the most severe.
-Every severity is a real gap.
-Use **Trivial** for a real gap with a small cost, which the developer can fix when it is cheap.
-Each observation has its own severity.
-The result is at least as severe as its most severe observation.
+# Write a practice
 
-Delivery is a separate decision.
-
-### Evidence is more than a matching quotation
-
-A quotation proves that text exists, not that the conclusion follows.
-An authored preview can provide an entry point.
-Implementation text alone need not communicate the intended result.
-An uninspected screenshot supplies no established visual facts.
-A template issue number is not automatically an adopted requirement.
-
-Required evidence that is missing, failed, or truncated stops assessment.
-
-1. Relate instructions to the actual changed behavior.
-2. If required evidence is missing, failed, or truncated, record the collection gap, not a result about the developer.
-3. With qualified evidence, use UNDETERMINED for a material open question. State what would settle it.
-
-Failure to find a quotation does not itself prove absence.
-A previous result records an earlier judgment.
-It is not independent proof that the judgment was correct.
+State a positive standard that a review can judge within a clear evidence boundary.
+Describe required behavior once. Keep guidance separate from the criteria.
 
-1. Separate recorded facts from the events they approximate.
-2. Do not replace an unknown deciding timestamp with a different event merely to produce a verdict.
-
-A commit timestamp records a commit, not the moment development began.
-A pull request creation time records a handoff, not an earlier start time.
-
-## Write the criteria as a decision procedure
-
-The bundled catalog uses this order.
-It is also a useful template for custom practices.
-The questions above remain the basis for each section's content.
+## Define the standard
 
-1. **REVIEW FOCUS** — name the observable standard.
-2. **The standard** — define what good conformance to that behavior means.
-3. **Occasion** — identify work where the expectation does not apply.
-4. **Sources** — state which captured sources can support each claim and their limits.
-5. **Judge** — state when the complete standard is MET.
-6. State what evidenced problem makes it NOT_MET.
-7. Define the exclusion that supports NOT_APPLICABLE.
-8. Define the unresolved question that supports UNDETERMINED.
-9. Make these conditions distinct.
-10. Where check order matters, state that order.
-11. Include an example that looks like a lapse but meets the standard.
-12. **Severity** — tie NOT_MET outcomes to consequences.
-13. **Grounding** — state the evidence needed to support each claim.
-14. **Defer** — identify expectations that other practices own.
-
-15. Keep each requirement in one place.
-16. Use the four outcome terms consistently.
-
-The bundled catalog has a criteria length limit.
-Conformance to that limit does not establish that the criteria are clear or correct.
-The recording tool checks the outcome and its required evidence fields.
-It does not establish that an assessment meets the practice criteria.
-
-Criteria must state the standard and the evidence needed to judge it.
-Do not encode excluded presence or desirability combinations.
-Each practice needs evidence and consequences that match its expectation and the sources your workspace can capture.
-
-1. To see the template, open **State how to verify the change** in the practice editor.
-2. Adapt its structure, not its applicability criteria.
-
-## Practice script
-
-A practice can have a practice script: TypeScript that runs as the review program of the practice.
-The script prepares the review input, such as places to check, and passes it to the review.
-A script can also return the result itself.
-The criteria stay the only standard of the review.
-
-The server checks each result against the same contract before the result can lead to feedback.
-A script never writes feedback.
-If a script fails or runs out of time, the practice gets no result in that review.
-A script failure is never a claim about the work.
-
-The editor's **Script** section follows **When this practice is reviewed**.
-It is optional, and it opens when the practice has a script.
-The section shows only when Hephaestus reviews the practice, with **AI-supported mentoring**, because only a review runs the script.
-
-If you choose another option under **How this practice is mentored**, the section hides, but the editor keeps the script.
-A note under the options tells you that the script stays in the draft.
-If you choose **AI-supported mentoring** again before you save, the script comes back.
-If you save with another option, Hephaestus removes the script from the practice.
-[Write a practice script](./practice-scripts.mdx) tells how to write and try one.
-
-## Feedback delivery
-
-The editor's **Feedback delivery** section separates delivery from what the practice measures.
-**Overlap group** groups practices whose feedback can cover the same concern.
-**Preferred practice identifier** identifies the practice to prefer in that overlap group.
-These settings do not change result outcomes or authorize automatic sending.
-
-1. If feedback must stay in the summary rather than on a changed line, select summary-only delivery.
-2. Use the identifier of an existing practice, not its display name.
-3. Before you save, check the preview's **How feedback is delivered** section.
-
-## Add a visual and a guide
-
-A practice can have two optional fields for the developer:
-
-- **Visual** is one SVG picture and its description.
-  The developer's practice panel shows it between **Why it matters** and **What good looks like**.
-- **Guide** is a longer explanation in Markdown, with up to 4 SVG figures.
-  The developer opens it in the **Guide** tab of the practice panel.
-
-Both fields are developer guidance.
-They do not change how the practice is reviewed.
-Heph receives the descriptions and the text of the guide, but not the pictures.
-Thus, a description must give the full meaning of its picture.
-
-Add a visual only when it shows the idea better than a sentence.
-The size of a change and an order of steps are examples.
-
-Both fields work like the other fields of a definition.
-Each change creates a revision, and a release can offer each field separately.
-[Practice Catalog](./practice-catalog) explains customizations and **Restore Hephaestus default**.
-
-### Add a visual
-
-1. Open the practice in the practice editor.
-2. In **Visual**, select **Upload SVG** and choose an SVG file.
-   You can also paste the markup into **SVG markup**.
-3. In **Description \***, say what the picture means. Do not describe the shapes or the colors.
-4. Check the **Light theme** and **Dark theme** previews.
-5. Save the practice.
-
-To remove the visual, select **Remove** in **Visual**.
-Then save the practice.
-
-### Add a guide
-
-1. In **Guide**, write the text in **Guide text** in Markdown.
-2. To add a figure, put the cursor where the figure must show.
-3. Select **Add figure** and choose an SVG file.
-   The editor adds the line `![Describe the figure](figures/<name>.svg)` at the cursor.
-4. Replace "Describe the figure" with what the figure means. Do not describe the shapes or the colors.
-5. Select **Preview** to check the text and the figures.
-6. Save the practice.
-
-To remove a figure, select **Remove** beside the figure.
-The editor also removes the lines that show the figure.
-To remove the guide, select **Remove guide**.
-Then save the practice.
-
-A link in a guide opens in a new tab.
-The guides of the Hephaestus defaults use four headings: **How to do it**, **When it does not apply**, **Common mistakes**, and **Sources**.
-Your guide can use other headings.
-
-### What Hephaestus accepts
-
-The server checks the visual, the guide, and each figure when you save.
-If it refuses the save, its message names the element, the attribute, or the limit.
-The webapp cleans the markup again before it shows the picture.
-
-| Rule               | Limit                                                                                                                                                        |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Root element       | `<svg xmlns="http://www.w3.org/2000/svg" viewBox="…">`                                                                                                       |
-| File size          | 64 KB or less for each SVG                                                                                                                                   |
-| Elements           | `svg`, `g`, `path`, `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, `text`, `tspan`, `title`, `desc`                                             |
-| Attributes         | Geometry and presentation only. The list follows this table.                                                                                                 |
-| Attribute values   | Letters, digits, spaces, and the characters `#` `.` `,` `%` `+` `(` `)` `/` `-` `_`. Thus, a value cannot contain a `url(...)` reference, a quote, or an escape. |
-| Not accepted       | Ids, the `style` attribute and element, links, a DOCTYPE, scripts, images, CDATA sections, processing instructions, and comments that contain `<` or `>`     |
-| Visual description | 1 to 300 characters                                                                                                                                          |
-| Guide text         | Markdown with no HTML, 12,000 characters or fewer                                                                                                            |
-| Links in a guide   | Web addresses that start with `https://` or `http://`                                                                                                        |
-| Figures            | 4 or fewer for each guide. A figure name has lowercase letters, digits, and single hyphens.                                                                  |
-| Images in a guide  | Only the guide's own figures, as `![description](figures/<name>.svg)`. The text shows each figure, with a description.                                       |
-
-The accepted attributes are:
-`viewBox`, `width`, `height`, `preserveAspectRatio`, `version`, `x`, `y`, `x1`, `y1`, `x2`, `y2`, `cx`, `cy`, `r`, `rx`, `ry`, `d`, `points`, `dx`, `dy`, `transform`, `class`, `fill`, `fill-rule`, `fill-opacity`, `clip-rule`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`, `stroke-dasharray`, `stroke-dashoffset`, `stroke-opacity`, `opacity`, `font-size`, `font-weight`, `font-style`, `text-anchor`, `dominant-baseline`, `letter-spacing`, `vector-effect`, `role`, `aria-hidden`, `focusable`, and `xml:space`.
-
-Most drawing tools add ids, styles, or gradients.
-Remove them before you upload the file.
-Without ids, a picture cannot use markers, gradients, masks, filters, or clip paths.
-Draw an arrowhead as a small filled triangle.
-
-### Colors in light and dark mode
-
-A `pv-*` class gives a shape a color of the app theme.
-The color changes with the theme.
-Thus, one file works in the light theme and in the dark theme.
-
-| Class                 | Color                                     |
-| --------------------- | ----------------------------------------- |
-| `pv-fill-ink`         | Fill with the main text color             |
-| `pv-fill-muted`       | Fill with the secondary text color        |
-| `pv-fill-surface`     | Fill with the panel background            |
-| `pv-fill-accent`      | Fill with the accent color                |
-| `pv-fill-accent-soft` | Fill with the accent color at 15% opacity |
-| `pv-stroke-ink`       | Stroke with the main text color           |
-| `pv-stroke-muted`     | Stroke with the secondary text color      |
-| `pv-stroke-line`      | Stroke with the border color              |
-| `pv-stroke-accent`    | Stroke with the accent color              |
-| `pv-mono`             | The code font of the app                  |
-
-`pv-mono` sets a font, not a color.
-Use it for one code token in a label of size 15.
-
-[Practice visuals and guides](/contributor/practice-visuals#color) gives the meaning of each class.
-
-Set `fill="none"` on a shape that has only a stroke.
-
-A visual with no `pv-*` class keeps its own colors.
-The panel shows it on a light surface in both themes.
-Thus, a visual from any drawing tool works without the classes.
-
-### Start from a template
-
-Each starter template uses only accepted markup and `pv-*` classes.
-Each one draws a composition pattern with placeholder labels:
-
-- [Contrast pair](/practice-visual-template.svg): the work without the practice on the left, and the same work with it on the right. Use it unless a fork or a sequence fits better.
-- [Fork](/practice-visual-template-fork.svg): one trigger, then the lapse on top and the practice below.
-- [Sequence](/practice-visual-template-sequence.svg): three steps in order, for a figure in a guide. A visual uses it only to compare two orders, as two rows. [Sequence](/contributor/practice-visuals#sequence) gives the layout.
-
-1. Save a copy of a template.
-2. Open the copy in a text editor or a drawing tool.
-3. Replace each placeholder label.
-4. Move, add, or delete shapes.
-5. Set the height of the viewBox to the bottom of the lowest shape.
-6. Upload the result in **Visual**.
-
-### Draw a visual with an AI assistant
-
-You can ask an AI assistant to draw a visual.
-
-1. Copy the prompt below.
-2. Replace each value in angle brackets.
-3. Send the prompt to the AI assistant, with the [starter template](#start-from-a-template) of the layout attached.
-4. Make sure that the picture adds no requirement to the practice criteria.
-5. Upload the SVG in **Visual**.
-6. Enter the description.
-
-```text
-Draw one SVG picture for a software engineering practice. Follow every rule below.
-
-Practice: <name of the practice>
-Why it matters: <text of Why it matters>
-What good looks like: <text of What good looks like>
-The one idea that the picture must show: <one sentence>
-Layout: <one of: contrast pair | fork | sequence (two rows that compare two orders)>
-
-Start from the attached starter template of the layout. Keep its coordinates. Change only the labels and the one part that differs, and delete what the idea does not need.
-
-Rules for the file:
-- Start with <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 H">, where H is the bottom of the lowest shape, at most 320. Do not set width or height.
-- Draw to the edges of the canvas: the first title at the top, the outermost shapes at x 0 and x 640. In a fork, the outcome labels end the picture and reach toward x 640. Leave no empty area larger than about a sixth of the canvas.
-- Put panes, frames, nodes, gutters, and content tops on a grid of 8. Keep the line heights, pitches, radii, and baselines of the template. Inset a stroked shape by half its stroke width.
-- Use only these elements: svg, g, path, rect, circle, ellipse, line, polyline, polygon, text, tspan, title, desc.
-- Use only these attributes: x, y, width, height, rx, ry, cx, cy, r, x1, y1, x2, y2, d, points, dx, dy, transform, class, fill, stroke, stroke-width, stroke-linecap, stroke-linejoin, stroke-dasharray, font-size, font-weight, text-anchor.
-- Do not use id, style, href, url(...), opacity, gradients, filters, markers, masks, images, scripts, or a DOCTYPE.
-- Color every shape and every text with one of these classes, not with a color value: pv-fill-ink, pv-fill-muted, pv-fill-surface, pv-fill-accent, pv-fill-accent-soft, pv-stroke-ink, pv-stroke-muted, pv-stroke-line, pv-stroke-accent. Add the class pv-mono to a text that is one code token.
-- Accent (pv-*-accent) means only what the practice asks for. Use it for one meaning, on the practice side only.
-- Muted (pv-*-muted) means context, the lapse, and a missing part. Ink (pv-*-ink) means titles and names. pv-fill-accent-soft fills only a node or region that holds the accent. pv-fill-surface fills the inside of an outlined shape. Use pv-stroke-line for nothing that matters.
-- Accent and muted have about the same lightness. Give every accent mark a shape or a position that differs too. A label alone is too small to read on a phone.
-- Use fill="none" on a shape that has only a stroke.
-- Do not set a font family. Use font-size 16 and font-weight 600 for titles, font-size 15 for labels, and no other size. Use weight 600 for one label only: the one that names what the practice asks for.
-- Use 24 words or fewer in the whole picture, in sentence case, with no period.
-- Show the difference as one short example on each side (6 words or fewer, or one code token with the class pv-mono), not as colored bars.
-- Draw a line of code as a bar 10 high with rx 3, and a line of prose as a bar 6 high. Draw one piece of work as a frame: rx 8, pv-fill-surface, pv-stroke-muted, stroke-width 1.5. Never put a frame inside a frame, and never draw a box around a group of shapes.
-- Write the part that the practice asks for as its example in accent text, and the lapse as its example in muted text, at the same place in both panes. Put no rule or other mark next to an example. Draw a missing part as a dashed muted outline with a muted label that names what is missing, such as "No test".
-- Make every mark explain itself. Name each piece of work with a word, such as "Pull request" or "Issue #57". Never draw a dot, a tick, or a glyph with no word next to it.
-- Draw an arrow as one line path and one small filled triangle path. Use arrows only for order, cause, or flow.
-- In a sequence, draw two rows: the lapse order on top, the practice order below. Put the row titles at baselines 16 and 132.
-- In a sequence, move the marks of each row 32 down, below its title. Delete the template's detail labels, and set H to 200.
-- In a sequence of two steps, use columns 304 wide at x 0 and x 336. Only the practice row has the solid accent marker.
-- Draw a person only as a filled circle of radius 8 with its role as a label, such as "Reviewer", never as a face or a figure. Do not draw mascots, logos, emoji, or decoration. Do not animate.
-- Do not show a number, a limit, or a threshold that the practice text does not state.
-- Keep the file smaller than 64 KB.
-
-Then write one description of 250 characters or fewer (Hephaestus accepts up to 300), in 1 or 2 sentences. Say what the picture means, in the order of the picture. Do not name colors or shapes.
-Return only the SVG markup and the description.
-```
-
-## Challenge the draft before adopting it
-
-1. Prepare a small set of real cases or clearly identified synthetic cases.
-2. Before the review runs, record the expected behavior, judgment, decisive evidence, and appropriate feedback.
-3. Include these cases:
-
-   - A clearly useful example, a misleading example, and genuinely missing necessary behavior.
-   - A harmless omission or excluded occasion, and a case with missing required capture.
-   - Sufficient context across permitted sources, and an irrelevant or unadopted linked source.
-   - An ambiguous case with a precise question that would resolve it.
-   - A near-identical pair where one decisive fact changes.
-   - A cosmetic rewrite that should not change the judgment.
-   - Source text that attempts to instruct the reviewer. This must stay evidence, not authority.
-
-4. Have another reviewer use the criteria without your expected judgments.
-5. Compare the named behaviors and rationales, not only labels.
-6. Revise ambiguous instructions.
-7. Evaluate additional cases that you did not use to write the revision.
-
-Matching outcomes can conceal different claims.
-Agreement measures consistency.
-It does not establish correctness or human independence.
-
-1. Keep **Review before sending** during evaluation.
-2. Check unsupported corrections, missed material concerns, exclusions, and uncertainty separately.
-3. Record the definition and evidence used for each evaluation.
-4. After a criteria change, validate the criteria again.
-
-One positive rate hides differences between these checks.
-Neither a successful run nor valid citations authorizes automatic sending.
-
-## Basis for these guidelines
-
-[Google's code-review guidance](https://google.github.io/eng-practices/review/reviewer/looking-for.html) supports checks of real functionality, justified complexity, useful tests, and explanatory comments.
-[Its guidance on small changes](https://google.github.io/eng-practices/review/developer/small-cls.html) uses review burden and context, not a universal line or file limit.
-[Artstein and Poesio's survey](https://aclanthology.org/J08-4004/) explains agreement measures and their assumptions.
-[Datasheets for Datasets](https://doi.org/10.1145/3458723) supports records of composition, collection, and limitations.
-These sources inform review and evaluation design.
-They do not prove that a particular practice or model is accurate.
+1. Enter the practice's name and stable identifier.
+2. Select its kind of work.
+3. Write what the work must do to meet the practice.
+4. Describe the facts that make the practice inapplicable.
+5. Describe the consequence that justifies each problem's severity.
+
+An optional improvement is not a problem.
+A broad claim needs evidence for its full boundary.
+A search can prove absence only within a complete bounded corpus.
+The [outcome contract](/contributor/practice-feedback-language#result-outcomes) owns the four verdicts.
+
+## Select review evidence
+
+Review on selects events. When selects their recorded state for automatic review.
+Applies when governs every origin, including a request.
+A request does not bypass source access, scope or consent.
+
+About selects Author, Reviewer, Assignee or Merger.
+Choose The work when the result concerns no developer.
+A selected role must resolve to one eligible human account.
+A missing or ambiguous role withholds the practice instead of choosing a person.
+
+Reads retains the source contract and required, complete or optional sources.
+Required capture failure never becomes a semantic outcome.
+Do not list optional evidence as sufficient proof of exhaustive coverage.
+
+## Choose who reviews
+
+Reviewed by has three choices:
+
+- Hephaestus: automated review within the declared evidence boundary.
+- People: human review, with the reason automation cannot decide.
+- Nobody: guidance without automated review.
+
+Keep the human reason and known limits with this choice.
+Do not duplicate them in a second rubric.
+Feedback mode is a separate delivery setting. Off does not stop eligible result recording.
+
+## Add a script and scan support
+
+A null Script uses the built-in script.
+A custom script can prepare model review or decide from exact captured records.
+The [script guide](./practice-scripts.mdx) owns its author contract and tests.
+An invalid custom script never falls back silently.
+
+Scan support declares selected files and context explicitly.
+It is available only for practices with a valid repository-state form.
+A duty at a change event cannot gain a scan form by ignoring that event.
+A scan result concerns the file and has no developer.
+
+## Write guidance
+
+Why it matters explains the practice's purpose.
+What good looks like describes work that meets it.
+Going well describes what the developer keeps doing when supported results establish that pattern.
+Visual and Guide use the existing validated picture and Markdown controls.
+Guidance does not add a new criterion or change the evidence standard.
+
+## Save or reset
+
+Saving a changed definition creates a fixed practice version.
+Earlier results retain their original definition.
+A name, group or guidance change does not change the review standard digest.
+Reuse still requires the exact practice version and method.
+Reset removes local customization through the catalog comparison.
+Check the displayed changes before resetting.

@@ -4,241 +4,49 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.AdmittedResultFixtures;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalog;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
-import tools.jackson.databind.ObjectMapper;
 
 class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
-
-    private static final ObjectMapper MAPPER = new ObjectMapper();
-
     @Test
-    void permitsCanonicalEvidenceForTheRequestedAudience() {
-        AgentJobRepository jobs = mock(AgentJobRepository.class);
-        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        UUID jobId = UUID.randomUUID();
-        when(jobs.findEvidenceContractVersion(jobId, 7L)).thenReturn(Optional.of("1.3.0"));
-        when(catalogs.isSourceUsePermitted(
-                        new SourceContractVersion("1.3.0"),
-                        new SourceKind("scm.pull-request.diff"),
-                        SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
-                .thenReturn(true);
-
-        assertThat(new EvidenceDeliveryAuthorization(
-                                jobs,
-                                catalogs,
-                                mock(
-                                        CitedSourceAccess.class,
-                                        call -> call.getMethod().getName().equals("checks")
-                                                ? (CitedSourceAccess.Checks) citation -> true
-                                                : Mockito.RETURNS_DEFAULTS.answer(call)))
-                        .permits(
-                                7L,
-                                PracticeResult.builder()
-                                        .scopeKey("test-scope")
-                                        .agentJobId(jobId)
-                                        .evidence(MAPPER.readTree(
-                                                "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"))
-                                        .build(),
-                                SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
-                .isTrue();
-    }
-
-    @Test
-    void rejectsMissingOrMalformedCitationSources() {
-        AgentJobRepository jobs = mock(AgentJobRepository.class);
-        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        EvidenceDeliveryAuthorization authorization = new EvidenceDeliveryAuthorization(
-                jobs,
-                catalogs,
-                mock(
-                        CitedSourceAccess.class,
-                        call -> call.getMethod().getName().equals("checks")
-                                ? (CitedSourceAccess.Checks) citation -> true
-                                : Mockito.RETURNS_DEFAULTS.answer(call)));
-        UUID malformedJobId = UUID.randomUUID();
-        when(jobs.findEvidenceContractVersion(malformedJobId, 7L)).thenReturn(Optional.of("1.3.0"));
-
-        assertThat(authorization.permits(
-                        7L,
-                        PracticeResult.builder().scopeKey("test-scope").build(),
-                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .isFalse();
-        for (String evidence :
-                List.of("{\"citations\":[]}", "{\"citations\":[{\"sourceKind\":7}]}", "{\"citations\":[{}]}")) {
-            PracticeResult result = PracticeResult.builder()
-                    .scopeKey("test-scope")
-                    .agentJobId(malformedJobId)
-                    .evidence(MAPPER.readTree(evidence))
-                    .build();
-            assertThat(authorization.permits(7L, result, SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                    .isFalse();
-        }
-    }
-
-    /**
-     * The batched answer must equal the per-row answer: a batch admitting what the row form denies would
-     * publish evidence nobody may cite, invisibly to any UI.
-     *
-     * <p>The set mixes both ways a contract version can fail to arrive — no row for the run, and a row
-     * whose snapshot recorded none — since the single-row form collapses both into an empty
-     * {@link Optional} and a batch that mapped a missing key to anything but "denied" would only fail here.
-     */
-    @Test
-    void batchedAuthorizationDecidesEveryResultTheWayTheSingleRowFormDoes() {
-        AgentJobRepository jobs = mock(AgentJobRepository.class);
-        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        EvidenceDeliveryAuthorization authorization = new EvidenceDeliveryAuthorization(
-                jobs,
-                catalogs,
-                mock(
-                        CitedSourceAccess.class,
-                        call -> call.getMethod().getName().equals("checks")
-                                ? (CitedSourceAccess.Checks) citation -> true
-                                : Mockito.RETURNS_DEFAULTS.answer(call)));
-
-        PracticeResult permittedSource = practiceResult("scm.pull-request.diff");
-        PracticeResult deniedSource = practiceResult("hephaestus.observation-history");
-        PracticeResult runMissing = practiceResult("scm.pull-request.diff");
-        PracticeResult snapshotless = practiceResult("scm.pull-request.diff");
-        List<PracticeResult> practiceResults = List.of(permittedSource, deniedSource, runMissing, snapshotless);
-
-        when(jobs.findEvidenceContractVersions(eq(7L), any()))
-                .thenReturn(List.of(
-                        new ContractRow(permittedSource.getAgentJobId(), "1.3.0"),
-                        new ContractRow(deniedSource.getAgentJobId(), "1.3.0"),
-                        new ContractRow(snapshotless.getAgentJobId(), null)));
-        when(jobs.findEvidenceContractVersion(permittedSource.getAgentJobId(), 7L))
-                .thenReturn(Optional.of("1.3.0"));
-        when(jobs.findEvidenceContractVersion(deniedSource.getAgentJobId(), 7L)).thenReturn(Optional.of("1.3.0"));
-        when(jobs.findEvidenceContractVersion(runMissing.getAgentJobId(), 7L)).thenReturn(Optional.empty());
-        when(jobs.findEvidenceContractVersion(snapshotless.getAgentJobId(), 7L)).thenReturn(Optional.empty());
-        when(catalogs.isSourceUsePermitted(
-                        new SourceContractVersion("1.3.0"),
-                        new SourceKind("scm.pull-request.diff"),
-                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .thenReturn(true);
-        when(catalogs.isSourceUsePermitted(
-                        new SourceContractVersion("1.3.0"),
-                        new SourceKind("hephaestus.observation-history"),
-                        SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .thenReturn(false);
-
-        Set<UUID> batched = authorization.permitsAll(7L, practiceResults, SourceUsePurpose.CONVERSATIONAL_MENTORING);
-
-        assertThat(batched).containsExactly(permittedSource.getId());
-        for (PracticeResult practiceResult : practiceResults) {
-            assertThat(batched.contains(practiceResult.getId()))
-                    .as("batched verdict for job %s", practiceResult.getAgentJobId())
-                    .isEqualTo(authorization.permits(7L, practiceResult, SourceUsePurpose.CONVERSATIONAL_MENTORING));
-        }
-        verify(jobs).findEvidenceContractVersions(eq(7L), any());
-    }
-
-    /**
-     * A result never persisted has no id to hand back, so membership cannot say "permitted" for
-     * it; denying is the safe direction, matching every read surface's own assumption that it authorizes
-     * rows it loaded.
-     */
-    @Test
-    void deniesAResultThatWasNeverPersisted() {
-        AgentJobRepository jobs = mock(AgentJobRepository.class);
-        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        PracticeResult transientResult = PracticeResult.builder()
-                .scopeKey("test-scope")
-                .agentJobId(UUID.randomUUID())
-                .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\"}]}"))
-                .build();
-
-        assertThat(new EvidenceDeliveryAuthorization(
-                                jobs,
-                                catalogs,
-                                mock(
-                                        CitedSourceAccess.class,
-                                        call -> call.getMethod().getName().equals("checks")
-                                                ? (CitedSourceAccess.Checks) citation -> true
-                                                : Mockito.RETURNS_DEFAULTS.answer(call)))
-                        .permitsAll(7L, List.of(transientResult), SourceUsePurpose.CONVERSATIONAL_MENTORING))
-                .isEmpty();
-        verifyNoInteractions(jobs);
-    }
-
-    @Test
-    void shouldRequireVerifiedCitationsOnlyForNewDelivery() {
-        AgentJobRepository jobs = mock(AgentJobRepository.class);
-        ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        var practiceResult = practiceResult("scm.pull-request.diff");
-        UUID jobId = practiceResult.getAgentJobId();
-        when(jobs.findEvidenceContractVersions(eq(7L), any())).thenReturn(List.of(new ContractRow(jobId, "1.3.0")));
-        when(catalogs.isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
-                .thenReturn(true);
-        var authorization = new EvidenceDeliveryAuthorization(
-                jobs,
-                catalogs,
-                mock(
-                        CitedSourceAccess.class,
-                        call -> call.getMethod().getName().equals("checks")
-                                ? (CitedSourceAccess.Checks) citation -> true
-                                : Mockito.RETURNS_DEFAULTS.answer(call)));
-        assertThat(authorization.permitsAll(7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .containsExactly(practiceResult.getId());
-        assertThat(authorization.permitsForNewDelivery(
-                        7L, List.of(practiceResult), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .isEmpty();
-        PracticeResult verified = PracticeResult.builder()
-                .scopeKey("test-scope")
-                .id(practiceResult.getId())
-                .agentJobId(jobId)
-                .evidence(AdmittedResultFixtures.evidence(jobId, "scm.pull-request.diff"))
-                .build();
-        assertThat(authorization.permitsForNewDelivery(
-                        7L, List.of(verified), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
-                .containsExactly(verified.getId());
-    }
-
-    private static PracticeResult practiceResult(String sourceKind) {
-        return PracticeResult.builder()
-                .scopeKey("test-scope")
+    void keepsVerifiedDeliveryIndependentOfRuntimeJobRetention() {
+        var sources = mock(SourceCatalogRegistry.class);
+        var access = mock(CitedSourceAccess.class);
+        var catalog = mock(SourceCatalog.class);
+        when(catalog.version()).thenReturn(new SourceContractVersion("2.0.0"));
+        when(sources.current()).thenReturn(catalog);
+        var authorization = new EvidenceDeliveryAuthorization(sources, access);
+        var result = Result.builder()
                 .id(UUID.randomUUID())
-                .agentJobId(UUID.randomUUID())
-                .evidence(MAPPER.readTree("{\"citations\":[{\"sourceKind\":\"" + sourceKind + "\"}]}"))
+                .workspaceId(1)
+                .developerId(2L)
+                .evidence(AdmittedResultFixtures.evidence("docs.document.core"))
                 .build();
-    }
-
-    private record ContractRow(UUID id, @Nullable String contractVersion)
-            implements AgentJobRepository.EvidenceContractVersionRow {
-        @Override
-        public int getAttempt() {
-            return 0;
-        }
-
-        @Override
-        public UUID getId() {
-            return id;
-        }
-
-        @Override
-        @Nullable
-        public String getContractVersion() {
-            return contractVersion;
-        }
+        when(access.permits(1, result.getId(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(true);
+        when(sources.isSourceUsePermitted(any(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+                .thenReturn(true);
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .containsExactly(result.getId());
+        result.setEvidenceVersion((short) 0);
+        assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isEmpty();
+        when(access.permits(1, result.getId(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(false);
+        assertThat(authorization.permits(1, result, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+        assertThat(authorization.permits(9, result, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
     }
 }

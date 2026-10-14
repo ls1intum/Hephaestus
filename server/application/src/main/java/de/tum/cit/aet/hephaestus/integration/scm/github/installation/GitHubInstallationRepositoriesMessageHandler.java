@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.installation;
 
 import de.tum.cit.aet.hephaestus.integration.core.handler.AbstractIntegrationMessageHandler;
+import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ProvisioningListener.RepositorySnapshot;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeserializer;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
 import de.tum.cit.aet.hephaestus.integration.scm.github.installation.dto.GitHubInstallationRepositoriesEventDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.repository.dto.GitHubRepositoryRefDTO;
@@ -17,9 +17,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Handles GitHub installation_repositories webhook events.
- * <p>
- * When repositories are added or removed from a GitHub App installation,
- * this handler notifies the consuming module via SPI to update monitored repositories.
+ *
+ * <p>When repositories are added or removed from a GitHub App installation, this handler notifies
+ * the consuming module via SPI to update monitored repositories.
  */
 @Component
 public class GitHubInstallationRepositoriesMessageHandler
@@ -56,7 +56,8 @@ public class GitHubInstallationRepositoriesMessageHandler
                 event.repositoriesRemoved() != null ? event.repositoriesRemoved() : List.of();
 
         log.debug(
-                "Received installation_repositories event: action={}, installationId={}, addedCount={}, removedCount={}",
+                "Received installation_repositories event: action={}, installationId={},"
+                        + " addedCount={}, removedCount={}",
                 event.action(),
                 installation.id(),
                 added.size(),

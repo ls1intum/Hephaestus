@@ -30,11 +30,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.connect.GitHubConnectionStrategy;
 import de.tum.cit.aet.hephaestus.integration.scm.github.workspace.GitHubWorkspaceProvisioningAdapter;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.connect.GitLabConnectionStrategy;
+import de.tum.cit.aet.hephaestus.integration.scm.workspace.adapter.ScmWorkspacePurgeAdapter;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
-import de.tum.cit.aet.hephaestus.workspace.adapter.ScmWorkspacePurgeAdapter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -53,8 +53,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * their children carry no {@code workspace_id} and are genuinely shared between workspaces that
  * monitor the same source repository. An erase that simply deleted "the workspace's repositories"
  * would destroy another tenant's data. A repository two workspaces monitor must survive one of them
- * disconnecting, together with its issues, while a repository only the erased workspace monitored is
- * cascade-deleted with everything hanging off it.
+ * disconnecting, together with its issues, while a repository only the erased workspace monitored
+ * is cascade-deleted with everything hanging off it.
  *
  * <p>Also pins idempotency (the erase is re-runnable) and the retention decisions: another
  * integration's rows and the {@code sync_job} history are NOT erased.
@@ -198,7 +198,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("erasure is surgical: another integration's rows and the retained sync history both survive")
+    @DisplayName("erasure is surgical: another integration's rows and the retained sync history both" + " survive")
     void erase_leavesOtherIntegrationsAndRetainedHistoryAlone() {
         SlackThread slackThread = new SlackThread();
         slackThread.setWorkspaceId(tenantA.getId());
@@ -220,8 +220,10 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
         eraser.eraseWorkspaceScmMirror(tenantA.getId());
 
-        // Slack is erased by its own eraser on its own disconnect — an SCM disconnect must not reach it.
-        // Counted through JDBC: slack_thread is workspace-scoped, so an unscoped JPA count() would be
+        // Slack is erased by its own eraser on its own disconnect — an SCM disconnect must not
+        // reach it.
+        // Counted through JDBC: slack_thread is workspace-scoped, so an unscoped JPA count() would
+        // be
         // rejected by the tenancy statement inspector.
         assertThat(countRows("slack_thread")).isEqualTo(1);
         // sync_job is retained: operational audit carries no mirrored third-party content.
@@ -263,10 +265,11 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
     /**
      * The {@code Workspace.organization} binding is <b>exclusive</b>, not shared: it is a
      * {@code @OneToOne} on a {@code unique = true} {@code organization_id} column ({@code
-     * workspace_organization_id_key}), so an organization backs at most ONE workspace. If a disconnect
-     * erased the org-tier mirror but kept the FK, the workspace would squat the organization forever —
-     * no other workspace could ever install it without violating the unique constraint, and a disconnect
-     * does not purge the workspace. The erase must therefore release the link.
+     * workspace_organization_id_key}), so an organization backs at most ONE workspace. If a
+     * disconnect erased the org-tier mirror but kept the FK, the workspace would squat the
+     * organization forever — no other workspace could ever install it without violating the unique
+     * constraint, and a disconnect does not purge the workspace. The erase must therefore release
+     * the link.
      */
     @Test
     @DisplayName("disconnect erases the org-tier mirror and releases the organization for re-binding")
@@ -289,7 +292,8 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         // The Organization identity row itself is global and survives — never deleted.
         assertThat(organizationRepository.findById(organization.getId())).isPresent();
 
-        // The released organization's single binding slot (workspace_organization_id_key) is now free
+        // The released organization's single binding slot (workspace_organization_id_key) is now
+        // free
         // to be bound again.
         bindOrganization(tenantB, organization);
         assertThat(organizationIdOf(tenantB)).isEqualTo(organization.getId());
@@ -327,15 +331,15 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
                 .as("tenant B still monitors the repository")
                 .isPresent();
         assertThat(jdbcTemplate.queryForList(
-                        "SELECT team_id FROM pull_request_requested_team WHERE pull_request_id = ?",
+                        "SELECT team_id FROM pull_request_requested_team WHERE" + " pull_request_id = ?",
                         Long.class,
                         stored.getId()))
                 .isEmpty();
     }
 
     /**
-     * A vendor-side {@code installation.deleted} must run the same purge chain an admin deletion runs,
-     * not just write {@code status=PURGED}: writing the label directly skips every {@code
+     * A vendor-side {@code installation.deleted} must run the same purge chain an admin deletion
+     * runs, not just write {@code status=PURGED}: writing the label directly skips every {@code
      * WorkspacePurgeContributor} bean, leaving Slack/Outline content, org-tier rows and an ACTIVE
      * Connection alive behind a "purged" label.
      */
@@ -406,7 +410,7 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
 
     private void bindOrganization(Workspace workspace, Organization organization) {
         Workspace managed = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        managed.setOrganization(organization);
+        managed.setOrganizationId(organization.getId());
         workspaceRepository.save(managed);
     }
 
@@ -423,7 +427,9 @@ class ScmWorkspaceErasureIntegrationTest extends BaseIntegrationTest {
         return teamRepository.save(team);
     }
 
-    /** The workspace's {@code organization_id} FK, read as a column so no lazy proxy is involved. */
+    /**
+     * The workspace's {@code organization_id} FK, read as a column so no lazy proxy is involved.
+     */
     private @Nullable Long organizationIdOf(Workspace workspace) {
         return jdbcTemplate.queryForObject(
                 "SELECT organization_id FROM workspace WHERE id = ?", Long.class, workspace.getId());

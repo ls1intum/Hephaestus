@@ -1,8 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone;
 
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepositoryScopeFilter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScopeIdResolver;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
@@ -13,6 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.MilestoneRepos
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.BaseGitLabProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabProperties;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.milestone.dto.GitLabMilestoneDTO;
@@ -33,21 +33,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Processor for GitLab milestones.
- * <p>
- * Converts {@link GitLabMilestoneDTO} to {@link Milestone} entities, persists them,
- * and publishes domain events. Extends {@link BaseGitLabProcessor} for shared
- * utilities (timestamp parsing, sanitization, GitLab properties).
- * <p>
- * <b>State mapping:</b>
+ *
+ * <p>Converts {@link GitLabMilestoneDTO} to {@link Milestone} entities, persists them, and
+ * publishes domain events. Extends {@link BaseGitLabProcessor} for shared utilities (timestamp
+ * parsing, sanitization, GitLab properties).
+ *
+ * <p><b>State mapping:</b>
+ *
  * <ul>
- *   <li>GitLab {@code "active"} &rarr; {@link Milestone.State#OPEN}</li>
- *   <li>GitLab {@code "closed"} &rarr; {@link Milestone.State#CLOSED}</li>
+ *   <li>GitLab {@code "active"} &rarr; {@link Milestone.State#OPEN}
+ *   <li>GitLab {@code "closed"} &rarr; {@link Milestone.State#CLOSED}
  * </ul>
- * <p>
- * <b>Group milestone handling:</b>
- * Group milestones share a single global ID across all projects. To avoid
- * {@code (provider_id, native_id)} constraint violations, group milestones use
- * a deterministic negative nativeId based on (repositoryId, iid).
+ *
+ * <p><b>Group milestone handling:</b> Group milestones share a single global ID across all
+ * projects. To avoid {@code (provider_id, native_id)} constraint violations, group milestones use a
+ * deterministic negative nativeId based on (repositoryId, iid).
  */
 @Service
 public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
@@ -84,12 +84,12 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
     /**
      * Processes a GitLab milestone DTO and persists it as a Milestone entity.
-     * <p>
-     * Lookup is always by (iid, repository_id) — the canonical unique key.
      *
-     * @param dto        the GitLab milestone DTO
+     * <p>Lookup is always by (iid, repository_id) — the canonical unique key.
+     *
+     * @param dto the GitLab milestone DTO
      * @param repository the repository this milestone belongs to
-     * @param context    processing context with scope information
+     * @param context processing context with scope information
      * @return the persisted Milestone entity, or null if the DTO is invalid
      */
     @Transactional
@@ -113,7 +113,8 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
         Milestone milestone = existingOpt.orElseGet(Milestone::new);
 
-        // Handle nativeId: group milestones use deterministic ID to avoid (provider_id, native_id) collisions
+        // Handle nativeId: group milestones use deterministic ID to avoid (provider_id, native_id)
+        // collisions
         if (isNew) {
             if (dto.groupMilestone()) {
                 milestone.setNativeId(generateDeterministicMilestoneId(repository.getId(), dto.iid()));
@@ -203,7 +204,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
      * Deletes a milestone by its number and repository, cleaning up issue references first.
      *
      * @param milestoneId the milestone database PK
-     * @param context     processing context with scope information
+     * @param context processing context with scope information
      */
     @Transactional
     public void delete(@Nullable Long milestoneId, ProcessingContext context) {
@@ -214,7 +215,7 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
         milestoneRepository.findById(milestoneId).ifPresent(milestone -> {
             int clearedCount = issueRepository.clearMilestoneReferences(milestoneId);
             if (clearedCount > 0) {
-                log.debug("Cleared milestone references from {} issues before deletion", clearedCount);
+                log.debug("Cleared milestone references from {} issues before" + " deletion", clearedCount);
             }
 
             milestoneRepository.delete(milestone);
@@ -226,8 +227,9 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
     /**
      * Maps GitLab milestone state to the Milestone.State enum.
-     * <p>
-     * GitLab uses {@code "active"}/{@code "closed"} (different from GitHub's {@code "open"}/{@code "closed"}).
+     *
+     * <p>GitLab uses {@code "active"}/{@code "closed"} (different from GitHub's {@code
+     * "open"}/{@code "closed"}).
      */
     static Milestone.State parseState(String state) {
         if (state == null) {
@@ -245,10 +247,10 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
     /**
      * Generates a deterministic negative nativeId for group milestones.
-     * <p>
-     * Group milestones share a single global ID across all projects in the group.
-     * Using the real global ID would cause {@code (provider_id, native_id)} constraint
-     * violations when the same group milestone is stored for multiple projects.
+     *
+     * <p>Group milestones share a single global ID across all projects in the group. Using the real
+     * global ID would cause {@code (provider_id, native_id)} constraint violations when the same
+     * group milestone is stored for multiple projects.
      */
     private static long generateDeterministicMilestoneId(long repositoryId, int iid) {
         long combined = (repositoryId << 32) | (iid & 0xFFFFFFFFL);
@@ -267,7 +269,10 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
         }
         // Fallback: construct from repository nameWithOwner
         if (repository.getNameWithOwner() != null) {
-            return (gitLabProperties.defaultServerUrl() + "/" + repository.getNameWithOwner() + "/-/milestones/"
+            return (gitLabProperties.defaultServerUrl()
+                    + "/"
+                    + repository.getNameWithOwner()
+                    + "/-/milestones/"
                     + dto.iid());
         }
         return null;
@@ -275,10 +280,9 @@ public class GitLabMilestoneProcessor extends BaseGitLabProcessor {
 
     /**
      * Parses a date string to an Instant at midnight UTC.
-     * <p>
-     * Handles both date-only strings ({@code "2026-06-01"}) and full ISO-8601
-     * timestamps ({@code "2026-06-01T00:00:00Z"}) for resilience against
-     * GitLab API format changes.
+     *
+     * <p>Handles both date-only strings ({@code "2026-06-01"}) and full ISO-8601 timestamps ({@code
+     * "2026-06-01T00:00:00Z"}) for resilience against GitLab API format changes.
      */
     @Nullable
     static Instant parseDateToInstant(@Nullable String dateStr) {

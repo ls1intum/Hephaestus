@@ -30,7 +30,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-runner-usage.ts",
             "pi-runner-retry.ts",
             "pi-runner-composition.ts",
-            "pi-public-completion.ts",
+            "pi-feedback-preparation.ts",
             "pi-session-lifecycle.ts",
             SandboxLayout.PROVIDER_HELPER_FILENAME);
 

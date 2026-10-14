@@ -2,170 +2,64 @@ package de.tum.cit.aet.hephaestus.agent.adapter;
 
 import de.tum.cit.aet.hephaestus.agent.context.CitedSourceAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.CitationVerification;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
-import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultCitations;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Supplier;
-import org.jspecify.annotations.Nullable;
+import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.JsonNodeFactory;
 
+/** Delivery checks retained proof and live visibility without requiring a retained runtime job. */
 @Component
+@RequiredArgsConstructor
 public class EvidenceDeliveryAuthorization implements EvidenceAuthorization {
-
-    private final AgentJobRepository jobRepository;
-    private final ArtifactSourceCatalogRegistry sourceCatalogs;
-    private final CitedSourceAccess citedSourceAccess;
-
-    public EvidenceDeliveryAuthorization(
-            AgentJobRepository jobRepository,
-            ArtifactSourceCatalogRegistry sourceCatalogs,
-            CitedSourceAccess citedSourceAccess) {
-        this.jobRepository = jobRepository;
-        this.sourceCatalogs = sourceCatalogs;
-        this.citedSourceAccess = citedSourceAccess;
-    }
+    private final SourceCatalogRegistry sourceCatalogs;
+    private final CitedSourceAccess access;
 
     @Override
-    public boolean permits(long workspaceId, PracticeResult practiceResult, SourceUsePurpose requestedPurpose) {
-        UUID jobId = practiceResult.getAgentJobId();
-        // Every place the result cites, its problems', its example's and its open questions' included.
-        return permitsCited(
-                workspaceId, jobId, citationsOrNull(jobId, ResultCitations.all(practiceResult)), requestedPurpose);
-    }
-
-    private boolean permitsCited(
-            long workspaceId, @Nullable UUID jobId, @Nullable JsonNode citations, SourceUsePurpose requestedPurpose) {
-        if (jobId == null || citations == null) {
-            return false;
-        }
-        return jobRepository
-                .findEvidenceContractVersion(jobId, workspaceId)
-                .map(contractVersion -> {
-                    var sources = citedSourceAccess.checks(workspaceId, requestedPurpose);
-                    sources.prepare(citations);
-                    return permits(contractVersion, citations, requestedPurpose, sources);
-                })
-                .orElse(false);
-    }
-
-    @Override
-    public Set<UUID> permitsAll(
-            long workspaceId, Collection<PracticeResult> practiceResults, SourceUsePurpose requestedPurpose) {
-        return permitsBatch(workspaceId, practiceResults, requestedPurpose, false);
-    }
-
-    @Override
-    public Set<UUID> permitsForNewDelivery(
-            long workspaceId, Collection<PracticeResult> practiceResults, SourceUsePurpose requestedPurpose) {
-        return permitsBatch(workspaceId, practiceResults, requestedPurpose, true);
-    }
-
-    private Set<UUID> permitsBatch(
-            long workspaceId,
-            Collection<PracticeResult> practiceResults,
-            SourceUsePurpose requestedPurpose,
-            boolean newDelivery) {
-        List<Citable> citable = new ArrayList<>();
-        Set<UUID> jobIds = new HashSet<>();
-        for (PracticeResult practiceResult : practiceResults) {
-            UUID practiceResultId = practiceResult.getId();
-            UUID jobId = practiceResult.getAgentJobId();
-            // Every place the result cites, its problems', its example's and its open questions'
-            // included.
-            JsonNode citations = citationsOrNull(jobId, ResultCitations.all(practiceResult));
-            if (practiceResultId == null || jobId == null || citations == null) {
-                continue;
-            }
-            citable.add(new Citable(practiceResultId, jobId, citations));
-            jobIds.add(jobId);
-        }
-        if (citable.isEmpty()) {
-            return Set.of();
-        }
-        // A run outside this workspace has no row and a run that recorded no evidence has a null value.
-        // Dropping both here is what makes an absent key mean "not permitted", which is the answer the
-        // empty Optional carries on the single-row path.
-        Map<UUID, AgentJobRepository.EvidenceContractVersionRow> contractVersions = new HashMap<>();
-        for (var row : jobRepository.findEvidenceContractVersions(workspaceId, jobIds)) {
-            if (row.getContractVersion() != null) {
-                contractVersions.put(row.getId(), row);
-            }
-        }
-        // One set of source checks for the whole batch: results citing the same source share its
-        // answer.
-        CitedSourceAccess.Checks sources = citedSourceAccess.checks(workspaceId, requestedPurpose);
-        // And one batch per kind of history record the batch cites, rather than one check per record.
-        List<JsonNode> cited = new ArrayList<>();
-        for (Citable entry : citable) {
-            if (contractVersions.containsKey(entry.jobId())) entry.citations().forEach(cited::add);
-        }
-        sources.prepare(cited);
-        Set<UUID> permitted = new HashSet<>();
-        for (Citable entry : citable) {
-            var row = contractVersions.get(entry.jobId());
-            if (row == null || row.getContractVersion() == null) continue;
-            if (newDelivery && !CitationVerification.isVerified(entry.jobId(), row.getAttempt(), entry.citations())) {
-                continue;
-            }
-            if (permits(row.getContractVersion(), entry.citations(), requestedPurpose, sources)) {
-                permitted.add(entry.practiceResultId());
-            }
-        }
-        return permitted;
-    }
-
-    @Override
-    public <T> T asOneRead(long workspaceId, SourceUsePurpose purpose, Supplier<T> read) {
-        return citedSourceAccess.asOneRead(workspaceId, purpose, read);
-    }
-
-    private record Citable(UUID practiceResultId, UUID jobId, JsonNode citations) {}
-
-    @Nullable
-    private static JsonNode citationsOrNull(@Nullable UUID jobId, List<JsonNode> cited) {
-        if (jobId == null || cited.isEmpty()) {
-            return null;
-        }
-        ArrayNode citations = JsonNodeFactory.instance.arrayNode();
-        cited.forEach(citations::add);
-        return citations;
-    }
-
-    private boolean permits(
-            String contractVersion,
-            JsonNode citations,
-            SourceUsePurpose requestedPurpose,
-            CitedSourceAccess.Checks sources) {
+    public boolean permits(long workspaceId, Result result, SourceUsePurpose purpose) {
+        if (result.getId() == null || result.getWorkspaceId() != workspaceId) return false;
+        if (!access.permits(workspaceId, result.getId(), purpose)) return false;
+        var citations = ResultCitations.all(result);
+        if (citations.isEmpty()) return false;
         try {
-            SourceContractVersion version = new SourceContractVersion(contractVersion);
-            for (JsonNode citation : citations) {
-                JsonNode sourceKind = citation.path("sourceKind");
-                if (!sourceKind.isString()
-                        || !sourceCatalogs.isSourceUsePermitted(
-                                version, new SourceKind(sourceKind.asString()), requestedPurpose)
-                        || !sources.permits(citation)) {
-                    return false;
-                }
+            for (var citation : citations) {
+                if (!sourceCatalogs.isSourceUsePermitted(
+                        sourceCatalogs.current().version(),
+                        new SourceKind(citation.path("sourceKind").asString()),
+                        purpose)) return false;
             }
             return true;
-        } catch (IllegalArgumentException exception) {
+        } catch (IllegalArgumentException unknownSource) {
             return false;
         }
+    }
+
+    @Override
+    public Set<UUID> permitsAll(long workspaceId, Collection<Result> results, SourceUsePurpose purpose) {
+        return results.stream()
+                .filter(result -> permits(workspaceId, result, purpose))
+                .map(Result::getId)
+                .collect(Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public Set<UUID> permitsForNewDelivery(long workspaceId, Collection<Result> results, SourceUsePurpose purpose) {
+        return results.stream()
+                .filter(result -> result.getEvidenceVersion() == 1 && permits(workspaceId, result, purpose))
+                .filter(result -> {
+                    var citations = JsonNodeFactory.instance.arrayNode();
+                    ResultCitations.all(result).forEach(citations::add);
+                    return CitationVerification.isVerified(citations);
+                })
+                .map(Result::getId)
+                .collect(Collectors.toUnmodifiableSet());
     }
 }

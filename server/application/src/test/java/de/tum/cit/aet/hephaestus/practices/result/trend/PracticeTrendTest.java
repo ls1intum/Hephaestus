@@ -5,8 +5,8 @@ import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.noVe
 import static de.tum.cit.aet.hephaestus.practices.result.trend.TrendResults.problem;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Tag;
@@ -20,8 +20,8 @@ class PracticeTrendTest {
 
     @Test
     void shouldCountBackFromTheNewestWhenAProblemEndsTheCleanRun() {
-        PracticeResult older = clean(3L, "2026-05-03T09:00:00Z");
-        PracticeResult newest = clean(4L, "2026-05-04T09:00:00Z");
+        ResultView older = clean(3L, "2026-05-03T09:00:00Z");
+        ResultView newest = clean(4L, "2026-05-04T09:00:00Z");
         PracticeTrend.CleanWork cleanWork = trend(
                         clean(1L, "2026-05-01T09:00:00Z"), problem(2L, "2026-05-02T09:00:00Z"), older, newest)
                 .cleanWork();
@@ -29,8 +29,9 @@ class PracticeTrendTest {
         assertThat(cleanWork.count()).isEqualTo(2);
         assertThat(cleanWork.decidedWork()).isEqualTo(4);
         assertThat(cleanWork.since()).isEqualTo(Instant.parse("2026-05-03T09:00:00Z"));
-        assertThat(cleanWork.kind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
-        assertThat(cleanWork.jobIds()).containsExactly(newest.getAgentJobId(), older.getAgentJobId());
+        assertThat(cleanWork.kind()).isEqualTo(new ItemKind("scm.pull_request"));
+        assertThat(cleanWork.reviewIds())
+                .containsExactly(newest.result().getReviewId(), older.result().getReviewId());
     }
 
     @Test
@@ -51,13 +52,13 @@ class PracticeTrendTest {
     @Test
     void shouldNameTheMajorityKindWhenTheCleanRunMixesKinds() {
         PracticeTrend.CleanWork cleanWork = trend(
-                        clean(1L, "2026-05-01T09:00:00Z", ArtifactKinds.ISSUE),
-                        clean(2L, "2026-05-02T09:00:00Z", ArtifactKinds.PULL_REQUEST),
-                        clean(3L, "2026-05-03T09:00:00Z", ArtifactKinds.PULL_REQUEST))
+                        clean(1L, "2026-05-01T09:00:00Z", new ItemKind("scm.issue")),
+                        clean(2L, "2026-05-02T09:00:00Z", new ItemKind("scm.pull_request")),
+                        clean(3L, "2026-05-03T09:00:00Z", new ItemKind("scm.pull_request")))
                 .cleanWork();
 
         assertThat(cleanWork.count()).isEqualTo(3);
-        assertThat(cleanWork.kind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
+        assertThat(cleanWork.kind()).isEqualTo(new ItemKind("scm.pull_request"));
     }
 
     @Test
@@ -72,7 +73,7 @@ class PracticeTrendTest {
         assertThat(cleanWork.since()).isNull();
     }
 
-    private PracticeTrend trend(PracticeResult... practiceResults) {
+    private PracticeTrend trend(ResultView... practiceResults) {
         return PracticeTrendCalculator.calculatePractice("testing", List.of(practiceResults), CUTOFF, properties);
     }
 }

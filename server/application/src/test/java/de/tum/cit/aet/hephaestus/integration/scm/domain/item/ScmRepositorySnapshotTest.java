@@ -1,0 +1,74 @@
+package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.GeneralReviewCommentContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.IssueContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.LinkedWorkItemContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.PullRequestContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.RepositoryTreeContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewThreadContentSource;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.jdbc.core.JdbcTemplate;
+import tools.jackson.databind.ObjectMapper;
+
+class ScmRepositorySnapshotTest extends BaseUnitTest {
+    @ParameterizedTest
+    @ValueSource(strings = {"main", "release/1.0"})
+    void shouldExposeTheActualDefaultBranchAlongsideThePinnedCommit(String branch) {
+        var items = mock(ScmItemAccess.class);
+        var rows = mock(RepositoryRepository.class);
+        var access = mock(ScmRepositoryAccess.class);
+        var tree = mock(ScmGitTree.class);
+        var ref = new ItemRef(1, 2, ScmItemEvents.REPOSITORY, 3L, null, null);
+        var repository = new Repository();
+        repository.setId(3L);
+        repository.setDefaultBranch(branch);
+        repository.setNameWithOwner("owner/repository");
+        var key = new RepositoryKey(1, 3);
+        when(items.require(ref)).thenReturn(ref);
+        when(rows.findById(3L)).thenReturn(Optional.of(repository));
+        when(access.authorize(1, repository)).thenReturn(new IntegrationRef(IntegrationKind.GITHUB, 1, null));
+        when(access.prepare(1, repository)).thenReturn(key);
+        when(tree.resolve(key, "refs/heads/" + branch)).thenReturn("a".repeat(40));
+        when(tree.inventory(key, "a".repeat(40))).thenReturn(List.of());
+        var service = new ScmItemService(
+                items,
+                mock(ScmItemLabelQuery.class),
+                access,
+                rows,
+                mock(IssueRepository.class),
+                mock(PullRequestReviewRepository.class),
+                mock(UserRepository.class),
+                mock(IssueEvidenceVersion.class),
+                tree,
+                mock(ScmFileVersions.class),
+                mock(ScmCaptureConsent.class),
+                mock(JdbcTemplate.class),
+                new ObjectMapper(),
+                mock(PullRequestContentSource.class),
+                mock(IssueContentSource.class),
+                mock(GeneralReviewCommentContentSource.class),
+                mock(ReviewThreadContentSource.class),
+                mock(LinkedWorkItemContentSource.class),
+                mock(RepositoryTreeContentSource.class));
+        var snapshot = service.pin(ref, null);
+        assertThat(snapshot.state()).containsEntry("defaultBranch", branch);
+        assertThat(snapshot.version().value()).isEqualTo("a".repeat(40));
+    }
+}

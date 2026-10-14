@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.node.ObjectNode;

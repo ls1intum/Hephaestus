@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelWorkspaceGrantRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,7 +17,7 @@ import org.mockito.Mock;
 class AgentWorkspacePurgeAdapterTest extends BaseUnitTest {
 
     @Mock
-    private AgentJobRepository jobRepository;
+    private ReviewJobRepository jobRepository;
 
     @Mock
     private WorkspaceAgentBindingRepository bindingRepository;

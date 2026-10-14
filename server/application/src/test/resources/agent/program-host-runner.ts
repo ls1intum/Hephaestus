@@ -19,7 +19,7 @@ import nodePath from "node:path";
 import { mock } from "node:test";
 
 import {
-	GOLDEN_CAUSE,
+	GOLDEN_INPUTS,
 	GOLDEN_RECORD,
 	PRACTICES_DIR,
 	stageGoldenWorkspace,
@@ -57,7 +57,7 @@ export const SESSION_CANDIDATE = {
 			citations: [
 				{
 					sourceKind: "scm.pull-request.core",
-					artifactPath: "evidence/metadata.json",
+					sourcePath: "evidence/metadata.json",
 					path: "evidence/metadata.json",
 					startLine: 1,
 					endLine: 1,
@@ -82,21 +82,21 @@ export const SESSION_CANDIDATE = {
  * `note`, which the summary carries.
  */
 export function directProgram(before = ""): string {
-	return `import { definePracticeScript, generateText, step } from "../lib/practice-script.ts";
+	return `import { definePracticeScript, generateText, step } from "../lib/core/practice-script.ts";
 export default definePracticeScript({
 	meta: { models: { chat: "optional" } },
 	async run(ctx) {
 		let note = "none";
 		${before}
 		return {
-			outcome: "NOT_APPLICABLE",
+			outcome: "DOES_NOT_APPLY",
 			summary: \`No user interface changes; note \${note}\`,
 			explanation: "The change adds no view, template or component.",
 			citations: [await ctx.evidence.citeRecord("metadata.json", 1)],
 			evidence: {
 				inapplicability: {
 					consulted: ["scm.pull-request.core"],
-					subject: "user interface views",
+					prerequisite: "user interface views",
 					ruledOutBy: "The record names one changed Java file.",
 				},
 			},
@@ -111,7 +111,7 @@ export default definePracticeScript({
 export function stagePractices(cwd: string, practices: readonly StagedPractice[]): void {
 	stageGoldenWorkspace(
 		cwd,
-		5,
+		6,
 		readFileSync(
 			new URL("../../../main/resources/agent/pi-orchestrator.md", import.meta.url),
 			"utf8",
@@ -123,6 +123,10 @@ export function stagePractices(cwd: string, practices: readonly StagedPractice[]
 	};
 	write("package.json", '{"type":"module"}\n');
 	symlinkSync(LIB, nodePath.join(cwd, nodePath.dirname(PRACTICES_DIR), "lib"));
+	symlinkSync(
+		nodePath.resolve(LIB, "../kits"),
+		nodePath.join(cwd, nodePath.dirname(PRACTICES_DIR), "kits"),
+	);
 	write(
 		"catalog/practices/index.json",
 		JSON.stringify(
@@ -131,7 +135,7 @@ export function stagePractices(cwd: string, practices: readonly StagedPractice[]
 				group: "security",
 				readsSources: ["scm.pull-request.core", "scm.pull-request.diff"],
 				exhaustiveSources: ["scm.pull-request.diff"],
-				revisionId: 7,
+				versionId: "7",
 			})),
 		),
 	);
@@ -141,8 +145,10 @@ export function stagePractices(cwd: string, practices: readonly StagedPractice[]
 			"# Uses secure authentication\n\n## Standard\nAdded authentication calls use checked(), not insecure().\n",
 		);
 		if (inputs) {
-			write(`${PRACTICES_DIR}/${slug}.cause.json`, JSON.stringify(GOLDEN_CAUSE));
-			write(`${PRACTICES_DIR}/${slug}.previous.json`, "null");
+			write(
+				`${PRACTICES_DIR}/${slug}.inputs.json`,
+				JSON.stringify({ ...GOLDEN_INPUTS, practice: { ...GOLDEN_INPUTS.practice, slug } }),
+			);
 		}
 		if (program !== undefined) {
 			write(`${PRACTICES_DIR}/${slug}.ts`, program);
@@ -261,9 +267,9 @@ if (scenario !== undefined && scenario !== "") {
 			reviewInputPresent: existsSync(nodePath.join(cwd, "work/review-input")),
 		});
 		return Response.json({
-			schemaVersion: 2,
+			contractVersion: 3,
 			admissionDigest: "digest",
-			results: [],
+			admitted: [],
 			withheld: [],
 		});
 	});

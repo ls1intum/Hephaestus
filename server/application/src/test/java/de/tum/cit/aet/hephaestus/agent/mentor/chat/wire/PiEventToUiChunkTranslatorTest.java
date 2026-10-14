@@ -355,7 +355,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     /** The result {@code runner_link_result.json} links. */
     private static final UUID FIXTURE_RESULT = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
 
-    /** The problem {@code runner_link_observation.json} links. */
+    /** The problem {@code runner_link_problem.json} links. */
     private static final UUID FIXTURE_OBSERVATION = UUID.fromString("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
 
     @Test
@@ -366,12 +366,12 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         assertThat(out).hasSize(1);
         UIMessageChunk.DataResult link = (UIMessageChunk.DataResult) out.get(0);
-        assertThat(link.data().practiceResultId()).isEqualTo(FIXTURE_RESULT);
+        assertThat(link.data().resultId()).isEqualTo(FIXTURE_RESULT);
         assertThat(link.data().text()).startsWith("Your description names the decision");
         JsonNode stored = state.partsSnapshot().get(0);
         assertThat(stored.path("type").asString()).isEqualTo("data-result");
         assertThat(stored.path("id").asString()).isEqualTo(link.id().toString());
-        assertThat(stored.path("data").path("practiceResultId").asString()).isEqualTo(FIXTURE_RESULT.toString());
+        assertThat(stored.path("data").path("resultId").asString()).isEqualTo(FIXTURE_RESULT.toString());
         assertThat(stored.path("data").path("text").asString())
                 .isEqualTo(link.data().text());
         assertThat(UIMessageChunk.LinkParts.shownResultIds(state.partsSnapshot()))
@@ -379,32 +379,32 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldShowAndStoreADataResultObservationNamingItsResultWhenAnAdmittedProblemIsLinked() throws Exception {
-        state.admitObservationLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
+    void shouldShowAndStoreADataProblemNamingItsResultWhenAnAdmittedProblemIsLinked() throws Exception {
+        state.admitProblemLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
 
-        List<UIMessageChunk> out = translator.translate(fixture("runner_link_observation.json"), state);
+        List<UIMessageChunk> out = translator.translate(fixture("runner_link_problem.json"), state);
 
         assertThat(out).hasSize(1);
-        UIMessageChunk.DataResultObservation link = (UIMessageChunk.DataResultObservation) out.get(0);
-        assertThat(link.data().practiceResultId()).isEqualTo(FIXTURE_RESULT);
-        assertThat(link.data().observationId()).isEqualTo(FIXTURE_OBSERVATION);
+        UIMessageChunk.DataProblem link = (UIMessageChunk.DataProblem) out.get(0);
+        assertThat(link.data().resultId()).isEqualTo(FIXTURE_RESULT);
+        assertThat(link.data().problemId()).isEqualTo(FIXTURE_OBSERVATION);
         assertThat(link.data().text()).startsWith("The retry on line 42");
         JsonNode stored = state.partsSnapshot().get(0);
-        assertThat(stored.path("type").asString()).isEqualTo("data-result-observation");
+        assertThat(stored.path("type").asString()).isEqualTo("data-problem");
         assertThat(stored.path("id").asString()).isEqualTo(link.id().toString());
-        assertThat(stored.path("data").path("practiceResultId").asString()).isEqualTo(FIXTURE_RESULT.toString());
-        assertThat(stored.path("data").path("observationId").asString()).isEqualTo(FIXTURE_OBSERVATION.toString());
+        assertThat(stored.path("data").path("resultId").asString()).isEqualTo(FIXTURE_RESULT.toString());
+        assertThat(stored.path("data").path("problemId").asString()).isEqualTo(FIXTURE_OBSERVATION.toString());
         assertThat(stored.path("data").path("text").asString())
                 .isEqualTo(link.data().text());
         assertThat(UIMessageChunk.LinkParts.resultOf(stored)).isEqualTo(FIXTURE_RESULT);
-        assertThat(UIMessageChunk.LinkParts.observationOf(stored)).isEqualTo(FIXTURE_OBSERVATION);
+        assertThat(UIMessageChunk.LinkParts.problemOf(stored)).isEqualTo(FIXTURE_OBSERVATION);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"{}", "{\"text\":\"   \"}", "{\"text\":7}"})
     void shouldFailTheTurnWhenAResultLinkCarriesNoFeedbackText(String extra) throws Exception {
         ObjectNode link = (ObjectNode) mapper.readTree(extra);
-        link.put("type", "link_result").put("practiceResultId", FIXTURE_RESULT.toString());
+        link.put("type", "link_result").put("resultId", FIXTURE_RESULT.toString());
         state.admitLink(FIXTURE_RESULT);
 
         assertThat(translator.translate(link, state))
@@ -417,8 +417,8 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     @ValueSource(strings = {"{}", "{\"text\":\"   \"}", "{\"text\":7}"})
     void shouldFailTheTurnWhenAProblemLinkCarriesNoFeedbackText(String extra) throws Exception {
         ObjectNode link = (ObjectNode) mapper.readTree(extra);
-        link.put("type", "link_observation").put("observationId", FIXTURE_OBSERVATION.toString());
-        state.admitObservationLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
+        link.put("type", "link_problem").put("problemId", FIXTURE_OBSERVATION.toString());
+        state.admitProblemLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
 
         assertThat(translator.translate(link, state))
                 .extracting(c -> c.getClass().getSimpleName())
@@ -427,7 +427,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"runner_link_result.json", "runner_link_observation.json"})
+    @ValueSource(strings = {"runner_link_result.json", "runner_link_problem.json"})
     void shouldFailTheTurnWithoutShowingOrStoringALinkWhenTheServerDidNotAdmitIt(String event) throws Exception {
         streamMessage("Let me look at your pull request.");
 
@@ -436,7 +436,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
                 .containsExactly("TurnError");
         assertThat(state.partsSnapshot())
                 .extracting(p -> p.get("type").asString())
-                .doesNotContain("data-result", "data-result-observation");
+                .doesNotContain("data-result", "data-problem");
     }
 
     @Test
@@ -444,7 +444,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         // A result's admission does not admit its problems: each link names what the server checked.
         state.admitLink(FIXTURE_RESULT);
 
-        assertThat(translator.translate(fixture("runner_link_observation.json"), state))
+        assertThat(translator.translate(fixture("runner_link_problem.json"), state))
                 .extracting(c -> c.getClass().getSimpleName())
                 .containsExactly("TurnError");
         assertThat(state.partsSnapshot()).isEmpty();
@@ -474,10 +474,10 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     @Test
     void shouldFinishWhenFeedbackIsShownBetweenVerifiedMessages() throws Exception {
         state.admitLink(FIXTURE_RESULT);
-        state.admitObservationLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
+        state.admitProblemLink(FIXTURE_OBSERVATION, FIXTURE_RESULT);
         streamMessage("Let me look at your pull request.");
         translator.translate(fixture("runner_link_result.json"), state);
-        translator.translate(fixture("runner_link_observation.json"), state);
+        translator.translate(fixture("runner_link_problem.json"), state);
         streamMessage("What made you choose that approach?");
 
         List<UIMessageChunk> out = translator.translate(
@@ -486,7 +486,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("Finish");
         assertThat(state.partsSnapshot())
                 .extracting(p -> p.get("type").asString())
-                .containsExactly("step-start", "text", "data-result", "data-result-observation", "step-start", "text");
+                .containsExactly("step-start", "text", "data-result", "data-problem", "step-start", "text");
     }
 
     @Test
@@ -567,8 +567,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
 
         // A renamed link_result must not disappear while the reply still finishes.
         List<UIMessageChunk> out = translator.translate(
-                mapper.readTree("{\"type\":\"link_results\",\"practiceResultId\":\"" + UUID.randomUUID() + "\"}"),
-                state);
+                mapper.readTree("{\"type\":\"link_results\",\"resultId\":\"" + UUID.randomUUID() + "\"}"), state);
 
         assertThat(out).extracting(c -> c.getClass().getSimpleName()).containsExactly("TextEnd", "TurnError");
         assertThat(state.isStreamBroken()).isTrue();
@@ -769,12 +768,12 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
     void shouldKeepALinkedResultWhenReplacingTextWithALostDelta() throws Exception {
         translator.translate(fixture("message_start_assistant.json"), state);
         streamDeltas("a");
-        UUID practiceResultId = UUID.randomUUID();
-        state.admitLink(practiceResultId);
+        UUID resultId = UUID.randomUUID();
+        state.admitLink(resultId);
         translator.translate(
                 mapper.createObjectNode()
                         .put("type", "link_result")
-                        .put("practiceResultId", practiceResultId.toString())
+                        .put("resultId", resultId.toString())
                         .put("text", "Name the trade-off."),
                 state);
         // "b" never arrived.
@@ -786,8 +785,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         assertThat(parts)
                 .extracting(p -> p.get("type").asString())
                 .containsExactly("step-start", "data-result", "text");
-        assertThat(parts.get(1).path("data").path("practiceResultId").asString())
-                .isEqualTo(practiceResultId.toString());
+        assertThat(parts.get(1).path("data").path("resultId").asString()).isEqualTo(resultId.toString());
         assertThat(parts.get(2).get("text").asString()).isEqualTo("ab");
     }
 
@@ -928,7 +926,7 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         List<UIMessageChunk> out = translator.translate(
                 mapper.createObjectNode()
                         .put("type", "link_result")
-                        .put("practiceResultId", "not-a-uuid")
+                        .put("resultId", "not-a-uuid")
                         .put("text", "Name the trade-off."),
                 state);
 

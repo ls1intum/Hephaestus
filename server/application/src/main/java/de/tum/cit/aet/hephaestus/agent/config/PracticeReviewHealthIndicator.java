@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.config;
 
 import de.tum.cit.aet.hephaestus.agent.job.AgentProperties;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryProperties;
 import java.time.Clock;
@@ -16,14 +16,14 @@ public class PracticeReviewHealthIndicator implements HealthIndicator {
 
     private final AgentProperties agentProperties;
     private final GitRepositoryProperties gitProperties;
-    private final ArtifactSourceCatalogRegistry sourceCatalog;
+    private final SourceCatalogRegistry sourceCatalog;
     private final Clock clock;
     private final boolean workerRole;
 
     public PracticeReviewHealthIndicator(
             AgentProperties agentProperties,
             GitRepositoryProperties gitProperties,
-            ArtifactSourceCatalogRegistry sourceCatalog,
+            SourceCatalogRegistry sourceCatalog,
             Clock clock,
             @Value("${" + RuntimeRole.WORKER_PROPERTY + ":true}") boolean workerRole) {
         this.agentProperties = agentProperties;

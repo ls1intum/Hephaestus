@@ -15,10 +15,10 @@ import static org.mockito.Mockito.when;
 
 import com.slack.api.model.block.LayoutBlock;
 import com.slack.api.model.view.View;
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorReadinessQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorReadinessQuery;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorRefusal;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorTurnRunner;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackHephaestusUiLinks;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
@@ -237,10 +237,7 @@ class SlackAppHomeServiceTest extends BaseUnitTest {
         verifyNoInteractions(workspaceResolver, messageService);
     }
 
-    private static User developer() {
-        var user = new User();
-        user.setId(314L);
-        user.setLogin("octocat");
-        return user;
+    private static AccountSummaryQuery.AccountSummary developer() {
+        return new AccountSummaryQuery.AccountSummary(314L, "octocat", null);
     }
 }

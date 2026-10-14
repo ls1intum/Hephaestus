@@ -1,91 +1,79 @@
 package de.tum.cit.aet.hephaestus.practices.adapter;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.result.PracticeResultRepository;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyCleanupCustody;
+import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import java.util.Collection;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Practices-internal implementation of {@link ConversationFeedbackErasure}. Runs two scoped bulk deletes —
- * feedback first (DB {@code ON DELETE CASCADE} clears its join/child tables), then the results. Both
- * statements pin {@code artifact_kind = chat.conversation_thread} + workspace (plus the per-method scope), so
- * PR/ISSUE rows and other tenants' rows are never touched — the no-regression contract of the port.
- */
 @Component
+@ConditionalOnServerRole
+@RequiredArgsConstructor
 public class ConversationFeedbackErasureAdapter implements ConversationFeedbackErasure {
+    private final JdbcClient jdbc;
+    private final FeedbackCopyCleanupCustody custody;
+    private final ScanReportService reports;
 
-    private static final Logger log = LoggerFactory.getLogger(ConversationFeedbackErasureAdapter.class);
-
-    private final DeliveryPolicyEvaluationRepository evaluationRepository;
-    private final FeedbackRepository feedbackRepository;
-    private final PracticeResultRepository practiceResultRepository;
-
-    public ConversationFeedbackErasureAdapter(
-            DeliveryPolicyEvaluationRepository evaluationRepository,
-            FeedbackRepository feedbackRepository,
-            PracticeResultRepository practiceResultRepository) {
-        this.evaluationRepository = evaluationRepository;
-        this.feedbackRepository = feedbackRepository;
-        this.practiceResultRepository = practiceResultRepository;
+    @Override
+    @Transactional
+    public int eraseForThreads(long ws, Collection<Long> threads) {
+        if (threads.isEmpty()) return 0;
+        return erase(ws, " AND i.source_id IN (:threads)", Map.of("threads", threads));
     }
 
     @Override
     @Transactional
-    public int eraseForThreads(long workspaceId, Collection<Long> slackThreadIds) {
-        if (slackThreadIds.isEmpty()) {
-            return 0;
-        }
-        evaluationRepository.deleteConversationEvaluationsForThreads(workspaceId, slackThreadIds);
-        int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedback(workspaceId, slackThreadIds);
-        int practiceResultsDeleted =
-                practiceResultRepository.deleteConversationThreadResults(workspaceId, slackThreadIds);
-        if (feedbackDeleted > 0 || practiceResultsDeleted > 0) {
-            log.info(
-                    "Erased conversation-derived practice rows: workspaceId={}, threads={}, feedback={}, results={}",
-                    workspaceId,
-                    slackThreadIds.size(),
-                    feedbackDeleted,
-                    practiceResultsDeleted);
-        }
-        return feedbackDeleted + practiceResultsDeleted;
+    public int eraseAllConversationForWorkspace(long ws) {
+        return erase(ws, "", Map.of());
     }
 
     @Override
     @Transactional
-    public int eraseAllConversationForWorkspace(long workspaceId) {
-        evaluationRepository.deleteAllConversationEvaluations(workspaceId);
-        int feedbackDeleted = feedbackRepository.deleteAllConversationThreadFeedback(workspaceId);
-        int practiceResultsDeleted = practiceResultRepository.deleteAllConversationThreadResults(workspaceId);
-        if (feedbackDeleted > 0 || practiceResultsDeleted > 0) {
-            log.info(
-                    "Erased all conversation-derived practice rows for workspace: workspaceId={}, feedback={}, results={}",
-                    workspaceId,
-                    feedbackDeleted,
-                    practiceResultsDeleted);
-        }
-        return feedbackDeleted + practiceResultsDeleted;
+    public int eraseConversationFeedbackAboutUser(long ws, long account) {
+        return erase(ws, " AND r.developer_id=:account", Map.of("account", account));
     }
 
-    @Override
-    @Transactional
-    public int eraseConversationFeedbackAboutUser(long workspaceId, long aboutUserId) {
-        evaluationRepository.deleteConversationEvaluationsAboutUser(workspaceId, aboutUserId);
-        int feedbackDeleted = feedbackRepository.deleteConversationThreadFeedbackAboutUser(workspaceId, aboutUserId);
-        int practiceResultsDeleted =
-                practiceResultRepository.deleteConversationThreadResultsAboutUser(workspaceId, aboutUserId);
-        if (feedbackDeleted > 0 || practiceResultsDeleted > 0) {
-            log.info(
-                    "Erased conversation-derived practice rows about user: workspaceId={}, aboutUserId={}, feedback={}, results={}",
-                    workspaceId,
-                    aboutUserId,
-                    feedbackDeleted,
-                    practiceResultsDeleted);
-        }
-        return feedbackDeleted + practiceResultsDeleted;
+    private int erase(long ws, String selection, Map<String, ?> extra) {
+        var params = new LinkedHashMap<String, Object>();
+        params.put("ws", ws);
+        params.putAll(extra);
+        String ids = "SELECT r.id FROM result r JOIN item i ON i.id=r.item_id AND i.workspace_id=r.workspace_id WHERE"
+                + " r.workspace_id=:ws AND i.kind='chat.thread'"
+                + selection;
+        custody.requireAcknowledged(
+                ws,
+                jdbc.sql("SELECT DISTINCT f.id FROM feedback f JOIN feedback_basis b ON b.feedback_id=f.id AND"
+                                + " b.workspace_id=f.workspace_id WHERE f.workspace_id=:ws AND b.result_id IN ("
+                                + ids + ")")
+                        .params(params)
+                        .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
+                        .list());
+        reports.eraseResultReferences(
+                ws,
+                jdbc.sql(ids)
+                        .params(params)
+                        .query((rs, n) -> Objects.requireNonNull(rs.getObject(1, UUID.class)))
+                        .list());
+        int feedback = jdbc.sql(
+                        "DELETE FROM feedback f WHERE f.workspace_id=:ws AND EXISTS(SELECT 1 FROM feedback_basis b"
+                                + " WHERE b.workspace_id=f.workspace_id AND b.feedback_id=f.id AND b.result_id IN ("
+                                + ids + "))")
+                .params(params)
+                .update();
+        jdbc.sql("DELETE FROM review_item WHERE workspace_id=:ws AND result_id IN (" + ids + ")")
+                .params(params)
+                .update();
+        return feedback
+                + jdbc.sql("DELETE FROM result WHERE workspace_id=:ws AND id IN (" + ids + ")")
+                        .params(params)
+                        .update();
     }
 }

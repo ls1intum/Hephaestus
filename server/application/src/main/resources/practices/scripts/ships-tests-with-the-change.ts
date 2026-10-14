@@ -1,14 +1,18 @@
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
+import { isTestPath, languageOf } from "../kits/scm/languages.ts";
 // Tells which changed source files are tests and which are production code, by the path. The review
 // reads from the diff if a test covers the changed behaviour.
-import { DIRECTION_CHARS, listWithin } from "../lib/bounded-text.ts";
-import { isTestPath, languageOf } from "../lib/languages.ts";
-import { definePracticeScript, expectKind, requireChange } from "../lib/practice-script.ts";
+import { DIRECTION_CHARS, listWithin } from "../lib/core/bounded-text.ts";
+import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
-		expectKind(ctx, "scm.pull_request");
-		const source = [...requireChange(ctx.files).keys()].filter((path) => languageOf(path) !== null);
+		const domain = scm(ctx);
+		expectKind(domain, "scm.pull_request");
+		const source = [...requireChange(domain.files).keys()].filter(
+			(path) => languageOf(path) !== null,
+		);
 		const tests = source.filter((path) => isTestPath(path));
 		const production = source.filter((path) => !isTestPath(path));
 

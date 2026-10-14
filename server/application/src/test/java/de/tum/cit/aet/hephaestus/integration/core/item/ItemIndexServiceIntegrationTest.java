@@ -1,0 +1,121 @@
+package de.tum.cit.aet.hephaestus.integration.core.item;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Instant;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+
+class ItemIndexServiceIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    private ItemWriter writer;
+
+    @Autowired
+    private ItemRepository items;
+
+    @Autowired
+    private WorkspaceRepository workspaces;
+
+    @Test
+    void shouldKeepIdentityAcrossRemoveAndRestore() {
+        long workspace = workspace();
+        var registration = new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null);
+        var item = writer.upsert(registration);
+        assertThat(writer.upsert(registration)).isEqualTo(item);
+        assertThat(writer.remove(workspace, item.itemId(), Instant.now())).isTrue();
+        assertThat(writer.remove(workspace, item.itemId(), Instant.now())).isFalse();
+        assertThat(writer.restore(workspace, item.itemId())).isTrue();
+        assertThat(writer.restore(workspace, item.itemId())).isFalse();
+        assertThat(items.findByIdAndWorkspaceId(item.itemId(), workspace))
+                .get()
+                .extracting(Item::getRemovedAt)
+                .isNull();
+    }
+
+    @Test
+    void shouldRejectParentFromAnotherWorkspace() {
+        long workspace = workspace();
+        var parent = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null));
+        long otherWorkspace = workspace();
+        assertThatThrownBy(() -> writer.upsert(new ItemRegistration(
+                        otherWorkspace, new ItemKind("scm.file"), null, parent.itemId(), "src/A.java")))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void shouldGiveRenamedPathItsOwnIdentity() {
+        long workspace = workspace();
+        var parent = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null));
+        var oldPath = writer.upsert(
+                new ItemRegistration(workspace, new ItemKind("scm.file"), null, parent.itemId(), "old.java"));
+        var newPath = writer.upsert(
+                new ItemRegistration(workspace, new ItemKind("scm.file"), null, parent.itemId(), "new.java"));
+        assertThat(newPath.itemId()).isNotEqualTo(oldPath.itemId());
+    }
+
+    @Test
+    void shouldKeepPathIdentityWithinItsParent() {
+        long workspace = workspace();
+        var repository = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null));
+        var registration =
+                new ItemRegistration(workspace, new ItemKind("scm.file"), null, repository.itemId(), "src/A.java");
+        var first = writer.upsert(registration);
+        assertThat(writer.upsert(registration)).isEqualTo(first);
+        assertThat(items.findByIdAndWorkspaceId(first.itemId(), workspace))
+                .get()
+                .satisfies(row -> {
+                    assertThat(row.getParentId()).isEqualTo(repository.itemId());
+                    assertThat(row.getPath()).isEqualTo("src/A.java");
+                });
+    }
+
+    @Test
+    void shouldRejectReparentingAnExistingSourceItem() {
+        long workspace = workspace();
+        var first = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null));
+        var second = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 2L, null, null));
+        var original =
+                writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.issue"), 3L, first.itemId(), null));
+
+        assertThatThrownBy(() -> writer.upsert(
+                        new ItemRegistration(workspace, new ItemKind("scm.issue"), 3L, second.itemId(), null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(items.findByIdAndWorkspaceId(original.itemId(), workspace))
+                .get()
+                .extracting(Item::getParentId)
+                .isEqualTo(first.itemId());
+    }
+
+    @Test
+    void shouldRefuseForeignRemoveAndRestoreWithoutChangingTheItem() {
+        long workspace = workspace();
+        long foreign = workspace();
+        var item = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null));
+        assertThat(writer.remove(foreign, item.itemId(), Instant.now())).isFalse();
+        assertThat(items.findByIdAndWorkspaceId(item.itemId(), workspace))
+                .get()
+                .extracting(Item::getRemovedAt)
+                .isNull();
+        Instant removedAt = Instant.parse("2026-10-14T10:00:00Z");
+        assertThat(writer.remove(workspace, item.itemId(), removedAt)).isTrue();
+        assertThat(writer.restore(foreign, item.itemId())).isFalse();
+        assertThat(items.findByIdAndWorkspaceId(item.itemId(), workspace))
+                .get()
+                .extracting(Item::getRemovedAt)
+                .isEqualTo(removedAt);
+    }
+
+    private long workspace() {
+        return workspaces
+                .save(WorkspaceTestFixtures.activeWorkspace("item-" + UUID.randomUUID()))
+                .getId();
+    }
+}

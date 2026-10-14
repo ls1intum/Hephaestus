@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result.trend;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
 import de.tum.cit.aet.hephaestus.practices.result.PracticeStandingService;
+import de.tum.cit.aet.hephaestus.practices.result.ResultView;
 import de.tum.cit.aet.hephaestus.practices.result.trend.dto.PracticeGroupTrendDTO;
 import java.time.Clock;
 import java.time.Instant;
@@ -33,12 +33,12 @@ public class PracticeTrendService {
     }
 
     /** One practice's trend over its evidence observed from {@code since}; insufficient over none. */
-    public PracticeTrend calculatePractice(String practiceSlug, List<PracticeResult> evidence, Instant since) {
+    public PracticeTrend calculatePractice(String practiceSlug, List<ResultView> evidence, Instant since) {
         return PracticeTrendCalculator.calculatePractice(practiceSlug, evidence, since, properties);
     }
 
     /** {@link PracticeTrend#recentMetShare} over a practice's requested and backfilled work alone. */
-    public OptionalDouble selfSelectedMetShare(List<PracticeResult> evidence, Instant since, int window, double decay) {
+    public OptionalDouble selfSelectedMetShare(List<ResultView> evidence, Instant since, int window, double decay) {
         return PracticeTrend.recentMetShare(
                 OpportunityBundler.opportunities(evidence, since, true).reversed(), window, decay);
     }

@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.core.auth;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLink;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityLinkRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
+import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import java.util.List;
 import java.util.Optional;
@@ -12,22 +12,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@WorkspaceAgnostic("Identity links are user-scoped (account → IdentityLink)")
+@WorkspaceAgnostic("Identity links are user-scoped (account → Identity)")
 public class AccountIdentityQueryService implements AccountIdentityQuery {
 
-    private final IdentityLinkRepository identityLinkRepository;
+    private final IdentityRepository identityRepository;
 
-    public AccountIdentityQueryService(IdentityLinkRepository identityLinkRepository) {
-        this.identityLinkRepository = identityLinkRepository;
+    public AccountIdentityQueryService(IdentityRepository identityRepository) {
+        this.identityRepository = identityRepository;
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<IdentityLinkView> activeLinksForAccount(Long accountId) {
+    public List<IdentityView> activeLinksForAccount(Long accountId) {
         if (accountId == null) {
             return List.of();
         }
-        return identityLinkRepository.findActiveByAccountId(accountId).stream()
+        return identityRepository.findActiveByAccountId(accountId).stream()
                 .map(this::toView)
                 .toList();
     }
@@ -38,7 +38,7 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
         if (providerId == null || subject == null || subject.isBlank()) {
             return Optional.empty();
         }
-        return identityLinkRepository
+        return identityRepository
                 .findActiveByProviderSubject(providerId, subject, teamId)
                 .map(link -> link.getAccount().getId());
     }
@@ -49,32 +49,15 @@ public class AccountIdentityQueryService implements AccountIdentityQuery {
         if (subject.isBlank()) {
             return Optional.empty();
         }
-        return identityLinkRepository
+        return identityRepository
                 .findActiveByProviderSubject(providerId, subject, teamId)
-                .map(IdentityLink::getAccount)
+                .map(Identity::getAccount)
                 .filter(account -> account.getStatus() == Account.Status.ACTIVE)
                 .map(Account::getId);
     }
 
-    @Override
-    @Transactional
-    public void linkExternalActor(Long identityLinkId, Long externalActorId) {
-        if (identityLinkId == null || externalActorId == null) {
-            return;
-        }
-        identityLinkRepository.linkExternalActorIfAbsent(identityLinkId, externalActorId);
-    }
-
-    private IdentityLinkView toView(IdentityLink link) {
-        return new IdentityLinkView(
-                link.getId(),
-                link.getProviderId(),
-                link.getSubject(),
-                link.getUsernameAtSignup(),
-                link.getDisplayName(),
-                link.getAvatarUrl(),
-                link.getProfileUrl(),
-                link.getExternalActorId(),
-                link.getTeamId());
+    private IdentityView toView(Identity identity) {
+        return new IdentityView(
+                identity.getId(), identity.getProviderId(), identity.getProviderUserKey(), identity.getTeamKey());
     }
 }

@@ -1,10 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.slack.mentor;
 
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountWorkspaceMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountSummaryQuery;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -27,39 +26,41 @@ public class SlackMentorIdentityResolver {
 
     private final GitProviderRegistry gitProviderRegistry;
     private final AccountIdentityQuery accountIdentityQuery;
-    private final AccountWorkspaceMembershipQuery workspaceMembershipQuery;
-    private final UserRepository userRepository;
+    private final AccountMembershipQuery workspaceMembershipQuery;
+    private final AccountSummaryQuery accounts;
 
     public SlackMentorIdentityResolver(
             GitProviderRegistry gitProviderRegistry,
             AccountIdentityQuery accountIdentityQuery,
-            AccountWorkspaceMembershipQuery workspaceMembershipQuery,
-            UserRepository userRepository) {
+            AccountMembershipQuery workspaceMembershipQuery,
+            AccountSummaryQuery accounts) {
         this.gitProviderRegistry = gitProviderRegistry;
         this.accountIdentityQuery = accountIdentityQuery;
         this.workspaceMembershipQuery = workspaceMembershipQuery;
-        this.userRepository = userRepository;
+        this.accounts = accounts;
     }
 
-    /** Resolves the display actor for a live interaction; requires an active account and workspace membership. */
+    /** Resolves the account summary for a live interaction; requires an active account and workspace membership. */
     @Transactional(readOnly = true)
-    public Optional<User> resolveDeveloper(long workspaceId, @Nullable String teamId, String slackUserId) {
-        return resolveMemberIdInternal(workspaceId, teamId, slackUserId, true).flatMap(userRepository::findById);
+    public Optional<AccountSummaryQuery.AccountSummary> resolveDeveloper(
+            long workspaceId, @Nullable String teamId, String slackUserId) {
+        return resolveAccountIdInternal(workspaceId, teamId, slackUserId, true)
+                .map(accountId -> accounts.findAllByIds(List.of(accountId)).get(accountId));
     }
 
     /** Resolves a historical author without requiring a currently active account. */
     @Transactional(readOnly = true)
-    public Optional<Long> resolveMemberId(long workspaceId, @Nullable String teamId, String slackUserId) {
-        return resolveMemberIdInternal(workspaceId, teamId, slackUserId, false);
+    public Optional<Long> resolveAccountId(long workspaceId, @Nullable String teamId, String slackUserId) {
+        return resolveAccountIdInternal(workspaceId, teamId, slackUserId, false);
     }
 
     /** Live mentor admission requires an active account; historical attribution does not. */
     @Transactional(readOnly = true)
-    public Optional<Long> resolveActiveMemberId(long workspaceId, @Nullable String teamId, String slackUserId) {
-        return resolveMemberIdInternal(workspaceId, teamId, slackUserId, true);
+    public Optional<Long> resolveActiveAccountId(long workspaceId, @Nullable String teamId, String slackUserId) {
+        return resolveAccountIdInternal(workspaceId, teamId, slackUserId, true);
     }
 
-    private Optional<Long> resolveMemberIdInternal(
+    private Optional<Long> resolveAccountIdInternal(
             long workspaceId, @Nullable String teamId, String slackUserId, boolean activeAccountOnly) {
         if (slackUserId.isBlank() || teamId == null || teamId.isBlank()) {
             return Optional.empty();
@@ -68,33 +69,26 @@ public class SlackMentorIdentityResolver {
         Optional<Long> accountId = activeAccountOnly
                 ? accountIdentityQuery.resolveActiveAccountId(slackProviderId, slackUserId, teamId)
                 : accountIdentityQuery.resolveAccountId(slackProviderId, slackUserId, teamId);
-        return accountId.map(workspaceMembershipQuery::membershipsForAccount).orElseGet(List::of).stream()
-                .filter(view -> view.workspaceId() == workspaceId)
-                .map(AccountWorkspaceMembershipQuery.WorkspaceMembershipView::memberId)
-                .filter(Objects::nonNull)
-                .findFirst();
+        return accountId.filter(id -> workspaceMembershipQuery.membershipsForAccount(id).stream()
+                .anyMatch(view -> view.workspaceId() == workspaceId && Objects.equals(view.accountId(), id)));
     }
 
-    /** Resolves an outbound recipient through the actor's provider subject and the connection's exact Slack team. */
+    /** Resolves an outbound recipient through the account's provider subject and the connection's exact Slack team. */
     @Transactional(readOnly = true)
-    public Optional<String> resolveSlackUserId(long memberId, @Nullable String teamId) {
+    public Optional<String> resolveSlackUserId(long accountId, @Nullable String teamId) {
         if (teamId == null || teamId.isBlank()) {
             return Optional.empty();
         }
         long slackProviderId = gitProviderRegistry.resolveProviderId("SLACK", SLACK_SERVER_URL);
-        return userRepository
-                .findById(memberId)
-                .flatMap(user -> accountIdentityQuery.resolveActiveAccountId(
-                        Objects.requireNonNull(user.getProvider().getId()),
-                        user.getNativeId().toString(),
-                        null))
-                .map(accountIdentityQuery::activeLinksForAccount)
-                .orElseGet(List::of)
-                .stream()
-                .filter(link -> link.gitProviderId() != null && link.gitProviderId() == slackProviderId)
-                .filter(link -> teamId.equals(link.teamId()))
-                .map(AccountIdentityQuery.IdentityLinkView::subject)
-                .filter(subject -> subject != null && !subject.isBlank())
+        return accountIdentityQuery.activeLinksForAccount(accountId).stream()
+                .filter(link -> link.providerId() == slackProviderId)
+                .filter(link -> teamId.equals(link.teamKey()))
+                .map(AccountIdentityQuery.IdentityView::providerUserKey)
+                .filter(subject -> !subject.isBlank())
+                .filter(subject -> accountIdentityQuery
+                        .resolveActiveAccountId(slackProviderId, subject, teamId)
+                        .filter(id -> id == accountId)
+                        .isPresent())
                 .findFirst();
     }
 }

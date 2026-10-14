@@ -1,24 +1,23 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackEvidenceRepository.ResultFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.Outcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeResult;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingDTO;
 import de.tum.cit.aet.hephaestus.practices.result.dto.PracticeStandingResultDTO;
+import de.tum.cit.aet.hephaestus.practices.result.dto.TrendSupportDTO;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrend;
 import de.tum.cit.aet.hephaestus.practices.result.trend.PracticeTrendService;
-import de.tum.cit.aet.hephaestus.practices.result.trend.dto.TrendSupportDTO;
-import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
+import de.tum.cit.aet.hephaestus.practices.result.trend.WorkResolution;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeStanding;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -34,10 +33,13 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
+@ConditionalOnServerRole
 @RequiredArgsConstructor
 public class PracticeStandingService {
 
@@ -54,12 +56,13 @@ public class PracticeStandingService {
 
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
-    private final PracticeResultRepository practiceResultRepository;
-    private final FeedbackEvidenceRepository feedbackEvidenceRepository;
+    private final ResultReadQuery resultReadQuery;
+    private final ResultViewQuery resultViewQuery;
+    private final JsonMapper json;
+    private final JdbcClient jdbc;
     private final CurrentDeveloperLookup currentDeveloperLookup;
     private final ResultVisibilityPolicy visibilityPolicy;
     private final PracticeRepository practiceRepository;
-    private final WorkspaceReviewDefaultsProvider workspaceReviewDefaultsProvider;
     private final PracticeTrendService practiceTrendService;
     private final Clock clock;
 
@@ -90,24 +93,35 @@ public class PracticeStandingService {
         Instant since = practiceTrendService.horizon();
         Instant until = Collections.max(edges);
         // Verdictless results distinguish NO_OPPORTUNITY from NOT_OBSERVED.
-        List<PracticeResult> window =
-                practiceResultRepository.findByDeveloperAndWorkspaceBetween(developerId, workspaceId, since, until);
-        Set<UUID> visible =
-                visibilityPolicy.permitsAll(workspaceId, window, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        List<PracticeResult> practiceResults = window.stream()
-                .filter(practiceResult -> visible.contains(practiceResult.getId()))
+        List<ResultView> window = resultViewQuery
+                .views(workspaceId, resultReadQuery.forDevelopersSince(workspaceId, List.of(developerId), since, false))
+                .stream()
+                .filter(v -> !v.result().getRecordedAt().isAfter(until))
+                .toList();
+        Set<UUID> visible = visibilityPolicy.permitsHistory(
+                workspaceId,
+                window.stream().map(ResultView::result).toList(),
+                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        List<ResultView> practiceResults = window.stream()
+                .filter(view -> visible.contains(view.result().getId()))
                 .toList();
         Map<UUID, String> deliveredGuidance = deliveredGuidanceByResult(
-                workspaceId, practiceResults.stream().map(PracticeResult::getId).collect(Collectors.toSet()));
+                workspaceId,
+                practiceResults.stream().map(view -> view.result().getId()).collect(Collectors.toSet()));
         Eligibility eligibility = eligibility(workspaceId);
 
         return edges.stream()
                 .map(edge -> snapshot(
                         window.stream()
-                                .filter(practiceResult ->
-                                        !practiceResult.getObservedAt().isAfter(edge))
+                                .filter(view -> !view.result().getRecordedAt().isAfter(edge)
+                                        && (view.result().getEndedAt() == null
+                                                || view.result().getEndedAt().isAfter(edge)))
                                 .toList(),
-                        visible,
+                        visibilityPolicy.permitsAt(
+                                workspaceId,
+                                window.stream().map(ResultView::result).toList(),
+                                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY,
+                                edge),
                         eligibility,
                         deliveredGuidance,
                         since))
@@ -125,13 +139,16 @@ public class PracticeStandingService {
     public WorkspaceStandings getWorkspaceStandingSnapshots(Long workspaceId, Set<Long> developerIds, Instant since) {
         // First, so the practices every result points at are already loaded when the gate reads them.
         Eligibility eligibility = eligibility(workspaceId);
-        List<PracticeResult> latest = developerIds.isEmpty()
+        List<ResultView> latest = developerIds.isEmpty()
                 ? List.of()
-                : practiceResultRepository.findLatestRunsByWorkspaceSince(workspaceId, developerIds, since);
-        Set<UUID> visible =
-                visibilityPolicy.permitsAll(workspaceId, latest, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-        Map<Long, List<PracticeResult>> byDeveloper =
-                latest.stream().collect(Collectors.groupingBy(PracticeResult::getAboutUserId));
+                : resultViewQuery.views(
+                        workspaceId, resultReadQuery.forDevelopersSince(workspaceId, developerIds, since, true));
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+                workspaceId,
+                latest.stream().map(ResultView::result).toList(),
+                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        Map<Long, List<ResultView>> byDeveloper = latest.stream()
+                .collect(Collectors.groupingBy(view -> view.result().getDeveloperId()));
         Map<Long, StandingSnapshot> snapshots = new LinkedHashMap<>();
         for (Long developerId : developerIds) {
             snapshots.put(
@@ -158,14 +175,13 @@ public class PracticeStandingService {
             Map<Long, StandingSnapshot> byDeveloper, Map<String, List<Practice>> eligiblePracticesByGroup) {}
 
     /** The visible rows of {@code narrowed}, per practice slug. */
-    private static Map<String, List<PracticeResult>> visibleByPractice(
-            List<PracticeResult> narrowed, Set<UUID> visible) {
-        Map<String, List<PracticeResult>> byPractice = new LinkedHashMap<>();
-        for (PracticeResult practiceResult : narrowed) {
-            if (visible.contains(practiceResult.getId())) {
+    private static Map<String, List<ResultView>> visibleByPractice(List<ResultView> narrowed, Set<UUID> visible) {
+        Map<String, List<ResultView>> byPractice = new LinkedHashMap<>();
+        for (ResultView view : narrowed) {
+            if (visible.contains(view.result().getId())) {
                 byPractice
-                        .computeIfAbsent(practiceResult.getPractice().getSlug(), ignored -> new ArrayList<>())
-                        .add(practiceResult);
+                        .computeIfAbsent(view.practice().getSlug(), ignored -> new ArrayList<>())
+                        .add(view);
             }
         }
         return byPractice;
@@ -174,7 +190,8 @@ public class PracticeStandingService {
     private static Map<String, List<Practice>> catalogOrder(Eligibility eligibility) {
         Map<String, List<Practice>> byGroup = new LinkedHashMap<>();
         eligibility.practices().stream()
-                .sorted(Comparator.comparingInt(Practice::getDisplayOrder).thenComparing(Practice::getName))
+                .sorted(Comparator.comparingInt(Practice::getPosition)
+                        .thenComparing(p -> p.getCurrentVersion().getName()))
                 .forEach(practice -> {
                     PracticeGroup group = practice.getGroup();
                     if (group != null) {
@@ -187,11 +204,12 @@ public class PracticeStandingService {
 
     /** The practices review is admitted for in the workspace today, and their slugs per group slug. */
     private Eligibility eligibility(Long workspaceId) {
-        PracticeAutonomy workspaceDefault =
-                workspaceReviewDefaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
         List<Practice> eligiblePractices = practiceRepository.findByWorkspaceId(workspaceId).stream()
-                .filter(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault)
-                        .admitsReview())
+                .filter(practice ->
+                        json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                                        .reviewedBy()
+                                        .by()
+                                == ReviewedByKind.HEPHAESTUS)
                 .toList();
         Map<String, List<String>> eligiblePracticesByGroup = new LinkedHashMap<>();
         for (Practice practice : eligiblePractices) {
@@ -218,77 +236,93 @@ public class PracticeStandingService {
      * the results themselves and still show it.
      */
     private StandingSnapshot snapshot(
-            List<PracticeResult> rows,
+            List<ResultView> rows,
             Set<UUID> visible,
             Eligibility eligibility,
             Map<UUID, String> deliveredGuidance,
             Instant since) {
-        Map<String, List<PracticeResult>> byPractice = visibleByPractice(LatestRun.perClaim(rows), visible);
-        Map<String, List<PracticeResult>> liveByPractice = visibleByPractice(LatestRun.perLiveClaim(rows), visible);
+        Map<String, List<ResultView>> byPractice = visibleByPractice(rows, visible);
+        Map<String, List<ResultView>> liveByPractice = visibleByPractice(
+                rows.stream()
+                        .filter(v -> v.review().getOrigin() == ReviewOrigin.EVENT
+                                || v.review().getOrigin() == ReviewOrigin.SCHEDULE)
+                        .toList(),
+                visible);
         Map<String, Practice> subjects = new LinkedHashMap<>();
         eligibility.practices().forEach(practice -> subjects.put(practice.getSlug(), practice));
 
-        List<StandingSnapshot.PracticeStanding> standings = new ArrayList<>();
+        List<StandingSnapshot.PracticeStandingSnapshot> standings = new ArrayList<>();
         for (Map.Entry<String, Practice> subject : subjects.entrySet()) {
             String slug = subject.getKey();
-            List<PracticeResult> group = byPractice.getOrDefault(slug, List.of());
+            List<ResultView> group = byPractice.getOrDefault(slug, List.of());
             PracticeEvidence evidence = group.isEmpty() ? null : PracticeEvidence.classify(group);
-            List<PracticeResult> observed = evidence == null ? List.of() : evidence.observed();
-            List<PracticeResult> liveRuns = liveByPractice.getOrDefault(slug, List.of());
+            List<ResultView> observed = evidence == null ? List.of() : evidence.observed();
+            List<ResultView> liveRuns = liveByPractice.getOrDefault(slug, List.of());
             PracticeTrend trend = practiceTrendService.calculatePractice(slug, liveRuns, since);
             Double share = evidence != null && evidence.hasStanding() ? standingShare(evidence, trend, since) : null;
             PracticeStandingDTO dto = evidence != null && share != null
                     ? toStanding(evidence, trend, deliveredGuidance, share)
                     : silentStanding(subject.getValue(), evidence);
-            standings.add(new StandingSnapshot.PracticeStanding(dto, observed, liveRuns, trend, share));
+            standings.add(new StandingSnapshot.PracticeStandingSnapshot(dto, observed, liveRuns, trend, share));
         }
-        standings.sort(Comparator.<StandingSnapshot.PracticeStanding>comparingInt(
-                        standing -> standing.dto().standing().rank())
+        standings.sort(Comparator.<StandingSnapshot.PracticeStandingSnapshot>comparingInt(
+                        standing -> StandingScale.rank(standing.dto().standing()))
                 .thenComparingInt(standing -> worstSeverityRank(standing.dto())));
-        Map<String, StandingSnapshot.PracticeStanding> practices = new LinkedHashMap<>();
+        Map<String, StandingSnapshot.PracticeStandingSnapshot> practices = new LinkedHashMap<>();
         standings.forEach(standing -> practices.put(standing.dto().slug(), standing));
         return new StandingSnapshot(practices, eligibility.practicesByGroup());
     }
 
     /**
-     * A practice with nothing to report, carrying WHICH silence it is ({@link PracticeStandingDTO.Standing#rank}
+     * A practice with nothing to report, carrying WHICH silence it is ({@link StandingScale#rank}
      * says why the two sort apart).
      *
      * <p>No trend either: a direction over evidence that produced no verdict would be a claim about nothing.
      */
-    private static PracticeStandingDTO silentStanding(Practice practice, @Nullable PracticeEvidence evidence) {
+    private PracticeStandingDTO silentStanding(Practice practice, @Nullable PracticeEvidence evidence) {
         boolean exercised = evidence != null && !evidence.withoutVerdict().isEmpty();
-        boolean notApplicableOnly = evidence != null
+        boolean doesNotApplyOnly = evidence != null
                 && exercised
-                && evidence.withoutVerdict().stream().allMatch(result -> result.getOutcome() == Outcome.NOT_APPLICABLE);
+                && evidence.withoutVerdict().stream()
+                        .allMatch(view -> view.result().getOutcome() == ResultOutcome.DOES_NOT_APPLY);
         PracticeGroup group = practice.getGroup();
         return new PracticeStandingDTO(
                 practice.getSlug(),
-                practice.getName(),
+                json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                        .name(),
                 group != null ? group.getSlug() : null,
                 group != null ? group.getName() : null,
-                practice.getWhyItMatters(),
-                practice.getWhatGoodLooksLike(),
-                exercised ? PracticeStandingDTO.Standing.NO_OPPORTUNITY : PracticeStandingDTO.Standing.NOT_OBSERVED,
+                json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                        .guidance()
+                        .whyItMatters(),
+                json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                        .guidance()
+                        .whatGoodLooksLike(),
+                exercised ? PracticeStanding.NO_OPPORTUNITY : PracticeStanding.NOT_OBSERVED,
                 List.of(),
                 List.of(),
                 null,
                 null,
-                notApplicableOnly);
+                doesNotApplyOnly);
     }
 
     /** One practice response, complete on first construction. */
-    private static PracticeStandingDTO toStanding(
+    private PracticeStandingDTO toStanding(
             PracticeEvidence evidence, PracticeTrend trend, Map<UUID, String> deliveredGuidance, double standingShare) {
         Practice practice = evidence.practice();
         PracticeGroup group = practice.getGroup();
         return new PracticeStandingDTO(
                 practice.getSlug(),
-                practice.getName(),
+                json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                        .name(),
                 group != null ? group.getSlug() : null,
                 group != null ? group.getName() : null,
-                practice.getWhyItMatters(),
-                practice.getWhatGoodLooksLike(),
+                json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                        .guidance()
+                        .whyItMatters(),
+                json.convertValue(practice.getCurrentVersion().getDefinition(), PracticeDefinition.class)
+                        .guidance()
+                        .whatGoodLooksLike(),
                 StandingScale.classify(standingShare),
                 feedback(evidence.problems(), MAX_FEEDBACK_PER_PRACTICE, deliveredGuidance),
                 feedback(evidence.strengths(), MAX_STRENGTHS_PER_PRACTICE, deliveredGuidance),
@@ -297,12 +331,20 @@ public class PracticeStandingService {
                 false);
     }
 
-    private static List<PracticeStandingResultDTO> feedback(
-            List<PracticeResult> practiceResults, int cap, Map<UUID, String> deliveredGuidance) {
+    private List<PracticeStandingResultDTO> feedback(
+            List<ResultView> practiceResults, int cap, Map<UUID, String> deliveredGuidance) {
         return practiceResults.stream()
                 .limit(cap)
-                .map(practiceResult ->
-                        PracticeStandingResultDTO.from(practiceResult, deliveredGuidance.get(practiceResult.getId())))
+                .map(view -> new PracticeStandingResultDTO(
+                        view.result().getId(),
+                        view.result().getSummary() == null
+                                ? view.item().label()
+                                : view.result().getSummary(),
+                        deliveredGuidance.get(view.result().getId()),
+                        view.result().getSeverity(),
+                        view.result().getOutcome(),
+                        view.item(),
+                        view.review().getOrigin()))
                 .toList();
     }
 
@@ -317,7 +359,7 @@ public class PracticeStandingService {
      *
      * <p>One rule over the newest {@link PracticeTrendService#standingWindow} opportunities, weighted by recency
      * ({@code PracticeTrend#recentMetShare}). The opportunities are the live runs the trend reads
-     * ({@link LatestRun#perLiveClaim}). Only a practice that no live run judged reads its requested and backfilled
+     * (current result occupancy). Only a practice that no live run judged reads its requested and backfilled
      * work instead, by the same rule, so the two populations are never mixed. The binary fallback answers a practice
      * whose verdicts no opportunity carries, such as one whose newest run on a piece of work reached no verdict.
      */
@@ -339,32 +381,29 @@ public class PracticeStandingService {
      * census.
      */
     private record PracticeEvidence(
-            Practice practice,
-            List<PracticeResult> problems,
-            List<PracticeResult> strengths,
-            List<PracticeResult> withoutVerdict) {
+            Practice practice, List<ResultView> problems, List<ResultView> strengths, List<ResultView> withoutVerdict) {
         /**
          * Partitions each result by its own kind; both positive shapes support the standing. Every problem
          * is kept, worst severity first: a recurrence key hashes the artifact, so a locus is single-artifact
          * by construction and nothing is withheld for lack of corroboration.
          */
-        static PracticeEvidence classify(List<PracticeResult> group) {
-            Practice practice = group.get(0).getPractice();
-            Map<Outcome, List<PracticeResult>> byOutcome =
-                    group.stream().collect(Collectors.groupingBy(PracticeResult::getOutcome));
+        static PracticeEvidence classify(List<ResultView> group) {
+            Practice practice = group.get(0).practice();
+            Map<ResultOutcome, List<ResultView>> byOutcome = group.stream()
+                    .collect(Collectors.groupingBy(view -> view.result().getOutcome()));
             return new PracticeEvidence(
                     practice,
-                    bucket(byOutcome, Outcome.NOT_MET).stream()
+                    bucket(byOutcome, ResultOutcome.NOT_MET).stream()
                             .sorted(Comparator.comparingInt(PracticeStandingService::severityRank))
                             .toList(),
-                    bucket(byOutcome, Outcome.MET),
+                    bucket(byOutcome, ResultOutcome.MET),
                     Stream.concat(
-                                    bucket(byOutcome, Outcome.NOT_APPLICABLE).stream(),
-                                    bucket(byOutcome, Outcome.UNDETERMINED).stream())
+                                    bucket(byOutcome, ResultOutcome.DOES_NOT_APPLY).stream(),
+                                    bucket(byOutcome, ResultOutcome.COULD_NOT_DETERMINE).stream())
                             .toList());
         }
 
-        private static List<PracticeResult> bucket(Map<Outcome, List<PracticeResult>> byOutcome, Outcome outcome) {
+        private static List<ResultView> bucket(Map<ResultOutcome, List<ResultView>> byOutcome, ResultOutcome outcome) {
             return byOutcome.getOrDefault(outcome, List.of());
         }
 
@@ -377,7 +416,7 @@ public class PracticeStandingService {
          * nothing rather than as work that was never reviewed. That is the same distinction
          * {@code NO_OPPORTUNITY} draws one level up.
          */
-        List<PracticeResult> observed() {
+        List<ResultView> observed() {
             return Stream.concat(Stream.concat(problems.stream(), strengths.stream()), withoutVerdict.stream())
                     .toList();
         }
@@ -395,7 +434,7 @@ public class PracticeStandingService {
      * @param eligiblePracticesByGroup the slugs of the practices review is admitted for, per group slug
      */
     public record StandingSnapshot(
-            Map<String, PracticeStanding> practices, Map<String, List<String>> eligiblePracticesByGroup) {
+            Map<String, PracticeStandingSnapshot> practices, Map<String, List<String>> eligiblePracticesByGroup) {
         /** The snapshot of someone nothing was read for: no practice at all. */
         public static final StandingSnapshot EMPTY = new StandingSnapshot(Map.of(), Map.of());
 
@@ -406,7 +445,7 @@ public class PracticeStandingService {
          * @param evidence everything the practice's latest runs said, verdict or not, in the order
          *     {@link PracticeEvidence#observed()} builds it: problems worst severity first, then strengths, then
          *     the rows that reached no verdict; empty for a practice nothing reached
-         * @param liveRuns each piece of work's newest live run ({@link LatestRun#perLiveClaim}): what the trend and
+         * @param liveRuns each piece of work's newest live run (current result occupancy): what the trend and
          *     the work resolution count
          * @param trend the trend the standing was read off, for a reader that needs the opportunities behind a
          *     standing rather than the label — which practices are holding, and over how many pieces of work
@@ -414,10 +453,10 @@ public class PracticeStandingService {
          *     aggregates THIS rather than the rendered labels, which would put 0.79 and 0.51 at the same
          *     weight. Kept out of {@link PracticeStandingDTO}: the developer-facing response carries no score.
          */
-        public record PracticeStanding(
+        public record PracticeStandingSnapshot(
                 PracticeStandingDTO dto,
-                List<PracticeResult> evidence,
-                List<PracticeResult> liveRuns,
+                List<ResultView> evidence,
+                List<ResultView> liveRuns,
                 PracticeTrend trend,
                 @Nullable Double share) {
 
@@ -430,46 +469,55 @@ public class PracticeStandingService {
              */
             public boolean isHolding(int window) {
                 PracticeTrend.CleanWork cleanWork = trend.cleanWork();
-                return dto.standing() == PracticeStandingDTO.Standing.STRENGTH
+                return dto.standing() == PracticeStanding.STRENGTH
+                        && cleanWork.count() >= WorkResolution.CLEAN_NEEDED
                         && cleanWork.count() >= Math.min(window, cleanWork.decidedWork());
             }
         }
 
         public List<PracticeStandingDTO> dtos() {
-            return practices.values().stream().map(PracticeStanding::dto).toList();
+            return practices.values().stream()
+                    .map(PracticeStandingSnapshot::dto)
+                    .toList();
         }
     }
 
     /**
      * The lanes whose text this read model's guidance means: the ones that speak about the one result
-     * they are bound to. {@code IN_APP} is excluded because it is feedback about a way of working across several
+     * they are bound to. {@code PRACTICE_PAGE} is excluded because it is feedback about a way of working across several
      * pieces of work, so it would answer "what did you tell me about this result" with a paragraph that
      * is explicitly not about it.
      */
-    private static final List<String> FEEDBACK_CHANNELS =
-            List.of(FeedbackChannel.IN_CONTEXT.name(), FeedbackChannel.IN_CHAT.name());
-
-    private Map<UUID, String> deliveredGuidanceByResult(Long workspaceId, Set<UUID> practiceResultIds) {
-        if (practiceResultIds.isEmpty()) {
-            return Map.of();
-        }
-        return feedbackEvidenceRepository
-                .findLatestFeedbackBodiesByResultIds(workspaceId, practiceResultIds, FEEDBACK_CHANNELS)
+    private Map<UUID, String> deliveredGuidanceByResult(Long ws, Set<UUID> ids) {
+        if (ids.isEmpty()) return Map.of();
+        return jdbc
+                .sql("""
+                    SELECT DISTINCT ON (b.result_id) b.result_id,f.body FROM feedback_basis b JOIN feedback f
+                      ON f.id=b.feedback_id AND f.workspace_id=b.workspace_id
+                    WHERE b.workspace_id=:ws AND b.result_id IN (:ids) AND f.state='DELIVERED'
+                      AND f.destination IN ('ON_WORK','CONVERSATION') AND f.body IS NOT NULL
+                      AND NOT COALESCE((SELECT d.action='WITHDRAW' FROM feedback_decision d WHERE d.workspace_id=f.workspace_id AND d.feedback_id=f.id AND d.action IN ('WITHDRAW','RESTORE') ORDER BY d.decided_at DESC,d.id::text DESC LIMIT 1),false)
+                    ORDER BY b.result_id,f.delivered_at DESC,f.id::text DESC
+                    """)
+                .param("ws", ws)
+                .param("ids", ids)
+                .query((rs, n) -> Map.entry(rs.getObject(1, UUID.class), rs.getString(2)))
+                .list()
                 .stream()
-                .collect(Collectors.toMap(ResultFeedbackBody::getPracticeResultId, ResultFeedbackBody::getBody));
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private static final int UNRANKED = Integer.MAX_VALUE;
 
     private static int worstSeverityRank(PracticeStandingDTO practiceStanding) {
         return practiceStanding.toWorkOn().stream()
-                .mapToInt(practiceResult -> rankOf(practiceResult.severity()))
+                .mapToInt(result -> rankOf(result.severity()))
                 .min()
                 .orElse(UNRANKED);
     }
 
-    private static int severityRank(PracticeResult practiceResult) {
-        return rankOf(practiceResult.getSeverity());
+    private static int severityRank(ResultView view) {
+        return rankOf(view.result().getSeverity());
     }
 
     /** Ranks a missing severity after every severity. */

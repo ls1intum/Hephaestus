@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.github.issue;
 
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
@@ -17,6 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.events.EventContext;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmDomainEvent;
+import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.BaseGitHubProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueDTO;
 import de.tum.cit.aet.hephaestus.integration.scm.github.issue.dto.GitHubIssueTypeDTO;
@@ -38,13 +38,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Unified processor for GitHub issues, converting GitHubIssueDTO to Issue entities and
- * persisting them. Used by both the GraphQL sync service and webhook handlers.
- * <p>
- * Some sync operations (dependency sync, sub-issue sync) need "stub" issues for referential
- * integrity — e.g., a blocking issue that exists in the org but hasn't been synced yet. Use
- * {@link #processStub} for these; stubs carry minimal data, don't trigger domain events, and
- * are hydrated later by the full issue sync or webhook.
+ * Unified processor for GitHub issues, converting GitHubIssueDTO to Issue entities and persisting
+ * them. Used by both the GraphQL sync service and webhook handlers.
+ *
+ * <p>Some sync operations (dependency sync, sub-issue sync) need "stub" issues for referential
+ * integrity — e.g., a blocking issue that exists in the org but hasn't been synced yet. Use {@link
+ * #processStub} for these; stubs carry minimal data, don't trigger domain events, and are hydrated
+ * later by the full issue sync or webhook.
  */
 @Service
 public class GitHubIssueProcessor extends BaseGitHubProcessor {
@@ -76,11 +76,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Whether this payload is a pull request rather than an issue. GitHub's REST issue payloads carry
-     * {@code pull_request} for a pull request, and issues and pull requests share one number space per
-     * repository, so a number this repository already stores as a pull request is not an issue either.
-     * The stored check reads current state only; it does not lock against a pull request written
-     * concurrently. The payload's issue id is never a pull request id.
+     * Whether this payload is a pull request rather than an issue. GitHub's REST issue payloads
+     * carry {@code pull_request} for a pull request, and issues and pull requests share one number
+     * space per repository, so a number this repository already stores as a pull request is not an
+     * issue either. The stored check reads current state only; it does not lock against a pull
+     * request written concurrently. The payload's issue id is never a pull request id.
      */
     private boolean namesPullRequest(GitHubIssueDTO dto, ProcessingContext context) {
         if (dto.isPullRequest()) return true;
@@ -92,12 +92,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Process a GitHub issue DTO and persist it as an Issue entity.
-     * Publishes appropriate domain events based on what changed.
-     * <p>
-     * Use this method for real issue data from webhooks or full sync operations.
-     * For creating placeholder issues (e.g., for dependency relationships),
-     * use {@link #processStub} instead.
+     * Process a GitHub issue DTO and persist it as an Issue entity. Publishes appropriate domain
+     * events based on what changed.
+     *
+     * <p>Use this method for real issue data from webhooks or full sync operations. For creating
+     * placeholder issues (e.g., for dependency relationships), use {@link #processStub} instead.
      */
     @Transactional
     public @Nullable Issue process(GitHubIssueDTO dto, ProcessingContext context) {
@@ -106,11 +105,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
 
     /**
      * Process a GitHub issue DTO as a "stub" entity for referential integrity. Does NOT publish
-     * domain events. Used for placeholder issues needed for relationships (blocking issues,
-     * parent issues) or when comment webhooks arrive before the issue/PR webhook; the stub is
-     * later hydrated with full data by the real issue webhook or scheduled sync.
+     * domain events. Used for placeholder issues needed for relationships (blocking issues, parent
+     * issues) or when comment webhooks arrive before the issue/PR webhook; the stub is later
+     * hydrated with full data by the real issue webhook or scheduled sync.
      *
-     * @param dto     the issue DTO (may have incomplete data)
+     * @param dto the issue DTO (may have incomplete data)
      * @param context the processing context
      * @return the created or updated Issue entity, or null if creation failed
      */
@@ -123,11 +122,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * Uses atomic upsert to prevent race conditions when concurrent threads (e.g., multiple NATS
      * consumers or webhook handlers) process the same issue.
      *
-     * @param dto           the issue DTO
-     * @param context       the processing context
+     * @param dto the issue DTO
+     * @param context the processing context
      * @param publishEvents whether to publish domain events (false for stubs)
-     * @param emitDerivedEvents whether to derive update and close events from the mirror; an explicit
-     *                          close publishes its own lifecycle event
+     * @param emitDerivedEvents whether to derive update and close events from the mirror; an
+     *     explicit close publishes its own lifecycle event
      * @return the created or updated Issue entity
      */
     private @Nullable Issue processInternal(
@@ -193,7 +192,9 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
         Issue issue = issueRepository
                 .findByRepositoryIdAndNumber(repository.getId(), dto.number())
                 .orElseThrow(() -> new IllegalStateException("Issue not found after upsert: repositoryId="
-                        + repository.getId() + ", number=" + dto.number()));
+                        + repository.getId()
+                        + ", number="
+                        + dto.number()));
 
         // ManyToMany relationships (labels, assignees) can't be handled by the native upsert.
         boolean relationshipsChanged = updateRelationships(dto, issue, repository, providerId);
@@ -235,7 +236,8 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * Updates ManyToMany relationships (labels, assignees) that can't be handled by the atomic upsert.
+     * Updates ManyToMany relationships (labels, assignees) that can't be handled by the atomic
+     * upsert.
      *
      * @return true if any relationships were changed
      */
@@ -248,10 +250,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
     }
 
     /**
-     * What this delivery moved, in the field vocabulary {@code ScmDomainEvent.IssueUpdated} carries.
-     * Reports every field the mirror tracks rather than only the review-relevant ones: which of them are
-     * worth a review is the review pipeline's decision, and which are worth a cache eviction is the
-     * mentor's, so narrowing here would silently answer both questions at once.
+     * What this delivery moved, in the field vocabulary {@code ScmDomainEvent.IssueUpdated}
+     * carries. Reports every field the mirror tracks rather than only the review-relevant ones:
+     * which of them are worth a review is the review pipeline's decision, and which are worth a
+     * cache eviction is the mentor's, so narrowing here would silently answer both questions at
+     * once.
      */
     private Set<String> computeChangedFields(Issue oldIssue, Issue newIssue) {
         Set<String> changedFields = new HashSet<>();
@@ -389,10 +392,11 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
      * Process a {@code transferred} event: the issue has moved to another repository and no longer
      * exists in this one.
      *
-     * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is the
-     * source-side issue. Routing it to {@link #process} would re-upsert the issue into the repository
-     * it had just left, creating a permanent phantom instead of removing one. A transfer is not a
-     * delete event, but from this repository's perspective the outcome is identical: the issue is gone.
+     * <p>GitHub delivers {@code transferred} to the SOURCE repository, and the payload's issue is
+     * the source-side issue. Routing it to {@link #process} would re-upsert the issue into the
+     * repository it had just left, creating a permanent phantom instead of removing one. A transfer
+     * is not a delete event, but from this repository's perspective the outcome is identical: the
+     * issue is gone.
      *
      * <p>Tombstoned rather than deleted, matching the {@code RECONCILIATION} sweep: the issue's
      * feedback/result rows reference it by bare id with no FK, so removing the row would orphan
@@ -414,7 +418,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     issue.setDeletedAt(Instant.now());
                     issueRepository.save(issue);
                     log.info(
-                            "Tombstoned transferred issue: issueId={}, number={}, repoId={}",
+                            "Tombstoned transferred issue: issueId={}, number={}," + " repoId={}",
                             issue.getId(),
                             issueDto.number(),
                             Objects.requireNonNull(context.repository(), "Issue event requires a repository")
@@ -441,9 +445,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                 });
     }
 
-    /**
-     * Issues cannot be MERGED - only PRs can. This only handles OPEN/CLOSED.
-     */
+    /** Issues cannot be MERGED - only PRs can. This only handles OPEN/CLOSED. */
     private Issue.@Nullable State convertState(@Nullable String state) {
         if (state == null) {
             return Issue.State.OPEN;
@@ -482,7 +484,7 @@ public class GitHubIssueProcessor extends BaseGitHubProcessor {
                     organizationRepository.findByLoginIgnoreCaseAndProvider_Type(orgLogin, IdentityProviderType.GITHUB);
             if (orgOpt.isEmpty()) {
                 log.warn(
-                        "Skipped issue type creation: reason=orgNotFound, issueTypeName={}, orgLogin={}",
+                        "Skipped issue type creation: reason=orgNotFound," + " issueTypeName={}, orgLogin={}",
                         dto.name(),
                         orgLogin);
                 return null;

@@ -41,9 +41,10 @@ public class GitLabWorkspaceLinkService {
     }
 
     /**
-     * Whether this scope may apply a destructive diff to a shared repository's rows: it monitors the repository,
-     * which lies inside the group it may write per {@link #groupWriteProvider}. Callers check again inside the write,
-     * since a listing can outlast a monitor, a connection or a link.
+     * Whether this scope may apply a destructive diff to a shared repository's rows: it monitors
+     * the repository, which lies inside the group it may write per {@link #groupWriteProvider}.
+     * Callers check again inside the write, since a listing can outlast a monitor, a connection or
+     * a link.
      */
     @Transactional(readOnly = true)
     public boolean mayWriteRepository(long scopeId, Repository repository) {
@@ -55,7 +56,11 @@ public class GitLabWorkspaceLinkService {
         return workspaceRepository
                 .findById(scopeId)
                 .map(workspace -> {
-                    Organization linked = workspace.getOrganization();
+                    Organization linked = workspace.getOrganizationId() == null
+                            ? null
+                            : organizationRepository
+                                    .findById(workspace.getOrganizationId())
+                                    .orElse(null);
                     return linked != null ? linked.getLogin() : workspace.getAccountLogin();
                 })
                 .filter(groupPath -> path.length() > groupPath.length()
@@ -84,8 +89,9 @@ public class GitLabWorkspaceLinkService {
     }
 
     /**
-     * The connected instance under which this scope writes the group at {@code groupPath}, while it may per
-     * {@link #mayWriteGroup} or the group is not synced yet and is this unlinked workspace's own; empty otherwise.
+     * The connected instance under which this scope writes the group at {@code groupPath}, while it
+     * may per {@link #mayWriteGroup} or the group is not synced yet and is this unlinked
+     * workspace's own; empty otherwise.
      */
     @Transactional(readOnly = true)
     public Optional<IdentityProvider> groupWriteProvider(long scopeId, String groupPath) {
@@ -100,16 +106,17 @@ public class GitLabWorkspaceLinkService {
                         .map(organization -> ownsGroup(scopeId, organization))
                         .orElseGet(() -> workspaceRepository
                                 .findById(scopeId)
-                                .filter(workspace -> workspace.getOrganization() == null)
+                                .filter(workspace -> workspace.getOrganizationId() == null)
                                 .map(workspace -> groupPath.equalsIgnoreCase(workspace.getAccountLogin()))
                                 .orElse(false)))
                 .flatMap(identityProviderRepository::findById);
     }
 
     /**
-     * Whether a scope may write an organization's roster and teams: it is connected to the organization's instance
-     * and linked to it, or unlinked at its path while no other workspace is. Another workspace on the same group reads
-     * it with its own, possibly narrower, credentials, and what those miss proves nothing.
+     * Whether a scope may write an organization's roster and teams: it is connected to the
+     * organization's instance and linked to it, or unlinked at its path while no other workspace
+     * is. Another workspace on the same group reads it with its own, possibly narrower,
+     * credentials, and what those miss proves nothing.
      */
     @Transactional(readOnly = true)
     public boolean mayWriteGroup(long scopeId, Organization organization) {
@@ -124,7 +131,11 @@ public class GitLabWorkspaceLinkService {
         return workspaceRepository
                 .findById(scopeId)
                 .map(workspace -> {
-                    Organization linked = workspace.getOrganization();
+                    Organization linked = workspace.getOrganizationId() == null
+                            ? null
+                            : organizationRepository
+                                    .findById(workspace.getOrganizationId())
+                                    .orElse(null);
                     if (linked != null) {
                         return Objects.equals(linked.getId(), organization.getId());
                     }
@@ -136,12 +147,13 @@ public class GitLabWorkspaceLinkService {
 
     @Transactional
     public void link(Workspace workspace) {
-        if (workspace.getOrganization() != null
+        if (workspace.getOrganizationId() != null
                 || workspace.getAccountLogin() == null
                 || workspace.getAccountLogin().isBlank()) {
             return;
         }
-        // Another GitLab instance can host the same group path, so only the connected instance's row is linked.
+        // Another GitLab instance can host the same group path, so only the connected instance's
+        // row is linked.
         actorSelector
                 .connectedProviderId(workspace.getId())
                 .flatMap(providerId -> organizationRepository.findByLoginIgnoreCaseAndProviderId(
@@ -150,20 +162,20 @@ public class GitLabWorkspaceLinkService {
                     if (workspaceRepository.existsByOrganizationId(org.getId())
                             && !workspaceRepository.existsByIdAndOrganizationId(workspace.getId(), org.getId())) {
                         log.warn(
-                                "Organization already linked to another workspace: orgId={}, workspaceId={}",
+                                "Organization already linked to another workspace:" + " orgId={}, workspaceId={}",
                                 org.getId(),
                                 workspace.getId());
                         return;
                     }
                     workspaceRepository
                             .findById(workspace.getId())
-                            .filter(current -> current.getOrganization() == null)
+                            .filter(current -> current.getOrganizationId() == null)
                             .ifPresent(current -> {
-                                current.setOrganization(org);
+                                current.setOrganizationId(org.getId());
                                 workspaceRepository.save(current);
-                                workspace.setOrganization(org);
+                                workspace.setOrganizationId(org.getId());
                                 log.info(
-                                        "Linked organization to workspace: orgId={}, workspaceId={}",
+                                        "Linked organization to workspace:" + " orgId={}, workspaceId={}",
                                         org.getId(),
                                         current.getId());
                             });

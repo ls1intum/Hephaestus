@@ -97,7 +97,7 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
             try (var admission = copies.erase()) {
                 writer = executor.submit(() -> new TransactionTemplate(transactions).execute(status -> {
                     writerPid.set(
-                            Objects.requireNonNull(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class)));
+                            Objects.requireNonNull(jdbc.queryForObject("SELECT" + " pg_backend_pid()", Integer.class)));
                     return connectionService.transition(
                             source,
                             new ConnectionService.TransitionRequest(
@@ -111,12 +111,17 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
                 await().atMost(Duration.ofSeconds(10))
                         .until(() -> writerPid.get() != 0
                                 && Boolean.TRUE.equals(jdbc.queryForObject(
-                                        "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE pid=? AND wait_event='advisory')",
+                                        "SELECT EXISTS(SELECT 1 FROM"
+                                                + " pg_stat_activity WHERE"
+                                                + " pid=? AND"
+                                                + " wait_event='advisory')",
                                         Boolean.class,
                                         writerPid.get())));
                 assertThat(writer.isDone()).isFalse();
                 jdbc.update(
-                        "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
+                        "INSERT INTO"
+                                + " identity_restriction(id,provider_id,provider_user_key,team_key,kind)"
+                                + " VALUES (?,?,?,?,'ERASED')",
                         UUID.randomUUID(),
                         original.getId(),
                         "native-42",
@@ -129,7 +134,8 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
                 .orElseThrow()
                 .getId());
         assertThat(jdbc.queryForObject(
-                        "SELECT count(*) FROM person_suppression WHERE provider_id=? AND subject='native-42' AND team_key=''",
+                        "SELECT count(*) FROM identity_restriction WHERE provider_id=? AND"
+                                + " provider_user_key='native-42' AND team_key=''",
                         Long.class,
                         aliasId))
                 .isEqualTo(1L);
@@ -206,14 +212,15 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
                         "state",
                         "OPEN"));
         jdbc.update(
-                "INSERT INTO person_suppression(id,provider_id,subject,team_key) VALUES (?,?,?,?)",
+                "INSERT INTO identity_restriction(id,provider_id,provider_user_key,team_key,kind)"
+                        + " VALUES (?,?,?,?,'ERASED')",
                 UUID.randomUUID(),
                 provider.getId(),
                 "42",
                 "");
-        assertThat(suppression.isArtifactSuppressed(first.getWorkspace().getId(), "scm.issue", 812502L))
+        assertThat(suppression.isSourceSuppressed(first.getWorkspace().getId(), "scm.issue", 812502L))
                 .isTrue();
-        assertThat(suppression.isArtifactSuppressed(second.getWorkspace().getId(), "scm.issue", 812502L))
+        assertThat(suppression.isSourceSuppressed(second.getWorkspace().getId(), "scm.issue", 812502L))
                 .isFalse();
     }
 
@@ -255,9 +262,9 @@ class SourceProviderNamespacesIntegrationTest extends BaseIntegrationTest {
         var mirrored = document(second, "native-42", "needle needle needle");
         var other = document(second, "native-84", "needle");
         long workspaceId = Objects.requireNonNull(second.getWorkspace().getId());
-        assertThat(suppression.isArtifactSuppressed(workspaceId, "docs.document", mirrored.getId()))
+        assertThat(suppression.isSourceSuppressed(workspaceId, "docs.document", mirrored.getId()))
                 .isTrue();
-        assertThat(suppression.isArtifactSuppressed(workspaceId, "docs.document", other.getId()))
+        assertThat(suppression.isSourceSuppressed(workspaceId, "docs.document", other.getId()))
                 .isFalse();
         assertThat(documents.searchByRelevance(workspaceId, "needle", 1))
                 .extracting(OutlineDocument::getId)
