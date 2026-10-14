@@ -16,7 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Folds one check event into the head-check state of every pull request whose head it is about. A
  * suite or a commit status is one voice among the head's checks, so it can only worsen a state
  * already recorded for that head ({@link PullRequest#observeHeadChecks}); the next GraphQL sync
- * reads GitHub's own rollup and settles it.
+ * reads GitHub's own rollup and settles it. Each row is locked before reading its state, so
+ * concurrent events compare against the last committed observation.
  */
 @Service
 public class GitHubHeadCheckProcessor {
@@ -32,7 +33,7 @@ public class GitHubHeadCheckProcessor {
     @Transactional
     public void observe(String sha, CheckState state, ProcessingContext context) {
         long repositoryId = Objects.requireNonNull(context.repository()).getId();
-        for (PullRequest pr : pullRequestRepository.findAllByRepository_IdAndHeadRefOid(repositoryId, sha)) {
+        for (PullRequest pr : pullRequestRepository.findAllForUpdateByRepositoryIdAndHeadRefOid(repositoryId, sha)) {
             if (pr.observeHeadChecks(sha, state, false)) {
                 pullRequestRepository.save(pr);
                 log.debug("Observed head checks: prId={}, sha={}, state={}", pr.getId(), sha, state);
