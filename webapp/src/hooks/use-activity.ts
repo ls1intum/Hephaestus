@@ -25,6 +25,7 @@ import type { ActivityWorkLogState } from "@/components/activity/ActivityWorkLog
 import type { OpenWorkState } from "@/components/activity/OpenWorkSections";
 import { workLogMarkdown } from "@/components/activity/work-log-markdown";
 import { panelState } from "@/components/common/panel-state";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { copyRichText } from "@/lib/clipboard";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
@@ -59,23 +60,39 @@ function scopeQuery({ period, team, repo }: ActivityScope) {
 
 /**
  * Everyone who contributed in the scope, in one response the table sorts in the browser. While
- * another period loads, the previous period's people stand in, marked stale.
+ * another period loads, the previous period's people stand in, marked stale. A failed refresh that
+ * can be retried keeps this scope's people, with the failure beside them; a refused one does not.
  */
 export function useActivityPeople({
 	enabled = true,
 	...scope
 }: ActivityRequest): ActivityPeopleState {
 	const { workspaceSlug, team, repo } = scope;
+	const options = getActivityPeopleOptions({ path: { workspaceSlug }, query: scopeQuery(scope) });
 	const query = useQuery({
-		...getActivityPeopleOptions({ path: { workspaceSlug }, query: scopeQuery(scope) }),
+		...options,
 		placeholderData: keepSameSubject({ workspaceSlug, team, repo }),
 		enabled,
 	});
-	return panelState(query, (people) => ({
+	useQueryReadRefusal(options.queryKey, query.isError, query.error);
+	const ready = (people: ActivityPeople) => ({
 		status: "ready" as const,
 		people,
 		stale: query.isPlaceholderData,
-	}));
+	});
+	if (query.isRefetchError && queryErrorIsRetryable(query.error)) {
+		return {
+			...ready(query.data),
+			refreshFailure: {
+				error: query.error,
+				pending: query.isFetching,
+				onRetry: () => {
+					void query.refetch();
+				},
+			},
+		};
+	}
+	return panelState(query, ready);
 }
 
 /**

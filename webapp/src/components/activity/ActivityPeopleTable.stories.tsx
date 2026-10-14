@@ -243,6 +243,55 @@ export const Failed: Story = {
 	},
 };
 
+/** A failed refresh keeps the people already read, with a warning and Retry above them. */
+export const RefreshFailed: Story = {
+	args: {
+		state: {
+			status: "ready",
+			people: peopleOf(PEOPLE),
+			stale: false,
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("alert")).toHaveTextContent("We could not refresh people");
+		const table = canvas.getByRole("table", { name: "People" });
+		await expect(within(table).getAllByRole("link")).toHaveLength(PEOPLE.length);
+	},
+};
+
+/** While the refresh is tried again, its Retry is busy and the people stay. */
+export const RefreshRetrying: Story = {
+	args: {
+		state: {
+			status: "ready",
+			people: peopleOf(PEOPLE),
+			stale: false,
+			refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
+		await expect(canvas.getByRole("table", { name: "People" })).toBeVisible();
+	},
+};
+
+/** A range that was read as empty stays empty when its refresh fails, with the warning above it. */
+export const RefreshFailedEmpty: Story = {
+	args: {
+		state: {
+			status: "ready",
+			people: peopleOf([]),
+			stale: false,
+			refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("alert")).toHaveTextContent("We could not refresh people");
+		await expect(canvas.getByText("No activity in this range")).toBeVisible();
+	},
+};
+
 export const Dark: Story = { globals: { theme: "dark" } };
 
 /** GitLab's own icons and colours: Pajamas merge requests, merged in blue. */

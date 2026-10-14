@@ -74,6 +74,20 @@ const people = {
 	],
 } satisfies Wire<ActivityPeople>;
 
+function servePeople(answers: readonly (Wire<ActivityPeople> | { status: number })[]) {
+	const served: { path: string; status: number }[] = [];
+	server.use(
+		http.get("*/workspaces/:workspaceSlug/activity/people", ({ request }) => {
+			const answer = answers[served.length];
+			assert(answer, "People read exceeded the prepared responses");
+			const status = "status" in answer ? answer.status : 200;
+			served.push({ path: new URL(request.url).pathname, status });
+			return HttpResponse.json(answer, { status });
+		}),
+	);
+	return served;
+}
+
 const personDetail = {
 	from: people.from,
 	to: people.to,
@@ -709,6 +723,106 @@ describe("Workspace activity", () => {
 		expect(first?.search).toBe("?range=90d");
 		expect(readsOf("/activity/work")).toHaveLength(0);
 		expect(router.state.location.href).toBe("/w/acme/workspace-activity");
+	});
+
+	describe("People read recovery", () => {
+		const recoveredPeople = {
+			...people,
+			people: people.people.slice(0, 1).map((entry) => ({
+				...entry,
+				person: { ...entry.person, id: 19, login: "grace", name: "Grace" },
+			})),
+		};
+		const queryKey = getActivityPeopleQueryKey({
+			path: { workspaceSlug: "acme" },
+			query: { range: "90d" },
+		});
+
+		it("keeps the same workspace's people through a failed refresh and retries the warning", async () => {
+			const user = userEvent.setup();
+			const served = servePeople([people, { status: 503 }, recoveredPeople]);
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/workspace-activity");
+			await screen.findByRole("table", { name: "People" }, ROUTE_RENDER_WAIT);
+			await act(async () => {
+				await queryClient.invalidateQueries({ queryKey, exact: true });
+			});
+
+			const warning = await screen.findByRole("alert");
+			expect(served.map(({ status }) => status)).toStrictEqual([200, 503]);
+			expect(screen.queryByRole("table", { name: "People" })).not.toBeNull();
+			expect(screen.queryByRole("link", { name: "Bob" })).not.toBeNull();
+			await user.click(within(warning).getByRole("button", { name: "Retry" }));
+
+			await screen.findByRole("link", { name: "Grace" });
+			expect(served.map(({ status }) => status)).toStrictEqual([200, 503, 200]);
+			expect(screen.queryByRole("link", { name: "Bob" })).toBeNull();
+			expect(screen.queryByRole("alert")).toBeNull();
+		});
+
+		it("does not call a failed first People read empty and retries it", async () => {
+			const user = userEvent.setup();
+			const served = servePeople([{ status: 503 }, recoveredPeople]);
+			renderRouteAtWithRouter("/w/acme/workspace-activity");
+			const warning = await screen.findByRole("alert", undefined, ROUTE_RENDER_WAIT);
+
+			expect(screen.queryByRole("table", { name: "People" })).toBeNull();
+			expect(screen.queryByText(/^No activity/u)).toBeNull();
+			await user.click(within(warning).getByRole("button", { name: "Retry" }));
+			await screen.findByRole("link", { name: "Grace" });
+			expect(served.map(({ status }) => status)).toStrictEqual([503, 200]);
+		});
+
+		it("keeps refused people hidden through a later outage until an authorized read", async () => {
+			const served = servePeople([people, { status: 403 }, { status: 503 }, recoveredPeople]);
+			const { queryClient } = renderRouteAtWithRouter("/w/acme/workspace-activity");
+			await screen.findByRole("table", { name: "People" }, ROUTE_RENDER_WAIT);
+			const refresh = async () => {
+				await act(async () => {
+					await queryClient.invalidateQueries({ queryKey, exact: true });
+				});
+			};
+
+			await refresh();
+			await screen.findByText("Ask a workspace admin or instance admin for access.");
+			expect(screen.queryByRole("table", { name: "People" })).toBeNull();
+			await refresh();
+			await screen.findByRole("button", { name: "Retry" });
+			expect(screen.queryByRole("table", { name: "People" })).toBeNull();
+			expect(screen.queryByRole("link", { name: "Bob" })).toBeNull();
+			await refresh();
+
+			await screen.findByRole("link", { name: "Grace" });
+			expect(served.map(({ status }) => status)).toStrictEqual([200, 403, 503, 200]);
+			expect(screen.queryByRole("link", { name: "Bob" })).toBeNull();
+		});
+
+		it("shows none of the previous workspace's people when the next workspace read fails", async () => {
+			const user = userEvent.setup();
+			const served = servePeople([people, { status: 503 }, recoveredPeople]);
+			server.use(
+				http.get("*/workspaces", () =>
+					HttpResponse.json([workspaceListItem("acme"), workspaceListItem("other")]),
+				),
+				http.get("*/workspaces/other", () => HttpResponse.json(workspaceListItem("other"))),
+			);
+			const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity");
+			await screen.findByRole("table", { name: "People" }, ROUTE_RENDER_WAIT);
+			await router.navigate({
+				to: "/w/$workspaceSlug/workspace-activity",
+				params: { workspaceSlug: "other" },
+			});
+			const warning = await screen.findByRole("alert");
+
+			expect(screen.queryByRole("table", { name: "People" })).toBeNull();
+			expect(screen.queryByRole("link", { name: "Bob" })).toBeNull();
+			await user.click(within(warning).getByRole("button", { name: "Retry" }));
+			await screen.findByRole("link", { name: "Grace" });
+			expect(served).toStrictEqual([
+				{ path: "/workspaces/acme/activity/people", status: 200 },
+				{ path: "/workspaces/other/activity/people", status: 503 },
+				{ path: "/workspaces/other/activity/people", status: 200 },
+			]);
+		});
 	});
 
 	it("opens the timeline independently and retains the scope and sort when switching views", async () => {

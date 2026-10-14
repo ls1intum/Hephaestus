@@ -26,6 +26,7 @@ import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ProviderType } from "@/lib/provider/provider-terms";
 import { nameOrder } from "@/lib/text";
+import type { RefreshFailure } from "@/runtime/tanstack-query/infinite-list";
 
 import { NoneMark } from "./ActionChip";
 import type { PeopleRow, PeopleRows } from "./activity-people-rows";
@@ -37,11 +38,22 @@ import { ActivitySparkline } from "./ActivitySparkline";
 import { MemberAvatar } from "./MemberAvatar";
 import { competitionPositions, PEOPLE_COUNTS } from "./people-positions";
 
-/** The people once they are in, and whether they are the previous period's while another loads. */
-export type PeopleTableState = PanelState<{ people: PeopleRows; stale: boolean }>;
+/**
+ * The people once they are in, whether they are the previous period's while another loads, and why
+ * reading them again failed while they stay.
+ */
+export type PeopleTableState = PanelState<{
+	people: PeopleRows;
+	stale: boolean;
+	refreshFailure?: RefreshFailure;
+}>;
 
 /** Workspace activity's people, with the automation and coverage the table leaves to its page. */
-export type ActivityPeopleState = PanelState<{ people: ActivityPeople; stale: boolean }>;
+export type ActivityPeopleState = PanelState<{
+	people: ActivityPeople;
+	stale: boolean;
+	refreshFailure?: RefreshFailure;
+}>;
 
 export interface PeopleOrder {
 	sort: PeopleSort;
@@ -281,6 +293,15 @@ export function ActivityPeopleTable({
 					error={state.error}
 					title="We could not load people"
 					onRetry={state.onRetry}
+				/>
+			)}
+			{/* The people already read stay, but a reader must know they may be out of date. */}
+			{state.status === "ready" && state.refreshFailure !== undefined && (
+				<QueryErrorAlert
+					error={state.refreshFailure.error}
+					title="We could not refresh people"
+					pending={state.refreshFailure.pending}
+					onRetry={state.refreshFailure.onRetry}
 				/>
 			)}
 			{empty && (
