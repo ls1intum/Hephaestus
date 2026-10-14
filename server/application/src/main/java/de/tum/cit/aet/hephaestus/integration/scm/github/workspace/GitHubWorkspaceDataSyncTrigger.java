@@ -201,7 +201,11 @@ public class GitHubWorkspaceDataSyncTrigger implements WorkspaceDataSyncTrigger 
                     // across the multi-repo loop of a full sync) add nothing here. When a broader sync is
                     // already running on this connection, the SyncJobConflictException below intentionally
                     // absorbs this single-target resync, since the in-flight full sync already covers it.
-                    handle -> dataSyncServiceProvider.getObject().syncSyncTarget(target));
+                    handle -> {
+                        if (!dataSyncServiceProvider.getObject().syncSyncTarget(target)) {
+                            handle.reportWarnings();
+                        }
+                    });
         } catch (SyncJobConflictException e) {
             log.info(
                     "Skipped single-target sync: reason=activeJobAlready, workspaceId={}, syncTargetId={}, activeJobId={}",

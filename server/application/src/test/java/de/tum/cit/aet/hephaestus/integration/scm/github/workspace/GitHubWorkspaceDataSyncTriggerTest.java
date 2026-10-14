@@ -72,7 +72,7 @@ class GitHubWorkspaceDataSyncTriggerTest extends BaseUnitTest {
         when(connection.getId()).thenReturn(99L);
         doAnswer(invocation -> {
                     Consumer<SyncJobHandle> body = invocation.getArgument(1);
-                    body.accept(null);
+                    body.accept(handle);
                     return null;
                 })
                 .when(syncJobService)

@@ -190,6 +190,72 @@ class GitHubLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void shouldRecordWarningsAndRecoverWhenFullSyncHasAnIncompleteIssuePhase(boolean app) {
+        Run run = connect(app);
+        stubIssueOutcome(first, SyncResult.abortedError(0));
+
+        run.trigger().syncAllRepositories(workspace.getId());
+
+        assertThat(processed).containsExactlyInAnyOrder(first.getId(), second.getId());
+        assertIssuesIncomplete(first);
+        assertCompleted(second);
+        RepositoryToMonitor completedSibling = monitor(second);
+        SyncJob warning = assertWarnings(run);
+
+        stubIssueOutcome(first, SyncResult.completed(1));
+        run.trigger().syncAllRepositories(workspace.getId());
+
+        assertThat(processed).containsExactlyInAnyOrder(first.getId(), second.getId(), first.getId());
+        assertCompleted(first);
+        assertSameProgress(second, completedSibling);
+        assertSuccessfulAfter(run, warning);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldRecordWarningsAndRecoverWhenSingleTargetSyncHasAnIncompleteIssuePhase(boolean app) {
+        Run run = connect(app);
+        long syncTargetId = Objects.requireNonNull(monitor(first).getId());
+        stubIssueOutcome(first, SyncResult.abortedError(0));
+
+        run.trigger().syncSingleSyncTarget(syncTargetId);
+
+        assertThat(processed).containsExactly(first.getId());
+        assertIssuesIncomplete(first);
+        assertUntouched(second);
+        SyncJob warning = assertWarnings(run);
+
+        stubIssueOutcome(first, SyncResult.completed(1));
+        run.trigger().syncSingleSyncTarget(syncTargetId);
+
+        assertThat(processed).containsExactly(first.getId(), first.getId());
+        assertCompleted(first);
+        assertUntouched(second);
+        assertSuccessfulAfter(run, warning);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void shouldRemainSuccessfulWithoutRepositoryWorkWhenFullSyncTargetsAreInCooldown(boolean app) {
+        Run run = connect(app);
+        run.trigger().syncAllRepositories(workspace.getId());
+
+        assertBothCompleted();
+        assertSuccessful(run);
+        RepositoryToMonitor completedFirst = monitor(first);
+        RepositoryToMonitor completedSecond = monitor(second);
+        SyncJob completed = lastJob(run.connection());
+
+        run.trigger().syncAllRepositories(workspace.getId());
+
+        assertThat(processed).containsExactlyInAnyOrder(first.getId(), second.getId());
+        assertSameProgress(first, completedFirst);
+        assertSameProgress(second, completedSecond);
+        assertSuccessfulAfter(run, completed);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void shouldKeepSuccessfulCompletionWhenCancellationArrivesInPostLoopTeamsPhase(boolean app) {
         Run run = connect(app);
         when(teams.syncTeamsForOrganization(workspace.getId(), workspace.getAccountLogin()))
@@ -302,6 +368,16 @@ class GitHubLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
 
     private record Run(Connection connection, GitHubWorkspaceDataSyncTrigger trigger, Instant previousSuccessfulAt) {}
 
+    private void stubIssueOutcome(Repository repository, SyncResult result) {
+        doAnswer(invocation -> {
+                    Long repositoryId = invocation.getArgument(1);
+                    processed.add(repositoryId);
+                    return repositoryId.equals(repository.getId()) ? result : SyncResult.completed(1);
+                })
+                .when(issues)
+                .syncForRepository(any(), any(), any(), any(), any());
+    }
+
     private Repository monitoredRepository(String name, long nativeId) {
         Repository repository = new Repository();
         repository.setNativeId(nativeId);
@@ -354,6 +430,28 @@ class GitHubLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                 .isAfter(run.previousSuccessfulAt());
     }
 
+    private SyncJob assertWarnings(Run run) {
+        SyncJob job = lastJob(run.connection());
+        assertThat(job.getType()).isEqualTo(SyncJobType.INITIAL);
+        assertThat(job.getTrigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
+        assertThat(job.getStatus()).isEqualTo(SyncJobStatus.SUCCEEDED_WITH_WARNINGS);
+        assertThat(job.isCancelRequested()).isFalse();
+        assertThat(job.getErrorSummary()).isNull();
+        assertThat(status.getStatus(workspace.getId(), run.connection().getId()).lastSuccessfulSyncAt())
+                .isEqualTo(job.getFinishedAt())
+                .isAfter(run.previousSuccessfulAt());
+        return job;
+    }
+
+    private void assertSuccessfulAfter(Run run, SyncJob previousJob) {
+        assertSuccessful(run);
+        SyncJob job = lastJob(run.connection());
+        assertThat(job.getId()).isNotEqualTo(previousJob.getId());
+        assertThat(job.getType()).isEqualTo(SyncJobType.INITIAL);
+        assertThat(job.getTrigger()).isEqualTo(SyncJobTrigger.LIFECYCLE);
+        assertThat(job.getFinishedAt()).isAfter(Objects.requireNonNull(previousJob.getFinishedAt()));
+    }
+
     private void assertBothCompleted() {
         assertThat(processed).containsExactlyInAnyOrder(first.getId(), second.getId());
         assertCompleted(first);
@@ -369,6 +467,44 @@ class GitHubLifecycleSyncCancellationIntegrationTest extends AbstractWorkspaceIn
                         RepositoryToMonitor::getIssuesSyncedAt,
                         RepositoryToMonitor::getPullRequestsSyncedAt)
                 .doesNotContainNull();
+        assertThat(monitor.getSyncErrorSummary()).isNull();
+    }
+
+    private void assertIssuesIncomplete(Repository repository) {
+        RepositoryToMonitor monitor = monitor(repository);
+        assertThat(monitor)
+                .extracting(
+                        RepositoryToMonitor::getRepositorySyncedAt,
+                        RepositoryToMonitor::getRepositoryVisibilityConfirmedAt,
+                        RepositoryToMonitor::getPullRequestsSyncedAt)
+                .doesNotContainNull();
+        assertThat(monitor.getIssuesSyncedAt()).isNull();
+        assertThat(monitor.getRecentSyncError()).isEqualTo("Issue sync: ABORTED_ERROR");
+        assertThat(monitor.getHistoricalBackfillSyncError()).isNull();
+        assertThat(monitor.getSyncErrorSummary()).isEqualTo("Issue sync: ABORTED_ERROR");
+    }
+
+    private void assertSameProgress(Repository repository, RepositoryToMonitor previous) {
+        RepositoryToMonitor monitor = monitor(repository);
+        assertThat(monitor)
+                .extracting(
+                        RepositoryToMonitor::getRepositorySyncedAt,
+                        RepositoryToMonitor::getRepositoryVisibilityConfirmedAt,
+                        RepositoryToMonitor::getIssuesSyncedAt,
+                        RepositoryToMonitor::getPullRequestsSyncedAt,
+                        RepositoryToMonitor::getCollaboratorsSyncedAt,
+                        RepositoryToMonitor::getLabelsSyncedAt,
+                        RepositoryToMonitor::getMilestonesSyncedAt,
+                        RepositoryToMonitor::getDiscussionsSyncedAt)
+                .containsExactly(
+                        previous.getRepositorySyncedAt(),
+                        previous.getRepositoryVisibilityConfirmedAt(),
+                        previous.getIssuesSyncedAt(),
+                        previous.getPullRequestsSyncedAt(),
+                        previous.getCollaboratorsSyncedAt(),
+                        previous.getLabelsSyncedAt(),
+                        previous.getMilestonesSyncedAt(),
+                        previous.getDiscussionsSyncedAt());
         assertThat(monitor.getSyncErrorSummary()).isNull();
     }
 
