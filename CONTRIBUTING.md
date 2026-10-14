@@ -77,6 +77,25 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 
 ## Issues
 
+Open issues hold selected delivery work, each with an owner and a bounded *Done when*.
+A selected change with an active pull request needs no second issue.
+Triage incoming reports: select the work, or close it with a reason and a tracking link.
+When selecting part of a larger proposal, narrow the issue to that commitment and move the rest to its topic Discussion.
+
+Close an issue as **completed** only when every *Done when* bullet is implemented and verified.
+Close unscheduled work as **not planned**, link its future home, and remove its milestone.
+This does not mean fixed or rejected.
+Retain the original report and Bug type for unresolved defects.
+Record supported limitations in the owning documentation.
+
+Do not defer material security, privacy, or tenancy defects without the accountable owner's explicit risk decision under the existing policy.
+Do not close issues because they are old.
+
+Milestones hold selected release commitments.
+ADRs retain accepted decisions.
+Discussions hold future direction and evidence links, not another task backlog.
+Native operational controls, such as the dependency-approval dashboard, are exceptions.
+
 An issue ships something.
 Its *Done when* names changes a reviewer can find in the repository: code, a test, a gate, or a document.
 It never names only a number, measurement, or verdict.

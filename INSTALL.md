@@ -1,8 +1,10 @@
 # Installing Hephaestus
 
 There is exactly **one supported install**: the Docker Compose stack in
-[`docker/self-host/`](docker/self-host/) on one 64-bit Linux host
-(4 vCPUs / 8 GB RAM / 40 GB SSD recommended). Other setups may work but are unsupported.
+[`docker/self-host/`](docker/self-host/) on one 64-bit Linux host.
+The [installation requirements](https://docs.hephaestus.build/admin/install#requirements)
+describe the supported hosts and capacity guidance.
+Other setups may work but are unsupported.
 
 **→ Follow the install guide: <https://docs.hephaestus.build/admin/install>**
 

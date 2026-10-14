@@ -15,6 +15,7 @@ This guide covers the codebase and development workflow, from local setup to pro
 ```text
 Hephaestus/
 ├── webapp/                    # React + Vite front-end (public UI)
+├── extension/                 # Browser extension
 ├── server/                    # Gradle multi-project build
 │   ├── application/           # Spring Boot application — server, worker, and webhook roles
 │   └── generated-clients/     # Generated GitHub, GitLab, and Outline transports
@@ -24,6 +25,8 @@ Hephaestus/
 
 The webhook receiver lives under `integration/core/webhook/` in the application module and runs
 in its own container in production — [Runtime roles](../admin/runtime-roles#monolith-vs-split-pod).
+
+[Browser extension architecture](./browser-extension) explains the extension and its connection to the server.
 
 ## How to use this guide
 
