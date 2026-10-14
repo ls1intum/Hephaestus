@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.context;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection.MessageKey;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.DocumentAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
@@ -16,6 +18,7 @@ import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import java.io.BufferedReader;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -225,7 +228,7 @@ public class CitedSourceAccess {
         boolean permits(JsonNode citation);
 
         /**
-         * Checks every history record the citations name in one batch per kind, before they are asked one by one.
+         * Prepares source authority and history dependencies in batches before citations are asked one by one.
          * Changes no answer, only how many statements the answers take.
          */
         default void prepare(Iterable<JsonNode> citations) {}
@@ -321,21 +324,15 @@ public class CitedSourceAccess {
                                 record.path("message").asString());
                     case "document" ->
                         documents
-                                .documentById(workspace, record.path("id").asLong(-1))
-                                .filter(doc -> !doc.deleted() && doc.bodyMarkdown() != null)
-                                .isPresent();
-                    case "docs" ->
-                        documents
-                                .documentsByReference(
-                                        workspace, List.of(record.path("id").asString()))
+                                .documentAccessById(
+                                        workspace, List.of(record.path("id").asLong()))
                                 .stream()
-                                .anyMatch(doc -> !doc.deleted()
-                                        && doc.bodyMarkdown() != null
-                                        && record.path("id").asString().equals(doc.sourceId())
-                                        && doc.slug().equals(record.path("slug").asString())
-                                        && doc.collectionSlug()
-                                                .equals(record.path("collection")
-                                                        .asString()));
+                                .anyMatch(RecordChecks::documentReadable);
+                    case "docs" ->
+                        docsReadable(
+                                record,
+                                documents.documentAccessByReference(
+                                        workspace, List.of(record.path("id").asString())));
                     case "repository" ->
                         permittedRepositories().stream()
                                 .anyMatch(repo ->
@@ -356,15 +353,19 @@ public class CitedSourceAccess {
         @Override
         public void prepare(Iterable<JsonNode> citations) {
             requireReadContext();
+            List<JsonNode> citationList = new ArrayList<>();
+            citations.forEach(citationList::add);
             Map<String, HistoryRecord> found = new HashMap<>();
             Map<String, Set<String>> waitsOn = new LinkedHashMap<>();
-            Set<String> frontier = unansweredHistory(citations, found);
+            Set<String> frontier = unansweredHistory(citationList, found);
             while (!frontier.isEmpty()) {
                 Set<String> next = new LinkedHashSet<>();
                 byType(frontier, found).forEach((type, ids) -> {
                     Map<UUID, List<JsonNode>> cited = history.historyRecordCitations(workspace, type, ids);
                     for (UUID id : ids) {
-                        Set<String> needed = unansweredHistory(cited.getOrDefault(id, List.of()), found);
+                        List<JsonNode> dependencies = cited.getOrDefault(id, List.of());
+                        citationList.addAll(dependencies);
+                        Set<String> needed = unansweredHistory(dependencies, found);
                         waitsOn.put(historyKey(type, id), needed);
                         next.addAll(needed);
                     }
@@ -372,6 +373,7 @@ public class CitedSourceAccess {
                 next.removeAll(waitsOn.keySet());
                 frontier = next;
             }
+            prepareDirectRecords(citationList);
             while (!waitsOn.isEmpty()) {
                 Set<String> ready = new LinkedHashSet<>();
                 waitsOn.forEach((key, needed) -> {
@@ -395,6 +397,67 @@ public class CitedSourceAccess {
                     inBatch.removeAll(ready);
                 }
                 waitsOn.keySet().removeAll(ready);
+            }
+        }
+
+        private void prepareDirectRecords(Iterable<JsonNode> citations) {
+            Set<MessageKey> messages = new LinkedHashSet<>();
+            Set<Long> documentIds = new LinkedHashSet<>();
+            Set<String> docReferences = new LinkedHashSet<>();
+            Map<String, JsonNode> recordsByKey = new LinkedHashMap<>();
+            for (JsonNode citation : citations) {
+                for (JsonNode record : citation.path("sourceReference").path("records")) {
+                    if (isHistory(record)) continue;
+                    String key = record.toString();
+                    if (recordAnswers.containsKey(key) || recordsByKey.containsKey(key)) continue;
+                    if (!validRecord(record)
+                            || (record.has("person")
+                                    && !permitsPerson(record.path("person").asLong()))) {
+                        recordAnswers.put(key, false);
+                        continue;
+                    }
+                    recordsByKey.put(key, record);
+                    switch (record.path("type").asString("")) {
+                        case "chat" ->
+                            messages.add(new MessageKey(
+                                    record.path("channel").asString(),
+                                    record.path("message").asString()));
+                        case "document" -> documentIds.add(record.path("id").asLong());
+                        case "docs" -> docReferences.add(record.path("id").asString());
+                        default -> {}
+                    }
+                }
+            }
+            if (!messages.isEmpty()) {
+                Set<MessageKey> readable = conversations.readableMessages(workspace, messages);
+                for (JsonNode record : recordsByKey.values()) {
+                    if (record.path("type").asString("").equals("chat")) {
+                        var key = new MessageKey(
+                                record.path("channel").asString(),
+                                record.path("message").asString());
+                        recordAnswers.putIfAbsent(record.toString(), readable.contains(key));
+                    }
+                }
+            }
+            if (!documentIds.isEmpty()) {
+                Map<Long, DocumentAccess> byId = new HashMap<>();
+                for (DocumentAccess access : documents.documentAccessById(workspace, documentIds)) {
+                    byId.put(access.id(), access);
+                }
+                for (JsonNode record : recordsByKey.values()) {
+                    if (record.path("type").asString("").equals("document")) {
+                        DocumentAccess access = byId.get(record.path("id").asLong());
+                        recordAnswers.putIfAbsent(record.toString(), documentReadable(access));
+                    }
+                }
+            }
+            if (!docReferences.isEmpty()) {
+                List<DocumentAccess> byReference = documents.documentAccessByReference(workspace, docReferences);
+                for (JsonNode record : recordsByKey.values()) {
+                    if (record.path("type").asString("").equals("docs")) {
+                        recordAnswers.putIfAbsent(record.toString(), docsReadable(record, byReference));
+                    }
+                }
             }
         }
 
@@ -490,6 +553,19 @@ public class CitedSourceAccess {
         private static boolean isHistory(JsonNode record) {
             String type = record.path("type").asString("");
             return type.equals("observation") || type.equals("feedback");
+        }
+
+        private static boolean documentReadable(@Nullable DocumentAccess access) {
+            return access != null && !access.deleted() && access.bodyAvailable();
+        }
+
+        private static boolean docsReadable(JsonNode record, List<DocumentAccess> documents) {
+            return documents.stream()
+                    .anyMatch(doc -> documentReadable(doc)
+                            && record.path("id").asString().equals(doc.sourceId())
+                            && doc.slug().equals(record.path("slug").asString())
+                            && doc.collectionSlug()
+                                    .equals(record.path("collection").asString()));
         }
 
         private static String historyKey(String type, UUID id) {

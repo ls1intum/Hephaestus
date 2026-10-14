@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.testconfig;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 import org.hibernate.CacheMode;
@@ -33,11 +34,12 @@ public class SqlReadMeasurement {
             var measured = statements.measure(read);
             return new Read<>(
                     measured.value(),
-                    new Cost(measured.statements(), session.getStatistics().getEntityCount()));
+                    new Cost(measured.statements(), session.getStatistics().getEntityCount()),
+                    measured.sql());
         }));
     }
 
     public record Cost(long statements, int entities) {}
 
-    public record Read<T>(T value, Cost cost) {}
+    public record Read<T>(T value, Cost cost, List<String> sql) {}
 }

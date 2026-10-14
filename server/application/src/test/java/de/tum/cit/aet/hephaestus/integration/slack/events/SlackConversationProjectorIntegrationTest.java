@@ -2,15 +2,21 @@ package de.tum.cit.aet.hephaestus.integration.slack.events;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection.MessageKey;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.SqlReadMeasurement;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -36,6 +42,9 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    @Autowired
+    private SqlReadMeasurement reads;
 
     // Distinct workspace ids per test → isolation without a clean-between step (no FK to a workspace row).
     private static final AtomicLong WS_SEQ = new AtomicLong(9_000_000L);
@@ -107,6 +116,11 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
                 .satisfies(record -> assertThat(record.path("text").asString()).isEqualTo("other participant reply"));
         assertThat(projector.isMessageReadable(workspace, "C1", "100.0")).isFalse();
         assertThat(projector.isMessageReadable(otherWorkspace, "C1", "200.0")).isTrue();
+        assertThat(projector.readableMessages(
+                        workspace, Set.of(new MessageKey("C1", "100.0"), new MessageKey("C1", "100.1"))))
+                .containsExactly(new MessageKey("C1", "100.1"));
+        assertThat(projector.readableMessages(otherWorkspace, Set.of(new MessageKey("C1", "200.0"))))
+                .containsExactly(new MessageKey("C1", "200.0"));
         var audience = conversations(projector.buildPayload(workspace, 100L));
         assertThat(audience).singleElement().satisfies(thread -> {
             assertThat(thread.path("messageCount").asInt()).isEqualTo(1);
@@ -139,13 +153,133 @@ class SlackConversationProjectorIntegrationTest extends BaseIntegrationTest {
             assertThat(record.path("synced_at").asString()).isNotBlank();
         });
         assertThat(projector.isMessageReadable(workspace, "C1", "1704067200.0")).isTrue();
+        assertThat(projector.readableMessages(
+                        workspace,
+                        Set.of(
+                                new MessageKey("C1", "1704067200.0"),
+                                new MessageKey("C2", "1704067200.0"),
+                                new MessageKey("C1", "1704067202.0"))))
+                .containsExactlyInAnyOrder(new MessageKey("C1", "1704067200.0"));
         jdbc.update(
                 "UPDATE slack_monitored_channel SET consent_state='REVOKED' WHERE workspace_id=? AND slack_channel_id='C1'",
                 workspace);
         assertThat(projector.isMessageReadable(workspace, "C1", "1704067200.0")).isFalse();
+        assertThat(projector.readableMessages(workspace, Set.of(new MessageKey("C1", "1704067200.0"))))
+                .isEmpty();
         captured.clear();
         projector.forEachWorkspaceMessage(workspace, captured::add);
         assertThat(captured).isEmpty();
+    }
+
+    @Test
+    void shouldBatchManyReadableMessagePairsInOneSqlRead() {
+        long workspace = newWorkspace();
+        seedChannel(workspace, "C1", "ACTIVE");
+        Set<MessageKey> messages = new LinkedHashSet<>();
+        for (int index = 0; index < 50; index++) {
+            String ts = "17040672%02d.0".formatted(index);
+            seedMessage(workspace, "C1", ts, null, "message " + index);
+            messages.add(new MessageKey("C1", ts));
+        }
+
+        var scalar = reads.measure(() -> messages.stream()
+                .filter(message -> projector.isMessageReadable(workspace, message.channelId(), message.messageTs()))
+                .collect(Collectors.toSet()));
+        var measured = reads.measure(() -> projector.readableMessages(workspace, messages));
+
+        assertThat(measured.value()).isEqualTo(scalar.value()).containsExactlyInAnyOrderElementsOf(messages);
+        assertThat(scalar.cost().statements()).isEqualTo(50);
+        assertThat(measured.cost().statements()).isEqualTo(1);
+        assertThat(measured.cost().entities()).isZero();
+    }
+
+    @Test
+    void shouldBoundLargeMessageReadsWhileKeepingExactPairsAndAccessGuards() {
+        long workspace = newWorkspace();
+        long otherWorkspace = newWorkspace();
+        seedChannel(workspace, "C1", "ACTIVE");
+        seedChannel(workspace, "C2", "ACTIVE");
+        seedChannel(workspace, "CREVOKED", "REVOKED");
+        seedChannel(otherWorkspace, "C1", "ACTIVE");
+        Set<MessageKey> permitted = new LinkedHashSet<>();
+        for (int index = 0; index < 1001; index++) {
+            String ts = "%d.0".formatted(1_800_000_000L + index);
+            seedMessage(workspace, "C1", ts, null, "permitted");
+            permitted.add(new MessageKey("C1", ts));
+        }
+        seedMessage(workspace, "C2", "1800000001.0", null, "uncited cross-pair");
+        seedMessage(workspace, "C1", "1900000000.0", null, "deleted");
+        messageRepository.tombstone(workspace, "T1", "C1", "1900000000.0", Instant.now());
+        seedMessage(workspace, "C1", "1900000001.0", null, "opted out");
+        jdbc.update(
+                "UPDATE slack_message SET author_slack_user_id='UBOUNDED' WHERE workspace_id=? AND slack_ts='1900000001.0'",
+                workspace);
+        jdbc.update(
+                "INSERT INTO slack_participant_consent(workspace_id,slack_user_id,ingestion_opted_out,decided_at) VALUES (?,'UBOUNDED',TRUE,CURRENT_TIMESTAMP)",
+                workspace);
+        seedMessage(workspace, "CREVOKED", "1900000002.0", null, "revoked");
+        seedMessage(otherWorkspace, "C1", "1900000003.0", null, "foreign");
+        var requested = new ArrayList<>(permitted);
+        requested.addAll(new ArrayList<>(permitted).subList(0, 600));
+        requested.addAll(List.of(
+                new MessageKey("C2", "1800000000.0"),
+                new MessageKey("C1", "1900000000.0"),
+                new MessageKey("C1", "1900000001.0"),
+                new MessageKey("CREVOKED", "1900000002.0"),
+                new MessageKey("C1", "1900000003.0")));
+
+        var measured = reads.measure(() -> projector.readableMessages(workspace, requested));
+
+        assertThat(measured.value()).containsExactlyInAnyOrderElementsOf(permitted);
+        assertThat(measured.sql().stream()
+                        .map(sql -> sql.chars()
+                                .filter(character -> character == '?')
+                                .count())
+                        .toList())
+                .as("Parameters in each message authority read")
+                .allSatisfy(parameters -> assertThat(parameters).isLessThanOrEqualTo(1004));
+        assertThat(measured.cost().statements()).isEqualTo(3);
+        assertThat(measured.cost().entities()).isZero();
+    }
+
+    @Test
+    void shouldReadOnlyExactPairsWithoutStringAliasesOrCrossProducts() {
+        long workspace = newWorkspace();
+        seedChannel(workspace, "C1", "ACTIVE");
+        seedChannel(workspace, "C2", "ACTIVE");
+        seedChannel(workspace, "C1:part", "ACTIVE");
+        seedMessage(workspace, "C1", "1", null, "first");
+        seedMessage(workspace, "C2", "2", null, "second");
+        seedMessage(workspace, "C1:part", "3", null, "distinct colon pair");
+
+        assertThat(projector.readableMessages(
+                        workspace,
+                        List.of(
+                                new MessageKey("C1", "1"),
+                                new MessageKey("C1", "1"),
+                                new MessageKey("C2", "1"),
+                                new MessageKey("C1", "2"),
+                                new MessageKey("C1", "part:3"))))
+                .containsExactly(new MessageKey("C1", "1"));
+        assertThat(projector.readableMessages(workspace, Set.of())).isEmpty();
+    }
+
+    @Test
+    void shouldRecheckParticipantConsentAndTombstonesOnEachBatchRead() {
+        long workspace = newWorkspace();
+        seedChannel(workspace, "C1", "ACTIVE");
+        seedMessage(workspace, "C1", "1", null, "first");
+        jdbc.update("UPDATE slack_message SET author_slack_user_id='UBATCH' WHERE workspace_id=?", workspace);
+        var requested = Set.of(new MessageKey("C1", "1"));
+        assertThat(projector.readableMessages(workspace, requested)).isEqualTo(requested);
+        jdbc.update(
+                "INSERT INTO slack_participant_consent(workspace_id,slack_user_id,ingestion_opted_out,decided_at) VALUES (?,'UBATCH',TRUE,CURRENT_TIMESTAMP)",
+                workspace);
+        assertThat(projector.readableMessages(workspace, requested)).isEmpty();
+        jdbc.update("UPDATE slack_participant_consent SET ingestion_opted_out=FALSE WHERE workspace_id=?", workspace);
+        assertThat(projector.readableMessages(workspace, requested)).isEqualTo(requested);
+        messageRepository.tombstone(workspace, "T1", "C1", "1", Instant.now());
+        assertThat(projector.readableMessages(workspace, requested)).isEmpty();
     }
 
     @Test

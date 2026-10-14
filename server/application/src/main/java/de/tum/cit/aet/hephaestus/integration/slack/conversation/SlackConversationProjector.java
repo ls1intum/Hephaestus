@@ -3,13 +3,17 @@ package de.tum.cit.aet.hephaestus.integration.slack.conversation;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
+import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageKeyRow;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMessageRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadMessageRow;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackTs;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
@@ -58,6 +62,22 @@ public class SlackConversationProjector implements ConversationThreadProjection 
     @Override
     public boolean isMessageReadable(long workspaceId, String channelId, String messageTs) {
         return messageRepository.isMessageReadable(workspaceId, channelId, messageTs);
+    }
+
+    @Override
+    public Set<MessageKey> readableMessages(long workspaceId, Collection<MessageKey> messages) {
+        if (messages.isEmpty()) {
+            return Set.of();
+        }
+        var requested = messages.stream()
+                .map(message -> new SlackMessageKeyRow(message.channelId(), message.messageTs()))
+                .toList();
+        Set<MessageKey> result = new LinkedHashSet<>();
+        for (SlackMessageKeyRow message :
+                messageRepository.findReadableMessageKeysByWorkspaceId(workspaceId, requested)) {
+            result.add(new MessageKey(message.channelId(), message.messageTs()));
+        }
+        return Set.copyOf(result);
     }
 
     @Override

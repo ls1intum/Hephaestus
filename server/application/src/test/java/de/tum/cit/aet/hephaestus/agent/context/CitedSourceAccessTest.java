@@ -2,6 +2,8 @@ package de.tum.cit.aet.hephaestus.agent.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -9,7 +11,9 @@ import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewHistoryContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.providers.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection.MessageKey;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.DocumentAccess;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
@@ -112,7 +116,8 @@ class CitedSourceAccessTest extends BaseUnitTest {
                     .put("startLine", 1)
                     .put("endLine", 1);
             citation.putObject("sourceReference").put("channel", "foreign");
-            when(conversations.isMessageReadable(1L, "C1", "1.000001")).thenReturn(true);
+            when(conversations.readableMessages(1L, Set.of(new MessageKey("C1", "1.000001"))))
+                    .thenReturn(Set.of(new MessageKey("C1", "1.000001")));
             var access = access(files);
             access.bind(job, citation, ProvenanceDigest.sha256Hex(bytes));
             assertThat(citation.path("sourceReference")
@@ -121,7 +126,8 @@ class CitedSourceAccessTest extends BaseUnitTest {
                             .path("channel")
                             .asString())
                     .isEqualTo("C1");
-            when(conversations.isMessageReadable(1L, "C1", "1.000001")).thenReturn(false);
+            when(conversations.readableMessages(1L, Set.of(new MessageKey("C1", "1.000001"))))
+                    .thenReturn(Set.of());
             assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                     .isFalse();
             assertThatThrownBy(() -> access.bind(job, citation, ProvenanceDigest.sha256Hex(bytes)))
@@ -141,12 +147,13 @@ class CitedSourceAccessTest extends BaseUnitTest {
         try (var prepared = files.prepare(job, new PreparedEvidence(Map.of(path, bytes), null), null)) {
             assertThat(prepared.filesOnDisk()).containsKey(path);
             var citation = mapper.createObjectNode().put("artifactPath", path);
-            when(conversations.isMessageReadable(1L, "C1", "1")).thenReturn(true);
-            when(conversations.isMessageReadable(1L, "C1", "2")).thenReturn(true);
+            when(conversations.readableMessages(1L, Set.of(new MessageKey("C1", "1"), new MessageKey("C1", "2"))))
+                    .thenReturn(Set.of(new MessageKey("C1", "1"), new MessageKey("C1", "2")));
             var access = access(files);
             access.bind(job, citation, ProvenanceDigest.sha256Hex(bytes));
             assertThat(citation.path("sourceReference").path("records")).hasSize(2);
-            when(conversations.isMessageReadable(1L, "C1", "2")).thenReturn(false);
+            when(conversations.readableMessages(1L, Set.of(new MessageKey("C1", "1"), new MessageKey("C1", "2"))))
+                    .thenReturn(Set.of(new MessageKey("C1", "1")));
             assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                     .isFalse();
         }
@@ -158,8 +165,8 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies());
         var job = job();
         job.setMetadata(mapper.createObjectNode().put("docs_document_id", 7L));
-        var document = DocumentProjection.ProjectedDocument.withoutAuthors("c", "d", "Title", "quote", false);
-        when(documents.documentById(1L, 7L)).thenReturn(Optional.of(document));
+        when(documents.documentAccessById(Mockito.eq(1L), any()))
+                .thenReturn(List.of(new DocumentAccess(7L, null, "c", "d", false, true)));
         var citation = mapper.createObjectNode().put("artifactPath", "context/document.md");
         var access = access(files);
         access.bind(job, citation, "a".repeat(64));
@@ -169,7 +176,7 @@ class CitedSourceAccessTest extends BaseUnitTest {
                         .path("id")
                         .asLong())
                 .isEqualTo(7L);
-        when(documents.documentById(1L, 7L)).thenReturn(Optional.empty());
+        when(documents.documentAccessById(Mockito.eq(1L), any())).thenReturn(List.of());
         assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isFalse();
     }
@@ -320,12 +327,12 @@ class CitedSourceAccessTest extends BaseUnitTest {
         var job = job();
         String path = "context/docs/engineering/design.md";
         byte[] bytes = "---\nsynced_at: null\nsource_id: \"source-7\"\n---\nquote\n".getBytes(StandardCharsets.UTF_8);
-        var doc = mock(DocumentProjection.ProjectedDocument.class);
+        var doc = mock(DocumentAccess.class);
         when(doc.sourceId()).thenReturn("source-7");
         when(doc.slug()).thenReturn("design");
         when(doc.collectionSlug()).thenReturn("engineering");
-        when(doc.bodyMarkdown()).thenReturn("quote");
-        when(documents.documentsByReference(1L, List.of("source-7"))).thenReturn(List.of(doc));
+        when(doc.bodyAvailable()).thenReturn(true);
+        when(documents.documentAccessByReference(Mockito.eq(1L), any())).thenReturn(List.of(doc));
         try (var prepared = files.prepare(job, new PreparedEvidence(Map.of(path, bytes), null), null)) {
             assertThat(prepared.filesOnDisk()).containsKey(path);
             var citation = mapper.createObjectNode().put("artifactPath", path);
@@ -337,13 +344,24 @@ class CitedSourceAccessTest extends BaseUnitTest {
             assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                     .isFalse();
             when(doc.deleted()).thenReturn(false);
-            when(doc.bodyMarkdown()).thenReturn(null);
+            when(doc.bodyAvailable()).thenReturn(false);
             assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                     .isFalse();
-            when(doc.bodyMarkdown()).thenReturn("quote");
+            when(doc.bodyAvailable()).thenReturn(true);
             when(doc.sourceId()).thenReturn("another-source");
             assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                     .isFalse();
+            when(doc.sourceId()).thenReturn("source-7");
+            when(doc.slug()).thenReturn("renamed");
+            assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                    .isFalse();
+            when(doc.slug()).thenReturn("design");
+            when(doc.collectionSlug()).thenReturn("moved");
+            assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                    .isFalse();
+            when(doc.collectionSlug()).thenReturn("engineering");
+            assertThat(access.permits(1L, citation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                    .isTrue();
         }
     }
 
@@ -409,17 +427,103 @@ class CitedSourceAccessTest extends BaseUnitTest {
         Mockito.verify(memberships, Mockito.times(1)).findByWorkspace_IdAndUser_Id(1L, 42L);
     }
 
+    @Test
+    void shouldBatchDirectSlackRecordsByExactChannelMessagePairsWhenPrepared() {
+        var access = access(new JobEvidenceFiles(
+                new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
+        var first = chat("C1", "1.000001");
+        var second = chat("C1", "2.000002");
+        var sameTimestampInAnotherChannel = chat("C2", "1.000001");
+        when(conversations.readableMessages(
+                        1L,
+                        Set.of(
+                                new MessageKey("C1", "1.000001"),
+                                new MessageKey("C1", "2.000002"),
+                                new MessageKey("C2", "1.000001"))))
+                .thenReturn(Set.of(new MessageKey("C1", "1.000001"), new MessageKey("C2", "1.000001")));
+
+        var checks = access.checks(1L, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        checks.prepare(List.of(first, second, sameTimestampInAnotherChannel));
+
+        assertThat(List.of(first, second, sameTimestampInAnotherChannel).stream()
+                        .map(checks::permits))
+                .containsExactly(true, false, true);
+        Mockito.verify(conversations, Mockito.times(1))
+                .readableMessages(
+                        1L,
+                        Set.of(
+                                new MessageKey("C1", "1.000001"),
+                                new MessageKey("C1", "2.000002"),
+                                new MessageKey("C2", "1.000001")));
+        Mockito.verify(conversations, Mockito.never()).isMessageReadable(anyLong(), any(), any());
+    }
+
+    @Test
+    void shouldPreserveRecordAndPersonGatesWhenPermittedSourcesShareAnIdentity() {
+        var access = access(new JobEvidenceFiles(
+                new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
+        var permitted = chat("C1", "1");
+        var withPerson = chat("C1", "1");
+        ((ObjectNode) withPerson.path("sourceReference").path("records").get(0)).put("person", 42L);
+        var hiddenPerson = chat("C1", "1");
+        ((ObjectNode) hiddenPerson.path("sourceReference").path("records").get(0)).put("person", 43L);
+        var malformed = chat("C1", "1");
+        ((ObjectNode) malformed.path("sourceReference").path("records").get(0)).put("message", 1);
+        when(preferences.forDeveloper(1L, 42L)).thenReturn(new MemberAiPreferences.Decision(false, null));
+        when(memberships.findByWorkspace_IdAndUser_Id(1L, 42L)).thenReturn(Optional.of(new WorkspaceMembership()));
+        when(preferences.forDeveloper(1L, 43L)).thenReturn(new MemberAiPreferences.Decision(false, null));
+        var hidden = new WorkspaceMembership();
+        hidden.setHidden(true);
+        when(memberships.findByWorkspace_IdAndUser_Id(1L, 43L)).thenReturn(Optional.of(hidden));
+        when(conversations.readableMessages(1L, Set.of(new MessageKey("C1", "1"))))
+                .thenReturn(Set.of(new MessageKey("C1", "1")));
+
+        var checks = access.checks(1L, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        var citations = List.of(permitted, withPerson, hiddenPerson, malformed, permitted);
+        checks.prepare(List.copyOf(citations));
+
+        assertThat(citations.stream().map(checks::permits)).containsExactly(true, true, false, false, true);
+        Mockito.verify(conversations, Mockito.times(1)).readableMessages(1L, Set.of(new MessageKey("C1", "1")));
+    }
+
+    @Test
+    void shouldBatchOutlineRecordsWithBodyFreeAuthorityMetadataWhenPrepared() {
+        var access = access(new JobEvidenceFiles(
+                new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies()));
+        var document = citation("context/document.md", "{\"records\":[{\"type\":\"document\",\"id\":7}]}");
+        var evicted = citation("context/document.md", "{\"records\":[{\"type\":\"document\",\"id\":8}]}");
+        var docsPath = citation(
+                "context/docs/engineering/design.md",
+                "{\"records\":[{\"type\":\"docs\",\"id\":\"source-7\",\"collection\":\"engineering\",\"slug\":\"design\"}]}");
+        when(documents.documentAccessById(1L, Set.of(7L, 8L)))
+                .thenReturn(List.of(
+                        new DocumentAccess(7L, "source-7", "engineering", "design", false, true),
+                        new DocumentAccess(8L, "source-8", "engineering", "evicted", false, false)));
+        when(documents.documentAccessByReference(1L, Set.of("source-7")))
+                .thenReturn(List.of(new DocumentAccess(7L, "source-7", "engineering", "design", false, true)));
+
+        var checks = access.checks(1L, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+        checks.prepare(List.of(document, evicted, docsPath));
+
+        assertThat(List.of(document, evicted, docsPath).stream().map(checks::permits))
+                .containsExactly(true, false, true);
+        Mockito.verify(documents, Mockito.times(1)).documentAccessById(1L, Set.of(7L, 8L));
+        Mockito.verify(documents, Mockito.times(1)).documentAccessByReference(1L, Set.of("source-7"));
+        Mockito.verify(documents, Mockito.never()).documentById(anyLong(), anyLong());
+        Mockito.verify(documents, Mockito.never()).documentsByReference(anyLong(), any());
+    }
+
     /**
      * The golden comparison for history: a record of a developer's history is decided by authorizing the
      * observation it names, whose own citations may name older history in turn. Checked in batches, one per link
      * of the longest chain, every citation gets the answer it gets alone, where each record is checked on its own.
      */
-    @Test
-    void shouldAnswerHistoryCitationsAsAloneWhenOneReadChecksTheirChainsInBatches() {
+    @ParameterizedTest
+    @EnumSource(SourceUsePurpose.class)
+    void shouldAnswerHistoryCitationsAsAloneWhenOneReadChecksTheirChainsInBatches(SourceUsePurpose purpose) {
         var files = new JobEvidenceFiles(
                 new FabricLayout(root.toString()), mock(AgentJobRepository.class), Clock.systemUTC(), personCopies());
         var access = access(files);
-        var purpose = SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY;
         when(repositories.permittedRepositories(1L)).thenReturn(List.of(TestEntities.repository(2L, "acme/api")));
         when(preferences.forDeveloper(1L, 42L)).thenReturn(new MemberAiPreferences.Decision(false, null));
         when(memberships.findByWorkspace_IdAndUser_Id(1L, 42L)).thenReturn(Optional.of(new WorkspaceMembership()));
@@ -429,14 +533,27 @@ class CitedSourceAccessTest extends BaseUnitTest {
         UUID refused = UUID.randomUUID();
         UUID onRefused = UUID.randomUUID();
         UUID onHiddenRepository = UUID.randomUUID();
+        UUID onWithdrawn = UUID.randomUUID();
+        var document = citation("context/document.md", "{\"records\":[{\"type\":\"document\",\"id\":7}]}");
+        var docs = citation(
+                "context/docs/engineering/design.md",
+                "{\"records\":[{\"type\":\"docs\",\"id\":\"source-7\",\"slug\":\"design\",\"collection\":\"engineering\"}]}");
+        var metadata = new DocumentAccess(7L, "source-7", "engineering", "design", false, true);
+        when(documents.documentAccessById(Mockito.eq(1L), any())).thenReturn(List.of(metadata));
+        when(documents.documentAccessByReference(Mockito.eq(1L), any())).thenReturn(List.of(metadata));
+        when(conversations.isMessageReadable(1L, "C1", "1")).thenReturn(true);
+        when(conversations.isMessageReadable(1L, "C2", "2")).thenReturn(false);
+        when(conversations.readableMessages(1L, Set.of(new MessageKey("C1", "1"), new MessageKey("C2", "2"))))
+                .thenReturn(Set.of(new MessageKey("C1", "1")));
         // newest cites middle, which cites oldest; onRefused cites a record its owner refuses.
         Map<UUID, List<ObjectNode>> cites = Map.of(
                 newest, List.of(history(middle)),
-                middle, List.of(history(oldest), repository(2L)),
-                oldest, List.of(repository(2L)),
+                middle, List.of(history(oldest), repository(2L), docs),
+                oldest, List.of(repository(2L), chat("C1", "1"), document),
                 refused, List.of(repository(2L)),
                 onRefused, List.of(history(refused)),
-                onHiddenRepository, List.of(repository(3L)));
+                onHiddenRepository, List.of(repository(3L)),
+                onWithdrawn, List.of(history(oldest), chat("C2", "2")));
         // The history source as it works: a record is permitted when its owner keeps it and each citation of the
         // observation it names is permitted, checked with whatever checks the read has running.
         Predicate<UUID> permitted = id -> !id.equals(refused)
@@ -471,6 +588,9 @@ class CitedSourceAccessTest extends BaseUnitTest {
                 history(onRefused),
                 history(refused),
                 history(onHiddenRepository),
+                history(onWithdrawn),
+                chat("C1", "1"),
+                document,
                 citation(
                         "context/people/42/observations.jsonl",
                         "{\"records\":[{\"type\":\"observation\",\"person\":42,\"id\":\"" + newest
@@ -479,13 +599,20 @@ class CitedSourceAccessTest extends BaseUnitTest {
         List<Boolean> alone = citations.stream()
                 .map(citation -> access.checks(1L, purpose).permits(citation))
                 .toList();
-        Mockito.clearInvocations(history);
+        Mockito.clearInvocations(history, conversations, documents);
 
         var checks = access.checks(1L, purpose);
         checks.prepare(List.copyOf(citations));
         List<Boolean> together = citations.stream().map(checks::permits).toList();
 
-        assertThat(together).isEqualTo(alone).containsExactly(true, true, false, false, false, false);
+        assertThat(together)
+                .isEqualTo(alone)
+                .containsExactly(true, true, false, false, false, false, true, true, false);
+        Mockito.verify(conversations, Mockito.times(1))
+                .readableMessages(1L, Set.of(new MessageKey("C1", "1"), new MessageKey("C2", "2")));
+        Mockito.verify(conversations, Mockito.never()).isMessageReadable(anyLong(), any(), any());
+        Mockito.verify(documents, Mockito.times(1)).documentAccessById(1L, Set.of(7L));
+        Mockito.verify(documents, Mockito.times(1)).documentAccessByReference(1L, Set.of("source-7"));
         // Three links in the longest chain, three batches; no record is checked alone.
         Mockito.verify(history, Mockito.times(3))
                 .permittedHistoryRecords(Mockito.eq(1L), Mockito.eq("observation"), Mockito.any(), Mockito.eq(purpose));
@@ -625,6 +752,12 @@ class CitedSourceAccessTest extends BaseUnitTest {
 
     private ObjectNode repository(long id) {
         return citation("context/diff.patch", "{\"records\":[{\"type\":\"repository\",\"id\":" + id + "}]}");
+    }
+
+    private ObjectNode chat(String channel, String message) {
+        return citation(
+                "context/chat/" + channel + "/2026-10.jsonl",
+                "{\"records\":[{\"type\":\"chat\",\"channel\":\"" + channel + "\",\"message\":\"" + message + "\"}]}");
     }
 
     private ObjectNode citation(String path, String reference) {

@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Scoped access to ingested Slack messages. Every finder carries the {@code workspace_id} predicate the tenancy
  * {@code StatementInspector} requires.
  */
-public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long> {
+public interface SlackMessageRepository extends JpaRepository<SlackMessage, Long>, SlackMessageAccess {
 
     String MESSAGE_READ_GUARD = """
           AND m.workspaceId=:workspaceId AND c.workspaceId=:workspaceId
