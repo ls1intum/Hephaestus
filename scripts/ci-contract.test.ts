@@ -565,32 +565,35 @@ void describe("CI contract", () => {
 		}
 	});
 
-	void test("task names follow the vocabulary in AGENTS.md", async () => {
+	void test("task names follow the vocabulary in the local verification guide", async () => {
 		const tasks = await loadTasks();
-		const instructions = await readFile("AGENTS.md", "utf8");
+		const instructions = await readFile("docs/contributor/local-verification.mdx", "utf8");
 		const vocabulary = /^### Task vocabulary\n(?<body>[\s\S]*?)(?=^###? )/mu.exec(instructions)
 			?.groups?.body;
-		assert.ok(isSet(vocabulary), "AGENTS.md § Verifying must contain the task vocabulary");
+		assert.ok(
+			isSet(vocabulary),
+			"Local verification § Repository tooling must contain the task vocabulary",
+		);
 		const allowedPrefixes = new Set(
 			[...vocabulary.matchAll(/^\| `(?<prefix>[a-z]+)` \|/gmu)].map(
 				({ groups }) => groups?.prefix ?? "",
 			),
 		);
-		assert.ok(allowedPrefixes.size > 0, "AGENTS.md task vocabulary lists no prefixes");
+		assert.ok(allowedPrefixes.size > 0, "Local verification task vocabulary lists no prefixes");
 		const used = new Set<string>();
 		for (const name of Object.keys(tasks).toSorted()) {
 			assert.match(name, /^[a-z]+(?::[a-z0-9-]+)*$/u, `${name} is not a valid task name`);
 			const prefix = name.split(":", 1)[0] ?? "";
 			assert.ok(
 				allowedPrefixes.has(prefix),
-				`${name} does not use a task prefix listed in AGENTS.md § Verifying`,
+				`${name} does not use a task prefix listed in Local verification § Repository tooling`,
 			);
 			used.add(prefix);
 		}
 		assert.deepEqual(
 			[...allowedPrefixes].filter((prefix) => !used.has(prefix)),
 			[],
-			"AGENTS.md § Verifying lists a task prefix no task uses",
+			"Local verification § Repository tooling lists a task prefix no task uses",
 		);
 	});
 

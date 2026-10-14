@@ -248,24 +248,28 @@ public class GitLabSubIssueSyncService {
             }
         }
 
-        if (parentIid == null || parentIid <= 0) {
+        if (parentIid == null || parentIid <= 0 || parentNamespacePath == null || parentNamespacePath.isBlank()) {
             unknownHierarchyIssueIds.add(issue.getId());
             return 0;
         }
         issuesWithParentInGitLab.add(issue.getId());
-        Issue parentIssue = issueByIid.get(parentIid);
-        if (parentIssue == null) {
-            // Try same-repo DB lookup first
-            parentIssue = issueRepository
-                    .findByRepositoryIdAndNumber(repository.getId(), parentIid)
-                    .orElse(null);
-        }
-        if (parentIssue == null && parentNamespacePath != null) {
-            // Cross-repo: look up parent in a different monitored repo by namespace path
+        Issue parentIssue;
+        if (parentNamespacePath.equals(repository.getNameWithOwner())) {
+            parentIssue = issueByIid.get(parentIid);
+            if (parentIssue == null) {
+                parentIssue = issueRepository
+                        .findByRepositoryIdAndNumber(repository.getId(), parentIid)
+                        .orElse(null);
+            }
+        } else {
             parentIssue = findCrossRepoIssue(parentNamespacePath, parentIid, repository);
         }
+        if (parentIssue == null) {
+            unknownHierarchyIssueIds.add(issue.getId());
+            return 0;
+        }
 
-        if (parentIssue != null && !parentIssue.getId().equals(issue.getId())) {
+        if (!parentIssue.getId().equals(issue.getId())) {
             if (issue.getParentIssue() == null
                     || !issue.getParentIssue().getId().equals(parentIssue.getId())) {
                 issue.setParentIssue(parentIssue);
@@ -296,12 +300,15 @@ public class GitLabSubIssueSyncService {
     }
 
     /**
-     * Looks up an issue in a different monitored repository by its namespace path (fullPath) and IID.
+     * Looks up an issue in a different repository on the current provider by namespace path and IID.
      */
     @Nullable
     private Issue findCrossRepoIssue(String namespacePath, int iid, Repository currentRepo) {
-        Repository crossRepo =
-                repositoryRepository.findByNameWithOwner(namespacePath).orElse(null);
+        Repository crossRepo = repositoryRepository
+                .findByNameWithOwnerAndProviderId(
+                        namespacePath,
+                        Objects.requireNonNull(currentRepo.getProvider().getId()))
+                .orElse(null);
         if (crossRepo == null || crossRepo.getId().equals(currentRepo.getId())) {
             return null;
         }

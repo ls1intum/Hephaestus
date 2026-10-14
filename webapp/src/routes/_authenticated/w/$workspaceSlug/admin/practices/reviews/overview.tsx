@@ -69,11 +69,11 @@ function PracticeReviewOverviewRoute() {
 	const timing = usePracticeReviewTiming(workspaceSlug, from, overview);
 	const queue = usePracticeReviewQueue(workspaceSlug, overview);
 	useSettleWhenReviewsFinish(workspaceSlug, overview);
-	const running = useReviewReadiness(workspaceSlug);
+	const readiness = useReviewReadiness(workspaceSlug);
 	const practices = useQuery(listPracticesOptions({ path: { workspaceSlug } })).data;
 	// Stated only while reviews are not known to run: a working workspace is not told so on every visit.
 	const stopped =
-		running !== undefined && !["running", "checking"].includes(reviewReadinessTone(running));
+		readiness !== undefined && !["ready", "checking"].includes(reviewReadinessTone(readiness));
 
 	return (
 		<div className="space-y-4">
@@ -138,7 +138,7 @@ function PracticeReviewOverviewRoute() {
 				}}
 				banner={
 					stopped && (
-						<ReviewReadinessBanner running={running}>
+						<ReviewReadinessBanner readiness={readiness}>
 							<InlineLink
 								render={
 									<Link to="/w/$workspaceSlug/admin/practices/review" params={{ workspaceSlug }} />

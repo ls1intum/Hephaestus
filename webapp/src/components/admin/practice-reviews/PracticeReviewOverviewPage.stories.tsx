@@ -327,7 +327,7 @@ export const NeedsAttention: Story = {
  */
 export const ReviewsCannotStart: Story = {
 	args: {
-		banner: <ReviewReadinessBanner running={{ enabled: true, model: { status: "ready" } }} />,
+		banner: <ReviewReadinessBanner readiness={{ enabled: true, model: { status: "ready" } }} />,
 	},
 	play: async ({ canvas }) => {
 		const banner = canvas.getByText("Reviews cannot start");

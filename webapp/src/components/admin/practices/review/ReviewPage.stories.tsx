@@ -38,7 +38,7 @@ const meta = {
 	args: {
 		section: "feedback-mode",
 		onSectionChange: fn(),
-		running: {
+		readiness: {
 			enabled: true,
 			model: { status: "ready", binding: readyBinding },
 		},
@@ -91,14 +91,14 @@ export const PastWork: Story = {
 };
 
 export const NoModelIsReady: Story = {
-	args: { running: { enabled: true, model: { status: "ready" } } },
+	args: { readiness: { enabled: true, model: { status: "ready" } } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews cannot start");
 	},
 };
 
 export const StateNotKnownYet: Story = {
-	args: { running: undefined },
+	args: { readiness: undefined },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("status")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("tablist")).toBeVisible();

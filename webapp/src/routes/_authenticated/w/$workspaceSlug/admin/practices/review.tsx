@@ -78,7 +78,7 @@ function ReviewRoute() {
 	const navigate = useNavigate({ from: Route.fullPath });
 	const setSearch = useSearchState();
 
-	const running = useReviewReadiness(workspaceSlug);
+	const readiness = useReviewReadiness(workspaceSlug);
 
 	return (
 		<ReviewPage
@@ -91,7 +91,7 @@ function ReviewRoute() {
 					}),
 				});
 			}}
-			running={running}
+			readiness={readiness}
 			sections={{
 				"feedback-mode": (
 					<FeedbackModeSection

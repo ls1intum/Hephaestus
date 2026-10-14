@@ -170,3 +170,94 @@ Run the affected component tests. A color suggestion is based
 on proximity in light mode, not on its semantic purpose.
 Select the existing token for the meaning.
 A genuine false positive gets a line-level suppression with its reason, never a palette-wide exception.
+
+## Repository tooling
+
+Use these conventions when changing tasks or lint configuration.
+
+### Task vocabulary
+
+Task names are lowercase colon-separated words.
+A word can also contain digits or hyphens.
+The first word identifies the task type.
+Only these prefixes are allowed:
+
+| Prefix | Meaning |
+|---|---|
+| `affected` | Internal groups selected by `check:affected` for one changed tree |
+| `build` | Produce a distributable artifact |
+| `check` | Run an uncached read-only check or a group of checks. `check` is the local quality entry point. |
+| `ci` | Internal groups shaped for CI jobs and runner platforms |
+| `db` | Inspect or update the development database schema and its generated documentation |
+| `dev` | Start, stop, reset, or configure local development infrastructure |
+| `docs` | Build, serve, or lint the documentation site |
+| `fix` | Apply formatting and safe lint fixes |
+| `format` | Apply formatting. A final `check` segment makes the operation read-only. |
+| `gate` | Produce one verdict that CI can annotate. Every gate belongs to `quality` unless explicitly CI-only in the task contract test. |
+| `generate` | Regenerate a committed artifact from its authoritative source |
+| `lint` | Run a linter. A final `fix` segment applies safe fixes. `report` writes a report. |
+| `quality` | Internal graph with every local quality gate. Use `check` at the command line. |
+| `release` | Prepare or publish a release version |
+| `report` | Turn existing results into a human- or machine-readable report |
+| `schema` | Refresh a checked-in external integration schema or contract fixture |
+| `sync` | Reconcile checked-in values with an authoritative local source |
+| `test` | Execute a test suite |
+| `typecheck` | Run a language type checker without emitting artifacts |
+| `verification` | Run credential-free builds and test suites beyond `quality`. The bare name is the internal graph. |
+| `verify` | Run the complete credential-free local verification entry point |
+
+Segments after the prefix identify the subject and specialization, such as
+`test:server:integration`.
+`:webapp`, `:server`, and `:agents` are the tree scopes.
+`:java` scopes only `format` and `lint`.
+The Java leg of `check` is `gate:server`.
+
+### Lint and format
+
+Oxlint lints.
+Oxfmt formats, sorts imports, and sorts Tailwind classes.
+One rule set has multiple layers.
+The root `.oxlintrc.json` is the base for every TypeScript file and the config for the Node trees.
+These trees are the agent runner, the practice script toolkit, `scripts/**`, `load-tests/**`, and the task graph.
+`oxlint.react.jsonc` is the React layer.
+
+`oxlint.app.jsonc` adds the application compiler, Vitest, and Storybook policy for `webapp/.oxlintrc.json` and `extension/.oxlintrc.json`.
+Docs extend the base and React layer.
+Each tree holds only its additions or different decisions, with a reason for each.
+Write a rule once.
+
+`gate:docs-lint` type-checks the docs tree and runs `markdownlint-cli2` (`docs/.markdownlint-cli2.jsonc`).
+`docs:lint` is its alias.
+
+- **Run oxlint through `vp` from the repo root**, as CI does:
+  - `vp -C webapp lint .`
+  - `vp -C extension lint .`
+  - `vp -C docs lint .`
+  - `vp run gate:agents-lint`
+
+  The `options` block (`typeAware`, `typeCheck`, `reportUnusedDisableDirectives`) travels through `extends`.
+  Thus, a bare `oxlint` started inside a tree sees the same rules.
+  It resolves `tsconfig.json` from where it started.
+- **`extends` carries `categories`, `rules`, `plugins`, `overrides`, and `options`.**
+  Each tree owns its `env`, `settings`, and `ignorePatterns`.
+  Vite+ takes the config as an object and accepts only objects in `extends`.
+  Thus, `webapp/tools/oxlint/load-config.ts` inlines the files for both Vite configs.
+  It drops their `jsPlugins`, because that path rejects relative plugin paths.
+  The file on disk keeps the paths for the CLI and editors.
+- **Type-aware rules need a file named exactly `tsconfig.json`.**
+  The root stub supplies one for the Node trees configured by `tsconfig.agents.json`.
+  `load-tests/tsconfig.json` types the k6 scripts the same way.
+- **The house rules are one oxlint plugin under `webapp/tools/oxlint/`.**
+  All tree configs load it.
+  Each config chooses which rules to turn on.
+  Thus, adding a rule to the plugin enables it nowhere.
+  `webapp/AGENTS.md` § Linting has the rest.
+- **`vp run` does not give a command a POSIX shell on every platform.**
+  Thus, a command never contains `$`.
+  `scripts/ci-contract.test.ts` enforces this.
+  When the config loads, `vite.config.ts` determines what a command reads from the environment.
+  `scripts/check-runner-contract.ts` proves the runner facts that the graph needs.
+
+  An oxfmt pattern with no `/` matches a basename at any depth.
+  A pattern with a `/` is anchored at the working directory.
+  Thus, a root-only pass pairs its patterns with `!*/**`.

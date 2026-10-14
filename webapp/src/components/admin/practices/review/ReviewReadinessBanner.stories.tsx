@@ -19,31 +19,31 @@ const meta = {
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
 	tags: ["autodocs"],
 	args: {
-		running: { enabled: true, model: { status: "ready", ...readyModel } },
+		readiness: { enabled: true, model: { status: "ready", ...readyModel } },
 	},
 } satisfies Meta<typeof ReviewReadinessBanner>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Running: Story = {
+export const Ready: Story = {
 	play: async ({ canvas }) => {
 		const status = canvas.getByRole("status");
-		await expect(status).toHaveTextContent("Reviews are running");
+		await expect(status).toHaveTextContent("Reviews can start");
 		await expect(status).toHaveTextContent("a review model declared as In-house is ready");
 	},
 };
 
 export const Checking: Story = {
-	args: { running: { enabled: true, model: { status: "loading" } } },
+	args: { readiness: { enabled: true, model: { status: "loading" } } },
 };
 
 export const Unconfirmed: Story = {
-	args: { running: { enabled: true, model: { status: "error" } } },
+	args: { readiness: { enabled: true, model: { status: "error" } } },
 };
 
 export const Blocked: Story = {
-	args: { running: { enabled: true, model: { status: "ready" } } },
+	args: { readiness: { enabled: true, model: { status: "ready" } } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews cannot start");
 	},
@@ -51,7 +51,7 @@ export const Blocked: Story = {
 
 export const Off: Story = {
 	args: {
-		running: { enabled: false, model: { status: "ready", ...readyModel } },
+		readiness: { enabled: false, model: { status: "ready", ...readyModel } },
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews are off");

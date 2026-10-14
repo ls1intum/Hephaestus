@@ -7,7 +7,6 @@ import { z } from "zod";
 
 import {
 	adminListUsersInfiniteOptions,
-	adminListUsersQueryKey,
 	adminRevokeUserSessionsMutation,
 	adminUpdateUserMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -63,8 +62,9 @@ function AdminUsersPage() {
 	const [roleTarget, setRoleTarget] = useState<DialogTarget>(null);
 	const [signOutTarget, setSignOutTarget] = useState<DialogTarget>(null);
 
+	const listOptions = adminListUsersInfiniteOptions({ query: { size: PAGE_SIZE } });
 	const listQuery = useInfiniteQuery({
-		...adminListUsersInfiniteOptions({ query: { size: PAGE_SIZE } }),
+		...listOptions,
 		initialPageParam: 0,
 		getNextPageParam: (lastPage: AdminAccountView[], allPages: AdminAccountView[][]) =>
 			lastPage.length === PAGE_SIZE ? allPages.length : undefined,
@@ -96,7 +96,8 @@ function AdminUsersPage() {
 
 	const invalidateList = async () =>
 		queryClient.invalidateQueries({
-			queryKey: adminListUsersQueryKey({ query: { size: PAGE_SIZE } }),
+			queryKey: listOptions.queryKey,
+			exact: true,
 		});
 
 	const [challenge, setChallenge] = useState<StepUpChallenge | undefined>(undefined);

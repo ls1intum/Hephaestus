@@ -110,6 +110,101 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldKeepReportedProjectParentWhenItsIidCollidesWithALocalIssue() {
+        var parentProjectPath = "team/parent-" + UUID.randomUUID();
+        var parentRepository = repository(repository.getProvider(), 3, parentProjectPath);
+        var reportedParent = issue(parentRepository, 6, 1, null);
+        existingChild.setParentIssue(reportedParent);
+        issues.save(existingChild);
+        assertThat(parentId(existingChild)).contains(reportedParent.getId());
+        answers.add(page(3, false, null, node(1, null, true), node(2, 1, parentProjectPath), node(3, 1)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(reportedParent.getId());
+            softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(result).isEqualTo(SyncResult.completed(1));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @Test
+    void shouldPreserveParentAndContinueSiblingsWhenOnlyAnotherProviderHasTheReportedProject() {
+        var parentProjectPath = "team/provider-parent-" + UUID.randomUUID();
+        var otherProvider = providers.save(new IdentityProvider(
+                IdentityProviderType.GITLAB, "https://" + UUID.randomUUID() + ".gitlab.example.test"));
+        var foreignRepository = repository(otherProvider, 1, parentProjectPath);
+        var foreignParent = issue(foreignRepository, 1, 7, null);
+        answers.add(page(3, false, null, node(1, null, true), node(2, 7, parentProjectPath), node(3, 1)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(parent.getId());
+            softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(parentId(foreignParent)).isEmpty();
+            softly.assertThat(result).isEqualTo(SyncResult.abortedError(1));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @Test
+    void shouldResolveParentUnderCurrentProviderWhenAnotherProviderHasTheSameProjectPathAndIid() {
+        var parentProjectPath = "team/shared-parent-" + UUID.randomUUID();
+        var parentRepository = repository(repository.getProvider(), 3, parentProjectPath);
+        var reportedParent = issue(parentRepository, 6, 7, null);
+        var otherProvider = providers.save(new IdentityProvider(
+                IdentityProviderType.GITLAB, "https://" + UUID.randomUUID() + ".gitlab.example.test"));
+        var foreignRepository = repository(otherProvider, 1, parentProjectPath);
+        var foreignParent = issue(foreignRepository, 1, 7, null);
+        answers.add(page(3, false, null, node(1, null, true), node(2, 7, parentProjectPath), node(3, 1)));
+
+        var result = sync();
+
+        assertSoftly(softly -> {
+            softly.assertThat(parentId(existingChild)).contains(reportedParent.getId());
+            softly.assertThat(parentId(newChild)).contains(parent.getId());
+            softly.assertThat(parentId(foreignParent)).isEmpty();
+            softly.assertThat(result).isEqualTo(SyncResult.completed(2));
+            softly.assertThat(parentId(unrelatedChild)).contains(unrelatedParent.getId());
+        });
+    }
+
+    @Test
+    void shouldPreserveUnmirroredParentThenRecoverAndRemoveItWhenExplicitlyAbsent() {
+        var parentProjectPath = "team/unmirrored-" + UUID.randomUUID();
+        answers.add(page(3, false, null, node(1, null, true), node(2, 1, parentProjectPath), node(3, 1)));
+
+        var incomplete = sync();
+
+        assertThat(parentId(existingChild)).contains(parent.getId());
+        assertThat(parentId(newChild)).contains(parent.getId());
+        assertThat(incomplete).isEqualTo(SyncResult.abortedError(1));
+        assertUnrelatedLink();
+
+        var parentRepository = repository(repository.getProvider(), 3, parentProjectPath);
+        var reportedParent = issue(parentRepository, 6, 1, null);
+        answers.add(page(3, false, null, node(1, null, true), node(2, 1, parentProjectPath), node(3, 1)));
+
+        var recovered = sync();
+
+        assertThat(parentId(existingChild)).contains(reportedParent.getId());
+        assertThat(parentId(newChild)).contains(parent.getId());
+        assertThat(recovered).isEqualTo(SyncResult.completed(1));
+        assertUnrelatedLink();
+
+        answers.add(page(3, false, null, node(1, null, true), node(2, null), node(3, 1)));
+
+        var removed = sync();
+
+        assertThat(parentId(existingChild)).isEmpty();
+        assertThat(parentId(newChild)).contains(parent.getId());
+        assertThat(removed).isEqualTo(SyncResult.completed(0));
+        assertUnrelatedLink();
+    }
+
+    @Test
     void shouldPreserveStoredParentAndAbortWhenProjectIsNull() {
         answers.add("""
                 {"data":{"project":null}}
@@ -387,11 +482,20 @@ class GitLabSubIssueReconciliationIntegrationTest extends BaseIntegrationTest {
         return node(iid, parentIid, false);
     }
 
+    private static String node(int iid, int parentIid, String parentNamespacePath) {
+        return node(iid, parentIid, false, parentNamespacePath);
+    }
+
     private static String node(int iid, @Nullable Integer parentIid, boolean hasChildren) {
-        String parentJson =
-                parentIid == null ? "null" : """
+        return node(iid, parentIid, hasChildren, PROJECT);
+    }
+
+    private static String node(int iid, @Nullable Integer parentIid, boolean hasChildren, String parentNamespacePath) {
+        String parentJson = parentIid == null
+                ? "null"
+                : """
                 {"iid":"%d","namespace":{"fullPath":"%s"}}
-                """.formatted(parentIid, PROJECT).strip();
+                """.formatted(parentIid, parentNamespacePath).strip();
         return """
                 {"iid":"%d","widgets":[{"type":"HIERARCHY","hasParent":%s,
                  "parent":%s,"hasChildren":%s}]}

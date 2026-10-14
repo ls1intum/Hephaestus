@@ -26,11 +26,11 @@ export interface ReviewReadinessState {
 	model: ReviewModelState;
 }
 
-export type ReviewReadinessTone = "running" | "checking" | "unconfirmed" | "blocked" | "off";
+export type ReviewReadinessTone = "ready" | "checking" | "unconfirmed" | "blocked" | "off";
 
 export const REVIEW_READINESS_DEFS: StatusDefs<ReviewReadinessTone> = {
-	running: {
-		label: "Reviews are running",
+	ready: {
+		label: "Reviews can start",
 		icon: CircleCheckIcon,
 		badgeVariant: "success",
 		description:
@@ -75,7 +75,7 @@ export function reviewReadinessTone({ enabled, model }: ReviewReadinessState): R
 	if (!reviewModelRunnable(model)) {
 		return "blocked";
 	}
-	return "running";
+	return "ready";
 }
 
 /**
@@ -83,12 +83,12 @@ export function reviewReadinessTone({ enabled, model }: ReviewReadinessState): R
  * which members it serves is decided by that tier against each developer's AI choice, so the banner
  * says which tier is in force rather than only that one is.
  */
-export function reviewReadinessDescription(running: ReviewReadinessState): string {
-	const tone = reviewReadinessTone(running);
-	if (tone !== "running" || running.model.status !== "ready" || !running.model.binding) {
+export function reviewReadinessDescription(readiness: ReviewReadinessState): string {
+	const tone = reviewReadinessTone(readiness);
+	if (tone !== "ready" || readiness.model.status !== "ready" || !readiness.model.binding) {
 		return REVIEW_READINESS_DEFS[tone].description;
 	}
-	const tier = running.model.binding.dataHandlingTier;
+	const tier = readiness.model.binding.dataHandlingTier;
 	const model =
 		tier === "UNDECLARED"
 			? "a review model is ready for members who have not chosen"
