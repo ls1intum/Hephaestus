@@ -294,7 +294,7 @@ jobs:
           if [ "$MIGRATIONS" = true ]; then
             {
               echo "> [!WARNING]"
-              echo "> This release contains **schema migrations**. They run automatically on startup — back up your database before upgrading. See the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/$SHA/MIGRATION.md)."
+              echo "> This release contains **schema migrations**. Before upgrading, complete the release-specific steps in the [migration guide](${{ github.server_url }}/${{ github.repository }}/blob/$SHA/MIGRATION.md) and verify your database backup."
               echo ""
             } >> "$NOTES"
           fi
