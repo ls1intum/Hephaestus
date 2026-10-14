@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeReleaseChoice;
 import de.tum.cit.aet.hephaestus.practices.dto.AcceptPracticeReleaseRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogGroupInputDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeUpdateDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
@@ -26,6 +27,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
@@ -36,6 +39,9 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     CatalogCustomizationService customization;
+
+    @Autowired
+    JsonMapper mapper;
 
     @Test
     @WithAdminUser
@@ -271,5 +277,65 @@ class CatalogAdminControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .jsonPath("$.definition.name")
                 .isEqualTo(definition.name());
         assertThat(catalog.practice(slug).effective().definition()).isEqualTo(definition);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldDeriveStableCodesForAuthoredReasonsAndLimitsWithoutChangingRecordedCodes() {
+        persistUser("admin");
+        String slug = "limit-" + UUID.randomUUID();
+        var body = (ObjectNode) mapper.valueToTree(new CatalogPracticeInputDTO(
+                slug,
+                "scm.pull_request",
+                null,
+                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
+                0));
+        var reviewedBy = (ObjectNode) body.path("definition").path("reviewedBy");
+        reviewedBy.put("by", "PEOPLE");
+        reviewedBy.putObject("humanReason").put("description", "The team reviews this decision together.");
+        var limits = reviewedBy.putArray("limits");
+        limits.addObject().put("description", "Runtime behavior was not observed.");
+        limits.addObject().put("description", "Private discussions were not captured.");
+        limits.addObject().put("code", "AUTHORED_LIMIT").put("description", "Keep this recorded code.");
+        var first = Objects.requireNonNull(client.post()
+                .uri("/admin/practice-catalog/practices")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(CatalogPracticeDTO.class)
+                .returnResult()
+                .getResponseBody());
+        var stored = catalog.practice(slug).effective().definition().reviewedBy();
+        assertThat(stored).isEqualTo(first.definition().reviewedBy());
+        assertThat(Objects.requireNonNull(stored.humanReason()).description())
+                .isEqualTo("The team reviews this decision together.");
+        assertThat(stored.limits())
+                .extracting(limit -> limit.description())
+                .containsExactlyInAnyOrder(
+                        "Runtime behavior was not observed.",
+                        "Private discussions were not captured.",
+                        "Keep this recorded code.");
+        assertThat(stored.limits().stream()
+                        .filter(limit -> limit.description().equals("Keep this recorded code."))
+                        .findFirst()
+                        .orElseThrow()
+                        .code())
+                .isEqualTo("AUTHORED_LIMIT");
+        body.put("slug", slug + "-again");
+        var repeated = Objects.requireNonNull(client.post()
+                .uri("/admin/practice-catalog/practices")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(body)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(CatalogPracticeDTO.class)
+                .returnResult()
+                .getResponseBody());
+        assertThat(repeated.definition().reviewedBy()).isEqualTo(stored);
     }
 }

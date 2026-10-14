@@ -23,7 +23,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ResultStoreService implements ResultStore {
-    private final ResultAdmissionService admission;
+    private final ResultAdmissionWriter admission;
     private final ResultItemLockRepository itemLocks;
     private final ResultRepository results;
     private final ResultMarkRepository marks;

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.practices.ClosedPracticeInput;
 import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -12,6 +13,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 @JsonInclude(JsonInclude.Include.ALWAYS)
+@Schema(additionalProperties = Schema.AdditionalPropertiesValue.FALSE)
 public record ReviewedByInputDTO(
         @JsonProperty(required = true) @NotNull ReviewedByKind by,
         @JsonProperty(required = true) @Valid @Nullable ReviewLimitInputDTO humanReason,

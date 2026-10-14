@@ -31,7 +31,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Service
 @ConditionalOnCaptureRole
 @RequiredArgsConstructor
-public class ResultAdmissionService {
+public class ResultAdmissionWriter {
     private final ReviewInvocationFence fence;
     private final ReviewPracticeRepository practices;
     private final ReviewItemRepository items;

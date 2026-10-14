@@ -84,4 +84,22 @@ class PracticeVersionServiceTest extends BaseUnitTest {
         assertThat(Objects.requireNonNull(scan.path("include").get(0)).asString())
                 .isEqualTo("**/*.ts");
     }
+
+    @Test
+    void shouldKeepAMissingHistoricalLimitCodeUnknownInsteadOfGeneratingOne() {
+        var recorded = (ObjectNode) mapper.valueToTree(DefinitionTestFixtures.definition());
+        ((ObjectNode) recorded.path("reviewedBy"))
+                .putArray("limits")
+                .addObject()
+                .put("description", "A previously recorded limitation.");
+        var version = TestEntities.practiceVersion(11L, 1, recorded, "v6:" + "c".repeat(64));
+        var view = service.view(version, null, null);
+        assertThat(view.definitionAvailable()).isFalse();
+        var historical = Objects.requireNonNull(view.historicalDefinition());
+        assertThat(historical.knownFields()).doesNotContain(PracticeDefinitionField.REVIEWED_BY);
+        assertThat(historical.reviewedBy()).isNull();
+        assertThat(historical.criteria())
+                .isEqualTo(DefinitionTestFixtures.definition().criteria());
+        assertThatThrownBy(() -> service.definitionOf(version)).isInstanceOf(IllegalArgumentException.class);
+    }
 }
