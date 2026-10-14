@@ -4,6 +4,7 @@ import { HttpResponse, http } from "msw";
 import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+	getActivityPeopleQueryKey,
 	getActivityPersonWorkInfiniteQueryKey,
 	getActivityWorkInfiniteQueryKey,
 } from "@/api/@tanstack/react-query.gen";
@@ -18,10 +19,11 @@ import type { Wire } from "@/lib/dates";
 import { currentUser } from "@/mocks/fixtures/auth";
 import { workspaceListItem } from "@/mocks/fixtures/workspaces";
 import { server } from "@/mocks/server";
+import { QUERY_STALE_TIME_MS } from "@/runtime/tanstack-query/query-defaults";
 import { clearUserView } from "@/runtime/user-view/session";
 import { deferred } from "@/test/async";
 import { ObserverStub } from "@/test/observers";
-import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harness";
+import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter, testQueryClient } from "@/test/router-harness";
 import { storeUserView } from "@/test/user-view";
 
 // A case mounts the whole app chrome, whose route modules are imported lazily.
@@ -661,6 +663,43 @@ describe("Workspace activity", () => {
 		);
 	});
 
+	/**
+	 * People and automation as the server classifies them, by workspace: a classification moves the
+	 * account between the two lists. Returns the classified accounts, `workspace/userId`, for a test
+	 * that holds a reply to record the change itself.
+	 */
+	function serveClassification(): Set<string> {
+		const automated = new Set<string>();
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/activity/people", ({ request, params }) => {
+				record(request);
+				const moved = (id: number) => automated.has(`${String(params.workspaceSlug)}/${id}`);
+				return HttpResponse.json({
+					...people,
+					people: people.people.filter(({ person }) => !moved(person.id)),
+					automation: people.people
+						.filter(({ person }) => moved(person.id))
+						.map((entry) => ({ ...entry, kind: "AUTOMATION" })),
+				});
+			}),
+			http.patch(
+				"*/workspaces/:workspaceSlug/activity/people/:userId/automation",
+				({ request, params }) => {
+					const url = new URL(request.url);
+					automation.push(url);
+					const account = `${String(params.workspaceSlug)}/${String(params.userId)}`;
+					if (url.searchParams.get("treatAsAutomation") === "true") {
+						automated.add(account);
+					} else {
+						automated.delete(account);
+					}
+					return new HttpResponse(null, { status: 204 });
+				},
+			),
+		);
+		return automated;
+	}
+
 	it("reads everyone in the last 90 days and keeps the defaults out of the address", async () => {
 		const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity");
 
@@ -1131,7 +1170,10 @@ describe("Workspace activity", () => {
 	it("lets an admin treat a person as automation, and nobody else", async () => {
 		role = "ADMIN";
 		const user = userEvent.setup();
-		renderRouteAtWithRouter("/w/acme/workspace-activity?view=timeline&detail=person:bob");
+		serveClassification();
+		const { router } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?view=timeline&detail=person:bob",
+		);
 
 		const action = await screen.findByRole(
 			"button",
@@ -1148,6 +1190,229 @@ describe("Workspace activity", () => {
 		);
 		// The people are read again, so the account moves between the lists at once.
 		await waitFor(() => expect(readsOf("/activity/people").length).toBeGreaterThan(readsBefore));
+		await screen.findByText("Bob is treated as automation");
+		screen.getByText("In workspace acme.");
+		// The account stays open, with the way back.
+		await user.click(
+			await screen.findByRole("button", { name: "Count as a person" }, ROUTE_RENDER_WAIT),
+		);
+		await screen.findByText("Bob counts as a person");
+		await screen.findByRole("button", { name: "Treat as automation" }, ROUTE_RENDER_WAIT);
+		expect(router.state.location.search.detail).toBe("person:bob");
+		expect(automation.map((url) => url.search)).toStrictEqual([
+			"?treatAsAutomation=true",
+			"?treatAsAutomation=false",
+		]);
+	});
+
+	it("says a failed classification for its own account and workspace, and leaves the other workspace alone", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		serveClassification();
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme"), workspaceListItem("beta", { id: 2 })]),
+			),
+			http.get("*/workspaces/beta", () => HttpResponse.json(workspaceListItem("beta", { id: 2 }))),
+			http.patch(
+				"*/workspaces/acme/activity/people/8/automation",
+				async ({ request }) => {
+					automation.push(new URL(request.url));
+					return response.promise;
+				},
+				{ once: true },
+			),
+		);
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+		);
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Treat as automation" }, ROUTE_RENDER_WAIT),
+			);
+			await screen.findByRole("button", { name: "Saving…" });
+			await act(async () => {
+				await router.navigate({
+					to: "/w/$workspaceSlug/workspace-activity",
+					params: { workspaceSlug: "beta" },
+					search: { detail: ["person:bob"] },
+				});
+			});
+			// Beta's Bob has the same account id, and acme's change does not hold his action.
+			const level = await screen.findByRole("dialog", { name: "Bob" }, ROUTE_RENDER_WAIT);
+			const betaAction = await within(level).findByRole("button", { name: "Treat as automation" });
+			expect(betaAction.getAttribute("aria-disabled")).not.toBe("true");
+
+			await act(async () => {
+				response.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+			});
+			await screen.findByText("We could not change how Bob counts");
+			screen.getByText(/In workspace acme\.$/u);
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(screen.queryByText(/is treated as automation/u)).toBeNull();
+			expect(router.state.location.pathname).toBe("/w/beta/workspace-activity");
+			expect(router.state.location.search.detail).toBe("person:bob");
+			within(screen.getByRole("dialog", { name: "Bob" })).getByRole("button", {
+				name: "Treat as automation",
+			});
+			expect(automation.map((url) => `${url.pathname}${url.search}`)).toStrictEqual([
+				"/workspaces/acme/activity/people/8/automation?treatAsAutomation=true",
+			]);
+		} finally {
+			response.resolve(HttpResponse.json({ status: 500 }, { status: 500 }));
+		}
+	});
+
+	it("keeps an account busy while its own change is out, after another account's change finished", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		const automated = serveClassification();
+		server.use(
+			http.patch(
+				"*/workspaces/acme/activity/people/8/automation",
+				async ({ request }) => {
+					automation.push(new URL(request.url));
+					return response.promise;
+				},
+				{ once: true },
+			),
+		);
+		const { router } = renderRouteAtWithRouter("/w/acme/workspace-activity?detail=person:bob");
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Treat as automation" }, ROUTE_RENDER_WAIT),
+			);
+			await screen.findByRole("button", { name: "Saving…" });
+			await user.keyboard("{Escape}");
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+			await user.click(
+				within(screen.getByRole("table", { name: "People" })).getByRole("link", { name: "Ada" }),
+			);
+			const ada = await screen.findByRole("dialog", { name: "Ada" }, ROUTE_RENDER_WAIT);
+			// Another account can be classified while Bob's change is out, and finishes first.
+			await user.click(await within(ada).findByRole("button", { name: "Treat as automation" }));
+			await screen.findByText("Ada is treated as automation");
+
+			await user.keyboard("{Escape}");
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+			await user.click(
+				within(screen.getByRole("table", { name: "People" })).getByRole("link", { name: "Bob" }),
+			);
+			const bob = await screen.findByRole("dialog", { name: "Bob" }, ROUTE_RENDER_WAIT);
+			expect(
+				within(bob).getByRole("button", { name: "Saving…" }).getAttribute("aria-disabled"),
+			).toBe("true");
+
+			automated.add("acme/8");
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+			});
+			await screen.findByText("Bob is treated as automation");
+			await within(bob).findByRole("button", { name: "Count as a person" });
+			expect(automation.map((url) => `${url.pathname}${url.search}`)).toStrictEqual([
+				"/workspaces/acme/activity/people/8/automation?treatAsAutomation=true",
+				"/workspaces/acme/activity/people/7/automation?treatAsAutomation=true",
+			]);
+		} finally {
+			response.resolve(new HttpResponse(null, { status: 204 }));
+		}
+	});
+
+	it("refreshes the submitted workspace after an automation reply arrives in another workspace", async () => {
+		role = "ADMIN";
+		const user = userEvent.setup();
+		const response = deferred<Response>();
+		let acmePeople: Wire<ActivityPeople> = people;
+		server.use(
+			http.get("*/workspaces", () =>
+				HttpResponse.json([workspaceListItem("acme"), workspaceListItem("beta", { id: 2 })]),
+			),
+			http.get("*/workspaces/beta", () => HttpResponse.json(workspaceListItem("beta", { id: 2 }))),
+			http.get("*/workspaces/acme/activity/people", ({ request }) => {
+				record(request);
+				return HttpResponse.json(acmePeople);
+			}),
+			http.get("*/workspaces/beta/activity/people", ({ request }) => {
+				record(request);
+				return HttpResponse.json(people);
+			}),
+			http.patch("*/workspaces/acme/activity/people/8/automation", async ({ request }) => {
+				automation.push(new URL(request.url));
+				return response.promise;
+			}),
+		);
+		const client = testQueryClient();
+		client.setDefaultOptions({
+			...client.getDefaultOptions(),
+			queries: { ...client.getDefaultOptions().queries, staleTime: QUERY_STALE_TIME_MS },
+		});
+		const { router, queryClient } = renderRouteAtWithRouter(
+			"/w/acme/workspace-activity?detail=person:bob",
+			client,
+		);
+		const acmeKey = getActivityPeopleQueryKey({
+			path: { workspaceSlug: "acme" },
+			query: { range: "90d" },
+		});
+		try {
+			await user.click(
+				await screen.findByRole("button", { name: "Treat as automation" }, ROUTE_RENDER_WAIT),
+			);
+			await waitFor(() =>
+				expect(automation.map((url) => `${url.pathname}${url.search}`)).toStrictEqual([
+					"/workspaces/acme/activity/people/8/automation?treatAsAutomation=true",
+				]),
+			);
+			await user.keyboard("{Escape}");
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+			await user.keyboard("{Control>}2{/Control}");
+			await waitFor(() =>
+				expect(router.state.location.pathname).toBe("/w/beta/workspace-activity"),
+			);
+			await user.click(
+				within(await screen.findByRole("table", { name: "People" })).getByRole("link", {
+					name: "Ada",
+				}),
+			);
+			await screen.findByRole("dialog", { name: "Ada" }, ROUTE_RENDER_WAIT);
+			const bob = people.people.find(({ person }) => person.id === 8);
+			assert(bob);
+			acmePeople = {
+				...people,
+				people: people.people.filter(({ person }) => person.id !== 8),
+				automation: [{ ...bob, kind: "AUTOMATION" }],
+			};
+			await act(async () => {
+				response.resolve(new HttpResponse(null, { status: 204 }));
+			});
+			await waitFor(() => expect(queryClient.isMutating()).toBe(0));
+			expect(router.state.location.pathname).toBe("/w/beta/workspace-activity");
+			expect(router.state.location.search.detail).toBe("person:ada-lrz");
+			const ownership = JSON.stringify({
+				acmeInvalidatedBeforeReturn: queryClient.getQueryState(acmeKey)?.isInvalidated,
+				peopleReads: readsOf("/activity/people").map((url) => url.pathname),
+				productionStaleTime: QUERY_STALE_TIME_MS,
+			});
+			await user.keyboard("{Escape}");
+			await waitFor(() => expect(router.state.location.search.detail).toBeUndefined());
+			await user.keyboard("{Control>}1{/Control}");
+			await waitFor(() =>
+				expect(router.state.location.pathname).toBe("/w/acme/workspace-activity"),
+			);
+			await waitFor(() => expect(queryClient.getQueryState(acmeKey)?.fetchStatus).toBe("idle"));
+			await waitFor(() =>
+				expect(screen.queryByRole("heading", { name: "Automation" }), ownership).not.toBeNull(),
+			);
+			const automationList = within(screen.getByRole("region", { name: "Automation" }));
+			automationList.getByRole("link", { name: "Bob" });
+			expect(
+				within(screen.getByRole("table", { name: "People" })).queryByRole("link", { name: "Bob" }),
+			).toBeNull();
+		} finally {
+			response.resolve(new HttpResponse(null, { status: 204 }));
+		}
 	});
 
 	it("lets an admin hide a person from the activity pages, and take it back", async () => {
