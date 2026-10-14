@@ -68,6 +68,10 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         """)
     Optional<Issue> findByRepositoryIdAndNumber(@Param("repositoryId") long repositoryId, @Param("number") int number);
 
+    @Query("SELECT i FROM Issue i WHERE TYPE(i) = Issue AND i.provider.id = :providerId AND i.nativeId IN :nativeIds")
+    List<Issue> findAllIssuesByProviderIdAndNativeIdIn(
+            @Param("providerId") Long providerId, @Param("nativeIds") Collection<Long> nativeIds);
+
     /**
      * How many issues name {@code parentIssueId} as their parent, and how many of those are closed, as one
      * {@code [total, completed]} row: the rollup a provider that syncs only the parent link never supplies.
