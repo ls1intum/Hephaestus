@@ -1,6 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.AdditionalAnswers.delegatesTo;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
@@ -26,11 +30,13 @@ import io.micrometer.tracing.Tracer;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -90,16 +96,7 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
-        sweeper = new AgentJobZombieSweeper(
-                jobRepository,
-                workerRegistryRepository,
-                agentProperties,
-                objectMapper,
-                transactionTemplate,
-                lifecycleService,
-                usageRecorder,
-                meterRegistry,
-                new AgentJobTelemetry(meterRegistry, Tracer.NOOP));
+        sweeper = sweeperWithRepository(jobRepository);
         workspace = workspaceRepository.save(TestEntities.activeWorkspace("stale-reap-ws"));
         LlmConnection connection = connectionRepository.save(LlmCatalogTestFixtures.connection("stale-reap"));
         instanceModel =
@@ -153,6 +150,101 @@ class AgentJobStaleReapIntegrationTest extends BaseIntegrationTest {
         sweeper.reapStaleRunningJobs();
         assertThat(usageEventRepository.findAll()).hasSize(1);
         assertThat(jobRepository.findById(jobId).orElseThrow().getStatus()).isEqualTo(AgentJobStatus.TIMED_OUT);
+    }
+
+    @Test
+    void shouldPreserveDeliveredStatusAndNewCommentWhenAnExhaustedCandidateIsStale() {
+        UUID jobId = cappedDeliveryJob(workspace, DeliveryStatus.PENDING, "old-comment");
+        AgentJobZombieSweeper racingSweeper =
+                sweeperAfterEnumeration(() -> assertThat(jobRepository.transitionDeliveryStatusFenced(
+                                jobId, DeliveryStatus.DELIVERED, "new-comment", Set.of(DeliveryStatus.PENDING), (short)
+                                        3))
+                        .isEqualTo(1));
+
+        racingSweeper.recoverStuckDeliveries();
+
+        assertDelivery(jobId, DeliveryStatus.DELIVERED, (short) 3, "new-comment");
+    }
+
+    @Test
+    void shouldPreserveTheCurrentAttemptWhenAnExhaustedCandidateHasAnOlderGeneration() {
+        UUID jobId = cappedDeliveryJob(workspace, DeliveryStatus.PENDING, "old-comment");
+        // Arrange a newer generation with the existing CAS, not a sweep beyond the cap or a counter reset.
+        AgentJobZombieSweeper racingSweeper =
+                sweeperAfterEnumeration(() -> assertThat(jobRepository.claimDeliveryRecoveryAttempt(jobId, (short) 3))
+                        .isEqualTo(1));
+
+        racingSweeper.recoverStuckDeliveries();
+
+        assertDelivery(jobId, DeliveryStatus.PENDING, (short) 4, "old-comment");
+    }
+
+    @Test
+    void shouldFailOnlyTheCurrentCappedDeliveryAndLeaveItUnchangedOnTheNextSweep() {
+        UUID jobId = cappedDeliveryJob(workspace, DeliveryStatus.PENDING, "old-comment");
+        Workspace otherWorkspace = workspaceRepository.save(TestEntities.activeWorkspace("delivery-other-ws"));
+        UUID otherJobId = cappedDeliveryJob(otherWorkspace, DeliveryStatus.DELIVERED, "other-comment");
+
+        sweeper.recoverStuckDeliveries();
+
+        assertDelivery(jobId, DeliveryStatus.FAILED, (short) 3, "old-comment");
+        assertDelivery(otherJobId, DeliveryStatus.DELIVERED, (short) 3, "other-comment");
+
+        sweeper.recoverStuckDeliveries();
+
+        assertDelivery(jobId, DeliveryStatus.FAILED, (short) 3, "old-comment");
+        assertDelivery(otherJobId, DeliveryStatus.DELIVERED, (short) 3, "other-comment");
+    }
+
+    private AgentJobZombieSweeper sweeperWithRepository(AgentJobRepository repository) {
+        return new AgentJobZombieSweeper(
+                repository,
+                workerRegistryRepository,
+                agentProperties,
+                objectMapper,
+                transactionTemplate,
+                lifecycleService,
+                usageRecorder,
+                meterRegistry,
+                new AgentJobTelemetry(meterRegistry, Tracer.NOOP));
+    }
+
+    private AgentJobZombieSweeper sweeperAfterEnumeration(Runnable competingTransition) {
+        AgentJobRepository delegate = mock(AgentJobRepository.class, delegatesTo(jobRepository));
+        doAnswer(invocation -> {
+                    var candidates = jobRepository.findStuckPendingDeliveries(
+                            invocation.getArgument(0, Instant.class), invocation.getArgument(1, Pageable.class));
+                    // Commit after the real query, before returning its unchanged scalar projections.
+                    transactionTemplate.executeWithoutResult(status -> competingTransition.run());
+                    return candidates;
+                })
+                .doAnswer(delegatesTo(jobRepository))
+                .when(delegate)
+                .findStuckPendingDeliveries(any(Instant.class), any(Pageable.class));
+        return sweeperWithRepository(delegate);
+    }
+
+    private UUID cappedDeliveryJob(Workspace owningWorkspace, DeliveryStatus deliveryStatus, String commentId) {
+        AgentJob job = new AgentJob();
+        job.setWorkspace(owningWorkspace);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
+        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setStatus(AgentJobStatus.COMPLETED);
+        job.setConfigSnapshot(readableSnapshot());
+        job.setCompletedAt(Instant.now().minus(Duration.ofMinutes(20)));
+        job.setDeliveryStatus(deliveryStatus);
+        job.setDeliveryAttempts((short) 3);
+        job.setDeliveryCommentId(commentId);
+        return jobRepository.saveAndFlush(job).getId();
+    }
+
+    private void assertDelivery(
+            UUID jobId, DeliveryStatus expectedStatus, short expectedAttempts, String expectedComment) {
+        AgentJob stored = jobRepository.findById(jobId).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(AgentJobStatus.COMPLETED);
+        assertThat(stored.getDeliveryStatus()).isEqualTo(expectedStatus);
+        assertThat(stored.getDeliveryAttempts()).isEqualTo(expectedAttempts);
+        assertThat(stored.getDeliveryCommentId()).isEqualTo(expectedComment);
     }
 
     private LlmUsageEvent onlyUsageEvent() {

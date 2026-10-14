@@ -321,12 +321,18 @@ public class AgentJobZombieSweeper {
         for (StuckDeliveryRow candidate : stuck) {
             try {
                 if (candidate.getDeliveryAttempts() >= MAX_DELIVERY_RECOVERY_ATTEMPTS) {
-                    transactionTemplate.executeWithoutResult(s -> jobRepository.updateDeliveryStatus(
-                            candidate.getId(), DeliveryStatus.FAILED, candidate.getDeliveryCommentId()));
-                    log.warn(
-                            "Delivery recovery exhausted after {} attempt(s); marking FAILED: jobId={}",
-                            candidate.getDeliveryAttempts(),
-                            candidate.getId());
+                    Integer updated = transactionTemplate.execute(s -> jobRepository.transitionDeliveryStatusFenced(
+                            candidate.getId(),
+                            DeliveryStatus.FAILED,
+                            candidate.getDeliveryCommentId(),
+                            Set.of(DeliveryStatus.PENDING),
+                            candidate.getDeliveryAttempts()));
+                    if (updated != null && updated > 0) {
+                        log.warn(
+                                "Delivery recovery exhausted after {} attempt(s); marking FAILED: jobId={}",
+                                candidate.getDeliveryAttempts(),
+                                candidate.getId());
+                    }
                     continue;
                 }
                 short expectedAttempts = candidate.getDeliveryAttempts();

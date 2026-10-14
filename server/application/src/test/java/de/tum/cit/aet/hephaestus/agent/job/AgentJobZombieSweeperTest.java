@@ -422,17 +422,60 @@ class AgentJobZombieSweeperTest extends BaseUnitTest {
             AgentJob job = stuckJob((short) AgentJobZombieSweeper.MAX_DELIVERY_RECOVERY_ATTEMPTS);
             job.setDeliveryCommentId("comment-1");
             stagedAsStuck(job);
+            when(jobRepository.transitionDeliveryStatusFenced(
+                            job.getId(),
+                            DeliveryStatus.FAILED,
+                            "comment-1",
+                            Set.of(DeliveryStatus.PENDING),
+                            job.getDeliveryAttempts()))
+                    .thenReturn(1);
 
             sweeper.recoverStuckDeliveries();
 
             ArgumentCaptor<DeliveryStatus> status = ArgumentCaptor.forClass(DeliveryStatus.class);
-            verify(jobRepository).updateDeliveryStatus(eq(job.getId()), status.capture(), eq("comment-1"));
+            verify(jobRepository)
+                    .transitionDeliveryStatusFenced(
+                            eq(job.getId()),
+                            status.capture(),
+                            eq("comment-1"),
+                            eq(Set.of(DeliveryStatus.PENDING)),
+                            eq(job.getDeliveryAttempts()));
             assertThat(status.getValue()).isEqualTo(DeliveryStatus.FAILED);
             // Giving up must not also burn another attempt, or delivery_attempts would climb past the
             // cap forever on a row nobody is retrying any more — and must not re-enter delivery, which
             // is what the row was given up on.
             verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), anyShort());
             verify(lifecycleService, never()).recoverStuckDelivery(any(), anyShort());
+            assertThat(meterRegistry.counter("agent.job.delivery.recovered").count())
+                    .isZero();
+        }
+
+        @Test
+        @DisplayName("a stale capped candidate loses its terminal CAS without starting another delivery attempt")
+        void shouldSkipExhaustedDeliveryWhenItsTerminalCasLost() {
+            AgentJob job = stuckJob((short) AgentJobZombieSweeper.MAX_DELIVERY_RECOVERY_ATTEMPTS);
+            job.setDeliveryCommentId("comment-1");
+            stagedAsStuck(job);
+            when(jobRepository.transitionDeliveryStatusFenced(
+                            job.getId(),
+                            DeliveryStatus.FAILED,
+                            "comment-1",
+                            Set.of(DeliveryStatus.PENDING),
+                            job.getDeliveryAttempts()))
+                    .thenReturn(0);
+
+            sweeper.recoverStuckDeliveries();
+
+            verify(jobRepository)
+                    .transitionDeliveryStatusFenced(
+                            job.getId(),
+                            DeliveryStatus.FAILED,
+                            "comment-1",
+                            Set.of(DeliveryStatus.PENDING),
+                            job.getDeliveryAttempts());
+            verify(jobRepository, never()).updateDeliveryStatus(any(), any(), any());
+            verify(jobRepository, never()).claimDeliveryRecoveryAttempt(any(), anyShort());
+            verifyNoInteractions(lifecycleService);
             assertThat(meterRegistry.counter("agent.job.delivery.recovered").count())
                     .isZero();
         }
