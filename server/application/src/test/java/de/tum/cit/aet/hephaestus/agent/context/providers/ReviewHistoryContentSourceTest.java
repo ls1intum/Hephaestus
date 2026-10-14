@@ -50,6 +50,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -1189,27 +1190,85 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepCommunicationFactsWhenHistoricalWordsAreUnavailable() {
-        Feedback unavailable = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
-        Feedback trusted = deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+    void shouldKeepCommunicationFactsWhenHistoricalWordsAreUnavailable() throws IOException {
+        Feedback unavailable = Feedback.builder()
+                .id(UUID.fromString("00000000-0000-4000-8000-000000000001"))
+                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000011"))
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
+                .body("Unvouched historical guidance must stay unavailable.")
+                .deliveredAt(Instant.parse("2026-10-07T10:00:00Z"))
+                .reviewedRevision("recorded-revision")
+                .build();
+        Feedback trusted = Feedback.builder()
+                .id(UUID.fromString("00000000-0000-4000-8000-000000000002"))
+                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000012"))
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
+                .body("Trusted delivered guidance on this work.")
+                .deliveredAt(Instant.parse("2026-10-07T10:00:00Z"))
+                .reviewedRevision("recorded-revision")
+                .build();
+        Feedback unvouchedCurrent = Feedback.builder()
+                .id(UUID.fromString("00000000-0000-4000-8000-000000000003"))
+                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000013"))
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(DELIVERED_ARTIFACT_ROW_ID)
+                .body("Current unvouched guidance must stay unavailable.")
+                .deliveredAt(Instant.parse("2026-10-07T10:00:00Z"))
+                .reviewedRevision("recorded-revision")
+                .build();
         Feedback prepared = queued("in-chat:7:subtasks", "Unavailable mentor words");
-        boundTo.put(unavailable.getId(), List.of(boundObservation(true)));
-        Observation trustedSupport = boundObservation(false);
+        PracticeRevision revision = mock(PracticeRevision.class);
+        when(revision.getId()).thenReturn(31L);
+        when(revision.getRevisionNumber()).thenReturn(1);
+        when(revision.getReviewRuleFingerprint()).thenReturn("v5:rules");
+        Practice practice = new Practice();
+        practice.setSlug("test-practice");
+        practice.setCurrentRevision(revision);
+        Observation unavailableSupport = Observation.builder()
+                .id(UUID.fromString("00000000-0000-4000-8000-000000000021"))
+                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000041"))
+                .practice(practice)
+                .practiceRevision(revision)
+                .outcome(Outcome.MET)
+                .supersededAt(Instant.parse("2026-10-07T10:30:00Z"))
+                .build();
+        Observation trustedSupport = Observation.builder()
+                .id(UUID.fromString("00000000-0000-4000-8000-000000000022"))
+                .agentJobId(UUID.fromString("00000000-0000-4000-8000-000000000042"))
+                .practice(practice)
+                .practiceRevision(revision)
+                .outcome(Outcome.MET)
+                .build();
+        boundTo.put(unavailable.getId(), List.of(unavailableSupport));
         boundTo.put(trusted.getId(), List.of(trustedSupport));
+        boundTo.put(unvouchedCurrent.getId(), List.of(trustedSupport));
         when(feedbackRepository.findDeliveredForPublicWorkHistory(
                         WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
-                .thenReturn(List.of(unavailable, trusted));
+                .thenReturn(List.of(unavailable, trusted, unvouchedCurrent));
         when(publicEligibility.permitsPublicHistory(eq(unavailable), any())).thenReturn(true);
         when(publicEligibility.permitsPublicHistory(eq(trusted), any())).thenReturn(true);
+        when(publicEligibility.permitsPublicHistory(eq(unvouchedCurrent), any()))
+                .thenReturn(true);
         when(feedbackRepository.findDeliveredForPersonHistory(any(), any())).thenReturn(List.of(unavailable, trusted));
         when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of(prepared));
-        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any())).thenReturn(Set.of(prepared.getId()));
+        when(withdrawalRepository.withdrawnAmong(eq(WORKSPACE_ID), any()))
+                .thenReturn(Set.of(unavailable.getId(), prepared.getId()));
         doReturn(Set.of(trusted.getAgentJobId(), trustedSupport.getAgentJobId()))
                 .when(copyAuthority)
                 .recordVouchedHistoricalJobs(anyLong(), any());
 
         JsonNode publicHistory = provider.publicSameWorkFeedback(
                 WORKSPACE_ID, AUTHOR_ID, ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID);
+        try (var fixture = Objects.requireNonNull(
+                getClass().getResourceAsStream("/agent/fixtures/public-feedback-history-unavailable-words.json"))) {
+            assertThat(objectMapper.readTree(objectMapper.writeValueAsBytes(publicHistory)))
+                    .isEqualTo(objectMapper.readTree(fixture));
+        }
         var captured = captureFeedbackHistory();
         JsonNode personHistory = read(captured.files().get("inputs/history/feedback.json"));
         JsonNode preparedHistory = read(captured.files().get("inputs/history/prepared.json"));
@@ -1218,7 +1277,7 @@ class ReviewHistoryContentSourceTest extends BaseUnitTest {
             JsonNode row = rows.get(0);
             assertThat(row.path("recordedClaimCurrentness").asString())
                     .isEqualTo(history.has("prepared") ? "CURRENT" : "STALE");
-            assertThat(row.path("withdrawn").asBoolean()).isEqualTo(history.has("prepared"));
+            assertThat(row.path("withdrawn").asBoolean()).isTrue();
             assertThat(row.has("body") || row.has("bodyRole")).isFalse();
             assertThat(row.path("wordsUnavailable").asString()).isEqualTo("COPY_AUTHORITY_UNAVAILABLE");
             assertThat(history.path("wordsCoverage").asString()).isEqualTo("PARTIAL");
