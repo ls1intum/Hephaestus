@@ -6,8 +6,8 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.ActivityTargetType;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.security.UserViewContextHolder;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -18,12 +18,13 @@ import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeGuidance;
 import de.tum.cit.aet.hephaestus.practices.PracticeGuide;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.PracticeVisual;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
 import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -67,12 +68,6 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ChatThreadRepository threads;
-
-    @Autowired
-    private PracticeRepository practices;
-
-    @Autowired
-    private IdentityRepository identityLinks;
 
     @Autowired
     private ActivityEventRepository activityEvents;
@@ -657,7 +652,9 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 new ReviewOn(List.of(), Map.of()),
                 null,
                 AboutRole.AUTHOR,
-                new PracticeReads("source-use/2.0.0", List.of()),
+                new PracticeReads(
+                        "source-use/2.0.0",
+                        List.of(new PracticeReadSource(new SourceKind("scm.pull-request.core"), ReadNeed.REQUIRED))),
                 new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
                 "Keep each change focused.",
                 null,
@@ -669,6 +666,6 @@ class UserViewIntegrationTest extends AbstractWorkspaceIntegrationTest {
                         null,
                         new PracticeVisual("<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "Two changes"),
                         new PracticeGuide("# Keep changes separate", Map.of())));
-        versions.create(ownerWorkspace, "guided-practice", new ItemKind("scm.pull_request"), definition, null);
+        versions.create(ownerWorkspace, "guided-practice", new ItemKind("scm.pull_request"), definition, null, 0, null);
     }
 }

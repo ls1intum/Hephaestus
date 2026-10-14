@@ -171,7 +171,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         // Login must match @WithMentorUser's default "mentor" principal so the workspace membership
         // resolver finds this exact row.
         User mentor = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
         webTestClient
                 .get()
@@ -213,7 +213,7 @@ class WorkspaceLlmConnectionControllerIntegrationTest extends AbstractWorkspaceI
         User admin = persistUser("mentor");
         Workspace workspace =
                 createWorkspace("byo-realadmin-ws", "Real Admin", "byo-realadmin-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(workspace, admin, WorkspaceRole.ADMIN);
+        ensureMembership(workspace, admin, WorkspaceRole.ADMIN);
 
         Workspace otherWorkspace = createWorkspace(
                 "byo-nonmember-ws-2",

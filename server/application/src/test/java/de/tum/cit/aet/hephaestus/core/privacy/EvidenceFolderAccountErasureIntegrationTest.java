@@ -16,6 +16,7 @@ import ch.qos.logback.core.read.ListAppender;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderLease;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog;
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceFolderPersonDataCatalog.CopyUnavailableException;
+import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
 import de.tum.cit.aet.hephaestus.agent.context.JobEvidenceFiles;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
@@ -27,7 +28,6 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account.AppRole;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
-import de.tum.cit.aet.hephaestus.core.auth.spi.PeopleRegistry;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyFence;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
@@ -41,6 +41,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.SchemaRowSeeder;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.PracticeModelTestFixtures;
@@ -125,9 +126,6 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private AccountRepository accounts;
-
-    @Autowired
-    private PeopleRegistry people;
 
     @Autowired
     private PlatformTransactionManager transactions;
@@ -497,8 +495,7 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                             assertThat(erased.get()).isFalse();
                             return catalog.recordVouchedHistoricalJobs(workspace.getId(), Set.of(source.getId()));
                         },
-                        result -> Set.of(),
-                        result -> Set.of()));
+                        result -> List.of()));
                 assertThat(read.get(10, TimeUnit.SECONDS)).containsExactly(source.getId());
                 Objects.requireNonNull(erasureTask.get()).get(5, TimeUnit.SECONDS);
                 assertThat(erased.get()).isTrue();
@@ -534,7 +531,8 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         var inputs = copy(
                 root, catalog, recorder, running, new PersonCopyIdentity("GITLAB", "https://late.example", "1", null));
         try (inputs) {
-            UUID supported = practiceResult(source, developerId);
+            var developerIdentity = new PersonCopyIdentity(
+                    "GITLAB", provider.getServerUrl(), Long.toString(developer.getNativeId()), null);
 
             String answered = catalog.indexLateRead(
                     running.getId(),
@@ -546,8 +544,8 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                                 .isFalse();
                         return "support read";
                     },
-                    read -> Set.of(supported),
-                    read -> Set.of());
+                    read -> List.of(
+                            historyCopy(catalog, workspace.getId(), List.of(source.getId()), developerIdentity)));
 
             assertThat(answered).isEqualTo("support read");
             assertThat(identities(running))
@@ -561,22 +559,22 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
             assertThat(catalog.jobsContaining(person)).contains(running.getId());
 
             var legacy = legacyCopy(workspace, new PersonCopyIdentity("GITLAB", "https://legacy.example", "8", null));
-            UUID legacySupport = practiceResult(legacy, developerId);
+
             assertThatThrownBy(() -> catalog.indexLateRead(
                             running.getId(),
                             workspace.getId(),
                             0,
                             () -> "old support",
-                            read -> Set.of(legacySupport),
-                            read -> Set.of()))
+                            read -> List.of(historyCopy(
+                                    catalog, workspace.getId(), List.of(legacy.getId()), developerIdentity))))
                     .isInstanceOf(CopyUnavailableException.class);
             catalog.indexLateRead(
                     running.getId(),
                     workspace.getId(),
                     0,
                     () -> "support again",
-                    read -> Set.of(supported),
-                    read -> Set.of());
+                    read -> List.of(
+                            historyCopy(catalog, workspace.getId(), List.of(source.getId()), developerIdentity)));
             assertThat(payload(running).path("dependencies").asString())
                     .as("refused words never entered the attempt's copy")
                     .isEqualTo("COMPLETE");
@@ -590,8 +588,8 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                             workspace.getId(),
                             0,
                             () -> "after erasure",
-                            read -> Set.of(supported),
-                            read -> Set.of()))
+                            read -> List.of(historyCopy(
+                                    catalog, workspace.getId(), List.of(source.getId()), developerIdentity))))
                     .isInstanceOf(CopyUnavailableException.class);
             assertThat(jdbc.queryForObject(
                             "SELECT state FROM person_evidence_copy WHERE job_id=?", String.class, running.getId()))
@@ -654,13 +652,10 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldCountALateReadsMissingRowsWithoutUpgradingOrRevivingItsReceipt() throws Exception {
+    void shouldRefuseUnavailableLateReadCustodyWithoutUpgradingOrRevivingItsReceipt() throws Exception {
         databaseTestUtils.cleanDatabase();
         var provider = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://late-diagnostics.example"));
-        long developerId =
-                Objects.requireNonNull(users.saveAndFlush(TestUserFactory.createUser(78L, "late-diagnostics", provider))
-                        .getId());
         var recorder = new ExactPersonDataCopyRecorder();
         var catalog = catalog(root, recorder);
         var running = job("late-read-diagnostics");
@@ -676,10 +671,15 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                 new PersonCopyIdentity("GITLAB", "https://late-diagnostics.example", "1", null));
         try (inputs;
                 var diagnostics = new Diagnostics()) {
-            UUID supported = practiceResult(source, developerId);
+            var developerIdentity = new PersonCopyIdentity("GITLAB", provider.getServerUrl(), "78", null);
             UUID vanished = UUID.randomUUID();
             catalog.indexLateRead(
-                    running.getId(), workspace.getId(), 0, () -> "read", read -> Set.of(supported), read -> Set.of());
+                    running.getId(),
+                    workspace.getId(),
+                    0,
+                    () -> "read",
+                    read -> List.of(
+                            historyCopy(catalog, workspace.getId(), List.of(source.getId()), developerIdentity)));
             assertThat(payload(running).path("dependencies").asString()).isEqualTo("COMPLETE");
             assertThat(diagnostics.drain())
                     .as("a complete late read stays quiet")
@@ -690,16 +690,19 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                             workspace.getId(),
                             0,
                             () -> "read",
-                            read -> Set.of(supported, vanished),
-                            read -> Set.of()))
+                            read -> List.of(historyCopy(
+                                    catalog, workspace.getId(), List.of(source.getId(), vanished), developerIdentity))))
                     .isInstanceOf(CopyUnavailableException.class);
-            var missingRow = new HashMap<>(assessed("LATE_READ", 1, 0, 1, 0, 0));
-            missingRow.put("evidence.missingRows", 1);
-            assertThat(diagnostics.drain()).containsExactly(missingRow);
+            assertThat(diagnostics.drain()).isEmpty();
             assertThat(payload(running).path("dependencies").asString()).isEqualTo("COMPLETE");
 
             catalog.indexLateRead(
-                    running.getId(), workspace.getId(), 0, () -> "read", read -> Set.of(supported), read -> Set.of());
+                    running.getId(),
+                    workspace.getId(),
+                    0,
+                    () -> "read",
+                    read -> List.of(
+                            historyCopy(catalog, workspace.getId(), List.of(source.getId()), developerIdentity)));
             assertThat(diagnostics.drain()).isEmpty();
             assertThat(payload(running).path("dependencies").asString())
                     .as("refused words were never copied")
@@ -712,8 +715,8 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
                             workspace.getId(),
                             0,
                             () -> "read",
-                            read -> Set.of(supported, vanished),
-                            read -> Set.of()))
+                            read -> List.of(historyCopy(
+                                    catalog, workspace.getId(), List.of(source.getId(), vanished), developerIdentity))))
                     .isInstanceOf(CopyUnavailableException.class);
             assertThat(diagnostics.drain())
                     .as("an unheld current copy refuses the read before disclosure")
@@ -837,17 +840,15 @@ class EvidenceFolderAccountErasureIntegrationTest extends BaseIntegrationTest {
         return legacy;
     }
 
-    private UUID practiceResult(ReviewJob source, long actorId) {
-        var actor = users.findById(actorId).orElseThrow();
-        long accountId = people.ensureHuman(
-                new PersonIdentity(
-                        Objects.requireNonNull(actor.getProvider().getId()),
-                        actor.getNativeId().toString(),
-                        null),
-                Objects.requireNonNullElse(actor.getName(), actor.getLogin()));
-        return modelFixtures
-                .result(modelFixtures.forJob(source), accountId, "Copied result")
-                .getId();
+    private HistoryCopy historyCopy(
+            EvidenceFolderPersonDataCatalog catalog,
+            long workspaceId,
+            List<UUID> producingJobs,
+            PersonCopyIdentity developer) {
+        var custody = catalog.custody(workspaceId, producingJobs);
+        var identities = new ArrayList<>(custody.copiedIdentities());
+        identities.add(developer);
+        return new HistoryCopy(custody.complete(), identities, custody.repositoryIds(), custody.sourceJobIds());
     }
 
     private ReviewJob job(String name) {

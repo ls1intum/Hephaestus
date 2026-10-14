@@ -103,6 +103,8 @@ public class ScanService {
             var definition = Objects.requireNonNull(practice.definition().scan());
             var selected = new ArrayList<ScanListedItem>();
             for (var file : files) {
+                if (!clock.instant().isBefore(deadline))
+                    throw new EnumerationFailure(ReviewStopReason.ENUMERATION_LIMIT);
                 String path = Objects.requireNonNull(file.path());
                 if (definition.include().stream().anyMatch(glob -> matcher.match(glob, path))
                         && definition.exclude().stream().noneMatch(glob -> matcher.match(glob, path))) {

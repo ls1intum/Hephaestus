@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.outline.item;
 
-import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -29,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection.ProjectedDocument;
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentProjector;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.json.JsonMapper;
 
 class DocumentItemSourceTest extends BaseUnitTest {
@@ -65,7 +66,8 @@ class DocumentItemSourceTest extends BaseUnitTest {
                 projection,
                 new DocumentContentSource(JsonMapper.builder().build()),
                 JsonMapper.builder().build(),
-                connections, permission);
+                connections,
+                permission);
     }
 
     private void readyDocument() {
@@ -76,7 +78,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
                 IntegrationKind.OUTLINE,
                 "team-a",
                 new ConnectionConfig.OutlineConfig("https://wiki.example.com", null, null, Set.of()));
-        connection.setId(21L);
+        ReflectionTestUtils.setField(connection, "id", 21L);
         connection.setState(IntegrationState.ACTIVE);
         when(connections.findInWorkspace(7L, 21L)).thenReturn(Optional.of(connection));
         document.setId(19L);
@@ -168,7 +170,6 @@ class DocumentItemSourceTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseDocumentPermissionAfterConsentOrOriginAccessIsRemoved() {
-        when(permission.permits(7L, 19L)).thenReturn(true);
         when(permission.permits(7L, 19L)).thenReturn(false);
         assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isFalse();

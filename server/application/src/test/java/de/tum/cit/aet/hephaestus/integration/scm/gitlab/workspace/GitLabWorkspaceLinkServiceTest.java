@@ -22,7 +22,6 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -93,6 +92,7 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
     @Test
     void shouldLetOnlyTheGroupsOwnerRewriteAProjectBothMonitor() {
+        when(organizationRepository.findById(5L)).thenReturn(Optional.of(group));
         when(monitorRepository.findByWorkspaceIdAndNativeId(OWNER, 700L)).thenReturn(List.of(monitor(700L)));
         when(monitorRepository.findByWorkspaceIdAndNativeId(SECOND, 700L)).thenReturn(List.of(monitor(700L)));
 
@@ -124,10 +124,7 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
         service.link(second);
 
-        assertThat(organizationRepository
-                        .findById(Objects.requireNonNull(second.getOrganizationId()))
-                        .orElseThrow())
-                .isSameAs(onOtherInstance);
+        assertThat(second.getOrganizationId()).isEqualTo(onOtherInstance.getId());
     }
 
     @Test
@@ -137,10 +134,7 @@ class GitLabWorkspaceLinkServiceTest extends BaseUnitTest {
 
         service.link(second);
 
-        assertThat(organizationRepository
-                        .findById(Objects.requireNonNull(second.getOrganizationId()))
-                        .orElseThrow())
-                .isNull();
+        assertThat(second.getOrganizationId()).isNull();
         verify(organizationRepository, never()).findByLoginIgnoreCaseAndProviderId(any(), anyLong());
     }
 

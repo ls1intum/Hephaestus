@@ -357,7 +357,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             job.setId(UUID.randomUUID());
             Workspace workspace = new Workspace();
             workspace.setId(7L);
-            RuntimeJobTestData.initialize(job, (workspace).getId());
+            RuntimeJobTestData.initialize(job, workspace.getId());
             job.setStatus(ReviewJobStatus.RUNNING);
             job.setWorkerId("worker-1");
             when(jwtVerifier.verify(JOB_JWT)).thenReturn(jobJwt(job, Set.of("llm_proxy")));
@@ -801,7 +801,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         job.setId(UUID.randomUUID());
         Workspace workspace = new Workspace();
         workspace.setId(7L);
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-1");
         return job;

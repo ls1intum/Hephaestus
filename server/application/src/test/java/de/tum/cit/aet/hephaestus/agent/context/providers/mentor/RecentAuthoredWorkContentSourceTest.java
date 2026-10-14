@@ -59,7 +59,7 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
 
         String resource = payload.get("pullRequests").get(0).get("resource").asString();
         assertThat(resource).isEqualTo("inputs/context/merge_readiness/4009553323.json");
-        assertThat(MergeReadinessContentSource.artifactIdOf(resource)).contains(4009553323L);
+        assertThat(MergeReadinessContentSource.pullRequestIdOf(resource)).contains(4009553323L);
         assertThat(payload.get("issues").get(0).has("resource")).isFalse();
 
         String pullRequestReviews =
@@ -68,9 +68,9 @@ class RecentAuthoredWorkContentSourceTest extends BaseUnitTest {
                 payload.get("issues").get(0).get("reviewsResource").asString();
         assertThat(pullRequestReviews).isEqualTo("inputs/context/review_attempts/pull_request/4009553323.json");
         assertThat(issueReviews).isEqualTo("inputs/context/review_attempts/issue/77.json");
-        assertThat(ReviewAttemptsContentSource.workOf(pullRequestReviews))
+        assertThat(ReviewAttemptsContentSource.selectionOf(pullRequestReviews))
                 .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.pull_request"), 4009553323L));
-        assertThat(ReviewAttemptsContentSource.workOf(issueReviews))
+        assertThat(ReviewAttemptsContentSource.selectionOf(issueReviews))
                 .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.issue"), 77L));
     }
 }

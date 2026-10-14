@@ -34,9 +34,7 @@ import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -44,6 +42,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.SharedTestDoubles.LateFailingWorkspacePurgeContributor;
@@ -130,19 +129,13 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private SlackWorkspacePurgeAdapter slackWorkspacePurgeAdapter;
 
     @Autowired
-    private PracticeRepository practiceRepository;
-
-    @Autowired
     private ResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
 
     @Autowired
-    private FeedbackBasisRepository feedbackEvidenceRepository;
-
-    @Autowired
-    private FeedbackCopyRepository feedbackPlacementRepository;
+    private FeedbackCopyRepository feedbackCopyRepository;
 
     @Autowired
     private ReviewJobRepository agentJobRepository;
@@ -661,7 +654,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             mentorThread.setSlackUserId("U1");
             mentorSlackThreadRepository.save(mentorThread);
 
-            slackParticipantConsentRepository.optOutOfIngestion(workspaceId, "U1", "SLACK_APP_HOME");
+            slackParticipantConsentRepository.optOutOfIngestion(workspaceId, "U1");
         }
 
         @Test
@@ -769,22 +762,23 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         private record DerivedConversation(
-                List<UUID> practiceResultIds, UUID preparedId, UUID deliveredId, UUID messageId) {}
+                long workspaceId, List<UUID> practiceResultIds, UUID preparedId, UUID deliveredId, UUID messageId) {}
 
         private void assertDerivedConversationExists(DerivedConversation derived) {
             assertThat(practiceResultRepository.findAllById(derived.practiceResultIds()))
                     .hasSize(2);
             assertThat(feedbackRepository.findById(derived.preparedId()))
                     .get()
-                    .extracting(Feedback::getDeliveryState)
+                    .extracting(Feedback::getState)
                     .isEqualTo(FeedbackState.READY);
             assertThat(feedbackRepository.findById(derived.deliveredId()))
                     .get()
-                    .extracting(Feedback::getDeliveryState)
+                    .extracting(Feedback::getState)
                     .isEqualTo(FeedbackState.DELIVERED);
             assertThat(boundFeedbackIds(derived))
                     .containsExactlyInAnyOrder(derived.preparedId(), derived.deliveredId());
-            assertThat(feedbackPlacementRepository.findByFeedbackId(derived.deliveredId()))
+            assertThat(feedbackCopyRepository.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(
+                            derived.workspaceId(), derived.deliveredId()))
                     .singleElement()
                     .extracting(FeedbackCopy::getChatMessageId)
                     .isEqualTo(derived.messageId());
@@ -796,13 +790,14 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(feedbackRepository.findById(derived.preparedId())).isEmpty();
             assertThat(feedbackRepository.findById(derived.deliveredId())).isEmpty();
             assertThat(boundFeedbackIds(derived)).isEmpty();
-            assertThat(feedbackPlacementRepository.findByFeedbackId(derived.deliveredId()))
+            assertThat(feedbackCopyRepository.findByWorkspaceIdAndFeedbackIdOrderByPositionAsc(
+                            derived.workspaceId(), derived.deliveredId()))
                     .isEmpty();
         }
 
         private List<@Nullable UUID> boundFeedbackIds(DerivedConversation derived) {
             return jdbcTemplate.queryForList(
-                    "SELECT feedback_id FROM feedback_evidence WHERE feedback_id IN (?, ?)",
+                    "SELECT feedback_id FROM feedback_basis WHERE feedback_id IN (?, ?)",
                     UUID.class,
                     derived.preparedId(),
                     derived.deliveredId());
@@ -833,20 +828,22 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     first, FeedbackDestination.CONVERSATION, FeedbackState.READY, "Prepared guidance");
             var delivered = modelFixtures.feedback(
                     second, FeedbackDestination.CONVERSATION, FeedbackState.DELIVERED, "Delivered guidance");
-            UUID copyId = UUID.randomUUID();
-            feedbackPlacementRepository.save(FeedbackCopy.builder()
+            UUID copyId = FeedbackIds.copy(delivered.getId(), FeedbackCopyKind.CHAT_TURN, 0);
+            feedbackCopyRepository.save(FeedbackCopy.builder()
                     .id(copyId)
                     .writeKey(copyId.toString())
-                    .writeMarker("hephaestus:" + copyId)
+                    .writeMarker(FeedbackIds.writeMarker(copyId))
                     .workspaceId(workspace.getId())
                     .feedbackId(delivered.getId())
                     .kind(FeedbackCopyKind.CHAT_TURN)
                     .state(FeedbackCopyState.POSTED)
+                    .writeStartedAt(Instant.now())
                     .chatMessageId(message.getId())
                     .postedAt(Instant.now())
                     .createdAt(Instant.now())
                     .build());
-            return new DerivedConversation(practiceResultIds, prepared.getId(), delivered.getId(), message.getId());
+            return new DerivedConversation(
+                    workspace.getId(), practiceResultIds, prepared.getId(), delivered.getId(), message.getId());
         }
     }
 }

@@ -59,7 +59,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         workspace.setWorkspaceSlug("ws");
         context = new WorkspaceContext(1L, "ws", "Ws", AccountType.ORG, null, Set.of());
         lenient().when(coverageService.scope(workspace)).thenReturn(WorkspaceReviewScope.ALL);
-        lenient().when(coverageService.wireScope(workspace)).thenAnswer(i -> wire(coverageService.scope(workspace)));
+        lenient().when(coverageService.wireScope(workspace)).thenReturn(wire(WorkspaceReviewScope.ALL));
         lenient().when(coverageService.fromWire(ArgumentMatchers.eq(1L), any())).thenAnswer(i -> {
             WorkspaceReviewScopeDTO dto = i.getArgument(1);
             return new WorkspaceReviewScope(
@@ -142,7 +142,8 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         writesWorkspace();
         WorkspaceReviewScope selectedEmpty =
                 new WorkspaceReviewScope(ReviewScopeMode.SELECTED, ReviewScopeMode.SELECTED, List.of(), List.of());
-        when(coverageService.scope(workspace)).thenReturn(WorkspaceReviewScope.ALL, selectedEmpty, selectedEmpty);
+        when(coverageService.scope(workspace)).thenReturn(WorkspaceReviewScope.ALL, selectedEmpty);
+        when(coverageService.wireScope(workspace)).thenReturn(wire(selectedEmpty));
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
                 context,
@@ -178,13 +179,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         WorkspaceReviewScope selectedEmpty =
                 new WorkspaceReviewScope(ReviewScopeMode.SELECTED, ReviewScopeMode.SELECTED, List.of(), List.of());
         when(coverageService.scope(workspace))
-                .thenReturn(
-                        WorkspaceReviewScope.ALL,
-                        selectedEmpty,
-                        selectedEmpty,
-                        selectedEmpty,
-                        WorkspaceReviewScope.ALL,
-                        WorkspaceReviewScope.ALL);
+                .thenReturn(WorkspaceReviewScope.ALL, selectedEmpty, selectedEmpty, WorkspaceReviewScope.ALL);
 
         service.updatePracticeReview(
                 context,

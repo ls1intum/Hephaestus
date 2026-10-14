@@ -44,8 +44,8 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
     void setUp() {
         resolver = new OutlineIdentityResolver(gitProviderRegistry, accountIdentityQuery, workspaceMembershipQuery);
         lenient()
-                .when(gitProviderRegistry.resolveProviderId("OUTLINE", SERVER_URL))
-                .thenReturn(PROVIDER_ID);
+                .when(gitProviderRegistry.findProviderId("OUTLINE", SERVER_URL))
+                .thenReturn(Optional.of(PROVIDER_ID));
     }
 
     private static AccountMembershipQuery.MembershipView membership(long workspaceId, @Nullable Long memberId) {
@@ -121,5 +121,14 @@ class OutlineIdentityResolverTest extends BaseUnitTest {
         assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, null, SUBJECT))
                 .contains(ACCOUNT_ID);
         verify(accountIdentityQuery).resolveAccountId(PROVIDER_ID, SUBJECT, null);
+    }
+
+    @Test
+    void missingProviderDoesNotCreateAuthorityOrResolveAnAccount() {
+        when(gitProviderRegistry.findProviderId("OUTLINE", SERVER_URL)).thenReturn(Optional.empty());
+        assertThat(resolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, SUBJECT))
+                .isEmpty();
+        verify(gitProviderRegistry, never()).resolveProviderId("OUTLINE", SERVER_URL);
+        verifyNoInteractions(accountIdentityQuery, workspaceMembershipQuery);
     }
 }

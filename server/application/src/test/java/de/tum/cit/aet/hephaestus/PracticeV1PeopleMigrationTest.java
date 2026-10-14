@@ -91,7 +91,7 @@ class PracticeV1PeopleMigrationTest {
         PracticeV1CutoverMigrationTest.upgrade(database, context);
         assertThat(PracticeV1CutoverMigrationTest.column(
                         database,
-                        "SELECT ai_choice || '|' || (ai_choice_at='2026-01-01'::timestamptz) || '|' ||"
+                        "SELECT ai_choice || '|' || (ai_choice_at='2026-01-01T00:00:00Z'::timestamptz) || '|' ||"
                                 + " feedback_delivery_enabled || '|' || public_activity_visible FROM account WHERE"
                                 + " id=992106"))
                 .containsExactly("IN_HOUSE_ONLY|true|false|false");

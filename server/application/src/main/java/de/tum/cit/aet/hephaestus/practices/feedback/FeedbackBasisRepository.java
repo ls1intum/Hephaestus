@@ -89,8 +89,10 @@ public interface FeedbackBasisRepository extends JpaRepository<FeedbackBasis, UU
 
     @WorkspaceAgnostic("Verified account absorption moves the same person across all workspaces")
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("UPDATE FeedbackBasis f SET f.developerId = :claimedAccountId WHERE f.developerId ="
-            + " :unclaimedAccountId")
+    @Query(
+            value = "UPDATE feedback_basis SET developer_id = :claimedAccountId WHERE developer_id"
+                    + " = :unclaimedAccountId",
+            nativeQuery = true)
     int absorbDeveloper(
             @Param("claimedAccountId") long claimedAccountId, @Param("unclaimedAccountId") long unclaimedAccountId);
 

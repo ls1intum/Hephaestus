@@ -5,7 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
-import de.tum.cit.aet.hephaestus.mentor.spi.MentorPracticeQuery;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorPracticeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Test;

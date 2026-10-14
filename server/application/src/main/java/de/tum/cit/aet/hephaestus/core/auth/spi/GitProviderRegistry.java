@@ -7,6 +7,9 @@ import org.jspecify.annotations.Nullable;
 public interface GitProviderRegistry {
     long resolveProviderId(String providerTypeName, String baseUrl);
 
+    /** Returns an existing exact provider namespace without creating one. */
+    Optional<Long> findProviderId(String providerTypeName, String baseUrl);
+
     String providerTypeName(@Nullable Long gitProviderId);
 
     @Nullable

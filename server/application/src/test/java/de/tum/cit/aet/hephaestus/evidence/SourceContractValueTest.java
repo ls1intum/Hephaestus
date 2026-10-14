@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.agent.context.FolderSource;
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
 import java.time.Instant;
 import java.util.List;
@@ -152,12 +151,7 @@ class SourceContractValueTest {
                         now,
                         List.of(),
                         List.of(),
-                        (List.of())
-                                .stream()
-                                        .flatMap(captureSource -> captureSource.files().stream()
-                                                .map(captureFile ->
-                                                        new FolderSource(captureSource.kind(), captureFile)))
-                                        .toList(),
+                        List.of(),
                         List.of()));
         assertThatIllegalArgumentException()
                 .isThrownBy(

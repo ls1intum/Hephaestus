@@ -2,16 +2,21 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.SetFeedbackModeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewedByKind;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,6 +29,111 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Autowired
     PracticeVersionService versions;
+
+    @Test
+    @WithAdminUser
+    void shouldPersistAnEventFreeScanWithItsOwnReadRequirements() {
+        var owner = persistUser("admin");
+        var workspace = createWorkspace("wire-scan", "Scan", "wire-scan-org", AccountType.ORG, owner);
+        var reads = new PracticeReads(
+                "2.0.0", List.of(new PracticeReadSource(new SourceKind("scm.repository.tree"), ReadNeed.COMPLETE)));
+        var definition = new PracticeDefinition(
+                "Keep repository code clear",
+                new ReviewOn(List.of(), Map.of()),
+                null,
+                null,
+                reads,
+                new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
+                "Each selected file clearly expresses its purpose.",
+                null,
+                new ScanDefinition(
+                        new ItemKind("scm.file"),
+                        List.of("src/**/*.ts"),
+                        List.of("dist/**"),
+                        List.of("src/**/*"),
+                        reads),
+                false,
+                new PracticeGuidance(null, null, null, null, null));
+        client.post()
+                .uri("/workspaces/{workspace}/practices", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreatePracticeRequestDTO("repository-scan", "scm.repository", definition, null, null))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.currentVersion.definition.reviewOn.events")
+                .isEmpty()
+                .jsonPath("$.currentVersion.definition.about")
+                .isEmpty()
+                .jsonPath("$.currentVersion.definition.scan.reads.sources[0].need")
+                .isEqualTo("COMPLETE");
+        client.get()
+                .uri("/workspaces/{workspace}/practices/repository-scan", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.kind")
+                .isEqualTo("scm.repository")
+                .jsonPath("$.currentVersion.definition.scan.itemKind")
+                .isEqualTo("scm.file")
+                .jsonPath("$.currentVersion.definition.scan.reads.contract")
+                .isEqualTo("2.0.0")
+                .jsonPath("$.currentVersion.definition.scan.reads.sources[0].source")
+                .isEqualTo("scm.repository.tree")
+                .jsonPath("$.currentVersion.definition.scan.context[0]")
+                .isEqualTo("src/**/*");
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldPersistEventFreeGuidanceWithoutAutomatedReadRequirements() {
+        var owner = persistUser("admin");
+        var workspace = createWorkspace("wire-no-review", "Guidance", "wire-no-review-org", AccountType.ORG, owner);
+        var definition = new PracticeDefinition(
+                "Discuss team decisions",
+                new ReviewOn(List.of(), Map.of()),
+                null,
+                null,
+                new PracticeReads("2.0.0", List.of()),
+                new ReviewedBy(ReviewedByKind.NOBODY, null, List.of()),
+                "Discuss the decisions that affect the team.",
+                null,
+                null,
+                false,
+                new PracticeGuidance("Keeps the team informed.", null, null, null, null));
+        client.post()
+                .uri("/workspaces/{workspace}/practices", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new CreatePracticeRequestDTO("team-decisions", "scm.pull_request", definition, null, null))
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.currentVersion.definition.reviewedBy.by")
+                .isEqualTo("NOBODY")
+                .jsonPath("$.currentVersion.definition.reads.sources")
+                .isEmpty()
+                .jsonPath("$.currentVersion.definition.guidance.whyItMatters")
+                .isEqualTo("Keeps the team informed.");
+        client.get()
+                .uri("/workspaces/{workspace}/practices/team-decisions", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.currentVersion.definition.reviewOn.events")
+                .isEmpty()
+                .jsonPath("$.currentVersion.definition.reviewedBy.by")
+                .isEqualTo("NOBODY")
+                .jsonPath("$.currentVersion.definition.script")
+                .isEmpty();
+    }
 
     @Test
     @WithAdminUser

@@ -7,6 +7,8 @@ import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,7 +79,10 @@ class PracticeProfileReviewIntegrationTest extends BaseIntegrationTest {
     @Test
     void foreignReviewIsNotFound() {
         var r = data.result(data.scenario(), ResultOutcome.MET, Instant.now());
-        get("/practice-profile/reviews/" + r.getReviewId()).expectStatus().isNotFound();
+        get("/practice-profile/reviews/" + r.getReviewId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test

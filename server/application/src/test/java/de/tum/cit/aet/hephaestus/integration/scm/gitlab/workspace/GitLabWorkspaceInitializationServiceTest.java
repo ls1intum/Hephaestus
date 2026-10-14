@@ -532,6 +532,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         @Test
         void shouldSkipOrgLinkingWhenAlreadyLinked() {
             Organization existingOrg = new Organization();
+            existingOrg.setId(5L);
             existingOrg.setLogin("my-group/subgroup");
             workspace.setOrganizationId(existingOrg.getId());
 
@@ -586,6 +587,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
         @Test
         void shouldSkipWhenAlreadyLinked() {
             Organization existingOrg = new Organization();
+            existingOrg.setId(5L);
             workspace.setOrganizationId(existingOrg.getId());
 
             initService.linkWorkspaceToOrganization(workspace);
@@ -615,7 +617,7 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
 
             ArgumentCaptor<Workspace> captor = ArgumentCaptor.forClass(Workspace.class);
             verify(workspaceRepository).save(captor.capture());
-            assertThat(captor.getValue().getOrganization()).isEqualTo(organization);
+            assertThat(captor.getValue().getOrganizationId()).isEqualTo(organization.getId());
 
             // In-memory reference must be updated too, for subsequent init phases in the same call.
             assertThat(workspace.getOrganizationId()).isEqualTo(organization.getId());

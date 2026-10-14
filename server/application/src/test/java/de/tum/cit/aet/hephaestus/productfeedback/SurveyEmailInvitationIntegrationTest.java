@@ -20,8 +20,8 @@ import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.mail.Multipart;
 import java.io.ByteArrayOutputStream;
 import java.net.ConnectException;
@@ -840,9 +840,10 @@ class SurveyEmailInvitationIntegrationTest extends AbstractWorkspaceIntegrationT
         String slug = "survey-email-" + UUID.randomUUID();
         var actor = persistUser(slug);
         Workspace workspace = createWorkspace(slug, "Survey workspace", slug, AccountType.ORG, actor);
-        ensureWorkspaceMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
         var providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
-        var link = identities.findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
+        var link = identities
+                .findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
                 .orElseThrow();
         var account = link.getAccount();
         account.setDisplayName("Survey recipient");

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.mentor;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.mentor.adapter.MentorWorkspacePurgeAdapter;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -71,7 +72,7 @@ public interface ChatThreadRepository extends JpaRepository<ChatThread, UUID> {
     /**
      * Bulk-delete every thread for a workspace. Cascades to {@code chat_message} +
      * {@code chat_message_vote} via existing FKs. Used by
-     * {@link de.tum.cit.aet.hephaestus.mentor.adapter.MentorWorkspacePurgeAdapter} on soft purge,
+     * {@link MentorWorkspacePurgeAdapter} on soft purge,
      * which leaves the workspace row in place (so the workspace-level cascade can't fire).
      */
     @Modifying

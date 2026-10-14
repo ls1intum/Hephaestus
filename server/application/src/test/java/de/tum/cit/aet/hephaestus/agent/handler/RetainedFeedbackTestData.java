@@ -46,7 +46,7 @@ public final class RetainedFeedbackTestData {
     }
 
     public static FeedbackCopy posted(
-            Feedback feedback, FeedbackCopyKind kind, @Nullable String ref, @Nullable String url) {
+            Feedback feedback, FeedbackCopyKind kind, int position, @Nullable String ref, @Nullable String url) {
         boolean anchored = kind == FeedbackCopyKind.LINE_NOTE || kind == FeedbackCopyKind.FILE_NOTE;
         Instant at = Instant.now();
         return FeedbackCopy.builder()
@@ -54,7 +54,7 @@ public final class RetainedFeedbackTestData {
                 .workspaceId(feedback.getWorkspaceId())
                 .feedbackId(feedback.getId())
                 .kind(kind)
-                .position(0)
+                .position(position)
                 .state(FeedbackCopyState.POSTED)
                 .externalRef(ref)
                 .externalUrl(url)

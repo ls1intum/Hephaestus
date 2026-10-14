@@ -136,6 +136,10 @@ class ResultVisibilityPolicyTest {
                 .practiceVersionId(practice.getCurrentVersion().getId())
                 .itemId(1)
                 .outcome(ResultOutcome.MET)
+                .summary("The captured work meets this practice.")
+                .explanation("The recorded work supports this judgment.")
+                .evidence(new JsonMapper().createObjectNode())
+                .coverage(new JsonMapper().createObjectNode())
                 .recordedAt(Instant.parse("2026-08-01T00:00:00Z"))
                 .build();
     }

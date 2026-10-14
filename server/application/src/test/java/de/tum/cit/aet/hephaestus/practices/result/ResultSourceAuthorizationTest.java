@@ -118,12 +118,12 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     @Test
     void storedSourceKindUsesCurrentGovernanceRatherThanAnOldDefinition() {
         var evidence = json.createObjectNode();
-        evidence.putArray("citations").addObject().put("sourceKind", "scm.pull_request");
+        evidence.putArray("citations").addObject().put("sourceKind", "scm.pull-request.diff");
         result.setEvidence(evidence);
         var current = mock(SourceCatalog.class);
         when(catalog.current()).thenReturn(current);
         when(current.version()).thenReturn(SourceCatalogRegistry.CURRENT_VERSION);
-        var kind = new SourceKind("scm.pull_request");
+        var kind = new SourceKind("scm.pull-request.diff");
         when(catalog.isSourceUsePermitted(SourceCatalogRegistry.CURRENT_VERSION, kind, purpose))
                 .thenReturn(false);
         assertThat(authorization.authorized(result, receipt(List.of()), purpose))

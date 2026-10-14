@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -41,7 +42,8 @@ class ThreadCaptureSourceTest extends BaseUnitTest {
         workspace.setId(7L);
         var connection = new Connection(
                 workspace, IntegrationKind.SLACK, "T1", new ConnectionConfig.SlackConfig("T1", null, null, Set.of()));
-        when(connections.findActive(7L, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
+        connection.setState(IntegrationState.ACTIVE);
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of(connection));
         var thread = new SlackThread();
         thread.setWorkspaceId(7L);
         thread.setSlackChannelId("C1");

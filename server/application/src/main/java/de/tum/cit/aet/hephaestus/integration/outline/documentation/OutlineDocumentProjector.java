@@ -2,11 +2,9 @@ package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
-import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
@@ -35,8 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
  * a vanished document still resolves to a placeholder. Reads are pure — the {@code readOnly} transaction enforces
  * that this projector never stamps {@code last_materialized_at}.
  *
- * <p>Authorship projects as-is; the workspace member id resolves lazily per batch (memoised per subject) through
- * {@link OutlineIdentityResolver}. An unlinked author degrades to name-only — no member id is ever stamped on the row.
+ * <p>Authorship projects as-is; the account id resolves lazily per connection and batch (memoised per subject) through
+ * {@link OutlineIdentityResolver}. An unlinked author degrades to name-only — no account id is ever stamped on the row.
  */
 @Component
 @ConditionalOnCaptureRole
@@ -58,7 +56,8 @@ public class OutlineDocumentProjector implements DocumentProjection {
             ConnectionService connectionService,
             OutlineIdentityResolver identityResolver,
             OutlineDocumentSelector documentSelector,
-            PersonDataCopyRecorder personCopies, OutlineDocumentPermission permission) {
+            PersonDataCopyRecorder personCopies,
+            OutlineDocumentPermission permission) {
         this.documentRepository = documentRepository;
         this.collectionRepository = collectionRepository;
         this.connectionService = connectionService;
@@ -144,11 +143,15 @@ public class OutlineDocumentProjector implements DocumentProjection {
         }
         Map<Long, AuthorContext> authors = new HashMap<>();
         Map<CollectionKey, String> collectionNames = collectionNames(workspaceId);
-        return hits.stream().filter(doc -> permission.permits(workspaceId, doc.getId())).map(doc -> project(doc, authorContext(doc, authors), collectionNames)).toList();
+        return hits.stream()
+                .filter(doc -> permission.permits(workspaceId, doc.getId()))
+                .map(doc -> project(doc, authorContext(doc, authors), collectionNames))
+                .toList();
     }
 
     /** Maps a mirrored row to the agent view; a tombstoned/evicted document serves a null body. */
-    private ProjectedDocument project(OutlineDocument doc, AuthorContext authors, Map<CollectionKey, String> collectionNames) {
+    private ProjectedDocument project(
+            OutlineDocument doc, AuthorContext authors, Map<CollectionKey, String> collectionNames) {
         connectionService
                 .findInWorkspace(doc.getWorkspaceId(), doc.getConnectionId())
                 .ifPresent(connection -> {
@@ -187,17 +190,14 @@ public class OutlineDocumentProjector implements DocumentProjection {
                 doc.getDocumentId());
     }
 
-    /**
-     * The workspace's collection id → display name map, loaded once per projection call (mirrors
-     * {@link #authorContext}'s per-batch resolution). A collection with no captured name is absent from
-     * the map, so {@code Map#get} degrades to {@code null} — the graceful floor for {@link
-     * de.tum.cit.aet.hephaestus.integration.docs.item.DocumentProjection.ProjectedDocument#collectionName}.
-     */
+    /** Collection labels use both the connection and native collection id. */
     private Map<CollectionKey, String> collectionNames(long workspaceId) {
         Map<CollectionKey, String> names = new HashMap<>();
         for (OutlineCollection collection : collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(workspaceId)) {
             if (collection.getName() != null) {
-                names.put(new CollectionKey(collection.getConnectionId(), collection.getCollectionId()), collection.getName());
+                names.put(
+                        new CollectionKey(collection.getConnectionId(), collection.getCollectionId()),
+                        collection.getName());
             }
         }
         return names;
@@ -230,17 +230,19 @@ public class OutlineDocumentProjector implements DocumentProjection {
         return List.copyOf(result);
     }
 
-    /**
-     * The per-batch author-resolution context: the ACTIVE Outline connection's server URL and instance
-     * key (= Outline team UUID), resolved ONCE per projection call. Without an ACTIVE connection (or a
-     * config missing its server URL) authors degrade to name-only rather than failing the projection.
-     */
+    /** Each connection has its own native author namespace and per-batch resolution cache. */
     private AuthorContext authorContext(OutlineDocument document, Map<Long, AuthorContext> contexts) {
         return contexts.computeIfAbsent(document.getConnectionId(), ignored -> {
             var connection = connectionService.findInWorkspace(document.getWorkspaceId(), document.getConnectionId());
-            if (connection.isEmpty() || !(connection.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)
-                    || config.serverUrl() == null || config.serverUrl().isBlank()) return AuthorContext.unresolvable();
-            return new AuthorContext(identityResolver, document.getWorkspaceId(), config.serverUrl(), connection.get().getInstanceKey());
+            if (connection.isEmpty()
+                    || !(connection.get().getConfig() instanceof ConnectionConfig.OutlineConfig config)
+                    || config.serverUrl() == null
+                    || config.serverUrl().isBlank()) return AuthorContext.unresolvable();
+            return new AuthorContext(
+                    identityResolver,
+                    document.getWorkspaceId(),
+                    config.serverUrl(),
+                    connection.get().getInstanceKey());
         });
     }
 

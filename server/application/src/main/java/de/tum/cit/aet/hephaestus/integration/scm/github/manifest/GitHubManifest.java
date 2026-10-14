@@ -57,15 +57,16 @@ public class GitHubManifest implements IntegrationManifest {
                 Capability.APPROVAL_WORKFLOW);
     }
 
-    /**
-     * GitHub carries the shared SCM domain in full: every signal a descriptor declares as
-     * webhook-produced has a GitHub event behind it. The manual review-request signals are absent
-     * because no ingested event raises them — somebody asks for those by hand.
-     */
+    /** GitHub declares the item events its webhooks produce. Manual requests create no item event. */
     @Override
     public ReviewContribution reviewContribution() {
         return new ReviewContribution(
-                Set.of(ScmItemEvents.PULL_REQUEST, ScmItemEvents.ISSUE),
+                Set.of(
+                        ScmItemEvents.PULL_REQUEST,
+                        ScmItemEvents.PULL_REQUEST_REVIEW,
+                        ScmItemEvents.ISSUE,
+                        ScmItemEvents.REPOSITORY,
+                        ScmItemEvents.FILE),
                 Map.of(
                         ScmItemEvents.PULL_REQUEST,
                         Set.of(
@@ -74,15 +75,18 @@ public class GitHubManifest implements IntegrationManifest {
                                 ScmItemEvents.PULL_REQUEST_SYNCHRONIZED,
                                 ScmItemEvents.PULL_REQUEST_EDITED,
                                 ScmItemEvents.PULL_REQUEST_LINKED_ISSUE_UPDATED,
-                                ScmItemEvents.PULL_REQUEST_REVIEW_SUBMITTED,
                                 ScmItemEvents.PULL_REQUEST_MERGED,
                                 ScmItemEvents.PULL_REQUEST_CLOSED),
                         ScmItemEvents.ISSUE,
-                        Set.of(ScmItemEvents.ISSUE_OPENED, ScmItemEvents.ISSUE_UPDATED, ScmItemEvents.ISSUE_CLOSED)),
+                        Set.of(ScmItemEvents.ISSUE_OPENED, ScmItemEvents.ISSUE_UPDATED, ScmItemEvents.ISSUE_CLOSED),
+                        ScmItemEvents.PULL_REQUEST_REVIEW,
+                        Set.of(ScmItemEvents.PULL_REQUEST_REVIEW_SUBMITTED)),
                 Map.of(
                         ScmItemEvents.PULL_REQUEST,
                         Set.of(CopyCapability.SUMMARY, CopyCapability.LINE_NOTE),
                         ScmItemEvents.ISSUE,
-                        Set.of(CopyCapability.SUMMARY)));
+                        Set.of(CopyCapability.SUMMARY),
+                        ScmItemEvents.PULL_REQUEST_REVIEW,
+                        Set.of(CopyCapability.SUMMARY, CopyCapability.LINE_NOTE)));
     }
 }

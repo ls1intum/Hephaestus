@@ -19,12 +19,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Integration-side implementation of the {@link GitProviderRegistry} auth SPI: upserts the {@code
- * git_provider} row for a login provider so {@code core.auth}'s account provisioning can key the
- * {@code Identity} by {@code (git_provider_id, subject)} without importing the {@link
- * IdentityProvider} entity. {@code core.auth} passes the provider's {@code (type, baseUrl)} (read
- * from its own {@code login_provider} store); this side owns the {@code IdentityProvider} row and
- * canonicalizes {@code baseUrl} to the server-url origin.
+ * Integration-side implementation of {@link GitProviderRegistry}. Resolves {@link IdentityProvider}
+ * namespaces by provider type and canonical server origin. Account provisioning binds the provider
+ * id to the verified native user and workspace key without importing integration persistence.
  */
 @Component
 public class RegistrationToGitProviderResolver implements GitProviderRegistry {

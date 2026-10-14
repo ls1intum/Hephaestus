@@ -210,8 +210,8 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
                 ScmFeedbackFixtures.target(new IntegrationRef(IntegrationKind.GITHUB, 1L, null), "owner/repo#42", null);
         assertThatThrownBy(() -> channel.updateSummary(
                         target, new SummaryHandle("  ", null), ScmFeedbackFixtures.summary("body", "marker")))
-                .isInstanceOf(FeedbackDeliveryException.class)
-                .hasMessageContaining("external comment id is missing");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Summary reference is blank");
     }
 
     @Test
@@ -623,7 +623,7 @@ class GitHubSummaryWriterTest extends BaseUnitTest {
 
     @Test
     void blankNativeSummaryIdCannotAcknowledgeDelivery() {
-        assertThatThrownBy(() -> new SummaryHandle(" ", null)).isInstanceOf(FeedbackDeliveryException.class);
+        assertThatThrownBy(() -> new SummaryHandle(" ", null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

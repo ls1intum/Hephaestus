@@ -54,7 +54,8 @@ class ItemTraceControllerIntegrationTest extends BaseIntegrationTest {
         var other = data.scenario();
         get("/practices/items/" + other.item().getId() + "/trace")
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -62,6 +63,7 @@ class ItemTraceControllerIntegrationTest extends BaseIntegrationTest {
         var r = data.result(data.scenario(), ResultOutcome.MET, Instant.now());
         get("/practices/items/" + scenario.item().getId() + "/own-trace?reviewId=" + r.getReviewId())
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 }

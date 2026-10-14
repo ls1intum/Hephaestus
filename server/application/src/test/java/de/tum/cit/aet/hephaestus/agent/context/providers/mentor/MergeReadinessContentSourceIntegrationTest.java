@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepositor
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
@@ -40,11 +41,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabHeadPipeline;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestProcessor;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.pullrequest.GitLabMergeRequestReadinessReader;
-import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
+import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -76,7 +78,12 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /** What Heph reads before merge advice, against a real schema: the staged MR !1 and its neighbours. */
-class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewIntegrationTest {
+class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegrationTest {
+    private static final Instant NOW = Instant.parse("2026-10-14T10:00:00Z");
+
+    @Autowired
+    private FeedbackRepository feedbackRepository;
+
     @Autowired
     private ItemWriter retainedItems;
 
@@ -107,6 +114,9 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
 
     @Autowired
     private IntegrationManifestRegistry manifests;
+
+    @Autowired
+    private DeliveredPullRequestCommentLookup deliveredComments;
 
     @Autowired
     private IssueCommentRepository commentRepository;
@@ -427,7 +437,13 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
                     }
                 });
         ProxyFactory transactional = new ProxyFactory(new MergeReadinessContentSource(
-                actorSelector, reopenBeforeSecondPage, reviewRepository, commentRepository, objectMapper, manifests));
+                actorSelector,
+                reopenBeforeSecondPage,
+                reviewRepository,
+                commentRepository,
+                objectMapper,
+                manifests,
+                deliveredComments));
         transactional.setProxyTargetClass(true);
         transactional.addAdvice(
                 new TransactionInterceptor(transactionManager, new AnnotationTransactionAttributeSource()));
@@ -1030,8 +1046,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractPracticeReviewI
                 jdbcTemplate, feedbackRepository, item, accountId, FeedbackState.DELIVERED);
         int position = 0;
         for (String ref : refs) {
-            var copy = RetainedFeedbackTestData.posted(feedback, FeedbackCopyKind.LINE_NOTE, ref, null);
-            copy.setPosition(position++);
+            var copy = RetainedFeedbackTestData.posted(feedback, FeedbackCopyKind.LINE_NOTE, position++, ref, null);
             placementRepository.saveAndFlush(copy);
         }
     }

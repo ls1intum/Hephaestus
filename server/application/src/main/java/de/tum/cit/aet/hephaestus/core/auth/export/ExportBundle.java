@@ -28,10 +28,10 @@ public record ExportBundle(
         AccountAiChoiceExport.@Nullable Choice aiChoice,
         NotificationPreferencesExportQuery.@Nullable Preferences notificationPreferences) {
     /** Current export schema version. Bump on any breaking shape change. */
-    public static final String SCHEMA_VERSION = "1.0";
+    public static final String SCHEMA_VERSION = "2.0";
 
     public record Profile(
-            Long id,
+            String id,
             String displayName,
             @Nullable String primaryEmail,
             // appRole intentionally omitted: it is controller-assigned authorization state, NOT
@@ -45,8 +45,7 @@ public record ExportBundle(
     public record Identity(
             String provider,
             String subject,
-            @Nullable String usernameAtSignup,
-            @Nullable String emailAtSignup,
+            @Nullable String login,
             @Nullable String displayName,
             Instant linkedAt,
             @Nullable Instant lastLoginAt) {}

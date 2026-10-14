@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CaptureContribution;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
+import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
@@ -87,11 +88,8 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
         if (!supports(item)) return false;
         Long sourceId = item.sourceId();
         if (sourceId == null) return false;
-        var connection = connections.findActive(item.workspaceId(), IntegrationKind.SLACK);
-        if (connection.isEmpty()) return false;
         return threads.findConsentedCandidateRow(item.workspaceId(), sourceId)
-                .filter(thread ->
-                        Objects.equals(thread.getSlackTeamId(), connection.get().getInstanceKey()))
+                .filter(thread -> connectionFor(item.workspaceId(), thread).isPresent())
                 .filter(thread -> projection.threadReadability(
                                 item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs())
                         == ConversationThreadProjection.ThreadReadability.READABLE)
@@ -134,51 +132,59 @@ public class ThreadItemSource implements ItemSource, ItemSourceAccess {
         if (!supports(item)) return Optional.empty();
         Long sourceId = item.sourceId();
         if (sourceId == null) return Optional.empty();
-        var connection = connections.findActive(item.workspaceId(), IntegrationKind.SLACK);
-        if (connection.isEmpty()) return Optional.empty();
-        var active = connection.get();
         return threads.findConsentedCandidateRow(item.workspaceId(), sourceId)
-                .filter(thread -> Objects.equals(thread.getSlackTeamId(), active.getInstanceKey()))
-                .filter(thread -> projection.threadReadability(
-                                item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs())
-                        == ConversationThreadProjection.ThreadReadability.READABLE)
-                .map(thread -> {
-                    var payload = projection.threadPayload(
-                            item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs());
-                    long providerId = providers.resolveProviderId("SLACK", "https://slack.com");
-                    var roles = messages
-                            .findThreadMessages(
-                                    item.workspaceId(),
-                                    thread.getSlackChannelId(),
-                                    thread.getSlackThreadTs(),
-                                    Pageable.unpaged())
-                            .stream()
-                            .filter(row -> row.authorAccountId() != null && row.authorSlackUserId() != null)
-                            .map(row -> new RoleHolder(
-                                    AboutRole.AUTHOR,
-                                    new PersonIdentity(
-                                            providerId,
-                                            Objects.requireNonNull(row.authorSlackUserId()),
-                                            row.slackTeamId()),
-                                    true))
-                            .distinct()
-                            .toList();
-                    return new ItemSnapshot(
-                            item,
-                            ThreadEvents.version(mapper.writeValueAsBytes(payload), thread.getLastTs()),
-                            new IntegrationRef(
-                                    IntegrationKind.SLACK, item.workspaceId(), active.getInstanceKey(), active.getId()),
-                            Map.of(),
-                            roles,
-                            new ItemLabel(
-                                    item.itemId(),
-                                    "Conversation thread",
-                                    "thread",
-                                    null,
-                                    thread.getSlackChannelName(),
-                                    null,
-                                    IntegrationKind.SLACK));
-                });
+                .flatMap(thread -> connectionFor(item.workspaceId(), thread)
+                        .filter(active -> projection.threadReadability(
+                                        item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs())
+                                == ConversationThreadProjection.ThreadReadability.READABLE)
+                        .flatMap(active -> providers
+                                .findProviderId("SLACK", "https://slack.com")
+                                .map(providerId -> {
+                                    var payload = projection.threadPayload(
+                                            item.workspaceId(), thread.getSlackChannelId(), thread.getSlackThreadTs());
+                                    var roles = messages
+                                            .findThreadMessages(
+                                                    item.workspaceId(),
+                                                    thread.getSlackChannelId(),
+                                                    thread.getSlackThreadTs(),
+                                                    Pageable.unpaged())
+                                            .stream()
+                                            .filter(row ->
+                                                    row.authorAccountId() != null && row.authorSlackUserId() != null)
+                                            .map(row -> new RoleHolder(
+                                                    AboutRole.AUTHOR,
+                                                    new PersonIdentity(
+                                                            providerId,
+                                                            Objects.requireNonNull(row.authorSlackUserId()),
+                                                            row.slackTeamId()),
+                                                    true))
+                                            .distinct()
+                                            .toList();
+                                    return new ItemSnapshot(
+                                            item,
+                                            ThreadEvents.version(mapper.writeValueAsBytes(payload), thread.getLastTs()),
+                                            new IntegrationRef(
+                                                    IntegrationKind.SLACK,
+                                                    item.workspaceId(),
+                                                    active.getInstanceKey(),
+                                                    active.getId()),
+                                            Map.of(),
+                                            roles,
+                                            new ItemLabel(
+                                                    item.itemId(),
+                                                    "Conversation thread",
+                                                    "thread",
+                                                    null,
+                                                    thread.getSlackChannelName(),
+                                                    null,
+                                                    IntegrationKind.SLACK));
+                                })));
+    }
+
+    private Optional<Connection> connectionFor(long workspaceId, SlackThreadRepository.SettledCandidateRow thread) {
+        return connections.findActiveConnections(workspaceId, IntegrationKind.SLACK).stream()
+                .filter(connection -> Objects.equals(thread.getSlackTeamId(), connection.getInstanceKey()))
+                .findFirst();
     }
 
     @Override

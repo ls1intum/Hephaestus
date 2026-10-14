@@ -366,7 +366,7 @@ class PiResultParserPracticeScriptReportTest extends BaseUnitTest {
     @EnumSource(ScriptStopReason.class)
     void shouldMapEachStopReasonWhenAFailedRunNamesIt(ScriptStopReason stopReason) {
         assertThat(parse(report(
-                        entry("comment-quality", "failed", stopReason.wire()).toString())))
+                        entry("comment-quality", "failed", stopReason.name()).toString())))
                 .extracting(PracticeScriptRunReport::practiceSlug, PracticeScriptRunReport::stopReason)
                 .contains(tuple("comment-quality", stopReason));
         assertThat(failures()).isZero();

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -99,6 +100,6 @@ class PracticeGroupReviewHistoryIntegrationTest extends BaseIntegrationTest {
         group.setName("Foreign");
         groups.saveAndFlush(group);
         data.result(other, ResultOutcome.MET, Instant.now());
-        get("/practice-groups/foreign/reviews").expectStatus().isNotFound();
+        get("/practice-groups/foreign/reviews").expectStatus().isNotFound().expectBody(Void.class);
     }
 }

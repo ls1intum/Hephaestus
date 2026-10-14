@@ -9,9 +9,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -31,16 +33,18 @@ class ReviewJobServiceTest extends BaseUnitTest {
         var job = RuntimeReviewTestData.job();
         when(jobs.findByReviewIdAndWorkspaceIdAndStatusIn(any(), any(Long.class), any()))
                 .thenReturn(Optional.of(job));
-        var service = new ReviewJobService(jobs,
-assignments,
-store,
-policy,
-models,
-new JsonMapper(),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService.class),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier.class));
+        var service = new ReviewJobService(
+                jobs,
+                mock(ReviewWriteGuard.class),
+                assignments,
+                store,
+                policy,
+                models,
+                new JsonMapper(),
+                mock(LlmAdmissionService.class),
+                mock(ReviewMethodVerifier.class));
         assertThat(service.enqueue(review, 2, List.of(assigned.id()))).isEqualTo(job.getId());
-        verifyNoInteractions(policy, models, store, assignments);
+        verifyNoInteractions(policy, models, assignments);
     }
 
     @Test
@@ -50,14 +54,16 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifie
         var review = RuntimeReviewTestData.review(ReviewKind.ITEM, assigned);
         when(jobs.findByReviewIdAndWorkspaceIdAndStatusIn(any(), any(Long.class), any()))
                 .thenReturn(Optional.of(RuntimeReviewTestData.job()));
-        var service = new ReviewJobService(jobs,
-mock(ReviewJobAssignments.class),
-mock(ReviewAssignmentStore.class),
-mock(ReviewMemberAiPolicy.class),
-mock(LlmModelResolver.class),
-new JsonMapper(),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService.class),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier.class));
+        var service = new ReviewJobService(
+                jobs,
+                mock(ReviewWriteGuard.class),
+                mock(ReviewJobAssignments.class),
+                mock(ReviewAssignmentStore.class),
+                mock(ReviewMemberAiPolicy.class),
+                mock(LlmModelResolver.class),
+                new JsonMapper(),
+                mock(LlmAdmissionService.class),
+                mock(ReviewMethodVerifier.class));
         var other = new ReviewAssignmentId(review.id(), 31, 7);
         assertThatThrownBy(() -> service.enqueue(review, 7, List.of(other)))
                 .isInstanceOf(ReviewJobStateConflictException.class);
@@ -66,14 +72,16 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifie
     @Test
     void shouldRejectAnEmptyInvocationBeforeTouchingTheQueue() {
         var jobs = mock(ReviewJobRepository.class);
-        var service = new ReviewJobService(jobs,
-mock(ReviewJobAssignments.class),
-mock(ReviewAssignmentStore.class),
-mock(ReviewMemberAiPolicy.class),
-mock(LlmModelResolver.class),
-new JsonMapper(),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService.class),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier.class));
+        var service = new ReviewJobService(
+                jobs,
+                mock(ReviewWriteGuard.class),
+                mock(ReviewJobAssignments.class),
+                mock(ReviewAssignmentStore.class),
+                mock(ReviewMemberAiPolicy.class),
+                mock(LlmModelResolver.class),
+                new JsonMapper(),
+                mock(LlmAdmissionService.class),
+                mock(ReviewMethodVerifier.class));
         var review = RuntimeReviewTestData.review(ReviewKind.ITEM, RuntimeReviewTestData.assignment(null, null));
         assertThatThrownBy(() -> service.enqueue(review, 2, List.of())).isInstanceOf(IllegalArgumentException.class);
         verifyNoInteractions(jobs);

@@ -53,7 +53,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         User owner = persistUser(slug + "-owner");
         Workspace workspace = createWorkspace(slug, "Proxy " + slug, slug + "-org", AccountType.ORG, owner);
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(MAPPER.createObjectNode());

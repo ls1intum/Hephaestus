@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import jakarta.persistence.EntityManager;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -60,7 +61,7 @@ class OutlinePersonDataTeamIntegrationTest extends BaseIntegrationTest {
                 .orElseGet(() ->
                         providers.save(new IdentityProvider(IdentityProviderType.OUTLINE, "https://wiki.example.com")));
         var person = new PersonScope(
-                null, List.of(new PersonIdentity(provider.getId(), "same-native-subject", firstTeam)), List.of());
+                null, List.of(new PersonIdentity(Objects.requireNonNull(provider.getId()), "same-native-subject", firstTeam)), List.of());
         var store = catalog.contributors().stream()
                 .filter(candidate -> candidate.store().equals(storeName))
                 .findFirst()
@@ -69,7 +70,7 @@ class OutlinePersonDataTeamIntegrationTest extends BaseIntegrationTest {
         assertThat(selected.rows())
                 .singleElement()
                 .satisfies(row -> assertThat(row.columns().get("id")).isEqualTo(Long.toString(firstId)));
-        assertThat(store.export(selected)).singleElement();
+        assertThat(store.export(selected)).hasSize(1);
         assertThat(store.erase(selected)).isEqualTo(1L);
         entities.clear();
         var untouched = documents.findById(secondId).orElseThrow();

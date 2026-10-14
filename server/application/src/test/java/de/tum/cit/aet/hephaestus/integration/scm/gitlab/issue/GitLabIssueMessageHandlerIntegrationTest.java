@@ -26,7 +26,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.feedback.ScmReviewFixtures;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.dto.GitLabWebhookUser;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.issue.dto.GitLabIssueEventDTO;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
@@ -48,6 +47,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
@@ -114,16 +114,13 @@ class GitLabIssueMessageHandlerIntegrationTest extends BaseIntegrationTest {
     private IssueTypeRepository issueTypeRepository;
 
     @Autowired
-    private PracticeRepository practiceRepository;
-
-    @Autowired
     private ResultRepository practiceResultRepository;
 
     @Autowired
     private IssueEvidenceVersion issueVersions;
 
     @Autowired
-    private org.springframework.jdbc.core.JdbcTemplate fixtureJdbc;
+    private JdbcTemplate fixtureJdbc;
 
     @Autowired
     private ItemWriter fixtureItems;

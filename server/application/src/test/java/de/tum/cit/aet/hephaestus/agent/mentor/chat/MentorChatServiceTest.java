@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -59,6 +60,7 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
@@ -253,6 +255,8 @@ class MentorChatServiceTest extends BaseUnitTest {
         assertThat(turnLock.activeSandboxKeys()).isZero();
     }
 
+    private final ConversationFeedbackReceipts feedbackReceipts = mock(ConversationFeedbackReceipts.class);
+
     private final ObjectMapper mapper = new ObjectMapper();
     private final List<Boolean> closedUnderSandboxLock = new CopyOnWriteArrayList<>();
 
@@ -415,29 +419,30 @@ class MentorChatServiceTest extends BaseUnitTest {
     private MentorChatService serviceWithExecutor(ExecutorService executor, ScheduledExecutorService runnerTimeouts) {
         var turnExecutorBean = new MentorChatExecutorConfig.MentorTurnExecutor(executor);
         var schedulerBean = new MentorChatExecutorConfig.MentorRunnerTimeoutScheduler(runnerTimeouts);
-        return new MentorChatService(userRepository,
-chatThreadRepository,
-workspaceContextBuilder,
-mentorPiAdapter,
-sandboxServiceProvider(interactiveSandboxService),
-translator,
-turnLock,
-persistence,
-mapper,
-turnExecutorBean,
-schedulerBean,
-new MentorChatMetrics(meterRegistry),
-llmBudgetService,
-llmAdmissionService,
-proxyCredentialRegistry,
-memberAiRouting,
-personSuppression,
-(workspaceId, developerId) -> aiDecision,
-mergeReadiness,
-practiceResultHistory,
-reviewAttempts,
-resultsHistory,
-feedbackReceiptsProvider());
+        return new MentorChatService(
+                userRepository,
+                chatThreadRepository,
+                workspaceContextBuilder,
+                mentorPiAdapter,
+                sandboxServiceProvider(interactiveSandboxService),
+                translator,
+                turnLock,
+                persistence,
+                mapper,
+                turnExecutorBean,
+                schedulerBean,
+                new MentorChatMetrics(meterRegistry),
+                llmBudgetService,
+                llmAdmissionService,
+                proxyCredentialRegistry,
+                memberAiRouting,
+                personSuppression,
+                (workspaceId, developerId) -> aiDecision,
+                mergeReadiness,
+                practiceResultHistory,
+                reviewAttempts,
+                resultsHistory,
+                feedbackReceipts);
     }
 
     @Test
@@ -1096,6 +1101,11 @@ feedbackReceiptsProvider());
         }
 
         @Override
+        public Optional<MentorTurnReceipt> receipt() {
+            return delegate.receipt();
+        }
+
+        @Override
         public void close() {
             delegate.close();
         }
@@ -1440,7 +1450,8 @@ feedbackReceiptsProvider());
                         .asString())
                 .isEqualTo(PROBLEM_ID.toString());
         // A problem nobody can resolve to a result is refused before the result's admission is asked.
-        verify(resultsHistory).find(WORKSPACE_ID, PRACTICE_RESULT_ID, USER_ID);
+        verify(resultsHistory)
+                .find(WORKSPACE_ID, PRACTICE_RESULT_ID, USER_ID, SourceUsePurpose.CONVERSATIONAL_MENTORING);
         assertThat(emitter.recordedTypes()).contains("data-problem", "finish");
         var completed = ArgumentCaptor.forClass(TranslatorState.class);
         verify(persistence).complete(any(), completed.capture(), any(UIMessageChunk.Finish.class));
@@ -1989,6 +2000,7 @@ feedbackReceiptsProvider());
     }
 
     private void runTurnSync(String message, ThreadSurface surface) {
+        MentorTurnAccount.set(USER_ID);
         service.start(new MentorTurnRequest(WORKSPACE_ID, THREAD_ID, message, null, surface, null), emitter);
     }
 
@@ -2198,7 +2210,8 @@ feedbackReceiptsProvider());
         var result = mock(ResultHistoryEntry.class);
         lenient().when(result.resultId()).thenReturn(PRACTICE_RESULT_ID);
         lenient().when(result.developerAccountId()).thenReturn(USER_ID);
-        when(resultsHistory.find(WORKSPACE_ID, PRACTICE_RESULT_ID, USER_ID, de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(Optional.of(result));
+        when(resultsHistory.find(WORKSPACE_ID, PRACTICE_RESULT_ID, USER_ID, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Optional.of(result));
         lenient()
                 .when(resultsHistory.forDeveloper(eq(WORKSPACE_ID), eq(USER_ID), any(), eq(90)))
                 .thenReturn(List.of(result));
@@ -2399,11 +2412,4 @@ feedbackReceiptsProvider());
             throw new AssertionError("No sent frame with id " + id);
         }
     }
-    private static ObjectProvider<ConversationFeedbackReceipts> feedbackReceiptsProvider() {
-        var receipts = org.mockito.Mockito.mock(ConversationFeedbackReceipts.class);
-        return new ObjectProvider<>() {
-            @Override public ConversationFeedbackReceipts getObject() { return receipts; }
-        };
-    }
-
 }

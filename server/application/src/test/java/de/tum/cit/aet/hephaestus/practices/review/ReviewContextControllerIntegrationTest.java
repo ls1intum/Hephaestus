@@ -46,7 +46,8 @@ class ReviewContextControllerIntegrationTest extends BaseIntegrationTest {
                     .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
                     .exchange()
                     .expectStatus()
-                    .isBadRequest();
+                    .isBadRequest()
+                    .expectBody(Void.class);
     }
 
     @Test
@@ -58,7 +59,8 @@ class ReviewContextControllerIntegrationTest extends BaseIntegrationTest {
                 .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
                 .exchange()
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -69,6 +71,7 @@ class ReviewContextControllerIntegrationTest extends BaseIntegrationTest {
                         .build())
                 .exchange()
                 .expectStatus()
-                .isUnauthorized();
+                .isUnauthorized()
+                .expectBody(Void.class);
     }
 }

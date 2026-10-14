@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCancellationRequested;
@@ -11,13 +12,14 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import java.time.Clock;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -26,10 +28,12 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** Settles runtime processing independently from product proof and physical-copy delivery. */
 @Component
 @ConditionalOnServerRole
+@ConditionalOnBooleanProperty(name = RuntimeRole.AGENT_ENABLED_PROPERTY)
 @RequiredArgsConstructor
 public class ReviewJobCompletionService {
     private static final Logger log = LoggerFactory.getLogger(ReviewJobCompletionService.class);
     private final ReviewJobRepository jobs;
+    private final ReviewWriteGuard writeGuard;
     private final ReviewJobAssignments assignments;
     private final ReviewAssignmentStore members;
     private final ReviewService reviews;
@@ -40,13 +44,13 @@ public class ReviewJobCompletionService {
     @Scheduled(fixedDelay = 10, timeUnit = TimeUnit.SECONDS)
     @SchedulerLock(name = "practice-job-completion", lockAtMostFor = "PT2M", lockAtLeastFor = "PT1S")
     public void tick() {
-        for (UUID id : jobs.findTerminalForProcessing(100))
+        for (var candidate : jobs.findTerminalForProcessing(100))
             try {
-                transactions.executeWithoutResult(status -> settle(id));
+                transactions.executeWithoutResult(status -> settle(candidate));
             } catch (RuntimeException failure) {
                 log.warn(
                         "Review processing could not settle: jobId={}, failure={}",
-                        id,
+                        candidate.getId(),
                         failure.getClass().getSimpleName());
             }
     }
@@ -58,10 +62,9 @@ public class ReviewJobCompletionService {
                 lifecycle.cancel(event.workspaceId(), job.getId());
     }
 
-    private void settle(UUID id) {
-        var retained = jobs.findById(id).orElse(null);
-        if (retained == null) return;
-        var job = jobs.findByIdAndWorkspaceIdForUpdate(id, retained.getWorkspaceId())
+    private void settle(ReviewJobRepository.CompletionCandidate candidate) {
+        writeGuard.lock(candidate.getWorkspaceId(), candidate.getReviewId());
+        var job = jobs.findByIdAndWorkspaceIdForUpdate(candidate.getId(), candidate.getWorkspaceId())
                 .orElse(null);
         if (job == null
                 || job.getStatus() == ReviewJobStatus.QUEUED
@@ -86,16 +89,26 @@ public class ReviewJobCompletionService {
         job.setProcessingStatus(completed ? ProcessingStatus.DONE : ProcessingStatus.FAILED);
         jobs.saveAndFlush(job);
         if (review.kind() == ReviewKind.SCAN) return;
+        var output = job.getOutput();
+        boolean readinessRefused = output != null
+                && ("INSUFFICIENT_EVIDENCE".equals(output.path("outcome").asString())
+                        || "WORKSPACE_REFUSED".equals(output.path("outcome").asString()));
         var status = job.getStatus() == ReviewJobStatus.CANCELLED
                 ? ReviewStatus.CANCELLED
+                : readinessRefused
+                        ? ReviewStatus.PARTIAL
+                        : completed
+                                ? ReviewStatus.COMPLETE
+                                : admitted || job.getExecutionStartedAt() != null
+                                        ? ReviewStatus.PARTIAL
+                                        : ReviewStatus.FAILED;
+        var stop = readinessRefused
+                ? ReviewStopReason.READINESS_REFUSED
                 : completed
-                        ? ReviewStatus.COMPLETE
-                        : admitted || job.getExecutionStartedAt() != null ? ReviewStatus.PARTIAL : ReviewStatus.FAILED;
-        var stop = completed
-                ? null
-                : job.getStatus() == ReviewJobStatus.TIMED_OUT
-                        ? ReviewStopReason.TIMED_OUT
-                        : job.getStatus() == ReviewJobStatus.CANCELLED ? ReviewStopReason.CANCELLED : reason;
+                        ? null
+                        : job.getStatus() == ReviewJobStatus.TIMED_OUT
+                                ? ReviewStopReason.TIMED_OUT
+                                : job.getStatus() == ReviewJobStatus.CANCELLED ? ReviewStopReason.CANCELLED : reason;
         reviews.complete(
                 job.getWorkspaceId(),
                 review.id(),

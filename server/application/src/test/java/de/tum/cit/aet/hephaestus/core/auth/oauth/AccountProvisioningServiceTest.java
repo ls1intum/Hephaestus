@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -173,9 +174,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
     @Test
     void outlineLink_withFlatTeamId_bindsToCurrentAccountWithTeamKey() {
         useOutlineProvider();
-        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("0aa1bb2c-user"), any()))
-                .thenReturn(Optional.empty());
-        when(accountRepository.findById(42L)).thenReturn(Optional.of(accountWithId(42L)));
         afterVerifiedClaim("0aa1bb2c-user", "9ff8ee7d-team");
         // The flat "team_id" attribute OutlineAuthInfoUserService emits (flattened from
         // data.team.id).
@@ -262,8 +260,10 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
         identity.setProviderUserKey(subject);
         identity.setTeamKey(team);
         when(people.ensureHuman(any(), any())).thenReturn(52L);
+        when(accountRepository.findById(42L)).thenReturn(Optional.of(identity.getAccount()));
         when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq(subject), any()))
-                .thenReturn(Optional.empty(), Optional.of(identity));
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(identity));
     }
 
     private static Account accountWithId(long id) {
@@ -309,7 +309,7 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
                 .thenReturn(Optional.empty());
         when(verifiedEmailResolver.resolve(eq("github"), any()))
                 .thenReturn(new VerifiedEmailResolver.ResolvedEmail("u@v.de", true));
-        when(accountJitCreator.create(any(), any())).thenReturn(winner);
+        doReturn(winner).when(accountJitCreator).create(any(), any());
 
         var result =
                 service.resolveOrProvision("github", "sub-1", principal(), AuthIntentCookie.Intent.login(null, null));
@@ -392,9 +392,6 @@ class AccountProvisioningServiceTest extends BaseUnitTest {
 
     @Test
     void link_bindsToCurrentAccount() {
-        when(identityRepository.findActiveByProviderSubject(eq(PROVIDER_ID), eq("sub-1"), any()))
-                .thenReturn(Optional.empty());
-        when(accountRepository.findById(42L)).thenReturn(Optional.of(accountWithId(42L)));
         afterVerifiedClaim("sub-1", "");
 
         var result =

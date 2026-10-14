@@ -22,8 +22,20 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         practice.setKind(new ItemKind("scm.pull_request"));
         practice.setCurrentVersion(version);
         var snapshot = PracticeDefinitionSnapshot.of(practice);
-        String json = JsonMapper.builder().build().writeValueAsString(snapshot);
+        var json = JsonMapper.builder().build().valueToTree(snapshot);
         assertThat(snapshot.versionId()).isEqualTo(17L);
-        assertThat(json).contains("reviewDigest").doesNotContain("criteria", "script", "definition");
+        assertThat(json.propertyNames())
+                .containsExactlyInAnyOrder(
+                        "slug",
+                        "kind",
+                        "versionId",
+                        "reviewDigest",
+                        "groupSlug",
+                        "position",
+                        "feedbackMode",
+                        "catalogSlug",
+                        "catalogBaseDigest");
+        assertThat(json.path("slug").asString()).isEqualTo("private-script");
+        assertThat(json.path("reviewDigest").asString()).isEqualTo(snapshot.reviewDigest());
     }
 }

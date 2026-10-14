@@ -70,7 +70,7 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         void providersInProviderPackage() {
             ArchRule rule = classes()
                     .that()
-                    .implement("de.tum.cit.aet.hephaestus.evidence.capture.ContentSource")
+                    .implement("ContentSource")
                     .should()
                     .resideInAPackage(CONTEXT_PROVIDERS)
                     .because("Provider implementations must live next to each other for discovery and arch hygiene");
@@ -86,7 +86,7 @@ class AgentRuntimeBoundaryTest extends HephaestusArchitectureTest {
         void profilesInDomainPackages() {
             ArchRule rule = classes()
                     .that()
-                    .implement("de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile")
+                    .implement("PiRunnerProfile")
                     .should()
                     .resideInAnyPackage(PRACTICE, MENTOR)
                     .because("Each runner kind owns its profile next to its adapter; the kernel sees only the"

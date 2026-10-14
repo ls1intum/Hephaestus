@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat;
 
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationCopyOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationCopyReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.CopyWriteFence;
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Service;
 /** Connects a prepared conversation copy to its actual mentor transport receipt. */
 @Service
 @RequiredArgsConstructor
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 public class ConversationFeedbackReceipts {
     private final FeedbackStore feedback;
 

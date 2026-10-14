@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.catalog;
 
+import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.util.Optional;
@@ -126,7 +127,7 @@ public class LlmModelResolver {
 
     /**
      * Identifies WHICH connection row funds a config's binding, without exposing any credential
-     * material. Frozen into {@link de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot} so the proxy
+     * material. Frozen into {@link ConfigSnapshot} so the proxy
      * can re-resolve the live credential for an in-flight job without re-reading the config's
      * (possibly since-changed) current binding.
      */

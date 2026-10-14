@@ -40,7 +40,7 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
         long accountId = Objects.requireNonNull(account.getId());
         var identity = new Identity();
         identity.setAccount(account);
-        identity.setProviderId(provider.getId());
+        identity.setProviderId(Objects.requireNonNull(provider.getId()));
         identity.setProviderUserKey("18024");
         identity.setDisabledAt(Instant.now());
         identities.saveAndFlush(identity);
@@ -57,7 +57,7 @@ class AuthenticatedGitProviderUserServiceSecurityIntegrationTest extends BaseInt
         long accountId = Objects.requireNonNull(account.getId());
         var identity = new Identity();
         identity.setAccount(account);
-        identity.setProviderId(provider.getId());
+        identity.setProviderId(Objects.requireNonNull(provider.getId()));
         identity.setProviderUserKey("18025");
         identities.saveAndFlush(identity);
         assertThat(query.activeLinksForAccount(accountId)).anySatisfy(link -> {

@@ -53,6 +53,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
@@ -76,9 +77,6 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private PracticeVersionService runtimePracticeVersions;
 
     private ReviewJobZombieSweeper sweeper;
-
-    @Autowired
-    private ReviewJobLifecycleService lifecycleService;
 
     @Autowired
     private LlmUsageRecorder usageRecorder;
@@ -662,7 +660,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int attempt) {
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(new ConfigSnapshot(

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,10 +32,13 @@ class ResultMarkFeedbackIntegrationTest extends BaseIntegrationTest {
 
     ReviewIntegrationData.Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     UUID feedback(Result result) {
@@ -67,7 +71,7 @@ class ResultMarkFeedbackIntegrationTest extends BaseIntegrationTest {
                 result.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.INCORRECT,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "The basis is incorrect");
         assertThat(jdbc.sql("SELECT state FROM feedback WHERE workspace_id=:ws AND id=:id")
                         .param("ws", result.getWorkspaceId())
@@ -92,7 +96,7 @@ class ResultMarkFeedbackIntegrationTest extends BaseIntegrationTest {
                 result.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.ACCEPTED,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "This tradeoff is accepted");
         assertThat(jdbc.sql("SELECT state FROM feedback WHERE workspace_id=:ws AND id=:id")
                         .param("ws", result.getWorkspaceId())
@@ -104,7 +108,7 @@ class ResultMarkFeedbackIntegrationTest extends BaseIntegrationTest {
                 result.getWorkspaceId(),
                 result.getId(),
                 mark.getId(),
-                scenario.account().getId(),
+                scenarioAccountId,
                 "The tradeoff is no longer accepted");
         assertThat(results.findById(result.getId()).orElseThrow().getEndedAt()).isNull();
     }
@@ -117,18 +121,14 @@ class ResultMarkFeedbackIntegrationTest extends BaseIntegrationTest {
                 result.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.INCORRECT,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "The basis is incorrect");
         jdbc.sql("UPDATE practice SET feedback_mode='OFF' WHERE workspace_id=:ws AND id=:id")
                 .param("ws", result.getWorkspaceId())
                 .param("id", result.getPracticeId())
                 .update();
         marks.remove(
-                result.getWorkspaceId(),
-                result.getId(),
-                mark.getId(),
-                scenario.account().getId(),
-                "The basis is now verified");
+                result.getWorkspaceId(), result.getId(), mark.getId(), scenarioAccountId, "The basis is now verified");
         assertThat(jdbc.sql("SELECT state FROM feedback WHERE workspace_id=:ws AND id=:id")
                         .param("ws", result.getWorkspaceId())
                         .param("id", id)

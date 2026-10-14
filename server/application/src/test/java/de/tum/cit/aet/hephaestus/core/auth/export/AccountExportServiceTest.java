@@ -73,13 +73,15 @@ class AccountExportServiceTest extends BaseUnitTest {
         link.setProviderId(55L);
         when(gitProviderRegistry.providerTypeName(55L)).thenReturn("GITLAB");
         link.setProviderUserKey("123");
+        when(gitProviderRegistry.profile(55L, "123", ""))
+                .thenReturn(Optional.of(new GitProviderRegistry.IdentityProfile("ada", "Ada on GitLab", null, null)));
 
         when(accountService.requireById(ACCOUNT_ID)).thenReturn(account);
         when(accountService.activeIdentities(ACCOUNT_ID)).thenReturn(List.of(link));
         when(featureRepo.findFlagsByAccountId(ACCOUNT_ID)).thenReturn(List.of("notification_access"));
         when(authEventRepo.findByAccountSince(eq(ACCOUNT_ID), any())).thenReturn(List.of());
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", 314L)));
+                .thenReturn(List.of(new MembershipView(7L, "tum-ase", "TUM ASE", "MEMBER", ACCOUNT_ID)));
         when(preferencesQuery.preferencesForAccount(ACCOUNT_ID))
                 .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(!participating, false)));
 
@@ -98,11 +100,11 @@ class AccountExportServiceTest extends BaseUnitTest {
         ExportBundle bundle = assembler.assemble(ACCOUNT_ID);
 
         assertThat(bundle.schemaVersion()).isEqualTo(ExportBundle.SCHEMA_VERSION);
-        assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID);
+        assertThat(bundle.account().id()).isEqualTo(ACCOUNT_ID.toString());
         assertThat(bundle.account().primaryEmail()).isEqualTo("ada@example.com");
         assertThat(bundle.identities()).singleElement().satisfies(i -> {
             assertThat(i.provider()).isEqualTo("GITLAB");
-            assertThat(i.usernameAtSignup()).isEqualTo("ada");
+            assertThat(i.login()).isEqualTo("ada");
         });
         assertThat(bundle.workspaceMemberships()).singleElement().satisfies(m -> {
             assertThat(m.slug()).isEqualTo("tum-ase");

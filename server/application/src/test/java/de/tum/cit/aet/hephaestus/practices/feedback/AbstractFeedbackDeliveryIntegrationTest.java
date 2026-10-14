@@ -118,7 +118,7 @@ public abstract class AbstractFeedbackDeliveryIntegrationTest extends AbstractFe
                     Instant.now(),
                     new FeedbackCheckFacts(0, 0, true, true, true, true, incorrect, true, true, false));
         });
-        supportingResult = result();
+        supportingResult = negativeResult();
         feedbackId = FeedbackIds.onWork(workspace.getId(), reviewId, developerId);
         target = new FeedbackTarget(
                 new ItemRef(workspace.getId(), itemId, new ItemKind("scm.pull_request"), 42L, null, null),

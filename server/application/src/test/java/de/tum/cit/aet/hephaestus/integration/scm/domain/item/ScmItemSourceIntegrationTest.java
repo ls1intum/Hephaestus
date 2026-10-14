@@ -49,6 +49,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -179,7 +180,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
     void shouldKeepKindsParentsAndProviderIdentitiesDistinct(IdentityProviderType type) {
         var fixture = fixture(type);
         var issue = new Issue();
-        issue.setNativeId(401);
+        issue.setNativeId(401L);
         issue.setProvider(fixture.provider());
         issue.setRepository(fixture.repository());
         issue.setNumber(7);
@@ -192,7 +193,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         issue.setUpdatedAt(Instant.now());
         issue = issues.saveAndFlush(issue);
         var pull = new PullRequest();
-        pull.setNativeId(402);
+        pull.setNativeId(402L);
         pull.setProvider(fixture.provider());
         pull.setRepository(fixture.repository());
         pull.setNumber(7);
@@ -208,7 +209,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull.setHeadRefName("topic");
         pull.setBaseRefName("main");
         var secondAssignee = users.saveAndFlush(TestUserFactory.createUser(
-                Math.abs(UUID.randomUUID().getMostSignificantBits()),
+                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
                 "assignee-" + UUID.randomUUID(),
                 fixture.provider()));
         pull.getAssignees().add(fixture.author());
@@ -254,7 +255,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         ItemCaptureException.class,
                         e -> assertThat(e.code()).isEqualTo(ItemCaptureCode.ITEM_NOT_VISIBLE));
         var review = new PullRequestReview();
-        review.setNativeId(403);
+        review.setNativeId(403L);
         review.setProvider(fixture.provider());
         review.setPullRequest(pull);
         review.setAuthor(fixture.author());
@@ -296,7 +297,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         }
         assertThat(reviewSnapshot.state()).containsEntry("baseBranch", "main");
         var historyAuthor = users.saveAndFlush(TestUserFactory.createUser(
-                Math.abs(UUID.randomUUID().getMostSignificantBits()),
+                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE),
                 "history-" + UUID.randomUUID(),
                 fixture.provider()));
         var historicalCommit = new Commit();
@@ -337,7 +338,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull.setMergedAt(mergedAt);
         pulls.saveAndFlush(pull);
         assertThat(mergeTimes.mergedAt(holder.workspaceId(), List.of(issueRef, pullRef, reviewRef)))
-                .containsOnlyEntriesOf(Map.of(pullRef.itemId(), mergedAt, reviewRef.itemId(), mergedAt));
+                .containsExactlyInAnyOrderEntriesOf(Map.of(pullRef.itemId(), mergedAt, reviewRef.itemId(), mergedAt));
         assertThatThrownBy(() -> mergeTimes.mergedAt(holder.workspaceId() + 1, List.of(pullRef)))
                 .isInstanceOfSatisfying(
                         ItemCaptureException.class,
@@ -363,7 +364,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         monitors.saveAndFlush(timingMonitor);
         writer.remove(holder.workspaceId(), pullRef.itemId(), Instant.now());
         assertThat(mergeTimes.mergedAt(holder.workspaceId(), List.of(pullRef, reviewRef)))
-                .containsOnlyEntriesOf(Map.of(pullRef.itemId(), mergedAt, reviewRef.itemId(), mergedAt));
+                .containsExactlyInAnyOrderEntriesOf(Map.of(pullRef.itemId(), mergedAt, reviewRef.itemId(), mergedAt));
         writer.restore(holder.workspaceId(), pullRef.itemId());
         var missingTiming = writer.upsert(new ItemRegistration(
                 holder.workspaceId(), ScmItemEvents.PULL_REQUEST, Long.MAX_VALUE - 1, holder.itemId(), null));
@@ -440,12 +441,12 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         workspaces,
                         connections,
                         WorkspaceTestFixtures.installationWorkspace(
-                                Math.abs(UUID.randomUUID().getMostSignificantBits()), slug),
-                        Math.abs(UUID.randomUUID().getMostSignificantBits()))
+                                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), slug),
+                        ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE))
                 : WorkspaceTestFixtures.persistGitLabWorkspace(
                         workspaces, connections, WorkspaceTestFixtures.gitLabPatWorkspace(slug), url);
         var repository = new Repository();
-        repository.setNativeId(Math.abs(UUID.randomUUID().getMostSignificantBits()));
+        repository.setNativeId(ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE));
         repository.setProvider(provider);
         repository.setName("source");
         repository.setNameWithOwner(slug + "/source");
@@ -458,7 +459,7 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         repository = repositories.saveAndFlush(repository);
         monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(workspace, repository.getNameWithOwner()));
         var author = users.saveAndFlush(TestUserFactory.createUser(
-                Math.abs(UUID.randomUUID().getMostSignificantBits()), slug + "-author", provider));
+                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), slug + "-author", provider));
         return new Fixture(workspace, provider, repository, author);
     }
 
@@ -470,8 +471,8 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         workspaces,
                         connections,
                         WorkspaceTestFixtures.installationWorkspace(
-                                Math.abs(UUID.randomUUID().getMostSignificantBits()), slug),
-                        Math.abs(UUID.randomUUID().getMostSignificantBits()))
+                                ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE), slug),
+                        ThreadLocalRandom.current().nextLong(1, Long.MAX_VALUE))
                 : WorkspaceTestFixtures.persistGitLabWorkspace(
                         workspaces, connections, WorkspaceTestFixtures.gitLabPatWorkspace(slug), url);
     }

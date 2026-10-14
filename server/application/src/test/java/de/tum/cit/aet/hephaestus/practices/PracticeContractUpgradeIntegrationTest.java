@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
+import java.util.Objects;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import tools.jackson.databind.json.JsonMapper;
@@ -36,7 +37,7 @@ class PracticeContractUpgradeIntegrationTest extends AbstractWorkspaceIntegratio
         ((ObjectNode) recorded.path("reads")).put("contract", "1.3.0");
         var legacy = history.saveAndFlush(new PracticeVersion(practice, 2, recorded, null));
         var previousBytes = legacy.getDefinition();
-        var previousId = legacy.getId();
+        var previousId = Objects.requireNonNull(legacy.getId());
         assertThatThrownBy(() -> versions.append(practice, versions.definitionOf(legacy), null))
                 .isInstanceOf(IllegalArgumentException.class);
         var appended = versions.append(practice, authored, null);

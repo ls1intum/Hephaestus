@@ -84,7 +84,9 @@ class ConnectionServiceTest extends BaseUnitTest {
     void shouldResolveExactlyOneActiveWorkspaceAndRefuseAnAmbiguousProviderInstance() {
         when(connectionRepository.findWorkspaceIdsByKindAndInstanceKeyAndState(
                         eq(IntegrationKind.SLACK), eq("T1"), eq(IntegrationState.ACTIVE), any()))
-                .thenReturn(List.of(), List.of(1L), List.of(1L, 2L));
+                .thenReturn(List.of())
+                .thenReturn(List.of(1L))
+                .thenReturn(List.of(1L, 2L));
         assertThat(service.findUniqueActiveWorkspaceId(IntegrationKind.SLACK, "T1"))
                 .isEmpty();
         assertThat(service.findUniqueActiveWorkspaceId(IntegrationKind.SLACK, "T1"))

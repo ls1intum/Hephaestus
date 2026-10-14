@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.media.Schema.RequiredMode;
 import io.swagger.v3.oas.models.media.Schema;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
@@ -36,8 +37,7 @@ class JSpecifyRequiredModelConverterTest {
 
     @Test
     void marksExplicitlyNonNullMembersRequiredAndKeepsSchemaRequiredPrimitives() {
-        Schema<?> schema = resolve(Sample.class).get("Sample");
-        assertThat(schema).isNotNull();
+        Schema<?> schema = Objects.requireNonNull(resolve(Sample.class).get("Sample"));
 
         // Required iff the member is explicitly @NonNull, or declares @Schema(requiredMode = REQUIRED)
         // as a primitive does (mirrors the real GitLabPreflightResponseDTO#valid). @Nullable,
@@ -48,33 +48,33 @@ class JSpecifyRequiredModelConverterTest {
     @Test
     void resolvesRequiredForNestedRecordReachedAsAJavaType() {
         // Nested types arrive at the converter as a Jackson JavaType, not a Class; this locks that path.
-        Schema<?> nested = resolve(Sample.class).get("Nested");
-        assertThat(nested).isNotNull();
+        Schema<?> nested = Objects.requireNonNull(resolve(Sample.class).get("Nested"));
 
         assertThat(nested.getRequired()).containsExactly("x");
     }
 
     @Test
     void walksSuperclassFieldsForPlainClasses() {
-        Schema<?> schema = resolve(Child.class).get("Child");
-        assertThat(schema).isNotNull();
+        Schema<?> schema = Objects.requireNonNull(resolve(Child.class).get("Child"));
 
         assertThat(schema.getRequired()).containsExactlyInAnyOrder("parentNonNull", "childNonNull");
     }
 
     @Test
     void shouldPublishEveryAlwaysPresentResponseKeyAndItsNullableType() {
-        Schema<?> schema = resolve(CompleteResponse.class).get("CompleteResponse");
-        assertThat(schema).isNotNull();
+        Schema<?> schema =
+                Objects.requireNonNull(resolve(CompleteResponse.class).get("CompleteResponse"));
         assertThat(schema.getRequired()).containsExactlyInAnyOrder("reason", "count", "detail");
-        assertThat(schema.getProperties().get("reason").getTypes()).containsExactlyInAnyOrder("string", "null");
-        assertThat(schema.getProperties().get("detail").getAnyOf()).anySatisfy(member -> {
-            assertThat(member.getType()).isEqualTo("null");
-        });
+        Schema<?> reason = Objects.requireNonNull(schema.getProperties().get("reason"));
+        Schema<?> detail = Objects.requireNonNull(schema.getProperties().get("detail"));
+        assertThat(reason.getTypes()).containsExactlyInAnyOrder("string", "null");
+        assertThat(detail.getAnyOf())
+                .anySatisfy(member -> assertThat(member.getType()).isEqualTo("null"));
     }
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
-    record CompleteResponse(@Nullable String reason, int count, @Nullable Nested detail) {}
+    record CompleteResponse(
+            @Nullable String reason, int count, @Nullable Nested detail) {}
 
     record Sample(
             @NonNull String nonNull,

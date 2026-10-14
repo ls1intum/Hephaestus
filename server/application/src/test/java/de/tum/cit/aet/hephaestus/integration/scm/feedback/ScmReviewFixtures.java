@@ -49,7 +49,10 @@ public final class ScmReviewFixtures {
         return Objects.requireNonNull(transactions.execute(status -> {
             User author = Objects.requireNonNull(issue.getAuthor());
             long developer = people.ensureHuman(
-                    new PersonIdentity(author.getProvider().getId(), Long.toString(author.getNativeId()), null),
+                    new PersonIdentity(
+                            Objects.requireNonNull(author.getProvider().getId()),
+                            Long.toString(author.getNativeId()),
+                            null),
                     author.getName() == null ? author.getLogin() : author.getName());
             jdbc.update(
                     "INSERT INTO"

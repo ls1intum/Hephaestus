@@ -167,7 +167,7 @@ class SlackChannelAdminControllerIntegrationTest extends AbstractWorkspaceIntegr
     @DisplayName("non-admin cannot activate a channel → 403, state unchanged")
     void activate_asNonAdmin_forbidden() {
         User mentor = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
         seedChannel(workspace.getId(), "C1", ConsentState.PENDING, null);
 
         patchConsent("C1", ConsentState.ACTIVE, null)

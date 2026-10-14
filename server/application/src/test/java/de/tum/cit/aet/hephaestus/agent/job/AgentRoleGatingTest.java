@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.scan.ScanDriver;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -33,7 +34,7 @@ class AgentRoleGatingTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(classes = {ReviewJobEventListener.class, IssueReviewJobEventListener.class, BotCommandProcessor.class})
+    @ValueSource(classes = {ReviewJobEventListener.class, ReviewJobCompletionService.class, ScanDriver.class})
     void shouldSubmitJobsOnlyWhenAgentJobsAreOn(Class<?> submitter) {
         assertThat(registers(submitter)).isFalse();
         assertThat(registers(submitter, AGENT_ON)).isTrue();

@@ -36,7 +36,6 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.ReviewMemberAiPolicy;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.agent.job.ScriptRun;
 import de.tum.cit.aet.hephaestus.agent.job.ScriptRunRepository;
@@ -66,7 +65,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
@@ -112,6 +110,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -224,9 +223,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
     private AgentBindingService bindings;
 
     @Autowired
-    private ReviewMemberAiPolicy reviewPolicy;
-
-    @Autowired
     private LlmModelResolver resolver;
 
     @Autowired
@@ -255,9 +251,6 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private PracticeRepository practiceRepository;
-
-    @Autowired
-    private PracticeVersionRepository revisionRepository;
 
     @Autowired
     private PullRequestRepository pullRequests;
@@ -411,14 +404,11 @@ class PracticeScriptLiveLlmTest extends AbstractWorkspaceIntegrationTest {
                 .as("one job token, no second credential")
                 .doesNotContainKey("PRACTICE_SCRIPT_PROXY_TOKEN");
         LiveRunnerWorkspace.stageSpec(workDir, spec.inputFiles());
-        long revisionId = Objects.requireNonNull(practice.getCurrentVersion().getId());
 
         var assigned = reviewAssignments.load(job);
         var frozenReview = reviewAssignments.review(job);
         var staged = new LinkedHashMap<String, byte[]>();
-        catalogInputs.inject(staged,
-assigned,
-de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
+        catalogInputs.inject(staged, assigned, ReviewKind.ITEM);
         for (var assignment : assigned)
             staged.putAll(scriptInputs.stage(
                     frozenReview,

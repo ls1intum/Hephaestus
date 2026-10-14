@@ -43,7 +43,8 @@ class ReviewJobExecutorTest extends BaseUnitTest {
             return callback.doInTransaction(mock(TransactionStatus.class));
         });
         var meters = new SimpleMeterRegistry();
-        return new ReviewJobExecutor(new AgentProperties(
+        return new ReviewJobExecutor(
+                new AgentProperties(
                         true,
                         Duration.ofSeconds(1),
                         5,
@@ -51,26 +52,26 @@ class ReviewJobExecutorTest extends BaseUnitTest {
                         Duration.ofSeconds(25),
                         Duration.ofDays(14),
                         Duration.ofDays(90)),
-jobs,
-policy,
-handler,
-assignments,
-mock(PracticePiAdapter.class),
-mock(WorkerJwtIssuer.class),
-sandbox,
-pool,
-transactions,
-new JsonMapper(),
-meters,
-new PracticeReviewRefusalMetrics(meters),
-mock(ReviewJobTelemetry.class),
-mock(LlmUsageRecorder.class),
-mock(PracticeScriptRunRecorder.class),
-mock(LlmBudgetService.class),
-null,
-Optional.empty(),
-Optional.empty(),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier.class));
+                jobs,
+                policy,
+                handler,
+                assignments,
+                mock(PracticePiAdapter.class),
+                mock(WorkerJwtIssuer.class),
+                sandbox,
+                pool,
+                transactions,
+                new JsonMapper(),
+                meters,
+                new PracticeReviewRefusalMetrics(meters),
+                mock(ReviewJobTelemetry.class),
+                mock(LlmUsageRecorder.class),
+                mock(PracticeScriptRunRecorder.class),
+                mock(LlmBudgetService.class),
+                null,
+                Optional.empty(),
+                Optional.empty(),
+                mock(ReviewMethodVerifier.class));
     }
 
     @Test

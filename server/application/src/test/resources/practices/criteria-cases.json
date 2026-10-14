@@ -1047,7 +1047,7 @@
 			"commit-subjects-explain-each-change": "NOT_MET"
 		},
 		"expectedSeverity": {
-			"commit-subjects-explain-each-change": "INFO"
+			"commit-subjects-explain-each-change": "TRIVIAL"
 		},
 		"files": {
 			"context/commits.json": "{\"commits\":[{\"sha\":\"1111111111111111111111111111111111111111\",\"message\":\"Add the settings screen\\n\",\"parents\":[\"0000000000000000000000000000000000000000\"],\"files\":[{\"status\":\"A\",\"path\":\"App/SettingsView.swift\",\"additions\":9,\"deletions\":0}]},{\"sha\":\"2222222222222222222222222222222222222222\",\"message\":\"Show the app version in settings\\n\",\"parents\":[\"1111111111111111111111111111111111111111\"],\"files\":[{\"status\":\"M\",\"path\":\"App/SettingsView.swift\",\"additions\":1,\"deletions\":0}]},{\"sha\":\"3333333333333333333333333333333333333333\",\"message\":\"update\\n\",\"parents\":[\"2222222222222222222222222222222222222222\"],\"files\":[{\"status\":\"M\",\"path\":\"App/SettingsView.swift\",\"additions\":1,\"deletions\":1}]}]}\n",

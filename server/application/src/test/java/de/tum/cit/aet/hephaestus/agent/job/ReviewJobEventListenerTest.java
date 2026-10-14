@@ -19,20 +19,26 @@ import org.junit.jupiter.api.Test;
 class ReviewJobEventListenerTest extends BaseUnitTest {
     @Test
     void shouldEnqueueOnlyEligibleFrozenAssignments() {
-        var reviews=mock(ReviewService.class);var queue=mock(ReviewQueue.class);var assignments=mock(ReviewAssignmentQuery.class);
-        var assignment=RuntimeReviewTestData.assignment(5L,null);var review=RuntimeReviewTestData.review(ReviewKind.ITEM,assignment);
-        when(reviews.find(1,review.id())).thenReturn(Optional.of(review));when(reviews.start(1,review.id())).thenReturn(true);
-        when(assignments.executable(1,review.id(),2)).thenReturn(List.of(assignment.id()));
-        new ReviewJobEventListener(reviews,queue,assignments).onReviewRequested(new ReviewRequested(review.id(),1));
-        verify(queue).enqueue(review,2,List.of(assignment.id()));
+        var reviews = mock(ReviewService.class);
+        var queue = mock(ReviewQueue.class);
+        var assignments = mock(ReviewAssignmentQuery.class);
+        var assignment = RuntimeReviewTestData.assignment(5L, null);
+        var review = RuntimeReviewTestData.review(ReviewKind.ITEM, assignment);
+        when(reviews.find(1, review.id())).thenReturn(Optional.of(review));
+        when(reviews.start(1, review.id())).thenReturn(true);
+        when(assignments.executable(1, review.id(), 2)).thenReturn(List.of(assignment.id()));
+        new ReviewJobEventListener(reviews, queue, assignments).onReviewRequested(new ReviewRequested(review.id(), 1));
+        verify(queue).enqueue(review, 2, List.of(assignment.id()));
     }
 
     @Test
     void shouldLeaveScanEnumerationToItsDriver() {
-        var reviews=mock(ReviewService.class);var queue=mock(ReviewQueue.class);var assignments=mock(ReviewAssignmentQuery.class);
-        var review=RuntimeReviewTestData.review(ReviewKind.SCAN,RuntimeReviewTestData.assignment(null,null));
-        when(reviews.find(1,review.id())).thenReturn(Optional.of(review));
-        new ReviewJobEventListener(reviews,queue,assignments).onReviewRequested(new ReviewRequested(review.id(),1));
-        verifyNoInteractions(queue,assignments);
+        var reviews = mock(ReviewService.class);
+        var queue = mock(ReviewQueue.class);
+        var assignments = mock(ReviewAssignmentQuery.class);
+        var review = RuntimeReviewTestData.review(ReviewKind.SCAN, RuntimeReviewTestData.assignment(null, null));
+        when(reviews.find(1, review.id())).thenReturn(Optional.of(review));
+        new ReviewJobEventListener(reviews, queue, assignments).onReviewRequested(new ReviewRequested(review.id(), 1));
+        verifyNoInteractions(queue, assignments);
     }
 }

@@ -13,11 +13,12 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.graphql.FragmentMergingDocumentSource;
-import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.OrganizationMembershipListener.MembershipChangedEvent;
-import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TeamMembershipListener;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMemberRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationMembership;
@@ -105,6 +106,9 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
     private static final long ASSISTANT = 1002L;
     private static final long TUTOR = 1003L;
     private static final long OWNER_ID = 999L;
+
+    @Autowired
+    private ItemWriter itemWriter;
 
     @Autowired
     private IdentityProviderRepository providers;
@@ -398,8 +402,20 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
     @Test
     void shouldAdmitAnInheritedAuthorAtTheReadyOccasionOnASelectedRepositoryAndBaseBranch() {
         String project = COURSE + "/team-1/project";
+        var repository = new Repository();
+        repository.setNativeId(7002L);
+        repository.setProvider(gitLab);
+        repository.setName("project");
+        repository.setNameWithOwner(project);
+        repository.setDefaultBranch("main");
+        repository = repositories.saveAndFlush(repository);
+        long repositoryItemId = itemWriter
+                .upsert(new ItemRegistration(
+                        workspace.getId(), ScmItemEvents.REPOSITORY, repository.getId(), null, null))
+                .itemId();
         RepositoryToMonitor monitor = new RepositoryToMonitor();
         monitor.setNameWithOwner(project);
+        monitor.setNativeId(7002L);
         monitor.setWorkspace(workspace);
         monitors.save(monitor);
         coverage.replace(
@@ -407,24 +423,27 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
                 new WorkspaceReviewScope(
                         ReviewScopeMode.SELECTED,
                         ReviewScopeMode.ALL,
-                        List.of(new ReviewRepositoryTarget(project, List.of("main"))),
+                        List.of(new ReviewRepositoryTarget(repositoryItemId, List.of("main"))),
                         List.of()));
         workspace = workspaces.save(workspace);
         User student = users.save(TestUserFactory.createUser(STUDENT, "student", gitLab));
+        ensureAccount(student);
         PullRequest ready = mergeRequest(student, "main");
 
-        assertThat(coverage.admits(workspace, project, ready.getBaseRefName(), accountId(student.getId()), true))
+        assertThat(coverage.admits(
+                        workspace, repositoryItemId, ready.getBaseRefName(), accountId(student.getId()), true))
                 .isFalse();
 
         answer("GetGroupMembers " + COURSE, page(false, member(STUDENT, "student", 30)));
         memberSync.syncGroupMemberships(workspace.getId(), COURSE, course);
 
-        assertThat(coverage.admits(workspace, project, ready.getBaseRefName(), accountId(student.getId()), true))
+        assertThat(coverage.admits(
+                        workspace, repositoryItemId, ready.getBaseRefName(), accountId(student.getId()), true))
                 .isTrue();
-        assertThat(coverage.admits(workspace, project, "develop", accountId(student.getId()), true))
+        assertThat(coverage.admits(workspace, repositoryItemId, "develop", accountId(student.getId()), true))
                 .as("the base branch still has to be selected")
                 .isFalse();
-        assertThat(coverage.admits(workspace, project, "main", Long.MAX_VALUE, true))
+        assertThat(coverage.admits(workspace, repositoryItemId, "main", Long.MAX_VALUE, true))
                 .isFalse();
     }
 
@@ -733,21 +752,16 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
 
     private long ensureAccount(User user) {
         return people.ensureHuman(
-                new PersonIdentity(user.getProvider().getId(), Long.toString(user.getNativeId()), null),
+                new PersonIdentity(
+                        Objects.requireNonNull(user.getProvider().getId()), Long.toString(user.getNativeId()), null),
                 user.getLogin());
     }
 
     private long accountId(long mirrorId) {
         var user = users.findById(mirrorId).orElseThrow();
         return accountIdentities
-                .resolveAccountId(user.getProvider().getId(), Long.toString(user.getNativeId()), null)
+                .resolveAccountId(
+                        Objects.requireNonNull(user.getProvider().getId()), Long.toString(user.getNativeId()), null)
                 .orElseThrow();
-    }
-
-    private RoleHolder role(User user) {
-        return new RoleHolder(
-                AboutRole.AUTHOR,
-                new PersonIdentity(user.getProvider().getId(), Long.toString(user.getNativeId()), null),
-                user.getType() == User.Type.USER);
     }
 }

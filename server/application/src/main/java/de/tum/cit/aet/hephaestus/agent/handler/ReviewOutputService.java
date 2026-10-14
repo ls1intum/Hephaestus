@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobAssignments;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.evidence.SourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.CandidateRefusal;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
@@ -40,6 +41,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Verifies one candidate per pinned assignment before the attempt's transactional admission. */
 @Service
+@ConditionalOnCaptureRole
 public class ReviewOutputService {
     private final ReviewJobAssignments assignments;
     private final CandidateEvidenceVerifier verifier;

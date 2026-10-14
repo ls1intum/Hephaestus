@@ -17,6 +17,6 @@ public interface PracticeVersionRepository extends JpaRepository<PracticeVersion
     Optional<PracticeVersion> findFirstByPracticeIdAndNumberLessThanOrderByNumberDesc(Long practiceId, int number);
 
     @Modifying
-    @Query("DELETE FROM PracticeVersion v WHERE v.workspaceId = :workspaceId")
+    @Query(value = "DELETE FROM practice_version WHERE workspace_id = :workspaceId", nativeQuery = true)
     void deleteAllByWorkspaceId(Long workspaceId);
 }

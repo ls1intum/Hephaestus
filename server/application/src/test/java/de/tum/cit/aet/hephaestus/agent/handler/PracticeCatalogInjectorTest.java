@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -16,9 +17,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         var mapper = new JsonMapper();
         var files = new LinkedHashMap<String, byte[]>();
         var pinned = RuntimeReviewTestData.assignment(5L, "export default {};");
-        new PracticeCatalogInjector(mapper).inject(files,
-List.of(pinned),
-de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
+        new PracticeCatalogInjector(mapper).inject(files, List.of(pinned), ReviewKind.ITEM);
         assertThat(files)
                 .containsOnlyKeys(
                         SandboxLayout.PRACTICES_PREFIX + "index.json",
@@ -38,9 +37,7 @@ de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
     void shouldStageNoAuthoredScriptForTheBuiltInProgram() {
         var files = new LinkedHashMap<String, byte[]>();
         new PracticeCatalogInjector(new JsonMapper())
-                .inject(files,
-List.of(RuntimeReviewTestData.assignment(null, null)),
-de.tum.cit.aet.hephaestus.practices.spi.ReviewKind.ITEM);
+                .inject(files, List.of(RuntimeReviewTestData.assignment(null, null)), ReviewKind.ITEM);
         assertThat(files).doesNotContainKey(SandboxLayout.PRACTICE_SCRIPT_PRACTICES_PREFIX + "clear-names.ts");
     }
 }

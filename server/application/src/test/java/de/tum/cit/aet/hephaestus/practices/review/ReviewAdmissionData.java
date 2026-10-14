@@ -146,6 +146,8 @@ public class ReviewAdmissionData {
     }
 
     public ResultCandidate candidate(Pending pending, ResultOutcome outcome) {
+        long versionId = Objects.requireNonNull(
+                pending.scenario().practice().getCurrentVersion().getId());
         var source = new SourceKind("scm.pull-request.diff");
         var digest = ProblemComparison.sha256("changed();");
         var citation = new EvidenceCitation(
@@ -169,7 +171,7 @@ public class ReviewAdmissionData {
                 "Correct the changed branch.");
         return new ResultCandidate(
                 pending.scenario().practice().getId(),
-                pending.scenario().practice().getCurrentVersion().getId(),
+                versionId,
                 pending.scenario().item().getId(),
                 Objects.requireNonNull(pending.review().getItemVersion()),
                 pending.developerId(),

@@ -60,6 +60,7 @@ class DeliveredWorkFeedbackControllerIntegrationTest extends BaseIntegrationTest
                         .build())
                 .exchange()
                 .expectStatus()
-                .isUnauthorized();
+                .isUnauthorized()
+                .expectBody(Void.class);
     }
 }

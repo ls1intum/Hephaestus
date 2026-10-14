@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCancellationRequested;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewItemState;
-import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
@@ -346,9 +345,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (terminal(review.getStatus())) return;
         if (!terminal(completion.status()))
             throw new IllegalArgumentException("Completion requires a terminal status.");
-        if (runtime.runtime(workspaceId, reviewId).stream()
-                .flatMap(r -> r.jobs().stream())
-                .anyMatch(j -> j.status() == ReviewJobStatus.RUNNING || j.status() == ReviewJobStatus.QUEUED))
+        if (hasUnsettledInvocation(workspaceId, reviewId))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "The active invocation must settle before closure.");
         boolean incomplete = (review.getKind() == ReviewKind.SCAN
                         && (review.getInventoryReceipt() == null
@@ -399,15 +396,18 @@ public class ReviewServiceImpl implements ReviewService {
         review.setChecks(checks);
         events.publishEvent(
                 new ReviewCancellationRequested(reviewId, workspaceId, reason == null ? "CANCELLED_BY_ADMIN" : reason));
-        if (runtime.runtime(workspaceId, reviewId).stream()
-                .flatMap(r -> r.jobs().stream())
-                .noneMatch(j -> j.status() == ReviewJobStatus.RUNNING || j.status() == ReviewJobStatus.QUEUED)) {
+        if (!hasUnsettledInvocation(workspaceId, reviewId)) {
             review.setStatus(ReviewStatus.CANCELLED);
             review.setStopReason(ReviewStopReason.CANCELLED);
             review.setCompletedAt(clock.instant());
             if (review.getKind() == ReviewKind.SCAN) reports.freeze(workspaceId, reviewId);
         }
         return true;
+    }
+
+    private boolean hasUnsettledInvocation(long workspaceId, UUID reviewId) {
+        return !runtime.activeJobIds(workspaceId, reviewId).isEmpty()
+                || !runtime.unsettledJobIds(workspaceId, reviewId).isEmpty();
     }
 
     public static boolean terminal(ReviewStatus status) {

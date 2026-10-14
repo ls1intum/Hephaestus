@@ -28,8 +28,9 @@
             // Admin controllers sit behind the workspace admin guard and resolve the workspace via WorkspaceContext.
             "workspace::authorization",
             "workspace::context",
-            // Document authors resolve through auth SPI ports only — never core.auth or SCM domain types.
+            // Document authors resolve through auth SPI ports; consent reads the exported account control enums.
             "core::auth-spi",
+            "core::auth-types",
             // Outline owns outline_document and projects it to the agent one-way, so no cycle forms.
             "mentor::spi",
         })

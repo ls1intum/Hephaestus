@@ -96,7 +96,8 @@ class PracticeReviewSettingsControllerIntegrationTest extends BaseIntegrationTes
                         List.of()))
                 .exchange()
                 .expectStatus()
-                .isOk();
+                .isOk()
+                .expectBody(Void.class);
         get("/practices/review-settings")
                 .expectStatus()
                 .isOk()

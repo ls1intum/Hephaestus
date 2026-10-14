@@ -46,8 +46,6 @@ import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessageRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopy;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -57,6 +55,7 @@ import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyState;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -178,9 +177,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     private ChatMessageRepository chatMessageRepository;
 
     @Autowired
-    private PracticeRepository practiceRepository;
-
-    @Autowired
     private ReviewJobRepository agentJobRepository;
 
     @Autowired
@@ -188,9 +184,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private FeedbackRepository feedbackRepository;
-
-    @Autowired
-    private FeedbackBasisRepository feedbackEvidenceRepository;
 
     @Autowired
     private FeedbackCopyRepository feedbackCopyRepository;
@@ -324,7 +317,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
             INSERT INTO feedback_send(workspace_id,feedback_id,action,state,attempts,next_attempt_at,created_at,updated_at)
             VALUES (?,?,'POST','PENDING',0,CURRENT_TIMESTAMP + INTERVAL '1 day',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
             """, workspace.getId(), feedback.getId());
-        var copyId = UUID.randomUUID();
+        var copyId = FeedbackIds.copy(feedback.getId(), FeedbackCopyKind.SUMMARY, 0);
         jdbc.update(
                 """
                 INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,state,body,write_key,write_marker,write_started_at,external_url,created_at)
@@ -334,7 +327,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 workspace.getId(),
                 feedback.getId(),
                 copyId.toString(),
-                "hephaestus:" + copyId,
+                FeedbackIds.writeMarker(copyId),
                 reviewedWorkUrl);
         return new ExternalInspectionFixture(
                 Objects.requireNonNull(administrator.getId()),
@@ -390,8 +383,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         }
         User target = users.saveAndFlush(TestUserFactory.createUser(42L, "target", scm));
         User other = users.saveAndFlush(TestUserFactory.createUser(84L, "other", scm));
-        link(targetAccount, scm, "42", null, target.getId());
-        link(otherAccount, scm, "84", null, other.getId());
+        link(targetAccount, scm, "42", null);
+        link(otherAccount, scm, "84", null);
         var recorder = new ExactPersonDataCopyRecorder();
         var worker = new EvidenceFolderPersonDataCatalog(
                 new FabricLayout(evidenceRoot.toString()),
@@ -416,8 +409,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                     IntegrationKind.SLACK,
                     team,
                     new ConnectionConfig.SlackConfig(team, null, null, Set.of())));
-            link(targetAccount, slack, "UTARGET", team, null);
-            link(otherAccount, slack, "UOTHER", team, null);
+            link(targetAccount, slack, "UTARGET", team);
+            link(otherAccount, slack, "UOTHER", team);
             membership(workspace, target);
             membership(workspace, other);
             jdbc.update(
@@ -577,15 +570,15 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         for (var derived : targetDerived) {
             assertThat(mentor.refusal(derived.workspaceId(), targetAccount.getId()))
                     .contains(MentorRefusal.PERSON_ERASED);
-            assertThat(mentor.refusal(derived.workspaceId(), other.getId()))
+            assertThat(mentor.refusal(derived.workspaceId(), otherAccount.getId()))
                     .isNotEqualTo(Optional.of(MentorRefusal.PERSON_ERASED));
         }
         for (long threadId : sharedThreads) {
             long workspaceId = Objects.requireNonNull(
                     jdbc.queryForObject("SELECT workspace_id FROM slack_thread WHERE id=?", Long.class, threadId));
-            assertThat(suppression.isSourceSuppressed(workspaceId, "chat.conversation_thread", threadId))
+            assertThat(suppression.isSourceSuppressed(workspaceId, "chat.thread", threadId))
                     .isTrue();
-            assertThat(suppression.isSourceSuppressed(-1L, "chat.conversation_thread", threadId))
+            assertThat(suppression.isSourceSuppressed(-1L, "chat.thread", threadId))
                     .isFalse();
         }
         try (var executor = Executors.newSingleThreadExecutor()) {
@@ -664,7 +657,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                             "SELECT message_count FROM slack_thread WHERE id=?", Integer.class, threadId))
                     .isEqualTo(1);
             assertThat(jdbc.queryForObject(
-                            "SELECT cardinality(participant_member_ids) FROM slack_thread" + " WHERE id=?",
+                            "SELECT cardinality(participant_account_ids) FROM slack_thread" + " WHERE id=?",
                             Integer.class,
                             threadId))
                     .isEqualTo(1);
@@ -932,8 +925,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         assertThat(personData.get(requestId).request().getState()).isEqualTo(PersonDataRequest.State.COMPLETE);
     }
 
-    private void link(
-            Account account, IdentityProvider provider, String subject, @Nullable String team, @Nullable Long actor) {
+    private void link(Account account, IdentityProvider provider, String subject, @Nullable String team) {
         Identity link = new Identity();
         link.setAccount(account);
         link.setProviderId(Objects.requireNonNull(provider.getId()));
@@ -949,14 +941,13 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 null);
         if (existing.isPresent()) return existing.get().getAccount();
         var account = accounts.saveAndFlush(new Account(user.getLogin()));
-        link(account, user.getProvider(), user.getNativeId().toString(), null, null);
+        link(account, user.getProvider(), user.getNativeId().toString(), null);
         return account;
     }
 
     private void membership(Workspace workspace, User user) {
         Membership membership = new Membership();
         membership.setWorkspace(workspace);
-        membership.setAccount(accountFor(user));
         membership.setId(new Membership.Id(workspace.getId(), accountFor(user).getId()));
         memberships.saveAndFlush(membership);
     }
@@ -988,7 +979,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         message.setSlackThreadTs(root);
         message.setSlackTs(timestamp);
         message.setAuthorSlackUserId(nativeUser);
-        message.setAuthorMemberId(member.getId());
+        message.setAuthorAccountId(accountFor(member).getId());
         message.setText(text);
         slackMessages.saveAndFlush(message);
     }
@@ -1023,15 +1014,16 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         reply.setStatus(ChatMessage.Status.completed);
         reply.setParts(mapper.valueToTree(List.of(Map.of("type", "text", "text", "Other reply to erased feedback"))));
         chatMessageRepository.saveAndFlush(reply);
-        UUID copyId = UUID.randomUUID();
+        UUID copyId = FeedbackIds.copy(target.deliveredId(), FeedbackCopyKind.CHAT_TURN, 0);
         feedbackCopyRepository.saveAndFlush(FeedbackCopy.builder()
                 .id(copyId)
                 .writeKey(copyId.toString())
-                .writeMarker("hephaestus:" + copyId)
+                .writeMarker(FeedbackIds.writeMarker(copyId))
                 .workspaceId(target.workspaceId())
                 .feedbackId(target.deliveredId())
                 .kind(FeedbackCopyKind.CHAT_TURN)
                 .state(FeedbackCopyState.POSTED)
+                .writeStartedAt(Instant.now())
                 .postedAt(Instant.now())
                 .chatMessageId(copied.getId())
                 .createdAt(Instant.now())
@@ -1145,15 +1137,16 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 FeedbackDestination.CONVERSATION,
                 FeedbackState.DELIVERED,
                 "Practice guidance for developer " + owner.getId());
-        UUID copyId = UUID.randomUUID();
+        UUID copyId = FeedbackIds.copy(delivered.getId(), FeedbackCopyKind.CHAT_TURN, 0);
         feedbackCopyRepository.save(FeedbackCopy.builder()
                 .id(copyId)
                 .writeKey(copyId.toString())
-                .writeMarker("hephaestus:" + copyId)
+                .writeMarker(FeedbackIds.writeMarker(copyId))
                 .workspaceId(workspace.getId())
                 .feedbackId(delivered.getId())
                 .kind(FeedbackCopyKind.CHAT_TURN)
                 .state(FeedbackCopyState.POSTED)
+                .writeStartedAt(Instant.now())
                 .chatMessageId(message.getId())
                 .postedAt(Instant.now())
                 .createdAt(Instant.now())

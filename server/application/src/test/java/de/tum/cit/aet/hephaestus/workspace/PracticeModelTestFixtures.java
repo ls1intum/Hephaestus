@@ -3,11 +3,13 @@ package de.tum.cit.aet.hephaestus.workspace;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobInput;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
 import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeGuidance;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
@@ -26,6 +28,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FrozenModel;
 import de.tum.cit.aet.hephaestus.practices.spi.HostCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -45,6 +48,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,33 +64,44 @@ public class PracticeModelTestFixtures {
     private final ObjectMapper mapper;
 
     @PersistenceContext
-    private EntityManager entities;
+    private @Nullable EntityManager entities;
 
     public record Work(Practice practice, Item item, Review review, ReviewJob job) {}
 
     @Transactional
     public Work work(Workspace workspace, String slug, String kind, long sourceId) {
+        var manager = Objects.requireNonNull(entities);
         var itemKind = new ItemKind(kind);
+        String source =
+                switch (kind) {
+                    case "scm.pull_request", "scm.pull_request_review" -> "scm.pull-request.core";
+                    case "scm.issue" -> "scm.issue.core";
+                    case "scm.file", "scm.repository" -> "scm.repository.tree";
+                    case "chat.thread" -> "slack.conversation.thread";
+                    case "docs.document" -> "docs.document.core";
+                    default -> throw new IllegalArgumentException("No source fixture for " + kind);
+                };
         var definition = new PracticeDefinition(
                 slug,
                 new ReviewOn(List.of(), Map.of()),
                 null,
-                AboutRole.AUTHOR,
-                new PracticeReads("source-use/2.0.0", List.of()),
+                kind.equals("scm.file") || kind.equals("scm.repository") ? null : AboutRole.AUTHOR,
+                new PracticeReads(
+                        "source-use/2.0.0", List.of(new PracticeReadSource(new SourceKind(source), ReadNeed.REQUIRED))),
                 new ReviewedBy(ReviewedByKind.HEPHAESTUS, null, List.of()),
                 "Check the retained fixture work.",
                 null,
                 null,
                 false,
                 new PracticeGuidance(null, null, null, null, null));
-        var practice = versions.create(workspace, slug, itemKind, definition, null);
+        var practice = versions.create(workspace, slug, itemKind, definition, null, 0, null);
         var item = new Item();
         item.setWorkspaceId(workspace.getId());
         item.setKind(itemKind);
         item.setSourceId(sourceId);
         item.setCreatedAt(Instant.now());
-        entities.persist(item);
-        entities.flush();
+        manager.persist(item);
+        manager.flush();
         var now = Instant.now();
         var review = Review.builder()
                 .id(UUID.randomUUID())
@@ -98,12 +113,17 @@ public class PracticeModelTestFixtures {
                 .orderedAt(now)
                 .createdAt(now)
                 .build();
-        entities.persist(review);
-        var models = List.of(new BoundModelSlot(
-                "review", ModelKind.CHAT, new FrozenModel("fixture", "OPENAI", "fixture", null, Map.of())));
+        manager.persist(review);
+        var models = List.of(
+                new BoundModelSlot("chat", ModelKind.CHAT, null),
+                new BoundModelSlot("decision", ModelKind.DECISION, null),
+                new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
+                new BoundModelSlot("reranking", ModelKind.RERANKING, null),
+                new BoundModelSlot(
+                        "review", ModelKind.CHAT, new FrozenModel("fixture", "OPENAI", "fixture", null, Map.of())));
         String digest = Objects.requireNonNull(jdbc.queryForObject(
                 "SELECT review_model_digest(CAST(? AS jsonb))", String.class, mapper.writeValueAsString(models)));
-        entities.persist(ReviewPractice.builder()
+        manager.persist(ReviewPractice.builder()
                 .workspaceId(workspace.getId())
                 .reviewId(review.getId())
                 .practiceId(practice.getId())
@@ -122,24 +142,26 @@ public class PracticeModelTestFixtures {
         job.setConfigSnapshot(mapper.valueToTree(Map.of("model", "fixture")));
         job.setAvailableAt(now);
         job.setTraceId(job.getId().toString().replace("-", ""));
-        entities.persist(job);
-        entities.flush();
+        manager.persist(job);
+        manager.flush();
         return new Work(practice, item, review, job);
     }
 
     @Transactional(readOnly = true)
     public Work forJob(ReviewJob job) {
+        var manager = Objects.requireNonNull(entities);
         var input = Objects.requireNonNull(job.getInput());
         var assignment = input.assignments().getFirst();
         return new Work(
-                Objects.requireNonNull(entities.find(Practice.class, assignment.practiceId())),
-                Objects.requireNonNull(entities.find(Item.class, assignment.itemId())),
-                Objects.requireNonNull(entities.find(Review.class, assignment.reviewId())),
+                Objects.requireNonNull(manager.find(Practice.class, assignment.practiceId())),
+                Objects.requireNonNull(manager.find(Item.class, assignment.itemId())),
+                Objects.requireNonNull(manager.find(Review.class, assignment.reviewId())),
                 job);
     }
 
     @Transactional
     public Work forkReview(Work work) {
+        var manager = Objects.requireNonNull(entities);
         var now = Instant.now();
         var review = Review.builder()
                 .id(UUID.randomUUID())
@@ -151,11 +173,11 @@ public class PracticeModelTestFixtures {
                 .orderedAt(now)
                 .createdAt(now)
                 .build();
-        entities.persist(review);
-        var original = Objects.requireNonNull(entities.find(
+        manager.persist(review);
+        var original = Objects.requireNonNull(manager.find(
                 ReviewPractice.class,
                 new ReviewPractice.Id(work.review().getId(), work.practice().getId())));
-        entities.persist(ReviewPractice.builder()
+        manager.persist(ReviewPractice.builder()
                 .workspaceId(review.getWorkspaceId())
                 .reviewId(review.getId())
                 .practiceId(work.practice().getId())
@@ -176,14 +198,15 @@ public class PracticeModelTestFixtures {
         job.setConfigSnapshot(work.job().getConfigSnapshot());
         job.setAvailableAt(now);
         job.setTraceId(job.getId().toString().replace("-", ""));
-        entities.persist(job);
-        entities.flush();
+        manager.persist(job);
+        manager.flush();
         return new Work(work.practice(), work.item(), review, job);
     }
 
     @Transactional
     public Result result(Work work, long developerId, String summary) {
-        long existing = entities.createQuery(
+        var manager = Objects.requireNonNull(entities);
+        long existing = manager.createQuery(
                         "SELECT count(r) FROM Result r WHERE r.reviewId=:review AND"
                                 + " r.practiceId=:practice AND r.itemId=:item AND"
                                 + " r.developerId=:developer",
@@ -200,7 +223,7 @@ public class PracticeModelTestFixtures {
                 work.review().getWorkspaceId(),
                 developerId);
         var at = Instant.now();
-        entities.createQuery("UPDATE Result r SET r.endedAt=:at, r.endReason=:reason WHERE"
+        manager.createQuery("UPDATE Result r SET r.endedAt=:at, r.endReason=:reason WHERE"
                         + " r.workspaceId=:workspace AND r.practiceId=:practice AND"
                         + " r.itemId=:item AND r.developerId=:developer AND r.endedAt IS NULL")
                 .setParameter("at", at)
@@ -225,8 +248,8 @@ public class PracticeModelTestFixtures {
                 .evidence(mapper.valueToTree(new ResultEvidence(List.of(), null, null, List.of())))
                 .recordedAt(Instant.now())
                 .build();
-        entities.persist(result);
-        entities.merge(ReviewItem.builder()
+        manager.persist(result);
+        manager.merge(ReviewItem.builder()
                 .workspaceId(result.getWorkspaceId())
                 .reviewId(result.getReviewId())
                 .practiceId(result.getPracticeId())
@@ -237,19 +260,19 @@ public class PracticeModelTestFixtures {
                 .jobId(work.job().getId())
                 .attemptedAt(Instant.now())
                 .build());
-        var assignment = Objects.requireNonNull(entities.find(
+        var assignment = Objects.requireNonNull(manager.find(
                 ReviewPractice.class,
                 new ReviewPractice.Id(work.review().getId(), work.practice().getId())));
         assignment.setStatus(ReviewPracticeStatus.DONE);
         work.job().setStatus(ReviewJobStatus.COMPLETED);
         work.job().setProcessingStatus(ProcessingStatus.DONE);
         work.job().setCompletedAt(Instant.now());
-        entities.merge(work.job());
+        manager.merge(work.job());
         work.review().setStatus(ReviewStatus.COMPLETE);
         work.review().setAdmittedAt(result.getRecordedAt());
         work.review().setCompletedAt(Instant.now());
-        entities.merge(work.review());
-        entities.flush();
+        manager.merge(work.review());
+        manager.flush();
         return result;
     }
 
@@ -261,6 +284,7 @@ public class PracticeModelTestFixtures {
     @Transactional
     public Feedback feedback(
             Result result, FeedbackDestination destination, FeedbackState state, String body, Instant now) {
+        var manager = Objects.requireNonNull(entities);
         var feedback = Feedback.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(result.getWorkspaceId())
@@ -273,8 +297,8 @@ public class PracticeModelTestFixtures {
                 .createdAt(now)
                 .deliveredAt(state == FeedbackState.DELIVERED ? now : null)
                 .build();
-        entities.persist(feedback);
-        entities.persist(FeedbackBasis.builder()
+        manager.persist(feedback);
+        manager.persist(FeedbackBasis.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(result.getWorkspaceId())
                 .feedbackId(feedback.getId())
@@ -282,7 +306,7 @@ public class PracticeModelTestFixtures {
                 .developerId(Objects.requireNonNull(result.getDeveloperId()))
                 .ordinal(0)
                 .build());
-        entities.flush();
+        manager.flush();
         return feedback;
     }
 }

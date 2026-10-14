@@ -152,7 +152,7 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldRejectLegacyOpaqueJobToken() throws Exception {
         // Only scoped per-attempt worker JWTs authorize the proxy.
-        ReviewJob job = runningJob(true);
+        runningJob(true);
 
         AuthenticationResult result = authenticate("retired-opaque-token");
 
@@ -609,11 +609,12 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private LlmProxyService proxyService(long maxTokensPerAttempt, long maxSearchUnitsPerAttempt, WebClient client) {
         ProxyRequestPolicy policy = mock(ProxyRequestPolicy.class);
         when(policy.allows(any())).thenReturn(true);
-        return new LlmProxyService(Tracer.NOOP,
-client,
-modelResolver,
-objectMapper,
-new ProxyAccounting(
+        return new LlmProxyService(
+                Tracer.NOOP,
+                client,
+                modelResolver,
+                objectMapper,
+                new ProxyAccounting(
                         new ProxyBudgetGate(
                                 mock(LlmBudgetService.class),
                                 new PracticeReviewProperties(
@@ -622,8 +623,8 @@ new ProxyAccounting(
                         mock(MentorTurnUsageAccumulator.class),
                         meterRegistry,
                         objectMapper),
-policy,
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.class));
+                policy,
+                mock(ScanCallGuard.class));
     }
 
     private ProxyUsageAccumulator accumulator() {
@@ -738,7 +739,7 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.cla
                 .withPracticeScript(slots);
 
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-1");
@@ -813,7 +814,7 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.cla
         snapshot.put("allowInternet", false);
 
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-1");

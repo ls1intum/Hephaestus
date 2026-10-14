@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.ArgumentMatchers;
@@ -62,7 +63,11 @@ class ReviewBatchSubmitterTest extends BaseUnitTest {
     }
 
     void assertRequest(
-            String kind, ReviewBatchOrigin origin, ReviewKind reviewKind, ReviewOrigin expected, BigDecimal reserved) {
+            String kind,
+            ReviewBatchOrigin origin,
+            ReviewKind reviewKind,
+            ReviewOrigin expected,
+            @Nullable BigDecimal reserved) {
         var batch = batch();
         batch.setOrigin(origin);
         batch.setBudgetUsd(reserved);

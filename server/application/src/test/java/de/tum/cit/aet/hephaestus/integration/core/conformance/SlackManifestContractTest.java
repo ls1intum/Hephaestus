@@ -1,11 +1,12 @@
 package de.tum.cit.aet.hephaestus.integration.core.conformance;
 
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemDescriptor;
 import de.tum.cit.aet.hephaestus.integration.slack.manifest.SlackManifest;
 import java.util.List;
 
-/** Slack through the shared acceptance suite; it contributes nothing and says so. */
+/** Slack through the shared acceptance suite; it declares its observed thread kind. */
 class SlackManifestContractTest extends IntegrationManifestContractTest {
 
     @Override
@@ -15,6 +16,6 @@ class SlackManifestContractTest extends IntegrationManifestContractTest {
 
     @Override
     protected List<ItemDescriptor> descriptors() {
-        return List.of();
+        return List.of(new ThreadItemDescriptor());
     }
 }

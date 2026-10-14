@@ -211,8 +211,7 @@ public class IssueContentSource {
      */
     public static ObjectNode workRecord(
             Issue issue, ScmCapturedWork metadata, IssueRepository.@Nullable ChildRollup children) {
-        String repoFullName =
-                issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
+        String repoFullName = metadata.repositoryPath();
         ObjectNode meta = JsonNodeFactory.instance.objectNode();
         meta.put("issue_number", issue.getNumber());
         meta.put("title", issue.getTitle());
@@ -225,7 +224,9 @@ public class IssueContentSource {
         meta.put("repository_full_name", repoFullName);
         // Keep the admitted repository identity; a moved mirror cannot supply its provider.
         meta.put("repository_id", metadata.repositoryId());
-        meta.put("provider_id", issue.getProvider().getId());
+        var repository = issue.getRepository();
+        if (repository != null && Objects.equals(repository.getId(), metadata.repositoryId()))
+            meta.put("provider_id", repository.getProvider().getId());
         meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
         meta.put("author_id", issue.getAuthor() != null ? issue.getAuthor().getNativeId() : null);
         meta.put(

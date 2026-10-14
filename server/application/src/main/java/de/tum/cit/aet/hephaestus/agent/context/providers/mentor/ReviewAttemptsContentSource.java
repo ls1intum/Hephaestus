@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSourceAccess;
 import java.time.Instant;
@@ -23,6 +24,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Retained executions about this developer, including failed captures; execution is separate from results. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ReviewAttemptsContentSource implements ContentSource {
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "review_attempts.json";

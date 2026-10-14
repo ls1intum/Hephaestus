@@ -424,7 +424,7 @@ class SyncControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @DisplayName("a workspace MEMBER is forbidden from every sync endpoint")
     void nonAdminMember_forbiddenEverywhere() {
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
 
         statusRequest().expectStatus().isForbidden().expectBody(Void.class);
         webTestClient

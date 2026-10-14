@@ -43,6 +43,9 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.springframework.graphql.ResponseError;
 import org.springframework.graphql.client.ClientGraphQlResponse;
@@ -92,7 +95,7 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
             assertThat(receipt.acknowledged()).isTrue();
             assertThat(receipt.actualKind()).isEqualTo(CopyForm.FILE_NOTE);
         });
-        var posted = org.mockito.ArgumentCaptor.forClass(SummaryContent.class);
+        var posted = ArgumentCaptor.forClass(SummaryContent.class);
         verify(summaries).postSummary(any(), posted.capture());
         assertThat(posted.getValue().externalBody())
                 .contains("/blob/" + COMMIT + "/src/a%20file.ts", MARKER, "hephaestus-diff-note-ck=file-copy")
@@ -300,6 +303,31 @@ class GitHubLineNoteWriterTest extends BaseUnitTest {
         verify(prNodeIdResolver, never()).resolve(any(Long.class), any(), any(), any(Integer.class));
         verify(client, never()).documentName("AddPullRequestReviewWithThreads");
         verify(client, never()).documentName("MinimizeComment");
+    }
+
+    @ParameterizedTest
+    @EnumSource(CitationSide.class)
+    void shouldVerifyBothRangeSidesBeforeAcknowledgingAnExistingCopy(CitationSide side) {
+        when(gitHubProvider.forScope(1L)).thenReturn(client);
+        var kept =
+                ScmFeedbackFixtures.line(new FeedbackAnchor("src/Foo.java", 9, 10, side), "fix", MARKER, "range-copy");
+        var comment = authored(kept);
+        comment.put("originalStartLine", 9);
+        comment.put("startDiffSide", side == CitationSide.OLD ? "LEFT" : "RIGHT");
+        stubReviewThreads(List.of(thread("THREAD_range", "RC_range", comment)));
+
+        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
+                .singleElement()
+                .satisfies(copy -> assertThat(copy.externalRef()).isEqualTo("RC_range"));
+
+        comment.put("startDiffSide", side == CitationSide.OLD ? "RIGHT" : "LEFT");
+        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
+                .isEmpty();
+        comment.remove("startDiffSide");
+        assertThat(channel.findPosted(githubTarget(), List.of(kept), CopyReadback.AUTHORED))
+                .isEmpty();
+        assertThat(fence.attempts).isEmpty();
+        verify(client, never()).documentName("AddPullRequestReviewWithThreads");
     }
 
     @Test

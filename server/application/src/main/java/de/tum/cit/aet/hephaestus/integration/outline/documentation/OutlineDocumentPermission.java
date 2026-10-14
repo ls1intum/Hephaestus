@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
+import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.auth.spi.GitProviderRegistry;
@@ -16,7 +17,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,7 +25,6 @@ import org.springframework.web.server.ResponseStatusException;
 /** Current permission uses the actual document connection and every native source contributor. */
 @Component
 @ConditionalOnCaptureRole
-@ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true")
 @Transactional(readOnly = true)
 public class OutlineDocumentPermission {
     private final OutlineDocumentRepository documents;
@@ -36,9 +35,14 @@ public class OutlineDocumentPermission {
     private final PersonProcessingSuppression suppression;
     private final OutlineOriginPolicy origins;
 
-    public OutlineDocumentPermission(OutlineDocumentRepository documents, ConnectionService connections,
-            GitProviderRegistry providers, PersonIdentityResolver identities, AccountDirectory accounts,
-            PersonProcessingSuppression suppression, OutlineOriginPolicy origins) {
+    public OutlineDocumentPermission(
+            OutlineDocumentRepository documents,
+            ConnectionService connections,
+            GitProviderRegistry providers,
+            PersonIdentityResolver identities,
+            AccountDirectory accounts,
+            PersonProcessingSuppression suppression,
+            OutlineOriginPolicy origins) {
         this.documents = documents;
         this.connections = connections;
         this.providers = providers;
@@ -54,7 +58,8 @@ public class OutlineDocumentPermission {
         var connection = source.get().connection();
         if (connection.getState() != IntegrationState.ACTIVE
                 || !(connection.getConfig() instanceof ConnectionConfig.OutlineConfig config)
-                || config.serverUrl() == null || !origins.allows(config.serverUrl())) return false;
+                || config.serverUrl() == null
+                || !origins.allows(config.serverUrl())) return false;
         for (var identity : source.get().people()) {
             if (suppression.isSuppressed(identity.providerId(), identity.subject(), identity.teamId())) return false;
             final Optional<Long> account;
@@ -67,7 +72,10 @@ public class OutlineDocumentPermission {
             if (account.isPresent()) {
                 if (suppression.isAccountSuppressed(account.get())) return false;
                 var profile = accounts.find(account.get());
-                if (profile.isEmpty() || profile.get().aiChoice() == AiChoice.NO_AI) return false;
+                if (profile.isEmpty()
+                        || profile.get().aiChoice() == AiChoice.NO_AI
+                        || (profile.get().status() != Account.Status.ACTIVE
+                                && profile.get().status() != Account.Status.UNCLAIMED)) return false;
             }
         }
         return true;
@@ -87,20 +95,26 @@ public class OutlineDocumentPermission {
     }
 
     private Optional<Context> context(long workspaceId, long documentId) {
-        return documents.findAccess(workspaceId, documentId)
+        return documents
+                .findAccess(workspaceId, documentId)
                 .filter(access -> access.workspaceId() == workspaceId && access.id() == documentId)
-                .flatMap(access -> connections.findInWorkspace(workspaceId, access.connectionId())
+                .flatMap(access -> connections
+                        .findInWorkspace(workspaceId, access.connectionId())
                         .filter(connection -> connection.getKind() == IntegrationKind.OUTLINE)
                         .flatMap(connection -> {
                             if (!(connection.getConfig() instanceof ConnectionConfig.OutlineConfig config)
-                                    || config.serverUrl() == null || config.serverUrl().isBlank())
-                                throw new IllegalStateException("An Outline source requires its exact provider namespace");
-                            return providers.findProviderId("OUTLINE", config.serverUrl())
-                                    .map(providerId -> new Context(access, connection, access.subjects().stream()
-                                            .map(subject -> new PersonIdentity(providerId, subject, connection.getInstanceKey()))
-                                            .toList()));
+                                    || config.serverUrl() == null
+                                    || config.serverUrl().isBlank()) return Optional.empty();
+                            return providers
+                                    .findProviderId("OUTLINE", config.serverUrl())
+                                    .map(providerId -> new Context(
+                                            connection,
+                                            access.subjects().stream()
+                                                    .map(subject -> new PersonIdentity(
+                                                            providerId, subject, connection.getInstanceKey()))
+                                                    .toList()));
                         }));
     }
 
-    private record Context(OutlineDocumentAccess access, Connection connection, List<PersonIdentity> people) {}
+    private record Context(Connection connection, List<PersonIdentity> people) {}
 }

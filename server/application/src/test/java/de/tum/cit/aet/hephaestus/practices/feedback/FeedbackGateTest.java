@@ -167,6 +167,7 @@ class FeedbackGateTest {
         when(row.getId()).thenReturn(3L);
         when(row.getKind()).thenReturn("scm.pull_request");
         when(row.getSourceId()).thenReturn(42L);
+        when(row.getParentId()).thenReturn(null);
         when(basis.findItems(1, List.of(3L))).thenReturn(List.of(row));
         var source = mock(ItemSource.class);
         var item = new ItemRef(1, 3, new ItemKind("scm.pull_request"), 42L, null, null);

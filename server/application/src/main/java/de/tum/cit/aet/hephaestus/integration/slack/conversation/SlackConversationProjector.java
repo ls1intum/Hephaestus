@@ -100,7 +100,7 @@ public class SlackConversationProjector implements ConversationThreadProjection 
      * wraps it under the content-source output key.
      *
      * @param workspaceId     the workspace to scope every query to (explicit predicate)
-     * @param audienceAccountId the mentor-chat requester's SCM user id — the participant-firewall audience
+     * @param audienceAccountId the requesting developer's account id for the participant consent check
      */
     @Override
     public ObjectNode buildPayload(long workspaceId, long audienceAccountId) {

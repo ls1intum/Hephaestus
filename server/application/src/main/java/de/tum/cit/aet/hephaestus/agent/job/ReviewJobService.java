@@ -15,6 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueue;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
@@ -32,6 +33,7 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class ReviewJobService implements ReviewQueue {
     private final ReviewJobRepository jobs;
+    private final ReviewWriteGuard writeGuard;
     private final ReviewJobAssignments assignments;
     private final ReviewAssignmentStore assignmentStore;
     private final ReviewMemberAiPolicy policy;
@@ -44,6 +46,7 @@ public class ReviewJobService implements ReviewQueue {
     @Transactional
     public UUID enqueue(ReviewSnapshot review, long itemId, List<ReviewAssignmentId> selected) {
         if (selected.isEmpty()) throw new IllegalArgumentException("A review job needs assigned practices");
+        writeGuard.lock(review.workspaceId(), review.id());
         var active = jobs.findByReviewIdAndWorkspaceIdAndStatusIn(
                 review.id(), review.workspaceId(), Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING));
         if (active.isPresent()) {

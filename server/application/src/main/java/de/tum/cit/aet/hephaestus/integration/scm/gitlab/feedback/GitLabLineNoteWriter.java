@@ -61,9 +61,9 @@ import org.springframework.stereotype.Component;
  * <p>Each comment carries the package marker and a hidden correlation tag with its delivery key,
  * and links to the reviewed commit, never to a newer head. Before any create, the merge request's
  * discussions are read completely and the copies of the package are indexed by key; an item with a
- * copy is never posted again, and no copy is ever edited or deleted. Diff notes and fallback
- * comments this channel posted earlier stay readable as copies. Each create is fenced on its own,
- * so a stop between two comments leaves the second provably unrequested.
+ * copy is never posted again. Explicit correction edits the existing authorized copy and preserves
+ * its physical marker. Existing diff notes and ordinary comments stay readable as copies. Each
+ * create is fenced on its own, so a stop between two comments leaves the second provably unrequested.
  *
  * <p>Every readback mode renders the same body: GitLab copies always carried the package marker.
  *

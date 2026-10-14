@@ -156,7 +156,7 @@ class WorkerRegistryOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
     private UUID runningJob(String workerId, Instant startedAt) {
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(objectMapper.createObjectNode());

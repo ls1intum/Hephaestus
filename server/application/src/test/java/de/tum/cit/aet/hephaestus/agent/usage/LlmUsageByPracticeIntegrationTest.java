@@ -16,7 +16,6 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -92,9 +91,6 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private LlmUsageEventRepository usageRepository;
-
-    @Autowired
-    private PracticeRepository practiceRepository;
 
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -349,7 +345,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         LlmUsageEventRepository.ReviewCostAggregate mean = usageRepository.aggregateCostPerReview(
                 workspace.getId(),
-                "PRACTICE_REVIEW".name(),
+                "PRACTICE_REVIEW",
                 MONTH.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant(),
                 MONTH.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant());
 
@@ -545,7 +541,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     private ReviewJob runningJob(Workspace workspace) {
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker-1");

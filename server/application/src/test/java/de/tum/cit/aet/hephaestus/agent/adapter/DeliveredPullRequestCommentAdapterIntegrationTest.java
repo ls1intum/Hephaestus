@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -28,7 +27,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.feedback.DeliveredPullRequestCo
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackCopyRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSendRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -42,8 +40,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.support.TransactionTemplate;
-import tools.jackson.databind.ObjectMapper;
 
 /** The comments on one pull request that a workspace's own delivery records name, matched against the mirror. */
 class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -77,27 +73,14 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
     private PullRequestReviewCommentRepository inlineComments;
 
     @Autowired
-    private ReviewJobRepository jobs;
-
-    @Autowired
     private FeedbackRepository feedback;
 
     @Autowired
     private FeedbackCopyRepository placements;
 
-    @Autowired
-    private FeedbackSendRepository dispatches;
-
-    @Autowired
-    private ObjectMapper mapper;
-
-    @Autowired
-    private TransactionTemplate transactions;
-
     private Workspace workspace;
     private Workspace elsewhere;
     private User owner;
-    private int position;
 
     @BeforeEach
     void setUp() {
@@ -105,7 +88,6 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         owner = persistUser("provenance-owner");
         workspace = createWorkspace("provenance", "Provenance", "provenance", AccountType.ORG, owner);
         elsewhere = createWorkspace("provenance-other", "Other", "provenance-other", AccountType.ORG, owner);
-        position = 0;
         recipientAccountId = Objects.requireNonNull(accounts.saveAndFlush(new Account("Retained feedback recipient"))
                 .getId());
     }
@@ -253,6 +235,6 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
     }
 
     private void placement(Feedback parent, FeedbackCopyKind type, @Nullable String ref, @Nullable String url) {
-        placements.saveAndFlush(RetainedFeedbackTestData.posted(parent, type, ref, url));
+        placements.saveAndFlush(RetainedFeedbackTestData.posted(parent, type, 0, ref, url));
     }
 }

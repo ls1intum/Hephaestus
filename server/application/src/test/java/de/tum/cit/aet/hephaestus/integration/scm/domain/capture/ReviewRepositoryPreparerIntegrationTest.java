@@ -19,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
-import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmReviewRangeSource;
 import de.tum.cit.aet.hephaestus.integration.scm.spi.ScmTokenSource;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -28,9 +27,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.PlatformTransactionManager;
 import tools.jackson.databind.json.JsonMapper;
 
 class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
@@ -43,17 +41,9 @@ class ReviewRepositoryPreparerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private IdentityProviderRepository providers;
 
-    @Autowired
-    private PlatformTransactionManager transactions;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
     private static final String HEAD = "a".repeat(40);
-    private static final String BASE = "b".repeat(40);
     private PullRequest pullRequest;
     private ScmCaptureContext context;
-    private ScmReviewRangeSource rangeSource;
     private ReviewRepositoryPreparer preparer;
 
     @BeforeEach

@@ -16,6 +16,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
@@ -255,31 +256,50 @@ class GitLabLineNoteWriterTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRequestNothingForAnOldSideAnchorTheReviewedHeadCannotAddress() {
+    void shouldLinkOldSideNotesToTheirCapturedBase() {
         stubResolvedMr();
         stubDiscussions(List.of(), BOT);
+        var spec = createSpec();
+        var bodies = ArgumentCaptor.forClass(String.class);
+        when(spec.variable(eq("body"), bodies.capture())).thenReturn(spec);
+        var firstResponse = createResponse(created("gid://gitlab/Note/OLD_1"), List.of());
+        var secondResponse = createResponse(created("gid://gitlab/Note/OLD_2"), List.of());
+        when(spec.execute()).thenReturn(Mono.just(firstResponse)).thenReturn(Mono.just(secondResponse));
         List<LineNote> oldSide = List.of(
                 ScmFeedbackFixtures.line(
-                        new FeedbackAnchor("src/Foo.java", null, 10, DiffSide.LEFT), "fix", MARKER, "observation:a:0"),
+                        new FeedbackAnchor("src/Foo.java", null, 10, CitationSide.OLD),
+                        "fix",
+                        MARKER,
+                        "observation:a:0"),
                 ScmFeedbackFixtures.line(
-                        new FeedbackAnchor("src/Foo.java", 11, 12, DiffSide.BOTH), "fix", MARKER, "observation:b:0"));
+                        new FeedbackAnchor("src/Foo.java", 11, 12, CitationSide.OLD),
+                        "fix",
+                        MARKER,
+                        "observation:b:0"));
 
         CopyWriteResult result = channel.postImmutablePackage(target(), oldSide, CopyReadback.AUTHORED, fence);
 
         assertThat(result.receipts()).hasSize(2).allSatisfy(signal -> {
-            assertThat(signal.acknowledged()).isFalse();
-            assertThat(signal.writeMayHaveStarted()).isFalse();
+            assertThat(signal.acknowledged()).isTrue();
+            assertThat(signal.writeMayHaveStarted()).isTrue();
         });
-        assertThat(fence.attempts).isEmpty();
-        verify(client, never()).documentName("CreateMergeRequestNote");
+        assertThat(bodies.getAllValues())
+                .hasSize(2)
+                .allSatisfy(body -> assertThat(body)
+                        .contains("/-/blob/" + "a".repeat(40) + "/src/Foo.java")
+                        .doesNotContain("/-/blob/" + REVIEWED));
+        assertThat(fence.attempts).hasSize(2);
+        verify(spec, times(2)).execute();
     }
 
     @Test
     void shouldRequestNothingWithoutAReviewedCommitToLinkTo() {
         CopyWriteResult unpinned = postAt(null);
-        CopyWriteResult branchName = postAt("main");
+        assertThatThrownBy(() -> postAt("main"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Invalid Git object id");
 
-        assertThat(List.of(unpinned, branchName))
+        assertThat(List.of(unpinned))
                 .allSatisfy(result -> assertThat(result.receipts())
                         .singleElement()
                         .satisfies(signal ->

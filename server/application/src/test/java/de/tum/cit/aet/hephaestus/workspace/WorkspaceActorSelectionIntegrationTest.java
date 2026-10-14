@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
-import static de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome.NOT_MET;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
@@ -19,14 +17,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.AbstractPracticeReviewIntegrationTest;
-import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.PracticePageFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
-import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
-import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -41,12 +33,15 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * reads the workspace as its actor on the connected instance, and keeps what it started through
  * either actor.
  */
-class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewIntegrationTest {
+class WorkspaceActorSelectionIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
-    private PracticeModelTestFixtures modelFixtures;
+    private WorkspaceActorSelector actors;
 
     @Autowired
     private IdentityRepository identities;
+
+    @Autowired
+    private WebTestClient webTestClient;
 
     @Autowired
     private ConnectionRepository connections;
@@ -69,30 +64,23 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
         Workspace workspace = createWorkspace("actor-github", "GitHub", "acme", AccountType.ORG, gitlabActor);
         ensureMembership(workspace, githubActor, Membership.WorkspaceRole.MEMBER);
         connect(workspace, IntegrationKind.GITHUB, new ConnectionConfig.GitHubPatConfig("acme", null, Set.of()));
-        Practice practice = persistPractice(workspace, null, "github-practice", "GitHub practice", null);
-        ReviewJob run = persistPullRequestReview(workspace, 1, NOW.minus(Duration.ofDays(1)));
-        observe(practice, run, 1L, githubActor, NOT_MET, Severity.MAJOR, NOW.minus(Duration.ofDays(1)));
+        assertThat(actors.select(
+                        workspace.getId(),
+                        List.of(
+                                Objects.requireNonNull(gitlabActor.getId()),
+                                Objects.requireNonNull(githubActor.getId()))))
+                .contains(githubActor.getId());
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-github/members/me")
-                .jsonPath("$.userId")
-                .isEqualTo(githubActor.getId())
+                .jsonPath("$.accountId")
+                .isEqualTo(Objects.requireNonNull(account.getId()).toString())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
-        read(token, "/workspaces/actor-github/practices/standings")
-                .jsonPath("$[0].slug")
-                .isEqualTo("github-practice")
-                // One problem on one piece of work: a verdict read for this actor, one setback.
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED");
-        read(token, "/workspaces/actor-github/practice-profile/overview")
-                .jsonPath("$.latestRun.reviewId")
-                .isEqualTo(run.getId().toString());
-
         // Slack and Outline attribute through the same account view.
         assertThat(memberships.membershipsForAccount(Objects.requireNonNull(account.getId())))
-                .extracting(MembershipView::memberId)
-                .containsExactly(githubActor.getId());
+                .extracting(MembershipView::accountId)
+                .containsExactly(account.getId());
     }
 
     @Test
@@ -167,37 +155,22 @@ class WorkspaceActorSelectionIntegrationTest extends AbstractPracticeReviewInteg
                         ConnectionConfig.GitLabConfig.SigningMode.PLAINTEXT,
                         Set.of(),
                         null));
-        Practice practice = persistPractice(workspace, null, "lrz-practice", "LRZ practice", null);
-        ReviewJob run = persistPullRequestReview(workspace, 3, NOW.minus(Duration.ofDays(1)));
-        UUID practiceResult =
-                observe(practice, run, 3L, selfHostedActor, NOT_MET, Severity.MAJOR, NOW.minus(Duration.ofDays(1)));
-        Feedback feedback = persistPracticePageFeedback(
-                run,
-                selfHostedActor,
-                1,
-                FeedbackState.DELIVERED,
-                PracticePageFeedbackBody.render("A way of working", "What recurs.", "One thing to try."),
-                NOW.minus(Duration.ofDays(1)));
-        bind(feedback, practiceResult);
+        assertThat(actors.select(
+                        workspace.getId(),
+                        List.of(
+                                Objects.requireNonNull(saasActor.getId()),
+                                Objects.requireNonNull(selfHostedActor.getId()))))
+                .contains(selfHostedActor.getId());
 
         String token = "mock-jwt-user-sub-" + account.getId();
         read(token, "/workspaces/actor-lrz/members/me")
-                .jsonPath("$.userId")
-                .isEqualTo(selfHostedActor.getId())
+                .jsonPath("$.accountId")
+                .isEqualTo(Objects.requireNonNull(account.getId()).toString())
                 .jsonPath("$.role")
                 .isEqualTo("OWNER");
-        read(token, "/workspaces/actor-lrz/practices/standings")
-                .jsonPath("$[0].slug")
-                .isEqualTo("lrz-practice")
-                // One problem on one piece of work: a verdict read for this actor, one setback.
-                .jsonPath("$[0].standing")
-                .isEqualTo("MIXED");
-        read(token, "/workspaces/actor-lrz/practices/feedback/in-app")
-                .jsonPath("$[0].id")
-                .isEqualTo(feedback.getId().toString());
         assertThat(memberships.membershipsForAccount(Objects.requireNonNull(account.getId())))
-                .extracting(MembershipView::memberId)
-                .containsExactly(selfHostedActor.getId());
+                .extracting(MembershipView::accountId)
+                .containsExactly(account.getId());
     }
 
     private WebTestClient.BodyContentSpec read(String token, String uri) {

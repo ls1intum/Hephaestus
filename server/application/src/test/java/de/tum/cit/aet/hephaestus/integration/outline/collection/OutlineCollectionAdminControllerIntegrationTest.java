@@ -127,7 +127,7 @@ class OutlineCollectionAdminControllerIntegrationTest extends AbstractWorkspaceI
     @DisplayName("non-admin cannot reach the collection control plane → 403")
     void nonAdmin_forbidden() {
         User mentor = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
 
         listRequest().expectStatus().isForbidden().expectBody(Void.class);
         registerRequest(COLLECTION_ID).expectStatus().isForbidden().expectBody(Void.class);

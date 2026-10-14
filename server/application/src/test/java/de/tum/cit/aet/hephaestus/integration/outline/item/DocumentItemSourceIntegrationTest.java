@@ -164,8 +164,9 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
                 .findByTypeAndServerUrl(IdentityProviderType.OUTLINE, "https://wiki.example.com")
                 .orElseGet(() ->
                         providers.save(new IdentityProvider(IdentityProviderType.OUTLINE, "https://wiki.example.com")));
-        human(workspace, provider.getId(), team, "creator");
-        long collaborator = human(workspace, provider.getId(), team, "collaborator");
+        long providerId = Objects.requireNonNull(provider.getId());
+        human(workspace, providerId, team, "creator");
+        long collaborator = human(workspace, providerId, team, "collaborator");
         var document = new OutlineDocument();
         document.setWorkspaceId(workspace.getId());
         document.setConnectionId(connection.getId());
@@ -181,7 +182,7 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
         documents.saveAndFlush(document);
         var item = items.upsert(
                 new ItemRegistration(workspace.getId(), DocumentEvents.DOCUMENT, document.getId(), null, null));
-        return new ReadableDocument(item, collaborator, provider.getId(), team);
+        return new ReadableDocument(item, collaborator, providerId, team);
     }
 
     private long human(Workspace workspace, long providerId, String team, String subject) {
@@ -193,8 +194,9 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
         identity.setTeamKey(team);
         identity.setLinkedVia(Identity.LinkedVia.ROSTER);
         identities.saveAndFlush(identity);
-        memberships.createMembership(workspace, account.getId(), Membership.WorkspaceRole.MEMBER);
-        return account.getId();
+        long accountId = Objects.requireNonNull(account.getId());
+        memberships.createMembership(workspace, accountId, Membership.WorkspaceRole.MEMBER);
+        return accountId;
     }
 
     private static CaptureRequest request() {
@@ -203,6 +205,61 @@ class DocumentItemSourceIntegrationTest extends BaseIntegrationTest {
     }
 
     private record ReadableDocument(ItemRef item, long collaboratorId, long providerId, String teamId) {}
+
+    @Test
+    void equivalentProviderSpellingCannotBypassKnownCollaboratorNoAi() {
+        var fixture = readableDocument();
+        var pinned = resolver.pin(fixture.item(), null);
+        var document = documents
+                .findById(Objects.requireNonNull(fixture.item().sourceId()))
+                .orElseThrow();
+        var connection = connections.findById(document.getConnectionId()).orElseThrow();
+        String alternateUrl = "https://WIKI.example.com:443/";
+        providers.saveAndFlush(new IdentityProvider(IdentityProviderType.OUTLINE, alternateUrl));
+        connection.setConfig(new ConnectionConfig.OutlineConfig(alternateUrl, null, null, Set.of()));
+        connections.saveAndFlush(connection);
+        assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isTrue();
+        var collaborator = accounts.findById(fixture.collaboratorId()).orElseThrow();
+        collaborator.setAiChoice(AiChoice.NO_AI);
+        collaborator.setAiChoiceAt(null);
+        accounts.saveAndFlush(collaborator);
+
+        assertThat(resolver.permits(fixture.item(), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isFalse();
+        assertThat(resolver.current(fixture.item())).isEmpty();
+        var capture = resolver.capture(pinned, request());
+        assertThat(capture.files()).isEmpty();
+        assertThat(capture.citableTexts()).isEmpty();
+        assertThat(capture.stateOverrides())
+                .containsEntry(
+                        DocumentContentSource.SOURCE,
+                        new SourceCaptureState.Redacted(SourceAbsenceReason.ACCESS_NOT_PERMITTED));
+    }
+
+    @Test
+    void anotherApprovedConnectionCannotPermitAnUnapprovedDocumentOrigin() {
+        var fixture = readableDocument();
+        var document = documents
+                .findById(Objects.requireNonNull(fixture.item().sourceId()))
+                .orElseThrow();
+        var connection = connections.findById(document.getConnectionId()).orElseThrow();
+        var approved = new Connection(
+                connection.getWorkspace(),
+                IntegrationKind.OUTLINE,
+                "approved-" + fixture.teamId(),
+                new ConnectionConfig.OutlineConfig("https://wiki.example.com", null, null, Set.of()));
+        approved.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(approved);
+        String unapprovedUrl = "https://unapproved.example.com";
+        providers.saveAndFlush(new IdentityProvider(IdentityProviderType.OUTLINE, unapprovedUrl));
+        connection.setConfig(new ConnectionConfig.OutlineConfig(unapprovedUrl, null, null, Set.of()));
+        connections.saveAndFlush(connection);
+
+        assertThat(resolver.current(fixture.item())).isEmpty();
+        assertThat(resolver.permits(fixture.item(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isFalse();
+    }
 
     @Test
     void shouldNameADocumentsCollectionByItsNameAndNeverByItsUrlId() {

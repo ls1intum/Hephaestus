@@ -8,8 +8,6 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUpstreamIdConflictExcepti
 import de.tum.cit.aet.hephaestus.agent.config.AgentBindingSlotMismatchException;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.core.LoggingUtils;
-import de.tum.cit.aet.hephaestus.practices.review.schedule.ReviewBatchConflictException;
-import de.tum.cit.aet.hephaestus.practices.review.schedule.ReviewScheduleConflictException;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import java.net.URI;
 import java.util.Optional;
@@ -20,6 +18,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.mvc.annotation.ResponseStatusExceptionResolver;
 
 /**
  * Error mapper for agent-module exceptions, per {@code docs/contributor/api-error-handling.md}.
@@ -27,22 +26,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
  * <p>An agent exception without an explicit handler below returns 500 regardless of any
  * {@code @ResponseStatus} on it: {@code GlobalControllerAdvice}'s
  * {@code @ExceptionHandler(Exception.class)} catches it before
- * {@link org.springframework.web.servlet.mvc.support.ResponseStatusExceptionResolver} can run.
+ * {@link ResponseStatusExceptionResolver} can run.
  */
 @RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {
-
-    @ExceptionHandler(ReviewBatchConflictException.class)
-    ProblemDetail handleReviewBackfillConflict(ReviewBatchConflictException exception) {
-        return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
-    }
-
-    @ExceptionHandler(ReviewScheduleConflictException.class)
-    ProblemDetail handleReviewSweepScheduleConflict(ReviewScheduleConflictException exception) {
-        return problem(
-                HttpStatus.CONFLICT, "review-sweep-schedule-conflict", "Review sweep schedule conflict", exception);
-    }
 
     /**
      * An optimistic-lock failure that outlived its retries is a conflict, not a server fault.

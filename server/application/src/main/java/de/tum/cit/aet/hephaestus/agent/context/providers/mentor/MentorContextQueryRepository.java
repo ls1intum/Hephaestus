@@ -102,12 +102,12 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
             COALESCE((SELECT COUNT(work)
                 FROM PullRequest work
                 JOIN RepositoryToMonitor rtmpr ON rtmpr.nameWithOwner = work.repository.nameWithOwner
-                    AND monitor_covers_repository(rtmpr.workspaceId, rtmpr.nativeId, work.repository.nativeId, work.repository.provider.id) = true
+                    AND monitor_covers_repository(rtmpr.workspace.id, rtmpr.nativeId, work.repository.nativeId, work.repository.provider.id) = true
                 JOIN work.requestedReviewers request
-                WHERE request.accountId = :userId
+                WHERE request.user.id = :userId
                   AND work.deletedAt IS NULL
                   AND work.isDraft = false
-                  AND rtmpr.workspaceId = :workspaceId
+                  AND rtmpr.workspace.id = :workspaceId
                   AND work.state = de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue.State.OPEN
                   AND
         """ + RequestedReviewer.AWAITING_REVIEW + """
@@ -170,7 +170,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         JOIN work.requestedReviewers request
         LEFT JOIN FETCH work.author
         LEFT JOIN FETCH work.repository
-        WHERE request.accountId = :userId
+        WHERE request.user.id = :userId
           AND work.deletedAt IS NULL
           AND work.isDraft = false
           AND rtm.workspace.id = :workspaceId

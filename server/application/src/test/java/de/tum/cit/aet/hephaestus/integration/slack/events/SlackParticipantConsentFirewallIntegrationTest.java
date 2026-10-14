@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -30,6 +31,7 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -112,7 +114,7 @@ class SlackParticipantConsentFirewallIntegrationTest extends BaseIntegrationTest
         workspaceResolver = mock(SlackWorkspaceResolver.class);
         when(workspaceResolver.resolveWorkspaceId(TEAM)).thenReturn(Optional.of(workspaceId));
         identityResolver = mock(SlackRosterIdentityResolver.class);
-        long human = accounts.save(new Account("Allowed human")).getId();
+        long human = Objects.requireNonNull(accounts.save(new Account("Allowed human")).getId());
         memberships.createMembership(workspace, human, Membership.WorkspaceRole.MEMBER);
         when(identityResolver.humanAccountId(anyLong(), any(), any())).thenReturn(Optional.of(human));
 

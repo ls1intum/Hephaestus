@@ -25,6 +25,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,10 +74,13 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
 
     ReviewIntegrationData.Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
         when(authorization.custody(any()))
                 .thenReturn(new HistoryCustody(true, List.of(), List.of(), List.of(UUID.randomUUID())));
         when(authorization.authorized(any(), any(), any())).thenReturn(true);
@@ -91,10 +95,9 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
                 current.getWorkspaceId(),
                 current.getId(),
                 ResultMarkKind.INCORRECT,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "The claim has the wrong basis");
-        var rows = history.forDeveloper(
-                scenario.workspace().getId(), scenario.account().getId(), Instant.EPOCH, 20);
+        var rows = history.forDeveloper(scenario.workspace().getId(), scenarioAccountId, Instant.EPOCH, 20);
         assertThat(rows).extracting(ResultHistoryEntry::resultId).containsExactly(current.getId(), old.getId());
         assertThat(rows.getFirst().activeMarks()).containsExactly(ResultMarkKind.INCORRECT);
         assertThat(rows.getLast().endedAt()).isNotNull();
@@ -116,11 +119,11 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
                 original.scan(),
                 original.lineNotes(),
                 original.guidance());
-        versions.append(scenario.practice(), changed, scenario.account().getId());
+        versions.append(scenario.practice(), changed, scenarioAccountId);
         var entry = history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW)
                 .orElseThrow();
         assertThat(entry.practiceVersion()).isEqualTo(1);
@@ -133,8 +136,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
     void deniedSourceLeavesExplicitlyUnavailableMetadataForContext() {
         var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
         when(authorization.authorized(any(), any(), any())).thenReturn(false);
-        var row = history.forDeveloper(
-                        result.getWorkspaceId(), scenario.account().getId(), Instant.EPOCH, 10)
+        var row = history.forDeveloper(result.getWorkspaceId(), scenarioAccountId, Instant.EPOCH, 10)
                 .getFirst();
         assertThat(row.resultId()).isEqualTo(result.getId());
         assertThat(row.copyAuthorityComplete()).isFalse();
@@ -143,7 +145,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isEmpty();
     }
@@ -154,7 +156,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         var row = history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW)
                 .orElseThrow();
         var evidence = row.evidence();
@@ -173,13 +175,13 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isPresent();
         assertThat(history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isEmpty();
     }
@@ -193,19 +195,19 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isPresent();
         assertThat(history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isEmpty();
         assertThat(history.find(
                         result.getWorkspaceId(),
                         result.getId(),
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
                 .isEmpty();
     }
@@ -217,8 +219,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         var other = new ReviewIntegrationData.Scenario(
                 scenario.workspace(), otherDeveloper, scenario.practice(), scenario.item());
         var recent = data.result(other, ResultOutcome.NOT_MET, Instant.now());
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var assignment = new ReviewAssignmentId(
                 pending.review().getId(),
                 scenario.practice().getId(),
@@ -244,7 +245,7 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         assertThat(history.find(
                         foreign.workspace().getId(),
                         result.getId(),
-                        foreign.account().getId(),
+                        Objects.requireNonNull(foreign.account().getId()),
                         SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
                 .isEmpty();
         assertThat(history.forItem(foreign.workspace().getId(), result.getItemId(), result.getPracticeId(), 20))

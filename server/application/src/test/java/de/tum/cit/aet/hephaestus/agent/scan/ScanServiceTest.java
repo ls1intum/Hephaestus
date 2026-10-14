@@ -1,0 +1,141 @@
+package de.tum.cit.aet.hephaestus.agent.scan;
+
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
+import de.tum.cit.aet.hephaestus.agent.handler.RuntimeReviewTestData;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLister;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemPage;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ListedItem;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
+import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.ScanDefinition;
+import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
+import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.ScanListedItem;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import org.junit.jupiter.api.Test;
+
+class ScanServiceTest extends BaseUnitTest {
+    private static final ItemKind FILE = new ItemKind("scm.file");
+    private final ItemLister lister = mock(ItemLister.class);
+    private final ScanItemVersions versions = mock(ScanItemVersions.class);
+    private final ItemWriter writer = mock(ItemWriter.class);
+    private final ReviewScanStore store = mock(ReviewScanStore.class);
+
+    private ScanService service(int entries) {
+        return new ScanService(
+                List.of(lister),
+                List.of(versions),
+                writer,
+                store,
+                new ScanProperties(entries, 10000, Duration.ofMinutes(1), Duration.ofHours(1)),
+                Clock.systemUTC());
+    }
+
+    private ReviewSnapshot review() {
+        var base = RuntimeReviewTestData.assignment(null, null).practice();
+        var d = base.definition();
+        var scan = new ScanDefinition(
+                FILE,
+                List.of("**/*.java"),
+                List.of("generated/**"),
+                List.of("pom.xml"),
+                new PracticeReads(
+                        "2.0.0",
+                        List.of(new PracticeReadSource(new SourceKind("scm.repository.tree"), ReadNeed.COMPLETE))));
+        var definition = new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                d.appliesWhen(),
+                d.about(),
+                d.reads(),
+                d.reviewedBy(),
+                d.criteria(),
+                d.script(),
+                scan,
+                d.lineNotes(),
+                d.guidance());
+        var review = new ReviewSnapshot(
+                RuntimeReviewTestData.REVIEW,
+                1,
+                RuntimeReviewTestData.ITEM,
+                ReviewKind.SCAN,
+                new ItemVersion("tree:one", null),
+                ReviewOrigin.REQUEST,
+                1,
+                List.of(new PinnedPractice(31, 32, definition, base.reviewDigest(), base.method())));
+        when(lister.supports(review.item())).thenReturn(true);
+        when(lister.memberKinds()).thenReturn(Set.of(FILE));
+        when(versions.kinds()).thenReturn(Set.of(FILE));
+        return review;
+    }
+
+    private ListedItem listed(long workspace, String path) {
+        return new ListedItem(new ItemRegistration(workspace, FILE, null, 2L, path), new ItemVersion("blob:one", null));
+    }
+
+    @Test
+    void rejectsAnIncompleteListingWithoutRecordingInventory() {
+        var review = review();
+        when(lister.list(any())).thenReturn(new ItemPage(List.of(), null, false, null));
+        assertThatThrownBy(() -> service(10).enumerate(review)).isInstanceOf(ScanService.EnumerationFailure.class);
+        verifyNoInteractions(writer, store);
+    }
+
+    @Test
+    void rejectsForeignWorkspaceItemsBeforeAnyWrite() {
+        var review = review();
+        when(lister.list(any())).thenReturn(new ItemPage(List.of(listed(99, "src/A.java")), null, true, null));
+        assertThatThrownBy(() -> service(10).enumerate(review)).isInstanceOf(ScanService.EnumerationFailure.class);
+        verifyNoInteractions(writer, store);
+    }
+
+    @Test
+    void boundsTheWholeTreeBeforeApplyingApplicability() {
+        var review = review();
+        when(lister.list(any()))
+                .thenReturn(new ItemPage(List.of(listed(1, "a.txt"), listed(1, "b.txt")), null, true, null));
+        assertThatThrownBy(() -> service(1).enumerate(review)).isInstanceOf(ScanService.EnumerationFailure.class);
+        verifyNoInteractions(writer, store);
+    }
+
+    @Test
+    void recordsAllFilesButJudgesOnlyApplicableFilesWithDeclaredContext() {
+        var review = review();
+        var eligible = listed(1, "src/A.java");
+        var excluded = listed(1, "generated/B.java");
+        var file = new ItemRef(1, 3, FILE, null, 2L, "src/A.java");
+        var generated = new ItemRef(1, 4, FILE, null, 2L, "generated/B.java");
+        when(lister.list(any())).thenReturn(new ItemPage(List.of(eligible, excluded), null, true, null));
+        when(writer.upsert(eligible.item())).thenReturn(file);
+        when(writer.upsert(excluded.item())).thenReturn(generated);
+        var version = new ItemVersion("blob:one:context", null);
+        when(versions.compose(file, Objects.requireNonNull(review.version()), List.of("pom.xml")))
+                .thenReturn(version);
+        service(10).enumerate(review);
+        verify(store).inventory(1, review.id(), List.of(3L, 4L), true);
+        verify(store).list(1, review.id(), 31, List.of(new ScanListedItem(file, version)), true);
+    }
+}

@@ -24,10 +24,13 @@ public final class ScmCaptureFixtures {
         Long review = fixture.path("review_id").isIntegralNumber()
                 ? fixture.path("review_id").asLong()
                 : null;
+        if (!fixture.path("subject_role").asString("AUTHOR").equals("REVIEWER")) review = null;
         Long reviewer = fixture.path("about_user_id").isIntegralNumber()
                 ? fixture.path("about_user_id").asLong()
                 : null;
-        String head = fixture.path("commit_sha").asString("a".repeat(40));
+        String head = fixture.has("commit_sha") && fixture.path("commit_sha").isNull()
+                ? null
+                : fixture.path("commit_sha").asString("a".repeat(40));
         String base = fixture.path("base_ref_oid").asString("b".repeat(40));
         var work = new ScmCapturedWork(
                 source,
@@ -44,7 +47,13 @@ public final class ScmCaptureFixtures {
                 review,
                 reviewer);
         var kind = new ItemKind(issue ? "scm.issue" : review == null ? "scm.pull_request" : "scm.pull_request_review");
-        var item = new ItemRef(workspaceId, source, kind, source, review == null ? null : source + 1, null);
+        var item = new ItemRef(
+                workspaceId,
+                review == null ? source : source + 1,
+                kind,
+                review == null ? source : review,
+                review == null ? null : source,
+                null);
         var version = new ItemVersion(fixture.path("itemVersion").asString("fixture"), null);
         var integration = new IntegrationRef(IntegrationKind.GITHUB, workspaceId, null);
         var snapshot = new ItemSnapshot(

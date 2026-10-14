@@ -16,8 +16,8 @@ import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.Membership;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -776,19 +776,20 @@ class FeedbackControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     private Member member(String slug) {
         User actor = persistUser(slug + "-member");
         Workspace workspace = createWorkspace(slug, "Workspace " + slug, slug, AccountType.ORG, actor);
-        ensureWorkspaceMembership(workspace, actor, Membership.WorkspaceRole.ADMIN);
+        ensureMembership(workspace, actor, Membership.WorkspaceRole.ADMIN);
         return member(slug, Account.AppRole.APP_ADMIN, workspace, actor);
     }
 
     private Member plainMember(String slug, Workspace workspace) {
         User actor = persistUser(slug + "-member");
-        ensureWorkspaceMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, actor, Membership.WorkspaceRole.MEMBER);
         return member(slug, Account.AppRole.USER, workspace, actor);
     }
 
     private Member member(String slug, Account.AppRole role, Workspace workspace, User actor) {
         var providerId = Objects.requireNonNull(ensureGitHubProvider().getId());
-        var link = identityLinks.findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
+        var link = identityLinks
+                .findActiveByProviderSubject(providerId, actor.getNativeId().toString(), null)
                 .orElseThrow();
         var account = link.getAccount();
         account.setDisplayName("Member " + slug);

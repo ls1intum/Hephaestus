@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,10 +27,13 @@ class ResultCurrentOrderIntegrationTest extends BaseIntegrationTest {
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -69,7 +73,7 @@ class ResultCurrentOrderIntegrationTest extends BaseIntegrationTest {
         var first = data.result(scenario, ResultOutcome.MET, Instant.now().minusSeconds(60));
         data.end(first, Instant.now().minusSeconds(30));
         var current = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
-        data.mark(current, ResultMarkKind.INCORRECT, scenario.account().getId());
+        data.mark(current, ResultMarkKind.INCORRECT, scenarioAccountId);
         assertThat(results.findCurrentClaim(
                         current.getWorkspaceId(),
                         current.getPracticeId(),
@@ -79,10 +83,7 @@ class ResultCurrentOrderIntegrationTest extends BaseIntegrationTest {
                 .extracting(Result::getId)
                 .isEqualTo(current.getId());
         assertThat(results.findCurrentForDeveloper(
-                        current.getWorkspaceId(),
-                        scenario.account().getId(),
-                        ResultMarkKind.INCORRECT,
-                        PageRequest.of(0, 20)))
+                        current.getWorkspaceId(), scenarioAccountId, ResultMarkKind.INCORRECT, PageRequest.of(0, 20)))
                 .isEmpty();
     }
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { ReviewedWorkRef } from "~/api/types.gen";
+import type { ItemRef } from "~/api/types.gen";
 import type { WorkspaceChoice } from "~/shared/review-context";
 
 /**
@@ -21,7 +21,7 @@ export interface ActionPreview {
 	action: ReviewAction;
 	instanceHost: string;
 	workspace: WorkspaceChoice;
-	work: ReviewedWorkRef;
+	item: ItemRef;
 }
 
 /** What became of a confirmed action, in the server's words. */

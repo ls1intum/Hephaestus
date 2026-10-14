@@ -46,7 +46,10 @@ class PracticeGroupReviewsControllerIntegrationTest extends BaseIntegrationTest 
     @Test
     void unknownGroupDoesNotExposeUnscopedReviews() {
         data.result(scenario, ResultOutcome.MET, Instant.now());
-        get("/practice-groups/foreign-group/reviews").expectStatus().isNotFound();
+        get("/practice-groups/foreign-group/reviews")
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test

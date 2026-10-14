@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 @Tag("unit")
@@ -57,7 +58,10 @@ class ResultEvidenceDTOTest {
 
     @Test
     void refusesRetiredProofFieldNames() {
-        assertThatThrownBy(() -> json.readValue("""
+        var strict = json.rebuild()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
+        assertThatThrownBy(() -> strict.readValue("""
             {"citations":[],"search":null,"inapplicability":null,"openQuestions":[],"undecidability":[]}
             """, ResultEvidenceDTO.class)).isInstanceOf(RuntimeException.class);
     }

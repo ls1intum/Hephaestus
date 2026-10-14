@@ -36,8 +36,8 @@ class PracticeScriptInputsTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldKeepExplicitNobodyForADeveloperlessScan() {
-        var assignment = RuntimeReviewTestData.assignment(null, null);
+    void shouldKeepExplicitNobodyForAScanEvenWhenTheItemPracticeHasAnAuthor() {
+        var assignment = RuntimeReviewTestData.assignment(5L, null);
         var files = new PracticeScriptInputs(mapper)
                 .stage(
                         RuntimeReviewTestData.review(ReviewKind.SCAN, assignment),

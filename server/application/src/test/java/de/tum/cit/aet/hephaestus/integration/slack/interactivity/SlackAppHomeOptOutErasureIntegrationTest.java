@@ -320,10 +320,17 @@ class SlackAppHomeOptOutErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     private UUID seedResult(ItemKind artifactKind, long artifactId, long aboutUserId) {
-        UUID practiceResultId = UUID.randomUUID();
-        UUID saved = SlackConversationTestSupport.seedResult(
-                reviews, items, practiceResultRepository, workspaceId, practice, artifactKind, artifactId, aboutUserId);
-        return saved;
+        return SlackConversationTestSupport.seedResult(
+                reviews,
+                assignments,
+                reviewItems,
+                items,
+                practiceResultRepository,
+                workspaceId,
+                practice,
+                artifactKind,
+                artifactId,
+                aboutUserId);
     }
 
     private Practice savePractice(Workspace ws) {

@@ -99,14 +99,15 @@ class LlmProxyServiceTest extends BaseUnitTest {
     void setUp() {
         lenient().when(requestPolicy.allows(any())).thenReturn(true);
         meterRegistry = new SimpleMeterRegistry();
-        controller = new LlmProxyService(Tracer.NOOP,
-WebClient.create(),
-resolver,
-OBJECT_MAPPER,
-new ProxyAccounting(
+        controller = new LlmProxyService(
+                Tracer.NOOP,
+                WebClient.create(),
+                resolver,
+                OBJECT_MAPPER,
+                new ProxyAccounting(
                         budgetGate, usageAccumulator, mentorTurnUsageAccumulator, meterRegistry, OBJECT_MAPPER),
-requestPolicy,
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.class));
+                requestPolicy,
+                mock(ScanCallGuard.class));
     }
 
     @Test
@@ -685,18 +686,19 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.cla
             var client = WebClient.builder()
                     .exchangeFunction(request -> Mono.just(upstreamResponse))
                     .build();
-            var service = new LlmProxyService(tracer,
-client,
-resolver,
-OBJECT_MAPPER,
-new ProxyAccounting(
+            var service = new LlmProxyService(
+                    tracer,
+                    client,
+                    resolver,
+                    OBJECT_MAPPER,
+                    new ProxyAccounting(
                             budgetGate,
                             usageAccumulator,
                             mentorTurnUsageAccumulator,
                             new SimpleMeterRegistry(),
                             OBJECT_MAPPER),
-requestPolicy,
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.class));
+                    requestPolicy,
+                    mock(ScanCallGuard.class));
             var routing = routing("openai-completions");
             authenticate(routing);
             when(resolver.resolveProxyCredential(any()))
@@ -777,20 +779,21 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.cla
                     .header(HttpHeaders.CONTENT_TYPE, "application/json")
                     .body(reply)
                     .build();
-            var service = new LlmProxyService(new OtelTracer(provider.get("test"), new OtelCurrentTraceContext(), event -> {}),
-WebClient.builder()
+            var service = new LlmProxyService(
+                    new OtelTracer(provider.get("test"), new OtelCurrentTraceContext(), event -> {}),
+                    WebClient.builder()
                             .exchangeFunction(request -> Mono.just(upstreamResponse))
                             .build(),
-resolver,
-OBJECT_MAPPER,
-new ProxyAccounting(
+                    resolver,
+                    OBJECT_MAPPER,
+                    new ProxyAccounting(
                             budgetGate,
                             usageAccumulator,
                             mentorTurnUsageAccumulator,
                             new SimpleMeterRegistry(),
                             OBJECT_MAPPER),
-requestPolicy,
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.class));
+                    requestPolicy,
+                    mock(ScanCallGuard.class));
             authenticate(practiceScriptRouting(slot, protocol));
             when(resolver.resolveProxyCredential(any())).thenReturn(credential(protocol, LlmAuthMode.BEARER));
             HttpHeaders headers = new HttpHeaders();
@@ -834,18 +837,19 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.cla
             upstream = new MockWebServer();
             upstream.start();
             streamingMeterRegistry = new SimpleMeterRegistry();
-            streamingController = new LlmProxyService(Tracer.NOOP,
-WebClient.builder().build(),
-resolver,
-OBJECT_MAPPER,
-new ProxyAccounting(
+            streamingController = new LlmProxyService(
+                    Tracer.NOOP,
+                    WebClient.builder().build(),
+                    resolver,
+                    OBJECT_MAPPER,
+                    new ProxyAccounting(
                             budgetGate,
                             usageAccumulator,
                             mentorTurnUsageAccumulator,
                             streamingMeterRegistry,
                             OBJECT_MAPPER),
-requestPolicy,
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.proxy.ScanCallGuard.class));
+                    requestPolicy,
+                    mock(ScanCallGuard.class));
         }
 
         @AfterEach

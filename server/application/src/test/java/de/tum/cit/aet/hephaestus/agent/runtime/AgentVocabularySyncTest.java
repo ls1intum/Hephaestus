@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Test;
 class AgentVocabularySyncTest extends BaseUnitTest {
 
     private static final Path CONTRACT = resolveRepoFile("docker/agents/practice-scripts/lib/core/contract.ts");
-    private static final Path RUNNER = resolveResource("agent/pi-runner.ts");
+
     private static final Path ORCHESTRATOR = resolveResource("agent/pi-orchestrator.md");
 
     @Test

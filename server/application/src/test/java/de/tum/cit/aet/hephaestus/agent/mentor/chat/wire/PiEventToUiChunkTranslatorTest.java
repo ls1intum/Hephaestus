@@ -2,11 +2,14 @@ package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.spi.CopyWriteFence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -990,5 +993,45 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
         translator.translate(end, state);
 
         assertThat(state.partsSnapshot()).isEmpty();
+    }
+
+    @Test
+    void feedbackWordsRequireTheirExplicitClaimAndBecomeStoredAssistantText() {
+        var feedbackId = UUID.randomUUID();
+        var fence = new CopyWriteFence(feedbackId, UUID.randomUUID(), assistantMessageId, Instant.EPOCH);
+        assertThat(state.claimFeedback(feedbackId, () -> Optional.of(fence))).isTrue();
+        var event = mapper.createObjectNode()
+                .put("type", "show_feedback")
+                .put("feedbackId", feedbackId.toString())
+                .put("text", "Use clear names.");
+        assertThat(translator.translate(event, state))
+                .extracting(chunk -> chunk.getClass().getSimpleName())
+                .contains("TextStart", "TextDelta", "TextEnd");
+        assertThat(state.partsSnapshot().toString()).contains("Use clear names.");
+        assertThat(state.hasShownFeedback(feedbackId)).isTrue();
+        assertThat(state.sealFeedbackClaims()).containsEntry(feedbackId, fence);
+    }
+
+    @Test
+    void unclaimedFeedbackCannotBecomeWordsOrAReceipt() {
+        var feedbackId = UUID.randomUUID();
+        var event = mapper.createObjectNode()
+                .put("type", "show_feedback")
+                .put("feedbackId", feedbackId.toString())
+                .put("text", "Unclaimed words.");
+        translator.translate(event, state);
+        assertThat(state.partsSnapshot().toString()).doesNotContain("Unclaimed words.");
+        assertThat(state.sealFeedbackClaims()).isEmpty();
+    }
+
+    @Test
+    void sealedFeedbackClaimsCannotAuthorizeALateWrite() {
+        var feedbackId = UUID.randomUUID();
+        state.sealFeedbackClaims();
+        assertThat(state.claimFeedback(
+                        feedbackId,
+                        () -> Optional.of(
+                                new CopyWriteFence(feedbackId, UUID.randomUUID(), assistantMessageId, Instant.EPOCH))))
+                .isFalse();
     }
 }

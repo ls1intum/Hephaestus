@@ -343,7 +343,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         // Login must match @WithMentorUser's default "mentor" principal so the membership resolver
         // finds this exact row.
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
                 .put()
@@ -367,7 +367,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
     void aWorkspaceMemberCannotDeleteABinding() {
         Workspace workspace = setupWorkspace("binding-member-del");
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
 
         webTestClient
                 .delete()
@@ -387,7 +387,7 @@ class AgentBindingControllerIntegrationTest extends AbstractWorkspaceIntegration
         // app_admin elevation and pass this call for the wrong reason.
         User admin = persistUser("mentor");
         Workspace own = createWorkspace("binding-own-ws", "Own", "binding-own-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
+        ensureMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
                 "binding-other-ws", "Other", "binding-other-org", AccountType.ORG, persistUser("binding-other-owner"));

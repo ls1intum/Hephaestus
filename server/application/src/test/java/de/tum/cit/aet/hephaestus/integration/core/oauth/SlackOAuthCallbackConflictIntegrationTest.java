@@ -306,15 +306,6 @@ class SlackOAuthCallbackConflictIntegrationTest extends AbstractWorkspaceIntegra
         return user;
     }
 
-    private long accountId(User user) {
-        Long providerId = Objects.requireNonNull(user.getProvider().getId());
-        return Objects.requireNonNull(identityLinks
-                .findActiveByProviderSubject(providerId, user.getNativeId().toString(), null)
-                .orElseThrow()
-                .getAccount()
-                .getId());
-    }
-
     private Workspace workspaceOwnedBy(User owner, String displayName) {
         String slug = "slack-oauth-" + System.nanoTime();
         return createWorkspace(slug, displayName, slug, AccountType.ORG, owner);

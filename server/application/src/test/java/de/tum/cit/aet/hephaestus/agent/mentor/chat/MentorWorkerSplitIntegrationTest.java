@@ -121,7 +121,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
     void configureTurn() {
         developer = persistUser("mentor");
         workspace = createWorkspace("worker-mentor", "Worker Mentor", "worker-mentor", AccountType.ORG, developer);
-        ensureWorkspaceMembership(workspace, developer, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, developer, Membership.WorkspaceRole.MEMBER);
         var binding = new WorkspaceAgentBinding();
         binding.setPurpose(AgentPurpose.MENTOR);
         binding.setEnabled(true);

@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
@@ -24,15 +25,14 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
 /** Reserves the finite worst cost before the single next file job enters the queue. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ScanBudget {
     private final ReviewMethodVerifier methods;
     private final ReviewJobRepository jobs;
-    private final ObjectMapper mapper;
     private final SandboxGatewayProperties gateway;
     private final JdbcClient jdbc;
     private final ReviewMemberAiPolicy policy;
@@ -112,7 +112,7 @@ public class ScanBudget {
         if (price.pricingState() == UsagePricingState.NO_CHARGE) return BigDecimal.ZERO;
         if (price.pricingState() == UsagePricingState.UNPRICED)
             throw new IllegalStateException("A scan cannot reserve an unpriced model");
-        return price.per1mInputUsd()
+        return inputRate(price)
                 .multiply(BigDecimal.valueOf(input))
                 .add(Objects.requireNonNullElse(price.per1mOutputUsd(), BigDecimal.ZERO)
                         .multiply(BigDecimal.valueOf(output)))

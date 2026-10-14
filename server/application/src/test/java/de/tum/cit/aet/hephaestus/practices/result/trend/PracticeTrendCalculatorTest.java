@@ -82,7 +82,7 @@ class PracticeTrendCalculatorTest {
                 List.of(
                         judged(40L, "2026-05-01T09:00:00Z", ResultOutcome.NOT_MET),
                         judged(40L, "2026-05-02T09:00:00Z", ResultOutcome.MET),
-                        clean(40L, "2026-05-03T09:00:00Z", new ItemKind("scm.issue"))),
+                        clean(41L, "2026-05-03T09:00:00Z", new ItemKind("scm.issue"))),
                 Instant.parse("2026-01-01T00:00:00Z"),
                 properties);
 

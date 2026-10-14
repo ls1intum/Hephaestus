@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,10 +26,13 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -65,8 +69,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
     @Test
     void developerSelectionRetainsOtherWorkKinds() {
         var r = data.result(scenario, ResultOutcome.MET, Instant.now());
-        assertThat(erasure.eraseConversationFeedbackAboutUser(
-                        r.getWorkspaceId(), scenario.account().getId()))
+        assertThat(erasure.eraseConversationFeedbackAboutUser(r.getWorkspaceId(), scenarioAccountId))
                 .isZero();
         assertThat(results.findById(r.getId())).isPresent();
     }

@@ -47,7 +47,7 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "RepositoryToMonitor", // has Workspace field
             "Membership", // has Workspace field
             "ChatThread", // has Workspace field
-            // Through repository -> Workspace.organization (JOIN)
+            // Through repository -> Workspace.organizationId (JOIN)
             "PullRequest",
             "Issue",
             "PullRequestReview",
@@ -56,20 +56,20 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             "IssueComment",
             "Label",
             "Milestone",
-            // Through Workspace.organization (JOIN)
+            // Through Workspace.organizationId (JOIN)
             "Repository",
             "Team",
             "TeamMembership",
             // Practice catalog entities
             "Practice", // has direct Workspace field
-            "Result", // through Practice.workspace
+            "Result", // direct workspace_id scalar
             // Through chat thread -> workspace
             "ChatMessage", // through ChatThread.workspace
             "ChatMessageVote", // through ChatMessage (via messageId) -> ChatThread.workspace
-            // Through Workspace.organization (ID-based relationship via JOIN)
-            "OrganizationMembership", // organizationId -> Workspace.organization
+            // Through Workspace.organizationId (ID-based relationship via JOIN)
+            "OrganizationMembership", // organizationId -> Workspace.organizationId
             // Through project owner (ID-based: ownerId -> Organization/Repository/User)
-            "Project", // ownerId -> Organization/Repository -> Workspace.organization
+            "Project", // ownerId -> Organization/Repository -> Workspace.organizationId
             "ProjectItem", // through Project.ownerId OR issue -> Repository
             "ProjectField", // through Project.ownerId
             "ProjectFieldValue", // through ProjectItem.project OR ProjectField.project
@@ -83,11 +83,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
             // Unified integration framework
             "Connection", // has direct Workspace field
             "ConnectionAudit", // through Connection.workspace
-            // Feedback synthesis seam — scoped via a raw workspace_id scalar (cross-module
-            // FK to avoid a Modulith cycle, mirrors Result.agentJobId).
-            "Feedback", // direct workspace_id scalar column (sfk_feedback_workspace)
-            "FeedbackEvidence", // through Feedback.workspace_id (and result -> Practice.workspace)
-            "FeedbackCopy", // through Feedback.workspace_id
+            // Product feedback and copies each carry the tenant independently.
+            "Feedback", // direct workspace_id scalar
+            "FeedbackCopy", // direct workspace_id scalar
             // Slack integration — every table carries a direct workspace_id scalar and is therefore
             // auto-classified scoped by WorkspaceScopedTables (absent from GLOBAL_TABLES). Listed here
             // so a future refactor that drops the column trips slackEntitiesCarryDirectWorkspaceId().
@@ -182,9 +180,10 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "ENTITY ISOLATION: %s is a JPA entity with no apparent workspace relationship. "
-                                                        + "Add to WORKSPACE_SCOPED_ENTITIES with relationship path, "
-                                                        + "or add to GLOBAL_ENTITIES if intentionally global.",
+                                                "ENTITY ISOLATION: %s is a JPA entity with no apparent workspace"
+                                                    + " relationship. Add to WORKSPACE_SCOPED_ENTITIES with"
+                                                    + " relationship path, or add to GLOBAL_ENTITIES if intentionally"
+                                                    + " global.",
                                                 entityName)));
                             }
                         }
@@ -225,8 +224,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                         events.add(SimpleConditionEvent.violated(
                                 javaClass,
                                 String.format(
-                                        "SLACK TENANCY: %s must carry a direct workspaceId field so it stays workspace-scoped. "
-                                                + "Removing it silently un-scopes Slack PII across tenants.",
+                                        "SLACK TENANCY: %s must carry a direct workspaceId field so it stays"
+                                                + " workspace-scoped. Removing it silently un-scopes Slack PII across"
+                                                + " tenants.",
                                         javaClass.getSimpleName())));
                     }
                 }
@@ -288,8 +288,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         javaClass,
                                         String.format(
-                                                "DTO LEAK RISK: %s exposes %s directly. Use projection DTOs "
-                                                        + "(e.g., UserDTO, AuthorDTO) instead to prevent cross-workspace data leakage.",
+                                                "DTO LEAK RISK: %s exposes %s directly. Use projection DTOs (e.g.,"
+                                                        + " UserDTO, AuthorDTO) instead to prevent cross-workspace data"
+                                                        + " leakage.",
                                                 javaClass.getSimpleName(), exposedDangerousTypes)));
                             }
                         }
@@ -387,8 +388,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                 events.add(SimpleConditionEvent.violated(
                                         method,
                                         String.format(
-                                                "ENTITY RETURN RISK: %s.%s returns entity type but appears unscoped. "
-                                                        + "Add workspace filtering or add to WORKSPACE_AGNOSTIC_METHODS if intentional.",
+                                                "ENTITY RETURN RISK: %s.%s returns entity type but appears unscoped."
+                                                    + " Add workspace filtering or add to WORKSPACE_AGNOSTIC_METHODS"
+                                                    + " if intentional.",
                                                 repoName, methodName)));
                             }
                         }
@@ -451,8 +453,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                     events.add(SimpleConditionEvent.violated(
                                             field,
                                             String.format(
-                                                    "CASCADE DELETE RISK: Workspace.%s has cascade delete to global entity %s. "
-                                                            + "This could delete shared data. Remove cascade or use orphanRemoval=false.",
+                                                    "CASCADE DELETE RISK: Workspace.%s has cascade delete to global"
+                                                        + " entity %s. This could delete shared data. Remove cascade"
+                                                        + " or use orphanRemoval=false.",
                                                     field.getName(), fieldType)));
                                 }
                             });

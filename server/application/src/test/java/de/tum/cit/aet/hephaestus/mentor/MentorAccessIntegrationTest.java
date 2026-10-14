@@ -120,7 +120,7 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldHandAMembersChatTurnToTheStarterWhenNoWorkspaceSwitchIsSet() throws Exception {
         Workspace workspace = workspace("mentor-access-member");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
 
         chat(MEMBER, workspace).expectStatus().isOk().expectBody(Void.class);
         assertThat(mentorChatStarter.awaitInvocation()).isTrue();
@@ -131,7 +131,7 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void shouldDecideEachWorkspaceOnItsOwnWhenOneSignInSwitchesBetweenWorkspaces() {
         Workspace own = workspace("mentor-access-own");
         Workspace foreign = workspace("mentor-access-foreign");
-        ensureWorkspaceMembership(own, member, WorkspaceRole.MEMBER);
+        ensureMembership(own, member, WorkspaceRole.MEMBER);
 
         chat(MEMBER, own).expectStatus().isOk().expectBody(Void.class);
         chat(MEMBER, foreign).expectStatus().isForbidden().expectBody(Void.class);
@@ -184,7 +184,7 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldKeepTheConversationListReadableWhenTheMemberChoseNoAi() {
         Workspace workspace = workspace("mentor-access-no-ai");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
         client.put()
                 .uri("/workspaces/{slug}/onboarding/me/ai-choice", workspace.getWorkspaceSlug())
                 .headers(headers -> headers.setBearerAuth(MEMBER))
@@ -203,7 +203,7 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Test
     void shouldRefuseAHephTurnWhenTheWorkspacesHephBindingIsDisabled() {
         Workspace workspace = workspace("mentor-access-binding-off");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
         WorkspaceAgentBinding binding = hephBinding(workspace);
         assertThat(mentorTurnRunner.refusal(workspace.getId(), member.getId())).isEmpty();
 

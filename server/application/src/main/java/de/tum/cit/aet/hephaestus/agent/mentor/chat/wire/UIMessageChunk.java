@@ -188,7 +188,7 @@ public sealed interface UIMessageChunk {
 
     /**
      * Fatal error during the turn; emitter completes after this chunk. The AI SDK calls it {@code error}, which
-     * is its type id above; the Java name avoids shadowing {@code java.lang.Error}.
+     * is its type id above; the Java name avoids shadowing {@code Error}.
      */
     record TurnError(String errorText) implements UIMessageChunk {}
 

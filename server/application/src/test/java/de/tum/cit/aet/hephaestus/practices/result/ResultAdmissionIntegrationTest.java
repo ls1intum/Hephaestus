@@ -31,7 +31,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustodyQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ProblemCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ProcessingStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -42,6 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAttemptGuard;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
@@ -54,17 +57,25 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshotQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
+import de.tum.cit.aet.hephaestus.practices.spi.Severity;
 import de.tum.cit.aet.hephaestus.practices.spi.WithheldItem;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.web.server.ResponseStatusException;
@@ -72,6 +83,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 
 @Import({ReviewIntegrationData.class, ReviewAdmissionData.class})
 class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
+    @Autowired
+    JdbcClient jdbc;
+
     @Autowired
     ReviewIntegrationData data;
 
@@ -128,16 +142,23 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     ReviewIntegrationData.Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
         when(custody.find(anyLong(), anyList()))
                 .thenAnswer(call -> new HistoryCustody(true, List.of(), List.of(), call.getArgument(1)));
     }
 
     void running(ReviewAdmissionData.Pending p, int attempt) {
         admissions.running(p, attempt);
+        when(runtime.activeJobIds(p.review().getWorkspaceId(), p.review().getId()))
+                .thenReturn(Set.of(p.jobId()));
+        when(runtime.unsettledJobIds(p.review().getWorkspaceId(), p.review().getId()))
+                .thenReturn(Set.of());
         when(runtime.runtime(p.review().getWorkspaceId(), p.review().getId()))
                 .thenReturn(Optional.of(new ReviewRuntimeSnapshot(List.of(new ReviewJobSnapshot(
                         p.jobId(),
@@ -164,8 +185,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void recordsOneResultAndAllocatedChildProofForItsExactAttempt() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var receipt = admit(pending, ResultOutcome.NOT_MET);
         assertThat(receipt.resultIds()).hasSize(1);
         var snapshots = proof.forAttempt(
@@ -187,8 +207,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void sameBodyReturnsSameIdsAndDifferentBodyIsConflict() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var first = admit(pending, ResultOutcome.NOT_MET);
         var repeated = admit(pending, ResultOutcome.NOT_MET);
         assertThat(repeated).isEqualTo(first);
@@ -200,10 +219,8 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void olderLateAdmissionIsEndedOutrankedWithoutReplacingTheNewerClaim() {
-        var older = admissions.pending(
-                scenario, Instant.now().minusSeconds(120), scenario.account().getId());
-        var newer =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var older = admissions.pending(scenario, Instant.now().minusSeconds(120), scenarioAccountId);
+        var newer = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var current = admit(newer, ResultOutcome.MET).resultIds().getFirst();
         var late = admit(older, ResultOutcome.NOT_MET).resultIds().getFirst();
         assertThat(results.findByIdAndWorkspaceId(late, scenario.workspace().getId())
@@ -214,7 +231,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                                 scenario.workspace().getId(),
                                 scenario.practice().getId(),
                                 scenario.item().getId(),
-                                scenario.account().getId())
+                                scenarioAccountId)
                         .orElseThrow()
                         .getId())
                 .isEqualTo(current);
@@ -222,17 +239,15 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void markedCurrentClaimStillOccupiesUntilANewerAdmissionReplacesIt() {
-        var first = admissions.pending(
-                scenario, Instant.now().minusSeconds(120), scenario.account().getId());
+        var first = admissions.pending(scenario, Instant.now().minusSeconds(120), scenarioAccountId);
         var current = admit(first, ResultOutcome.NOT_MET).resultIds().getFirst();
         store.mark(
                 scenario.workspace().getId(),
                 current,
                 ResultMarkKind.INCORRECT,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "The claim is incorrect");
-        var next =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var next = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var replacement = admit(next, ResultOutcome.MET).resultIds().getFirst();
         assertThat(results.findById(current).orElseThrow().getEndReason()).isEqualTo(ResultEndReason.REPLACED);
         assertThat(results.findById(replacement).orElseThrow().getEndedAt()).isNull();
@@ -240,8 +255,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void cancellationFenceRejectsLaterAdmissionAndKeepsAlreadyAdmittedProof() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var saved = admit(pending, ResultOutcome.NOT_MET).resultIds().getFirst();
         service.cancel(scenario.workspace().getId(), pending.review().getId(), "CANCELLED_BY_ADMIN");
         assertThatThrownBy(() -> admit(pending, ResultOutcome.NOT_MET)).isInstanceOf(ResponseStatusException.class);
@@ -250,10 +264,118 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(ReviewStatus.RUNNING);
     }
 
+    @ParameterizedTest
+    @EnumSource(ResultOutcome.class)
+    void shouldAdmitTheOutcomeWithItsRequiredProblemShape(ResultOutcome outcome) {
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
+        var receipt = admit(pending, outcome);
+        assertThat(receipt.withheldItems()).isEmpty();
+        assertThat(receipt.resultIds()).hasSize(1);
+        var result = results.findById(receipt.resultIds().getFirst()).orElseThrow();
+        assertThat(result.getOutcome()).isEqualTo(outcome);
+        assertThat(result.getSeverity()).isEqualTo(outcome == ResultOutcome.NOT_MET ? Severity.MAJOR : null);
+    }
+
+    @ParameterizedTest
+    @EnumSource(ResultOutcome.class)
+    void shouldWithholdAnOutcomeWhoseProblemShapeDoesNotMatch(ResultOutcome outcome) {
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
+        running(pending, 1);
+        var candidate = admissions.candidate(pending, outcome);
+        var problems = outcome == ResultOutcome.NOT_MET
+                ? List.<ProblemCandidate>of()
+                : admissions.candidate(pending, ResultOutcome.NOT_MET).problems();
+        var invalid = new ResultCandidate(
+                candidate.practiceId(),
+                candidate.practiceVersionId(),
+                candidate.itemId(),
+                candidate.itemVersion(),
+                candidate.developerId(),
+                candidate.outcome(),
+                candidate.summary(),
+                candidate.explanation(),
+                candidate.evidence(),
+                candidate.example(),
+                candidate.coverage(),
+                problems);
+        var receipt = store.admit(
+                scenario.workspace().getId(), pending.review().getId(), pending.jobId(), 1, List.of(invalid));
+        assertThat(receipt.resultIds()).isEmpty();
+        assertThat(receipt.withheldItems()).hasSize(1);
+        assertThat(receipt.withheldItems().getFirst().reason())
+                .isEqualTo(CandidateRefusal.OUTCOME_PROBLEM_MISMATCH.wireValue());
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM result WHERE workspace_id=:ws AND review_id=:review")
+                        .param("ws", scenario.workspace().getId())
+                        .param("review", pending.review().getId())
+                        .query(Integer.class)
+                        .single())
+                .isZero();
+    }
+
+    @Test
+    void shouldWaitForTerminalProcessingBeforeClosingACancelledReview() {
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
+        long workspaceId = scenario.workspace().getId();
+        UUID reviewId = pending.review().getId();
+        jdbc.sql("UPDATE review_job SET"
+                        + " status='FAILED',processing_status='PENDING',started_at=now(),completed_at=now() WHERE"
+                        + " workspace_id=:ws AND id=:id")
+                .param("ws", workspaceId)
+                .param("id", pending.jobId())
+                .update();
+        when(runtime.activeJobIds(workspaceId, reviewId)).thenReturn(Set.of());
+        when(runtime.unsettledJobIds(workspaceId, reviewId)).thenReturn(Set.of(pending.jobId()));
+        var completion = new ReviewCompletion(
+                ReviewStatus.COMPLETE,
+                null,
+                Instant.now().truncatedTo(ChronoUnit.MICROS),
+                pending.review().getOrderedAt());
+
+        assertThatThrownBy(() -> service.complete(workspaceId, reviewId, completion))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(service.cancel(workspaceId, reviewId, "CANCELLED_BY_ADMIN")).isTrue();
+        assertThat(reviews.findById(reviewId).orElseThrow().getCompletedAt()).isNull();
+        assertThat(reviews.findById(reviewId).orElseThrow().getStatus()).isEqualTo(ReviewStatus.RUNNING);
+
+        var assignment = new ReviewAssignmentId(
+                reviewId, scenario.practice().getId(), scenario.item().getId());
+        assertThatThrownBy(() -> assignments.withhold(
+                        workspaceId,
+                        assignment,
+                        CandidateRefusal.QUOTE_UNVERIFIED,
+                        "A cancelled invocation cannot admit new refusal output."))
+                .isInstanceOf(IllegalStateException.class);
+        assignments.fail(
+                workspaceId,
+                assignment,
+                ReviewStopReason.CANCELLED,
+                "The invoked execution stopped before admitting a result.");
+        assertThat(jdbc.sql("SELECT state FROM review_item WHERE workspace_id=:ws AND review_id=:review")
+                        .param("ws", workspaceId)
+                        .param("review", reviewId)
+                        .query(String.class)
+                        .single())
+                .isEqualTo("WITHHELD");
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM result WHERE workspace_id=:ws AND review_id=:review")
+                        .param("ws", workspaceId)
+                        .param("review", reviewId)
+                        .query(Integer.class)
+                        .single())
+                .isZero();
+
+        jdbc.sql("UPDATE review_job SET processing_status='DONE' WHERE workspace_id=:ws AND id=:id")
+                .param("ws", workspaceId)
+                .param("id", pending.jobId())
+                .update();
+        when(runtime.unsettledJobIds(workspaceId, reviewId)).thenReturn(Set.of());
+        service.complete(workspaceId, reviewId, completion);
+        assertThat(reviews.findById(reviewId).orElseThrow().getStatus()).isEqualTo(ReviewStatus.CANCELLED);
+        assertThat(reviews.findById(reviewId).orElseThrow().getCompletedAt()).isEqualTo(completion.completedAt());
+    }
+
     @Test
     void shouldKeepItemWithholdingSeparateFromResults() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         var assignment = new ReviewAssignmentId(
                 pending.review().getId(),
                 scenario.practice().getId(),
@@ -295,8 +417,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldKeepTheFirstPublicAcceptanceOnTheProductReview() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         admit(pending, ResultOutcome.MET);
         var acceptedAt = Instant.now();
         assertThat(assignments.publicReviewed(
@@ -325,8 +446,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldRecordCaptureFailureWithoutCreatingAMissingEvidenceResult() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         running(pending, 1);
         assignments.capture(
                 scenario.workspace().getId(),
@@ -386,7 +506,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
                 null,
                 ReviewOrigin.REQUEST,
                 null,
-                scenario.account().getId(),
+                scenarioAccountId,
                 null,
                 null,
                 null,
@@ -427,8 +547,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void zeroAttemptIsAnExactValidExecutionAttempt() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         running(pending, 0);
         var receipt = store.admit(
                 scenario.workspace().getId(),
@@ -444,8 +563,7 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void feedbackModeOffStillRecordsTheResult() {
-        var pending =
-                admissions.pending(scenario, Instant.now(), scenario.account().getId());
+        var pending = admissions.pending(scenario, Instant.now(), scenarioAccountId);
         scenario.practice().setFeedbackMode(FeedbackMode.OFF);
         var id = admit(pending, ResultOutcome.NOT_MET).resultIds().getFirst();
         assertThat(results.findById(id).orElseThrow().getOutcome()).isEqualTo(ResultOutcome.NOT_MET);

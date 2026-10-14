@@ -3,7 +3,9 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -46,8 +48,7 @@ class FeedbackResponseServiceTest {
 
     @BeforeEach
     void setup() {
-        when(privacy.holdForAccountWrite(org.mockito.ArgumentMatchers.anyLong()))
-                .thenReturn(true);
+        when(privacy.holdForAccountWrite(anyLong())).thenReturn(true);
         when(responses.save(any())).thenAnswer(a -> a.getArgument(0));
         when(current.currentDeveloperIdElseThrow()).thenReturn(2L);
     }
@@ -91,7 +92,7 @@ class FeedbackResponseServiceTest {
         when(privacy.holdForAccountWrite(2)).thenReturn(false);
         assertThatThrownBy(() -> service.respond(1, id, 2, null, FeedbackUsefulness.HELPFUL, null))
                 .isInstanceOf(ResponseStatusException.class);
-        verify(responses, org.mockito.Mockito.never()).save(any());
+        verify(responses, never()).save(any());
     }
 
     @Test

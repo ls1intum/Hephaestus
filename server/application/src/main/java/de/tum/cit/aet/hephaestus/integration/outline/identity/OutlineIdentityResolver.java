@@ -37,9 +37,10 @@ public class OutlineIdentityResolver {
         if (outlineSubject.isBlank() || serverUrl.isBlank()) {
             return Optional.empty();
         }
-        long outlineProviderId = gitProviderRegistry.resolveProviderId("OUTLINE", serverUrl);
-        return accountIdentityQuery
-                .resolveAccountId(outlineProviderId, outlineSubject, teamId)
+        return gitProviderRegistry
+                .findProviderId("OUTLINE", serverUrl)
+                .flatMap(outlineProviderId ->
+                        accountIdentityQuery.resolveAccountId(outlineProviderId, outlineSubject, teamId))
                 .filter(accountId -> workspaceMembershipQuery.membershipsForAccount(accountId).stream()
                         .anyMatch(view ->
                                 view.workspaceId() == workspaceId && Objects.equals(view.accountId(), accountId)));

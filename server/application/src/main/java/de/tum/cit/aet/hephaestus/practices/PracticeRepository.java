@@ -65,8 +65,10 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         ItemKind getKind();
     }
 
-    @Query("SELECT DISTINCT r.practice FROM FeedbackBasis b JOIN Result r ON r.id = b.resultId"
-            + " WHERE b.feedbackId = :feedbackId AND b.workspaceId = :workspaceId")
+    @Query("SELECT DISTINCT p FROM FeedbackBasis b JOIN Result r ON r.id = b.resultId"
+            + " AND r.workspaceId = b.workspaceId JOIN Practice p ON p.id = r.practiceId"
+            + " AND p.workspaceId = r.workspaceId WHERE b.feedbackId = :feedbackId"
+            + " AND b.workspaceId = :workspaceId")
     List<Practice> findContributingPractices(Long workspaceId, UUID feedbackId);
 
     boolean existsByWorkspaceId(Long workspaceId);

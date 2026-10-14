@@ -33,6 +33,8 @@ import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionPropert
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobRequest;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobService;
@@ -45,6 +47,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -244,6 +247,9 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ConnectionService connectionService;
+
+    @Autowired
+    private ItemWriter itemWriter;
 
     @Autowired
     private ConnectionRepository connectionRepository;
@@ -833,12 +839,15 @@ class GitLabWorkspaceEventRoutingIntegrationTest extends BaseIntegrationTest {
                 });
         assertThat(issueRepository.findAll()).anyMatch(issue -> NATIVE_ISSUE_ID.equals(issue.getNativeId()));
         Workspace reviewed = workspaceRepository.findById(workspaceId).orElseThrow();
+        long repositoryItemId = itemWriter
+                .upsert(new ItemRegistration(workspaceId, ScmItemEvents.REPOSITORY, project.getId(), null, null))
+                .itemId();
         assertThat(practiceReviewCoverageService.scope(reviewed).repositories())
-                .extracting(ReviewRepositoryTarget::nameWithOwner)
-                .containsExactly(renamed);
-        assertThat(practiceReviewCoverageService.admits(reviewed, renamed, "main", null, true))
+                .extracting(ReviewRepositoryTarget::repositoryItemId)
+                .containsExactly(repositoryItemId);
+        assertThat(practiceReviewCoverageService.admits(reviewed, repositoryItemId, "main", null, true))
                 .isTrue();
-        assertThat(practiceReviewCoverageService.admits(reviewed, REPOSITORY, "main", null, true))
+        assertThat(practiceReviewCoverageService.admits(reviewed, Long.MAX_VALUE, "main", null, true))
                 .isFalse();
 
         ObjectNode rename = (ObjectNode) projectCreate(renamed, projectId);

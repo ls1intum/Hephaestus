@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.slack.capture;
 
-import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
@@ -13,6 +12,7 @@ import de.tum.cit.aet.hephaestus.evidence.capture.CitableText;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
@@ -67,10 +67,12 @@ public class ThreadCaptureSource {
                 || pinned.integration().workspaceId() != pinned.item().workspaceId())
             throw new ItemCaptureException(
                     ItemCaptureCode.ITEM_NOT_VISIBLE, "Thread source does not match the pinned item");
-        var connection = connections.findActive(pinned.item().workspaceId(), IntegrationKind.SLACK);
-        if (connection.isEmpty()
-                || !Objects.equals(
-                        connection.get().getInstanceKey(), pinned.integration().instanceKey())) {
+        boolean connected =
+                connections.findActiveConnections(pinned.item().workspaceId(), IntegrationKind.SLACK).stream()
+                        .anyMatch(connection -> Objects.equals(
+                                connection.getInstanceKey(),
+                                pinned.integration().instanceKey()));
+        if (!connected) {
             return contribution(
                     Map.of(),
                     Map.of(),

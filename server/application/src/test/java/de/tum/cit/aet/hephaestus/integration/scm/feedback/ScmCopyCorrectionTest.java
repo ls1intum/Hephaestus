@@ -8,7 +8,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyDisposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyForm;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyReceipt;
@@ -16,13 +15,8 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.LineNoteWriter;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GitHubLineNoteWriter;
-import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GitHubPrNodeIdResolver;
-import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GitHubSummaryWriter;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitLabLineNoteWriter;
-import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitLabMrResolver;
+import de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GitHubCorrectionTestFixture;
+import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitLabCorrectionTestFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
@@ -126,23 +120,9 @@ class ScmCopyCorrectionTest extends BaseUnitTest {
     }
 
     private LineNoteWriter writer(IntegrationKind kind, HttpGraphQlClient client) {
-        if (kind == IntegrationKind.GITHUB) {
-            var provider = mock(GitHubGraphQlClientProvider.class);
-            when(provider.forScope(1L)).thenReturn(client);
-            return new GitHubLineNoteWriter(
-                    provider,
-                    mock(GitHubPrNodeIdResolver.class),
-                    mock(OutboundEgressGuard.class),
-                    ScmFeedbackFixtures.resolver(),
-                    mock(GitHubSummaryWriter.class));
-        }
-        var provider = mock(GitLabGraphQlClientProvider.class);
-        when(provider.forScope(1L)).thenReturn(client);
-        return new GitLabLineNoteWriter(
-                provider,
-                mock(GitLabMrResolver.class),
-                mock(OutboundEgressGuard.class),
-                ScmFeedbackFixtures.resolver());
+        return kind == IntegrationKind.GITHUB
+                ? GitHubCorrectionTestFixture.writer(client)
+                : GitLabCorrectionTestFixture.writer(client);
     }
 
     private static void field(ClientGraphQlResponse response, String path, Object value) {

@@ -10,6 +10,9 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemListRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
@@ -18,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
@@ -35,13 +39,16 @@ class ScmWorkItemListerTest extends BaseUnitTest {
         var revision = new AtomicReference<>("before");
         when(sources.pin(any(), nullable(ItemVersion.class))).thenAnswer(call -> {
             ItemRef item = call.getArgument(0);
-            var snapshot = mock(ItemSnapshot.class);
-            when(snapshot.version())
-                    .thenReturn(
-                            item.kind().equals(ScmItemEvents.REPOSITORY)
-                                    ? commit
-                                    : new ItemVersion(revision.get() + ":" + item.sourceId(), null));
-            return snapshot;
+            var version = item.kind().equals(ScmItemEvents.REPOSITORY)
+                    ? commit
+                    : new ItemVersion(revision.get() + ":" + item.sourceId(), null);
+            return new ItemSnapshot(
+                    item,
+                    version,
+                    new IntegrationRef(IntegrationKind.GITHUB, 1, null),
+                    Map.of(),
+                    List.of(),
+                    new ItemLabel(item.itemId(), "Work", "Issue", 1, "owner/repo", null, IntegrationKind.GITHUB));
         });
         when(writer.upsert(any())).thenAnswer(call -> {
             ItemRegistration registration = call.getArgument(0);

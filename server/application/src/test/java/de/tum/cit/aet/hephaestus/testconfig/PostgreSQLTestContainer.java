@@ -80,8 +80,6 @@ public final class PostgreSQLTestContainer {
     }
 
     public static void migrateDatabase(TestDatabase testDatabase, String contexts) {
-        String validationSetting = System.getProperty("liquibase.validateXmlChangelogFiles");
-        System.setProperty("liquibase.validateXmlChangelogFiles", "false");
         try {
             for (String changelog : new String[] {"db/practice-cutover/released-main.xml", "db/master.xml"}) {
                 try (Connection connection = DriverManager.getConnection(
@@ -95,12 +93,6 @@ public final class PostgreSQLTestContainer {
             }
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to prepare migrated test database template", exception);
-        } finally {
-            if (validationSetting == null) {
-                System.clearProperty("liquibase.validateXmlChangelogFiles");
-            } else {
-                System.setProperty("liquibase.validateXmlChangelogFiles", validationSetting);
-            }
         }
     }
 

@@ -93,7 +93,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
     private ReviewJob createJobWithStatus(ReviewJobStatus status) {
         ReviewJob job = new ReviewJob();
         job.prePersist();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
         job.setStatus(status);
 
         ConfigSnapshot snapshot = new ConfigSnapshot(

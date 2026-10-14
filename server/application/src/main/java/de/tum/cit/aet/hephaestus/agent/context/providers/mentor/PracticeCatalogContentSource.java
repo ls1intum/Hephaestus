@@ -2,8 +2,9 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
-import de.tum.cit.aet.hephaestus.mentor.spi.MentorPracticeQuery;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeGuidanceRules;
+import de.tum.cit.aet.hephaestus.practices.spi.MentorPracticeQuery;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -12,6 +13,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class PracticeCatalogContentSource implements ContentSource {
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";

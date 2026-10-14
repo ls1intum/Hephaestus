@@ -29,6 +29,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxResult;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
@@ -1744,7 +1745,7 @@ public class ReviewJobExecutor {
 
     /**
      * A job whose purpose or binding is gone yields {@code null}, which
-     * {@link de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision#forFunding} judges against BOTH caps: an unattributable job must not be
+     * {@link LlmBudgetDecision#forFunding} judges against BOTH caps: an unattributable job must not be
      * a way around either one.
      */
     private @Nullable UsageFundingSource claimedFundingSource(ReviewJob job) {

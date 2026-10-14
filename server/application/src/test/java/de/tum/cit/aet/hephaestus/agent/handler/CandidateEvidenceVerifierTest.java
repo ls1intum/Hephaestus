@@ -44,7 +44,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -53,7 +52,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Function;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
@@ -69,6 +67,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
     private final CitationVerifier domain = mock(CitationVerifier.class);
 
     private CandidateEvidenceVerifier verifier(String text) {
+        job.setWorkspaceId(1);
         var policy = mock(SourceContract.class);
         when(catalogs.requireSource(new SourceContractVersion("2.0.0"), SOURCE)).thenReturn(policy);
         when(policy.appliesTo(KIND.value())).thenReturn(true);
@@ -85,8 +84,8 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
         lenient()
                 .when(files.inspect(eq(job), eq("context/body.txt"), any(), any()))
                 .thenAnswer(invocation -> {
-                    Function<Reader, Object> read = invocation.getArgument(3);
-                    return Optional.ofNullable(read.apply(new StringReader(text)));
+                    JobEvidenceFiles.TextInspection<Object> read = invocation.getArgument(3);
+                    return Optional.ofNullable(read.inspect(new StringReader(text)));
                 });
         return new CandidateEvidenceVerifier(files, catalogs, List.of(domain));
     }
@@ -132,7 +131,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
             {"outcome":"MET","summary":"The practice is met","explanation":"The captured body supports the criterion",
              "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
              "startLine":999,"endLine":999,"quote":"Exact quote"}],
-             "coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+             "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
             """));
     }
 

@@ -137,19 +137,21 @@ public class ReviewAssignmentStoreService implements ReviewAssignmentStore {
     @Override
     @Transactional
     public void withhold(long workspaceId, ReviewAssignmentId assignment, CandidateRefusal reason, String message) {
-        recordWithheld(workspaceId, assignment, reason.wireValue(), message);
+        recordWithheld(workspaceId, assignment, reason.wireValue(), message, false);
     }
 
     @Override
     @Transactional
     public void fail(long workspaceId, ReviewAssignmentId assignment, ReviewStopReason reason, String message) {
-        recordWithheld(workspaceId, assignment, reason.name(), message);
+        recordWithheld(workspaceId, assignment, reason.name(), message, true);
     }
 
-    private void recordWithheld(long workspaceId, ReviewAssignmentId id, String reason, String message) {
+    private void recordWithheld(
+            long workspaceId, ReviewAssignmentId id, String reason, String message, boolean terminalFailure) {
         var review = reviews.lockByIdAndWorkspaceId(id.reviewId(), workspaceId).orElseThrow();
         if (ReviewServiceImpl.terminal(review.getStatus())
-                || review.getChecks().path("cancellationRequested").asBoolean())
+                || (!terminalFailure
+                        && review.getChecks().path("cancellationRequested").asBoolean()))
             throw new IllegalStateException("This review no longer accepts withholding.");
         if (message.length() > 1000)
             throw new IllegalArgumentException("Use a withholding detail of at most 1000 characters.");
@@ -160,6 +162,10 @@ public class ReviewAssignmentStoreService implements ReviewAssignmentStore {
         var member = items.lockAssignment(workspaceId, id.reviewId(), id.practiceId(), id.itemId())
                 .orElseThrow();
         if (member.getState() != ReviewItemState.LISTED) return;
+        if (terminalFailure
+                && (member.getJobId() == null
+                        || !runtime.unsettledJobIds(workspaceId, id.reviewId()).contains(member.getJobId())))
+            throw new IllegalStateException("Only the bound terminal invocation can record an execution failure.");
         member.setState(ReviewItemState.WITHHELD);
         member.setReason(reason);
         member.setAttemptedAt(clock.instant());

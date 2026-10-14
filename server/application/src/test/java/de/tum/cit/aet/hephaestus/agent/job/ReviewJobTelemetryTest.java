@@ -33,7 +33,7 @@ class ReviewJobTelemetryTest {
         var telemetry = new ReviewJobTelemetry(registry, Tracer.NOOP);
         var job = new ReviewJob();
         job.prePersist();
-        RuntimeJobTestData.initialize(job, (workspace(42L)).getId());
+        RuntimeJobTestData.initialize(job, workspace(42L).getId());
 
         telemetry.terminal(job, ReviewJobStatus.COMPLETED, Duration.ofSeconds(3));
 
@@ -63,7 +63,7 @@ class ReviewJobTelemetryTest {
             var telemetry = new ReviewJobTelemetry(new SimpleMeterRegistry(), tracer);
             var job = new ReviewJob();
             job.prePersist();
-            RuntimeJobTestData.initialize(job, (workspace(42L)).getId());
+            RuntimeJobTestData.initialize(job, workspace(42L).getId());
             job.setTraceId("a".repeat(32));
             var span = telemetry.startExecution(job);
             try (var scope = telemetry.executionScope(span)) {
@@ -99,7 +99,7 @@ class ReviewJobTelemetryTest {
             var telemetry = new ReviewJobTelemetry(new SimpleMeterRegistry(), tracer);
             var job = new ReviewJob();
             job.prePersist();
-            RuntimeJobTestData.initialize(job, (workspace(42L)).getId());
+            RuntimeJobTestData.initialize(job, workspace(42L).getId());
 
             var failure = PreparationFailure.of(
                     PreparationFailure.Stage.PROVENANCE,

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
 import de.tum.cit.aet.hephaestus.agent.handler.ResultAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PublicFeedbackHistoryDTO;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabels;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ItemRefDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
@@ -23,6 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Reads the owning product modules' authorized snapshots, never their persistence model. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ReviewHistoryContentSource {
     private final ResultHistoryQuery results;

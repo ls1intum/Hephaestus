@@ -58,8 +58,8 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void unlinkSecondaryIdentityDeletesItAndKeepsTheRest() {
         Account account = accountRepository.save(new Account("Two-provider User"));
-        Identity github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-1", "octocat");
-        Identity gitlab = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-1", "gluser");
+        Identity github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-1");
+        Identity gitlab = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-1");
         String token = tokenFor(account);
 
         webTestClient
@@ -82,8 +82,8 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void unlinkIsReversibleTheSameProviderCanBeRelinked() {
         Account account = accountRepository.save(new Account("Reversible User"));
-        Identity github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
-        seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-rev", "rev-gl");
+        Identity github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev");
+        seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-rev");
         String token = tokenFor(account);
 
         webTestClient
@@ -100,7 +100,7 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         // identity can be linked again — the promise the disconnect dialog makes. A soft-delete
         // regression would leave the key occupied and this re-link would throw a unique violation.
         assertThat(identityRepository.findById(persistedId(github.getId()))).isEmpty();
-        Identity relinked = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev", "rev");
+        Identity relinked = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-rev");
         assertThat(identityRepository.findActiveByAccountId(persistedId(account.getId())))
                 .extracting(Identity::getId)
                 .contains(persistedId(relinked.getId()));
@@ -109,7 +109,7 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void cannotUnlinkTheOnlyRemainingIdentity() {
         Account account = accountRepository.save(new Account("Single-provider User"));
-        Identity only = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-only", "soloist");
+        Identity only = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-only");
         String token = tokenFor(account);
 
         webTestClient
@@ -131,12 +131,12 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void cannotUnlinkAnotherAccountsIdentity() {
         Account me = accountRepository.save(new Account("Me"));
-        seedLink(me, IdentityProviderType.GITHUB, "https://github.com", "gh-me", "me");
-        seedLink(me, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-me", "me-gl");
+        seedLink(me, IdentityProviderType.GITHUB, "https://github.com", "gh-me");
+        seedLink(me, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-me");
         String myToken = tokenFor(me);
 
         Account other = accountRepository.save(new Account("Other"));
-        Identity otherGithub = seedLink(other, IdentityProviderType.GITHUB, "https://github.com", "gh-other", "other");
+        Identity otherGithub = seedLink(other, IdentityProviderType.GITHUB, "https://github.com", "gh-other");
 
         webTestClient
                 .delete()
@@ -155,8 +155,8 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void unlinkingAnUnknownIdentityIs404() {
         Account account = accountRepository.save(new Account("User"));
-        seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-x", "x");
-        seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-x", "x-gl");
+        seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-x");
+        seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-x");
         String token = tokenFor(account);
 
         webTestClient
@@ -172,8 +172,8 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
     @Test
     void concurrentUnlinksCannotDrainTheAccountToZero() throws Exception {
         Account account = accountRepository.save(new Account("Race User"));
-        Identity a = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-race", "race");
-        Identity b = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-race", "race-gl");
+        Identity a = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "gh-race");
+        Identity b = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.lrz.de", "gl-race");
         String token = tokenFor(account);
 
         // Fire both unlinks at once. The pessimistic write-lock over the account's active links
@@ -215,8 +215,7 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
         };
     }
 
-    private Identity seedLink(
-            Account account, IdentityProviderType type, String serverUrl, String subject, String login) {
+    private Identity seedLink(Account account, IdentityProviderType type, String serverUrl, String subject) {
         IdentityProvider provider = gitProviderRepository
                 .findByTypeAndServerUrl(type, serverUrl)
                 .orElseGet(() -> gitProviderRepository.save(new IdentityProvider(type, serverUrl)));

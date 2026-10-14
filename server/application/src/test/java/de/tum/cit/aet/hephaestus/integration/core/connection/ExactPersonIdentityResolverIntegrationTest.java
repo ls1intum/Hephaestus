@@ -126,7 +126,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         denied.setAiChoice(AiChoice.NO_AI);
         denied.setAiChoiceAt(Instant.now());
         var account = accounts.saveAndFlush(denied);
-        link(account, canonical, "42", null, target.getId());
+        link(account, canonical, "42", null);
 
         var expected = List.of(identity(canonical, "42", null), identity(alias, "42", null));
         assertThat(resolver.accountFor(identity(alias, "42", null))).contains(Objects.requireNonNull(account.getId()));
@@ -153,8 +153,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
                 providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITLAB, "HTTPS://" + host + ":443/"));
         var first = accounts.saveAndFlush(new Account("first"));
         var second = accounts.saveAndFlush(new Account("second"));
-        link(first, canonical, "42", null, null);
-        link(second, alias, "42", null, null);
+        link(first, canonical, "42", null);
+        link(second, alias, "42", null);
         assertThatThrownBy(() -> resolver.accountFor(identity(canonical, "42", null)))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");
@@ -352,14 +352,14 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldIncludeDisabledLinksAndResolveActorsByNativeKeyInsteadOfCachedActor() {
+    void shouldIncludeDisabledLinksWhenResolvingEveryLinkedNativeProfile() {
         var github = provider(IdentityProviderType.GITHUB);
         var gitlab = provider(IdentityProviderType.GITLAB);
         var first = user(github, 42);
         var second = user(gitlab, 84);
         var account = accounts.saveAndFlush(new Account("Subject"));
-        link(account, github, "42", null, null);
-        var disabled = link(account, gitlab, "84", null, null);
+        link(account, github, "42", null);
+        var disabled = link(account, gitlab, "84", null);
         disabled.setDisabledAt(Instant.now());
         links.saveAndFlush(disabled);
         assertThat(resolver.accountFor(identity(gitlab, "84", null))).contains(Objects.requireNonNull(account.getId()));
@@ -373,18 +373,18 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldStopWhenCachedActorPointsAtAnotherPersonsProfile() {
+    void shouldResolveOnlyTheLinkedNativeProfileWhenAnotherProfileExists() {
         var github = provider(IdentityProviderType.GITHUB);
         var selected = user(github, 42);
         var other = user(github, 84);
         var account = accounts.saveAndFlush(new Account("Selected account"));
-        link(account, github, "42", null, other.getId());
+        link(account, github, "42", null);
         assertThat(resolver.accountFor(identity(github, "42", null))).contains(Objects.requireNonNull(account.getId()));
 
-        assertThatThrownBy(() -> resolver.resolve(account.getId(), List.of()))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("409")
-                .hasMessageContaining("conflicting cached actor");
+        var scope = resolver.resolve(account.getId(), List.of());
+        assertThat(scope.accountId()).isEqualTo(account.getId());
+        assertThat(scope.identities()).containsExactly(identity(github, "42", null));
+        assertThat(scope.userIds()).containsExactly(selected.getId()).doesNotContain(other.getId());
         assertThat(users.findById(selected.getId())).isPresent();
         assertThat(users.findById(other.getId())).isPresent();
     }
@@ -394,7 +394,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var github = provider(IdentityProviderType.GITHUB);
         var account = accounts.saveAndFlush(new Account("Requested subject"));
         var other = accounts.saveAndFlush(new Account("Other person"));
-        link(other, github, "42", null, null);
+        link(other, github, "42", null);
 
         assertThatThrownBy(() -> resolver.resolve(account.getId(), List.of(identity(github, "42", null))))
                 .isInstanceOf(ResponseStatusException.class)
@@ -409,8 +409,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var github = provider(IdentityProviderType.GITHUB);
         var first = accounts.saveAndFlush(new Account("First"));
         var second = accounts.saveAndFlush(new Account("Second"));
-        link(first, github, "42", null, null);
-        link(second, github, "84", null, null);
+        link(first, github, "42", null);
+        link(second, github, "84", null);
 
         assertThatThrownBy(() ->
                         resolver.resolve(null, List.of(identity(github, "42", null), identity(github, "84", null))))
@@ -423,8 +423,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var slack = provider(IdentityProviderType.SLACK);
         var first = accounts.saveAndFlush(new Account("First Slack person"));
         var second = accounts.saveAndFlush(new Account("Second Slack person"));
-        link(first, slack, "U42", "T1", null);
-        link(second, slack, "U42", "T2", null);
+        link(first, slack, "U42", "T1");
+        link(second, slack, "U42", "T2");
 
         assertThat(resolver.resolve(null, List.of(identity(slack, "U42", "T1"))).accountId())
                 .isEqualTo(first.getId());
@@ -480,12 +480,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         return new PersonIdentity(Objects.requireNonNull(provider.getId()), subject, teamId);
     }
 
-    private Identity link(
-            Account account,
-            IdentityProvider provider,
-            String subject,
-            @Nullable String teamId,
-            @Nullable Long actorId) {
+    private Identity link(Account account, IdentityProvider provider, String subject, @Nullable String teamId) {
         var link = new Identity();
         link.setAccount(account);
         link.setProviderId(Objects.requireNonNull(provider.getId()));
@@ -500,7 +495,7 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var outline = provider(IdentityProviderType.OUTLINE);
         var account = accounts.saveAndFlush(new Account("Outline person"));
         String subject = UUID.randomUUID().toString();
-        link(account, outline, subject, "outline-workspace", null);
+        link(account, outline, subject, "outline-workspace");
         var scope = resolver.resolve(null, List.of(identity(outline, subject, null)));
         assertThat(scope.accountId()).isEqualTo(account.getId());
         assertThat(scope.identities())
@@ -516,8 +511,8 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
         var first = accounts.saveAndFlush(new Account("First Outline person"));
         var second = accounts.saveAndFlush(new Account("Second Outline person"));
         String subject = UUID.randomUUID().toString();
-        link(first, outline, subject, "outline-workspace-a", null);
-        link(second, outline, subject, "outline-workspace-b", null);
+        link(first, outline, subject, "outline-workspace-a");
+        link(second, outline, subject, "outline-workspace-b");
         assertThatThrownBy(() -> resolver.resolve(null, List.of(identity(outline, subject, "outline-workspace-a"))))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409");

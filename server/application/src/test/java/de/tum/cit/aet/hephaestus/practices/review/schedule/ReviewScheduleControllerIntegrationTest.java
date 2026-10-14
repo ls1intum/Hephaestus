@@ -58,7 +58,35 @@ class ReviewScheduleControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("itemKind", "scm.repository", "cadence", "DAILY", "enabled", true))
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isBadRequest()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldReturnConflictWhenAScheduleAlreadyExistsForTheKind() {
+        var input = Map.of("itemKind", "scm.pull_request", "cadence", "DAILY", "enabled", false, "lookbackDays", 1);
+        http.post()
+                .uri(root() + "/practices/review-schedules")
+                .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(input)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(Void.class);
+        http.post()
+                .uri(root() + "/practices/review-schedules")
+                .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(input)
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.type")
+                .isEqualTo("/problems/review-schedule-conflict")
+                .jsonPath("$.status")
+                .isEqualTo(409);
     }
 
     @Test
@@ -72,6 +100,7 @@ class ReviewScheduleControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("enabled", false))
                 .exchange()
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 }

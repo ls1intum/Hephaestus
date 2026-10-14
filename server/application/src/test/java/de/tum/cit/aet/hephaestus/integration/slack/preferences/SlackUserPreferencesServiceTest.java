@@ -86,8 +86,8 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
     @Test
     void listReturnsOnlyAccessibleSlackWorkspacesWithConsentState() {
         givenWorkspaceSummary();
-        var slackLink = link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack");
-        var gitLabLink = link(7L, "42", null, "ga84xah");
+        var slackLink = link(SLACK_PROVIDER_ID, "U1", "T1");
+        var gitLabLink = link(7L, "42", null);
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID)).thenReturn(List.of(slackLink, gitLabLink));
         when(membershipQuery.membershipsForAccount(ACCOUNT_ID))
                 .thenReturn(List.of(
@@ -118,7 +118,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         when(connectionRepository.findActive(1L, IntegrationKind.SLACK))
                 .thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack")));
+                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1")));
         when(monitoredChannelRepository.countByWorkspaceIdAndConsentState(1L, ConsentState.ACTIVE))
                 .thenReturn(1L);
 
@@ -135,7 +135,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         when(connectionRepository.findActive(1L, IntegrationKind.SLACK))
                 .thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1", "Felix Slack")));
+                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U1", "T1")));
 
         service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, true);
 
@@ -149,7 +149,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
         when(connectionRepository.findActive(1L, IntegrationKind.SLACK))
                 .thenReturn(Optional.of(slackConnection(1L, "acme", "Hephaestus", "T1", "acme-slack")));
         when(accountIdentityQuery.activeLinksForAccount(ACCOUNT_ID))
-                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U2", "T2", "Other Slack")));
+                .thenReturn(List.of(link(SLACK_PROVIDER_ID, "U2", "T2")));
 
         assertThatThrownBy(() -> service.updateChannelMessagesAllowed(1L, ACCOUNT_ID, false))
                 .isInstanceOf(ResponseStatusException.class)
@@ -157,7 +157,7 @@ class SlackUserPreferencesServiceTest extends BaseUnitTest {
     }
 
     private static AccountIdentityQuery.IdentityView link(
-            long providerId, String subject, @Nullable String teamId, String username) {
+            long providerId, String subject, @Nullable String teamId) {
         return new AccountIdentityQuery.IdentityView(1L, providerId, subject, teamId == null ? "" : teamId);
     }
 

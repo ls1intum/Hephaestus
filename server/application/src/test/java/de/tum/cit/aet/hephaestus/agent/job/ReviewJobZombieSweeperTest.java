@@ -64,9 +64,6 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
             true, Duration.ofSeconds(1), 5, 5, Duration.ofSeconds(25), Duration.ofDays(14), Duration.ofDays(90));
 
     @Mock
-    private ReviewJobLifecycleService lifecycleService;
-
-    @Mock
     private LlmUsageRecorder usageRecorder;
 
     @BeforeEach
@@ -133,14 +130,14 @@ class ReviewJobZombieSweeperTest extends BaseUnitTest {
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setStartedAt(startedAt);
 
-        RuntimeJobTestData.initialize(job, (workspace(7L)).getId());
+        RuntimeJobTestData.initialize(job, workspace(7L).getId());
         job.setConfigSnapshot(admittedSnapshot(timeoutSeconds).toJson(objectMapper));
         return job;
     }
 
     private ReviewJob orphanedJob(UUID id, Long workspaceId, int attempt) {
         ReviewJob job = runningJob(id, Instant.now().minusSeconds(180), 600);
-        RuntimeJobTestData.initialize(job, (workspace(workspaceId)).getId());
+        RuntimeJobTestData.initialize(job, workspace(workspaceId).getId());
         job.setWorkerId(DEAD_WORKER_ID);
         job.setExecutionStartedAt(Instant.now());
         job.setAttempt(attempt);

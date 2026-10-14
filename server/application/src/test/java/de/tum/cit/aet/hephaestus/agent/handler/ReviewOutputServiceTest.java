@@ -31,6 +31,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -50,7 +51,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
     @BeforeEach
     void setup() {
         var assigned = RuntimeReviewTestData.assignment(5L, null);
-        when(assignments.load(job)).thenReturn(List.of(assigned));
+        when(assignments.admissible(job)).thenReturn(List.of(assigned));
         when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, assigned));
         var manifest = new JobFolderIndex(
                 new SourceContractVersion("2.0.0"),
@@ -76,7 +77,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         var candidate = mapper.readTree("""
             {"outcome":"MET","summary":"Clear names","explanation":"The names explain the document.",
              "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body","startLine":1,"endLine":1,"quote":"Clear names"}],
-             "coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+             "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
             """);
         return new AdmissionRequestDTO(
                 3,
@@ -102,7 +103,11 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                         RuntimeReviewTestData.assignment(5L, null).id(),
                         CandidateRefusal.QUOTE_UNVERIFIED,
                         "The text was unavailable");
-        assertThat(job.getCapture().path("withheld").get(0).path("reason").asString())
+        assertThat(Objects.requireNonNull(job.getCapture())
+                        .path("withheld")
+                        .get(0)
+                        .path("reason")
+                        .asString())
                 .isEqualTo("quote_unverified");
     }
 

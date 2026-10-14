@@ -108,33 +108,36 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
             ReviewJob selected = invocation.getArgument(0);
             var snapshot = ConfigSnapshot.fromJson(selected.getConfigSnapshot(), mapper);
             return bindings.findByWorkspaceIdAndPurposeAndDataHandlingTier(
-                    selected.getWorkspaceId(), AgentPurpose.PRACTICE_REVIEW, snapshot.dataHandlingTier());
+                    selected.getWorkspaceId(),
+                    AgentPurpose.PRACTICE_REVIEW,
+                    Objects.requireNonNull(snapshot.dataHandlingTier()));
         });
         var budgets = mock(LlmBudgetService.class);
         when(budgets.decide(anyLong())).thenReturn(LlmBudgetDecision.ALLOWED);
         var metrics = new SimpleMeterRegistry();
         // Hold dispatched sandbox work outside this test: admission, locks and RUNNING rows are real.
-        executor = new ReviewJobExecutor(properties,
-jobs,
-policy,
-mock(ReviewExecutionHandler.class),
-mock(ReviewJobAssignments.class),
-mock(PracticePiAdapter.class),
-mock(WorkerJwtIssuer.class),
-mock(SandboxManager.class),
-mock(AsyncTaskExecutor.class),
-transactions,
-mapper,
-metrics,
-new PracticeReviewRefusalMetrics(metrics),
-new ReviewJobTelemetry(metrics, Tracer.NOOP),
-mock(LlmUsageRecorder.class),
-mock(PracticeScriptRunRecorder.class),
-budgets,
-admission,
-Optional.empty(),
-Optional.empty(),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifier.class));
+        executor = new ReviewJobExecutor(
+                properties,
+                jobs,
+                policy,
+                mock(ReviewExecutionHandler.class),
+                mock(ReviewJobAssignments.class),
+                mock(PracticePiAdapter.class),
+                mock(WorkerJwtIssuer.class),
+                mock(SandboxManager.class),
+                mock(AsyncTaskExecutor.class),
+                transactions,
+                mapper,
+                metrics,
+                new PracticeReviewRefusalMetrics(metrics),
+                new ReviewJobTelemetry(metrics, Tracer.NOOP),
+                mock(LlmUsageRecorder.class),
+                mock(PracticeScriptRunRecorder.class),
+                budgets,
+                admission,
+                Optional.empty(),
+                Optional.empty(),
+                mock(ReviewMethodVerifier.class));
     }
 
     @Test
@@ -205,7 +208,7 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifie
         var inHouse = binding(DataHandlingTier.IN_HOUSE);
         var job = queued(inHouse);
         var routedElsewhere = binding(DataHandlingTier.CLOUD);
-        doReturn(Optional.of(routedElsewhere)).when(policy).binding(anyLong(), any(), any());
+        doReturn(Optional.of(routedElsewhere)).when(policy).binding(any(ReviewJob.class));
 
         assertThat(executor.processJob(job.getId())).isFalse();
         assertThat(jobs.findById(job.getId()))
@@ -265,7 +268,7 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.job.ReviewMethodVerifie
                             workspace.getId(), AgentPurpose.PRACTICE_REVIEW, binding.getDataHandlingTier())
                     .orElseThrow();
             var job = new ReviewJob();
-            RuntimeJobTestData.initialize(job, (workspace).getId());
+            RuntimeJobTestData.initialize(job, workspace.getId());
 
             job.setConfigSnapshot(ConfigSnapshot.from(currentBinding, resolver)
                     .withPriceSnapshot(admission.admit(currentBinding).price())

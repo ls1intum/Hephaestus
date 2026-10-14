@@ -1,4 +1,4 @@
-import type { ArtifactTrace, PracticeResultList, ReviewedWorkRef } from "~/api/types.gen";
+import type { ItemRef, OwnItemTrace, ResultList, ReviewRef } from "~/api/types.gen";
 import type { WorkPageView } from "~/shared/work-url";
 
 /**
@@ -19,11 +19,13 @@ export interface ReadyContext {
 	workspace: WorkspaceChoice;
 	/** Other workspaces that know the same work; the reader may switch to one. */
 	alternatives: WorkspaceChoice[];
-	work: ReviewedWorkRef;
-	canRequestReview: boolean;
+	/** The workspace's item for the work, as the server resolved it. */
+	item: ItemRef;
+	requestAllowed: boolean;
+	/** A workspace admin may open the review of every developer in the web app. */
 	canInspectReviewDetails: boolean;
-	/** `null` when no own review trace is available; other reviews may exist. */
-	trace: ArtifactTrace | null;
+	/** The trace of the reader's latest own review; `null` when none is available, though other reviews may exist. */
+	trace: OwnItemTrace | null;
 	links: { trace: string; reviewDetails?: string };
 	/** The page this answers for, canonical: a view shows it only while its tab shows the same. */
 	pageUrl: string;
@@ -48,24 +50,19 @@ export const THE_PAGE: WorkSubject = { kind: "page" };
 export interface WorkFeedback {
 	/** One per provider comment, newest feedback first. */
 	comments: WorkComment[];
-	/** Older feedback exists beyond these, so the count is a floor. */
-	more: boolean;
 	fetchedAt: string;
 }
 
 export interface WorkComment {
-	/**
-	 * The summary comment on the work, a comment on a line of its changes, or a comment on the work as a
-	 * whole that links to lines of its changes.
-	 */
-	kind: "SUMMARY" | "INLINE" | "LOCATION_COMMENT";
+	/** The summary comment on the work, a comment on lines of its changes, or a comment on one changed file. */
+	kind: "SUMMARY" | "LINE_NOTE" | "FILE_NOTE";
 	path?: string;
 	startLine?: number;
 	endLine?: number;
 	/** The practices its feedback named, by name; empty when only part of it was posted. */
 	practices: string[];
-	/** When feedback in it was last delivered, if Hephaestus recorded that. */
-	deliveredAt?: string;
+	/** When Hephaestus last recorded posting feedback in it. */
+	postedAt: string;
 	/** The comment's address on this work's pages, when the server recorded one; otherwise no link. */
 	permalink?: string;
 }
@@ -91,15 +88,15 @@ export type ReviewContext =
  * when it is not met, the one line of each problem under it.
  */
 export type ResultRow = Pick<
-	PracticeResultList,
+	ResultList,
 	| "id"
 	| "practiceName"
 	| "practiceSlug"
 	| "summary"
 	| "outcome"
 	| "severity"
-	| "claimCurrentness"
-	| "observedAt"
+	| "currentness"
+	| "recordedAt"
 	| "problems"
 >;
 
@@ -115,25 +112,15 @@ export interface ResultPage {
 export const SETTLING_REFRESH_MS = 10_000;
 export const VISIBLE_REFRESH_MS = 60_000;
 
-/** The named own review's recorded decision states, never another developer's run activity. */
-export type ReviewActivity = "deferred" | "pending";
+/** The named own review's status while it is still moving, never another developer's review. */
+export type ReviewActivity = Extract<ReviewRef["status"], "QUEUED" | "RUNNING">;
 
 export function reviewActivity(context: ReviewContext): ReviewActivity | undefined {
 	if (context.status !== "ready") {
 		return undefined;
 	}
-	const signals = context.trace?.signals ?? [];
-	const practices = context.trace?.practices ?? [];
-	if (signals.some((signal) => signal.state === "PENDING")) {
-		return "pending";
-	}
-	if (signals.some((signal) => signal.state === "DEFERRED")) {
-		return "deferred";
-	}
-	if (practices.some((entry) => entry.outcome === "PENDING")) {
-		return "pending";
-	}
-	return undefined;
+	const status = context.trace?.review.status;
+	return status === "QUEUED" || status === "RUNNING" ? status : undefined;
 }
 
 /** Whether the server reports anything about this work still moving, which sets how often a view asks again. */

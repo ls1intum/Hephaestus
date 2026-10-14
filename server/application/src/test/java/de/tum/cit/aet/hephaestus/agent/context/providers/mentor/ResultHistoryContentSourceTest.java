@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.agent.context.HistoryCopy;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
@@ -48,7 +49,9 @@ class ResultHistoryContentSourceTest extends BaseUnitTest {
         UUID id = UUID.randomUUID();
         var entry = mock(ResultHistoryEntry.class);
         when(entry.developerAccountId()).thenReturn(9L);
-        when(results.find(1, id, 2)).thenReturn(Optional.of(entry), Optional.empty());
+        when(results.find(1, id, 2, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .thenReturn(Optional.of(entry))
+                .thenReturn(Optional.empty());
         var source = new ResultHistoryContentSource(
                 results, new JsonMapper(), mock(HistoryCopies.class), mock(ConversationConsentGate.class));
         assertThat(source.inspect(1, 2, id).path("status").asString()).isEqualTo("NOT_FOUND");

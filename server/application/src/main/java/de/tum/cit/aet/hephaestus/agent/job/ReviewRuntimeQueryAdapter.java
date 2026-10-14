@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueueJob;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueueSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
@@ -16,20 +17,25 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewTimingSums;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewUsageAttempt;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewUsageSnapshot;
 import java.math.BigDecimal;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.support.SqlArrayValue;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,7 +48,7 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
     private final ReviewJobRepository jobs;
     private final ReviewAssignmentQuery assignments;
     private final JdbcClient jdbc;
-    private final ObjectProvider<ReviewTimingFactsQuery> timingFacts;
+    private final ReviewTimingFactsQuery timingFacts;
 
     @Override
     public Optional<ReviewRuntimeSnapshot> runtime(long workspaceId, UUID reviewId) {
@@ -164,7 +170,8 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
                 .query(UUID.class)
                 .list()
                 .stream()
-                .map(id -> {
+                .map(nullableId -> {
+                    var id = Objects.requireNonNull(nullableId);
                     var job = jobs.findByIdAndWorkspaceId(id, workspaceId).orElseThrow();
                     var people = job.getInput().assignments().stream()
                             .flatMap(assignmentId -> assignments.find(workspaceId, assignmentId).stream())
@@ -197,12 +204,34 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
     @Override
     public ReviewTimingSnapshot timing(long workspaceId, Instant from, Instant to, Instant longWaitThreshold) {
         if (!from.isBefore(to)) throw new IllegalArgumentException("The timing window is empty");
-        var rows = jobs
-                .findByWorkspaceIdAndAvailableAtGreaterThanEqualOrderByAvailableAtDesc(
-                        workspaceId, from, Pageable.unpaged())
-                .stream()
-                .filter(j -> j.getAvailableAt().isBefore(to))
-                .toList();
+        var product = timingFacts;
+        var timelines = product.window(workspaceId, from, to);
+        var reviewIds = timelines.stream().map(fact -> fact.reviewId()).toList();
+        var rows = new ArrayList<TimingJob>();
+        for (int offset = 0; offset < reviewIds.size(); offset += 1000) {
+            rows.addAll(jdbc.sql("SELECT"
+                            + " review_id,status,available_at,started_at,execution_started_at,completed_at,hold_reason"
+                            + " FROM review_job WHERE workspace_id=:ws AND review_id=ANY(:ids) ORDER BY"
+                            + " available_at,id")
+                    .param("ws", workspaceId)
+                    .param(
+                            "ids",
+                            new SqlArrayValue(
+                                    "uuid",
+                                    reviewIds
+                                            .subList(offset, Math.min(offset + 1000, reviewIds.size()))
+                                            .toArray()))
+                    .query((rs, n) -> new TimingJob(
+                            Objects.requireNonNull(rs.getObject("review_id", UUID.class)),
+                            ReviewJobStatus.valueOf(Objects.requireNonNull(rs.getString("status"))),
+                            Objects.requireNonNull(instant(rs, "available_at")),
+                            instant(rs, "started_at"),
+                            instant(rs, "execution_started_at"),
+                            instant(rs, "completed_at"),
+                            rs.getString("hold_reason")))
+                    .list());
+        }
+        var byReview = timelines.stream().collect(Collectors.toMap(fact -> fact.reviewId(), Function.identity()));
         var samples = new HashMap<String, List<Double>>();
         double queue = 0,
                 preparation = 0,
@@ -214,31 +243,62 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
                 finishedUnsplit = 0;
         long longWait = 0;
         for (var row : rows) {
-            var start = row.getStartedAt();
-            var execution = row.getExecutionStartedAt();
-            var end = row.getCompletedAt();
-            if (row.getStatus() == ReviewJobStatus.QUEUED
-                    && row.getAvailableAt().isBefore(longWaitThreshold)) longWait++;
+            if (row.status() == ReviewJobStatus.QUEUED
+                    && !ReviewJob.HOLD_REASON_BUDGET.equals(row.holdReason())
+                    && row.availableAt().isBefore(longWaitThreshold)) longWait++;
+            var start = row.startedAt();
             if (start == null) continue;
-            double q = seconds(row.getAvailableAt(), start);
-            queue += q;
-            samples.computeIfAbsent("queue", key -> new ArrayList<>()).add(q);
-            if (end == null) continue;
-            finishedQueue += q;
-            if (execution == null) {
-                double duration = seconds(start, end);
-                unsplit += duration;
-                finishedUnsplit += duration;
-                samples.computeIfAbsent("runUnsplit", key -> new ArrayList<>()).add(duration);
-            } else {
-                double p = seconds(start, execution), m = seconds(execution, end);
-                preparation += p;
-                finishedPreparation += p;
-                model += m;
-                finishedModel += m;
-                samples.computeIfAbsent("preparation", key -> new ArrayList<>()).add(p);
-                samples.computeIfAbsent("model", key -> new ArrayList<>()).add(m);
+            sample(samples, "QUEUE", seconds(row.availableAt(), start));
+            var fact = Objects.requireNonNull(byReview.get(row.reviewId()));
+            var publicAt = fact.publicCompletedAt();
+            var end = row.completedAt();
+            var execution = row.executionStartedAt();
+            var measuredEnd = end == null ? publicAt : end;
+            if (measuredEnd != null) {
+                if (execution == null) sample(samples, "RUN_UNSPLIT", seconds(start, measuredEnd));
+                else {
+                    sample(samples, "PREPARATION", seconds(start, execution));
+                    sample(samples, "MODEL", seconds(execution, measuredEnd));
+                }
             }
+            if (fact.firstAutomaticPostedAt() != null
+                    && publicAt != null
+                    && row.availableAt().isBefore(publicAt)) {
+                queue += interval(row.availableAt(), start, publicAt);
+                if (execution == null) unsplit += interval(start, end, publicAt);
+                else {
+                    preparation += interval(start, execution, publicAt);
+                    model += interval(execution, end, publicAt);
+                }
+            }
+            if (fact.finished() && end != null) {
+                finishedQueue += seconds(row.availableAt(), start);
+                if (execution == null) finishedUnsplit += seconds(start, end);
+                else {
+                    finishedPreparation += seconds(start, execution);
+                    finishedModel += seconds(execution, end);
+                }
+            }
+        }
+        Double posted = null, finishedPosted = null;
+        for (var fact : timelines) {
+            Instant basis = fact.origin() == ReviewOrigin.EVENT ? fact.eventAt() : fact.createdAt();
+            if (basis != null) {
+                sample(samples, "ASKED", seconds(basis, fact.createdAt()));
+                if (fact.firstAutomaticPostedAt() != null)
+                    sample(samples, "TOTAL", seconds(basis, fact.firstAutomaticPostedAt()));
+                if (fact.finished() && fact.completedAt() != null)
+                    sample(samples, "FINISHED", seconds(basis, fact.completedAt()));
+            }
+            var publicAt = fact.publicCompletedAt();
+            if (publicAt != null && fact.firstAutomaticPostedAt() != null) {
+                double delay = seconds(publicAt, fact.firstAutomaticPostedAt());
+                sample(samples, "POSTED", delay);
+                posted = (posted == null ? 0d : posted) + delay;
+                if (fact.finished()) finishedPosted = (finishedPosted == null ? 0d : finishedPosted) + delay;
+            }
+            if (publicAt != null && fact.firstReadAt() != null)
+                sample(samples, "READ", seconds(publicAt, fact.firstReadAt()));
         }
         var stages = new HashMap<String, ReviewTimingStage>();
         for (var entry : samples.entrySet()) {
@@ -246,29 +306,49 @@ public class ReviewRuntimeQueryAdapter implements ReviewRuntimeQuery {
             stages.put(
                     entry.getKey(), new ReviewTimingStage(sorted.size(), quantile(sorted, 0.5), quantile(sorted, 0.9)));
         }
-        var facts = timingFacts
-                .getObject()
-                .facts(
-                        workspaceId,
-                        rows.stream().map(ReviewJob::getReviewId).distinct().toList(), from, to);
+        var facts = product.facts(workspaceId, reviewIds, from, to);
         return new ReviewTimingSnapshot(
                 stages,
-                new ReviewTimingSums(facts.asked(), queue, preparation, model, unsplit, null),
+                new ReviewTimingSums(facts.asked(), queue, preparation, model, unsplit, posted),
                 new ReviewTimingSums(
                         facts.finishedAsked(),
                         finishedQueue,
                         finishedPreparation,
                         finishedModel,
                         finishedUnsplit,
-                        null),
+                        finishedPosted),
                 longWait,
                 facts.finishedAfterMerge(),
                 facts.finishedAfterMergeStartedByMerge(),
                 facts.feedbackWithheldAsMerged());
     }
 
+    private static void sample(Map<String, List<Double>> samples, String name, double value) {
+        samples.computeIfAbsent(name, key -> new ArrayList<>()).add(value);
+    }
+
+    private static double interval(Instant start, @Nullable Instant end, Instant cutoff) {
+        if (!start.isBefore(cutoff)) return 0;
+        return seconds(start, end == null || end.isAfter(cutoff) ? cutoff : end);
+    }
+
+    private record TimingJob(
+            UUID reviewId,
+            ReviewJobStatus status,
+            Instant availableAt,
+            @Nullable Instant startedAt,
+            @Nullable Instant executionStartedAt,
+            @Nullable Instant completedAt,
+            @Nullable String holdReason) {}
+
+    private static @Nullable Instant instant(ResultSet rs, String column) throws SQLException {
+        var value = rs.getObject(column, OffsetDateTime.class);
+        return value == null ? null : value.toInstant();
+    }
+
     private static double seconds(Instant from, Instant to) {
-        return Math.max(0, Duration.between(from, to).toNanos() / 1_000_000_000d);
+        var elapsed = Duration.between(from, to);
+        return Math.max(0, elapsed.getSeconds() + elapsed.getNano() / 1_000_000_000d);
     }
 
     private static double quantile(List<Double> sorted, double p) {

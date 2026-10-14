@@ -8,17 +8,15 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
-import de.tum.cit.aet.hephaestus.integration.core.framework.IntegrationManifestRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.handler.NatsMessageDeserializer;
-import de.tum.cit.aet.hephaestus.integration.core.itemevent.ItemEventRepository;
-import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.capture.ReviewRepositoryPreparer;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.CheckState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.MergeStateStatus;
@@ -48,9 +46,10 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.GraphQlResponses;
 import de.tum.cit.aet.hephaestus.testconfig.RecordingScmEventListener;
 import de.tum.cit.aet.hephaestus.testconfig.ScriptedGraphQlClient;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -93,9 +92,6 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("integration")
 @DisplayName("GitLab Merge Request Message Handler")
 class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTest {
-
-    @Autowired
-    private ReviewRepositoryPreparer repositoryPreparer;
 
     private static final long NATIVE_AUTHOR_ID = 18024L;
     private static final String FIXTURE_AUTHOR_LOGIN = "ga84xah";
@@ -146,6 +142,12 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
     private RepositoryRepository repositoryRepository;
 
     @Autowired
+    private ConnectionRepository connectionRepository;
+
+    @Autowired
+    private RepositoryToMonitorRepository repositoryMonitors;
+
+    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -162,18 +164,6 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
 
     @Autowired
     private RecordingScmEventListener eventListener;
-
-    @Autowired
-    private ItemEventRepository artifactSignalRepository;
-
-    @Autowired
-    private ItemWriter signalRecorder;
-
-    @Autowired
-    private IntegrationManifestRegistry manifests;
-
-    @Autowired
-    private WorkspaceResolver workspaceResolver;
 
     @Autowired
     private GitLabGraphQlResponseHandler graphQlResponseHandler;
@@ -2320,10 +2310,165 @@ class GitLabMergeRequestMessageHandlerIntegrationTest extends BaseIntegrationTes
         }
     }
 
-    /**
-     * A merge's review judges who merged only once Hephaestus knows who that was. MR !2's recorded
-     * merge hook names a merge commit but no merger and no merge time, and its user is the author,
-     * which says nothing about who merged. The listener and resubmitter are constructed here, as in
-     * {@link TombstonedWork}.
-     */
+    private GitLabMergeRequestProcessor.SyncReviewerData syncedReviewer(
+            long id, String username, @Nullable String state) {
+        return new GitLabMergeRequestProcessor.SyncReviewerData(syncedUser(id, username), state);
+    }
+
+    private GitLabMergeRequestProcessor.SyncUserData syncedUser(long id, String username) {
+        return new GitLabMergeRequestProcessor.SyncUserData(
+                "gid://gitlab/User/" + id, username, username, null, null, null, null);
+    }
+
+    /** MR !2 as a sync reads it, with only what these tests need; a list the sync did not read whole is null. */
+    private GitLabMergeRequestProcessor.SyncMergeRequestData syncedMergeRequest(
+            boolean approved,
+            @Nullable String detailedMergeStatus,
+            @Nullable List<GitLabMergeRequestProcessor.SyncReviewerData> reviewers,
+            @Nullable List<GitLabMergeRequestProcessor.SyncUserData> approvers) {
+        return syncedMergeRequest(
+                approved, detailedMergeStatus, reviewers, approvers, MR2_HEAD, GitLabHeadPipeline.NOT_CAPTURED);
+    }
+
+    /** MR !2 as a sync reads it at {@code head}, with its head pipeline as read. */
+    private GitLabMergeRequestProcessor.SyncMergeRequestData syncedMergeRequest(
+            boolean approved,
+            @Nullable String detailedMergeStatus,
+            @Nullable List<GitLabMergeRequestProcessor.SyncReviewerData> reviewers,
+            @Nullable List<GitLabMergeRequestProcessor.SyncUserData> approvers,
+            @Nullable String head,
+            GitLabHeadPipeline headPipeline) {
+        return syncedMergeRequest(approved, detailedMergeStatus, reviewers, approvers, head, headPipeline, null);
+    }
+
+    /** MR !2 as a sync reads it at {@code head}, with the diff base GitLab paired with that head where it gave one. */
+    private GitLabMergeRequestProcessor.SyncMergeRequestData syncedMergeRequest(
+            boolean approved,
+            @Nullable String detailedMergeStatus,
+            @Nullable List<GitLabMergeRequestProcessor.SyncReviewerData> reviewers,
+            @Nullable List<GitLabMergeRequestProcessor.SyncUserData> approvers,
+            @Nullable String head,
+            GitLabHeadPipeline headPipeline,
+            @Nullable String base) {
+        return new GitLabMergeRequestProcessor.SyncMergeRequestData(
+                "gid://gitlab/MergeRequest/" + NATIVE_MR2_ID,
+                String.valueOf(MR2_IID),
+                MR2_TITLE,
+                null, // description
+                "opened",
+                false, // draft
+                null, // mergeable
+                detailedMergeStatus,
+                approved,
+                "https://gitlab.lrz.de/" + FIXTURE_REPO_FULL_NAME + "/-/merge_requests/" + MR2_IID,
+                "2026-01-31T18:00:00Z",
+                "2026-01-31T18:10:00Z",
+                null, // closedAt
+                null, // mergedAt
+                1, // commitCount
+                0, // additions
+                0, // deletions
+                0, // fileCount
+                "feature/oauth",
+                "main",
+                head, // diffHeadSha
+                base, // baseSha
+                null, // mergeCommitSha
+                false, // discussionLocked
+                0, // commentsCount
+                "gid://gitlab/User/" + NATIVE_AUTHOR_ID,
+                FIXTURE_AUTHOR_LOGIN,
+                FIXTURE_AUTHOR_LOGIN,
+                null, // authorAvatarUrl
+                null, // authorWebUrl
+                null,
+                null, // authorPublicEmail
+                null, // mergeUserGlobalId
+                null, // mergeUserUsername
+                null, // mergeUserName
+                null, // mergeUserAvatarUrl
+                null, // mergeUserWebUrl
+                null,
+                null, // mergeUserPublicEmail
+                null, // syncLabels
+                null, // syncAssignees
+                reviewers,
+                approvers,
+                null, // syncParticipants
+                null, // milestoneIid
+                headPipeline,
+                null,
+                null); // closingIssueNumbers
+    }
+
+    /** Delivers {@code event} as the stream does: stored, then read from GitLab, then offered for review. */
+    private void deliver(GitLabMergeRequestEventDTO event) {
+        handler.dispatchEvent(event, Instant.now());
+    }
+
+    /** Handles {@code event} as a delivery that reached the stream now. */
+    private void receive(GitLabMergeRequestEventDTO event) {
+        handler.handle(event, Instant.now());
+    }
+
+    /** MR !2's update hook at {@code updatedAt}, carrying {@code description} where one is given. */
+    private GitLabMergeRequestEventDTO update(String updatedAt, @Nullable String description) throws IOException {
+        ObjectNode payload = (ObjectNode) objectMapper.readTree(
+                new ClassPathResource("gitlab/merge_request.update.json").getContentAsString(StandardCharsets.UTF_8));
+        ObjectNode attributes = (ObjectNode) payload.get("object_attributes");
+        attributes.put("updated_at", updatedAt);
+        if (description != null) {
+            attributes.put("description", description);
+        }
+        return objectMapper.treeToValue(payload, GitLabMergeRequestEventDTO.class);
+    }
+
+    private GitLabMergeRequestEventDTO loadPayload(String filename) throws IOException {
+        ClassPathResource resource = new ClassPathResource("gitlab/" + filename + ".json");
+        String json = resource.getContentAsString(StandardCharsets.UTF_8);
+        return objectMapper.readValue(json, GitLabMergeRequestEventDTO.class);
+    }
+
+    private void setupTestData() {
+        savedProvider = gitProviderRepository
+                .findByTypeAndServerUrl(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")
+                .orElseGet(() -> gitProviderRepository.save(
+                        new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.lrz.de")));
+
+        Organization org = new Organization();
+        org.setNativeId(1L);
+        org.setLogin(FIXTURE_ORG_LOGIN);
+        org.setCreatedAt(Instant.now());
+        org.setUpdatedAt(Instant.now());
+        org.setName("HephaestusTest");
+        org.setAvatarUrl("");
+        org.setHtmlUrl("https://gitlab.lrz.de/hephaestustest");
+        org.setProvider(savedProvider);
+        org = organizationRepository.save(org);
+
+        Repository repo = new Repository();
+        repo.setNativeId(246765L);
+        repo.setName("demo-repository");
+        repo.setNameWithOwner(FIXTURE_REPO_FULL_NAME);
+        repo.setHtmlUrl("https://gitlab.lrz.de/hephaestustest/demo-repository");
+        repo.setVisibility(Repository.Visibility.PRIVATE);
+        repo.setDefaultBranch("main");
+        repo.setCreatedAt(Instant.now());
+        repo.setUpdatedAt(Instant.now());
+        repo.setPushedAt(Instant.now());
+        repo.setOrganization(org);
+        repo.setProvider(savedProvider);
+        savedRepo = repositoryRepository.save(repo);
+
+        var workspace = WorkspaceTestFixtures.gitLabPatWorkspace("hephaestus-test-gitlab");
+        workspace.build().setPublicActivityEnabled(true);
+        savedWorkspace = WorkspaceTestFixtures.persistGitLabWorkspace(
+                workspaceRepository, connectionRepository, workspace, "https://gitlab.lrz.de");
+        repositoryMonitors.saveAndFlush(
+                WorkspaceTestFixtures.repositoryMonitor(savedWorkspace, FIXTURE_REPO_FULL_NAME));
+    }
+
+    private static long persistedId(IdentityProvider provider) {
+        return Objects.requireNonNull(provider.getId());
+    }
 }

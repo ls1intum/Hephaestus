@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -84,7 +85,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
                 issueRepository,
                 gitRepositoryManager,
                 repositoryPreparer,
-                org.mockito.Mockito.mock(ScmCaptureConsent.class));
+                mock(ScmCaptureConsent.class));
         lenient()
                 .when(repositoryPreparer.prepare(any()))
                 .thenReturn(new ReviewRepositoryPreparer.PreparedReview(KEY, HEAD, BASE));
@@ -690,12 +691,10 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
     class Failures {
 
         @Test
-        void missingRepositoryIdIsACollectionError() {
-            ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("pull_request_id", PR_ID);
-
-            assertThatExceptionOfType(ItemCaptureException.class)
-                    .isThrownBy(() -> provider.capture(request(metadata), provider.sourceKinds()));
+        void shouldRejectPinnedWorkWithoutARepository() {
+            var metadata = sampleMetadata();
+            metadata.put("repository_id", 0);
+            assertThatExceptionOfType(IllegalArgumentException.class).isThrownBy(() -> request(metadata));
         }
 
         @Test

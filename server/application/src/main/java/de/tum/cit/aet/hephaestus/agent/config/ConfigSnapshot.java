@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
 import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
+import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
@@ -19,7 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Immutable projection of a workspace's {@link WorkspaceAgentBinding} frozen at job submission time.
  *
- * <p>Stored as JSONB on {@link de.tum.cit.aet.hephaestus.agent.job.ReviewJob#getConfigSnapshot()}.
+ * <p>Stored as JSONB on {@link ReviewJob#getConfigSnapshot()}.
  * The executor reads this snapshot instead of the live binding so that in-flight jobs are not
  * affected by binding changes.
  *

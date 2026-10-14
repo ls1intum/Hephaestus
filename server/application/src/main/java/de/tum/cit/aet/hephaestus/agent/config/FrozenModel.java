@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.config;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
 import de.tum.cit.aet.hephaestus.agent.catalog.ModelBindingSource;
 import de.tum.cit.aet.hephaestus.agent.catalog.ReasoningEffort;
@@ -18,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * resolves its credential live.
  *
  * @param apiProtocol a {@code String}, because a pre-catalog snapshot can hold a protocol that {@link
- *     de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol} does not name
+ *     LlmApiProtocol} does not name
  * @param dataHandlingTier the tier slot of the binding that supplied this model
  * @param priceSnapshot the price frozen when the job was admitted; {@code null} until then
  */

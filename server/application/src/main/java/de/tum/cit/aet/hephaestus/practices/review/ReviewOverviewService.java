@@ -215,13 +215,15 @@ public class ReviewOverviewService {
                 .map(p -> {
                     var c = outcomes(ws, range, p.getId());
                     var statuses = jdbc
-                            .sql("SELECT rp.status,count(*) FROM review_practice rp JOIN review q ON"
-                                    + " q.id=rp.review_id AND q.workspace_id=rp.workspace_id WHERE"
-                                    + " rp.workspace_id=:ws AND rp.practice_id=:practice AND q.created_at>=:from"
-                                    + " GROUP BY rp.status")
+                            .sql("SELECT m.state,count(*) FROM review_item m JOIN review q ON"
+                                    + " q.id=m.review_id AND q.workspace_id=m.workspace_id WHERE"
+                                    + " m.workspace_id=:ws AND m.practice_id=:practice AND q.created_at>=:from"
+                                    + " AND q.created_at<:to AND (m.state='WITHHELD' OR (m.state='LISTED'"
+                                    + " AND q.status IN ('COMPLETE','PARTIAL','FAILED','CANCELLED'))) GROUP BY m.state")
                             .param("ws", ws)
                             .param("practice", p.getId())
                             .param("from", range.from())
+                            .param("to", range.to())
                             .query((rs, n) -> Map.entry(rs.getString(1), rs.getInt(2)))
                             .list()
                             .stream()
@@ -231,7 +233,7 @@ public class ReviewOverviewService {
                             Objects.requireNonNull(p.getCurrentVersion().getName()),
                             new OutcomeVectorDTO(c.met(), c.notMet(), c.doesNotApply(), c.couldNotDetermine()),
                             get(statuses, "WITHHELD"),
-                            get(statuses, "NOT_REACHED"));
+                            get(statuses, "LISTED"));
                 })
                 .toList();
     }

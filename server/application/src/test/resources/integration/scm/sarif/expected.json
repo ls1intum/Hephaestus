@@ -51,8 +51,8 @@
             }
           ],
           "properties": {
-            "problemId": "00000000-0000-0000-0000-000000000003",
-            "resultId": "00000000-0000-0000-0000-000000000004",
+            "problemId": "00000000-0000-4000-8000-000000000003",
+            "resultId": "00000000-0000-4000-8000-000000000004",
             "itemId": "3",
             "practiceVersionId": "4",
             "reviewDigest": "digest",
@@ -61,7 +61,7 @@
           }
         }
       ],
-      "baselineGuid": "00000000-0000-0000-0000-000000000002",
+      "baselineGuid": "00000000-0000-4000-8000-000000000002",
       "automationDetails": {
         "id": "hephaestus/1/2/default/selected/model/1/"
       },
@@ -86,7 +86,7 @@
       ],
       "properties": {
         "hephaestus": {
-          "scanId": "00000000-0000-0000-0000-000000000001",
+          "scanId": "00000000-0000-4000-8000-000000000001",
           "repositoryItemId": "2",
           "commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "listingComplete": true,

@@ -29,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.Mockito;
+import tools.jackson.databind.ObjectMapper;
 
 class RepositoryTreeContentSourceTest extends BaseUnitTest {
 
@@ -174,11 +175,11 @@ class RepositoryTreeContentSourceTest extends BaseUnitTest {
 
     private static ScmCaptureContext job(long repositoryId, @Nullable String commitSha) {
         return ScmCaptureFixtures.context(
-                new tools.jackson.databind.ObjectMapper()
+                new ObjectMapper()
                         .createObjectNode()
                         .put("repository_id", repositoryId)
                         .put("commit_sha", commitSha),
-                1L,
+                99L,
                 false);
     }
 }

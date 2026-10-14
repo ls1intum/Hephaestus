@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -86,7 +87,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         var issue = richIssue();
         issue.setBody(words);
         when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-        var captured = provider.capture(request(sampleMetadata()), Set.of(CORE));
+        var captured = provider.capture(request(sampleMetadata(), issue), Set.of(CORE));
         assertThat(captured.citableTexts())
                 .filteredOn(text -> text.path().equals(METADATA_KEY + "#/body"))
                 .singleElement()
@@ -109,7 +110,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         stubComments(List.of(comment("bob", "first", Instant.parse("2025-06-01T10:00:00Z"))));
         when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
-        var captured = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
+        var captured = provider.capture(request(sampleMetadata(), issue), Set.of(COMMENTS));
 
         assertThat(captured.completeness()).containsEntry(COMMENTS, SourceCompleteness.PARTIAL);
     }
@@ -124,7 +125,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
         var captured = excludingDelivered(firstFeedback, secondFeedback)
-                .capture(request(sampleMetadata()), Set.of(CORE, COMMENTS));
+                .capture(request(sampleMetadata(), issue, firstFeedback, secondFeedback), Set.of(CORE, COMMENTS));
 
         assertThat(objectMapper.readTree(captured.files().get(COMMENTS_KEY))).isEmpty();
         assertThat(captured.completeness()).containsEntry(COMMENTS, SourceCompleteness.COMPLETE);
@@ -148,7 +149,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
         var captured = excludingDelivered(firstFeedback, secondFeedback)
-                .capture(request(sampleMetadata()), Set.of(CORE, COMMENTS));
+                .capture(request(sampleMetadata(), issue, firstFeedback, secondFeedback), Set.of(CORE, COMMENTS));
 
         JsonNode comments = objectMapper.readTree(captured.files().get(COMMENTS_KEY));
         assertThat(comments).singleElement().satisfies(only -> {
@@ -170,16 +171,15 @@ class IssueContentSourceTest extends BaseUnitTest {
 
     /** A source whose delivery record names {@code delivered} as Hephaestus's own GitLab notes. */
     private IssueContentSource excludingDelivered(StoredComment... delivered) {
+        return new IssueContentSource(objectMapper, issueRepository, issueCommentRepository, versions(delivered));
+    }
+
+    private IssueEvidenceVersion versions(StoredComment... delivered) {
         List<DeliveredIssueCommentLookup.DeliveredComment> notes = new ArrayList<>();
-        for (StoredComment comment : delivered) {
+        for (StoredComment comment : delivered)
             notes.add(new DeliveredIssueCommentLookup.DeliveredComment(
                     "gid://gitlab/Note/" + comment.getNativeId(), null));
-        }
-        return new IssueContentSource(
-                objectMapper,
-                issueRepository,
-                issueCommentRepository,
-                new IssueEvidenceVersion(issueCommentRepository, new IssueCommentProvenance(deliveries(notes))));
+        return new IssueEvidenceVersion(issueCommentRepository, new IssueCommentProvenance(deliveries(notes)));
     }
 
     @Test
@@ -189,7 +189,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = sampleMetadata();
         metadata.put("itemVersion", "digest~old");
 
-        var captured = provider.capture(request(metadata), Set.of(CORE, COMMENTS));
+        var captured = provider.capture(request(metadata, issue), Set.of(CORE, COMMENTS));
 
         assertThat(captured.files()).isEmpty();
         assertThat(captured.stateOverrides())
@@ -210,7 +210,8 @@ class IssueContentSourceTest extends BaseUnitTest {
                         .of(ScmEventPayload.IssueData.from(issue))
                         .value());
         Map<String, byte[]> files = new HashMap<>();
-        files.putAll(provider.capture(request(metadata), provider.sourceKinds()).files());
+        files.putAll(provider.capture(request(metadata, issue), provider.sourceKinds())
+                .files());
         assertThat(files).containsKey(METADATA_KEY);
     }
 
@@ -221,24 +222,10 @@ class IssueContentSourceTest extends BaseUnitTest {
         return metadata;
     }
 
-    private ScmCaptureContext jobWith(ObjectNode metadata) {
-        return ScmCaptureFixtures.context(metadata, 1L, true);
-    }
-
-    private ScmCaptureContext request(ObjectNode metadata) {
+    private ScmCaptureContext request(ObjectNode metadata, @Nullable Issue pinned, StoredComment... delivered) {
         var context = ScmCaptureFixtures.context(metadata, 1L, true);
-        if (metadata.has("itemVersion")) return context;
-        var current = issueRepository
-                .findByIdWithRepository(metadata.path("issue_id").asLong())
-                .orElse(null);
-        return current == null
-                ? context
-                : ScmCaptureFixtures.withVersion(
-                        context,
-                        new IssueEvidenceVersion(
-                                        issueCommentRepository,
-                                        new IssueCommentProvenance(mock(DeliveredIssueCommentLookup.class)))
-                                .of(ScmEventPayload.IssueData.from(current)));
+        if (metadata.has("itemVersion") || pinned == null) return context;
+        return ScmCaptureFixtures.withVersion(context, versions(delivered).of(ScmEventPayload.IssueData.from(pinned)));
     }
 
     private User user(String login) {
@@ -336,6 +323,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         capturedProvider.setId(2L);
         repo.setProvider(capturedProvider);
         issue.setRepository(repo);
+        issue.setProvider(capturedProvider);
 
         Milestone milestone = new Milestone();
         milestone.setTitle("v1.0");
@@ -352,7 +340,7 @@ class IssueContentSourceTest extends BaseUnitTest {
 
         @Test
         void supportsIssueReviewRequest() {
-            assertThat(provider.supports(request(sampleMetadata()))).isTrue();
+            assertThat(provider.supports(request(sampleMetadata(), null))).isTrue();
         }
     }
 
@@ -361,10 +349,11 @@ class IssueContentSourceTest extends BaseUnitTest {
 
         @Test
         void writesIssueMetadataFields() throws Exception {
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+            var issue = richIssue();
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             assertThat(files).containsKey(METADATA_KEY);
@@ -390,7 +379,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             assertThat(repository).isNotNull();
             repository.setId(3L);
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata(), issue), Set.of(CORE))
                     .files()
                     .get(METADATA_KEY));
             assertThat(meta.path("repository_id").asLong()).isEqualTo(1L);
@@ -399,10 +388,11 @@ class IssueContentSourceTest extends BaseUnitTest {
 
         @Test
         void rollsUpSubIssueCounts() throws Exception {
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+            var issue = richIssue();
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode meta = objectMapper.readTree(files.get(METADATA_KEY));
@@ -419,7 +409,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             issue.setSubIssuesCompleted(0);
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
-            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata(), issue), Set.of(CORE))
                     .files()
                     .get(METADATA_KEY));
 
@@ -439,7 +429,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.countChildrenByParentIssueId(ISSUE_ID, Issue.State.CLOSED))
                     .thenReturn(children);
 
-            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata(), issue), Set.of(CORE))
                     .files()
                     .get(METADATA_KEY));
 
@@ -459,7 +449,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.countChildrenByParentIssueId(ISSUE_ID, Issue.State.CLOSED))
                     .thenReturn(children);
 
-            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata()), Set.of(CORE))
+            JsonNode meta = objectMapper.readTree(provider.capture(request(sampleMetadata(), issue), Set.of(CORE))
                     .files()
                     .get(METADATA_KEY));
 
@@ -470,10 +460,11 @@ class IssueContentSourceTest extends BaseUnitTest {
 
         @Test
         void sortsLabelsAlphabetically() throws Exception {
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+            var issue = richIssue();
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode labels = objectMapper.readTree(files.get(METADATA_KEY)).get("labels");
@@ -484,10 +475,11 @@ class IssueContentSourceTest extends BaseUnitTest {
 
         @Test
         void sortsAssigneeLoginsAlphabetically() throws Exception {
-            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(richIssue()));
+            var issue = richIssue();
+            when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode assignees = objectMapper.readTree(files.get(METADATA_KEY)).get("assignees");
@@ -503,7 +495,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode meta = objectMapper.readTree(files.get(METADATA_KEY));
@@ -524,7 +516,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
@@ -542,7 +534,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
@@ -563,7 +555,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             JsonNode comments = objectMapper.readTree(files.get(COMMENTS_KEY));
@@ -582,14 +574,14 @@ class IssueContentSourceTest extends BaseUnitTest {
                 comments.add(comment("u" + i, "Comment " + i, base.plusSeconds(i)));
             }
             stubComments(comments);
-            assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
+            assertThat(provider.capture(request(sampleMetadata(), issue), Set.of(COMMENTS))
                             .completeness()
                             .get(COMMENTS))
                     .isEqualTo(SourceCompleteness.COMPLETE);
 
             comments.add(comment("overflow", "Overflow", base.plusSeconds(comments.size())));
             stubComments(comments);
-            assertThat(provider.capture(request(sampleMetadata()), Set.of(COMMENTS))
+            assertThat(provider.capture(request(sampleMetadata(), issue), Set.of(COMMENTS))
                             .completeness()
                             .get(COMMENTS))
                     .isEqualTo(SourceCompleteness.COMPLETE);
@@ -606,7 +598,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             assertThat(files).containsKeys(METADATA_KEY, "context/description.md", COMMENTS_KEY);
@@ -629,7 +621,7 @@ class IssueContentSourceTest extends BaseUnitTest {
             when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
 
             Map<String, byte[]> files = new LinkedHashMap<>();
-            files.putAll(provider.capture(request(sampleMetadata()), provider.sourceKinds())
+            files.putAll(provider.capture(request(sampleMetadata(), issue), provider.sourceKinds())
                     .files());
 
             // An empty body still produces a valid metadata body field (empty string, not null).
@@ -642,12 +634,14 @@ class IssueContentSourceTest extends BaseUnitTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void shouldReportUnavailableThenAllowCaptureWhenArtifactReturns(boolean tombstoned) {
-        var artifact = new Issue();
+        var artifact = richIssue();
+        var pinned = request(sampleMetadata(), artifact);
+        clearInvocations(issueCommentRepository);
         artifact.setDeletedAt(Instant.parse("2026-09-05T00:00:00Z"));
         when(issueRepository.findByIdWithRepository(ISSUE_ID))
                 .thenReturn(tombstoned ? Optional.of(artifact) : Optional.empty());
         for (var kind : provider.sourceKinds()) {
-            var captured = provider.capture(request(sampleMetadata()), Set.of(kind));
+            var captured = provider.capture(pinned, Set.of(kind));
             assertThat(captured.files()).isEmpty();
             assertThat(captured.completeness()).isEmpty();
             assertThat(captured.contentStates()).isEmpty();
@@ -658,7 +652,7 @@ class IssueContentSourceTest extends BaseUnitTest {
         verifyNoInteractions(issueCommentRepository);
         artifact.setDeletedAt(null);
         when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(artifact));
-        var restored = provider.capture(request(sampleMetadata()), Set.of(COMMENTS));
+        var restored = provider.capture(pinned, Set.of(COMMENTS));
         assertThat(restored.stateOverrides()).isEmpty();
         assertThat(restored.files()).isNotEmpty();
     }

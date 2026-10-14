@@ -149,6 +149,26 @@ class ThreadItemSourceIntegrationTest extends BaseIntegrationTest {
                         new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE));
     }
 
+    @Test
+    void anotherActiveSlackTeamCannotReplaceTheThreadSourceConnection() {
+        var fixture = fixture();
+        var pinned = source.pin(fixture.item(), null);
+        var workspace = workspaces.findById(fixture.item().workspaceId()).orElseThrow();
+        String otherTeam = "other-" + UUID.randomUUID();
+        var other = new Connection(
+                workspace,
+                IntegrationKind.SLACK,
+                otherTeam,
+                new ConnectionConfig.SlackConfig(otherTeam, null, null, Set.of()));
+        other.setState(IntegrationState.ACTIVE);
+        connections.saveAndFlush(other);
+
+        assertThat(source.permits(fixture.item(), SourceUsePurpose.CONVERSATIONAL_MENTORING))
+                .isTrue();
+        assertThat(source.pin(fixture.item(), null).integration()).isEqualTo(pinned.integration());
+        assertThat(source.capture(pinned, request()).files()).containsKey(ThreadCaptureSource.OUTPUT_KEY);
+    }
+
     private Fixture fixture() {
         var workspace = workspaces.save(WorkspaceTestFixtures.activeWorkspace("thread-source-" + UUID.randomUUID()));
         long workspaceId = workspace.getId();

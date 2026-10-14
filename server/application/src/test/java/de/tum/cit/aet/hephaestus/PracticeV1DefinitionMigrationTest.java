@@ -175,6 +175,7 @@ class PracticeV1DefinitionMigrationTest {
             FROM practice WHERE id=992121;
             UPDATE practice SET criteria='Changed standard.',current_revision_id=992132,
                 source_curated_slug='local-offer',source_curated_fingerprint='v5:'||repeat('a',64),
+                adopted_base_source='EXACT_ADOPTION',
                 adopted_base=jsonb_build_object('name',name,'signals',signals,'reviewWhen',review_when,
                     'subject',subject,'precondition',precondition,'criteria','Original standard.',
                     'evidenceRequirements',evidence_requirements,'automatedReviewPolicy',automated_review_policy,

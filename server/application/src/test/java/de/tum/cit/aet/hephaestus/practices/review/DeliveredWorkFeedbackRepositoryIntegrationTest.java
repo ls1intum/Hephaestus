@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,10 +29,13 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -57,8 +61,7 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
         var feedback = feedback(result, "UNCONFIRMED");
         copy(result, feedback, 0, true);
         copy(result, feedback, 1, false);
-        var metadata =
-                ledger.findDelivered(result.getWorkspaceId(), scenario.account().getId(), result.getItemId());
+        var metadata = ledger.findDelivered(result.getWorkspaceId(), scenarioAccountId, result.getItemId());
         assertThat(metadata).singleElement().satisfies(f -> {
             assertThat(f.id()).isEqualTo(feedback);
             assertThat(f.copies()).hasSize(1);
@@ -71,8 +74,7 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
         var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
         var feedback = feedback(result, "UNCONFIRMED");
         copy(result, feedback, 0, false);
-        assertThat(ledger.findDelivered(
-                        result.getWorkspaceId(), scenario.account().getId(), result.getItemId()))
+        assertThat(ledger.findDelivered(result.getWorkspaceId(), scenarioAccountId, result.getItemId()))
                 .isEmpty();
     }
 
@@ -81,8 +83,7 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
         var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
         var feedback = feedback(result, "REPLACED");
         copy(result, feedback, 0, true);
-        assertThat(ledger.findDelivered(
-                        result.getWorkspaceId(), scenario.account().getId(), result.getItemId()))
+        assertThat(ledger.findDelivered(result.getWorkspaceId(), scenarioAccountId, result.getItemId()))
                 .isEmpty();
     }
 
@@ -96,7 +97,7 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
                 .param("ws", result.getWorkspaceId())
                 .param("review", result.getReviewId())
                 .param("item", result.getItemId())
-                .param("developer", scenario.account().getId())
+                .param("developer", scenarioAccountId)
                 .param("state", state)
                 .param("at", result.getRecordedAt())
                 .update();
@@ -106,7 +107,7 @@ class DeliveredWorkFeedbackRepositoryIntegrationTest extends BaseIntegrationTest
                 .param("ws", result.getWorkspaceId())
                 .param("feedback", id)
                 .param("result", result.getId())
-                .param("developer", scenario.account().getId())
+                .param("developer", scenarioAccountId)
                 .update();
         return id;
     }

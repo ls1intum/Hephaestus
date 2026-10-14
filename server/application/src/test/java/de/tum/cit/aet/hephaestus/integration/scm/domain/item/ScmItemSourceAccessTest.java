@@ -10,8 +10,8 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentityResolver;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
@@ -72,8 +72,12 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         when(fixture.issues().findByIdWithAuthorAndRepository(6L)).thenReturn(Optional.of(issue));
         when(fixture.contributors().identitiesForSource(1, "scm.issue", 6))
                 .thenReturn(List.of(new PersonIdentity(7, "author", null), new PersonIdentity(7, "commenter", null)));
-        when(fixture.identities().accountFor(new PersonIdentity(7L, "author", null))).thenReturn(Optional.of(8L));
-        when(fixture.identities().accountFor(new PersonIdentity(7L, "commenter", null))).thenReturn(Optional.of(9L));
+        when(fixture.suppression().isSuppressed(7, "author", null)).thenReturn(false);
+        when(fixture.suppression().isSuppressed(7, "commenter", null)).thenReturn(false);
+        when(fixture.identities().accountFor(new PersonIdentity(7L, "author", null)))
+                .thenReturn(Optional.of(8L));
+        when(fixture.identities().accountFor(new PersonIdentity(7L, "commenter", null)))
+                .thenReturn(Optional.of(9L));
         when(fixture.accounts().find(8L))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         8, Account.Status.ACTIVE, "Author", AiChoice.CLOUD, null, true)));
@@ -90,6 +94,7 @@ class ScmItemSourceAccessTest extends BaseUnitTest {
         when(fixture.accounts().find(9L))
                 .thenReturn(Optional.of(new AccountDirectory.AccountView(
                         9, Account.Status.ACTIVE, "Commenter", AiChoice.IN_HOUSE_ONLY, null, true)));
+        assertThat(fixture.service().permits(ref, PURPOSE)).isTrue();
         when(fixture.suppression().isSuppressed(7, "commenter", null)).thenReturn(true);
         assertThat(fixture.service().permits(ref, PURPOSE)).isFalse();
         when(fixture.suppression().isSuppressed(7, "commenter", null)).thenReturn(false);

@@ -192,7 +192,8 @@ class WorkspaceOnboardingServiceTest extends BaseUnitTest {
         when(links.options(1L, 10L, List.of(9L))).thenReturn(List.of(UNAVAILABLE_SLACK));
         var result = service.choose(context, 10L, AiChoice.NO_AI);
         verify(choices).setAiChoice(10L, AiChoice.NO_AI);
-        assertThat(savedChoices.get(10L).getAiChoiceAt()).isEqualTo(NOW);
+        var savedAccount = Objects.requireNonNull(savedChoices.get(10L));
+        assertThat(savedAccount.getAiChoiceAt()).isEqualTo(NOW);
         // The page reads the answer back the same way every other workspace will.
         assertThat(result.aiChoice()).isEqualTo(AiChoice.NO_AI);
         verify(members, never()).save(any());

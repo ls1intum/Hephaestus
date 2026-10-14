@@ -22,6 +22,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
 import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
@@ -46,6 +47,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Captures one pinned item through its domain source and stages the same contract for every kind. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
     private final ReviewJobAssignments assignments;
@@ -214,10 +216,10 @@ public class DefaultReviewExecutionHandler implements ReviewExecutionHandler {
                             .orElse(null);
                     var missing = new ArrayList<SourceReadinessReason>();
                     if (read.need() != ReadNeed.OPTIONAL) {
-                        if (!(state instanceof SourceCaptureState.Available))
+                        if (!(state instanceof SourceCaptureState.Available available))
                             missing.add(SourceReadinessReason.SOURCE_NOT_AVAILABLE);
                         else if (read.need() == ReadNeed.COMPLETE
-                                && ((SourceCaptureState.Available) state).completeness() != SourceCompleteness.COMPLETE)
+                                && available.completeness() != SourceCompleteness.COMPLETE)
                             missing.add(SourceReadinessReason.SOURCE_INCOMPLETE);
                     }
                     return new SourceReadinessCheck(

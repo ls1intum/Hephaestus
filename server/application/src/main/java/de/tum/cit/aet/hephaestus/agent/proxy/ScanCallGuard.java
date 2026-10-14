@@ -67,7 +67,12 @@ public class ScanCallGuard {
             if (model == null || model.priceSnapshot() == null) throw refused();
             var cap = reviews.budgetUsd(workspace, job.getReviewId()).orElseThrow(ScanCallGuard::refused);
             var spent = budget.spent(workspace, job.getReviewId());
-            BigDecimal inFlight = budget.inFlight(job, snapshot);
+            BigDecimal inFlight;
+            try {
+                inFlight = budget.inFlight(job, snapshot);
+            } catch (IllegalStateException unavailable) {
+                throw refused();
+            }
             String slot = route.practiceScriptSlot() == null
                     ? "review"
                     : route.practiceScriptSlot().name().toLowerCase(Locale.ROOT);
@@ -112,6 +117,12 @@ public class ScanCallGuard {
         for (String field : List.of("max_tokens", "max_completion_tokens", "max_output_tokens")) {
             if (!request.has(field)) continue;
             var value = request.path(field);
+            if (!value.isIntegralNumber() || value.asLong() <= 0 || value.asLong() > limit) throw refused();
+            requested = Math.min(requested, value.asLong());
+        }
+        var generation = request.path("generationConfig");
+        if (generation.has("maxOutputTokens")) {
+            var value = generation.path("maxOutputTokens");
             if (!value.isIntegralNumber() || value.asLong() <= 0 || value.asLong() > limit) throw refused();
             requested = Math.min(requested, value.asLong());
         }

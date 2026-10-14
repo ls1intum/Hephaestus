@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,10 +27,13 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -56,7 +60,7 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
                 .jsonPath("$.reviewId")
                 .isEqualTo(r.getReviewId().toString())
                 .jsonPath("$.developer.accountId")
-                .isEqualTo(scenario.account().getId().toString())
+                .isEqualTo(Long.toString(scenarioAccountId))
                 .jsonPath("$.problems.length()")
                 .isEqualTo(1);
         get("/practices/reviews/problems?resultId=" + r.getId())
@@ -95,6 +99,9 @@ class PracticeReviewOutputControllerIntegrationTest extends BaseIntegrationTest 
     @Test
     void foreignResultIsNotFound() {
         var r = data.result(data.scenario(), ResultOutcome.MET, Instant.now());
-        get("/practices/reviews/results/" + r.getId()).expectStatus().isNotFound();
+        get("/practices/reviews/results/" + r.getId())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
     }
 }

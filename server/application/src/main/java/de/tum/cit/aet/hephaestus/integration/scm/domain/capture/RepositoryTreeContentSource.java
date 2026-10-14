@@ -148,7 +148,7 @@ public class RepositoryTreeContentSource {
             throw new ItemCaptureException(
                     ItemCaptureCode.CAPTURE_FAILED, "Pull request job has no repository_id: jobId=" + request.jobId());
         }
-        String commitSha = Objects.requireNonNull(metadata.head(), "Pinned SCM work has no head");
+        String commitSha = metadata.head();
         if (commitSha == null || commitSha.isBlank()) {
             throw new ItemCaptureException(
                     ItemCaptureCode.CAPTURE_FAILED, "Pull request job has no commit_sha: jobId=" + request.jobId());

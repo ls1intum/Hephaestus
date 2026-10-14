@@ -543,9 +543,11 @@ public class GitHubLineNoteWriter implements LineNoteWriter {
         if (diff.endLine() == null || diff.side() == null) return false;
         Integer startLine = diff.startLine();
         Integer expectedStart = startLine != null && startLine < diff.endLine() ? startLine : null;
+        String expectedSide = diff.side() == CitationSide.OLD ? "LEFT" : "RIGHT";
         return Boolean.TRUE.equals(comment.get("viewerDidAuthor"))
                 && body.equals(postedBody(item, readback))
-                && (diff.side() == CitationSide.OLD ? "LEFT" : "RIGHT").equals(comment.get("diffSide"))
+                && expectedSide.equals(comment.get("diffSide"))
+                && (expectedStart == null || expectedSide.equals(comment.get("startDiffSide")))
                 && diff.path().equals(comment.get("path"))
                 && comment.get("originalLine") instanceof Number line
                 && line.intValue() == diff.endLine()

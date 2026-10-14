@@ -907,7 +907,7 @@ class JobEvidenceFilesTest extends BaseUnitTest {
         workspace.setId(1L);
         var job = new ReviewJob();
         job.setId(UUID.randomUUID());
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
         job.setWorkerId("worker");
         return job;
     }

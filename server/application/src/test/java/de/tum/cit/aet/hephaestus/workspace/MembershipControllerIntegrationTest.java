@@ -47,7 +47,7 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         Workspace workspace =
                 createWorkspace("membership-space", "Membership Space", "membership", AccountType.ORG, owner);
 
-        ensureAdminMembership(workspace);
+        var admin = ensureAdminMembership(workspace);
 
         User member = persistUser("membership-member");
         workspaceMembershipService.createMembership(workspace, accountId(member), WorkspaceRole.MEMBER);
@@ -65,8 +65,11 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
 
         assertThat(memberships).isNotNull();
         assertThat(memberships)
-                .extracting(WorkspaceMembershipDTO::userLogin)
-                .containsExactlyInAnyOrder("admin", "membership-member", "membership-owner");
+                .extracting(WorkspaceMembershipDTO::accountId)
+                .containsExactlyInAnyOrder(
+                        Long.toString(accountId(owner)),
+                        Long.toString(accountId(member)),
+                        Objects.requireNonNull(admin.getAccountId()).toString());
     }
 
     @ParameterizedTest

@@ -19,6 +19,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.CopyUpdateReceipt;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackNotSentException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackTarget;
@@ -355,8 +356,8 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
         FeedbackTarget target = gitlabTarget();
         assertThatThrownBy(() -> channel.updateSummary(
                         target, new SummaryHandle("  ", null), ScmFeedbackFixtures.summary("body", "marker")))
-                .isInstanceOf(FeedbackDeliveryException.class)
-                .hasMessageContaining("external note id is missing");
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Summary reference is blank");
     }
 
     private void stubMutationErrors(List<String> errors) {
@@ -754,7 +755,7 @@ class GitLabSummaryWriterTest extends BaseUnitTest {
 
     @Test
     void blankNativeSummaryIdCannotAcknowledgeDelivery() {
-        assertThatThrownBy(() -> new SummaryHandle(" ", null)).isInstanceOf(FeedbackDeliveryException.class);
+        assertThatThrownBy(() -> new SummaryHandle(" ", null)).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

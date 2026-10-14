@@ -49,7 +49,7 @@ class CapturedEvidenceTest extends BaseUnitTest {
                                 new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND),
                                 List.of())),
                 List.of(),
-                (List.of(
+                List.of(
                                 new SourceCapture(
                                         CONTENT,
                                         new SourceCaptureState.Available(
@@ -62,11 +62,11 @@ class CapturedEvidenceTest extends BaseUnitTest {
                                 new SourceCapture(
                                         COMMENTS,
                                         new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND),
-                                        List.of())))
+                                        List.of()))
                         .stream()
-                                .flatMap(captureSource -> captureSource.files().stream()
-                                        .map(captureFile -> new FolderSource(captureSource.kind(), captureFile)))
-                                .toList(),
+                        .flatMap(captureSource -> captureSource.files().stream()
+                                .map(captureFile -> new FolderSource(captureSource.kind(), captureFile)))
+                        .toList(),
                 List.of());
         var capture = mapper.createObjectNode();
         capture.set("manifest", mapper.valueToTree(manifest));

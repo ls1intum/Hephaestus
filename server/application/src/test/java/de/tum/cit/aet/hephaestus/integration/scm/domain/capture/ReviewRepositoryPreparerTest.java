@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -86,8 +87,7 @@ class ReviewRepositoryPreparerTest extends BaseUnitTest {
     @Test
     void shouldRefuseUnavailablePinnedBaseWithoutMovingIt() {
         when(git.commitExists(any(), anyString())).thenReturn(true);
-        when(git.commitExists(any(), org.mockito.ArgumentMatchers.eq("b".repeat(40))))
-                .thenReturn(false);
+        when(git.commitExists(any(), eq("b".repeat(40)))).thenReturn(false);
         assertThatThrownBy(() -> preparer.prepare(context))
                 .isInstanceOf(ItemCaptureException.class)
                 .hasMessageContaining("Pinned review diff range");

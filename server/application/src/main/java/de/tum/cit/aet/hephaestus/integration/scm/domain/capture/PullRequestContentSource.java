@@ -348,14 +348,14 @@ public class PullRequestContentSource {
         // Preserve admission identity; the mirror supplies its provider only while it still
         // matches.
         result.put("repository_id", work.repositoryId());
-        result.put("provider_id", pullRequest.getProvider().getId());
+        var repository = pullRequest.getRepository();
+        if (repository != null && Objects.equals(repository.getId(), work.repositoryId()))
+            result.put("provider_id", repository.getProvider().getId());
         result.put("source_branch", work.sourceBranch());
         result.put("target_branch", work.targetBranch());
         String reviewedHead = Objects.requireNonNull(work.head(), "Pinned pull request has no head");
         result.put("commit_sha", reviewedHead);
-        result.put(
-                "subject_role",
-                "REVIEWER".equals((work.reviewSourceId() == null ? "AUTHOR" : "REVIEWER")) ? "REVIEWER" : "AUTHOR");
+        result.put("subject_role", work.reviewSourceId() == null ? "AUTHOR" : "REVIEWER");
 
         // Absent key: the job does not carry the text, which is unknown, never the current text
         // instead.

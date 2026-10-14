@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +29,13 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -58,7 +62,7 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
                         r.getId(), scenario.workspace().getId())
                 .orElseThrow();
         assertThat(saved.getReviewId()).isEqualTo(r.getReviewId());
-        assertThat(saved.getDeveloperId()).isEqualTo(scenario.account().getId());
+        assertThat(saved.getDeveloperId()).isEqualTo(scenarioAccountId);
         assertThat(saved.getEvidenceVersion()).isEqualTo(1);
         assertThat(problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(saved.getWorkspaceId(), r.getId()))
                 .hasSize(1);
@@ -78,7 +82,7 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
     @Test
     void markingIncorrectDoesNotFreeCurrentClaim() {
         var r = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
-        data.mark(r, ResultMarkKind.INCORRECT, scenario.account().getId());
+        data.mark(r, ResultMarkKind.INCORRECT, scenarioAccountId);
         assertThat(results.findCurrentClaim(r.getWorkspaceId(), r.getPracticeId(), r.getItemId(), r.getDeveloperId()))
                 .get()
                 .extracting(Result::getId)
@@ -88,7 +92,7 @@ class ResultRepositoryIntegrationTest extends BaseIntegrationTest {
     @Test
     void acceptedDoesNotChangeNotMetOutcome() {
         var r = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
-        data.mark(r, ResultMarkKind.ACCEPTED, scenario.account().getId());
+        data.mark(r, ResultMarkKind.ACCEPTED, scenarioAccountId);
         assertThat(results.findById(r.getId()).orElseThrow().getOutcome()).isEqualTo(ResultOutcome.NOT_MET);
         assertThat(problems.findByWorkspaceIdAndResultIdOrderByPositionAsc(r.getWorkspaceId(), r.getId()))
                 .hasSize(1);

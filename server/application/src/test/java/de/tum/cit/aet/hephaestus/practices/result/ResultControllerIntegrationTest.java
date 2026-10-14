@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,10 +23,13 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -53,7 +57,7 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
                 .jsonPath("$.item.id")
                 .isEqualTo(Long.toString(r.getItemId()))
                 .jsonPath("$.practiceVersionId")
-                .isEqualTo(Long.toString(r.getPracticeVersionId()))
+                .isEqualTo(Long.toString(Objects.requireNonNull(r.getPracticeVersionId())))
                 .jsonPath("$.outcome")
                 .isEqualTo("MET");
     }
@@ -62,7 +66,7 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
     void foreignWorkspaceResultIsNotVisible() {
         var other = data.scenario();
         var r = data.result(other, ResultOutcome.MET, Instant.now());
-        get("/practices/results/" + r.getId()).expectStatus().isNotFound();
+        get("/practices/results/" + r.getId()).expectStatus().isNotFound().expectBody(Void.class);
     }
 
     @Test
@@ -74,7 +78,8 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
                 .headers(h -> h.setBearerAuth("mock-jwt-member-" + other.getId()))
                 .exchange()
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -93,7 +98,7 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
     @Test
     void markedResultRemainsInHistory() {
         var r = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
-        data.mark(r, ResultMarkKind.INCORRECT, scenario.account().getId());
+        data.mark(r, ResultMarkKind.INCORRECT, scenarioAccountId);
         get("/practices/results/" + r.getId())
                 .expectStatus()
                 .isOk()
@@ -106,6 +111,11 @@ class ResultControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void unauthenticatedRequestIsRejected() {
-        http.get().uri(root() + "/practices/results").exchange().expectStatus().isUnauthorized();
+        http.get()
+                .uri(root() + "/practices/results")
+                .exchange()
+                .expectStatus()
+                .isUnauthorized()
+                .expectBody(Void.class);
     }
 }

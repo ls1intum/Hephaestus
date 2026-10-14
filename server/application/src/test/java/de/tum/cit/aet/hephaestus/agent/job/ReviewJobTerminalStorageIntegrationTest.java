@@ -44,7 +44,7 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     void shouldKeepTheReviewAndPinnedInputWhenRecordingTheTerminalState() {
         var job = running("runtime-terminal-owner");
         var input = job.getInput();
-        assertThat(transactions.execute(status -> jobs.transitionStatusOwnedBy(
+        assertThat(transactions.<Integer>execute(status -> jobs.transitionStatusOwnedBy(
                         job.getId(),
                         ReviewJobStatus.COMPLETED,
                         Instant.now(),
@@ -63,7 +63,7 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldRefuseATerminalWriteFromAnotherWorker() {
         var job = running("runtime-terminal-foreign");
-        assertThat(transactions.execute(status -> jobs.transitionStatusOwnedBy(
+        assertThat(transactions.<Integer>execute(status -> jobs.transitionStatusOwnedBy(
                         job.getId(),
                         ReviewJobStatus.FAILED,
                         Instant.now(),
@@ -80,7 +80,7 @@ class ReviewJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         job.setAdmissionAttempt(0);
         job.setAdmissionDigest("a".repeat(64));
         jobs.saveAndFlush(job);
-        assertThat(transactions.execute(status -> jobs.failAdmittedOwnedBy(
+        assertThat(transactions.<Integer>execute(status -> jobs.failAdmittedOwnedBy(
                         job.getId(), "owner", 0, Instant.now(), ResultAdmissionService.INTERRUPTED_AFTER_ADMISSION)))
                 .isEqualTo(1);
         var stored = jobs.findById(job.getId()).orElseThrow();

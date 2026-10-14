@@ -443,7 +443,7 @@ class MemberAiRoutingAdapterTest extends BaseUnitTest {
                 new Served(AiChoice.IN_HOUSE_ONLY, inHouseSlot, inHouseRoute),
                 new Served(AiChoice.CLOUD, cloudSlot, cloudRoute))) {
             var choice = expected.choice();
-            var member = choice.ceiling().orElseThrow();
+            var member = choice == AiChoice.IN_HOUSE_ONLY ? DataHandlingTier.IN_HOUSE : DataHandlingTier.CLOUD;
             var slot = expected.slot();
             var route = expected.route();
             assertThat(served.entrySet().stream()

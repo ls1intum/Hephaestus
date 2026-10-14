@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.outline.documentation;
 
-import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -13,7 +12,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
-import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -76,12 +74,11 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 connectionService,
                 identityResolver,
                 documentSelector,
-                Mockito.mock(PersonDataCopyRecorder.class), permission);
+                Mockito.mock(PersonDataCopyRecorder.class),
+                permission);
         lenient().when(permission.workspaceReadable(WORKSPACE_ID)).thenReturn(true);
         lenient().when(permission.permits(eq(WORKSPACE_ID), anyLong())).thenReturn(true);
-        lenient()
-                .when(connectionService.findInWorkspace(WORKSPACE_ID, 7L))
-                .thenReturn(Optional.of(activeConnection()));
+        lenient().when(connectionService.findInWorkspace(WORKSPACE_ID, 7L)).thenReturn(Optional.of(activeConnection()));
         lenient()
                 .when(identityResolver.resolveAccountId(anyLong(), anyString(), any(), anyString()))
                 .thenReturn(Optional.empty());
@@ -311,21 +308,48 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("without an ACTIVE Outline connection authors degrade to name-only and the resolver is never called")
-    void noActiveConnection_skipsResolution() {
-        when(connectionService.findInWorkspace(WORKSPACE_ID, 7L))
-                .thenReturn(Optional.empty());
-        OutlineDocument doc = authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace");
+    @DisplayName("a document without current connection permission is omitted before author resolution")
+    void noActiveConnection_deniesProjection() {
+        when(permission.permits(WORKSPACE_ID, 11L)).thenReturn(false);
         when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
-                .thenReturn(List.of(doc));
+                .thenReturn(List.of(authoredDocument("doc-uuid-1", "0aa1bb2c-user", "Ada Lovelace")));
 
-        List<ProjectedDocument> result = projector.documentsForWorkspace(WORKSPACE_ID);
-
-        assertThat(result).singleElement().satisfies(projected -> {
-            assertThat(projected.createdByName()).isEqualTo("Ada Lovelace");
-            assertThat(projected.createdByAccountId()).isNull();
-        });
+        assertThat(projector.documentsForWorkspace(WORKSPACE_ID)).isEmpty();
         verify(identityResolver, never()).resolveAccountId(anyLong(), anyString(), any(), anyString());
+    }
+
+    @Test
+    void sameNativeSubjectAndCollectionOnTwoInstancesUseTheirOwnConnection() {
+        OutlineDocument first = authoredDocument("doc-uuid-1", "same-subject", "First author");
+        OutlineDocument second = authoredDocument("doc-uuid-2", "same-subject", "Second author");
+        second.setId(12L);
+        second.setConnectionId(8L);
+        var otherConnection = new Connection(
+                activeConnection().getWorkspace(),
+                IntegrationKind.OUTLINE,
+                "other-team",
+                new ConnectionConfig.OutlineConfig("https://other.example.com", null, null, Set.of()));
+        when(connectionService.findInWorkspace(WORKSPACE_ID, 8L)).thenReturn(Optional.of(otherConnection));
+        when(documentRepository.findForProjection(eq(WORKSPACE_ID), any(Pageable.class)))
+                .thenReturn(List.of(first, second));
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "same-subject"))
+                .thenReturn(Optional.of(555L));
+        when(identityResolver.resolveAccountId(WORKSPACE_ID, "https://other.example.com", "other-team", "same-subject"))
+                .thenReturn(Optional.of(556L));
+        var firstCollection = registeredCollection("col-uuid-1", "First collection");
+        var secondCollection = registeredCollection("col-uuid-1", "Second collection");
+        secondCollection.setConnectionId(8L);
+        when(collectionRepository.findByWorkspaceIdOrderByCreatedAtAsc(WORKSPACE_ID))
+                .thenReturn(List.of(firstCollection, secondCollection));
+
+        var projected = projector.documentsForWorkspace(WORKSPACE_ID);
+        assertThat(projected).extracting(ProjectedDocument::createdByAccountId).containsExactly(555L, 556L);
+        assertThat(projected)
+                .extracting(ProjectedDocument::collectionName)
+                .containsExactly("First collection", "Second collection");
+        verify(identityResolver).resolveAccountId(WORKSPACE_ID, SERVER_URL, TEAM_ID, "same-subject");
+        verify(identityResolver)
+                .resolveAccountId(WORKSPACE_ID, "https://other.example.com", "other-team", "same-subject");
     }
 
     @Test
@@ -453,7 +477,8 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
                 connectionService,
                 identityResolver,
                 documentSelector,
-                Mockito.mock(PersonDataCopyRecorder.class), deniedPermission);
+                Mockito.mock(PersonDataCopyRecorder.class),
+                deniedPermission);
 
         assertThat(denied.documentsForWorkspace(WORKSPACE_ID)).isEmpty();
         verify(documentRepository, never()).findForProjection(anyLong(), any());

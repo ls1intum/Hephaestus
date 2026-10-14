@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewSnapshot;
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
 
 /** Reads frozen product facts through the neutral contract before an attempt executes. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ReviewJobAssignments {
     private final ReviewSnapshotQuery reviews;

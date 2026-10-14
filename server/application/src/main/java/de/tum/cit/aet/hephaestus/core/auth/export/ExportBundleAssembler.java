@@ -71,7 +71,7 @@ public class ExportBundleAssembler {
         List<Identity> identities = accountService.activeIdentities(accountId);
 
         ExportBundle.Profile profile = new ExportBundle.Profile(
-                Objects.requireNonNull(account.getId()),
+                Long.toString(Objects.requireNonNull(account.getId())),
                 account.getDisplayName(),
                 account.getPrimaryEmail(),
                 // appRole deliberately not disclosed here — see ExportBundle.Profile (Art.
@@ -132,7 +132,6 @@ public class ExportBundleAssembler {
                 provider,
                 il.getProviderUserKey(),
                 profile == null ? null : profile.login(),
-                null,
                 profile == null ? null : profile.displayName(),
                 il.getLinkedAt(),
                 il.getLastLoginAt());

@@ -10,13 +10,9 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPrice;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelPriceRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.PricingMode;
-import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmConnectionRepository;
-import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
-import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
 import de.tum.cit.aet.hephaestus.agent.job.PracticeScriptCallUsage;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJob;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJobService;
 import de.tum.cit.aet.hephaestus.agent.job.RuntimeJobTestData;
 import de.tum.cit.aet.hephaestus.agent.job.ScriptUsage;
 import de.tum.cit.aet.hephaestus.core.llm.usage.LlmPriceSnapshot;
@@ -28,7 +24,6 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
@@ -69,9 +64,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private LlmBudgetService budgetService;
 
     @Autowired
-    private ReviewJobService agentJobService;
-
-    @Autowired
     private WorkspaceRepository workspaceRepository;
 
     @Autowired
@@ -82,9 +74,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private ReviewJobRepository jobRepository;
-
-    @Autowired
-    private WorkspaceAgentBindingRepository bindingRepository;
 
     @Autowired
     private LlmConnectionRepository llmConnectionRepository;
@@ -103,15 +92,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     @Autowired
     private LlmUsageAdminService llmUsageAdminService;
-
-    @Autowired
-    private WorkspaceLlmConnectionRepository workspaceConnections;
-
-    @Autowired
-    private WorkspaceLlmModelRepository workspaceModels;
-
-    @Autowired
-    private PracticeRepository practices;
 
     private Workspace setupWorkspace(String slug) {
         User owner = persistUser(slug + "-owner");
@@ -182,12 +162,6 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 BigDecimal.ZERO);
     }
 
-    private double blockedCount(String cap) {
-        return meterRegistry
-                .counter("llm.budget.blocked", "surface", "review_job", "cap", cap)
-                .count();
-    }
-
     /**
      * Give the workspace a PRACTICE_REVIEW binding funded by {@code fundingSource} — submission
      * resolves it first, because the cap that applies is the one belonging to whoever pays for it.
@@ -199,7 +173,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private ReviewJob queuedJob(Workspace workspace, Instant availableAt, @Nullable String holdReason) {
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.QUEUED);
         job.setConfigSnapshot(new ObjectMapper().createObjectNode());

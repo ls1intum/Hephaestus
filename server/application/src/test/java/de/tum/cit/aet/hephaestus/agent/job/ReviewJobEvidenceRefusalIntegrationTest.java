@@ -34,7 +34,11 @@ class ReviewJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
     void evidenceRefusalSettlesProcessingWithoutModelExecutionOrResults() {
         databaseTestUtils.cleanDatabase();
         var job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspaces.save(TestEntities.activeWorkspace("evidence-refusal"))).getId());
+        RuntimeJobTestData.initialize(
+                job,
+                workspaces
+                        .save(TestEntities.activeWorkspace("evidence-refusal"))
+                        .getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("owner");
@@ -52,7 +56,6 @@ class ReviewJobEvidenceRefusalIntegrationTest extends BaseIntegrationTest {
         assertThat(saved.getProcessingStatus()).isEqualTo(ProcessingStatus.DONE);
         assertThat(saved.getCompletedAt()).isNotNull();
         assertThat(saved.getExecutionStartedAt()).isNull();
-        assertThat(saved.getDeliveryCommentId()).isNull();
         assertThat(saved.getOutput()).isEqualTo(output);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM practice_result WHERE review_job_id = ?", Long.class, id))
                 .isZero();

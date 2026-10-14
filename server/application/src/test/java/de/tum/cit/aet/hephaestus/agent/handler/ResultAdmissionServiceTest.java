@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -20,13 +21,17 @@ import de.tum.cit.aet.hephaestus.agent.proxy.dto.AdmissionRequestDTO;
 import de.tum.cit.aet.hephaestus.agent.proxy.dto.PrepareFeedbackRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultSnapshot;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCompositionContext;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackIds;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedFeedback;
 import de.tum.cit.aet.hephaestus.practices.spi.PreparedPackage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultCandidate;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +39,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -49,6 +55,8 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
     private final PublicReviewEligibility publicEligibility = mock(PublicReviewEligibility.class);
     private final JobEvidenceFiles files = mock(JobEvidenceFiles.class);
     private final FeedbackStore feedback = mock(FeedbackStore.class);
+    private final FeedbackCompositionContextReader composition = mock(FeedbackCompositionContextReader.class);
+    private final ReviewAssignmentStore members = mock(ReviewAssignmentStore.class);
     private final PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
     private final ReviewJob job = RuntimeReviewTestData.job();
     private ResultAdmissionService service;
@@ -56,21 +64,32 @@ class ResultAdmissionServiceTest extends BaseUnitTest {
     @BeforeEach
     void setup() {
         when(manager.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        service = new ResultAdmissionService(jobs,
-output,
-proof,
-assignments,
-publicEligibility,
-files,
-feedback,
-mock(ReviewHistoryContentSource.class),
-mapper,
-manager,
-mock(ReviewCompositionBasisRepository.class),
-org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.handler.FeedbackCompositionContextReader.class));
+        lenient()
+                .when(files.indexLateRead(any(), any(), any()))
+                .thenAnswer(call -> ((Supplier<?>) call.getArgument(1)).get());
+        lenient()
+                .when(composition.read(any(), any()))
+                .thenReturn(new FeedbackCompositionContextReader.Read(
+                        new FeedbackCompositionContext(null, null), List.of(), List.of()));
+        service = new ResultAdmissionService(
+                jobs,
+                output,
+                proof,
+                assignments,
+                publicEligibility,
+                files,
+                feedback,
+                mock(ReviewHistoryContentSource.class),
+                mapper,
+                manager,
+                mock(ReviewCompositionBasisRepository.class),
+                composition,
+                members,
+                mock(ReviewWriteGuard.class));
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("worker");
         job.setCapture(mapper.createObjectNode());
+        when(jobs.findByIdAndWorkspaceId(job.getId(), 1L)).thenReturn(Optional.of(job));
         when(jobs.findByIdAndWorkspaceIdForUpdate(job.getId(), 1)).thenReturn(Optional.of(job));
     }
 
@@ -89,7 +108,7 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.handler.FeedbackComposi
         when(candidate.developerId()).thenReturn(5L);
         when(proof.forAttempt(1, job.getReviewId(), job.getId(), 0))
                 .thenReturn(List.of(new AdmittedResultSnapshot(resultId, candidate, List.of())));
-        UUID feedbackId = UUID.randomUUID();
+        UUID feedbackId = FeedbackIds.onWork(1, job.getReviewId(), 5);
         Instant preparedAt = Instant.parse("2026-10-14T06:00:00Z");
         when(feedback.prepareAll(eq(1L), eq(job.getReviewId()), any()))
                 .thenReturn(new PreparedPackage(
@@ -102,19 +121,23 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.handler.FeedbackComposi
                 0,
                 List.of(resultId),
                 List.of(new ComposedFeedback(
-                        FeedbackDestination.ON_WORK, List.of(resultId), "Use clear names.", List.of(), null)));
+                        FeedbackDestination.ON_WORK, List.of(resultId), "Use clear names.", List.of(), null)),
+                true);
         var response = service.prepareFeedback(identity(), request);
         assertThat(response.feedbackIds()).containsExactly(feedbackId);
         assertThat(response.contentDigest()).isEqualTo("package-digest");
         assertThat(response.preparedAt()).isEqualTo(preparedAt);
+        assertThat(job.getPublicReviewDigest()).isEqualTo("package-digest");
         verify(feedback).prepareAll(eq(1L), eq(job.getReviewId()), any());
+        verify(members).publicReviewed(1, job.getReviewId(), job.getId(), 0, preparedAt);
     }
 
     @Test
     void shouldRejectAnOldWorkerAttemptBeforePreparingAnything() {
         var stale = new ResultAdmissionService.AdmissionIdentity(job.getId(), 1, 1, "worker");
         assertThatThrownBy(() -> service.prepareFeedback(
-                        stale, new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 1, List.of(), List.of())))
+                        stale,
+                        new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 1, List.of(), List.of(), false)))
                 .isInstanceOf(ResultAdmissionService.StaleAttemptException.class);
         verifyNoInteractions(feedback, proof);
     }
@@ -135,5 +158,38 @@ org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.agent.handler.FeedbackComposi
         job.setAdmissionDigest("another-payload");
         assertThatThrownBy(() -> service.admit(identity(), request))
                 .isInstanceOf(ResultAdmissionService.AdmissionConflictException.class);
+    }
+
+    @Test
+    void completedEmptyPublicCompositionRecordsAcceptanceWithoutInventingFeedback() {
+        job.setAdmissionAttempt(0);
+        job.setAdmissionDigest("admitted");
+        when(assignments.review(job))
+                .thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, RuntimeReviewTestData.assignment(5L, null)));
+        var acceptedAt = Instant.parse("2026-10-14T10:00:00Z");
+        when(feedback.prepareAll(1, job.getReviewId(), List.of()))
+                .thenReturn(new PreparedPackage("empty-package", acceptedAt, List.of()));
+        var response = service.prepareFeedback(
+                identity(),
+                new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), true));
+        assertThat(response.feedbackIds()).isEmpty();
+        assertThat(job.getPublicReviewDigest()).isEqualTo("empty-package");
+        verify(members).publicReviewed(1, job.getReviewId(), job.getId(), 0, acceptedAt);
+    }
+
+    @Test
+    void privateOnlyPreparationDoesNotRecordPublicAcceptance() {
+        job.setAdmissionAttempt(0);
+        job.setAdmissionDigest("admitted");
+        when(assignments.review(job))
+                .thenReturn(RuntimeReviewTestData.review(ReviewKind.ITEM, RuntimeReviewTestData.assignment(5L, null)));
+        var acceptedAt = Instant.parse("2026-10-14T10:00:00Z");
+        when(feedback.prepareAll(1, job.getReviewId(), List.of()))
+                .thenReturn(new PreparedPackage("empty-package", acceptedAt, List.of()));
+        service.prepareFeedback(
+                identity(),
+                new PrepareFeedbackRequestDTO(job.getReviewId(), job.getId(), 0, List.of(), List.of(), false));
+        assertThat(job.getPublicReviewDigest()).isNull();
+        verifyNoInteractions(members);
     }
 }

@@ -136,17 +136,10 @@ public class LinkedWorkItemContentSource {
                 repositoryPreparer.authorize(capture);
             }
             ScmCapturedWork m = capture.work();
-            Long repositoryId = m.repositoryId();
-            Long pullRequestId = m.sourceId();
-            if (repositoryId == null) {
-                throw new ItemCaptureException(
-                        ItemCaptureCode.CAPTURE_FAILED, "Linked-work-item repository id is missing");
-            }
-            PullRequest pullRequest = pullRequestId == null
-                    ? null
-                    : pullRequestRepository
-                            .findByIdWithAllForGate(pullRequestId)
-                            .orElse(null);
+            long repositoryId = m.repositoryId();
+            long pullRequestId = m.sourceId();
+            PullRequest pullRequest =
+                    pullRequestRepository.findByIdWithAllForGate(pullRequestId).orElse(null);
 
             // The provider's closing candidates before what the text mentions: a link made in the
             // provider's UI matches no `#N`.

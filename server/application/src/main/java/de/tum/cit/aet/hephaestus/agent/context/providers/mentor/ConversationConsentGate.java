@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 
-import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ConversationSourceLiveness;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import java.util.Collection;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -14,7 +15,7 @@ import tools.jackson.databind.node.ObjectNode;
  * message read.
  *
  * <p>The thread → channel → consent linkage is owned by {@code integration.slack}; this gate reads it only
- * through the agent-owned {@link ConversationSourceLiveness} SPI (implemented by {@code integration.slack}), so
+ * through the chat-domain {@link ConversationSourceLiveness} SPI (implemented by {@code integration.slack}), so
  * the dependency runs one way and the agent carries no raw SQL against {@code slack_*} tables.
  *
  * <p><strong>Erasure (GDPR "erase the copies").</strong> On channel uninstall/erase the Slack module flips consent
@@ -24,6 +25,7 @@ import tools.jackson.databind.node.ObjectNode;
  * (the {@code practiceResult}/{@code feedback} rows carry no FK back to {@code slack_thread}).
  */
 @Component
+@ConditionalOnCaptureRole
 public class ConversationConsentGate {
 
     /** Trust tag stamped on any payload that carries a surviving chat.conversation_thread-derived row. Matches the projector. */

@@ -10,6 +10,8 @@ public interface ReviewRuntimeQuery {
 
     Set<UUID> activeJobIds(long workspaceId, UUID reviewId);
 
+    Set<UUID> unsettledJobIds(long workspaceId, UUID reviewId);
+
     ReviewUsageSnapshot usage(long workspaceId, UUID reviewId);
 
     ReviewQueueSnapshot queue(long workspaceId, Instant asOf, int headLimit);

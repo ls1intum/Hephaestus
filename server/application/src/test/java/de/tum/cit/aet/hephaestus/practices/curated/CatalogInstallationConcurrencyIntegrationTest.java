@@ -48,9 +48,11 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
         var workspace = createWorkspace("catalog-install", "Install", "install-org", AccountType.ORG, owner);
         installer.install(workspace.getId());
         var first = workspaces.findById(workspace.getId()).orElseThrow().getPracticeCatalogInstalledAt();
+        assertThat(first).isNotNull();
         List<Long> ids = practices.findByWorkspaceId(workspace.getId()).stream()
                 .map(Practice::getId)
                 .toList();
+        assertThat(ids).isNotEmpty();
         installer.install(workspace.getId());
         assertThat(workspaces.findById(workspace.getId()).orElseThrow().getPracticeCatalogInstalledAt())
                 .isEqualTo(first);
@@ -63,6 +65,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
     void shouldInstallTheCommittedDefinitionWhenACatalogWriteIsInProgress() throws Exception {
         var owner = persistUser("install-race-owner");
         var workspace = createWorkspace("catalog-race", "Install race", "install-race-org", AccountType.ORG, owner);
+        assertThat(workspace.getPracticeCatalogInstalledAt()).isNull();
         var current = catalog.effectiveCatalog().practices().stream()
                 .filter(entry -> entry.shipped() != null)
                 .findFirst()

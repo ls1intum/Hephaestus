@@ -21,9 +21,12 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.practices.spi.AdmittedResultQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceCitation;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewWriteGuard;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -62,6 +65,8 @@ public class ResultAdmissionService {
     private final TransactionTemplate transactions;
     private final ReviewCompositionBasisRepository bases;
     private final FeedbackCompositionContextReader composition;
+    private final ReviewAssignmentStore members;
+    private final ReviewWriteGuard writeGuard;
 
     public ResultAdmissionService(
             ReviewJobRepository jobs,
@@ -75,7 +80,9 @@ public class ResultAdmissionService {
             ObjectMapper mapper,
             PlatformTransactionManager manager,
             ReviewCompositionBasisRepository bases,
-            FeedbackCompositionContextReader composition) {
+            FeedbackCompositionContextReader composition,
+            ReviewAssignmentStore members,
+            ReviewWriteGuard writeGuard) {
         this.jobs = jobs;
         this.output = output;
         this.proof = proof;
@@ -88,6 +95,8 @@ public class ResultAdmissionService {
         this.transactions = new TransactionTemplate(manager);
         this.bases = bases;
         this.composition = composition;
+        this.members = members;
+        this.writeGuard = writeGuard;
     }
 
     public AdmissionResponseDTO admit(AdmissionIdentity identity, AdmissionRequestDTO request) {
@@ -275,17 +284,27 @@ public class ResultAdmissionService {
                 }
             var drafts = FeedbackDraftBuilder.build(
                     job, Set.copyOf(request.basisResultIds()), rows, context.support(), request.composition(), anchors);
+            boolean hasPublic = drafts.stream().anyMatch(draft -> draft.destination() == FeedbackDestination.ON_WORK);
+            if (hasPublic && !request.publicComposition()) throw new AdmissionConflictException();
+            boolean publicAlreadyAccepted = request.publicComposition() && assignments.publicReviewed(job);
+            if (publicAlreadyAccepted && job.getPublicReviewDigest() == null) throw new AdmissionConflictException();
             var prepared = feedback.prepareAll(job.getWorkspaceId(), job.getReviewId(), drafts);
+            if (publicAlreadyAccepted && !prepared.packageDigest().equals(job.getPublicReviewDigest()))
+                throw new AdmissionConflictException();
+            if (request.publicComposition()) {
+                members.publicReviewed(
+                        job.getWorkspaceId(), job.getReviewId(), job.getId(), job.getAttempt(), prepared.preparedAt());
+                job.setPublicReviewDigest(prepared.packageDigest());
+            }
             for (var draft : drafts) {
                 var receipt = prepared.pieces().stream()
                         .filter(piece -> piece.feedbackId().equals(draft.id()))
                         .findFirst()
                         .orElseThrow();
-                switch (draft.destination()) {
-                    case ON_WORK -> job.setPublicReviewDigest(receipt.packageDigest());
-                    case PRACTICE_PAGE -> job.setPracticePagePreparedAt(receipt.preparedAt());
-                    case CONVERSATION -> job.setConversationPreparedAt(receipt.preparedAt());
-                }
+                if (draft.destination() == FeedbackDestination.PRACTICE_PAGE)
+                    job.setPracticePagePreparedAt(receipt.preparedAt());
+                else if (draft.destination() == FeedbackDestination.CONVERSATION)
+                    job.setConversationPreparedAt(receipt.preparedAt());
             }
             jobs.saveAndFlush(job);
             return new PrepareFeedbackResponseDTO(
@@ -309,6 +328,9 @@ public class ResultAdmissionService {
     }
 
     public ReviewJob ownedJob(AdmissionIdentity identity) {
+        var retained = jobs.findByIdAndWorkspaceId(identity.jobId(), identity.workspaceId())
+                .orElseThrow(StaleAttemptException::new);
+        writeGuard.lock(identity.workspaceId(), retained.getReviewId());
         var job = jobs.findByIdAndWorkspaceIdForUpdate(identity.jobId(), identity.workspaceId())
                 .orElseThrow(StaleAttemptException::new);
         if (job.getStatus() != ReviewJobStatus.RUNNING

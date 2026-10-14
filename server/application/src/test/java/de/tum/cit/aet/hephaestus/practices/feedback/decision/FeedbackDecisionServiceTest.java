@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback.decision;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -68,8 +69,7 @@ class FeedbackDecisionServiceTest {
 
     @BeforeEach
     void setup() {
-        when(privacy.holdForAccountWrite(org.mockito.ArgumentMatchers.anyLong()))
-                .thenReturn(true);
+        when(privacy.holdForAccountWrite(anyLong())).thenReturn(true);
         when(digests.current(1, id)).thenReturn(digest());
         row = Feedback.builder()
                 .id(id)

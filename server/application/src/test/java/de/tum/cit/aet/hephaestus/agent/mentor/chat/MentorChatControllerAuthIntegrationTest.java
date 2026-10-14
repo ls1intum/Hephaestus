@@ -96,7 +96,7 @@ class MentorChatControllerAuthIntegrationTest extends AbstractWorkspaceIntegrati
         User mentor = persistUser("mentor");
         User owner = persistUser("workspace-owner-for-mentor-happy");
         Workspace workspace = createWorkspace("mentor-happy-space", "Happy", "mentor-happy", AccountType.ORG, owner);
-        ensureWorkspaceMembership(workspace, mentor, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .post()

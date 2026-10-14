@@ -54,10 +54,19 @@ public interface ReviewJobRepository extends JpaRepository<ReviewJob, UUID> {
 
     @WorkspaceAgnostic("Bounded server completion pass; each selected job is reloaded under its own workspace")
     @Query(
-            value = "SELECT id FROM review_job WHERE status NOT IN ('QUEUED','RUNNING') AND processing_status IN"
-                    + " ('NONE','PENDING') ORDER BY completed_at,id LIMIT :limit",
+            value = "SELECT id,workspace_id AS \"workspaceId\",review_id AS \"reviewId\" FROM review_job WHERE status"
+                    + " NOT IN ('QUEUED','RUNNING') AND processing_status IN ('NONE','PENDING') ORDER BY"
+                    + " completed_at,id LIMIT :limit",
             nativeQuery = true)
-    List<UUID> findTerminalForProcessing(@Param("limit") int limit);
+    List<CompletionCandidate> findTerminalForProcessing(@Param("limit") int limit);
+
+    interface CompletionCandidate {
+        UUID getId();
+
+        long getWorkspaceId();
+
+        UUID getReviewId();
+    }
 
     @Query(
             value = "SELECT EXISTS(SELECT 1 FROM review_job WHERE workspace_id=:ws AND review_id=:review AND status"

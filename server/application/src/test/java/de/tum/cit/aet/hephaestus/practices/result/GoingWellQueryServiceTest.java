@@ -41,7 +41,7 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
                             now.minusSeconds((i + 1) * 86400L),
                             new ItemKind("scm.pull_request"),
                             ResultOutcome.MET);
-                    view.result().setEvidenceVersion(1);
+                    view.result().setEvidenceVersion((short) 1);
                     view.result().setSummary("The work meets the practice.");
                     view.result().setExplanation("The captured work supports the result.");
                     view.result().setEvidence(json.createObjectNode());
@@ -71,7 +71,7 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
                 false);
         var standing =
                 new PracticeStandingService.StandingSnapshot.PracticeStandingSnapshot(dto, rows, rows, trend, null);
-        when(standings.getStandingSnapshots(1, 7, List.of(now)))
+        when(standings.getStandingSnapshots(1L, 7L, List.of(now)))
                 .thenReturn(List.of(
                         new PracticeStandingService.StandingSnapshot(Map.of("test-practice", standing), Map.of())));
     }
@@ -102,7 +102,7 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
     @Test
     void unverifiableProofDoesNotSupportARecurringClaim() {
         var proof = proofs(3);
-        proof.getFirst().result().setEvidenceVersion(0);
+        proof.getFirst().result().setEvidenceVersion((short) 0);
         eligible(proof);
         assertThat(query.own(1)).isEmpty();
     }

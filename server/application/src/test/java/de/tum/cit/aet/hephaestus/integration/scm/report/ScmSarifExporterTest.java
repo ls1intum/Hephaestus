@@ -68,8 +68,8 @@ class ScmSarifExporterTest extends BaseUnitTest {
     @Test
     void shouldProduceTheOfficialSchemaProtocolFixture() throws Exception {
         var problem = new ScanExportProblem(
-                UUID.fromString("00000000-0000-0000-0000-000000000003"),
-                UUID.fromString("00000000-0000-0000-0000-000000000004"),
+                UUID.fromString("00000000-0000-4000-8000-000000000003"),
+                UUID.fromString("00000000-0000-4000-8000-000000000004"),
                 3,
                 "frozen",
                 4,
@@ -85,7 +85,7 @@ class ScmSarifExporterTest extends BaseUnitTest {
                 false,
                 List.of(new ScanExportLocation("src/a #%\nä.java", 2, 2, "if (ready) run();")));
         var report = new ScanExport(
-                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                UUID.fromString("00000000-0000-4000-8000-000000000001"),
                 1,
                 2,
                 "https://user:secret@example.test/team/repo?token=secret#secret",
@@ -97,7 +97,7 @@ class ScmSarifExporterTest extends BaseUnitTest {
                 false,
                 false,
                 true,
-                UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                UUID.fromString("00000000-0000-4000-8000-000000000002"),
                 true,
                 Map.of("problems", 1L),
                 List.of("INCOMPLETE"),

@@ -6,7 +6,6 @@ import de.tum.cit.aet.hephaestus.activity.ActivityEventRepository;
 import de.tum.cit.aet.hephaestus.activity.ActivityEventType;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPeopleDTO;
 import de.tum.cit.aet.hephaestus.activity.overview.dto.ActivityPersonDTO;
-import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
@@ -19,10 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMemb
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackBasisRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PracticePageFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
@@ -37,7 +33,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
-import org.jspecify.annotations.Nullable;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -46,7 +42,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.StatusAssertions;
 import org.springframework.test.web.reactive.server.WebTestClient;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Cross-tenant probes use two workspaces with the same account login and an overlapping member.
@@ -58,33 +53,16 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     @Autowired
     private PracticeModelTestFixtures modelFixtures;
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SHARED_LOGIN = "shared-org";
-    private static final String DIFF_EVIDENCE_JSON =
-            "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"context/diff.patch\","
-                + "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\","
-                + "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
-
-    @Autowired
-    private PracticeRepository practiceRepository;
-
-    @Autowired
-    private ReviewJobRepository agentJobRepository;
 
     @Autowired
     private ResultRepository practiceResultRepository;
 
     @Autowired
     private FeedbackRepository feedbackRepository;
-
-    @Autowired
-    private FeedbackBasisRepository feedbackEvidenceRepository;
-
-    @Autowired
-    private PracticeVersionRepository practiceRevisionRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -253,16 +231,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @Test
         @WithMentorUser
         void adviceOnTheDetailReadComesOnlyFromThisWorkspace() {
-            bindAdvice(
-                    workspaceA,
-                    tenantA.practiceResultId(),
-                    "Advice in tenant A",
-                    Instant.parse("2026-01-01T00:00:00Z"));
-            bindAdvice(
-                    workspaceB,
-                    tenantA.practiceResultId(),
-                    "Advice in tenant B",
-                    Instant.parse("2026-02-01T00:00:00Z"));
+            UUID localFeedback = bindFeedback(
+                    tenantA.practiceResultId(), "Feedback in tenant A", Instant.parse("2026-01-01T00:00:00Z"));
+            UUID foreignFeedback = bindFeedback(
+                    tenantB.practiceResultId(), "Feedback in tenant B", Instant.parse("2026-02-01T00:00:00Z"));
 
             webTestClient
                     .get()
@@ -275,14 +247,19 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                     .expectStatus()
                     .isOk()
                     .expectBody()
-                    .jsonPath("$.deliveredFeedback")
-                    .isEqualTo("Advice in tenant A");
+                    .jsonPath("$.feedback[*].id")
+                    .value(ids -> assertThat(ids)
+                            .asInstanceOf(InstanceOfAssertFactories.LIST)
+                            .contains(localFeedback.toString())
+                            .doesNotContain(foreignFeedback.toString()));
         }
     }
 
-    private void bindAdvice(Workspace ws, UUID resultId, String body, Instant createdAt) {
+    private UUID bindFeedback(UUID resultId, String body, Instant createdAt) {
         var result = practiceResultRepository.findById(resultId).orElseThrow();
-        modelFixtures.feedback(result, FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, body, createdAt);
+        return modelFixtures
+                .feedback(result, FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, body, createdAt)
+                .getId();
     }
 
     @Nested
@@ -307,12 +284,12 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @Test
         @WithMentorUser
         void readsOnlyTheMessagesPreparedInThisWorkspace() {
-            seedInAppUnit(workspaceA, "A way of working measured in tenant A");
-            seedInAppUnit(workspaceB, "A way of working measured in tenant B");
+            seedPracticePageFeedback(workspaceA, "A way of working measured in tenant A");
+            seedPracticePageFeedback(workspaceB, "A way of working measured in tenant B");
 
             webTestClient
                     .get()
-                    .uri("/workspaces/{slug}/practices/feedback/in-app", workspaceA.getWorkspaceSlug())
+                    .uri("/workspaces/{slug}/practices/feedback/practice-page", workspaceA.getWorkspaceSlug())
                     .headers(TestAuthUtils.withCurrentUser())
                     .exchange()
                     .expectStatus()
@@ -327,8 +304,8 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @Test
         @WithMentorUser
         void neverRetiresACardQueuedInAnotherTenant() {
-            Feedback inA = seedInAppUnit(workspaceA, "A way of working measured in tenant A");
-            Feedback inB = seedInAppUnit(workspaceB, "A way of working measured in tenant B");
+            Feedback inA = seedPracticePageFeedback(workspaceA, "A way of working measured in tenant A");
+            Feedback inB = seedPracticePageFeedback(workspaceB, "A way of working measured in tenant B");
             assertThat(feedbackRepository.findByIdAndWorkspaceId(inA.getId(), workspaceA.getId()))
                     .isPresent();
             assertThat(feedbackRepository.findByIdAndWorkspaceId(inB.getId(), workspaceA.getId()))
@@ -340,8 +317,8 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         @Test
         @WithMentorUser
         void namesOnlyThisTenantsPracticeForAQueuedCard() {
-            Feedback inA = seedInAppUnit(workspaceA, "A way of working measured in tenant A");
-            Feedback inB = seedInAppUnit(workspaceB, "A way of working measured in tenant B");
+            Feedback inA = seedPracticePageFeedback(workspaceA, "A way of working measured in tenant A");
+            Feedback inB = seedPracticePageFeedback(workspaceB, "A way of working measured in tenant B");
 
             assertThat(feedbackRepository.findByWorkspaceIdAndReviewIdOrderByCreatedAtAscIdAsc(
                             workspaceA.getId(), inA.getReviewId()))
@@ -351,14 +328,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
         }
     }
 
-    private Feedback seedInAppUnit(Workspace ws, String headline) {
-        return seedInAppUnit(ws, headline, null);
-    }
-
-    private Feedback seedInAppUnit(Workspace ws, String headline, @Nullable String threadKey) {
+    private Feedback seedPracticePageFeedback(Workspace ws, String headline) {
         var work = modelFixtures.work(
                 ws,
-                "in-app-"
+                "practice-page-"
                         + ws.getWorkspaceSlug()
                         + "-"
                         + UUID.randomUUID().toString().substring(0, 8),

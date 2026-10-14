@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review.schedule;
 
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData.Scenario;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewBatchStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
 import java.util.Map;
@@ -17,6 +18,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     ReviewIntegrationData data;
+
+    @Autowired
+    ReviewBatchRepository batches;
 
     @Autowired
     WebTestClient http;
@@ -52,7 +56,41 @@ class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void unknownBatchIsNotFound() {
-        get("/practices/review-batches/" + UUID.randomUUID()).expectStatus().isNotFound();
+        get("/practices/review-batches/" + UUID.randomUUID())
+                .expectStatus()
+                .isNotFound()
+                .expectBody(Void.class);
+    }
+
+    @Test
+    void shouldReturnConflictWhenAnEndedBatchIsResumed() {
+        var now = Instant.now();
+        var batch = batches.saveAndFlush(ReviewBatch.builder()
+                .id(UUID.randomUUID())
+                .workspaceId(scenario.workspace().getId())
+                .kind("scm.pull_request")
+                .fromAt(now.minusSeconds(60))
+                .toAt(now)
+                .status(ReviewBatchStatus.CANCELLED)
+                .requestedByAccountId(scenario.account().getId())
+                .createdAt(now)
+                .updatedAt(now)
+                .finishedAt(now)
+                .build());
+        http.patch()
+                .uri(root() + "/practices/review-batches/" + batch.getId() + "/status")
+                .headers(h -> h.setBearerAuth(ReviewIntegrationData.memberToken(scenario)))
+                .header("If-Match", "\"" + batch.getVersion() + "\"")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(Map.of("status", "RUNNING"))
+                .exchange()
+                .expectStatus()
+                .isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.type")
+                .isEqualTo("/problems/review-batch-conflict")
+                .jsonPath("$.status")
+                .isEqualTo(409);
     }
 
     @Test
@@ -69,6 +107,7 @@ class ReviewBatchControllerIntegrationTest extends BaseIntegrationTest {
                         Instant.now().toString()))
                 .exchange()
                 .expectStatus()
-                .isUnauthorized();
+                .isUnauthorized()
+                .expectBody(Void.class);
     }
 }

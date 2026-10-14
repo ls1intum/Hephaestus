@@ -5,7 +5,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -38,9 +37,6 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
     private WorkspaceOnboardingSettingsRepository settings;
 
     @Autowired
-    private AccountIdentityQuery identities;
-
-    @Autowired
     private MemberAiPreferences preferences;
 
     private Workspace workspace(String slug, User member) {
@@ -48,15 +44,6 @@ class WorkspaceOnboardingControllerIntegrationTest extends AbstractWorkspaceInte
         ensureOwnerMembership(workspace);
         ensureMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
         return workspace;
-    }
-
-    private long accountId(User user) {
-        return identities
-                .resolveActiveAccountId(
-                        Objects.requireNonNull(user.getProvider().getId()),
-                        user.getNativeId().toString(),
-                        null)
-                .orElseThrow();
     }
 
     private WorkspaceOnboardingDTO choose(String slug, String value) {

@@ -46,7 +46,8 @@ class ReviewRequestControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("itemId", Long.toString(Long.MAX_VALUE)))
                 .exchange()
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -59,7 +60,8 @@ class ReviewRequestControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("itemId", other.item().getId().toString()))
                 .exchange()
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -71,7 +73,8 @@ class ReviewRequestControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("itemId", "-1"))
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isBadRequest()
+                .expectBody(Void.class);
     }
 
     @Test
@@ -82,6 +85,7 @@ class ReviewRequestControllerIntegrationTest extends BaseIntegrationTest {
                 .bodyValue(Map.of("itemId", scenario.item().getId().toString()))
                 .exchange()
                 .expectStatus()
-                .isUnauthorized();
+                .isUnauthorized()
+                .expectBody(Void.class);
     }
 }

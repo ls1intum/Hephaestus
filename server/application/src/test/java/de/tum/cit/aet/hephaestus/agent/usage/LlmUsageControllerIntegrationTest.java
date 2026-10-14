@@ -147,7 +147,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
     }
 
     private UsageSourceType sourceType(String type) {
-        return type == "MENTOR_TURN" ? UsageSourceType.MENTOR_TURN : UsageSourceType.REVIEW_JOB;
+        return "MENTOR_TURN".equals(type) ? UsageSourceType.MENTOR_TURN : UsageSourceType.REVIEW_JOB;
     }
 
     private void connectOwnProvider(Workspace workspace, boolean modelEnabled) {
@@ -494,7 +494,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         User admin = persistUser("mentor");
         Workspace ownWorkspace =
                 createWorkspace("usage-own-admin", "Usage own admin", "usage-own-admin-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(ownWorkspace, admin, Membership.WorkspaceRole.ADMIN);
+        ensureMembership(ownWorkspace, admin, Membership.WorkspaceRole.ADMIN);
         Workspace otherWorkspace = createWorkspace(
                 "usage-other-admin",
                 "Usage other admin",
@@ -654,7 +654,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 "own-provider-budget-boundary-org",
                 AccountType.ORG,
                 admin);
-        ensureWorkspaceMembership(workspace, admin, Membership.WorkspaceRole.ADMIN);
+        ensureMembership(workspace, admin, Membership.WorkspaceRole.ADMIN);
 
         webTestClient
                 .put()
@@ -725,7 +725,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         User admin = persistUser("mentor");
         Workspace ownWorkspace =
                 createWorkspace("budget-own-admin", "Budget own admin", "budget-own-admin-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(ownWorkspace, admin, Membership.WorkspaceRole.ADMIN);
+        ensureMembership(ownWorkspace, admin, Membership.WorkspaceRole.ADMIN);
         Workspace otherWorkspace = createWorkspace(
                 "budget-other-admin",
                 "Budget other admin",
@@ -760,7 +760,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace =
                 createWorkspace("budget-member", "Budget member", "budget-member-org", AccountType.ORG, owner);
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .put()
@@ -784,7 +784,7 @@ class LlmUsageControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace =
                 createWorkspace("usage-member", "Usage member", "usage-member-org", AccountType.ORG, owner);
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .get()

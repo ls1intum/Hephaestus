@@ -26,6 +26,7 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.CopyCapability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
@@ -52,6 +53,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.json.JsonMapper;
 
 class ThreadItemSourceTest extends BaseUnitTest {
@@ -76,13 +78,18 @@ class ThreadItemSourceTest extends BaseUnitTest {
                 connections);
     }
 
-    private SlackThreadRepository.SettledCandidateRow readableThread() {
+    private static Connection connection(String team, long id) {
         var workspace = new Workspace();
         workspace.setId(7L);
-        var connection = new Connection(
-                workspace, IntegrationKind.SLACK, "T1", new ConnectionConfig.SlackConfig("T1", null, null, Set.of()));
-        connection.setId(21L);
-        when(connections.findActive(7L, IntegrationKind.SLACK)).thenReturn(Optional.of(connection));
+        var connection = new Connection(workspace, IntegrationKind.SLACK, team,
+                new ConnectionConfig.SlackConfig(team, null, null, Set.of()));
+        ReflectionTestUtils.setField(connection, "id", id);
+        connection.setState(IntegrationState.ACTIVE);
+        return connection;
+    }
+
+    private SlackThreadRepository.SettledCandidateRow readableThread() {
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of(connection("T1", 21L)));
         var candidate = mock(SlackThreadRepository.SettledCandidateRow.class);
         when(candidate.getSlackChannelId()).thenReturn("C1");
         when(candidate.getSlackTeamId()).thenReturn("T1");
@@ -98,7 +105,7 @@ class ThreadItemSourceTest extends BaseUnitTest {
         when(candidate.getLastTs()).thenReturn("1700000001.000000");
         when(messages.findThreadMessages(anyLong(), any(), any(), any()))
                 .thenReturn(List.of(turn("First", "U1", 55L), turn("Second", "U1", 55L)));
-        when(providers.resolveProviderId("SLACK", "https://slack.com")).thenReturn(3L);
+        when(providers.findProviderId("SLACK", "https://slack.com")).thenReturn(Optional.of(3L));
     }
 
     private void allowCapture() {
@@ -213,8 +220,32 @@ class ThreadItemSourceTest extends BaseUnitTest {
     void shouldRefuseAThreadFromAnotherWorkspaceOrDisconnectedTeam() {
         assertThat(source.current(new ItemRef(8L, 41L, ThreadEvents.THREAD, 19L, null, null)))
                 .isEmpty();
-        when(connections.findActive(7L, IntegrationKind.SLACK)).thenReturn(Optional.empty());
         assertThat(source.current(item)).isEmpty();
+    }
+
+    @Test
+    void shouldCaptureTheOwningTeamWhenAnotherActiveTeamConnectionIsNewer() {
+        readyThread();
+        allowCapture();
+        var owning = connection("T1", 21L);
+        var other = connection("T2", 22L);
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of(other, owning));
+        assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
+                .isTrue();
+        var pinned = source.pin(item, null);
+        assertThat(pinned.integration().instanceKey()).isEqualTo("T1");
+        assertThat(pinned.integration().connectionId()).isEqualTo(21L);
+        assertThat(source.capture(pinned, request()).files()).containsKey(ThreadCaptureSource.OUTPUT_KEY);
+        verify(connections, never()).findActive(7L, IntegrationKind.SLACK);
+    }
+
+    @Test
+    void shouldNotCreateAnIdentityNamespaceWhilePinningAThread() {
+        readableThread();
+        when(providers.findProviderId("SLACK", "https://slack.com")).thenReturn(Optional.empty());
+        assertThat(source.current(item)).isEmpty();
+        verify(providers, never()).resolveProviderId("SLACK", "https://slack.com");
+        verify(messages, never()).findThreadMessages(anyLong(), any(), any(), any());
     }
 
     @Test
@@ -256,7 +287,7 @@ class ThreadItemSourceTest extends BaseUnitTest {
         when(messages.countReadableTurns(7L, "C1", "1700000000.000000")).thenReturn(2L);
         assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isTrue();
-        when(connections.findActive(7L, IntegrationKind.SLACK)).thenReturn(Optional.empty());
+        when(connections.findActiveConnections(7L, IntegrationKind.SLACK)).thenReturn(List.of());
         assertThat(source.permits(item, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isFalse();
         assertThat(source.permits(
@@ -267,8 +298,7 @@ class ThreadItemSourceTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseThreadAccessWhenTheOwningTeamDiffersFromTheActiveConnection() {
-        readableThread();
-        var candidate = threads.findConsentedCandidateRow(7L, 19L).orElseThrow();
+        var candidate = readableThread();
         when(candidate.getSlackTeamId()).thenReturn("T2");
         assertThat(source.permits(item, SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isFalse();

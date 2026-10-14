@@ -19,9 +19,6 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
     PracticeVersionService versions;
 
     @Autowired
-    PracticeRepository practices;
-
-    @Autowired
     PracticeService service;
 
     @Test

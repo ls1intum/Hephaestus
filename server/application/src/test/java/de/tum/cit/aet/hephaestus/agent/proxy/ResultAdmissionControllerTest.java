@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -25,8 +26,7 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
                         controller.readPublicFeedbackHistory(new TestingAuthenticationToken("mentor", "credential")))
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
-                        error -> org.assertj.core.api.Assertions.assertThat(error.getStatusCode())
-                                .isEqualTo(HttpStatus.FORBIDDEN));
+                        error -> Assertions.assertThat(error.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN));
     }
 
     @Test
@@ -50,7 +50,6 @@ class ResultAdmissionControllerTest extends BaseUnitTest {
                         .admitResults(request, new TestingAuthenticationToken(routing, "credential")))
                 .isInstanceOfSatisfying(
                         ResponseStatusException.class,
-                        error -> org.assertj.core.api.Assertions.assertThat(error.getStatusCode())
-                                .isEqualTo(HttpStatus.CONFLICT));
+                        error -> Assertions.assertThat(error.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));
     }
 }

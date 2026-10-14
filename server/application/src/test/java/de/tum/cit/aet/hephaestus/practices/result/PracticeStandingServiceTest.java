@@ -160,9 +160,16 @@ class PracticeStandingServiceTest {
     @Test
     void keepsRequestedEvidenceSeparateFromEventEvidence() {
         add(1, ResultOutcome.NOT_MET);
+        var eventStanding = card().standing();
         add(2, ResultOutcome.MET);
         data.getLast().review().setOrigin(ReviewOrigin.REQUEST);
-        assertThat(card().standing()).isEqualTo(PracticeStanding.DEVELOPING);
+        var snapshot = service.getStandingSnapshots(1L, 7L, List.of(now)).getFirst();
+        var standing = snapshot.practices().values().iterator().next();
+        assertThat(standing.dto().standing()).isEqualTo(eventStanding);
+        assertThat(standing.evidence()).hasSize(2);
+        assertThat(standing.liveRuns())
+                .extracting(view -> view.review().getOrigin())
+                .containsExactly(ReviewOrigin.EVENT);
     }
 
     @Test

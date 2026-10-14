@@ -34,11 +34,11 @@ class ChatThreadVotesIntegrationTest extends AbstractWorkspaceIntegrationTest {
         User mentor = persistUser("mentor");
         User colleague = persistUser("colleague");
         Workspace workspace = createWorkspace("vote-reload", "Vote Reload", "org-vr", AccountType.ORG, mentor);
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
-        ensureWorkspaceMembership(workspace, colleague, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, colleague, WorkspaceRole.MEMBER);
         Workspace otherWorkspace =
                 createWorkspace("vote-reload-other", "Vote Reload Other", "org-vro", AccountType.ORG, mentor);
-        ensureWorkspaceMembership(otherWorkspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(otherWorkspace, mentor, WorkspaceRole.MEMBER);
 
         UUID threadId = UUID.randomUUID();
         UUID reply = reply(workspace, threadId, mentor);

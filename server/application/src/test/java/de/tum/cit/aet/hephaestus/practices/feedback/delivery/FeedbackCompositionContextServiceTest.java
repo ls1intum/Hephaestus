@@ -70,6 +70,10 @@ class FeedbackCompositionContextServiceTest {
     final UUID reviewId = UUID.randomUUID();
     final Result current = result(3, reviewId), historical = result(4, UUID.randomUUID());
     final ReviewSnapshot snapshot = mock(ReviewSnapshot.class);
+    final ItemRef item = new ItemRef(1, 3, new ItemKind("scm.pull_request"), 42L, null, null);
+    final PinnedPractice pin = mock(PinnedPractice.class);
+    final PracticeDefinition definition = mock(PracticeDefinition.class);
+    final PracticeVersion version = mock(PracticeVersion.class);
     final FeedbackCompositionContextService service = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -91,10 +95,9 @@ class FeedbackCompositionContextServiceTest {
         when(snapshot.workspaceId()).thenReturn(1L);
         when(snapshot.kind()).thenReturn(ReviewKind.ITEM);
         when(snapshot.origin()).thenReturn(ReviewOrigin.EVENT);
-        when(snapshot.item()).thenReturn(new ItemRef(1, 3, new ItemKind("scm.pull_request"), 42L, null, null));
-        var pin = mock(PinnedPractice.class);
+        when(snapshot.item()).thenReturn(item);
         when(pin.practiceId()).thenReturn(5L);
-        when(pin.definition()).thenReturn(mock(PracticeDefinition.class));
+        when(pin.definition()).thenReturn(definition);
         when(snapshot.practices()).thenReturn(List.of(pin));
         when(reviews.find(1, reviewId)).thenReturn(Optional.of(snapshot));
         when(reviews.find(1, historical.getReviewId())).thenReturn(Optional.of(snapshot));
@@ -103,7 +106,6 @@ class FeedbackCompositionContextServiceTest {
         when(practice.getWorkspaceId()).thenReturn(1L);
         when(practice.getSlug()).thenReturn("focused-tests");
         when(practices.findById(5L)).thenReturn(Optional.of(practice));
-        var version = mock(PracticeVersion.class);
         when(version.getWorkspaceId()).thenReturn(1L);
         when(version.getDefinition()).thenReturn(new JsonMapper().readTree("{\"about\":\"AUTHOR\"}"));
         when(versions.findById(8L)).thenReturn(Optional.of(version));
@@ -219,15 +221,13 @@ class FeedbackCompositionContextServiceTest {
         assertThat(service.conversationDecision(snapshot, current))
                 .isEqualTo(ConversationDecision.PRACTICE_REQUIRES_APPROVAL);
         when(gate.mode(current)).thenReturn(FeedbackMode.AUTOMATIC);
-        var version = versions.findById(8L).orElseThrow();
         when(version.getDefinition()).thenReturn(new JsonMapper().readTree("{\"about\":\"REVIEWER\"}"));
         assertThat(service.conversationDecision(snapshot, current)).isEqualTo(ConversationDecision.REVIEWER_DEFERRED);
         when(version.getDefinition()).thenReturn(new JsonMapper().readTree("{\"about\":\"AUTHOR\"}"));
-        var pin = snapshot.practices().getFirst();
-        when(pin.definition().lineNotes()).thenReturn(true);
+        when(definition.lineNotes()).thenReturn(true);
         var descriptor = mock(ItemDescriptor.class);
         when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.LINE_NOTE));
-        when(catalog.descriptorFor(snapshot.item().kind())).thenReturn(Optional.of(descriptor));
+        when(catalog.descriptorFor(item.kind())).thenReturn(Optional.of(descriptor));
         current.setEvidence(new JsonMapper().readTree("""
             {"citations":[{"path":"src/Work.java","startLine":3,"side":"NEW",
               "verification":{"status":"VERIFIED"}}]}

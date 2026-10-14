@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.MemberAiRoutingAdapter;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.MemberAiPreferences;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Every account whose work enters an invocation must permit its frozen model route. */
 @Service
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class ReviewMemberAiPolicy {

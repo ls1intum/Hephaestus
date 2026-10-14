@@ -226,8 +226,12 @@ class CatalogServiceTest extends BaseUnitTest {
         assertThat(result.effective().definition()).isEqualTo(offered);
         var entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
         verify(audit, times(1)).record(entry.capture());
-        assertThat(mapper.writeValueAsString(entry.getValue()))
-                .doesNotContain(original.criteria(), "script", "criteria");
+        var json = mapper.valueToTree(entry.getValue());
+        for (String field : List.of("before", "after")) {
+            assertThat(json.path(field).propertyNames())
+                    .containsExactlyInAnyOrder("slug", "definitionDigest", "baseDigest", "position", "excluded");
+        }
+        assertThat(mapper.writeValueAsString(entry.getValue())).doesNotContain(original.criteria());
     }
 
     @Test

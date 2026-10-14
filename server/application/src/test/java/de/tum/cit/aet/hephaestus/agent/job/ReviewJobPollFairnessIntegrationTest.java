@@ -232,7 +232,7 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
     /** A job running on the slot of {@code tier}; null leaves the tier out of its snapshot, as older jobs did. */
     private UUID runningJob(Workspace workspace, @Nullable DataHandlingTier tier) {
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setStartedAt(Instant.now());
@@ -249,7 +249,7 @@ class ReviewJobPollFairnessIntegrationTest extends BaseIntegrationTest {
 
     private UUID queuedJob(Workspace workspace, Instant createdAt, @Nullable DataHandlingTier tier) {
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.QUEUED);
         job.setConfigSnapshot(snapshot(tier));

@@ -21,7 +21,9 @@ import de.tum.cit.aet.hephaestus.practices.spi.HistoryCustody;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -40,16 +42,17 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
     void shouldKeepPrivateHistoryWithItsDeveloperAndWorkspace() {
         var privatePiece = piece(FeedbackDestination.CONVERSATION, FeedbackState.READY, null);
         var publicPiece = piece(FeedbackDestination.ON_WORK, FeedbackState.DELIVERED, AT);
-        var other = persistAccount("Another history viewer");
+        long otherId =
+                Objects.requireNonNull(persistAccount("Another history viewer").getId());
         jdbc.update(
                 "INSERT INTO membership(workspace_id,account_id,role,joined_at,review_selected)"
                         + " VALUES (?,?,'MEMBER',now(),false)",
                 workspace.getId(),
-                other.getId());
-        assertThat(history.forItem(workspace.getId(), itemId, other.getId(), 10))
+                otherId);
+        assertThat(history.forItem(workspace.getId(), itemId, otherId, 10))
                 .extracting(entry -> entry.feedbackId())
                 .containsExactly(publicPiece.getId());
-        assertThat(history.forDeveloper(workspace.getId(), other.getId(), AT.minusSeconds(1), 10))
+        assertThat(history.forDeveloper(workspace.getId(), otherId, AT.minusSeconds(1), 10))
                 .isEmpty();
         assertThat(history.forDeveloper(workspace.getId() + 1, developerId, AT.minusSeconds(1), 10))
                 .isEmpty();
@@ -181,14 +184,14 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
         bind(row, proof);
         summary(row, FeedbackCopyState.POSTED);
         authorize(proof);
-        var peer = persistAccount("Public feedback viewer");
+        long peerId =
+                Objects.requireNonNull(persistAccount("Public feedback viewer").getId());
         jdbc.update(
                 "INSERT INTO membership(workspace_id,account_id,role,joined_at,review_selected)"
                         + " VALUES (?,?,'MEMBER',now(),false)",
                 workspace.getId(),
-                Objects.requireNonNull(peer.getId()));
-        var entry = history.forItem(workspace.getId(), itemId, Objects.requireNonNull(peer.getId()), 1)
-                .getFirst();
+                peerId);
+        var entry = history.forItem(workspace.getId(), itemId, peerId, 1).getFirst();
         assertThat(entry.body()).isEqualTo(row.getBody());
         assertThat(entry.copyAuthorityComplete()).isTrue();
         assertThat(Objects.requireNonNull(entry.publicHistory())
@@ -198,14 +201,10 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
                         .asString())
                 .isEqualTo(row.getBody());
         verify(permission, never())
-                .find(
-                        workspace.getId(),
-                        proof.getId(),
-                        Objects.requireNonNull(peer.getId()),
-                        SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
+                .find(workspace.getId(), proof.getId(), peerId, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
         when(publicPermission.authorized(any(), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
                 .thenReturn(false);
-        assertThat(history.forItem(workspace.getId(), itemId, Objects.requireNonNull(peer.getId()), 1)
+        assertThat(history.forItem(workspace.getId(), itemId, peerId, 1)
                         .getFirst()
                         .body())
                 .isNull();

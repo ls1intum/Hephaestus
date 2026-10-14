@@ -196,7 +196,7 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     .isEqualTo(DIFF);
             assertThat(PullRequestContentSource.CHANGE_FILE).isEqualTo("context/change.json");
             assertThat(provider.sourceKindFor(PullRequestContentSource.COMMITS_FILE))
-                    .isEqualTo(DIFF);
+                    .isEqualTo(CORE);
         }
     }
 
@@ -381,6 +381,8 @@ class PullRequestContentSourceTest extends BaseUnitTest {
             assertThat(metadataJson.path("subject_role").asString()).isEqualTo("AUTHOR");
             var reviewerMetadata = sampleMetadata();
             reviewerMetadata.put("subject_role", "REVIEWER");
+            reviewerMetadata.put("review_id", 31L);
+            reviewerMetadata.put("about_user_id", 32L);
             JsonNode reviewerCore = objectMapper.readTree(provider.capture(request(reviewerMetadata), Set.of(CORE))
                     .files()
                     .get("context/metadata.json"));
@@ -974,11 +976,20 @@ class PullRequestContentSourceTest extends BaseUnitTest {
 
         var captured = provider.capture(request(sampleMetadata()), Set.of(CORE, DIFF));
 
+        var recordPaths = Set.of(
+                "context/metadata.json",
+                PullRequestContentSource.DESCRIPTION_FILE,
+                PullRequestContentSource.CHANGE_FILE,
+                PullRequestContentSource.COMMITS_FILE);
         assertThat(captured.files().keySet())
-                .containsExactlyInAnyOrder(
-                        "context/metadata.json",
-                        PullRequestContentSource.DESCRIPTION_FILE,
-                        PullRequestContentSource.CHANGE_FILE);
+                .containsAll(recordPaths)
+                .allSatisfy(path -> assertThat(recordPaths.contains(path)
+                                || path.startsWith("context/citable-records/")
+                                || path.startsWith("context/citable/"))
+                        .isTrue());
+        assertThat(captured.citableTexts())
+                .isNotEmpty()
+                .allSatisfy(text -> assertThat(captured.files()).containsKey(text.stagedPath()));
         assertThat(provider.sourceKindFor(PullRequestContentSource.DESCRIPTION_FILE))
                 .isEqualTo(CORE);
         assertThat(captured.immutableIdentities()).doesNotContainKey(CORE);

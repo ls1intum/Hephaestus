@@ -1,4 +1,4 @@
-import { FileCodeIcon, Link2Icon, MessageSquareTextIcon } from "lucide-react";
+import { FileCodeIcon, FileIcon, MessageSquareTextIcon } from "lucide-react";
 
 import { cn } from "cn";
 import { formatDateTime, formatRelative } from "~/components/common/format";
@@ -11,7 +11,7 @@ import type { WorkPageView } from "~/shared/work-url";
 
 export interface CommentListProps {
 	feedback: Loadable<WorkFeedback>;
-	/** Which view of the work the page shows: on the changes, comments on lines come first. */
+	/** Which view of the work the page shows: on the changes, comments on its files and lines come first. */
 	view: WorkPageView;
 	/** The provider page's origin, the only one a comment link may lead to. */
 	pageOrigin: string;
@@ -22,7 +22,7 @@ export interface CommentListProps {
 
 function byView(view: WorkPageView) {
 	const rank = (comment: WorkComment) =>
-		(comment.kind === "INLINE") === (view === "changes") ? 0 : 1;
+		(comment.kind !== "SUMMARY") === (view === "changes") ? 0 : 1;
 	return (a: WorkComment, b: WorkComment): number => rank(a) - rank(b);
 }
 
@@ -41,12 +41,12 @@ function Comment({
 	now: string;
 }) {
 	const Icon = {
-		INLINE: FileCodeIcon,
-		LOCATION_COMMENT: Link2Icon,
+		LINE_NOTE: FileCodeIcon,
+		FILE_NOTE: FileIcon,
 		SUMMARY: MessageSquareTextIcon,
 	}[comment.kind];
 	const label = where(comment, false);
-	const { deliveredAt } = comment;
+	const { postedAt } = comment;
 	return (
 		<li className={cn(INDENT, "flex min-w-0 items-start gap-2 py-1.5 text-sm")}>
 			<Icon aria-hidden className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
@@ -62,14 +62,10 @@ function Comment({
 				)}
 				<span className="text-xs text-muted-foreground">
 					{comment.practices.length === 0 ? "Feedback" : comment.practices.join(", ")}
-					{deliveredAt === undefined ? null : (
-						<>
-							{" · "}
-							<time dateTime={deliveredAt} title={formatDateTime(deliveredAt)}>
-								{formatRelative(deliveredAt, now)}
-							</time>
-						</>
-					)}
+					{" · "}
+					<time dateTime={postedAt} title={formatDateTime(postedAt)}>
+						{formatRelative(postedAt, now)}
+					</time>
 				</span>
 			</div>
 		</li>
@@ -88,8 +84,8 @@ export function CommentList({ feedback, view, pageOrigin, now, onRetry }: Commen
 	if (feedback.status === "error") {
 		return <LoadError message={feedback.message} onRetry={onRetry} />;
 	}
-	const { comments, more } = feedback.data;
-	if (comments.length === 0 && !more) {
+	const { comments } = feedback.data;
+	if (comments.length === 0) {
 		return null;
 	}
 	return (
@@ -105,11 +101,6 @@ export function CommentList({ feedback, view, pageOrigin, now, onRetry }: Commen
 					/>
 				))}
 			</ul>
-			{more ? (
-				<p className={cn(INDENT, "py-1 text-xs text-muted-foreground")}>
-					Older comments are not listed here.
-				</p>
-			) : null}
 		</div>
 	);
 }

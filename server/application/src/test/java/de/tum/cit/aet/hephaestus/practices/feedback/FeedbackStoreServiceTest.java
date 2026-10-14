@@ -86,6 +86,13 @@ class FeedbackStoreServiceTest {
             digests,
             mock(FeedbackCompositionContextService.class));
     final UUID reviewId = UUID.randomUUID(), resultId = UUID.randomUUID();
+    final Review review = Review.builder()
+            .id(reviewId)
+            .workspaceId(1)
+            .itemId(3)
+            .kind(ReviewKind.ITEM)
+            .status(ReviewStatus.RUNNING)
+            .build();
     FeedbackDraft draft;
 
     @BeforeEach
@@ -116,14 +123,7 @@ class FeedbackStoreServiceTest {
                         copyId.toString(),
                         FeedbackIds.writeMarker(copyId))),
                 Map.of());
-        when(reviews.lockByIdAndWorkspaceId(reviewId, 1))
-                .thenReturn(Optional.of(Review.builder()
-                        .id(reviewId)
-                        .workspaceId(1)
-                        .itemId(3)
-                        .kind(ReviewKind.ITEM)
-                        .status(ReviewStatus.RUNNING)
-                        .build()));
+        when(reviews.lockByIdAndWorkspaceId(reviewId, 1)).thenReturn(Optional.of(review));
         when(results.findByWorkspaceIdAndIdIn(1, List.of(resultId)))
                 .thenReturn(List.of(Result.builder()
                         .id(resultId)
@@ -151,7 +151,6 @@ class FeedbackStoreServiceTest {
 
     @Test
     void shouldRetainPublicCompletionAndOtherChecksWhenRecordingPreparation() {
-        var review = reviews.lockByIdAndWorkspaceId(reviewId, 1).orElseThrow();
         var publicAt = Instant.EPOCH.minusSeconds(60);
         review.setPublicReviewAt(publicAt);
         review.setChecks(JsonNodeFactory.instance.objectNode().put("cancellationRequested", false));

@@ -1142,7 +1142,16 @@
 								"**/*.hpp"
 							],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -1200,7 +1209,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -1286,7 +1304,16 @@
 								"**/*.hpp"
 							],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -1381,7 +1408,16 @@
 								"**/*.hpp"
 							],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -1467,7 +1503,16 @@
 								"**/*.hpp"
 							],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -1553,7 +1598,16 @@
 								"**/*.hpp"
 							],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -1675,7 +1729,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -2093,7 +2156,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -2654,7 +2726,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*.swift"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -2720,7 +2801,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*.swift"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -2786,7 +2876,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*.swift"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -2852,7 +2951,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*.swift"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {
@@ -3040,7 +3148,16 @@
 							"itemKind": "scm.file",
 							"include": ["**/*.swift"],
 							"exclude": [],
-							"context": ["**/*"]
+							"context": ["**/*"],
+							"reads": {
+								"contract": "2.0.0",
+								"sources": [
+									{
+										"source": "scm.repository.tree",
+										"need": "COMPLETE"
+									}
+								]
+							}
 						},
 						"lineNotes": true,
 						"guidance": {

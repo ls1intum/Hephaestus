@@ -53,7 +53,8 @@ class PracticeReviewItemFactsIntegrationTest extends BaseIntegrationTest {
         var other = data.scenario();
         get("/practices/items/" + other.item().getId() + "/facts")
                 .expectStatus()
-                .isNotFound();
+                .isNotFound()
+                .expectBody(Void.class);
     }
 
     @Test

@@ -40,6 +40,7 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.mentor.MentorTurnAccount;
@@ -84,6 +85,7 @@ import tools.jackson.databind.node.JsonNodeFactory;
  * submitted to the virtual-thread executor; all blocking work happens off the request thread.
  */
 @Service
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
 
@@ -114,7 +116,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
     private final ResultHistoryContentSource practiceResultHistory;
     private final ReviewAttemptsContentSource reviewAttempts;
     private final ResultHistoryQuery resultsHistory;
-    private final ObjectProvider<ConversationFeedbackReceipts> feedbackReceipts;
+    private final ConversationFeedbackReceipts feedbackReceipts;
 
     /** The holder lets a disconnect abort a runner attached after lifecycle callbacks were registered. */
     @Override
@@ -337,11 +339,9 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                     callback -> handleFetchContext(callback, contextInputs, request.workspaceId(), user.id());
             Predicate<MentorRunnerClient.LinkRequest> linkProblem = link -> {
                 if (link.kind() == MentorRunnerClient.LinkKind.FEEDBACK) {
-                    var receipts = feedbackReceipts.getIfAvailable();
-                    return receipts != null
-                            && state.claimFeedback(
-                                    link.linkedId(),
-                                    () -> receipts.claim(request.workspaceId(), link.linkedId(), assistantMessageId));
+                    return state.claimFeedback(
+                            link.linkedId(),
+                            () -> feedbackReceipts.claim(request.workspaceId(), link.linkedId(), assistantMessageId));
                 }
                 // A problem is shown under its result: the result decides whether either may be shown.
                 UUID resultId = link.kind() == MentorRunnerClient.LinkKind.RESULT
@@ -528,8 +528,6 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
 
     private void settleFeedback(
             long workspaceId, UUID messageId, TranslatorState state, MentorChannel channel, boolean completed) {
-        var receipts = feedbackReceipts.getIfAvailable();
-        if (receipts == null) return;
         var actual = channel.receipt().filter(receipt -> messageId.equals(receipt.chatMessageId()));
         var now = Instant.now();
         for (var entry : state.sealFeedbackClaims().entrySet()) {
@@ -540,7 +538,7 @@ public class MentorChatService implements MentorTurnRunner, MentorChatStarter {
                             ? new MentorTurnReceipt(messageId, null, null, null, null, true)
                             : actual.orElseGet(() -> new MentorTurnReceipt(messageId, null, null, null, null, true));
             try {
-                receipts.record(workspaceId, entry.getValue(), receipt, now);
+                feedbackReceipts.record(workspaceId, entry.getValue(), receipt, now);
             } catch (RuntimeException failure) {
                 log.warn(
                         "Conversation copy receipt could not be stored: workspaceId={}, messageId={}, failure={}",

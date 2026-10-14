@@ -2,14 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review.schedule;
 
 import java.io.Serial;
 
-/**
- * A sweep schedule cannot exist on the terms asked for — this workspace already sweeps that kind of
- * work. Maps to 409.
- *
- * <p>Apart from {@link ReviewBatchConflictException} because the {@code type} slug is what a client
- * branches on, and the two send an admin to different screens: a campaign conflict is resolved on the
- * campaign that is running, a schedule conflict on the schedule that already exists.
- */
+/** The requested schedule conflicts with an existing schedule or a retained batch. */
 public class ReviewScheduleConflictException extends RuntimeException {
 
     @Serial

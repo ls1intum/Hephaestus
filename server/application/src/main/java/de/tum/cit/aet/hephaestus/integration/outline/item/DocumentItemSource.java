@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.outline.item;
 
-import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
@@ -25,6 +23,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RoleHolder;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
+import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentProjector;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocument;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
@@ -60,7 +59,8 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
             OutlineDocumentProjector projection,
             DocumentContentSource content,
             ObjectMapper mapper,
-            ConnectionService connections, OutlineDocumentPermission permission) {
+            ConnectionService connections,
+            OutlineDocumentPermission permission) {
         this.documents = documents;
         this.projection = projection;
         this.content = content;
@@ -140,10 +140,7 @@ public class DocumentItemSource implements ItemSource, ItemSourceAccess {
                         ItemCaptureCode.ITEM_NOT_VISIBLE, "Outline is not connected for this document"));
         var roles = permission.identities(item.workspaceId(), doc.getId()).stream()
                 .filter(identity -> identity.subject().equals(doc.getCreatedBySubject()))
-                .map(identity -> new RoleHolder(
-                        AboutRole.AUTHOR,
-                        identity,
-                        true))
+                .map(identity -> new RoleHolder(AboutRole.AUTHOR, identity, true))
                 .distinct()
                 .toList();
         String title = doc.getTitle();

@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
@@ -20,6 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Restores the original captured text for composition without asking an item source to capture again. */
 @Component
+@ConditionalOnCaptureRole
 public class ReviewCompositionContinuation {
     public static final String CONTINUATION_PATH = SandboxLayout.INPUTS_PREFIX + "composition-continuation.json";
     private final ReviewCompositionBasisRepository bases;

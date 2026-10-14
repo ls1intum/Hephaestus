@@ -35,12 +35,14 @@ class ScmCitableTextsTest extends BaseUnitTest {
             Files.writeString(root.resolve("a.ts"), "before\n");
             git.add().addFilepattern("a.ts").call();
             var base = git.commit()
+                    .setSign(false)
                     .setMessage("Base")
                     .setAuthor("Test", "test@example.test")
                     .call();
             Files.writeString(root.resolve("a.ts"), "after\n");
             git.add().addFilepattern("a.ts").call();
             var head = git.commit()
+                    .setSign(false)
                     .setMessage("Head")
                     .setAuthor("Test", "test@example.test")
                     .call();
@@ -112,6 +114,7 @@ class ScmCitableTextsTest extends BaseUnitTest {
             Files.writeString(root.resolve("before.ts"), "Renamed words\n");
             git.add().addFilepattern(".").call();
             var base = git.commit()
+                    .setSign(false)
                     .setMessage("Base")
                     .setAuthor("Test", "test@example.test")
                     .call();
@@ -121,6 +124,7 @@ class ScmCitableTextsTest extends BaseUnitTest {
             Files.writeString(root.resolve("added.json"), "This is source text, not valid JSON.\n");
             git.add().addFilepattern(".").call();
             var head = git.commit()
+                    .setSign(false)
                     .setMessage("Head")
                     .setAuthor("Test", "test@example.test")
                     .call();
@@ -153,12 +157,14 @@ class ScmCitableTextsTest extends BaseUnitTest {
             Files.writeString(root.resolve("a.ts"), "before\n");
             git.add().addFilepattern(".").call();
             var base = git.commit()
+                    .setSign(false)
                     .setMessage("Base")
                     .setAuthor("Test", "test@example.test")
                     .call();
             Files.writeString(root.resolve("a.ts"), "x".repeat(2 * 1024 * 1024 + 1));
             git.add().addFilepattern(".").call();
             var head = git.commit()
+                    .setSign(false)
                     .setMessage("Head")
                     .setAuthor("Test", "test@example.test")
                     .call();

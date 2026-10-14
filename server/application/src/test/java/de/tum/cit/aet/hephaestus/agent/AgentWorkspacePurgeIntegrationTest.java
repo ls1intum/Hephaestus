@@ -121,7 +121,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
     void shouldExplainHowToResolvePendingFeedbackDeliveryBeforePurge() {
         Workspace workspace = workspaceRepository.save(TestEntities.activeWorkspace("pending-delivery"));
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.COMPLETED);
         job.setProcessingStatus(ProcessingStatus.PENDING);
@@ -167,7 +167,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         grantRepository.save(grant);
 
         ReviewJob job = new ReviewJob();
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
 
         job.setStatus(ReviewJobStatus.COMPLETED);
         job.setProcessingStatus(ProcessingStatus.DONE);

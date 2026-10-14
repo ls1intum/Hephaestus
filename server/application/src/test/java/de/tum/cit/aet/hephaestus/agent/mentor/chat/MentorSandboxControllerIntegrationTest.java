@@ -23,7 +23,7 @@ class MentorSandboxControllerIntegrationTest extends AbstractWorkspaceIntegratio
         User owner = persistUser("workspace-owner-for-mentor-prepare");
         Workspace workspace =
                 createWorkspace("mentor-prepare-space", "Prepare", "mentor-prepare", AccountType.ORG, owner);
-        ensureWorkspaceMembership(workspace, mentor, Membership.WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, Membership.WorkspaceRole.MEMBER);
 
         webTestClient
                 .post()

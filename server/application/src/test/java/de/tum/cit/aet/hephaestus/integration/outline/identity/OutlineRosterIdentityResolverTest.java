@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 class OutlineRosterIdentityResolverTest extends BaseUnitTest {
     @Test
@@ -35,7 +36,7 @@ class OutlineRosterIdentityResolverTest extends BaseUnitTest {
                 IntegrationKind.OUTLINE,
                 "team-a",
                 new ConnectionConfig.OutlineConfig("https://wiki.example.com", null, null, Set.of()));
-        connection.setId(21L);
+        ReflectionTestUtils.setField(connection, "id", 21L);
         when(connections.findInWorkspace(7L, 21L)).thenReturn(Optional.of(connection));
         when(providers.resolveProviderId("OUTLINE", "https://wiki.example.com")).thenReturn(3L);
         when(people.ensureHuman(new PersonIdentity(3L, "creator", "team-a"), "Ada"))

@@ -120,7 +120,7 @@ class WorkspaceIdentityAuthorizationIntegrationTest extends AbstractWorkspaceInt
 
     @Test
     void shouldKeepTheVerifiedOwnerWhenLoginsCollideAndDenyAccessWhenItsLinkIsDisabled() {
-        var namesake = persistUser("shared-login");
+        persistUser("shared-login");
         var provider = ensureGitLabProvider();
         var providerId = provider.getId();
         assertNotNull(providerId);

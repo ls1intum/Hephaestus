@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.job.ReviewJobLifecycleService;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.ReviewJobStateConflictException;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewQueue;
@@ -15,9 +16,11 @@ import de.tum.cit.aet.hephaestus.practices.spi.ScanExecutionSnapshot;
 import java.time.Clock;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.jspecify.annotations.Nullable;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -25,6 +28,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 /** Feeds scans through the existing serial queue; product locks and indexes remain the final fence. */
 @Component
 @ConditionalOnServerRole
+@ConditionalOnBooleanProperty(name = RuntimeRole.AGENT_ENABLED_PROPERTY)
 @RequiredArgsConstructor
 public class ScanDriver {
     private static final Set<ReviewJobStatus> ACTIVE = Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING);
@@ -60,6 +64,7 @@ public class ScanDriver {
     }
 
     public void advance(ScanExecutionSnapshot state) {
+        if (state.status() != ReviewStatus.QUEUED && state.status() != ReviewStatus.RUNNING) return;
         var review = state.review();
         var active = jobs.findByReviewIdAndWorkspaceIdAndStatusIn(review.id(), review.workspaceId(), ACTIVE);
         if (active.isPresent()) {
@@ -86,6 +91,7 @@ public class ScanDriver {
                 || state.listedPracticeIds().size() != review.practices().size())
             throw new ScanService.EnumerationFailure(ReviewStopReason.ENUMERATION_FAILED);
         var pending = scans.pending(review.workspaceId(), review.id(), 1000);
+        var attempted = pending.stream().map(assignment -> assignment.id()).collect(Collectors.toSet());
         for (var assignment : pending) scans.reuse(review.workspaceId(), assignment.id());
         pending = scans.pending(review.workspaceId(), review.id(), 1000);
         if (pending.isEmpty()) {
@@ -101,6 +107,7 @@ public class ScanDriver {
                                     : ReviewStopReason.EXECUTION_INCOMPLETE);
             return;
         }
+        if (!attempted.contains(pending.getFirst().id())) return;
         long item = pending.getFirst().item().itemId();
         var selected = pending.stream()
                 .filter(assignment -> assignment.item().itemId() == item)
@@ -133,6 +140,7 @@ public class ScanDriver {
         transactions.executeWithoutResult(status -> {
             var state = scans.lock(
                     candidate.review().workspaceId(), candidate.review().id());
+            if (state.status() != ReviewStatus.QUEUED && state.status() != ReviewStatus.RUNNING) return;
             if (jobs.findByReviewIdAndWorkspaceIdAndStatusIn(
                             state.review().id(), state.review().workspaceId(), ACTIVE)
                     .isEmpty())

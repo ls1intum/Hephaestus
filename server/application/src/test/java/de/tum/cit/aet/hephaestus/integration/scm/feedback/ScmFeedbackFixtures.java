@@ -1,9 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.feedback;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
@@ -21,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import org.jspecify.annotations.Nullable;
+import org.mockito.Answers;
 
 public final class ScmFeedbackFixtures {
     private static final AtomicLong NEXT = new AtomicLong(100);
@@ -42,15 +40,16 @@ public final class ScmFeedbackFixtures {
     }
 
     public static ScmFeedbackTargetResolver resolver() {
-        ScmFeedbackTargetResolver resolver = mock(ScmFeedbackTargetResolver.class);
-        lenient().when(resolver.serverUrl(any(), any())).thenReturn("https://github.com");
-        when(resolver.subject(any(), any())).thenAnswer(call -> {
-            FeedbackTarget target = call.getArgument(0);
-            String subject = SUBJECTS.get(target.item());
-            if (subject == null) throw new IllegalArgumentException("Unregistered test target");
-            return subject;
+        return mock(ScmFeedbackTargetResolver.class, call -> {
+            if (call.getMethod().getName().equals("serverUrl")) return "https://github.com";
+            if (call.getMethod().getName().equals("subject")) {
+                FeedbackTarget target = call.getArgument(0);
+                String subject = SUBJECTS.get(target.item());
+                if (subject == null) throw new IllegalArgumentException("Unregistered test target");
+                return subject;
+            }
+            return Answers.RETURNS_DEFAULTS.answer(call);
         });
-        return resolver;
     }
 
     public static UUID copyId(@Nullable String key) {

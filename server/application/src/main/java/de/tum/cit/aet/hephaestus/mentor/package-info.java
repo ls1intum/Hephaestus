@@ -9,9 +9,9 @@
  *
  * <h2>Key entry points</h2>
  * <ul>
- *   <li>{@link de.tum.cit.aet.hephaestus.mentor.ChatThreadController} — thread CRUD</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.mentor.ChatMessageVoteController} — votes</li>
- *   <li>{@link de.tum.cit.aet.hephaestus.mentor.ChatThread} / {@link de.tum.cit.aet.hephaestus.mentor.ChatMessage}
+ *   <li>{@link ChatThreadController} — thread CRUD</li>
+ *   <li>{@link ChatMessageVoteController} — votes</li>
+ *   <li>{@link ChatThread} / {@link ChatMessage}
  *       — entities backing {@code chat_thread}, {@code chat_message}</li>
  * </ul>
  */

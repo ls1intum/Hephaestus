@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.HistoryCopies;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.evidence.capture.ContentSource;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryEntry;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultHistoryQuery;
 import java.time.Instant;
@@ -21,6 +22,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 /** Bounded authorized history; detail always rechecks the same developer scope. */
 @Component
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ResultHistoryContentSource implements ContentSource {
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "results_history.json";

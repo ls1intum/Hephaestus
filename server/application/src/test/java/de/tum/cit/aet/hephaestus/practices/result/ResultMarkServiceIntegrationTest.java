@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import java.time.Instant;
+import java.util.Objects;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,10 +29,13 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
 
     Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setUp() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.account().getId());
     }
 
     String root() {
@@ -58,7 +62,7 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
                 result.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.INCORRECT,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "Incorrect location");
         assertThat(results.findCurrentClaim(
                         result.getWorkspaceId(), result.getPracticeId(), result.getItemId(), result.getDeveloperId()))
@@ -66,11 +70,7 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
                 .extracting(Result::getId)
                 .isEqualTo(result.getId());
         var removed = service.remove(
-                result.getWorkspaceId(),
-                result.getId(),
-                mark.getId(),
-                scenario.account().getId(),
-                "The location is verified");
+                result.getWorkspaceId(), result.getId(), mark.getId(), scenarioAccountId, "The location is verified");
         assertThat(removed.getRemovedAt()).isNotNull();
         assertThat(results.findById(result.getId()).orElseThrow().getEndedAt()).isNull();
     }
@@ -82,20 +82,12 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
                 result.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.ACCEPTED,
-                scenario.account().getId(),
+                scenarioAccountId,
                 "Intentional tradeoff");
         var first = service.remove(
-                result.getWorkspaceId(),
-                result.getId(),
-                mark.getId(),
-                scenario.account().getId(),
-                "Reconsidered");
+                result.getWorkspaceId(), result.getId(), mark.getId(), scenarioAccountId, "Reconsidered");
         var second = service.remove(
-                result.getWorkspaceId(),
-                result.getId(),
-                mark.getId(),
-                scenario.account().getId(),
-                "Second request");
+                result.getWorkspaceId(), result.getId(), mark.getId(), scenarioAccountId, "Second request");
         assertThat(second.getRemovedAt()).isEqualTo(first.getRemovedAt());
         assertThat(second.getRemovalReason()).isEqualTo("Reconsidered");
         assertThat(second.getRemovedById()).isEqualTo(first.getRemovedById());
@@ -108,7 +100,7 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
                         scenario.workspace().getId(),
                         result.getId(),
                         ResultMarkKind.INCORRECT,
-                        scenario.account().getId(),
+                        scenarioAccountId,
                         "Wrong workspace"))
                 .isInstanceOf(EntityNotFoundException.class);
     }
@@ -117,17 +109,9 @@ class ResultMarkServiceIntegrationTest extends BaseIntegrationTest {
     void activeDuplicateMarkIsAConflict() {
         var result = data.result(scenario, ResultOutcome.NOT_MET, Instant.now());
         service.create(
-                result.getWorkspaceId(),
-                result.getId(),
-                ResultMarkKind.ACCEPTED,
-                scenario.account().getId(),
-                "Intentional");
+                result.getWorkspaceId(), result.getId(), ResultMarkKind.ACCEPTED, scenarioAccountId, "Intentional");
         assertThatThrownBy(() -> service.create(
-                        result.getWorkspaceId(),
-                        result.getId(),
-                        ResultMarkKind.ACCEPTED,
-                        scenario.account().getId(),
-                        "Again"))
+                        result.getWorkspaceId(), result.getId(), ResultMarkKind.ACCEPTED, scenarioAccountId, "Again"))
                 .isInstanceOf(ResponseStatusException.class)
                 .satisfies(e -> assertThat(
                                 ((ResponseStatusException) e).getStatusCode().value())

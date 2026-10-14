@@ -36,7 +36,7 @@ class MentorInterruptedReplyIntegrationTest extends AbstractWorkspaceIntegration
         User mentor = persistUser("mentor");
         Workspace workspace =
                 createWorkspace("interrupted-reply", "Interrupted Reply", "org-ir", AccountType.ORG, mentor);
-        ensureWorkspaceMembership(workspace, mentor, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
         UUID threadId = UUID.randomUUID();
         ChatThread thread =
                 persistence.ensureThread(workspace.getId(), threadId, mentor.getId(), "How do I link issues?");

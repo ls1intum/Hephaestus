@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.result.ResultMarkService;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewIntegrationData;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewItemRepository;
+import de.tum.cit.aet.hephaestus.practices.review.ReviewOverviewService;
 import de.tum.cit.aet.hephaestus.practices.review.model.ReviewItem;
 import de.tum.cit.aet.hephaestus.practices.review.report.ScanReportService;
 import de.tum.cit.aet.hephaestus.practices.scan.dto.ReusedScanReportItemDTO;
@@ -35,6 +36,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAttemptGuard;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewBudget;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewCaptureDecision;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
@@ -42,6 +44,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeQuery;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRuntimeSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewScanStore;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewService;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewStopReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -82,6 +85,12 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ReviewAssignmentStore assignments;
+
+    @Autowired
+    ReviewOverviewService overview;
+
+    @Autowired
+    ReviewService reviews;
 
     @Autowired
     ScanReportService reports;
@@ -130,10 +139,13 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
 
     ScanReportTestData.Scenario scenario;
 
+    long scenarioAccountId;
+
     @BeforeEach
     void setup() {
         databaseTestUtils.cleanDatabase();
         scenario = data.scenario();
+        scenarioAccountId = Objects.requireNonNull(scenario.owner().account().getId());
         when(custody.find(anyLong(), anyList()))
                 .thenAnswer(call -> new HistoryCustody(false, List.of(), List.of(), call.getArgument(1)));
         when(authorization.permitsAll(anyLong(), anyCollection(), any())).thenAnswer(call -> {
@@ -155,7 +167,9 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         var report = query.report(scan.getWorkspaceId(), scan.getId());
         assertThat(report.counts().reviewed()).isOne();
         assertThat(report.counts().problems()).isEqualTo(2);
-        assertThat(report.recordedCounts().problems()).isEqualTo(2);
+        var recorded = report.recordedCounts();
+        assertThat(recorded).isNotNull();
+        assertThat(recorded.problems()).isEqualTo(2);
         assertThat(report.problemChanges().added()).isEqualTo(2);
     }
 
@@ -244,6 +258,63 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                 .param("trace", id.toString())
                 .update();
         return id;
+    }
+
+    @Test
+    void shouldFreezeCancellationCountsOnlyAfterTerminalProcessingRecordsTheFailure() {
+        var scan = data.scan(scenario, ReviewStatus.RUNNING, Instant.now());
+        long workspaceId = scan.getWorkspaceId();
+        UUID reviewId = scan.getId();
+        var jobId = invocation(workspaceId, reviewId, ReviewJobStatus.RUNNING);
+        var assignment = new ReviewAssignmentId(
+                reviewId, scenario.owner().practice().getId(), scenario.file().getId());
+        assignments.bind(workspaceId, reviewId, jobId, List.of(assignment));
+        jdbc.sql("UPDATE review_job SET"
+                        + " status='CANCELLED',started_at=now(),execution_started_at=now(),completed_at=now()"
+                        + " WHERE workspace_id=:ws AND id=:id")
+                .param("ws", workspaceId)
+                .param("id", jobId)
+                .update();
+        when(runtime.activeJobIds(workspaceId, reviewId)).thenReturn(Set.of());
+        when(runtime.unsettledJobIds(workspaceId, reviewId)).thenReturn(Set.of(jobId));
+        assertThat(reviews.cancel(workspaceId, reviewId, "CANCELLED_BY_ADMIN")).isTrue();
+        assertThat(jdbc.sql("SELECT report IS NULL FROM review WHERE workspace_id=:ws AND id=:id")
+                        .param("ws", workspaceId)
+                        .param("id", reviewId)
+                        .query(Boolean.class)
+                        .single())
+                .isTrue();
+        assignments.fail(
+                workspaceId,
+                assignment,
+                ReviewStopReason.CANCELLED,
+                "The invoked execution stopped before admitting a result.");
+        jdbc.sql("UPDATE review_job SET processing_status='FAILED' WHERE workspace_id=:ws AND id=:id")
+                .param("ws", workspaceId)
+                .param("id", jobId)
+                .update();
+        when(runtime.unsettledJobIds(workspaceId, reviewId)).thenReturn(Set.of());
+        reviews.complete(
+                workspaceId,
+                reviewId,
+                new ReviewCompletion(
+                        ReviewStatus.CANCELLED, ReviewStopReason.CANCELLED, Instant.now(), scan.getOrderedAt()));
+        var report = query.report(workspaceId, reviewId);
+        assertThat(report.scan().status()).isEqualTo(ReviewStatus.CANCELLED);
+        var recorded = report.recordedCounts();
+        assertThat(recorded).isNotNull();
+        assertThat(recorded.withheld()).isOne();
+        assertThat(recorded.notReviewed()).isZero();
+        assertThat(recorded.reviewed()).isZero();
+        var evidence = overview.evidenceOutcomes(workspaceId).getFirst();
+        assertThat(evidence.withheld()).isOne();
+        assertThat(evidence.notReviewed()).isZero();
+        assertThat(jdbc.sql("SELECT COUNT(*) FROM result WHERE workspace_id=:ws AND review_id=:review")
+                        .param("ws", workspaceId)
+                        .param("review", reviewId)
+                        .query(Integer.class)
+                        .single())
+                .isZero();
     }
 
     @Test
@@ -362,7 +433,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                 scan.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.ACCEPTED,
-                scenario.owner().account().getId(),
+                scenarioAccountId,
                 "This tradeoff is accepted");
         var after = query.report(scan.getWorkspaceId(), scan.getId());
         assertThat(after.counts().openProblems()).isZero();
@@ -395,7 +466,7 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
                 original.getWorkspaceId(),
                 result.getId(),
                 ResultMarkKind.ACCEPTED,
-                scenario.owner().account().getId(),
+                scenarioAccountId,
                 "Accept the known tradeoff");
         var current = data.scan(scenario, ReviewStatus.RUNNING, Instant.now().minusSeconds(10));
         var id = new ReviewAssignmentId(current.getId(), result.getPracticeId(), result.getItemId());
@@ -462,7 +533,9 @@ class ScanReportIntegrationTest extends BaseIntegrationTest {
         reports.expire(scan.getWorkspaceId(), scan.getId());
         var report = query.report(scan.getWorkspaceId(), scan.getId());
         assertThat(report.availability().expired()).isTrue();
-        assertThat(report.recordedCounts().problems()).isEqualTo(2);
+        var recorded = report.recordedCounts();
+        assertThat(recorded).isNotNull();
+        assertThat(recorded.problems()).isEqualTo(2);
         assertThatThrownBy(() -> query.items(
                         scan.getWorkspaceId(),
                         scan.getId(),

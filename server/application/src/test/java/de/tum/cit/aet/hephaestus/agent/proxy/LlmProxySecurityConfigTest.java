@@ -379,7 +379,7 @@ class LlmProxySecurityConfigTest extends BaseUnitTest {
         workspace.setId(7L);
         ReviewJob job = new ReviewJob();
         job.setId(UUID.randomUUID());
-        RuntimeJobTestData.initialize(job, (workspace).getId());
+        RuntimeJobTestData.initialize(job, workspace.getId());
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setWorkerId("test-worker");
         job.setAttempt(attempt);

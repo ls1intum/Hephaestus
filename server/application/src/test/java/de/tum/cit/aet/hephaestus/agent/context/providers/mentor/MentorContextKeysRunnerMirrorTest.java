@@ -69,14 +69,14 @@ class MentorContextKeysRunnerMirrorTest {
     @DisplayName("a result detail key is one canonical lowercase id, mirrored by the runner")
     void practiceResultDetailKeyIsCanonical() throws IOException {
         String id = "0b7e1c9a-3f5d-4a8e-9c21-6d4f8e2a1b3c";
-        assertThat(ResultHistoryContentSource.practiceResultIdOf("inputs/context/results_history/" + id + ".json"))
+        assertThat(ResultHistoryContentSource.resultIdOf("inputs/context/results_history/" + id + ".json"))
                 .contains(UUID.fromString(id));
-        assertThat(ResultHistoryContentSource.practiceResultIdOf(
+        assertThat(ResultHistoryContentSource.resultIdOf(
                         "inputs/context/results_history/" + id.toUpperCase(Locale.ROOT) + ".json"))
                 .isEmpty();
-        assertThat(ResultHistoryContentSource.practiceResultIdOf("inputs/context/results_history/../user.json"))
+        assertThat(ResultHistoryContentSource.resultIdOf("inputs/context/results_history/../user.json"))
                 .isEmpty();
-        assertThat(ResultHistoryContentSource.practiceResultIdOf("inputs/context/results_history/42.json"))
+        assertThat(ResultHistoryContentSource.resultIdOf("inputs/context/results_history/42.json"))
                 .isEmpty();
         assertThat(Files.readString(PROTOCOL, StandardCharsets.UTF_8))
                 .contains(
@@ -86,17 +86,18 @@ class MentorContextKeysRunnerMirrorTest {
     @Test
     @DisplayName("a review-attempts key names one pull request or issue by pullRequestId, mirrored by the runner")
     void reviewAttemptsKeyIsCanonical() throws IOException {
-        assertThat(ReviewAttemptsContentSource.workOf("inputs/context/review_attempts/issue/21.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/issue/21.json"))
                 .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.issue"), 21L));
-        assertThat(ReviewAttemptsContentSource.workOf("inputs/context/review_attempts/pull_request/42.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/pull_request/42.json"))
                 .contains(new ReviewAttemptsContentSource.ItemSelection(new ItemKind("scm.pull_request"), 42L));
-        assertThat(ReviewAttemptsContentSource.workOf("inputs/context/review_attempts/21.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/21.json"))
                 .isEmpty();
-        assertThat(ReviewAttemptsContentSource.workOf("inputs/context/review_attempts/conversation/21.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/conversation/21.json"))
                 .isEmpty();
-        assertThat(ReviewAttemptsContentSource.workOf("inputs/context/review_attempts/issue/../user.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf("inputs/context/review_attempts/issue/../user.json"))
                 .isEmpty();
-        assertThat(ReviewAttemptsContentSource.workOf("inputs/context/review_attempts/issue/1234567890123456789.json"))
+        assertThat(ReviewAttemptsContentSource.selectionOf(
+                        "inputs/context/review_attempts/issue/1234567890123456789.json"))
                 .isEmpty();
         assertThat(Files.readString(PROTOCOL, StandardCharsets.UTF_8))
                 .contains("/^inputs\\/context\\/review_attempts\\/(?:pull_request|issue)\\/\\d{1,18}\\.json$/u");

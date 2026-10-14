@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
-import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
-@ConditionalOnServerRole
+@ConditionalOnCaptureRole
 @RequiredArgsConstructor
 public class ResultVisibilityPolicy {
 

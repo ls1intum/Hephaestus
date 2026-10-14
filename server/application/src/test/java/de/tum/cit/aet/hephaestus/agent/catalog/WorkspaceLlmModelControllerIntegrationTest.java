@@ -491,7 +491,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         // Login must match @WithMentorUser's default "mentor" principal so the membership resolver
         // finds this exact row.
         User member = persistUser("mentor");
-        ensureWorkspaceMembership(workspace, member, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, member, WorkspaceRole.MEMBER);
         String slug = workspace.getWorkspaceSlug();
 
         webTestClient
@@ -542,7 +542,7 @@ class WorkspaceLlmModelControllerIntegrationTest extends AbstractWorkspaceIntegr
         // app_admin elevation, which would let this call through for the wrong reason.
         User admin = persistUser("mentor");
         Workspace own = createWorkspace("wsmodel-own-ws", "Own", "wsmodel-own-org", AccountType.ORG, admin);
-        ensureWorkspaceMembership(own, admin, WorkspaceRole.ADMIN);
+        ensureMembership(own, admin, WorkspaceRole.ADMIN);
 
         Workspace other = createWorkspace(
                 "wsmodel-other-ws", "Other", "wsmodel-other-org", AccountType.ORG, persistUser("wsmodel-other-owner"));

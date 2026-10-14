@@ -17,23 +17,28 @@ class PracticeReviewHttpSurfaceTest extends HephaestusArchitectureTest {
     void shouldExposeOnlyFrozenReviewMutationsToAdmins() {
         var controllers = classes.stream()
                 .filter(type -> type.isAnnotatedWith(RequestMapping.class))
-                .filter(type -> Arrays.stream(type.getAnnotationOfType(RequestMapping.class).value())
+                .filter(type -> Arrays.stream(
+                                type.getAnnotationOfType(RequestMapping.class).value())
                         .anyMatch(path -> path.startsWith("/practices/reviews")))
                 .toList();
         assertThat(controllers).isNotEmpty();
         assertThat(controllers).allMatch(type -> type.isAnnotatedWith(RequireAtLeastWorkspaceAdmin.class));
-        Set<String> creates = Set.of("createResultMark", "createFeedbackDecision", "retryFeedback");
-        var unsupported = controllers.stream().flatMap(type -> type.getMethods().stream())
+        Set<String> creates = Set.of("createResultMark", "createFeedbackDecision", "retryFeedback", "cancelReview");
+        var unsupported = controllers.stream()
+                .flatMap(type -> type.getMethods().stream())
                 .filter(method -> method.isAnnotatedWith(RequestMapping.class)
                         || method.isMetaAnnotatedWith(RequestMapping.class))
                 .filter(method -> {
                     if (method.isAnnotatedWith(GetMapping.class)) return false;
                     if (!method.isAnnotatedWith(Operation.class)) return true;
-                    String operation = method.getAnnotationOfType(Operation.class).operationId();
+                    String operation =
+                            method.getAnnotationOfType(Operation.class).operationId();
                     return !(method.isAnnotatedWith(PostMapping.class) && creates.contains(operation))
                             && !(method.isAnnotatedWith(DeleteMapping.class) && operation.equals("removeResultMark"));
                 })
-                .map(method -> method.getFullName()).sorted().toList();
+                .map(method -> method.getFullName())
+                .sorted()
+                .toList();
         assertThat(unsupported).isEmpty();
     }
 }
