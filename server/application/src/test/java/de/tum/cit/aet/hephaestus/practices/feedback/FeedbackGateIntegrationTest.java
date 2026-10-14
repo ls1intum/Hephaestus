@@ -52,17 +52,19 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
 
     @BeforeEach
     void admitPolicyRevision() {
-        jdbc.update(
-                "UPDATE workspace SET practices_enabled=true,practice_rollout_revision=4 WHERE" + " id=?",
-                workspace.getId());
+        jdbc.update("""
+            UPDATE workspace SET practices_enabled=true,practice_rollout_revision=4 WHERE id=?
+            """, workspace.getId());
         jdbc.update("UPDATE review SET rollout_revision=4 WHERE workspace_id=? AND id=?", workspace.getId(), reviewId);
         piece = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.READY, null);
         supportedItem = new ItemRef(workspace.getId(), itemId, new ItemKind("scm.pull_request"), 42L, null, null);
     }
 
     private void supportOnWorkFeedback() {
-        jdbc.update("INSERT INTO instance_settings(id,silent_mode_engaged,version) VALUES(1,false,0) "
-                + "ON CONFLICT(id) DO UPDATE SET silent_mode_engaged=false");
+        jdbc.update("""
+            INSERT INTO instance_settings(id,silent_mode_engaged,version) VALUES(1,false,0)
+            ON CONFLICT(id) DO UPDATE SET silent_mode_engaged=false
+            """);
         var result = resultWithStateFilter("open");
         supportedFeedback = piece(FeedbackDestination.ON_WORK, FeedbackState.READY, null);
         bind(supportedFeedback, result);
@@ -102,18 +104,16 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
         supportOnWorkFeedback();
         assertThat(check().allowed()).isTrue();
         new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
-            Long next = jdbc.queryForObject(
-                    "SELECT" + " nextval(pg_get_serial_sequence('practice_version','id'))", Long.class);
-            jdbc.update(
-                    "INSERT INTO"
-                            + " practice_version(id,workspace_id,practice_id,number,definition)"
-                            + " SELECT"
-                            + " ?,workspace_id,practice_id,number+1,jsonb_set(definition,'{criteria}','\"A"
-                            + " changed standard.\"'::jsonb) FROM practice_version"
-                            + " WHERE id=(SELECT current_version_id FROM practice WHERE"
-                            + " id=?)",
-                    next,
-                    supportedPracticeId);
+            Long next = jdbc.queryForObject("""
+                SELECT nextval(pg_get_serial_sequence('practice_version','id'))
+                """, Long.class);
+            jdbc.update("""
+                INSERT INTO practice_version(id,workspace_id,practice_id,number,definition)
+                SELECT ?,workspace_id,practice_id,number+1,
+                    jsonb_set(definition,'{criteria}','"A changed standard."'::jsonb)
+                FROM practice_version
+                WHERE id=(SELECT current_version_id FROM practice WHERE id=?)
+                """, next, supportedPracticeId);
             jdbc.update("UPDATE practice SET current_version_id=? WHERE id=?", next, supportedPracticeId);
         });
         assertThat(check().reason()).isEqualTo(FeedbackStopReason.REVIEWED_VERSION_CHANGED);

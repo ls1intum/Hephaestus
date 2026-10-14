@@ -23,6 +23,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -150,7 +151,7 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"8.8.8.8", "deadbeef", "localhost", "2001:db8::1"})
+    @ValueSource(strings = {"8.8.8.8", "deadbeef", "localhost", "2001:db8::1", "fec0::1"})
     void rejectsNonprivateLiteralsAndHostnamesBeforeCredentialVerification(String address) throws Exception {
         var request = request("/internal/llm/prepare-feedback", "Bearer valid-token");
         request.setRemoteAddr(address);
@@ -160,6 +161,21 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
         });
         assertThat(response.getStatus()).isEqualTo(401);
         verifyNoInteractions(verifier, jobs);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"fc00::1", "fd12:3456:789a::2"})
+    void shouldAuthenticateAnIpv6PrivateGateway(String address) throws Exception {
+        var job = running();
+        when(verifier.verify("valid-token")).thenReturn(jwt(job.getId(), job.getWorkspaceId(), job.getAttempt()));
+        when(jobs.findById(job.getId())).thenReturn(Optional.of(job));
+        var request = request("/internal/llm/prepare-feedback", "Bearer valid-token");
+        request.setRemoteAddr(address);
+        var response = new MockHttpServletResponse();
+        var served = new AtomicBoolean();
+        filter.doFilter(request, response, (incoming, outgoing) -> served.set(true));
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(served).isTrue();
     }
 
     private static ReviewJob running() {

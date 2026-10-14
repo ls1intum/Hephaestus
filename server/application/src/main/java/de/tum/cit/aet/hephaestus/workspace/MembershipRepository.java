@@ -55,6 +55,15 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
 
     @Query("""
         SELECT COUNT(m) > 0 FROM Membership m JOIN Account a ON a.id = m.id.accountId
+        WHERE m.workspace.id = :workspaceId AND m.id.accountId = :accountId
+          AND m.leftAt IS NULL AND m.hidden = false
+          AND a.status IN (de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.ACTIVE,
+                           de.tum.cit.aet.hephaestus.core.auth.domain.Account.Status.UNCLAIMED)
+        """)
+    boolean isActiveVisibleMember(@Param("workspaceId") long workspaceId, @Param("accountId") long accountId);
+
+    @Query("""
+        SELECT COUNT(m) > 0 FROM Membership m JOIN Account a ON a.id = m.id.accountId
         WHERE m.workspace.id = :workspaceId AND m.id.accountId = :accountId AND m.leftAt IS NULL
           AND m.role IN (de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole.ADMIN,
                          de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole.OWNER)
@@ -97,8 +106,6 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
                 ELSE GREATEST(membership.left_at,EXCLUDED.left_at) END
         """, nativeQuery = true)
     int absorbAccount(@Param("target") long target, @Param("source") long source);
-
-    Page<Membership> findByWorkspace_Id(Long workspaceId, Pageable pageable);
 
     Optional<Membership> findByWorkspace_IdAndId_AccountId(Long workspaceId, Long accountId);
 

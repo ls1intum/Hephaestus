@@ -81,16 +81,7 @@ public sealed interface Candidate
                         citations,
                         coverage(),
                         problems().stream()
-                                .map(problem -> new CandidateProblem(
-                                        problem.key(),
-                                        problem.severity(),
-                                        problem.summary(),
-                                        problem.explanation(),
-                                        problem.citations().stream()
-                                                .map(verified)
-                                                .toList(),
-                                        problem.basis(),
-                                        problem.nextStep()))
+                                .map(problem -> problem.withCitations(verified))
                                 .toList(),
                         verifiedExample,
                         search(),

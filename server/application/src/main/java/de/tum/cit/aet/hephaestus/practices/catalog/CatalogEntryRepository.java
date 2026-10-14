@@ -15,7 +15,7 @@ public interface CatalogEntryRepository extends JpaRepository<CatalogEntry, Cata
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("""
         UPDATE CatalogEntry entry
-           SET entry.position = null, entry.version = entry.version + 1, entry.updatedAt = :updatedAt
+           SET entry.position = null, entry.updatedAt = :updatedAt
          WHERE entry.position IS NOT NULL
         """)
     int clearPositions(@Param("updatedAt") Instant updatedAt);

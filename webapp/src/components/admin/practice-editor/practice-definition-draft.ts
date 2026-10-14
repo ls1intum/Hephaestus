@@ -101,7 +101,7 @@ export function freshKindDraft(itemType: PracticeItemTypeOption | undefined): Ki
 			reviewOn: itemType ? recommendedReviewOn(itemType) : { events: [], state: {} },
 			reads: [],
 		},
-		appliesWhen: { clauses: "", otherwise: "" },
+		appliesWhen: { clauses: [], otherwise: "" },
 		about: itemType?.aboutRoles[0] ?? null,
 		script: "",
 		scan: {

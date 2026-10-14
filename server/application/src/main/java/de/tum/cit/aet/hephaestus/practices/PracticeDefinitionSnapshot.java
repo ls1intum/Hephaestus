@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
+import tools.jackson.databind.json.JsonMapper;
 
 record PracticeDefinitionSnapshot(
         String slug,
@@ -17,7 +18,7 @@ record PracticeDefinitionSnapshot(
         @Nullable String catalogSlug,
         @Nullable String catalogBaseDigest)
         implements ConfigAuditSnapshot {
-    static PracticeDefinitionSnapshot of(Practice practice) {
+    static PracticeDefinitionSnapshot of(Practice practice, JsonMapper mapper) {
         return new PracticeDefinitionSnapshot(
                 practice.getSlug(),
                 practice.getKind().value(),
@@ -30,7 +31,7 @@ record PracticeDefinitionSnapshot(
                 practice.getCatalogBase() == null
                         ? null
                         : new CanonicalDigest()
-                                .add(practice.getCatalogBase().toString())
+                                .add(mapper.writeValueAsString(practice.getCatalogBase()))
                                 .hex());
     }
 }

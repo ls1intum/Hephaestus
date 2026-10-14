@@ -87,9 +87,6 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID>, JpaSp
     int absorbDeveloper(
             @Param("claimedAccountId") long claimedAccountId, @Param("unclaimedAccountId") long unclaimedAccountId);
 
-    @WorkspaceAgnostic("Verified account absorption checks that no source references remain")
-    long countByDeveloperId(long developerId);
-
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE Feedback f SET f.checks = :checks WHERE f.id = :id AND f.workspaceId =" + " :workspaceId")
     int updateChecks(

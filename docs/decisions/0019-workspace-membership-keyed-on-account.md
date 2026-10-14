@@ -95,6 +95,6 @@ has the schema, including the name the `ExternalActor` rename § Decision antici
 - The SPI is `core.auth.spi.AccountWorkspaceMembershipQuery`, implemented by
   `workspace.AccountWorkspaceMembershipQueryAdapter`.
 
-## Update — 2026-10-14 (#2656): the 1.0 practice model
+## Update — 2026-10-14 (#2656): the practice model cutover
 
 Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for membership ownership and retention.

@@ -96,6 +96,6 @@ Append new active versions when source or script contracts change.
 Do not rewrite pinned historical definitions.
 Unchanged bundled copies receive the audited catalog update.
 Changed copies retain their text until an admin accepts the offer or rewrites them.
-The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the 1.0 script preflight and upgrade procedure.
+The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns the script preflight and cutover procedure.
 
 An invalid script cannot fall back silently.

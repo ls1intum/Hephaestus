@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.item.ThreadItemSource;
 import de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import jakarta.persistence.EntityManagerFactory;
+import java.time.Clock;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -144,7 +145,7 @@ class ChatDocsRoleStartupTest extends BaseUnitTest {
                 .withBean(ObjectMapper.class, JsonMapper::new)
                 .withBean(
                         DocumentContentSource.class,
-                        () -> new DocumentContentSource(JsonMapper.builder().build()));
+                        () -> new DocumentContentSource(JsonMapper.builder().build(), Clock.systemUTC()));
         if (server)
             runner = runner.withBean(ConversationFeedbackErasure.class, () -> mock(ConversationFeedbackErasure.class));
         runner.run(context -> {

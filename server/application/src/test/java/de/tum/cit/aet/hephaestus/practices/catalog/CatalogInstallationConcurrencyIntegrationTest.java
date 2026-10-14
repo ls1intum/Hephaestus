@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.practices.CatalogOriginPresenter;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeCatalogInstallationManager;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
@@ -32,6 +33,9 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
 
     @Autowired
     CatalogCustomizationService customization;
+
+    @Autowired
+    CatalogOriginPresenter presenter;
 
     @Autowired
     PracticeVersionService versions;
@@ -139,7 +143,7 @@ class CatalogInstallationConcurrencyIntegrationTest extends AbstractWorkspaceInt
                 .isEqualTo("Committed catalog criteria");
         assertThat(workspaces.findById(workspace.getId()).orElseThrow().getPracticeCatalogInstalledAt())
                 .isNotNull();
-        assertThat(versions.history(installed)).hasSize(1);
+        assertThat(presenter.history(installed)).hasSize(1);
     }
 
     private static void awaitCommit(CountDownLatch latch) {

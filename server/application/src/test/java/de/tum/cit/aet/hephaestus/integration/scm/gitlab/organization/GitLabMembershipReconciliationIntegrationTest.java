@@ -61,6 +61,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryTarget;
 import de.tum.cit.aet.hephaestus.workspace.settings.ReviewScopeMode;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -77,7 +78,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ClassPathResource;
-import org.springframework.data.domain.Pageable;
 import org.springframework.graphql.client.ClientGraphQlRequest;
 import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.graphql.client.GraphQlClientInterceptor;
@@ -125,6 +125,9 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
 
     @Autowired
     private MembershipService membershipService;
+
+    @Autowired
+    private MembershipReviewSelection reviewSelection;
 
     @Autowired
     private UserRepository users;
@@ -609,10 +612,7 @@ class GitLabMembershipReconciliationIntegrationTest extends BaseIntegrationTest 
     }
 
     private Set<Long> eligibleAccounts() {
-        var accountIds = membershipService.listMembers(workspace.getId(), Pageable.unpaged()).getContent().stream()
-                .map(member -> member.getAccountId())
-                .toList();
-        return membershipService.eligibleAccountIds(workspace.getId(), accountIds);
+        return reviewSelection.eligibleAccountIds(workspace.getId());
     }
 
     private Optional<WorkspaceRole> workspaceRoleOf(long nativeId) {

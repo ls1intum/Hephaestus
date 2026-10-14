@@ -8,7 +8,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
-import jakarta.persistence.Version;
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
@@ -61,11 +60,6 @@ public class CatalogEntry {
     @Column(name = "updated_at", nullable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
     private @Nullable Instant updatedAt;
-
-    @Version
-    @Column(nullable = false)
-    @ColumnDefault("0")
-    private long version;
 
     public CatalogEntry(CatalogEntryType type, String slug) {
         this.id = new Id(type, slug);

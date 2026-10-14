@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
@@ -58,6 +59,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
 class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
@@ -156,9 +158,18 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
                                         SourceContentState.EMPTY,
                                         SourceCompleteness.COMPLETE,
                                         new SourceCaptureFacts(NOW, null, null, "docs:one")),
+                                EvidenceSnapshotFixtures.citation(new SourceKind("docs.document.core")),
                                 List.of()),
-                        new SourceCapture(new SourceKind("hephaestus.result-history"), capturedState, List.of()))
-                : List.of(new SourceCapture(new SourceKind("docs.document.core"), capturedState, List.of()));
+                        new SourceCapture(
+                                new SourceKind("hephaestus.result-history"),
+                                capturedState,
+                                EvidenceSnapshotFixtures.citation(new SourceKind("hephaestus.result-history")),
+                                List.of()))
+                : List.of(new SourceCapture(
+                        new SourceKind("docs.document.core"),
+                        capturedState,
+                        EvidenceSnapshotFixtures.citation(new SourceKind("docs.document.core")),
+                        List.of()));
         var manifest = new JobFolderIndex(
                 new SourceContractVersion("2.0.0"),
                 "a".repeat(64),
@@ -230,6 +241,19 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldRefuseAScanWithoutItsDomainVersionComposer() {
+        var job = RuntimeReviewTestData.job();
+        var assignment = PracticeCatalogInjectorTest.scanAssignment();
+        when(assignments.load(job)).thenReturn(List.of(assignment));
+        when(assignments.review(job)).thenReturn(RuntimeReviewTestData.review(ReviewKind.SCAN, assignment));
+        when(source.supports(assignment.item())).thenReturn(true);
+        assertThatThrownBy(() -> handler.prepareInputs(job))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("The scan item needs exactly one version composer");
+        verifyNoInteractions(context, files);
+    }
+
+    @Test
     void captureRefusalRecordsWithheldAndNeverInventsAResult() {
         var job = prepare(false);
         assertThatThrownBy(() -> handler.prepareInputs(job)).isInstanceOf(InsufficientEvidenceException.class);
@@ -275,7 +299,7 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         when(prior.itemVersion()).thenReturn("docs:previous");
         when(prior.outcome()).thenReturn(ResultOutcome.MET);
         when(prior.evidence()).thenReturn(mapper.readTree("""
-            {"citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
+            {"openQuestions":[],"citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
               "path":"document/body","startLine":2,"endLine":3,"quote":"Exact words",
               "verification":{"status":"VERIFIED","itemSha256":"digest","quoteSha256":"digest"}}]}
             """));
@@ -296,5 +320,24 @@ class DefaultReviewExecutionHandlerTest extends BaseUnitTest {
         assertThat(citations.get(0).path("path").asString()).isEqualTo("document/body");
         assertThat(citations.get(0).has("quote")).isFalse();
         assertThat(citations.get(0).has("verification")).isFalse();
+    }
+
+    @Test
+    void shouldRejectMalformedStoredCitationHistory() {
+        var job = prepare(true);
+        var prior = mock(ResultHistoryEntry.class);
+        when(prior.resultId()).thenReturn(UUID.fromString("10000000-0000-4000-8000-000000000099"));
+        when(prior.recordedAt()).thenReturn(NOW.minusSeconds(60));
+        when(prior.origin()).thenReturn(ReviewOrigin.REQUEST);
+        when(prior.itemVersion()).thenReturn("docs:previous");
+        when(prior.outcome()).thenReturn(ResultOutcome.MET);
+        when(prior.evidence()).thenReturn(mapper.readTree("""
+            {"citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
+              "path":"document/body","startLine":"corrupt","endLine":3,"quote":"Exact words"}],
+              "openQuestions":[]}
+            """));
+        when(history.previousResults(any())).thenReturn(List.of(prior));
+        assertThatThrownBy(() -> handler.prepareInputs(job)).isInstanceOf(JacksonException.class);
+        verify(files).abortPersonCapture(job);
     }
 }

@@ -47,6 +47,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -112,7 +113,7 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
                 "a".repeat(64),
                 KIND.value(),
                 now,
-                List.of(new SourceCapture(SOURCE, state, List.of(file))),
+                List.of(new SourceCapture(SOURCE, state, EvidenceSnapshotFixtures.citation(SOURCE), List.of(file))),
                 List.of(),
                 List.of(new FolderSource(SOURCE, file)),
                 registered
@@ -162,6 +163,26 @@ class CandidateEvidenceVerifierTest extends BaseUnitTest {
                 .isInstanceOf(CandidateEvidenceVerifier.Unverified.class)
                 .satisfies(failure -> assertThat(((CandidateEvidenceVerifier.Unverified) failure).refusal())
                         .isEqualTo(CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM));
+    }
+
+    @Test
+    void shouldAcceptSeparateQuotesWhenTheirClaimedLinesOverlap() {
+        var verifier = verifier(TEXT);
+        var candidate = CandidateParser.parse(MAPPER.readTree("""
+            {"outcome":"NOT_MET","summary":"A problem","explanation":"The body has a problem","citations":[],
+             "problems":[{"severity":"MINOR","summary":"A problem","explanation":"The body has a problem",
+              "citations":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
+                "startLine":999,"endLine":999,"quote":"Exact quote"}],
+                "basis":{"type":"duty","criterionQuote":"Use clear names.","event":0,"explanation":"The body is the witness"}}],
+             "example":{"citation":{"sourceKind":"docs.document.core","sourcePath":"context/body.txt","path":"document/body",
+                "startLine":999,"endLine":999,"quote":"After"},"note":"A separate example"},
+             "evidence":{},"coverage":{"source":"claimed","selected":1,"checked":1,"total":1,"complete":true}}
+            """));
+        var verified = verifier.verifyCandidate(job, assignment(), ReviewKind.ITEM, candidate, captured(true));
+        assertThat(verified.problems().getFirst().citations().getFirst().startLine())
+                .isEqualTo(2);
+        assertThat(Objects.requireNonNull(verified.example()).citation().startLine())
+                .isEqualTo(3);
     }
 
     @Test

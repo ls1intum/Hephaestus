@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogChangeKind;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryState;
@@ -52,7 +54,10 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
                         catalog,
                         mock(PracticeReviewDigest.class),
                         mock(PracticeVersionService.class),
-                        mock(WorkspaceReviewDefaultsProvider.class))
+                        mock(WorkspaceReviewDefaultsProvider.class),
+                        mock(PracticeVersionRepository.class),
+                        mock(AccountDirectory.class),
+                        mock(AccountReferenceService.class))
                 .present(10L, group);
 
         assertThat(dto.catalogOrigin().state()).isEqualTo(CatalogEntryState.FROM_HEPHAESTUS);
@@ -76,16 +81,20 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
                 1,
                 "Local practice",
                 DefinitionTestFixtures.definition(),
-                true,
-                null,
                 "v6:" + "a".repeat(64),
                 Instant.EPOCH,
                 null,
                 List.of(),
                 false);
-        when(versions.viewCurrent(practice)).thenReturn(current);
+        when(versions.view(version, null, null)).thenReturn(current);
         var dto = new CatalogOriginPresenter(
-                        mock(CatalogService.class), mock(PracticeReviewDigest.class), versions, defaults)
+                        mock(CatalogService.class),
+                        mock(PracticeReviewDigest.class),
+                        versions,
+                        defaults,
+                        mock(PracticeVersionRepository.class),
+                        mock(AccountDirectory.class),
+                        mock(AccountReferenceService.class))
                 .present(10L, practice);
         assertThat(dto.id()).isEqualTo("9007199254740993");
         assertThat(dto.currentVersion()).isEqualTo(current);

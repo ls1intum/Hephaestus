@@ -16,7 +16,9 @@ import org.springframework.data.repository.Repository;
 
 public interface ItemTraceRepository extends Repository<Review, UUID> {
     String EVENT_COLUMNS = "id,item_id AS itemId,name,item_version AS itemVersion,occurred_at AS occurredAt,"
-            + "found_by AS foundBy,state,reason,decided_at AS decidedAt,review_id AS reviewId";
+            + "found_by AS foundBy,state,reason,decided_at AS decidedAt,"
+            + "(SELECT r.id FROM review r WHERE r.workspace_id=item_event.workspace_id"
+            + " AND r.event_id=item_event.id) AS reviewId";
 
     @Query(value = "SELECT " + EVENT_COLUMNS + " FROM item_event WHERE workspace_id=:ws AND id=:id", nativeQuery = true)
     Optional<EventRow> event(long ws, UUID id);

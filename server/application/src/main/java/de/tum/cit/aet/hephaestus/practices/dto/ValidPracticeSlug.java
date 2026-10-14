@@ -10,7 +10,13 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target({ElementType.FIELD, ElementType.PARAMETER, ElementType.RECORD_COMPONENT, ElementType.ANNOTATION_TYPE})
+@Target({
+    ElementType.FIELD,
+    ElementType.PARAMETER,
+    ElementType.RECORD_COMPONENT,
+    ElementType.ANNOTATION_TYPE,
+    ElementType.TYPE_USE
+})
 @Retention(RetentionPolicy.RUNTIME)
 @Constraint(validatedBy = {})
 @NotBlank

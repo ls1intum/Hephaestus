@@ -57,7 +57,7 @@ function submitted(onSubmit: Mock<Submit>): PracticeDefinitionSubmission {
 const nameField = () => screen.getByRole<HTMLInputElement>("textbox", { name: /^Name/u });
 const slugField = () => screen.getByRole<HTMLInputElement>("textbox", { name: "Identifier" });
 const appliesWhenField = () =>
-	screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Applies when" });
+	screen.getByRole<HTMLTextAreaElement>("textbox", { name: "File paths 1" });
 
 async function openTechnicalSettings() {
 	fireEvent.click(screen.getByRole("button", { name: /Technical settings/u }));
@@ -175,22 +175,21 @@ describe("About", () => {
 });
 
 describe("Applies when", () => {
-	it("does not save malformed JSON while keeping the draft visible", async () => {
+	it("does not save an empty condition while keeping it visible", async () => {
 		const onSubmit = vi.fn<Submit>();
 		await renderEditForm(onSubmit);
-		fireEvent.change(appliesWhenField(), { target: { value: "[" } });
+		fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSubmit).not.toHaveBeenCalled();
-		expect(appliesWhenField().value).toBe("[");
-		expect(screen.getAllByText("Enter the conditions as valid JSON.").length).toBeGreaterThan(0);
+		expect(appliesWhenField().value).toBe("");
+		expect(screen.getAllByText("Enter a value for each condition.").length).toBeGreaterThan(0);
 	});
 
 	it("asks for Otherwise once there are conditions, and saves both", async () => {
 		const onSubmit = vi.fn<Submit>();
 		await renderEditForm(onSubmit);
-		fireEvent.change(appliesWhenField(), {
-			target: { value: '[{"changedPath":["**/*.swift"]}]' },
-		});
+		fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+		fireEvent.change(appliesWhenField(), { target: { value: "**/*.swift" } });
 		fireEvent.change(screen.getByRole("textbox", { name: /^Otherwise/u }), {
 			target: { value: "the change touches no Swift source file" },
 		});
@@ -207,13 +206,16 @@ describe("the kind a practice is created for", () => {
 	it("restores each kind's conditions when the item kind changes", async () => {
 		await renderCreateForm(vi.fn());
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
-		fireEvent.change(appliesWhenField(), {
-			target: { value: '[{"hasItems":"scm.review-threads"}]' },
+		fireEvent.click(screen.getByRole("button", { name: "Add condition" }));
+		fireEvent.change(screen.getByRole("textbox", { name: "Source 1" }), {
+			target: { value: "scm.review-threads" },
 		});
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request\b(?! review)/u }));
-		expect(appliesWhenField().value).toBe("");
+		expect(screen.queryByRole("textbox", { name: "Source 1" })).toBeNull();
 		fireEvent.click(screen.getByRole("radio", { name: /^Pull request review/u }));
-		expect(appliesWhenField().value).toBe('[{"hasItems":"scm.review-threads"}]');
+		expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Source 1" }).value).toBe(
+			"scm.review-threads",
+		);
 	});
 });
 

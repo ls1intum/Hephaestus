@@ -78,10 +78,7 @@ public class PeopleRegistryService implements PeopleRegistry {
         var sourceIdentities = identities.findByAccount_Id(unclaimedAccountId);
         if (sourceIdentities.isEmpty()) throw conflict("The unclaimed account has no identity.");
         var sourceKeys = sourceIdentities.stream()
-                .map(i -> new PersonIdentity(
-                        i.getProviderId(),
-                        i.getProviderUserKey(),
-                        i.getTeamKey().isEmpty() ? null : i.getTeamKey()))
+                .map(i -> PersonIdentity.of(i.getProviderId(), i.getProviderUserKey(), i.getTeamKey()))
                 .toList();
         identityKeys.holdAndLock(sourceKeys);
         var first = accounts.findByIdForUpdate(Math.min(claimedAccountId, unclaimedAccountId))

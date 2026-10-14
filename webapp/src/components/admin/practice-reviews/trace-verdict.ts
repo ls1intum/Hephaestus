@@ -557,7 +557,6 @@ export function unreviewedVerdict(
 		}
 		case "RECORDED":
 		case "WITHHELD":
-		case "BLOCKED":
 		case "EXPIRED": {
 			break;
 		}

@@ -43,6 +43,7 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class ReviewJobLifecycleServiceTest extends BaseUnitTest {
 
@@ -58,7 +59,7 @@ class ReviewJobLifecycleServiceTest extends BaseUnitTest {
     @Mock
     private LlmUsageRecorder usageRecorder;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper = JsonMapper.builder().build();
 
     private ReviewJobLifecycleService service;
 

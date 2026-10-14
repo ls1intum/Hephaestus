@@ -371,8 +371,7 @@ void test("a quote of code is refused unless the checkout admission verifies it 
 	);
 });
 
-void test("the server's live harnesses stage the checkout a quote of the change is verified against", () => {
-	// LiveWorkRecordsTest pins this fixture from the live-review staging harness.
+void test("a quote of the change requires its captured checkout witness", () => {
 	const { availableSourceKinds, sourceFileSources } = folderCitationIndex(
 		JSON.parse(
 			readFileSync(new URL("../practice-results/live-manifest.json", import.meta.url), "utf8"),

@@ -16,11 +16,17 @@ import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import de.tum.cit.aet.hephaestus.workspace.dto.AssignRoleRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.SetMemberHiddenRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceMembershipDTO;
+import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Positive;
 import java.util.Objects;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -33,6 +39,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Validated
 @WorkspaceScopedController
@@ -42,6 +49,7 @@ public class MembershipController {
 
     private final MembershipService workspaceMembershipService;
     private final AccountReferenceService accounts;
+    private final MembershipReviewSelection selections;
 
     @GetMapping("/me")
     @Operation(operationId = "getOwnMembership", summary = "Get your workspace membership")
@@ -63,13 +71,15 @@ public class MembershipController {
     @Operation(operationId = "listMemberships", summary = "List workspace memberships")
     public ResponseEntity<PageResponseDTO<WorkspaceMembershipDTO>> listMembers(
             WorkspaceContext context,
+            @RequestParam(required = false) @Nullable String q,
+            @Parameter(schema = @Schema(type = "string")) @RequestParam(required = false) @Positive @Nullable Long team,
             @ParameterObject @PageableDefault(size = 50, sort = "joinedAt") Pageable pageable) {
-        var page = workspaceMembershipService.listMembers(context.id(), pageable);
+        var page = workspaceMembershipService.listMembers(context.id(), q, team, pageable);
         var accountIds = page.getContent().stream()
                 .map(member -> Objects.requireNonNull(member.getAccountId()))
                 .toList();
         var references = accounts.references(context.id(), accountIds);
-        var eligible = workspaceMembershipService.eligibleAccountIds(context.id(), accountIds);
+        var eligible = selections.eligibleAccountIds(context.id(), accountIds);
         return ResponseEntity.ok(PageResponseDTO.from(page.map(member -> toDTO(
                 member,
                 member.getRole(),
@@ -81,7 +91,7 @@ public class MembershipController {
     @Operation(operationId = "getMembership", summary = "Get a workspace membership")
     public ResponseEntity<WorkspaceMembershipDTO> getMember(
             WorkspaceContext context, @PathVariable @AccountId String accountId) {
-        Membership membership = workspaceMembershipService.getMembership(context.id(), Long.parseLong(accountId));
+        Membership membership = workspaceMembershipService.getMembership(context.id(), accountId(accountId));
         return ResponseEntity.ok(toDTO(context.id(), membership, membership.getRole()));
     }
 
@@ -91,8 +101,8 @@ public class MembershipController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<WorkspaceMembershipDTO> assignRole(
             WorkspaceContext context, @Valid @RequestBody AssignRoleRequestDTO request) {
-        Membership membership = workspaceMembershipService.assignRole(
-                context.id(), Long.parseLong(request.accountId()), request.role());
+        Membership membership =
+                workspaceMembershipService.assignRole(context.id(), accountId(request.accountId()), request.role());
         return ResponseEntity.ok(toDTO(context.id(), membership, membership.getRole()));
     }
 
@@ -104,8 +114,8 @@ public class MembershipController {
             WorkspaceContext context,
             @PathVariable @AccountId String accountId,
             @Valid @RequestBody SetMemberHiddenRequestDTO request) {
-        Membership membership = workspaceMembershipService.updateMemberVisibility(
-                context.id(), Long.parseLong(accountId), request.hidden());
+        Membership membership =
+                workspaceMembershipService.updateMemberVisibility(context.id(), accountId(accountId), request.hidden());
         return ResponseEntity.ok(toDTO(context.id(), membership, membership.getRole()));
     }
 
@@ -115,8 +125,12 @@ public class MembershipController {
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "WORKSPACE_ROLE")
     public ResponseEntity<Void> removeMember(WorkspaceContext context, @PathVariable @AccountId String accountId) {
-        workspaceMembershipService.removeMembership(context.id(), Long.parseLong(accountId));
+        workspaceMembershipService.removeMembership(context.id(), accountId(accountId));
         return ResponseEntity.noContent().build();
+    }
+
+    private static long accountId(String value) {
+        return Long.parseLong(value);
     }
 
     private WorkspaceMembershipDTO toDTO(long workspaceId, Membership member, WorkspaceRole role) {
@@ -125,7 +139,7 @@ public class MembershipController {
                 member,
                 role,
                 accounts.reference(workspaceId, accountId),
-                workspaceMembershipService.isPracticeReviewEligible(workspaceId, accountId));
+                selections.eligibleAccountIds(workspaceId, Set.of(accountId)).contains(accountId));
     }
 
     private WorkspaceMembershipDTO toDTO(

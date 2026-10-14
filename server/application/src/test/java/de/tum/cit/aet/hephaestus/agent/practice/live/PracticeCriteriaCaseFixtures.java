@@ -131,9 +131,9 @@ final class PracticeCriteriaCaseFixtures {
         String commentsKind = issue ? "scm.issue.comments" : "scm.pull-request.comments";
         Map<String, String> contextKinds = new HashMap<>(CONTEXT_KINDS);
         contextKinds.put(COMMENTS, commentsKind);
-        // One home per artifact: a file the scenario supplies is staged as supplied, and a default fills only
+        // One home per file: a file the scenario supplies is staged as supplied, and a default fills only
         // what it leaves out. A path the scenario omits is left uncaptured rather than generated.
-        Map<String, String> artifacts = new LinkedHashMap<>();
+        Map<String, String> files = new LinkedHashMap<>();
         Set<String> omitted = new HashSet<>();
         scenario.path("omit").forEach(path -> omitted.add(path.asString()));
         for (var entry : scenario.path("files").properties()) {
@@ -144,8 +144,7 @@ final class PracticeCriteriaCaseFixtures {
             Path file = workspace.resolve(relative);
             Files.createDirectories(file.getParent());
             Files.writeString(file, entry.getValue().asString());
-            artifacts.put(
-                    relative, repositoryFile ? "scm.repository.tree" : contextKinds.getOrDefault(relative, coreKind));
+            files.put(relative, repositoryFile ? "scm.repository.tree" : contextKinds.getOrDefault(relative, coreKind));
         }
         if (!scenario.path("files").has(COMMENTS)) {
             Files.writeString(workspace.resolve(COMMENTS), "[]\n");
@@ -193,7 +192,11 @@ final class PracticeCriteriaCaseFixtures {
                     .put("slug", slug)
                     .put("name", definition.path("name").asString())
                     .put("versionId", Long.toString(id));
-            entry.putArray("knownLimitations");
+            var limits = entry.putArray("knownLimitations");
+            definition
+                    .path("reviewedBy")
+                    .path("limits")
+                    .forEach(limit -> limits.add(limit.path("description").asString()));
             var exhaustive = entry.putArray("exhaustiveSources");
             var reads = entry.putArray("readsSources");
             for (var source : definition.path("reads").path("sources")) {
@@ -219,7 +222,7 @@ final class PracticeCriteriaCaseFixtures {
                         + "Follow " + SandboxLayout.ORCHESTRATOR_PATH + "."));
         Files.write(workspace.resolve(SandboxLayout.TASK_ENVELOPE_FILENAME), MAPPER.writeValueAsBytes(envelope));
         deriveChangeView(workspace);
-        JsonNode files = MAPPER.readTree(
+        JsonNode changedFiles = MAPPER.readTree(
                         workspace.resolve(CHANGE_VIEW_PREFIX + "files.json").toFile())
                 .path("files");
         boolean commitsCaptured = !omitted.contains(COMMITS);
@@ -236,7 +239,7 @@ final class PracticeCriteriaCaseFixtures {
                                     "parents",
                                     List.of(base),
                                     "files",
-                                    files)))));
+                                    changedFiles)))));
         }
         Map<String, String> contents = new LinkedHashMap<>();
         contents.put(coreKind, "NON_EMPTY");
@@ -244,26 +247,26 @@ final class PracticeCriteriaCaseFixtures {
                 "scm.pull-request.diff",
                 Files.size(workspace.resolve(CHANGE_VIEW_PREFIX + "diff.patch")) == 0 ? "EMPTY" : "NON_EMPTY");
         contents.put(commentsKind, content(workspace.resolve(COMMENTS)));
-        contents.put("scm.repository.tree", files.isEmpty() ? "EMPTY" : "NON_EMPTY");
+        contents.put("scm.repository.tree", changedFiles.isEmpty() ? "EMPTY" : "NON_EMPTY");
         for (String file : List.of("diff.patch", "files.json", "description.authored.md")) {
-            artifacts.putIfAbsent(CHANGE_VIEW_PREFIX + file, "scm.pull-request.diff");
+            files.putIfAbsent(CHANGE_VIEW_PREFIX + file, "scm.pull-request.diff");
         }
         for (String file : List.of("context/description.md", "context/metadata.json", COMMENTS)) {
-            artifacts.putIfAbsent(file, contextKinds.getOrDefault(file, coreKind));
+            files.putIfAbsent(file, contextKinds.getOrDefault(file, coreKind));
         }
-        artifacts.putIfAbsent("context/change.json", "scm.pull-request.diff");
+        files.putIfAbsent("context/change.json", "scm.pull-request.diff");
         // Admission verifies every quote of code against the captured checkout, which these witnesses name.
-        LiveRunnerWorkspace.CHECKOUT_WITNESSES.forEach(witness -> artifacts.put(witness, "scm.repository.tree"));
+        LiveRunnerWorkspace.CHECKOUT_WITNESSES.forEach(witness -> files.put(witness, "scm.repository.tree"));
         if (commitsCaptured) {
-            artifacts.putIfAbsent(COMMITS, CONTEXT_KINDS.get(COMMITS));
+            files.putIfAbsent(COMMITS, CONTEXT_KINDS.get(COMMITS));
         }
-        for (var artifact : artifacts.entrySet()) {
-            contents.putIfAbsent(artifact.getValue(), content(workspace.resolve(artifact.getKey())));
+        for (var file : files.entrySet()) {
+            contents.putIfAbsent(file.getValue(), content(workspace.resolve(file.getKey())));
         }
-        var manifest = LiveRunnerWorkspace.manifest(workspace, artifacts);
+        var manifest = LiveRunnerWorkspace.manifest(workspace, files);
         manifest.put("itemKind", issue ? "scm.issue" : "scm.pull_request");
         for (var source : manifest.path("sources")) {
-            ((ObjectNode) source.path("state"))
+            source.withObjectProperty("state")
                     .put("content", contents.get(source.path("kind").asString()));
         }
         Files.write(workspace.resolve(SandboxLayout.MANIFEST_PATH), MAPPER.writeValueAsBytes(manifest));

@@ -72,7 +72,8 @@ export const Edit: Story = {
 		await expect(canvas.queryByRole("radio", { name: /^Issue/u })).toBeNull();
 		await expect(canvas.getByRole("checkbox", { name: "Ready for review" })).toBeChecked();
 		await expect(canvas.getByRole("combobox", { name: /^About/u })).toHaveTextContent("Author");
-		await expect(canvas.getByRole("textbox", { name: "Applies when" })).toHaveValue("");
+		await expect(canvas.getByRole("button", { name: "Add condition" })).toBeVisible();
+		await expect(canvas.queryByRole("textbox", { name: "File paths 1" })).toBeNull();
 	},
 };
 

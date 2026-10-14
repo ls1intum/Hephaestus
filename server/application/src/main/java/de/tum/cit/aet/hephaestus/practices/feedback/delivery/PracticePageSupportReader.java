@@ -5,18 +5,14 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PreviousPracticePageFeedback;
 import de.tum.cit.aet.hephaestus.practices.model.Result;
-import de.tum.cit.aet.hephaestus.practices.result.ResultRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
-import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnCaptureRole
 public class PracticePageSupportReader {
     private static final Duration LOOKBACK = Duration.ofDays(90);
-    private final ResultRepository results;
-    private final Clock clock;
     private final PreviousPracticePageFeedback previous;
     private final PracticeRepository practices;
     private final FeedbackQueryRepository queries;
@@ -44,11 +38,7 @@ public class PracticePageSupportReader {
         var window = now.minus(LOOKBACK);
         var since = prior.map(card -> card.nextEvidenceSince(window)).orElse(window);
         return new Selection(
-                prior,
-                candidateResults(workspaceId, developerId).stream()
-                        .filter(row -> row.getPracticeId() == practiceId
-                                && row.getRecordedAt().isAfter(since))
-                        .toList());
+                prior, queries.findPageSupport(workspaceId, developerId, practiceId, since, ResultMarkKind.INCORRECT));
     }
 
     @Transactional(readOnly = true)
@@ -61,17 +51,5 @@ public class PracticePageSupportReader {
         if (origins.size() != reviewIds.size())
             throw new NoSuchElementException("Selected support has missing review authority.");
         return origins.stream().allMatch(origin -> origin == ReviewOrigin.BACKFILL);
-    }
-
-    private List<Result> candidateResults(long workspaceId, long developerId) {
-        var since = clock.instant().minus(LOOKBACK);
-        return results
-                .findCurrentForDeveloper(workspaceId, developerId, ResultMarkKind.INCORRECT, PageRequest.of(0, 100))
-                .getContent()
-                .stream()
-                .filter(row -> row.getOutcome() == ResultOutcome.NOT_MET
-                        && row.getEvidenceVersion() == 1
-                        && !row.getRecordedAt().isBefore(since))
-                .toList();
     }
 }

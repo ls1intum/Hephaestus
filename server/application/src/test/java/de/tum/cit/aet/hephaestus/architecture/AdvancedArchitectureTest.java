@@ -5,7 +5,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 import static de.tum.cit.aet.hephaestus.architecture.ArchitectureTestConstants.BASE_PACKAGE;
-import static de.tum.cit.aet.hephaestus.architecture.conditions.HephaestusConditions.haveSecurityAnnotationIfEndpoint;
+import static de.tum.cit.aet.hephaestus.architecture.conditions.HephaestusConditions.haveExplicitSecurityIfEndpoint;
 
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
@@ -138,14 +138,14 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
     class SecurityTests {
 
         @Test
-        void controllerMethodsHaveSecurityAnnotations() {
+        void controllerMethodsHaveExplicitSecurity() {
             ArchRule rule = methods()
                     .that()
                     .areDeclaredInClassesThat()
                     .areAnnotatedWith(RestController.class)
                     .and()
                     .arePublic()
-                    .should(haveSecurityAnnotationIfEndpoint())
+                    .should(haveExplicitSecurityIfEndpoint())
                     .because("All endpoints must have explicit security");
 
             rule.check(classes);

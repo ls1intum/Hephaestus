@@ -74,8 +74,8 @@ class LiveWorkRecordsTest {
         Path repo = workspace.resolve(SandboxLayout.REPO_MOUNT_RELATIVE);
         assertThat(Files.readString(repo.resolve(".git/HEAD")).strip())
                 .isEqualTo(change.path("head_sha").asString());
-        for (String artifact : LiveRunnerWorkspace.capturedFiles().keySet()) {
-            assertThat(workspace.resolve(artifact)).as(artifact).exists();
+        for (String file : LiveRunnerWorkspace.capturedFiles().keySet()) {
+            assertThat(workspace.resolve(file)).as(file).exists();
         }
         assertThat(Files.readAllLines(repo.resolve("src/cart.ts")))
                 .as("the added comments every model slot of the fixture reads")

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { appliesWhenText, parseAppliesWhen } from "./applies-when";
+import { type AppliesWhenDraft, appliesWhenDraftOf, parseAppliesWhen } from "./applies-when";
 import { mockIssueItemType, mockPullRequestItemType } from "./fixtures";
 
 const swift = {
@@ -8,8 +8,11 @@ const swift = {
 	otherwise: "the change has no Swift code",
 };
 
-function draft(anyOf: unknown, otherwise = swift.otherwise) {
-	return { clauses: JSON.stringify(anyOf), otherwise };
+function draft(
+	clauses: AppliesWhenDraft["clauses"],
+	otherwise = swift.otherwise,
+): AppliesWhenDraft {
+	return { clauses, otherwise };
 }
 
 describe("parseAppliesWhen", () => {
@@ -19,33 +22,30 @@ describe("parseAppliesWhen", () => {
 		});
 	});
 
-	it("reads a blank field as no conditions, whatever Otherwise still says", () => {
-		expect(
-			parseAppliesWhen({ clauses: " ", otherwise: "left over" }, mockPullRequestItemType),
-		).toStrictEqual({ value: null });
+	it("clears conditions independently of a retained Otherwise draft", () => {
+		expect(parseAppliesWhen(draft([], "left over"), mockPullRequestItemType)).toStrictEqual({
+			value: null,
+		});
 	});
 
-	it("refuses malformed, unknown and empty clauses instead of discarding them", () => {
-		expect(parseAppliesWhen({ clauses: "{", otherwise: "x" }, undefined).clausesError).toBe(
-			"Enter the conditions as valid JSON.",
-		);
-		expect(
-			parseAppliesWhen(draft([{ changedPath: ["**/*.swift"], typo: true }]), undefined)
-				.clausesError,
-		).toBeDefined();
-		expect(parseAppliesWhen(draft([{ changedPath: [" "] }]), undefined).clausesError).toBeDefined();
-		expect(parseAppliesWhen(draft([]), undefined).clausesError).toBeDefined();
-	});
+	it.each([{ changedPath: [" "] }, { diffContains: [] }, { hasItems: "" }])(
+		"requires a value for each condition: %j",
+		(clause) => {
+			expect(parseAppliesWhen(draft([clause]), undefined).clausesError).toBe(
+				"Enter a value for each condition.",
+			);
+		},
+	);
 
 	it("refuses a changed path that leaves the repository", () => {
-		expect(
-			parseAppliesWhen(draft([{ changedPath: ["../secrets"] }]), undefined).clausesError,
-		).toBeDefined();
+		expect(parseAppliesWhen(draft([{ changedPath: ["../secrets"] }]), undefined).clausesError).toBe(
+			"A pattern cannot leave the repository: remove “..” from “../secrets”.",
+		);
 	});
 
 	it("requires the Otherwise sentence once there are conditions", () => {
 		expect(parseAppliesWhen(draft(swift.anyOf, " "), mockPullRequestItemType).otherwiseError).toBe(
-			"Say in at most 300 characters why the practice does not apply otherwise.",
+			"Say why the practice does not apply when no condition holds.",
 		);
 	});
 
@@ -54,14 +54,19 @@ describe("parseAppliesWhen", () => {
 			"This kind of item cannot check one of these conditions.",
 		);
 	});
-});
 
-describe("appliesWhenText", () => {
-	it("round-trips the saved conditions", () => {
+	it("preserves indentation in a saved diff phrase", () => {
+		const saved = {
+			anyOf: [{ diffContains: ["    return value;"] }],
+			otherwise: "The diff has no matching line.",
+		};
 		expect(
-			parseAppliesWhen({ clauses: appliesWhenText(swift), otherwise: swift.otherwise }, undefined)
-				.value,
-		).toStrictEqual(swift);
-		expect(appliesWhenText(null)).toBe("");
+			parseAppliesWhen(appliesWhenDraftOf(saved), mockPullRequestItemType).value,
+		).toStrictEqual(saved);
+	});
+
+	it("restores saved conditions without a JSON representation", () => {
+		expect(parseAppliesWhen(appliesWhenDraftOf(swift), undefined).value).toStrictEqual(swift);
+		expect(appliesWhenDraftOf(null)).toStrictEqual({ clauses: [], otherwise: "" });
 	});
 });

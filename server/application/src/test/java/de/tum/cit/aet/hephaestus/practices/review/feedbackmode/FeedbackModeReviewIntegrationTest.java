@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.CatalogOriginPresenter;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.GroupAttributes;
 import de.tum.cit.aet.hephaestus.practices.PracticeGroupService;
@@ -68,6 +69,9 @@ class FeedbackModeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @MockitoBean
     HistoryCustodyQuery custody;
+
+    @Autowired
+    CatalogOriginPresenter presenter;
 
     @Autowired
     PracticeVersionService versions;
@@ -140,7 +144,7 @@ class FeedbackModeReviewIntegrationTest extends AbstractWorkspaceIntegrationTest
                         .mode())
                 .isEqualTo(FeedbackMode.AUTOMATIC);
         assertThat(reloaded.getCurrentVersion().getId()).isEqualTo(versionId);
-        assertThat(versions.history(reloaded)).hasSize(1);
+        assertThat(presenter.history(reloaded)).hasSize(1);
     }
 
     @Test

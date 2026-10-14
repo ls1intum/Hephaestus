@@ -154,3 +154,26 @@ SELECT ('00000000-0000-0000-0000-000000'||(n+60))::uuid,992101,
     ('00000000-0000-0000-0000-000000'||(n-10))::uuid,'Wrong evidence.',
     '2026-01-01T00:02:00Z',992106,correction,'2026-01-01T00:03:00Z'
 FROM (VALUES (992314,'UPDATED'),(992315,'PENDING')) m(n,correction);
+
+INSERT INTO config_audit_event(id,workspace_id,actor_kind,actor_account_id,acting_account_id,
+    entity_type,entity_id,action,changed_keys,old_value,new_value,occurred_at)
+VALUES(995901,992101,'SYSTEM',NULL,NULL,'REVIEW_BACKFILL_RUN','original-batch','CREATED',
+        ARRAY['lookback'],'{"before":1}','{"after":2}','2026-01-01T00:00:00Z'),
+      (995902,992101,'SYSTEM',NULL,NULL,'REVIEW_SWEEP_SCHEDULE','original-schedule','UPDATED',
+        ARRAY['paused'],'{"before":false}','{"after":true}','2026-01-02T00:00:00Z'),
+      (995903,992101,'SYSTEM',NULL,NULL,'PRACTICE_REVIEW_SETTINGS','original-settings','UPDATED',
+        ARRAY['mode'],'{"before":"kept"}','{"after":"kept"}','2026-01-03T00:00:00Z'),
+      (995904,NULL,'SYSTEM',NULL,NULL,'CURATED_PRACTICE','catalog-practice','UPDATED',
+        ARRAY['criteria'],'{}','{}','2026-01-04T00:00:00Z'),
+      (995905,NULL,'SYSTEM',NULL,NULL,'CURATED_PRACTICE_AREA','catalog-group','UPDATED',
+        ARRAY['name'],'{}','{}','2026-01-05T00:00:00Z'),
+      (995906,992101,'SYSTEM',NULL,NULL,'CURATED_PRACTICE_GROUP','workspace-catalog-history','UPDATED',
+        ARRAY['name'],'{}','{}','2026-01-06T00:00:00Z'),
+      (995907,992101,'SYSTEM',NULL,NULL,'PRACTICE_AREA','practice-group','UPDATED',
+        ARRAY['name'],'{}','{}','2026-01-07T00:00:00Z');
+
+INSERT INTO artifact_signal(id,workspace_id,artifact_kind,artifact_id,signal_name,revision,occurred_at,
+    discovered_via,state,state_changed_at,last_attempted_at,actor_user_id)
+VALUES('00000000-0000-0000-0000-000000992184',992101,'scm.pull_request',992109,
+    'scm.pull_request.synchronized','pending-head','2026-01-02T00:00:00Z','SYNC','PENDING',
+    '2026-01-02T00:01:00Z','2026-01-02T00:01:00Z',992103);

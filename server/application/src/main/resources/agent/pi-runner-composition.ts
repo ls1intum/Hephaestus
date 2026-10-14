@@ -3,7 +3,7 @@ import {
 	type PublicReviewHistory,
 	SAME_WORK_LIMITS,
 } from "./pi-review-brief.ts";
-import { isRecord } from "./pi-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 import { z } from "./work/practice-scripts/lib/core/practice-script.ts";
 
 export const DESTINATIONS = ["ON_WORK", "PRACTICE_PAGE", "CONVERSATION"] as const;
@@ -647,12 +647,7 @@ const inlineNoteSchema = z.strictObject({
 		]),
 	}),
 });
-const reviewInputSchema = z.strictObject({
-	decisions: z.unknown().optional(),
-	summary: z.unknown().optional(),
-	inline: z.unknown().optional(),
-});
-const reviewToolInputSchema = reviewInputSchema.extend({
+const reviewToolInputSchema = z.strictObject({
 	decisions: z.array(reviewDecisionSchema),
 	summary: reviewSummarySchema.nullish(),
 	inline: z.array(inlineNoteSchema).nullish(),
@@ -664,17 +659,13 @@ const schemaErrors = (issues: readonly z.core.$ZodIssue[], prefix: string) =>
 	);
 
 function readSummary(
-	value: unknown,
+	value: z.infer<typeof reviewSummarySchema> | null | undefined,
 	named: Named,
 ): { summary: ReviewSummary | null; errors: string[] } {
 	if (value === undefined || value === null) {
 		return { summary: null, errors: [] };
 	}
-	const parsed = reviewSummarySchema.safeParse(value);
-	if (!parsed.success) {
-		return { summary: null, errors: schemaErrors(parsed.error.issues, "summary") };
-	}
-	const { body, basedOn } = parsed.data;
+	const { body, basedOn } = value;
 	const problems = [
 		textProblem(body, REVIEW_LIMITS.summaryChars),
 		supportProblem(basedOn, named),
@@ -686,32 +677,17 @@ function readSummary(
 }
 
 function readDecisions(
-	value: unknown,
+	value: z.infer<typeof reviewDecisionSchema>[],
 	results: ReadonlyMap<string, ReviewedResult>,
 	evidence: Named,
 	witnesses: ReadonlyMap<string, PriorAdviceWitness>,
 ): { decided: Map<string, Disposition>; named: Set<string>; errors: string[] } {
 	const decided = new Map<string, Disposition>();
 	const named = new Set<string>();
-	if (!Array.isArray(value)) {
-		return {
-			decided,
-			named,
-			errors: [
-				"decisions is required: an array with one decision for each NOT_MET result, empty when there is none",
-			],
-		};
-	}
-	const sent: unknown[] = value;
 	const errors: string[] = [];
-	for (const [index, raw] of sent.entries()) {
+	for (const [index, decision] of value.entries()) {
 		const label = `decisions #${index + 1}`;
-		const parsed = reviewDecisionSchema.safeParse(raw);
-		if (!parsed.success) {
-			errors.push(...schemaErrors(parsed.error.issues, label));
-			continue;
-		}
-		const { resultId: id, disposition, witnessIds } = parsed.data;
+		const { resultId: id, disposition, witnessIds } = decision;
 		const problems: string[] = [];
 		const result = results.get(id);
 		const parent = evidence.get(id)?.ref.resultId;
@@ -756,7 +732,7 @@ export function readReview(
 	lineNotes: boolean,
 	context: ReviewContext,
 ): { review: ComposedReview } | { errors: string[] } {
-	const parsed = reviewInputSchema.safeParse(value);
+	const parsed = reviewToolInputSchema.safeParse(value);
 	if (!parsed.success) {
 		return { errors: schemaErrors(parsed.error.issues, "review") };
 	}
@@ -770,11 +746,7 @@ export function readReview(
 	errors.push(...read.errors);
 	const { summary } = read;
 
-	const sentNotes = listOf(input.inline);
-	if (sentNotes === null) {
-		errors.push("inline must be an array of line notes");
-	}
-	const notes = sentNotes ?? [];
+	const notes = input.inline ?? [];
 	if (notes.length > REVIEW_LIMITS.inlineNotes) {
 		errors.push(
 			`inline: at most ${REVIEW_LIMITS.inlineNotes} line notes; this review has ${notes.length}`,
@@ -787,16 +759,11 @@ export function readReview(
 	const anchors = new Set<string>();
 	for (const [index, raw] of notes.entries()) {
 		const label = `inline #${index + 1}`;
-		const parsedNote = inlineNoteSchema.safeParse(raw);
-		if (!parsedNote.success) {
-			errors.push(...schemaErrors(parsedNote.error.issues, label));
-			continue;
-		}
 		const {
 			body,
 			basedOn,
 			anchor: { problemId, citationIndex },
-		} = parsedNote.data;
+		} = raw;
 		const problems = [
 			textProblem(body, REVIEW_LIMITS.inlineChars),
 			supportProblem(basedOn, named),

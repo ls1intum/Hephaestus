@@ -32,7 +32,9 @@ class PracticeV1ItemMappingMigrationTest {
                 artifact_kind,artifact_id,about_user_id,summary,outcome,evidence,observed_at)
             VALUES('00000000-0000-0000-0000-000000998141','shared-provider-work',
                 '00000000-0000-0000-0000-000000998111',992201,998121,998131,'scm.pull_request',992109,
-                992103,'Purpose is clear','MET','{}','2026-01-01T00:00:30Z');
+                992103,'Purpose is clear','MET',
+                '{"citations":[{"sourceKind":"scm.pull-request.core","artifactPath":"context/description.md","revision":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","path":"description.md","startLine":1,"endLine":1,"quote":"Add retry"}]}',
+                '2026-01-01T00:00:30Z');
             INSERT INTO slack_thread(id,workspace_id,slack_channel_id,slack_thread_ts,participant_member_ids)
             VALUES(998201,992101,'C1','1.0','{992103,992104,992104}');
             INSERT INTO slack_message(id,workspace_id,slack_team_id,slack_channel_id,slack_ts,slack_thread_ts,
@@ -62,6 +64,12 @@ class PracticeV1ItemMappingMigrationTest {
                                 + " (coverage IS NULL) FROM result WHERE"
                                 + " id='00000000-0000-0000-0000-000000998141'"))
                 .containsExactly("992201|992106|0|true");
+        assertThat(PracticeMigrationFixture.column(database, """
+            SELECT (evidence->'citations'->0->>'commit') || '|'
+                || jsonb_exists(evidence->'citations'->0,'revision') || '|'
+                || (evidence->'citations'->0->>'quote')
+            FROM result WHERE id='00000000-0000-0000-0000-000000998141'
+            """)).containsExactly("a".repeat(40) + "|false|Add retry");
         assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT kind || '|' || workspace_id || '|' || (removed_at IS NULL) FROM item WHERE"

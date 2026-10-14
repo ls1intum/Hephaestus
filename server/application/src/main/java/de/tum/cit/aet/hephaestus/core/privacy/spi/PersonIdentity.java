@@ -14,6 +14,10 @@ public record PersonIdentity(
         }
     }
 
+    public static PersonIdentity of(long providerId, String subject, String teamKey) {
+        return new PersonIdentity(providerId, subject, teamKey.isEmpty() ? null : teamKey);
+    }
+
     public String teamKey() {
         return teamKey(teamId);
     }

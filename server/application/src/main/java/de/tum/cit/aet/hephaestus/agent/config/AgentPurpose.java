@@ -49,6 +49,7 @@ public enum AgentPurpose {
                 .toList();
     }
 
+    /** Practice scripts use the review chat model and these additional model purposes. */
     public static List<AgentPurpose> practiceScript() {
         return PRACTICE_SCRIPT;
     }

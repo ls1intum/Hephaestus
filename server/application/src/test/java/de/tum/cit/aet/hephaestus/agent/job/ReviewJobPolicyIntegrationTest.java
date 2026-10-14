@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -99,6 +100,7 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
     private final ReviewMemberAiPolicy policy = mock(ReviewMemberAiPolicy.class);
     private Workspace workspace;
     private ReviewJobExecutor executor;
+    private final ReviewMethodVerifier methods = mock(ReviewMethodVerifier.class);
 
     @BeforeEach
     void setUp() {
@@ -138,7 +140,7 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                 new ReviewJobClaimService(
                         jobs,
                         policy,
-                        mock(ReviewMethodVerifier.class),
+                        methods,
                         assignmentSnapshots,
                         transactions,
                         mapper,
@@ -226,6 +228,32 @@ class ReviewJobPolicyIntegrationTest extends BaseIntegrationTest {
                 .get()
                 .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)
                 .containsExactly(ReviewJobStatus.CANCELLED, ReviewJobCancellationReason.MODEL_UNAVAILABLE);
+    }
+
+    @Test
+    void shouldCancelAQueuedJobWhenItsFrozenModelBecomesUnavailable() {
+        var slot = binding(DataHandlingTier.IN_HOUSE);
+        var job = queued(slot);
+        var model = Objects.requireNonNull(slot.getInstanceModel());
+        model.setEnabled(false);
+        models.saveAndFlush(model);
+        assertThat(executor.processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
+        assertThat(jobs.findById(job.getId()))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)
+                .containsExactly(ReviewJobStatus.CANCELLED, ReviewJobCancellationReason.MODEL_UNAVAILABLE);
+    }
+
+    @Test
+    void shouldKeepTheJobQueuedWhenModelAdmissionFailsUnexpectedly() {
+        var job = queued(binding(DataHandlingTier.IN_HOUSE));
+        var failure = new IllegalStateException("Unexpected programming error");
+        doThrow(failure).when(methods).require(any(), any(), any());
+        assertThat(executor.processJob(job.getId())).isEqualTo(ReviewJobExecutor.StartOutcome.SKIPPED);
+        assertThat(jobs.findById(job.getId()))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)
+                .containsExactly(ReviewJobStatus.QUEUED, null);
     }
 
     @Test

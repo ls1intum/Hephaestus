@@ -28,6 +28,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScanItemVersions;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultEvidence;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentStore;
@@ -179,8 +180,7 @@ public class DefaultReviewExecutionHandler {
                                         .put("itemVersion", prior.itemVersion())
                                         .put("outcome", prior.outcome().name());
                                 var priorEvidence = prior.evidence();
-                                if (priorEvidence != null
-                                        && priorEvidence.path("citations").isArray()) {
+                                if (priorEvidence != null) {
                                     coordinates.set("citations", previousCitations(priorEvidence));
                                     previous = coordinates;
                                 }
@@ -233,22 +233,17 @@ public class DefaultReviewExecutionHandler {
     }
 
     private JsonNode previousCitations(JsonNode evidence) {
-        var citations = new ArrayList<PreviousCitation>();
-        for (var source : evidence.path("citations")) {
-            if (!source.path("sourcePath").isString()
-                    || !source.path("path").isString()
-                    || !source.path("startLine").isIntegralNumber()
-                    || !source.path("endLine").isIntegralNumber()) continue;
-            citations.add(new PreviousCitation(
-                    source.path("sourceKind").asString(),
-                    source.path("sourcePath").asString(),
-                    source.path("path").asString(),
-                    source.path("startLine").asInt(),
-                    source.path("endLine").asInt(),
-                    source.hasNonNull("side") ? source.path("side").asString() : null,
-                    source.hasNonNull("commit") ? source.path("commit").asString() : null));
-        }
-        return mapper.valueToTree(citations);
+        var stored = mapper.treeToValue(evidence, ResultEvidence.class);
+        return mapper.valueToTree(stored.citations().stream()
+                .map(c -> new PreviousCitation(
+                        c.sourceKind().value(),
+                        c.sourcePath(),
+                        c.path(),
+                        c.startLine(),
+                        c.endLine(),
+                        c.side() == null ? null : c.side().name(),
+                        c.commit()))
+                .toList());
     }
 
     @JsonInclude(JsonInclude.Include.NON_NULL)

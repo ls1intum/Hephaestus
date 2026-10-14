@@ -4,7 +4,9 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceScope;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
+import de.tum.cit.aet.hephaestus.integration.docs.item.DocumentEvents;
 import de.tum.cit.aet.hephaestus.integration.outline.documentation.OutlineDocumentPermission;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import java.util.List;
@@ -25,8 +27,13 @@ public class OutlinePersonSourceIdentityContributor implements PersonSourceIdent
     private final ObjectProvider<OutlineDocumentPermission> permission;
 
     @Override
+    public PersonSourceScope scope() {
+        return PersonSourceScope.DOCUMENTS;
+    }
+
+    @Override
     public Set<String> itemKinds() {
-        return Set.of("docs.document");
+        return Set.of(DocumentEvents.DOCUMENT.value());
     }
 
     @Override

@@ -226,16 +226,6 @@ const INTENTIONALLY_MISSING_PATHS = [
 		reason: "a path inside the staged agent workspace, not the repository checkout",
 	},
 	{
-		document: "docs/contributor/artifact-source-contract.mdx",
-		value: "INDEX.md",
-		reason: "a path inside the staged agent workspace, not the repository checkout",
-	},
-	{
-		document: "docs/contributor/artifact-source-contract.mdx",
-		value: "context/change.json",
-		reason: "a path inside the staged agent workspace, not the repository checkout",
-	},
-	{
 		document: "docs/contributor/practice-review-pipeline.mdx",
 		value: "inputs/context/change.json",
 		reason: "a path inside the staged agent workspace, not the repository checkout",

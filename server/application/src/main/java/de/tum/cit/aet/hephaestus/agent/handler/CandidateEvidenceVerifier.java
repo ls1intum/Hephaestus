@@ -135,7 +135,7 @@ class CandidateEvidenceVerifier {
             }
             String path = citation.path();
             CitationSide side = citation.side() != null ? citation.side() : CitationSide.NEW;
-            String commit = citation.commit() != null ? citation.commit() : null;
+            String commit = citation.commit();
             var proof = captured.resolve(source, path, side, commit);
             String quote = citation.quote();
             var text = files.readText(job, proof.stagedPath(), proof.sha256())

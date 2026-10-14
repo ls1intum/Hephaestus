@@ -195,7 +195,10 @@ public class CatalogAdminController {
 
     @PatchMapping("/practices/reorder")
     @AuditExempt(reason = "Order changes presentation only")
-    @Operation(operationId = "reorderCatalogPractices")
+    @Operation(
+            operationId = "reorderCatalogPractices",
+            description =
+                    "Supply every practice slug in one group, or every unassigned practice slug, in the new order.")
     public CatalogDTO reorderPractices(
             @RequestBody @Valid ReorderRequestDTO input,
             @RequestHeader(name = "If-Match", required = false) @Nullable String ifMatch) {

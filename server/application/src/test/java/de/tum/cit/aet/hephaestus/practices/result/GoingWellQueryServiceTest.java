@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -42,7 +43,7 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
                             now.minusSeconds((i + 1) * 86400L),
                             new ItemKind("scm.pull_request"),
                             ResultOutcome.MET);
-                    var proof = view.result().toBuilder()
+                    var proof = resultBuilder(view.result())
                             .evidenceVersion((short) 1)
                             .summary("The work meets the practice.")
                             .explanation("The captured work supports the result.")
@@ -109,7 +110,7 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
         proof.set(
                 0,
                 new ResultView(
-                        view.result().toBuilder().evidenceVersion((short) 0).build(),
+                        resultBuilder(view.result()).evidenceVersion((short) 0).build(),
                         view.practice(),
                         view.version(),
                         view.review(),
@@ -125,7 +126,9 @@ class GoingWellQueryServiceTest extends BaseUnitTest {
         proof.set(
                 4,
                 new ResultView(
-                        view.result().toBuilder().outcome(ResultOutcome.NOT_MET).build(),
+                        resultBuilder(view.result())
+                                .outcome(ResultOutcome.NOT_MET)
+                                .build(),
                         view.practice(),
                         view.version(),
                         view.review(),

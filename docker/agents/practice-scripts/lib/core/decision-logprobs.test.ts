@@ -118,3 +118,107 @@ void describe("a decision model on a chat model's logprobs", () => {
 		);
 	});
 });
+
+void test("a bounded reasoning completion uses only its visible answer's letter probabilities", async () => {
+	const reasoning = [
+		{ token: "q1", top_logprobs: [] },
+		{ token: ":", top_logprobs: [] },
+		{
+			token: " B",
+			top_logprobs: [
+				{ token: " A", logprob: Math.log(0.1) },
+				{ token: " B", logprob: Math.log(0.9) },
+			],
+		},
+		{ token: " (analysis)", top_logprobs: [] },
+	];
+	const answer = answering(" A", [
+		{ token: " A", logprob: Math.log(0.8) },
+		{ token: " B", logprob: Math.log(0.2) },
+	]);
+	const model = new MockLanguageModelV4({
+		doGenerate: async (options) => {
+			assert.ok((options.maxOutputTokens ?? 0) >= 515);
+			assert.equal(options.providerOptions?.openai?.reasoningEffort, undefined);
+			return {
+				...answer,
+				content: [
+					{ type: "reasoning", text: reasoning.map((entry) => entry.token).join("") },
+					...answer.content,
+				],
+				providerMetadata: {
+					openai: {
+						logprobs: [
+							...reasoning,
+							{ token: "q1", top_logprobs: [] },
+							{ token: ":", top_logprobs: [] },
+							{
+								token: " A",
+								top_logprobs: [
+									{ token: " A", logprob: Math.log(0.8) },
+									{ token: " B", logprob: Math.log(0.2) },
+								],
+							},
+						],
+					},
+				},
+				usage: { ...answer.usage, outputTokens: { total: 515, text: 3, reasoning: 512 } },
+			};
+		},
+	});
+	const result = await experimental_decide({
+		model: logprobDecisionModel(model),
+		state: "current work",
+		questions: { answer: { type: "boolean", instructions: "Does the work meet the criterion?" } },
+	});
+	assert.ok(Math.abs(result.answers.answer.probability - 0.8) < 1e-9);
+	assert.equal(result.usage.outputTokens, 515);
+});
+
+void test("reasoning alone and logprobs that do not match visible text cannot supply a decision", async () => {
+	const result = answering(" A", [{ token: " A", logprob: 0 }]);
+	for (const content of [
+		[{ type: "reasoning" as const, text: "q1: A" }],
+		[{ type: "text" as const, text: "q1: B" }],
+	]) {
+		await assert.rejects(decideKind({ ...result, content }), (error) =>
+			InvalidResponseDataError.isInstance(error),
+		);
+	}
+});
+
+void test("a question answered only in reasoning remains unanswered", async () => {
+	const result = answering(" A", [{ token: " A", logprob: 0 }]);
+	const model = logprobDecisionModel(
+		new MockLanguageModelV4({
+			doGenerate: {
+				...result,
+				content: [{ type: "reasoning", text: "q2: A\n" }, ...result.content],
+				providerMetadata: {
+					openai: {
+						logprobs: [
+							{ token: "q2", top_logprobs: [] },
+							{ token: ":", top_logprobs: [] },
+							{ token: " A", top_logprobs: [{ token: " A", logprob: 0 }] },
+							{ token: "\n", top_logprobs: [] },
+							{ token: "q1", top_logprobs: [] },
+							{ token: ":", top_logprobs: [] },
+							{ token: " A", top_logprobs: [{ token: " A", logprob: 0 }] },
+						],
+					},
+				},
+			},
+		}),
+	);
+	await assert.rejects(
+		experimental_decide({
+			model,
+			state: "current work",
+			questions: {
+				first: { type: "boolean", instructions: "Is the first criterion met?" },
+				second: { type: "boolean", instructions: "Is the second criterion met?" },
+			},
+		}),
+		(error) => InvalidResponseDataError.isInstance(error),
+	);
+});

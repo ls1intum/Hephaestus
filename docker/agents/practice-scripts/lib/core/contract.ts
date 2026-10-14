@@ -316,7 +316,6 @@ const previousCitationSchema = z.strictObject({
 	commit: version.optional(),
 });
 const destinationBoundsSchema = z.strictObject({
-	enabled: z.boolean(),
 	maxPieces: z.int().min(0).max(10),
 });
 /**
@@ -325,7 +324,6 @@ const destinationBoundsSchema = z.strictObject({
  */
 export const compositionRequestSchema = z.strictObject({
 	contractVersion: z.literal(3),
-	enabled: z.literal(true),
 	destinations: z.strictObject({
 		ON_WORK: destinationBoundsSchema.optional(),
 		PRACTICE_PAGE: destinationBoundsSchema.optional(),
@@ -389,8 +387,8 @@ export interface CitationCapabilities {
 }
 /*
  * The result a practice program returns: one candidate per practice. Admission on the server parses
- * it again with the same rules and the same refusal codes (`CandidateParser`), and checks every quote
- * against the captured sources; `CandidateContractSyncTest` keeps the bounds equal.
+ * its structure again (`CandidateParser`) and verifies quotes and example overlap against captured
+ * sources (`CandidateEvidenceVerifier`). `CandidateContractSyncTest` keeps the bounds and codes equal.
  */
 
 export const CANDIDATE_REFUSALS = [
@@ -417,12 +415,6 @@ export type Outcome = (typeof OUTCOMES)[number];
  */
 export type Citation = z.infer<typeof citationShape>;
 
-export interface CitationIdentity {
-	source: string;
-	version: string;
-}
-
-type ResolveCitationIdentity = (citation: Citation) => CitationIdentity | undefined;
 /** What a search for something missing consulted, looked for, and did not cover. Consulted names source kinds. */
 export type SearchWarrant = z.infer<typeof searchShape>;
 export type InapplicabilityWarrant = z.infer<typeof inapplicabilityShape>;
@@ -693,26 +685,6 @@ function readCoverage(coverage: Superset["coverage"]): Coverage | string {
 		: { source: "claimed", selected, checked, total, complete: false, omitted: omissions };
 }
 
-function overlaps(a: Citation, b: Citation, resolve?: ResolveCitationIdentity): boolean {
-	if (a.startLine > b.endLine || b.startLine > a.endLine) {
-		return false;
-	}
-	if (resolve !== undefined) {
-		const left = resolve(a);
-		const right = resolve(b);
-		if (left !== undefined && right !== undefined) {
-			return left.source === right.source && left.version === right.version;
-		}
-	}
-	return (
-		a.sourceKind === b.sourceKind &&
-		a.sourcePath === b.sourcePath &&
-		a.path === b.path &&
-		a.side === b.side &&
-		a.commit === b.commit
-	);
-}
-
 function basisIndices(basis: ClaimBasis): number[] {
 	switch (basis.type) {
 		case "introduced": {
@@ -796,22 +768,11 @@ function outcomeRefusal(
 	return undefined;
 }
 
-function problemRefusal(
-	sent: Omit<Superset, "coverage">,
-	resolve?: ResolveCitationIdentity,
-): Refusal | undefined {
+function problemRefusal(sent: Omit<Superset, "coverage">): Refusal | undefined {
 	const { example, outcome } = sent;
 	const problems = sent.problems ?? [];
 	if (example !== undefined && outcome !== "MET" && outcome !== "NOT_MET") {
 		return refuse("example_outcome_mismatch", `a ${outcome} result has no example`);
-	}
-	if (
-		example !== undefined &&
-		problems.some((problem) =>
-			problem.citations.some((cited) => overlaps(cited, example.citation, resolve)),
-		)
-	) {
-		return refuse("example_overlaps_problem", "the example cites the place of a problem");
 	}
 	for (const [index, problem] of problems.entries()) {
 		const out = basisIndices(problem.basis).find((at) => at >= problem.citations.length);
@@ -885,7 +846,6 @@ function candidateOf(sent: Superset, coverage: Coverage) {
  */
 export function parseCandidate(
 	value: unknown,
-	resolve?: ResolveCitationIdentity,
 ):
 	| { ok: true; candidate: Candidate }
 	| { ok: false; reasonCode: CandidateRefusal; message: string } {
@@ -916,7 +876,7 @@ export function parseCandidate(
 	if (typeof coverage === "string") {
 		return refuse("coverage_inconsistent", coverage);
 	}
-	const after = problemRefusal(sent, resolve);
+	const after = problemRefusal(sent);
 	if (after !== undefined) {
 		return after;
 	}

@@ -1,16 +1,22 @@
 package de.tum.cit.aet.hephaestus.integration.core.item;
 
+import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ItemRepository extends JpaRepository<Item, Long> {
     Optional<Item> findByIdAndWorkspaceId(long itemId, long workspaceId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Item i WHERE i.workspaceId = :workspaceId AND i.id = :itemId")
+    Optional<Item> lockByIdAndWorkspaceId(@Param("itemId") long itemId, @Param("workspaceId") long workspaceId);
 
     List<Item> findByWorkspaceIdAndIdIn(long workspaceId, List<Long> ids);
 

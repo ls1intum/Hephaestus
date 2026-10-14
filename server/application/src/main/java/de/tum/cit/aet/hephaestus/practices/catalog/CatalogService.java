@@ -25,6 +25,7 @@ import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -72,9 +73,13 @@ public class CatalogService {
             Set<String> offeredGroups) {
         Map<String, D> bundle = new LinkedHashMap<>();
         Map<String, Integer> positions = new HashMap<>();
+        Map<@Nullable String, Integer> nextPositions = new HashMap<>();
         shipped.forEach(entry -> {
             bundle.put(entry.slug(), entry.definition());
             positions.put(entry.slug(), entry.position());
+            String groupSlug =
+                    entry.definition() instanceof CatalogPracticeDocument document ? document.groupSlug() : null;
+            nextPositions.merge(groupSlug, entry.position() + 1, Math::max);
         });
         Map<String, CatalogEntry> local = new HashMap<>();
         entries.findByIdTypeOrderByIdSlugAsc(type)
@@ -82,8 +87,6 @@ public class CatalogService {
         var slugs = new TreeSet<>(bundle.keySet());
         slugs.addAll(local.keySet());
         List<CatalogOffer<D>> offers = new ArrayList<>();
-        int localPosition =
-                positions.values().stream().mapToInt(Integer::intValue).max().orElse(-1) + 1;
         for (String slug : slugs) {
             CatalogEntry entry = local.get(slug);
             D original = bundle.get(slug);
@@ -92,17 +95,27 @@ public class CatalogService {
             if (effective == null) continue;
             JsonNode baseNode = entry == null ? null : entry.getBase();
             D base = baseNode == null ? null : mapper.treeToValue(baseNode, shape);
-            int position = entry != null && entry.getPosition() != null
-                    ? entry.getPosition()
-                    : positions.containsKey(slug) ? positions.get(slug) : localPosition++;
+            int position;
+            if (entry != null && entry.getPosition() != null) {
+                position = entry.getPosition();
+            } else if (positions.containsKey(slug)) {
+                position = positions.get(slug);
+            } else {
+                String groupSlug = effective instanceof CatalogPracticeDocument document ? document.groupSlug() : null;
+                position = nextPositions.getOrDefault(groupSlug, 0);
+                nextPositions.put(groupSlug, position + 1);
+            }
             boolean excluded = entry != null && entry.getExcludedAt() != null;
-            CatalogEntryState state = authored == null
-                    ? CatalogEntryState.FROM_HEPHAESTUS
-                    : original == null
-                            ? baseNode == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED
-                            : Objects.equals(effective, original) || Objects.equals(original, base)
-                                    ? CatalogEntryState.EDITED_HERE
-                                    : CatalogEntryState.UPDATE_WAITING;
+            CatalogEntryState state;
+            if (authored == null) {
+                state = CatalogEntryState.FROM_HEPHAESTUS;
+            } else if (original == null) {
+                state = baseNode == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED;
+            } else if (Objects.equals(effective, original) || Objects.equals(original, base)) {
+                state = CatalogEntryState.EDITED_HERE;
+            } else {
+                state = CatalogEntryState.UPDATE_WAITING;
+            }
             CatalogChangeKind change = CatalogChangeKind.NONE;
             if (original != null && !Objects.equals(effective, original)) {
                 if (effective instanceof CatalogPracticeDocument current
@@ -119,7 +132,6 @@ public class CatalogService {
                     .addNullable(baseNode == null ? null : mapper.writeValueAsString(base))
                     .addInt(position)
                     .addInt(excluded ? 1 : 0)
-                    .add(entry == null ? "0" : Long.toString(entry.getVersion()))
                     .hex();
             offers.add(new CatalogOffer<>(
                     slug,

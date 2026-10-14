@@ -8,6 +8,8 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeReadSource;
 import de.tum.cit.aet.hephaestus.practices.PracticeReads;
+import de.tum.cit.aet.hephaestus.practices.ReviewLimit;
+import de.tum.cit.aet.hephaestus.practices.ReviewedBy;
 import de.tum.cit.aet.hephaestus.practices.ScanDefinition;
 import de.tum.cit.aet.hephaestus.practices.spi.PinnedPractice;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
@@ -65,6 +67,40 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
             assertThat(entry.path("readsSources")).isEqualTo(mapper.valueToTree(List.of("docs.document.core")));
             assertThat(entry.path("exhaustiveSources")).isEqualTo(entry.path("readsSources"));
         }
+    }
+
+    @Test
+    void shouldStageAuthoredReviewLimits() {
+        var original = RuntimeReviewTestData.assignment(null, null);
+        var p = original.practice();
+        var d = p.definition();
+        var limit = new ReviewLimit("context", "Cannot judge behavior outside the captured document.");
+        var definition = new PracticeDefinition(
+                d.name(),
+                d.reviewOn(),
+                d.appliesWhen(),
+                d.about(),
+                d.reads(),
+                new ReviewedBy(d.reviewedBy().by(), d.reviewedBy().humanReason(), List.of(limit)),
+                d.criteria(),
+                d.script(),
+                d.scan(),
+                d.lineNotes(),
+                d.guidance());
+        var assignment = new ReviewAssignmentSnapshot(
+                original.id(),
+                original.item(),
+                original.version(),
+                original.developerId(),
+                original.practiceSlug(),
+                new PinnedPractice(p.practiceId(), p.practiceVersionId(), definition, p.reviewDigest(), p.method()));
+        var mapper = JsonMapper.builder().build();
+        var files = new LinkedHashMap<String, byte[]>();
+        new PracticeCatalogInjector(mapper).inject(files, List.of(assignment), ReviewKind.ITEM, Map.of());
+        assertThat(mapper.readTree(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"))
+                        .get(0)
+                        .path("knownLimitations"))
+                .isEqualTo(mapper.valueToTree(List.of(limit.description())));
     }
 
     @Test

@@ -33,8 +33,6 @@ public interface GitProviderRegistry {
 
     boolean visibleInWorkspace(long providerId, long workspaceId);
 
-    Optional<IdentityProfile> profile(long providerId, String providerUserKey, @Nullable String teamKey);
-
     Map<IdentityKey, IdentityProfile> profiles(Collection<IdentityKey> identities);
 
     record IdentityKey(long providerId, String providerUserKey, String teamKey) {}

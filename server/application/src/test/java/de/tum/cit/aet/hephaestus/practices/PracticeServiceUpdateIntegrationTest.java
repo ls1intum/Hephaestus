@@ -16,6 +16,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
+    CatalogOriginPresenter presenter;
+
+    @Autowired
     PracticeVersionService versions;
 
     @Autowired
@@ -49,6 +52,6 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
                         .getCurrentVersion()
                         .getId())
                 .hasToString(initialId);
-        assertThat(versions.history(practice)).hasSize(1);
+        assertThat(presenter.history(practice)).hasSize(1);
     }
 }

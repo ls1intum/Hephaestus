@@ -12,7 +12,7 @@ import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +35,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
     private final OrganizationRepository organizationRepository;
     private final TeamMembershipRepository teamMembershipRepository;
     private final WorkspaceActorSelector actorSelector;
+    private final Clock clock;
 
     public WorkspaceOrganizationMembershipAdapter(
             WorkspaceRepository workspaceRepository,
@@ -42,13 +43,15 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
             OrganizationMembershipRepository organizationMembershipRepository,
             OrganizationRepository organizationRepository,
             TeamMembershipRepository teamMembershipRepository,
-            WorkspaceActorSelector actorSelector) {
+            WorkspaceActorSelector actorSelector,
+            Clock clock) {
         this.workspaceRepository = workspaceRepository;
         this.workspaceMembershipService = workspaceMembershipService;
         this.organizationMembershipRepository = organizationMembershipRepository;
         this.organizationRepository = organizationRepository;
         this.teamMembershipRepository = teamMembershipRepository;
         this.actorSelector = actorSelector;
+        this.clock = clock;
     }
 
     @Override
@@ -207,7 +210,7 @@ public class WorkspaceOrganizationMembershipAdapter implements OrganizationMembe
         // An owner stays owner whether or not the provider still lists them.
         workspaceMembershipService.syncWorkspaceMembers(workspace, desiredRoles);
 
-        workspace.setMembersSyncedAt(Instant.now());
+        workspace.setMembersSyncedAt(clock.instant());
         workspaceRepository.save(workspace);
 
         return desiredRoles.size();

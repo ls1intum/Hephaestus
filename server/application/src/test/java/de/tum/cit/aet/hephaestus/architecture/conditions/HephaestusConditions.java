@@ -7,11 +7,15 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWorkerRole;
 import jakarta.validation.constraints.NotNull;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
 
 /**
  * Reusable ArchUnit conditions for Hephaestus architecture tests.
@@ -317,14 +321,14 @@ public final class HephaestusConditions {
     }
 
     /**
-     * Condition that checks if endpoint methods have security annotations.
+     * Condition that checks explicit authorization for HTTP endpoints.
      *
      * <p>Only checks methods that have HTTP mapping annotations (@GetMapping, etc.).
      *
      * @return condition that validates security on endpoints
      */
-    public static ArchCondition<JavaMethod> haveSecurityAnnotationIfEndpoint() {
-        return new ArchCondition<>("have security annotation if HTTP endpoint") {
+    public static ArchCondition<JavaMethod> haveExplicitSecurityIfEndpoint() {
+        return new ArchCondition<>("have explicit security if HTTP endpoint") {
             @Override
             public void check(JavaMethod method, ConditionEvents events) {
                 if (!isHttpEndpoint(method)) {
@@ -341,15 +345,26 @@ public final class HephaestusConditions {
                                 .anyMatch(a -> a.getRawType().getName().contains("Require")
                                         || a.getRawType().getName().contains("Ensure"));
 
-                if (!hasSecurityAnnotation) {
+                if (!hasSecurityAnnotation && !usesWorkerGatewaySecurity(method.getOwner())) {
                     events.add(SimpleConditionEvent.violated(
                             method,
                             String.format(
-                                    "%s.%s is an endpoint with no security annotation",
+                                    "%s.%s is an endpoint without explicit security",
                                     method.getOwner().getSimpleName(), method.getName())));
                 }
             }
         };
+    }
+
+    private static boolean usesWorkerGatewaySecurity(JavaClass owner) {
+        if (!owner.isAnnotatedWith(ConditionalOnWorkerRole.class) || !owner.isAnnotatedWith(RequestMapping.class))
+            return false;
+        var mapping = owner.getAnnotationOfType(RequestMapping.class);
+        var paths = Stream.concat(Arrays.stream(mapping.value()), Arrays.stream(mapping.path()))
+                .toList();
+        // The connector's JWT/scope chains deny unknown paths and hide all capabilities on other connectors.
+        return !paths.isEmpty()
+                && paths.stream().allMatch(path -> path.equals("/internal/llm") || path.startsWith("/internal/llm/"));
     }
 
     /**

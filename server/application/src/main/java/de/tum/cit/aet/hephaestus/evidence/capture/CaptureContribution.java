@@ -10,7 +10,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
@@ -52,9 +51,24 @@ public record CaptureContribution(
     public static CaptureContribution unavailable(Set<SourceKind> kinds, SourceAbsenceReason reason) {
         Map<SourceKind, SourceCaptureState> states = new HashMap<>();
         kinds.forEach(kind -> states.put(kind, new SourceCaptureState.Unavailable(reason)));
+        return empty().withStateOverrides(states);
+    }
+
+    public CaptureContribution withStateOverrides(Map<SourceKind, SourceCaptureState> states) {
         return new CaptureContribution(
-                Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), states, Map.of(), null, Map.of(), List.of(),
-                List.of(), List.of());
+                files,
+                completeness,
+                immutableIdentities,
+                observedAt,
+                sourceEffectiveAt,
+                contentStates,
+                states,
+                filesOnDisk,
+                cleanup,
+                captureLimitations,
+                directories,
+                refusals,
+                citableTexts);
     }
 
     @SuppressWarnings("ReferenceEquality") // Throwable rejects suppression of the same exception instance.
@@ -78,14 +92,14 @@ public record CaptureContribution(
         filesOnDisk = Map.copyOf(filesOnDisk);
         refusals = List.copyOf(refusals);
         directories = List.copyOf(directories);
-        files = Map.copyOf(Objects.requireNonNull(files, "files"));
-        completeness = Map.copyOf(Objects.requireNonNull(completeness, "completeness"));
-        immutableIdentities = Map.copyOf(Objects.requireNonNull(immutableIdentities, "immutableIdentities"));
-        observedAt = Map.copyOf(Objects.requireNonNull(observedAt, "observedAt"));
-        sourceEffectiveAt = Map.copyOf(Objects.requireNonNull(sourceEffectiveAt, "sourceEffectiveAt"));
-        stateOverrides = Map.copyOf(Objects.requireNonNull(stateOverrides, "stateOverrides"));
-        contentStates = Map.copyOf(Objects.requireNonNull(contentStates, "contentStates"));
-        captureLimitations = Objects.requireNonNull(captureLimitations, "captureLimitations").entrySet().stream()
+        files = Map.copyOf(files);
+        completeness = Map.copyOf(completeness);
+        immutableIdentities = Map.copyOf(immutableIdentities);
+        observedAt = Map.copyOf(observedAt);
+        sourceEffectiveAt = Map.copyOf(sourceEffectiveAt);
+        stateOverrides = Map.copyOf(stateOverrides);
+        contentStates = Map.copyOf(contentStates);
+        captureLimitations = captureLimitations.entrySet().stream()
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> List.copyOf(e.getValue())));
     }
 }

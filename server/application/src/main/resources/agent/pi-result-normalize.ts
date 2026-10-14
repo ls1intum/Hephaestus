@@ -1,4 +1,3 @@
-import { isRecord } from "./pi-text.ts";
 import { DIFF_SOURCE, TREE_SOURCE } from "./work/practice-scripts/kits/scm/sources.ts";
 // Repair transport and coordinates before admission; emit a result only when its full contract holds.
 import {
@@ -9,7 +8,10 @@ import {
 	type Outcome,
 	type Severity,
 } from "./work/practice-scripts/lib/core/contract.ts";
-import { recordArrayEntries } from "./work/practice-scripts/lib/core/json.ts";
+import {
+	recordArrayEntries,
+	isJsonObject as isRecord,
+} from "./work/practice-scripts/lib/core/json.ts";
 
 /**
  * The captured witness of a checkout that a repository citation names (`CandidateEvidenceVerifier.CHECKOUT_WITNESS` on

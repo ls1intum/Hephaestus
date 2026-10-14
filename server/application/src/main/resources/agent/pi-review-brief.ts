@@ -11,7 +11,7 @@ import {
 	readChange,
 	safeRepositoryPath,
 } from "./pi-change.ts";
-import { isRecord } from "./pi-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 export interface BriefLimits {
 	/** Cap both source bytes read and rendered characters per file. */

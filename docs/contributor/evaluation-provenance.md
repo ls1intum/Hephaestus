@@ -5,7 +5,7 @@ description: Trace a persisted practice result to its review inputs, configurati
 
 # Evaluation provenance
 
-A result records an evidence-bounded verdict, not a developer's mastery.
+A result records an evidence-bounded outcome, not a developer's mastery.
 A delivery record states what the system confirmed or withheld, not whether the guidance was correct.
 Keep these dimensions separate in research and operational exports.
 

@@ -32,7 +32,7 @@ Never use a schema-only dump as a rollback backup.
 
 The target release's changelog rejects older migration history for both startup and synchronization.
 
-1. Read the [upgrade-path table](compatibility-policy#upgrade-paths-to-10).
+1. Read the [database baseline prerequisites](compatibility-policy#database-baseline-prerequisites).
 2. If the database is older than v0.77.4, install v0.77.4.
 3. In that case, start v0.77.4 once before you continue.
 4. Verify that the current release completed every v0.77.4 migration with no pending changesets.
@@ -53,7 +53,7 @@ The target release's changelog rejects older migration history for both startup 
 ## Synchronize without executing DDL
 
 The procedure uses the **target release** application image's bundled Liquibase and changelog.
-For the 1.0 upgrade, this is the signed **v1.0.0** image, not the v0.77.4 image.
+Use the signed target image for the practice model cutover.
 Do not put credentials in command arguments, shell history, or the repository.
 
 1. Set `TARGET_IMAGE` to the verified image digest.

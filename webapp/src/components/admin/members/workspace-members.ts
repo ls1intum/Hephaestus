@@ -17,26 +17,22 @@ export interface WorkspaceMemberRow {
 }
 
 /**
- * One row per account, sorted by name. Teams come from the provider and list provider logins, so a
+ * One row per account. Teams come from the provider and list provider logins, so a
  * member is on a team that lists one of the account's logins.
  */
 export function workspaceMemberRows(
 	memberships: readonly WorkspaceMembership[],
 	teams: readonly TeamInfo[],
 ): WorkspaceMemberRow[] {
-	return memberships
-		.map((membership) => {
-			const logins = membership.account.identities
-				.map((identity) => identity.login)
-				.filter(hasText);
-			return {
-				membership,
-				name: accountName(membership.account),
-				logins,
-				teams: teams
-					.filter((team) => team.members.some((member) => logins.includes(member.login)))
-					.sort((a, b) => a.name.localeCompare(b.name)),
-			};
-		})
-		.sort((a, b) => a.name.localeCompare(b.name));
+	return memberships.map((membership) => {
+		const logins = membership.account.identities.map((identity) => identity.login).filter(hasText);
+		return {
+			membership,
+			name: accountName(membership.account),
+			logins,
+			teams: teams
+				.filter((team) => team.members.some((member) => logins.includes(member.login)))
+				.sort((a, b) => a.name.localeCompare(b.name)),
+		};
+	});
 }

@@ -1,5 +1,4 @@
 import {
-	BanIcon,
 	CirclePlayIcon,
 	ClockIcon,
 	EyeOffIcon,
@@ -42,12 +41,6 @@ export const ITEM_EVENT_STATE_DEFS: StatusDefs<ItemEventState> = {
 		icon: EyeOffIcon,
 		badgeVariant: "warning",
 		description: "A check decided not to review on this event. The reason says which.",
-	},
-	BLOCKED: {
-		label: "Blocked",
-		icon: BanIcon,
-		badgeVariant: "destructive",
-		description: "Something the review needs was missing, so no review started.",
 	},
 	EXPIRED: {
 		label: "Expired",

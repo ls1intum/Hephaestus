@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceScope;
 import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.util.List;
@@ -35,6 +36,11 @@ public class ScmPersonSourceIdentityContributor implements PersonSourceIdentityC
         UNION ALL SELECT cp.pull_request_id,c.committer_id FROM commit_pull_request cp JOIN git_commit c ON c.id=cp.commit_id
         UNION ALL SELECT cp.pull_request_id,c.user_id FROM commit_pull_request cp JOIN commit_contributor c ON c.commit_id=cp.commit_id
         """;
+
+    @Override
+    public PersonSourceScope scope() {
+        return PersonSourceScope.SCM_SOURCES;
+    }
 
     @Override
     public Set<String> itemKinds() {

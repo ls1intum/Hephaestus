@@ -1,14 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadNeed;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentId;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewAssignmentSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
@@ -26,33 +29,30 @@ public class PracticeCatalogInjector {
             List<ReviewAssignmentSnapshot> assignments,
             ReviewKind scope,
             Map<ReviewAssignmentId, List<String>> contextPaths) {
-        var index = mapper.createArrayNode();
+        var index = new ArrayList<PracticeIndexEntry>();
         for (var assignment : assignments) {
             var practice = assignment.practice();
             var definition = practice.definition();
-            var entry = index.addObject()
-                    .put("slug", assignment.practiceSlug())
-                    .put("name", definition.name())
-                    .put("versionId", Long.toString(practice.practiceVersionId()));
-            if (scope == ReviewKind.SCAN) {
-                var paths =
-                        Objects.requireNonNull(contextPaths.get(assignment.id()), "Missing frozen scan context grant");
-                var granted = entry.putArray("contextPaths");
-                paths.forEach(granted::add);
-            }
-            var sources = entry.putArray("readsSources");
-            var exhaustive = entry.putArray("exhaustiveSources");
-            entry.putArray("knownLimitations");
+            var paths = scope == ReviewKind.SCAN
+                    ? Objects.requireNonNull(contextPaths.get(assignment.id()), "Missing frozen scan context grant")
+                    : null;
             var reads = scope == ReviewKind.SCAN
                     ? Objects.requireNonNull(definition.scan()).reads()
                     : definition.reads();
-            for (var read : reads.sources()) {
-                sources.add(read.source().value());
-                if (read.need() == ReadNeed.COMPLETE)
-                    exhaustive.add(read.source().value());
-            }
-            String whyItMatters = definition.guidance().whyItMatters();
-            if (whyItMatters != null) entry.put("whyItMatters", whyItMatters);
+            index.add(new PracticeIndexEntry(
+                    assignment.practiceSlug(),
+                    definition.name(),
+                    Long.toString(practice.practiceVersionId()),
+                    paths,
+                    reads.sources().stream().map(read -> read.source().value()).toList(),
+                    reads.sources().stream()
+                            .filter(read -> read.need() == ReadNeed.COMPLETE)
+                            .map(read -> read.source().value())
+                            .toList(),
+                    definition.reviewedBy().limits().stream()
+                            .map(limit -> limit.description())
+                            .toList(),
+                    definition.guidance().whyItMatters()));
             files.put(
                     SandboxLayout.PRACTICES_PREFIX + assignment.practiceSlug() + ".md",
                     definition.criteria().getBytes(StandardCharsets.UTF_8));
@@ -64,4 +64,15 @@ public class PracticeCatalogInjector {
         }
         files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", mapper.writeValueAsBytes(index));
     }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record PracticeIndexEntry(
+            String slug,
+            String name,
+            String versionId,
+            @Nullable List<String> contextPaths,
+            List<String> readsSources,
+            List<String> exhaustiveSources,
+            List<String> knownLimitations,
+            @Nullable String whyItMatters) {}
 }

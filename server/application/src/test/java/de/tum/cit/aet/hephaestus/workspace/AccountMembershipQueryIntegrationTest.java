@@ -9,6 +9,8 @@ import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
+import de.tum.cit.aet.hephaestus.core.privacy.IdentityRestriction;
+import de.tum.cit.aet.hephaestus.core.privacy.IdentityRestrictionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
@@ -65,7 +67,7 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
     private MembershipReviewSelection selections;
 
     @Autowired
-    private MembershipService service;
+    private IdentityRestrictionRepository restrictions;
 
     @Autowired
     private ConnectionRepository connections;
@@ -75,6 +77,69 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private EntityManager entityManager;
+
+    @Test
+    void shouldAuthorizeOnlyActiveVisibleMembersInTheRequestedWorkspace() {
+        var account = accounts.saveAndFlush(new Account("History member"));
+        var member = membership(account, "history-membership");
+        long workspaceId = member.getWorkspace().getId();
+        long accountId = Objects.requireNonNull(account.getId());
+        assertThat(query.isActiveVisibleMember(workspaceId, accountId)).isTrue();
+        assertThat(query.isActiveVisibleMember(workspaceId + 1, accountId)).isFalse();
+        member.setHidden(true);
+        memberships.flush();
+        assertThat(query.isActiveVisibleMember(workspaceId, accountId)).isFalse();
+        member.setHidden(false);
+        member.setLeftAt(Instant.now());
+        memberships.flush();
+        assertThat(query.isActiveVisibleMember(workspaceId, accountId)).isFalse();
+        member.setLeftAt(null);
+        account.setStatus(Account.Status.SUSPENDED);
+        accounts.flush();
+        assertThat(query.isActiveVisibleMember(workspaceId, accountId)).isFalse();
+        account.setStatus(Account.Status.UNCLAIMED);
+        accounts.flush();
+        assertThat(query.isActiveVisibleMember(workspaceId, accountId)).isTrue();
+    }
+
+    @Test
+    void shouldApplyExactErasureSuppressionToBothEligibilityReaders() {
+        var erased = accounts.saveAndFlush(new Account("Erased identity"));
+        var member = membership(erased, "suppressed-eligibility");
+        var visible = accounts.saveAndFlush(new Account("Public visibility only"));
+        addMember(member.getWorkspace(), visible, Membership.WorkspaceRole.MEMBER, null);
+        var foreign = accounts.saveAndFlush(new Account("Different provider origin"));
+        addMember(member.getWorkspace(), foreign, Membership.WorkspaceRole.MEMBER, null);
+        var provider = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com"));
+        var alias = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com/"));
+        var other =
+                providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://git.example.org"));
+        for (var account : List.of(erased, visible, foreign)) {
+            var identity = new Identity();
+            identity.setAccount(account);
+            identity.setProviderId(Objects.requireNonNull(account.equals(foreign) ? other.getId() : provider.getId()));
+            identity.setProviderUserKey(account.equals(visible) ? "visible-key" : "erased-key");
+            identities.saveAndFlush(identity);
+        }
+        var erasedRestriction = new IdentityRestriction();
+        erasedRestriction.setProviderId(Objects.requireNonNull(alias.getId()));
+        erasedRestriction.setProviderUserKey("erased-key");
+        erasedRestriction.setKind(IdentityRestriction.Kind.ERASED);
+        restrictions.saveAndFlush(erasedRestriction);
+        var hiddenRestriction = new IdentityRestriction();
+        hiddenRestriction.setProviderId(Objects.requireNonNull(provider.getId()));
+        hiddenRestriction.setProviderUserKey("visible-key");
+        hiddenRestriction.setKind(IdentityRestriction.Kind.HIDE_PUBLIC);
+        restrictions.saveAndFlush(hiddenRestriction);
+        List<Long> ids = List.of(
+                Objects.requireNonNull(erased.getId()),
+                Objects.requireNonNull(visible.getId()),
+                Objects.requireNonNull(foreign.getId()));
+        assertThat(selections.eligibleAccountIds(member.getWorkspace().getId(), ids))
+                .containsExactlyInAnyOrder(visible.getId(), foreign.getId());
+        assertThat(coverage.eligibleAccountIds(member.getWorkspace().getId()))
+                .containsExactlyInAnyOrder(visible.getId(), foreign.getId());
+    }
 
     @Test
     void shouldKeepLoadedSelectionCurrentWhenReviewScopeIsReplaced() {
@@ -225,7 +290,7 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
                 Objects.requireNonNull(visible.getId()),
                 Objects.requireNonNull(hidden.getId()),
                 Objects.requireNonNull(noAi.getId()));
-        assertThat(service.eligibleAccountIds(member.getWorkspace().getId(), ids))
+        assertThat(selections.eligibleAccountIds(member.getWorkspace().getId(), ids))
                 .containsExactly(visible.getId());
         assertThat(coverage.eligibleAccountIds(member.getWorkspace().getId())).containsExactly(visible.getId());
     }
@@ -260,7 +325,7 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
                         UUID.randomUUID().toString(),
                         "Source connected"));
         List<Long> ids = List.of(Objects.requireNonNull(linked.getId()), Objects.requireNonNull(unlinked.getId()));
-        assertThat(service.eligibleAccountIds(workspace.getId(), ids)).containsExactly(linked.getId());
+        assertThat(selections.eligibleAccountIds(workspace.getId(), ids)).containsExactly(linked.getId());
         assertThat(coverage.eligibleAccountIds(workspace.getId())).containsExactly(linked.getId());
     }
 

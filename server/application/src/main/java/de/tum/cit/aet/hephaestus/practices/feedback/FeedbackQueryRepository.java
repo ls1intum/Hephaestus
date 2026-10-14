@@ -1,8 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackLocation;
+import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +20,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Transactional(readOnly = true)
 public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
+    @Query("""
+        SELECT r FROM Result r
+        WHERE r.workspaceId = :workspaceId AND r.developerId = :developerId
+          AND r.practiceId = :practiceId AND r.endedAt IS NULL
+          AND r.outcome = de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome.NOT_MET
+          AND r.evidenceVersion = 1 AND r.recordedAt > :since
+          AND NOT EXISTS (SELECT m.id FROM ResultMark m WHERE m.resultId = r.id
+              AND m.workspaceId = r.workspaceId AND m.kind = :incorrect AND m.removedAt IS NULL)
+        ORDER BY r.recordedAt DESC, r.id DESC
+        """)
+    List<Result> findPageSupport(
+            @Param("workspaceId") long workspaceId,
+            @Param("developerId") long developerId,
+            @Param("practiceId") long practiceId,
+            @Param("since") Instant since,
+            @Param("incorrect") ResultMarkKind incorrect);
+
     String LOCATED = """
         WITH located AS (
           SELECT f.*,
@@ -87,13 +107,6 @@ public interface FeedbackQueryRepository extends Repository<Feedback, UUID> {
         """, nativeQuery = true)
     @Nullable
     UUID threadId(@Param("workspaceId") long workspaceId, @Param("feedbackId") UUID feedbackId);
-
-    @Query(value = """
-        SELECT EXISTS(SELECT 1 FROM membership m JOIN account a ON a.id=m.account_id
-          WHERE m.workspace_id=:workspaceId AND m.account_id=:accountId
-            AND m.left_at IS NULL AND a.status IN ('ACTIVE','UNCLAIMED'))
-        """, nativeQuery = true)
-    boolean member(@Param("workspaceId") long workspaceId, @Param("accountId") long accountId);
 
     @Query(
             value = "SELECT feedback_content_digest(id) FROM feedback WHERE"

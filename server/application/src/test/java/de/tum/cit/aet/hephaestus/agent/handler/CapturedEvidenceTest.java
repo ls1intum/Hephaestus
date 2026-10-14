@@ -24,8 +24,8 @@ import tools.jackson.databind.json.JsonMapper;
 
 class CapturedEvidenceTest extends BaseUnitTest {
     private final JsonMapper mapper = new JsonMapper();
-    private static final SourceKind CONTENT = new SourceKind("docs.document.content");
-    private static final SourceKind COMMENTS = new SourceKind("docs.document.comments");
+    private static final SourceKind CONTENT = new SourceKind("docs.document.core");
+    private static final SourceKind COMMENTS = new SourceKind("hephaestus.result-history");
 
     @Test
     void readsOnlyAvailableSourcesAndTheirExactFileProof() {
@@ -43,10 +43,12 @@ class CapturedEvidenceTest extends BaseUnitTest {
                                         SourceCompleteness.COMPLETE,
                                         new SourceCaptureFacts(now, null, null, "opaque:version"),
                                         List.of()),
+                                EvidenceSnapshotFixtures.citation(CONTENT),
                                 List.of(new CapturedSource("context/document.md", "text/plain", "a".repeat(64), 8))),
                         new SourceCapture(
                                 COMMENTS,
                                 new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND),
+                                EvidenceSnapshotFixtures.citation(COMMENTS),
                                 List.of())),
                 List.of(),
                 List.of(
@@ -57,11 +59,13 @@ class CapturedEvidenceTest extends BaseUnitTest {
                                                 SourceCompleteness.COMPLETE,
                                                 new SourceCaptureFacts(now, null, null, "opaque:version"),
                                                 List.of()),
+                                        EvidenceSnapshotFixtures.citation(CONTENT),
                                         List.of(new CapturedSource(
                                                 "context/document.md", "text/plain", "a".repeat(64), 8))),
                                 new SourceCapture(
                                         COMMENTS,
                                         new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND),
+                                        EvidenceSnapshotFixtures.citation(COMMENTS),
                                         List.of()))
                         .stream()
                         .flatMap(captureSource -> captureSource.files().stream()

@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
+import de.tum.cit.aet.hephaestus.core.auth.dto.AccountRefDTO;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryState;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPracticeDocument;
@@ -9,11 +12,14 @@ import de.tum.cit.aet.hephaestus.practices.dto.CatalogOriginDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.FeedbackModeAssignmentDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeGroupDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeGroup;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.feedbackmode.FeedbackModeResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -31,6 +37,37 @@ public class CatalogOriginPresenter {
     private final PracticeReviewDigest digest;
     private final PracticeVersionService versions;
     private final WorkspaceReviewDefaultsProvider defaults;
+    private final PracticeVersionRepository versionRepository;
+    private final AccountDirectory accounts;
+    private final AccountReferenceService accountReferences;
+
+    public PracticeVersionDTO viewCurrent(Practice practice) {
+        var version = practice.getCurrentVersion();
+        var previous = versionRepository
+                .findFirstByPracticeIdAndNumberLessThanOrderByNumberDesc(practice.getId(), version.getNumber())
+                .orElse(null);
+        return versions.view(version, previous, createdBy(version));
+    }
+
+    public List<PracticeVersionDTO> history(Practice practice) {
+        List<PracticeVersionDTO> history = new ArrayList<>();
+        PracticeVersion previous = null;
+        for (PracticeVersion version : versionRepository.findByWorkspaceIdAndPracticeIdOrderByNumberAsc(
+                Objects.requireNonNull(practice.getWorkspace().getId()), practice.getId())) {
+            history.add(versions.view(version, previous, createdBy(version)));
+            previous = version;
+        }
+        return history.reversed();
+    }
+
+    private @Nullable AccountRefDTO createdBy(PracticeVersion version) {
+        Long creator = version.getCreatedByAccountId();
+        return creator == null
+                ? null
+                : accounts.find(creator)
+                        .map(account -> accountReferences.reference(version.getWorkspaceId(), creator))
+                        .orElse(null);
+    }
 
     public PracticeDTO present(Long workspaceId, Practice practice) {
         return present(
@@ -46,7 +83,7 @@ public class CatalogOriginPresenter {
                 practice.getId().toString(),
                 practice.getSlug(),
                 practice.getKind().value(),
-                versions.viewCurrent(practice),
+                viewCurrent(practice),
                 practice.getGroup() == null ? null : practice.getGroup().getSlug(),
                 practice.getPosition(),
                 new FeedbackModeAssignmentDTO(practice.getFeedbackMode(), effective.mode(), effective.source()),
@@ -115,7 +152,7 @@ public class CatalogOriginPresenter {
 
     private CatalogOriginDTO origin(Practice practice, @Nullable EffectiveCatalog effectiveCatalog) {
         String source = practice.getCatalogSlug();
-        CatalogPracticeDocument base = versions.catalogBaseOf(practice);
+        CatalogPracticeDocument base = practice.getCatalogBase();
         if (source == null) return new CatalogOriginDTO(null, CatalogEntryState.YOURS, List.of(), null);
         var current = versions.definitionOf(practice.getCurrentVersion());
         var edits = Arrays.stream(PracticeDefinitionField.values())

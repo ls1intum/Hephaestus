@@ -1,11 +1,20 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.delivery.PracticePageSupportReader;
+import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackState;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
+import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,6 +22,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 class FeedbackBasisRepositoryIntegrationTest extends AbstractFeedbackIntegrationTest {
     @Autowired
     private FeedbackQueryRepository queries;
+
+    @Autowired
+    private PracticePageSupportReader support;
 
     @Test
     void shouldReadOnlyThisWorkspacesBasisInItsStoredOrder() {
@@ -54,5 +66,83 @@ class FeedbackBasisRepositoryIntegrationTest extends AbstractFeedbackIntegration
                 .containsExactlyInAnyOrder(ReviewOrigin.REQUEST, ReviewOrigin.BACKFILL);
         assertThat(queries.reviewOrigins(workspace.getId() + 1, List.of(reviewId, backfill)))
                 .isEmpty();
+    }
+
+    @Test
+    void shouldSelectThePracticeSupportWhenMoreThanOneHundredOtherResultsAreNewer() {
+        var expected = negativeResult();
+        var otherPractice = result();
+        for (int position = 1; position <= 100; position++) {
+            currentResultOnNewWork(otherPractice, AT.plusSeconds(position), position);
+        }
+        var samePracticeMet = resultBuilder(otherPractice)
+                .practiceId(expected.getPracticeId())
+                .practiceVersionId(expected.getPracticeVersionId())
+                .build();
+        currentResultOnNewWork(samePracticeMet, AT.plusSeconds(101), 101);
+        assertThat(support.select(workspace.getId(), developerId, expected.getPracticeId(), AT.plusSeconds(102))
+                        .evidence())
+                .extracting(Result::getId)
+                .containsExactly(expected.getId());
+        assertThatThrownBy(() -> support.select(
+                        workspace.getId() + 1, developerId, expected.getPracticeId(), AT.plusSeconds(102)))
+                .isInstanceOf(NoSuchElementException.class);
+    }
+
+    @Test
+    void shouldUseTheSuppliedTimeForThePracticeSupportLookback() {
+        var expected = negativeResult();
+        assertThat(support.select(
+                                workspace.getId(), developerId, expected.getPracticeId(), AT.plus(Duration.ofDays(90)))
+                        .evidence())
+                .isEmpty();
+        assertThat(support.select(workspace.getId(), developerId, expected.getPracticeId(), AT.plus(Duration.ofDays(1)))
+                        .evidence())
+                .extracting(Result::getId)
+                .containsExactly(expected.getId());
+    }
+
+    private void currentResultOnNewWork(Result template, Instant recordedAt, int sourceOffset) {
+        long nextItem = Objects.requireNonNull(jdbc.queryForObject(
+                "INSERT INTO item(workspace_id,kind,source_id,created_at) VALUES"
+                        + " (?,'scm.pull_request',?,?) RETURNING id",
+                Long.class,
+                workspace.getId(),
+                1000L + sourceOffset,
+                Timestamp.from(AT)));
+        var nextReview = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO"
+                        + " review(id,workspace_id,item_id,kind,item_version,origin,status,ordered_at,created_at)"
+                        + " SELECT"
+                        + " ?,workspace_id,?,'ITEM',item_version,origin,status,ordered_at,created_at"
+                        + " FROM review WHERE workspace_id=? AND id=?",
+                nextReview,
+                nextItem,
+                workspace.getId(),
+                template.getReviewId());
+        jdbc.update(
+                "INSERT INTO"
+                        + " review_practice(review_id,practice_id,workspace_id,practice_version_id,status,method)"
+                        + " SELECT ?,practice_id,workspace_id,practice_version_id,status,method FROM"
+                        + " review_practice WHERE workspace_id=? AND review_id=? AND practice_id=?",
+                nextReview,
+                workspace.getId(),
+                template.getReviewId(),
+                template.getPracticeId());
+        jdbc.update(
+                "INSERT INTO"
+                        + " review_item(review_id,practice_id,item_id,workspace_id,item_version,state)"
+                        + " VALUES (?,?,?,?,'v1','LISTED')",
+                nextReview,
+                template.getPracticeId(),
+                nextItem,
+                workspace.getId());
+        results.saveAndFlush(resultBuilder(template)
+                .id(UUID.randomUUID())
+                .itemId(nextItem)
+                .reviewId(nextReview)
+                .recordedAt(recordedAt)
+                .build());
     }
 }

@@ -24,7 +24,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommen
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.IssueEvidenceVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
@@ -34,7 +33,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,29 +78,6 @@ class IssueContentSourceTest extends BaseUnitTest {
                         issueCommentRepository, new IssueCommentProvenance(mock(DeliveredIssueCommentLookup.class))));
         lenient().when(issueCommentRepository.countByIssueId(ISSUE_ID)).thenReturn(0L);
         lenient().when(issueCommentRepository.findStoredByIssueId(ISSUE_ID)).thenReturn(List.of());
-    }
-
-    @Test
-    void shouldRegisterThePinnedIssueDescriptionWithExactStagedTextAndDigest() {
-        String words = "Issue description\n\"Quoted β\"";
-        var issue = richIssue();
-        issue.setBody(words);
-        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-        var captured = provider.capture(request(sampleMetadata(), issue), Set.of(CORE));
-        assertThat(captured.citableTexts())
-                .filteredOn(text -> text.path().equals(METADATA_KEY + "#/body"))
-                .singleElement()
-                .satisfies(text -> {
-                    assertThat(text.source()).isEqualTo(CORE.value());
-                    assertThat(captured.files().get(text.stagedPath()))
-                            .isEqualTo(words.getBytes(StandardCharsets.UTF_8));
-                    assertThat(text.sha256()).isEqualTo(ScmVersion.contentHash(words.getBytes(StandardCharsets.UTF_8)));
-                });
-        assertThat(captured.citableTexts())
-                .filteredOn(text -> text.path().equals("context/description.md"))
-                .singleElement()
-                .satisfies(text -> assertThat(captured.files().get(text.stagedPath()))
-                        .isEqualTo(words.getBytes(StandardCharsets.UTF_8)));
     }
 
     @Test
@@ -197,24 +172,6 @@ class IssueContentSourceTest extends BaseUnitTest {
         assertThat(captured.stateOverrides())
                 .containsEntry(CORE, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND))
                 .containsEntry(COMMENTS, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
-    }
-
-    @Test
-    void shouldCaptureMetadataWhenItStillMatchesTheAdmittedRevision() {
-        Issue issue = richIssue();
-        when(issueRepository.findByIdWithRepository(ISSUE_ID)).thenReturn(Optional.of(issue));
-        ObjectNode metadata = sampleMetadata();
-        metadata.put(
-                "itemVersion",
-                new IssueEvidenceVersion(
-                                issueCommentRepository,
-                                new IssueCommentProvenance(mock(DeliveredIssueCommentLookup.class)))
-                        .of(ScmEventPayload.IssueData.from(issue))
-                        .value());
-        Map<String, byte[]> files = new HashMap<>();
-        files.putAll(provider.capture(request(metadata, issue), provider.sourceKinds())
-                .files());
-        assertThat(files).containsKey(METADATA_KEY);
     }
 
     private ObjectNode sampleMetadata() {

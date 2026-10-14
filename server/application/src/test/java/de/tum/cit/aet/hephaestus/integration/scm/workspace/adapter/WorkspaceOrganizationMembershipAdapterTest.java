@@ -19,6 +19,9 @@ import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceActorSelector;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,7 +62,8 @@ class WorkspaceOrganizationMembershipAdapterTest extends BaseUnitTest {
                 roster,
                 organizationRepository,
                 teamMembershipRepository,
-                actorSelector);
+                actorSelector,
+                Clock.fixed(Instant.parse("2026-01-01T00:00:00Z"), ZoneOffset.UTC));
         Organization group = new Organization();
         group.setId(ORGANIZATION_ID);
         group.setLogin(GROUP);

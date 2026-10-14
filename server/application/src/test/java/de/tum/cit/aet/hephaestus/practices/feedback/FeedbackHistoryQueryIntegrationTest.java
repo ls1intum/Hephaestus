@@ -63,6 +63,44 @@ class FeedbackHistoryQueryIntegrationTest extends AbstractFeedbackIntegrationTes
     }
 
     @Test
+    void shouldExcludeHiddenSuspendedAndDepartedMembersFromHistory() {
+        var row = piece(FeedbackDestination.CONVERSATION, FeedbackState.READY, null);
+        assertThat(history.forDeveloper(workspace.getId(), developerId, AT.minusSeconds(1), 10))
+                .extracting(entry -> entry.feedbackId())
+                .containsExactly(row.getId());
+        jdbc.update(
+                "UPDATE membership SET hidden=true WHERE workspace_id=? AND account_id=?",
+                workspace.getId(),
+                developerId);
+        assertThat(history.forDeveloper(workspace.getId(), developerId, AT.minusSeconds(1), 10))
+                .isEmpty();
+        assertThat(history.forItem(workspace.getId(), itemId, developerId, 10)).isEmpty();
+        jdbc.update(
+                "UPDATE membership SET hidden=false WHERE workspace_id=? AND account_id=?",
+                workspace.getId(),
+                developerId);
+        try {
+            jdbc.update("UPDATE account SET status='SUSPENDED' WHERE id=?", developerId);
+            assertThat(history.forDeveloper(workspace.getId(), developerId, AT.minusSeconds(1), 10))
+                    .isEmpty();
+            assertThat(history.forItem(workspace.getId(), itemId, developerId, 10))
+                    .isEmpty();
+        } finally {
+            jdbc.update("UPDATE account SET status='ACTIVE' WHERE id=?", developerId);
+        }
+        assertThat(history.forDeveloper(workspace.getId(), developerId, AT.minusSeconds(1), 10))
+                .extracting(entry -> entry.feedbackId())
+                .containsExactly(row.getId());
+        jdbc.update(
+                "UPDATE membership SET left_at=now() WHERE workspace_id=? AND account_id=?",
+                workspace.getId(),
+                developerId);
+        assertThat(history.forDeveloper(workspace.getId(), developerId, AT.minusSeconds(1), 10))
+                .isEmpty();
+        assertThat(history.forItem(workspace.getId(), itemId, developerId, 10)).isEmpty();
+    }
+
+    @Test
     void shouldRedactUnavailableEvidenceWhileRetainingTheRecordedDeliveryState() {
         var row = piece(FeedbackDestination.PRACTICE_PAGE, FeedbackState.DELIVERED, AT);
         var proof = result();

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.response.FeedbackResponse;
@@ -42,11 +43,12 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
     private final ResultHistoryQuery history;
     private final FeedbackQueryRepository queries;
     private final FeedbackPublicHistory publicHistoryReader;
+    private final AccountMembershipQuery memberships;
 
     @Override
     public List<FeedbackHistoryEntry> forDeveloper(
             long workspaceId, long developerAccountId, Instant since, int limit) {
-        if (!queries.member(workspaceId, developerAccountId)) return List.of();
+        if (!memberships.isActiveVisibleMember(workspaceId, developerAccountId)) return List.of();
         Specification<Feedback> selected = (row, query, cb) -> cb.and(
                 cb.equal(row.get("workspaceId"), workspaceId),
                 cb.equal(row.get("developerId"), developerAccountId),
@@ -56,7 +58,7 @@ public class FeedbackHistoryQueryService implements FeedbackHistoryQuery {
 
     @Override
     public List<FeedbackHistoryEntry> forItem(long workspaceId, long itemId, long viewerAccountId, int limit) {
-        if (!queries.member(workspaceId, viewerAccountId)) return List.of();
+        if (!memberships.isActiveVisibleMember(workspaceId, viewerAccountId)) return List.of();
         Specification<Feedback> selected = (row, query, cb) -> cb.and(
                 cb.equal(row.get("workspaceId"), workspaceId),
                 cb.equal(row.get("itemId"), itemId),

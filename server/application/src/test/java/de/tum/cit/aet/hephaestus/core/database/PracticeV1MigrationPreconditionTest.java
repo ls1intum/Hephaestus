@@ -18,8 +18,8 @@ class PracticeV1MigrationPreconditionTest {
         var cases = new Corruption[] {
             new Corruption(
                     "UPDATE feedback_dispatch SET"
-                            + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
-                            + " WHERE id='00000000-0000-0000-0000-000000992241'",
+                        + " state='CLAIMED',lease_owner='released-worker',lease_expires_at=now()+interval '1 minute'"
+                        + " WHERE id='00000000-0000-0000-0000-000000992241'",
                     "SQL Precondition failed",
                     "UPDATE feedback_dispatch SET state='PENDING',lease_owner=NULL,lease_expires_at=NULL WHERE"
                             + " id='00000000-0000-0000-0000-000000992241'"),
@@ -47,9 +47,10 @@ class PracticeV1MigrationPreconditionTest {
                     "UPDATE observation SET evidence=jsonb_set(evidence,'{citations}','[]'::jsonb) WHERE"
                             + " id='00000000-0000-0000-0000-000000992141'"),
             new Corruption(
-                    "UPDATE observation SET evidence=jsonb_set(evidence,'{citations,0,commit}',to_jsonb(repeat('b',40)))"
-                            + " WHERE id='00000000-0000-0000-0000-000000992141'",
-                    "legacy citation commits conflict",
+                    "UPDATE observation SET"
+                            + " evidence=jsonb_set(evidence,'{citations,0,commit}',to_jsonb(repeat('b',40))) WHERE"
+                            + " id='00000000-0000-0000-0000-000000992141'",
+                    "released citation commits conflict",
                     "UPDATE observation SET evidence=evidence #- '{citations,0,commit}'"
                             + " WHERE id='00000000-0000-0000-0000-000000992141'")
         };
@@ -63,6 +64,12 @@ class PracticeV1MigrationPreconditionTest {
             throws Exception {
         var database = PracticeMigrationFixture.releasedDatabase(context);
         PracticeMigrationFixture.execute(database, corruption.seed());
+        String auditFacts = "SELECT to_jsonb(e)::text FROM config_audit_event e"
+                + " WHERE id BETWEEN 995901 AND 995907 ORDER BY id";
+        String auditGuard = "SELECT tgenabled::text FROM pg_trigger"
+                + " WHERE tgrelid='config_audit_event'::regclass AND tgname='trg_config_audit_event_block_mutation'";
+        var sourceAudit = PracticeMigrationFixture.column(database, auditFacts);
+        var sourceGuard = PracticeMigrationFixture.column(database, auditGuard);
         assertThatThrownBy(() -> PracticeMigrationFixture.upgrade(database, context))
                 .hasMessageContaining(corruption.reason());
         assertThat(PracticeMigrationFixture.column(
@@ -80,6 +87,8 @@ class PracticeV1MigrationPreconditionTest {
         assertThat(PracticeMigrationFixture.column(
                         database, "SELECT locked::text FROM databasechangeloglock WHERE id=1"))
                 .containsExactly("false");
+        assertThat(PracticeMigrationFixture.column(database, auditFacts)).isEqualTo(sourceAudit);
+        assertThat(PracticeMigrationFixture.column(database, auditGuard)).isEqualTo(sourceGuard);
         PracticeMigrationFixture.execute(database, corruption.repair());
         PracticeMigrationFixture.upgrade(database, context);
         assertThat(PracticeMigrationFixture.column(

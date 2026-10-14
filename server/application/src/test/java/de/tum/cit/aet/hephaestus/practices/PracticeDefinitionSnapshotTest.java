@@ -21,7 +21,8 @@ class PracticeDefinitionSnapshotTest extends BaseUnitTest {
         practice.setSlug("private-script");
         practice.setKind(new ItemKind("scm.pull_request"));
         practice.setCurrentVersion(version);
-        var snapshot = PracticeDefinitionSnapshot.of(practice);
+        var snapshot =
+                PracticeDefinitionSnapshot.of(practice, JsonMapper.builder().build());
         var json = JsonMapper.builder().build().valueToTree(snapshot);
         assertThat(snapshot.versionId()).isEqualTo(17L);
         assertThat(json.propertyNames())

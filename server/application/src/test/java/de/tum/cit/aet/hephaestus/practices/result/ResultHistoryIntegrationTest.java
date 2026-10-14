@@ -30,8 +30,11 @@ import java.util.Objects;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Import;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -48,6 +51,9 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     ResultRepository read;
+
+    @Autowired
+    JdbcTemplate jdbc;
 
     @Autowired
     ResultMarkService marks;
@@ -88,6 +94,34 @@ class ResultHistoryIntegrationTest extends BaseIntegrationTest {
         when(authorization.custody(any()))
                 .thenReturn(new HistoryCustody(true, List.of(), List.of(), List.of(UUID.randomUUID())));
         when(authorization.authorized(any(), any(), any())).thenReturn(true);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"hidden", "left", "suspended"})
+    void shouldDenyHistoryWhenMembershipIsNotActiveAndVisible(String restriction) {
+        var result = data.result(scenario, ResultOutcome.MET, Instant.now());
+        switch (restriction) {
+            case "hidden" ->
+                jdbc.update(
+                        "UPDATE membership SET hidden=true WHERE workspace_id=? AND account_id=?",
+                        result.getWorkspaceId(),
+                        scenarioAccountId);
+            case "left" ->
+                jdbc.update(
+                        "UPDATE membership SET left_at=now() WHERE workspace_id=? AND account_id=?",
+                        result.getWorkspaceId(),
+                        scenarioAccountId);
+            case "suspended" -> jdbc.update("UPDATE account SET status='SUSPENDED' WHERE id=?", scenarioAccountId);
+            default -> throw new IllegalArgumentException(restriction);
+        }
+        assertThat(history.forDeveloper(result.getWorkspaceId(), scenarioAccountId, Instant.EPOCH, 20))
+                .isEmpty();
+        assertThat(history.find(
+                        result.getWorkspaceId(),
+                        result.getId(),
+                        scenarioAccountId,
+                        SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW))
+                .isEmpty();
     }
 
     @Test

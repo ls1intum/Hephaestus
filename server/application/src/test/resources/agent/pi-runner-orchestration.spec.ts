@@ -23,16 +23,16 @@ import type {
 	ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
+import { isJsonObject as isRecord } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import {
 	addModelCall,
 	newModelCallTiming,
 } from "../../../main/resources/agent/pi-model-failure.ts";
-import { isRecord } from "../../../main/resources/agent/pi-text.ts";
 import { GOLDEN_INPUTS, PRACTICES_DIR } from "./golden-review-workspace.ts";
 
 // Each child process mocks the SDK and drives one isolated review through runReviewJob.
 
-import { mockPiCodingAgent } from "./program-host-runner.ts";
+import { mockChange, mockPiCodingAgent } from "./program-host-runner.ts";
 
 const LIB = nodePath.resolve(
 	import.meta.dirname,
@@ -79,7 +79,7 @@ const admittedChild = (problemId: string, citation: unknown = admittedCitation) 
 });
 
 const admittedResult = {
-	resultId: "result-1",
+	resultId: "00000000-0000-4000-8000-000000000001",
 	practiceSlug: "test-practice",
 	outcome: "NOT_MET",
 	summary: "Added authentication call is insecure",
@@ -537,7 +537,11 @@ const withhold = (
 	destination: string,
 	practiceSlug: string,
 	withholdReason: string,
-	basedOn = [practiceSlug === "test-practice" ? "result-1" : "result-2"],
+	basedOn = [
+		practiceSlug === "test-practice"
+			? "00000000-0000-4000-8000-000000000001"
+			: "00000000-0000-4000-8000-000000000002",
+	],
 ) => ({
 	destination,
 	practiceSlug,
@@ -586,15 +590,10 @@ if (scenario !== undefined && scenario !== "") {
 	let now = 1_000_000;
 	mock.method(Date, "now", () => now);
 	const record = (event: string) => appendFileSync(nodePath.join(cwd, "events"), `${event}\n`);
-	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
-	const derived: unknown = await import(change);
-	assert.ok(typeof derived === "object" && derived !== null);
-	mock.module(change, {
-		namedExports: { ...derived, writeChangeView: () => record("derive-change") },
-	});
+	await mockChange({ writeChangeView: () => record("derive-change") });
 	const secondNotMet = {
 		...admittedResult,
-		resultId: "result-2",
+		resultId: "00000000-0000-4000-8000-000000000002",
 		practiceSlug: "second-practice",
 		problems: [admittedChild("problem-2")],
 	};
@@ -622,7 +621,7 @@ if (scenario !== undefined && scenario !== "") {
 					return {
 						...admittedResult,
 						...candidate,
-						resultId: `result-${ids.indexOf(String(posted.practiceSlug)) + 1}`,
+						resultId: `00000000-0000-4000-8000-${String(ids.indexOf(String(posted.practiceSlug)) + 1).padStart(12, "0")}`,
 						practiceSlug: posted.practiceSlug,
 						severity: null,
 						citations: listOf(candidate.citations).map((citation, index) => ({
@@ -636,10 +635,17 @@ if (scenario !== undefined && scenario !== "") {
 			}
 			case "compose-already-said": {
 				// Two NOT_MET practices, and MET counterevidence of another practice without delivered history.
-				return [admittedResult, secondNotMet, metResult("result-3", "counter-practice")];
+				return [
+					admittedResult,
+					secondNotMet,
+					metResult("00000000-0000-4000-8000-000000000003", "counter-practice"),
+				];
 			}
 			case "compose-reselect": {
-				return [admittedResult, metResult("result-2", "second-practice")];
+				return [
+					admittedResult,
+					metResult("00000000-0000-4000-8000-000000000002", "second-practice"),
+				];
 			}
 			case "compose-partial-error":
 			case "compose-qualify":
@@ -649,7 +655,7 @@ if (scenario !== undefined && scenario !== "") {
 					counterevidence
 						? {
 								...metResult(
-									"result-2",
+									"00000000-0000-4000-8000-000000000002",
 									scenario === "compose-qualify" ? "test-practice" : "second-practice",
 								),
 								publicEligible: !reviewerOnly,
@@ -668,7 +674,7 @@ if (scenario !== undefined && scenario !== "") {
 						? [
 								{
 									...abstention(
-										"qualification-und",
+										"00000000-0000-4000-8000-000000000011",
 										"request-scope-practice",
 										"src/RequestScope.java",
 										41,
@@ -690,7 +696,7 @@ if (scenario !== undefined && scenario !== "") {
 								},
 								{
 									...abstention(
-										"qualification-na",
+										"00000000-0000-4000-8000-000000000012",
 										"external-interface-practice",
 										"src/ExternalInterface.java",
 										73,
@@ -719,7 +725,7 @@ if (scenario !== undefined && scenario !== "") {
 					},
 					{
 						...admittedResult,
-						resultId: "result-history",
+						resultId: "00000000-0000-4000-8000-000000000010",
 						summary: PRIVATE_HISTORY_SENTENCE,
 						explanation: PRIVATE_HISTORY_SENTENCE,
 						publicEligible: false,
@@ -738,7 +744,7 @@ if (scenario !== undefined && scenario !== "") {
 				];
 			}
 			case "compose-empty": {
-				return [metResult("result-1", "test-practice")];
+				return [metResult("00000000-0000-4000-8000-000000000001", "test-practice")];
 			}
 			case "compose-unknown-outcome": {
 				return [{ ...admittedResult, outcome: "PASSED" }];
@@ -1719,8 +1725,13 @@ if (scenario !== undefined && scenario !== "") {
 											.slice(from)
 											.map((message) => ["report_review"].filter((name) => message.includes(name)));
 									const said = {
-										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
+										decisions: [
+											{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+										],
+										summary: {
+											body: REVIEW_SUMMARY,
+											basedOn: ["00000000-0000-4000-8000-000000000001"],
+										},
 									};
 									const decidesNothing = { decisions: [] };
 									record(`invalid-report:${await native("report_review", "r-1", decidesNothing)}`);
@@ -1738,13 +1749,24 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-qualify" && reviewCompacted) {
 									const raised = {
-										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
+										decisions: [
+											{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+										],
+										summary: {
+											body: REVIEW_SUMMARY,
+											basedOn: ["00000000-0000-4000-8000-000000000001"],
+										},
 									};
 									record(
 										`mixed-met:${await attempt("r-met", {
 											...raised,
-											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1", "result-2"] },
+											summary: {
+												body: REVIEW_SUMMARY,
+												basedOn: [
+													"00000000-0000-4000-8000-000000000001",
+													"00000000-0000-4000-8000-000000000002",
+												],
+											},
 										})}`,
 									);
 									emit({
@@ -1772,16 +1794,27 @@ if (scenario !== undefined && scenario !== "") {
 									writeFileSync(
 										nodePath.join(cwd, "qualification-refused.txt"),
 										await attempt("r-q1", {
-											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
+											decisions: [
+												{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+											],
+											summary: {
+												body: REVIEW_SUMMARY,
+												basedOn: ["00000000-0000-4000-8000-000000000001"],
+											},
 										}),
 									);
 									record(
 										`qualification-stored:${await attempt("r-q", {
-											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
+											summary: {
+												body: REVIEW_SUMMARY,
+												basedOn: ["00000000-0000-4000-8000-000000000001"],
+											},
 											decisions: [
-												{ resultId: "result-1", disposition: "RAISE" },
-												{ resultId: "result-2", disposition: "BELOW_BAR" },
+												{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+												{
+													resultId: "00000000-0000-4000-8000-000000000002",
+													disposition: "BELOW_BAR",
+												},
 											],
 										})}`,
 									);
@@ -1796,8 +1829,13 @@ if (scenario !== undefined && scenario !== "") {
 									// The composer leaves a problem undecided, then withholds it naming no witness, and then
 									// sends the corrected whole review.
 									const said = {
-										decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-										summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
+										decisions: [
+											{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+										],
+										summary: {
+											body: REVIEW_SUMMARY,
+											basedOn: ["00000000-0000-4000-8000-000000000001"],
+										},
 									};
 									await this.steer();
 									record(`reselect-incomplete:${await attempt("r-0", { decisions: [] })}`);
@@ -1805,13 +1843,24 @@ if (scenario !== undefined && scenario !== "") {
 									record(`reselect-retained:${this.pendingMessageCount}`);
 									record(
 										`reselect-unwitnessed:${await attempt("r-1", {
-											decisions: [{ resultId: "result-1", disposition: "ALREADY_SAID" }],
+											decisions: [
+												{
+													resultId: "00000000-0000-4000-8000-000000000001",
+													disposition: "ALREADY_SAID",
+												},
+											],
 										})}`,
 									);
 									record(
 										`reselect-met:${await attempt("r-met", {
 											...said,
-											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1", "result-2"] },
+											summary: {
+												body: REVIEW_SUMMARY,
+												basedOn: [
+													"00000000-0000-4000-8000-000000000001",
+													"00000000-0000-4000-8000-000000000002",
+												],
+											},
 										})}`,
 									);
 									record(`reselect-final:${await attempt("r-2", said)}`);
@@ -1824,7 +1873,12 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "compose-complete-error") {
 									record(
 										`complete-final:${await attempt("r-e", {
-											decisions: [{ resultId: "result-1", disposition: "BELOW_BAR" }],
+											decisions: [
+												{
+													resultId: "00000000-0000-4000-8000-000000000001",
+													disposition: "BELOW_BAR",
+												},
+											],
 										})}`,
 									);
 									emit({
@@ -1836,8 +1890,13 @@ if (scenario !== undefined && scenario !== "") {
 								if (scenario === "compose" || scenario === "compose-foreign-provider") {
 									record(
 										`review-refused:${await attempt("r-1", {
-											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-											summary: { body: "Fine. <!-- marker -->", basedOn: ["result-1"] },
+											decisions: [
+												{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+											],
+											summary: {
+												body: "Fine. <!-- marker -->",
+												basedOn: ["00000000-0000-4000-8000-000000000001"],
+											},
 											inline: [
 												{
 													body: "On this line.",
@@ -1849,14 +1908,24 @@ if (scenario !== undefined && scenario !== "") {
 									);
 									record(
 										`review-history:${await attempt("r-h", {
-											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-											summary: { body: "A sentence.", basedOn: ["result-history"] },
+											decisions: [
+												{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+											],
+											summary: {
+												body: "A sentence.",
+												basedOn: ["00000000-0000-4000-8000-000000000010"],
+											},
 										})}`,
 									);
 									record(
 										`review-stored:${await attempt("r-2", {
-											decisions: [{ resultId: "result-1", disposition: "RAISE" }],
-											summary: { body: REVIEW_SUMMARY, basedOn: ["result-1"] },
+											decisions: [
+												{ resultId: "00000000-0000-4000-8000-000000000001", disposition: "RAISE" },
+											],
+											summary: {
+												body: REVIEW_SUMMARY,
+												basedOn: ["00000000-0000-4000-8000-000000000001"],
+											},
 											inline: [
 												{
 													body: "`insecure()` runs here before the token is checked; call the checked helper instead.",
@@ -1874,8 +1943,11 @@ if (scenario !== undefined && scenario !== "") {
 										scenario === "compose-partial-error" ||
 										scenario === "compose-already-said") &&
 									!counterevidence
-										? ["result-1", "result-2"]
-										: ["result-1"];
+										? [
+												"00000000-0000-4000-8000-000000000001",
+												"00000000-0000-4000-8000-000000000002",
+											]
+										: ["00000000-0000-4000-8000-000000000001"];
 								const decisions = ids.map((resultId) => ({
 									resultId,
 									disposition: "BELOW_BAR",
@@ -1886,7 +1958,7 @@ if (scenario !== undefined && scenario !== "") {
 											decisions,
 											summary: {
 												body: "A limit is not a concern.",
-												basedOn: ["qualification-und"],
+												basedOn: ["00000000-0000-4000-8000-000000000011"],
 											},
 										})}`,
 									);
@@ -1925,7 +1997,7 @@ if (scenario !== undefined && scenario !== "") {
 										{
 											destination: "PRACTICE_PAGE",
 											practiceSlug: "test-practice",
-											basedOn: ["result-1"],
+											basedOn: ["00000000-0000-4000-8000-000000000001"],
 											action: "WITHHOLD",
 											withholdReason: "BELOW_BAR",
 										},
@@ -2105,12 +2177,15 @@ if (scenario !== undefined && scenario !== "") {
 								}
 								if (scenario === "compose-already-said") {
 									const feedback = tool("report_feedback");
-									const both = ["result-1", "result-2"];
+									const both = [
+										"00000000-0000-4000-8000-000000000001",
+										"00000000-0000-4000-8000-000000000002",
+									];
 									const first = await feedback.execute("said", {
 										feedback: [
 											withhold("CONVERSATION", "second-practice", "NO_MATERIAL_CHANGE", [
-												"result-2",
-												"result-1",
+												"00000000-0000-4000-8000-000000000002",
+												"00000000-0000-4000-8000-000000000001",
 											]),
 											withhold("CONVERSATION", "test-practice", "ALREADY_SAID"),
 											withhold("PRACTICE_PAGE", "test-practice", "ALREADY_SAID", both),
@@ -2121,8 +2196,8 @@ if (scenario !== undefined && scenario !== "") {
 										feedback: [
 											withhold("CONVERSATION", "test-practice", "NO_MATERIAL_CHANGE"),
 											withhold("CONVERSATION", "second-practice", "NO_MATERIAL_CHANGE", [
-												"result-2",
-												"result-3",
+												"00000000-0000-4000-8000-000000000002",
+												"00000000-0000-4000-8000-000000000003",
 											]),
 											withhold("CONVERSATION", "test-practice", "BELOW_BAR"),
 										],
@@ -2136,7 +2211,12 @@ if (scenario !== undefined && scenario !== "") {
 											{
 												destination: "PRACTICE_PAGE",
 												practiceSlug: "test-practice",
-												basedOn: ["result-1", "result-2", "qualification-und", "qualification-na"],
+												basedOn: [
+													"00000000-0000-4000-8000-000000000001",
+													"00000000-0000-4000-8000-000000000002",
+													"00000000-0000-4000-8000-000000000011",
+													"00000000-0000-4000-8000-000000000012",
+												],
 												action: "WITHHOLD",
 												withholdReason: "BELOW_BAR",
 											},
@@ -3309,12 +3389,12 @@ if (scenario !== undefined && scenario !== "") {
 									: {
 											...SERVER_COMPOSITION_REQUEST,
 											destinations: {
-												PRACTICE_PAGE: { enabled: true, maxPieces: 1 },
-												ON_WORK: { enabled: true, maxPieces: 1 },
-												...(stage === "compose-support" || stage === "compose-already-said"
+												PRACTICE_PAGE: { maxPieces: 1 },
+												ON_WORK: { maxPieces: 1 },
+												...((stage === "compose-support" || stage === "compose-already-said") &&
+												fixture !== "compose-support-refused-only"
 													? {
 															CONVERSATION: {
-																enabled: fixture !== "compose-support-refused-only",
 																maxPieces: 1,
 															},
 														}
@@ -3770,7 +3850,12 @@ if (scenario !== undefined && scenario !== "") {
 						assert.ok(isRecord(feedback));
 						assert.deepEqual(
 							listOf(feedback.results).map((row) => recordOf(row).resultId),
-							["result-1", "result-2", "qualification-und", "qualification-na"],
+							[
+								"00000000-0000-4000-8000-000000000001",
+								"00000000-0000-4000-8000-000000000002",
+								"00000000-0000-4000-8000-000000000011",
+								"00000000-0000-4000-8000-000000000012",
+							],
 						);
 						assert.ok(Array.isArray(feedback.feedback) && feedback.feedback.length > 0);
 						assert.ok(
@@ -4051,7 +4136,7 @@ if (scenario !== undefined && scenario !== "") {
 							// A refused review is not a review: nothing is left to deliver on the work.
 							assert.match(
 								events.find((event) => event.startsWith("refused-only:")) ?? "",
-								/review refused, nothing was stored:[\s\S]*result-1 has no decision/u,
+								/review refused, nothing was stored:[\s\S]*00000000-0000-4000-8000-000000000001 has no decision/u,
 							);
 							const feedback: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),
@@ -4249,7 +4334,7 @@ for (const item of [
   { ...base, problems: [{ ...problem, citations: [] }] },
   { ...base, problems: [{ ...problem, citations: [without(citation, "sourcePath")] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, sourcePath: "" }] }] },
-  { ...base, problems: [{ ...problem, citations: [{ ...citation, sourceKind: "hephaestus.result-history" }] }] },
+  { ...base, problems: [{ ...problem, citations: [{ ...citation, sourceKind: "hephaestus.00000000-0000-4000-8000-000000000010" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, side: "MIDDLE" }] }] },
   { ...base, problems: [{ ...problem, citations: [{ ...citation, startLine: 0 }] }] },
 ]) {
@@ -5034,11 +5119,12 @@ for (const item of nullableCases) {
 							// The captured record of this same work comes first, and the measurement task never.
 							const record = reviewTurn.indexOf('"title": "Add login"');
 							assert.ok(
-								record !== -1 && record < reviewTurn.indexOf('"resultId": "result-1"'),
+								record !== -1 &&
+									record < reviewTurn.indexOf('"resultId": "00000000-0000-4000-8000-000000000001"'),
 								reviewTurn,
 							);
 							assert.match(reviewTurn, /linked_work_items\.json[^\n]*not part of this capture/u);
-							assert.match(reviewTurn, /"resultId": "result-1"/u);
+							assert.match(reviewTurn, /"resultId": "00000000-0000-4000-8000-000000000001"/u);
 							assert.match(reviewTurn, /"problemId": "problem-1"/u);
 							assert.match(reviewTurn, /"quote": "\+ insecure\(\);"/u);
 							if (
@@ -5063,13 +5149,15 @@ for (const item of nullableCases) {
 							});
 							const standard = reviewTurn.indexOf("```markdown\n# Test practice\nCriteria.\n```");
 							assert.ok(
-								record < standard && standard < reviewTurn.indexOf('"resultId": "result-1"'),
+								record < standard &&
+									standard <
+										reviewTurn.indexOf('"resultId": "00000000-0000-4000-8000-000000000001"'),
 								reviewTurn,
 							);
 							assert.equal(reviewTurn.split("# Test practice\nCriteria.").length, 2, reviewTurn);
 							assert.ok(!reviewTurn.includes(PRIVATE_HISTORY_SENTENCE), reviewTurn);
 							assert.ok(!reviewTurn.includes("problem-history"), reviewTurn);
-							assert.ok(!reviewTurn.includes("result-history"), reviewTurn);
+							assert.ok(!reviewTurn.includes("00000000-0000-4000-8000-000000000010"), reviewTurn);
 							assert.ok(!reviewTurn.includes("Review the practice."), reviewTurn);
 							assert.match(
 								events.find((event) => event.startsWith("review-refused:")) ?? "",
@@ -5077,7 +5165,7 @@ for (const item of nullableCases) {
 							);
 							assert.match(
 								events.find((event) => event.startsWith("review-history:")) ?? "",
-								/result-history, which is not one of the NOT_MET results or problems this review may rest on/u,
+								/00000000-0000-4000-8000-000000000010, which is not one of the NOT_MET results or problems this review may rest on/u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("review-stored:")) ?? "",
@@ -5130,7 +5218,7 @@ for (const item of nullableCases) {
 								second,
 								/Compose from admitted problems|How submit_result takes/u,
 							);
-							assert.match(second, /"resultId": "result-1"/u);
+							assert.match(second, /"resultId": "00000000-0000-4000-8000-000000000001"/u);
 							assert.match(second, /"problemId": "problem-1"/u);
 							// The quoted lines and the verification records stay on disk, where the composer
 							// can read them if needed; the search it recorded is still shown.
@@ -5140,7 +5228,11 @@ for (const item of nullableCases) {
 							// measuring leads or a sibling's criteria; the staged files stay readable.
 							const criteriaAt = composerTurn.indexOf("# Test practice\nCriteria.");
 							assert.ok(criteriaAt !== -1, composerTurn);
-							assert.ok(criteriaAt < composerTurn.indexOf('"resultId": "result-1"'), composerTurn);
+							assert.ok(
+								criteriaAt <
+									composerTurn.indexOf('"resultId": "00000000-0000-4000-8000-000000000001"'),
+								composerTurn,
+							);
 							assert.doesNotMatch(
 								composerTurn,
 								/Leads from the practice script|insecure call: |Complete second criterion/u,
@@ -5260,11 +5352,16 @@ for (const item of nullableCases) {
 							assert.ok(isRecord(pieces[0]) && pieces[0].destination === "PRACTICE_PAGE");
 							// The review as stored: the summary verbatim, the note on its cited line.
 							assert.deepEqual(Reflect.get(feedback, "review"), {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
+								summary: {
+									body: REVIEW_SUMMARY,
+									basedOn: [{ resultId: "00000000-0000-4000-8000-000000000001" }],
+								},
 								inline: [
 									{
 										body: "`insecure()` runs here before the token is checked; call the checked helper instead.",
-										basedOn: [{ resultId: "result-1", problemId: "problem-1" }],
+										basedOn: [
+											{ resultId: "00000000-0000-4000-8000-000000000001", problemId: "problem-1" },
+										],
 										anchor: { problemId: "problem-1", citationIndex: 0 },
 									},
 								],
@@ -5323,7 +5420,7 @@ for (const item of nullableCases) {
 							assert.equal(events.filter((event) => event === "steer").length, 1);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-finish:")) ?? "",
-								/#1: basedOn is required: [^;]*\(test-practice's results: result-1\); skipped\./u,
+								/#1: basedOn is required: [^;]*\(test-practice's results: 00000000-0000-4000-8000-000000000001\); skipped\./u,
 							);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-finish:")) ?? "",
@@ -5375,7 +5472,7 @@ for (const item of nullableCases) {
 							for (const label of ["invalid-report", "invalid-again"]) {
 								assert.match(
 									said(label),
-									/review refused, nothing was stored:[\s\S]*result-1 has no decision/u,
+									/review refused, nothing was stored:[\s\S]*00000000-0000-4000-8000-000000000001 has no decision/u,
 								);
 							}
 							assert.equal(
@@ -5395,7 +5492,10 @@ for (const item of nullableCases) {
 							);
 							assert.ok(isRecord(feedback));
 							assert.deepEqual(feedback.review, {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
+								summary: {
+									body: REVIEW_SUMMARY,
+									basedOn: [{ resultId: "00000000-0000-4000-8000-000000000001" }],
+								},
 								inline: [],
 								withheld: [],
 							});
@@ -5430,7 +5530,7 @@ for (const item of nullableCases) {
 							// The retry holds only what is owed and how to finish.
 							const retry = prompts.find((prompt) => prompt.startsWith("## Undecided"));
 							assert.ok(retry !== undefined, events.join("\n"));
-							assert.ok(retry.includes("result-1"), retry);
+							assert.ok(retry.includes("00000000-0000-4000-8000-000000000001"), retry);
 							assert.ok(!retry.includes(staged), retry);
 							break;
 						}
@@ -5459,10 +5559,13 @@ for (const item of nullableCases) {
 									),
 									reviewTurn,
 								);
-								assert.ok(!reviewTurn.includes('"resultId": "result-2"'), reviewTurn);
+								assert.ok(
+									!reviewTurn.includes('"resultId": "00000000-0000-4000-8000-000000000002"'),
+									reviewTurn,
+								);
 								assert.match(
 									events.find((event) => event.startsWith("mixed-met:")) ?? "",
-									/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or problems this review may rest on/u,
+									/review refused, nothing was stored:[\s\S]*basedOn names 00000000-0000-4000-8000-000000000002, which is not one of the NOT_MET results or problems this review may rest on/u,
 								);
 								const refused = readToolText(nodePath.join(cwd, "compacted-refused.txt"));
 								assert.match(
@@ -5484,7 +5587,10 @@ for (const item of nullableCases) {
 								);
 								assert.ok(isRecord(stored));
 								assert.deepEqual(stored.review, {
-									summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
+									summary: {
+										body: REVIEW_SUMMARY,
+										basedOn: [{ resultId: "00000000-0000-4000-8000-000000000001" }],
+									},
 									inline: [],
 									withheld: [],
 								});
@@ -5497,7 +5603,7 @@ for (const item of nullableCases) {
 							const refused = readFileSync(nodePath.join(cwd, "qualification-refused.txt"), "utf8");
 							assert.match(
 								refused,
-								/review refused, nothing was stored:[\s\S]*result-2 has no decision/u,
+								/review refused, nothing was stored:[\s\S]*00000000-0000-4000-8000-000000000002 has no decision/u,
 							);
 							for (const standard of standards) {
 								assert.ok(!refused.includes(standard), refused);
@@ -5512,9 +5618,17 @@ for (const item of nullableCases) {
 							assert.ok(isRecord(feedback));
 							assert.equal(feedback.admissionDigest, "admitted-digest");
 							assert.deepEqual(feedback.review, {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
+								summary: {
+									body: REVIEW_SUMMARY,
+									basedOn: [{ resultId: "00000000-0000-4000-8000-000000000001" }],
+								},
 								inline: [],
-								withheld: [{ basedOn: [{ resultId: "result-2" }], reason: "BELOW_BAR" }],
+								withheld: [
+									{
+										basedOn: [{ resultId: "00000000-0000-4000-8000-000000000002" }],
+										reason: "BELOW_BAR",
+									},
+								],
 							});
 							assert.ok(events.includes("qualification:canonical-unchanged"), events.join("\n"));
 							reached({ "test-practice": "EVALUATED", "second-practice": "EVALUATED" });
@@ -5531,7 +5645,7 @@ for (const item of nullableCases) {
 							assert.ok(events.includes("reselect-retained:1"), events.join("\n"));
 							assert.match(
 								said("reselect-incomplete"),
-								/review refused, nothing was stored:[\s\S]*result-1 has no decision/u,
+								/review refused, nothing was stored:[\s\S]*00000000-0000-4000-8000-000000000001 has no decision/u,
 							);
 							// A prior-advice reason with no statement to name is refused whole, not stored without it.
 							assert.match(
@@ -5569,7 +5683,7 @@ for (const item of nullableCases) {
 							assert.equal(events.filter((event) => event === "native-finish-turn").length, 2);
 							assert.match(
 								said("reselect-met"),
-								/review refused, nothing was stored:[\s\S]*basedOn names result-2, which is not one of the NOT_MET results or problems this review may rest on/u,
+								/review refused, nothing was stored:[\s\S]*basedOn names 00000000-0000-4000-8000-000000000002, which is not one of the NOT_MET results or problems this review may rest on/u,
 							);
 							assert.match(
 								said("reselect-after-review"),
@@ -5599,7 +5713,10 @@ for (const item of nullableCases) {
 							);
 							assert.ok(isRecord(feedback));
 							assert.deepEqual(feedback.review, {
-								summary: { body: REVIEW_SUMMARY, basedOn: [{ resultId: "result-1" }] },
+								summary: {
+									body: REVIEW_SUMMARY,
+									basedOn: [{ resultId: "00000000-0000-4000-8000-000000000001" }],
+								},
 								inline: [],
 								withheld: [],
 							});
@@ -5653,9 +5770,13 @@ for (const item of nullableCases) {
 									return `${String(piece.destination)}:${String(piece.practiceSlug)}:${String(piece.withholdReason)}:${refs.join("+")}`;
 								}),
 								[
-									"PRACTICE_PAGE:test-practice:ALREADY_SAID:result-1+result-2",
-									"CONVERSATION:second-practice:NO_MATERIAL_CHANGE:result-2+result-3",
-									...(inline ? [] : ["CONVERSATION:test-practice:BELOW_BAR:result-1"]),
+									"PRACTICE_PAGE:test-practice:ALREADY_SAID:00000000-0000-4000-8000-000000000001+00000000-0000-4000-8000-000000000002",
+									"CONVERSATION:second-practice:NO_MATERIAL_CHANGE:00000000-0000-4000-8000-000000000002+00000000-0000-4000-8000-000000000003",
+									...(inline
+										? []
+										: [
+												"CONVERSATION:test-practice:BELOW_BAR:00000000-0000-4000-8000-000000000001",
+											]),
 								],
 							);
 							assert.deepEqual(payload.compositionFailures, []);
@@ -5743,12 +5864,14 @@ for (const item of nullableCases) {
 								}
 								assert.ok(limits.includes("+ unresolvedCurrentRequest();"));
 								assert.ok(limits.includes("+ unchangedInterface();"));
-								assert.ok(!publicTurn.includes("qualification-und"));
-								assert.ok(privateTurn.includes('"resultId": "qualification-und"'));
+								assert.ok(!publicTurn.includes("00000000-0000-4000-8000-000000000011"));
+								assert.ok(
+									privateTurn.includes('"resultId": "00000000-0000-4000-8000-000000000011"'),
+								);
 								assert.doesNotMatch(privateTurn, /"quote"|"verification"/u);
 								assert.match(
 									events.find((event) => event.startsWith("qualification-support:")) ?? "",
-									/qualification-und, which is not one of the NOT_MET results or problems this review may rest on/u,
+									/00000000-0000-4000-8000-000000000011, which is not one of the NOT_MET results or problems this review may rest on/u,
 								);
 								const restored =
 									events.find((event) => event.startsWith("qualification-restored:")) ?? "";
@@ -5761,10 +5884,10 @@ for (const item of nullableCases) {
 								const piece: unknown = feedback.feedback[0];
 								assert.ok(isRecord(piece));
 								assert.deepEqual(piece.basedOn, [
-									{ resultId: "result-1" },
-									{ resultId: "result-2" },
-									{ resultId: "qualification-und" },
-									{ resultId: "qualification-na" },
+									{ resultId: "00000000-0000-4000-8000-000000000001" },
+									{ resultId: "00000000-0000-4000-8000-000000000002" },
+									{ resultId: "00000000-0000-4000-8000-000000000011" },
+									{ resultId: "00000000-0000-4000-8000-000000000012" },
 								]);
 							}
 							break;
@@ -5808,7 +5931,7 @@ for (const item of nullableCases) {
 						case "compose-unknown-outcome":
 						case "compose-null-outcome": {
 							assert.equal(child.status, 2, child.stderr);
-							assert.match(child.stderr, /result admission returned an invalid contract/u);
+							assert.match(child.stderr, /outcome/u);
 							assert.deepEqual(
 								events.filter((event) => event.startsWith("prompt:")),
 								["prompt:1"],

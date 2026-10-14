@@ -196,29 +196,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
     class MetadataAndComments {
 
         @Test
-        void shouldRegisterTheFrozenDescriptionAsCitableText() {
-            String words = "Frozen description\n\"Quoted β\"";
-            var metadata = sampleMetadata();
-            metadata.put("body", words);
-            var captured = provider.capture(request(metadata), Set.of(CORE));
-            assertThat(captured.citableTexts())
-                    .filteredOn(text -> text.path().equals("context/metadata.json#/body"))
-                    .singleElement()
-                    .satisfies(text -> {
-                        assertThat(text.source()).isEqualTo(CORE.value());
-                        assertThat(captured.files().get(text.stagedPath()))
-                                .isEqualTo(words.getBytes(StandardCharsets.UTF_8));
-                        assertThat(text.sha256())
-                                .isEqualTo(ScmVersion.contentHash(words.getBytes(StandardCharsets.UTF_8)));
-                    });
-            assertThat(captured.citableTexts())
-                    .filteredOn(text -> text.path().equals(PullRequestContentSource.DESCRIPTION_FILE))
-                    .singleElement()
-                    .satisfies(text -> assertThat(captured.files().get(text.stagedPath()))
-                            .isEqualTo(words.getBytes(StandardCharsets.UTF_8)));
-        }
-
-        @Test
         void shouldReadCoreFromTheSnapshotWithoutRequiringGit() {
             assertThat(provider.capture(request(sampleMetadata()), Set.of(CORE)).files())
                     .containsKey("context/metadata.json");
@@ -265,33 +242,6 @@ class PullRequestContentSourceTest extends BaseUnitTest {
                     assertThat(metadataJson.has("provider_id")).isFalse();
                 }
             }
-        }
-
-        @Test
-        void enrichesFromDb() throws Exception {
-            PullRequest pr = pullRequest();
-            pr.setTitle("Fix authentication bug");
-            pr.setBody("This PR fixes the login issue");
-            pr.setState(Issue.State.MERGED);
-            pr.setAdditions(10);
-            pr.setCreatedAt(Instant.parse("2026-04-09T12:39:13Z"));
-            pr.setMergedAt(Instant.parse("2026-04-09T14:47:18Z"));
-            User author = new User();
-            author.setLogin("testuser");
-            pr.setAuthor(author);
-
-            stubGit();
-            mirroredPullRequest = pr;
-
-            Map<String, byte[]> files = captureFiles(request(sampleMetadata()));
-
-            JsonNode metadataJson = objectMapper.readTree(files.get("context/metadata.json"));
-            assertThat(metadataJson.get("title").asString()).isEqualTo("Fix authentication bug");
-            assertThat(metadataJson.get("author").asString()).isEqualTo("testuser");
-            assertThat(metadataJson.get("additions").asInt()).isEqualTo(10);
-            assertThat(metadataJson.get("created_at").asString()).isEqualTo("2026-04-09T12:39:13Z");
-            assertThat(metadataJson.get("merged_at").asString()).isEqualTo("2026-04-09T14:47:18Z");
-            assertThat(metadataJson.has("closed_at")).isFalse();
         }
 
         @Test

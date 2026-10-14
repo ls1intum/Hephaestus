@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 public final class ScmVersion {
@@ -44,19 +45,32 @@ public final class ScmVersion {
                 version.baseVersion());
     }
 
-    public static String reviewedHead(ItemVersion version) {
+    public record Parsed(String base, String head, @Nullable String reviewCommit, String digest) {}
+
+    public static Optional<Parsed> parse(ItemVersion version) {
         String[] fields = version.value().split(":", -1);
         if (fields.length < 2
                 || !fields[1].equals("v1")
                 || !((fields[0].equals(ScmItemEvents.PULL_REQUEST.value()) && fields.length == 5)
                         || (fields[0].equals(ScmItemEvents.PULL_REQUEST_REVIEW.value()) && fields.length == 6)))
-            throw new IllegalArgumentException("Not an SCM review version");
-        requireObjectId(fields[2]);
-        requireObjectId(fields[3]);
-        if (fields.length == 6) requireObjectId(fields[4]);
+            return Optional.empty();
+        try {
+            requireObjectId(fields[2]);
+            requireObjectId(fields[3]);
+            if (fields.length == 6) requireObjectId(fields[4]);
+        } catch (IllegalArgumentException invalid) {
+            return Optional.empty();
+        }
         if (!fields[fields.length - 1].matches("[0-9a-f]{64}") || !fields[2].equals(version.baseVersion()))
-            throw new IllegalArgumentException("Invalid SCM review version");
-        return fields[3];
+            return Optional.empty();
+        return Optional.of(
+                new Parsed(fields[2], fields[3], fields.length == 6 ? fields[4] : null, fields[fields.length - 1]));
+    }
+
+    public static String reviewedHead(ItemVersion version) {
+        return parse(version)
+                .map(Parsed::head)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid SCM review version"));
     }
 
     public static ItemVersion ofContentDigest(@Nullable String... content) {

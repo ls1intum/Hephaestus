@@ -15,6 +15,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 class PracticeContractUpgradeIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
+    CatalogOriginPresenter presenter;
+
+    @Autowired
     PracticeVersionService versions;
 
     @Autowired
@@ -56,7 +59,7 @@ class PracticeContractUpgradeIntegrationTest extends AbstractWorkspaceIntegratio
                         .getCurrentVersion()
                         .getId())
                 .isEqualTo(appended.getId());
-        assertThat(versions.history(practice))
+        assertThat(presenter.history(practice))
                 .extracting(version -> version.number())
                 .containsExactly(3, 2, 1);
     }

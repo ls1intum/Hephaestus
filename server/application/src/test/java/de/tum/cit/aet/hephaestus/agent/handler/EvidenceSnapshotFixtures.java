@@ -1,8 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.evidence.CitationCapabilities;
 import de.tum.cit.aet.hephaestus.evidence.ClasspathSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import java.time.Clock;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
@@ -10,6 +14,14 @@ import tools.jackson.databind.node.ObjectNode;
  * the typed manifest the way it reads a real one.
  */
 public final class EvidenceSnapshotFixtures {
+
+    private static final JsonMapper MAPPER = JsonMapper.builder().build();
+    private static final ClasspathSourceCatalogRegistry CATALOG =
+            new ClasspathSourceCatalogRegistry(MAPPER, Clock.systemUTC());
+
+    public static CitationCapabilities citation(SourceKind kind) {
+        return CATALOG.current().source(kind).orElseThrow().citation();
+    }
 
     public static final String CAPTURED_AT = "2026-08-03T00:00:00Z";
 
@@ -35,10 +47,11 @@ public final class EvidenceSnapshotFixtures {
         return snapshot;
     }
 
-    /** Adds an available, complete, non-empty source and returns it so artifacts can be added. */
+    /** Adds an available, complete, non-empty source and returns it so files can be added. */
     public static ObjectNode availableSource(ObjectNode snapshot, String kind, @Nullable String immutableIdentity) {
         ObjectNode source = snapshot.withObject("manifest").withArray("sources").addObject();
         source.put("kind", kind);
+        source.set("citation", MAPPER.valueToTree(citation(new SourceKind(kind))));
         ObjectNode state = source.putObject("state");
         state.put("availability", "AVAILABLE");
         state.put("content", "NON_EMPTY");
@@ -52,7 +65,7 @@ public final class EvidenceSnapshotFixtures {
     }
 
     public static ObjectNode file(ObjectNode snapshot, ObjectNode source, String path, String sha256) {
-        ObjectNode artifact = source.withArray("files")
+        ObjectNode file = source.withArray("files")
                 .addObject()
                 .put("path", path)
                 .put("mediaType", "text/plain")
@@ -60,17 +73,17 @@ public final class EvidenceSnapshotFixtures {
                 .put("bytes", 0);
         var proof = snapshot.withObject("manifest").withArray("files").addObject();
         proof.set("kind", source.path("kind"));
-        proof.set("file", artifact);
-        return artifact;
+        proof.set("file", file);
+        return file;
     }
 
-    /** Turns a source into one the capture could not read; its artifacts go with it. */
+    /** Turns a source into one the capture could not read; its files go with it. */
     public static void unavailable(ObjectNode snapshot, ObjectNode source) {
         source.putObject("state").put("availability", "UNAVAILABLE").put("reasonCode", "NOT_FOUND");
         source.putArray("files");
-        var artifacts = snapshot.withObject("manifest").withArray("files");
-        for (int index = artifacts.size() - 1; index >= 0; index--) {
-            if (artifacts.get(index).path("kind").equals(source.path("kind"))) artifacts.remove(index);
+        var files = snapshot.withObject("manifest").withArray("files");
+        for (int index = files.size() - 1; index >= 0; index--) {
+            if (files.get(index).path("kind").equals(source.path("kind"))) files.remove(index);
         }
     }
 

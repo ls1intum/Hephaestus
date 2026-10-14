@@ -38,7 +38,7 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
 
     @Query(
             value =
-                    "SELECT * FROM item_event WHERE state IN ('RECORDED','WAITING','BLOCKED') AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
+                    "SELECT * FROM item_event WHERE state IN ('RECORDED','WAITING') AND (retry_at IS NULL OR retry_at <= :now) ORDER BY occurred_at, id FOR UPDATE SKIP LOCKED LIMIT :limit",
             nativeQuery = true)
     @WorkspaceAgnostic("Background reaper claims due events across workspaces and preserves each event workspace")
     List<ItemEvent> claimDue(@Param("now") Instant now, @Param("limit") int limit);
@@ -58,7 +58,7 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
 
     @Modifying
     @Query(
-            "UPDATE ItemEvent e SET e.lastAttemptedAt = :now, e.retryAt = :retryAt WHERE e.workspaceId = :workspaceId AND e.id = :id AND e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.BLOCKED)")
+            "UPDATE ItemEvent e SET e.lastAttemptedAt = :now, e.retryAt = :retryAt WHERE e.workspaceId = :workspaceId AND e.id = :id AND e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING)")
     int attempted(
             @Param("workspaceId") long workspaceId,
             @Param("id") UUID id,
@@ -67,7 +67,7 @@ public interface ItemEventRepository extends JpaRepository<ItemEvent, UUID> {
 
     @Modifying
     @Query(
-            "UPDATE ItemEvent e SET e.state = de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.EXPIRED, e.reason = :reason, e.decidedAt = :now, e.retryAt = NULL WHERE e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.BLOCKED) AND e.occurredAt < :before")
+            "UPDATE ItemEvent e SET e.state = de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.EXPIRED, e.reason = :reason, e.decidedAt = :now, e.retryAt = NULL WHERE e.state IN (de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.RECORDED, de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventState.WAITING) AND e.occurredAt < :before")
     @WorkspaceAgnostic("Background reaper expires pending events across workspaces at the configured deadline")
     int expire(@Param("before") Instant before, @Param("now") Instant now, @Param("reason") ReviewRequestReason reason);
 

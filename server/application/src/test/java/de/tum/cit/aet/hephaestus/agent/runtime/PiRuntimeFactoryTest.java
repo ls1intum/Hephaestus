@@ -390,11 +390,13 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRunNoSetupWhenTheProfileHasNone() {
+        void shouldMakeSharedJsonHelpersReadableToTheMentor() {
             String body = factory.build(spec(MENTOR)).command().get(2);
 
-            assertThat(MENTOR.setupCommands()).isEmpty();
-            assertThat(body).doesNotContain("ln -sfn").doesNotContain("practice-scripts");
+            assertThat(body)
+                    .contains("ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET)
+                    .contains("--allow-fs-read=" + SandboxLayout.PRACTICE_SCRIPT_IMAGE_ROOT);
+            assertThat(body).doesNotContain(SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET);
         }
 
         @Test

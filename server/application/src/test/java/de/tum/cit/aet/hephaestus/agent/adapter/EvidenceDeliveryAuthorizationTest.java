@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.adapter;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,7 +35,7 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
                 .thenReturn(true);
         assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .containsExactly(result.getId());
-        result = result.toBuilder().evidenceVersion((short) 0).build();
+        result = resultBuilder(result).evidenceVersion((short) 0).build();
         assertThat(authorization.permitsForNewDelivery(1, List.of(result), SourceUsePurpose.CONVERSATIONAL_MENTORING))
                 .isEmpty();
         when(access.permits(1, result.getId(), SourceUsePurpose.CONVERSATIONAL_MENTORING))

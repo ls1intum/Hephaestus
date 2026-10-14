@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -150,7 +151,7 @@ class FeedbackPreparationServiceTest {
     void shouldRejectCallerChosenHistoricalIdsBeforePreparingAnyFeedback() {
         UUID historical = UUID.randomUUID();
         var older =
-                result(historical, 4).toBuilder().reviewId(UUID.randomUUID()).build();
+                resultBuilder(result(historical, 4)).reviewId(UUID.randomUUID()).build();
         when(results.findByWorkspaceIdAndIdIn(1, List.of(resultId, historical)))
                 .thenReturn(List.of(result(resultId, 3), older));
         assertThatThrownBy(() -> service.prepare(draft(List.of(resultId, historical)), Optional.empty()))
@@ -162,7 +163,7 @@ class FeedbackPreparationServiceTest {
         UUID historical = UUID.randomUUID();
         var current = result(resultId, 3);
         var older =
-                result(historical, 4).toBuilder().reviewId(UUID.randomUUID()).build();
+                resultBuilder(result(historical, 4)).reviewId(UUID.randomUUID()).build();
         when(results.findByWorkspaceIdAndIdIn(1, List.of(resultId, historical))).thenReturn(List.of(current, older));
         when(support.select(1, 7, 5, now))
                 .thenReturn(new PracticePageSupportReader.Selection(Optional.empty(), List.of(current, older)));

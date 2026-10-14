@@ -28,7 +28,7 @@ import {
 
 // Run each golden capture in its own process; runner paths and state are module-local.
 
-import { mockPiCodingAgent } from "./program-host-runner.ts";
+import { mockChange, mockPiCodingAgent } from "./program-host-runner.ts";
 
 const GOLDEN = nodePath.join(import.meta.dirname, "golden-prompts");
 const LIB = nodePath.resolve(
@@ -208,17 +208,11 @@ if (scenario !== undefined && scenario !== "") {
 	const capture = (name: string, text: string) =>
 		writeFileSync(nodePath.join(cwd, "captured", name), text);
 	mkdirSync(nodePath.join(cwd, "captured"), { recursive: true });
-	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
-	const derived: unknown = await import(change);
-	assert.ok(typeof derived === "object" && derived !== null);
-	mock.module(change, {
-		namedExports: {
-			...derived,
-			writeChangeView: () => undefined,
-			...(scenario === "scan"
-				? { readChange: () => null, checkedOutCommit: () => "a".repeat(40) }
-				: {}),
-		},
+	await mockChange({
+		writeChangeView: () => undefined,
+		...(scenario === "scan"
+			? { readChange: () => null, checkedOutCommit: () => "a".repeat(40) }
+			: {}),
 	});
 	mock.method(globalThis, "fetch", async (_input: unknown, init?: RequestInit) => {
 		assert.ok(typeof init?.body === "string");
@@ -531,8 +525,10 @@ if (scenario !== undefined && scenario !== "") {
 	}
 	void test("truncated leads disclose the omitted context and locate the full input", () => {
 		const prompt = captures.get("leads-truncated")?.get("prompt-1.md") ?? "";
-		assert.match(prompt, /(?:truncat|omitt|not shown|cut)/iu);
-		assert.ok(prompt.includes("work/review-input"));
+		const omitted =
+			/^- \d+ more lines are not shown, \d+ of them leads\. The full input is in `work\/review-input\/test-practice\.json`\.$/mu;
+		assert.match(prompt, omitted);
+		assert.doesNotMatch(captures.get("leads")?.get("prompt-1.md") ?? "", omitted);
 	});
 	void test("compaction restores the captured change and complete criterion before another result", () => {
 		const prompt = captures.get("compaction")?.get("prompt-2.md") ?? "";

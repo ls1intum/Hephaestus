@@ -15,7 +15,6 @@ import {
 	CANDIDATE_LIMITS,
 	isSafeRelativePath,
 	type Citation,
-	type CitationIdentity,
 	type ReadReceipt,
 } from "./contract.ts";
 import type { ReadRequest, ReadValues } from "./ipc.ts";
@@ -154,25 +153,6 @@ export class EvidenceReader {
 		return (
 			this.#sources.permittedPaths === undefined || this.#sources.permittedPaths.has(citation.path)
 		);
-	}
-
-	citationIdentity(citation: Citation): CitationIdentity | undefined {
-		const sources = this.#sources;
-		if (sources.repo === null) {
-			return undefined;
-		}
-		let commit: string | null | undefined;
-		if (citation.sourceKind === TREE_SOURCE && citation.sourcePath === sources.treeSourceFile) {
-			commit = citation.commit ?? sources.headRevision;
-		} else if (
-			citation.sourceKind === DIFF_SOURCE &&
-			citation.sourcePath === path.posix.join(sources.contextReference, "change.json")
-		) {
-			commit = citation.side === "OLD" ? sources.change?.base : sources.change?.head;
-		}
-		return commit == null
-			? undefined
-			: { source: `${sources.treeSourceFile}:${citation.path}`, version: commit };
 	}
 
 	/** Answer one read. A read that cannot be answered throws `UnratedError` with its reason. */

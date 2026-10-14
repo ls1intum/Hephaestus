@@ -3,7 +3,8 @@ import { existsSync, readFileSync } from "node:fs";
 import type { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 import { errorText } from "./pi-error-text.ts";
-import { hasText, isRecord } from "./pi-text.ts";
+import { hasText } from "./pi-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 /** One chat model as {@link ModelRuntime.registerProvider} takes it; the extension-facing type omits sampling. */
 export type RegisteredModel = Extract<

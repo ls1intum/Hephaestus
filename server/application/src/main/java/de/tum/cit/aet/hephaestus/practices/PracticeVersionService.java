@@ -1,20 +1,14 @@
 package de.tum.cit.aet.hephaestus.practices;
 
-import de.tum.cit.aet.hephaestus.core.auth.AccountReferenceService;
 import de.tum.cit.aet.hephaestus.core.auth.dto.AccountRefDTO;
-import de.tum.cit.aet.hephaestus.core.auth.spi.AccountDirectory;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.AboutRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
-import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPracticeDocument;
-import de.tum.cit.aet.hephaestus.practices.dto.HistoricalPracticeDefinitionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeVersionDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeVersion;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -24,7 +18,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 @Service
@@ -34,8 +27,6 @@ public class PracticeVersionService {
     private final PracticeVersionRepository versions;
     private final JsonMapper mapper;
     private final PracticeDefinitionValidator validator;
-    private final AccountDirectory accounts;
-    private final AccountReferenceService accountReferences;
 
     @PersistenceContext
     private @Nullable EntityManager entityManager;
@@ -53,28 +44,7 @@ public class PracticeVersionService {
     }
 
     public PracticeDefinition definitionOf(PracticeVersion version) {
-        if (!available(version.getDefinition())) {
-            throw new IllegalArgumentException("This historical definition is incomplete and cannot run a review.");
-        }
         return mapper.treeToValue(version.getDefinition(), PracticeDefinition.class);
-    }
-
-    public @Nullable CatalogPracticeDocument catalogBaseOf(Practice practice) {
-        JsonNode base = practice.getCatalogBase();
-        if (base == null || !available(base.path("definition"))) return null;
-        return mapper.treeToValue(base, CatalogPracticeDocument.class);
-    }
-
-    public boolean available(JsonNode node) {
-        if (!node.isObject()
-                || Arrays.stream(PracticeDefinitionField.values()).anyMatch(field -> !node.has(key(field))))
-            return false;
-        try {
-            mapper.treeToValue(node, PracticeDefinition.class);
-            return true;
-        } catch (JacksonException | IllegalArgumentException exception) {
-            return false;
-        }
     }
 
     @Transactional
@@ -148,39 +118,14 @@ public class PracticeVersionService {
             int position,
             @Nullable Long createdByAccountId) {}
 
-    @Transactional(readOnly = true)
-    public PracticeVersionDTO viewCurrent(Practice practice) {
-        var version = practice.getCurrentVersion();
-        var previous = versions.findFirstByPracticeIdAndNumberLessThanOrderByNumberDesc(
-                        practice.getId(), version.getNumber())
-                .orElse(null);
-        return view(version, previous, createdBy(version));
-    }
-
-    @Transactional(readOnly = true)
-    public List<PracticeVersionDTO> history(Practice practice) {
-        List<PracticeVersionDTO> history = new ArrayList<>();
-        PracticeVersion previous = null;
-        for (PracticeVersion version :
-                versions.findByWorkspaceIdAndPracticeIdOrderByNumberAsc(practice.getWorkspaceId(), practice.getId())) {
-            history.add(view(version, previous, createdBy(version)));
-            previous = version;
-        }
-        return history.reversed();
-    }
-
-    public @Nullable AccountRefDTO createdBy(PracticeVersion version) {
-        Long creator = version.getCreatedByAccountId();
-        return creator == null
-                ? null
-                : accounts.find(creator)
-                        .map(account -> accountReferences.reference(version.getWorkspaceId(), creator))
-                        .orElse(null);
-    }
-
     public PracticeVersionDTO view(
             PracticeVersion version, @Nullable PracticeVersion previous, @Nullable AccountRefDTO createdBy) {
-        boolean complete = available(version.getDefinition());
+        PracticeDefinition definition;
+        try {
+            definition = definitionOf(version);
+        } catch (JacksonException | IllegalArgumentException exception) {
+            definition = null;
+        }
         List<PracticeDefinitionField> changed = previous == null
                 ? List.of()
                 : Arrays.stream(PracticeDefinitionField.values())
@@ -192,67 +137,12 @@ public class PracticeVersionService {
                 Objects.requireNonNull(version.getId()).toString(),
                 version.getNumber(),
                 version.getName(),
-                complete ? definitionOf(version) : null,
-                complete,
-                complete ? null : historical(version.getDefinition()),
+                definition,
                 version.getReviewDigest(),
                 version.getCreatedAt(),
                 createdBy,
                 changed,
                 previous != null && !previous.getReviewDigest().equals(version.getReviewDigest()));
-    }
-
-    private HistoricalPracticeDefinitionDTO historical(JsonNode node) {
-        List<PracticeDefinitionField> known = Arrays.stream(PracticeDefinitionField.values())
-                .filter(field -> known(node, field))
-                .toList();
-        return new HistoricalPracticeDefinitionDTO(
-                known,
-                nullable(node, "name", String.class),
-                nullable(node, "reviewOn", ReviewOn.class),
-                nullable(node, "appliesWhen", AppliesWhen.class),
-                nullable(node, "about", AboutRole.class),
-                nullable(node, "reads", PracticeReads.class),
-                nullable(node, "reviewedBy", ReviewedBy.class),
-                nullable(node, "criteria", String.class),
-                nullable(node, "script", String.class),
-                nullable(node, "scan", ScanDefinition.class),
-                nullable(node, "lineNotes", Boolean.class),
-                nullable(node, "guidance", PracticeGuidance.class));
-    }
-
-    private <T> @Nullable T nullable(JsonNode node, String field, Class<T> type) {
-        JsonNode value = node.get(field);
-        if (value == null || value.isNull()) return null;
-        try {
-            return mapper.treeToValue(value, type);
-        } catch (JacksonException | IllegalArgumentException exception) {
-            return null;
-        }
-    }
-
-    private boolean known(JsonNode node, PracticeDefinitionField field) {
-        JsonNode value = node.get(key(field));
-        if (value == null) return false;
-        if (value.isNull()) {
-            return switch (field) {
-                case APPLIES_WHEN, ABOUT, SCRIPT, SCAN -> true;
-                default -> false;
-            };
-        }
-        Class<?> type =
-                switch (field) {
-                    case NAME, CRITERIA, SCRIPT -> String.class;
-                    case REVIEW_ON -> ReviewOn.class;
-                    case APPLIES_WHEN -> AppliesWhen.class;
-                    case ABOUT -> AboutRole.class;
-                    case READS -> PracticeReads.class;
-                    case REVIEWED_BY -> ReviewedBy.class;
-                    case SCAN -> ScanDefinition.class;
-                    case LINE_NOTES -> Boolean.class;
-                    case GUIDANCE -> PracticeGuidance.class;
-                };
-        return nullable(node, key(field), type) != null;
     }
 
     public static String key(PracticeDefinitionField field) {

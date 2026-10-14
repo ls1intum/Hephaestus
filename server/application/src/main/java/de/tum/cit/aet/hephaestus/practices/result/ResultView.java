@@ -13,7 +13,7 @@ public record ResultView(
 
     public ResultView {
         long workspaceId = result.getWorkspaceId();
-        if (practice.getWorkspaceId() != workspaceId
+        if (!Objects.equals(practice.getWorkspace().getId(), workspaceId)
                 || review.getWorkspaceId() != workspaceId
                 || review.getId().compareTo(result.getReviewId()) != 0
                 || !Long.toString(result.getItemId()).equals(item.id())

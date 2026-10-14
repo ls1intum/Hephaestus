@@ -29,27 +29,6 @@ public record TrendSupport(
         int bundleSize,
         double ropeHalfWidth,
         double credibilityThreshold) {
-    static TrendSupport forPractice(
-            TrendProperties properties,
-            int currentOpportunities,
-            int previousOpportunities,
-            int opportunitiesUntilComparable,
-            Map<Long, ItemKind> reviewedWork,
-            List<EvidenceOpportunity> trail) {
-        // One practice's bundles are disjoint, so no piece of reviewed work is in both.
-        return forGroup(
-                properties,
-                currentOpportunities,
-                previousOpportunities,
-                currentOpportunities + previousOpportunities,
-                opportunitiesUntilComparable,
-                currentOpportunities,
-                reviewedWork,
-                null,
-                null,
-                trail);
-    }
-
     static TrendSupport forGroup(
             TrendProperties properties,
             int currentOpportunities,

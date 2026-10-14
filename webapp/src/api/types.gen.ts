@@ -1759,21 +1759,6 @@ export type GroupRef = {
     slug: string;
 };
 
-export type HistoricalPracticeDefinition = {
-    about: 'AUTHOR' | 'REVIEWER' | 'ASSIGNEE' | 'MERGER' | null;
-    appliesWhen: AppliesWhen | null;
-    criteria: string | null;
-    guidance: PracticeGuidance | null;
-    knownFields: Array<'NAME' | 'REVIEW_ON' | 'APPLIES_WHEN' | 'ABOUT' | 'READS' | 'REVIEWED_BY' | 'CRITERIA' | 'SCRIPT' | 'SCAN' | 'LINE_NOTES' | 'GUIDANCE'>;
-    lineNotes: boolean | null;
-    name: string | null;
-    reads: PracticeReads | null;
-    reviewOn: ReviewOn | null;
-    reviewedBy: ReviewedBy | null;
-    scan: ScanDefinition | null;
-    script: string | null;
-};
-
 export type HostCoverage = Omit<ResultCoverage, 'source'> & {
     complete?: boolean;
     failedReads?: number;
@@ -1929,7 +1914,7 @@ export type ItemEvent = {
     occurredAt: Date;
     reason: 'GATE_WITHHELD' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'COALESCED' | 'OUT_OF_REVIEW_SCOPE' | 'BOT_AUTHOR' | 'BOT_REVIEWER' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'MEMBER_AI_DECLINED' | 'PERSON_DATA_ERASED' | 'FEEDBACK_MODE_OFF' | 'SUBJECT_UNLINKED' | 'MERGE_ACTOR_UNAVAILABLE' | 'MODEL_UNAVAILABLE' | 'BUDGET_EXHAUSTED' | 'ITEM_NOT_VISIBLE' | 'VERSION_SUPERSEDED' | 'PENDING_DEADLINE_EXCEEDED' | 'ITEM_GONE' | null;
     reviewId: string | null;
-    state: 'RECORDED' | 'WAITING' | 'STARTED' | 'WITHHELD' | 'BLOCKED' | 'EXPIRED';
+    state: 'RECORDED' | 'WAITING' | 'STARTED' | 'WITHHELD' | 'EXPIRED';
 };
 
 export type ItemEventOption = {
@@ -3364,8 +3349,6 @@ export type PracticeVersion = {
     createdAt: Date;
     createdBy: AccountRef | null;
     definition: PracticeDefinition | null;
-    definitionAvailable: boolean;
-    historicalDefinition: HistoricalPracticeDefinition | null;
     id: string;
     name: string | null;
     number: number;
@@ -10301,6 +10284,8 @@ export type ListMembershipsData = {
         workspaceSlug: string;
     };
     query?: {
+        q?: string;
+        team?: string;
         /**
          * Zero-based page index (0..N)
          */
@@ -11066,28 +11051,6 @@ export type AdoptPracticeResponses = {
 };
 
 export type AdoptPracticeResponse = AdoptPracticeResponses[keyof AdoptPracticeResponses];
-
-export type GetPracticeCatalogEntryData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/practices/{slug}';
-};
-
-export type GetPracticeCatalogEntryResponses = {
-    /**
-     * OK
-     */
-    200: CatalogPractice;
-};
-
-export type GetPracticeCatalogEntryResponse = GetPracticeCatalogEntryResponses[keyof GetPracticeCatalogEntryResponses];
 
 export type ListPracticeGroupsData = {
     body?: never;

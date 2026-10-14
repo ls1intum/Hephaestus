@@ -1242,6 +1242,8 @@ paths:
       - catalog-admin
   /admin/practice-catalog/practices/reorder:
     patch:
+      description: "Supply every practice slug in one group, or every unassigned practice\
+        \ slug, in the new order."
       operationId: reorderCatalogPractices
       parameters:
       - in: header
@@ -5156,6 +5158,17 @@ paths:
           maxLength: 51
           minLength: 3
           pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
+      - in: query
+        name: q
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: team
+        required: false
+        schema:
+          type: string
+          exclusiveMinimum: 0
       - description: Zero-based page index (0..N)
         in: query
         name: page
@@ -6059,33 +6072,6 @@ paths:
       summary: Adopt a catalog practice
       tags:
       - Practice Catalog Adoption
-  /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
-    get:
-      operationId: getPracticeCatalogEntry
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          maxLength: 51
-          minLength: 3
-          pattern: "^(?!.*--)[a-z0-9][a-z0-9-]{1,49}[a-z0-9]$"
-      - in: path
-        name: slug
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CatalogPractice"
-          description: OK
-      tags:
-      - workspace-catalog
   /workspaces/{workspaceSlug}/practice-groups:
     get:
       operationId: listPracticeGroups
@@ -15168,88 +15154,6 @@ components:
       - icon
       - name
       - slug
-    HistoricalPracticeDefinition:
-      type: object
-      properties:
-        about:
-          type:
-          - string
-          - "null"
-          enum:
-          - AUTHOR
-          - REVIEWER
-          - ASSIGNEE
-          - MERGER
-          - null
-        appliesWhen:
-          anyOf:
-          - $ref: "#/components/schemas/AppliesWhen"
-          - type: "null"
-        criteria:
-          type:
-          - string
-          - "null"
-        guidance:
-          anyOf:
-          - $ref: "#/components/schemas/PracticeGuidance"
-          - type: "null"
-        knownFields:
-          type: array
-          items:
-            type: string
-            enum:
-            - NAME
-            - REVIEW_ON
-            - APPLIES_WHEN
-            - ABOUT
-            - READS
-            - REVIEWED_BY
-            - CRITERIA
-            - SCRIPT
-            - SCAN
-            - LINE_NOTES
-            - GUIDANCE
-        lineNotes:
-          type:
-          - boolean
-          - "null"
-        name:
-          type:
-          - string
-          - "null"
-        reads:
-          anyOf:
-          - $ref: "#/components/schemas/PracticeReads"
-          - type: "null"
-        reviewOn:
-          anyOf:
-          - $ref: "#/components/schemas/ReviewOn"
-          - type: "null"
-        reviewedBy:
-          anyOf:
-          - $ref: "#/components/schemas/ReviewedBy"
-          - type: "null"
-        scan:
-          anyOf:
-          - $ref: "#/components/schemas/ScanDefinition"
-          - type: "null"
-        script:
-          type:
-          - string
-          - "null"
-      required:
-      - about
-      - appliesWhen
-      - criteria
-      - guidance
-      - knownFields
-      - lineNotes
-      - name
-      - reads
-      - reviewOn
-      - reviewedBy
-      - scan
-      - script
     HostCoverage:
       allOf:
       - $ref: "#/components/schemas/ResultCoverage"
@@ -15557,7 +15461,6 @@ components:
           - WAITING
           - STARTED
           - WITHHELD
-          - BLOCKED
           - EXPIRED
       required:
       - decidedAt
@@ -18885,12 +18788,6 @@ components:
           anyOf:
           - $ref: "#/components/schemas/PracticeDefinition"
           - type: "null"
-        definitionAvailable:
-          type: boolean
-        historicalDefinition:
-          anyOf:
-          - $ref: "#/components/schemas/HistoricalPracticeDefinition"
-          - type: "null"
         id:
           type: string
           pattern: "^[1-9][0-9]*$"
@@ -18910,8 +18807,6 @@ components:
       - createdAt
       - createdBy
       - definition
-      - definitionAvailable
-      - historicalDefinition
       - id
       - name
       - number
@@ -19997,6 +19892,11 @@ components:
           type: array
           items:
             type: string
+            maxLength: 64
+            minLength: 0
+            pattern: "[a-z0-9]+(?:-[a-z0-9]+)*"
+          maxItems: 10000
+          minItems: 0
       required:
       - slugs
     RepositoryInfo:

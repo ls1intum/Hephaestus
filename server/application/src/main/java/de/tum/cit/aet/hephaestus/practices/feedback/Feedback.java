@@ -16,11 +16,13 @@ import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Builder.Default;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -84,6 +86,7 @@ public class Feedback {
     @Default
     @ColumnDefault("'{}'")
     @Column(name = "checks", nullable = false, columnDefinition = "jsonb")
+    @Setter(AccessLevel.PACKAGE)
     private Map<FeedbackCheckStage, FeedbackChecks> checks = Map.of();
 
     @Column(name = "replaces_id", nullable = true, columnDefinition = "UUID")

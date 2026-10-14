@@ -18,11 +18,8 @@ function accepted(value: unknown) {
 	return parsed.candidate;
 }
 
-function refusalOf(
-	value: unknown,
-	resolve?: Parameters<typeof parseCandidate>[1],
-): CandidateRefusal | "accepted" {
-	const parsed = parseCandidate(value, resolve);
+function refusalOf(value: unknown): CandidateRefusal | "accepted" {
+	const parsed = parseCandidate(value);
 	return parsed.ok ? "accepted" : parsed.reasonCode;
 }
 
@@ -144,7 +141,10 @@ const problemsOf = (value: Record<string, unknown>): Record<string, unknown>[] =
 const evidenceOf = (value: Record<string, unknown>): Record<string, unknown> =>
 	isJsonObject(value.evidence) ? value.evidence : {};
 
-const BREACHES: Record<CandidateRefusal, [keyof typeof BASES, Breach]> = {
+const BREACHES: Record<
+	Exclude<CandidateRefusal, "example_overlaps_problem">,
+	[keyof typeof BASES, Breach]
+> = {
 	malformed_candidate: ["notMet", (v) => Object.assign(v, { extra: true })],
 	outcome_problem_mismatch: ["met", (v) => Object.assign(v, { problems: [problem(20)] })],
 	warrant_outcome_mismatch: [
@@ -181,11 +181,6 @@ const BREACHES: Record<CandidateRefusal, [keyof typeof BASES, Breach]> = {
 				example: { citation: citation(40, "  throw error;"), note: "A good catch." },
 			}),
 	],
-	example_overlaps_problem: [
-		"notMet",
-		(v) =>
-			Object.assign(v, { example: { citation: citation(30, "  } catch {}"), note: "Overlaps." } }),
-	],
 	basis_citation_out_of_range: [
 		"notMet",
 		(v) => {
@@ -205,7 +200,10 @@ const BREACHES: Record<CandidateRefusal, [keyof typeof BASES, Breach]> = {
 	],
 };
 
-function broken(base: keyof typeof BASES, ...codes: CandidateRefusal[]): Record<string, unknown> {
+function broken(
+	base: keyof typeof BASES,
+	...codes: (keyof typeof BREACHES)[]
+): Record<string, unknown> {
 	const value = BASES[base]();
 	for (const code of codes) {
 		BREACHES[code][1](value);
@@ -214,37 +212,13 @@ function broken(base: keyof typeof BASES, ...codes: CandidateRefusal[]): Record<
 }
 
 void describe("the candidate rules", () => {
-	void test("a record's display path cannot separate an example from a problem on its sourceFile", () => {
-		const record = {
-			sourceKind: "scm.pull-request.comments",
-			sourcePath: "context/comments.json",
-			path: "comment label",
-			startLine: 1,
-			endLine: 2,
-			quote: "A comment",
+	void test("claimed line overlap waits for canonical quote verification", () => {
+		const value = notMet();
+		value.example = {
+			citation: citation(20, "  throw error;"),
+			note: "A separate quote at a claimed problem line.",
 		};
-		const value = {
-			...notMet(),
-			problems: [problem(1, { citations: [record] })],
-			example: {
-				citation: { ...record, path: "another label", startLine: 2 },
-				note: "The same comment.",
-			},
-		};
-		assert.equal(
-			refusalOf(value, () => ({ source: "captured comment", version: "1" })),
-			"example_overlaps_problem",
-		);
-		assert.equal(
-			refusalOf({
-				...value,
-				example: {
-					citation: { ...record, sourcePath: "context/other-comments.json" },
-					note: "Another sourceFile.",
-				},
-			}),
-			"accepted",
-		);
+		assert.equal(refusalOf(value), "accepted");
 	});
 	void test("each base result is valid", () => {
 		for (const make of Object.values(BASES)) {
@@ -252,20 +226,20 @@ void describe("the candidate rules", () => {
 		}
 	});
 
-	void test("every refusal code is reachable by breaking its rule alone", () => {
-		for (const code of CANDIDATE_REFUSALS) {
-			const [base] = BREACHES[code];
-			assert.equal(refusalOf(broken(base, code)), code, code);
+	void test("each structural refusal is reachable by breaking its rule alone", () => {
+		for (const [code, [base, breach]] of Object.entries(BREACHES)) {
+			const value = BASES[base]();
+			breach(value);
+			assert.equal(refusalOf(value), code, code);
 		}
 	});
 
 	void test("a result that breaks two rules is refused with the code of the earlier rule", () => {
-		const pairs: [keyof typeof BASES, CandidateRefusal, CandidateRefusal][] = [
+		const pairs: [keyof typeof BASES, keyof typeof BREACHES, keyof typeof BREACHES][] = [
 			["met", "malformed_candidate", "outcome_problem_mismatch"],
 			["notMet", "warrant_outcome_mismatch", "coverage_inconsistent"],
 			["met", "result_citations_required", "met_coverage_incomplete"],
-			["notMet", "coverage_inconsistent", "example_overlaps_problem"],
-			["notMet", "example_overlaps_problem", "basis_citation_out_of_range"],
+			["notMet", "coverage_inconsistent", "basis_citation_out_of_range"],
 			["notMet", "basis_citation_out_of_range", "duplicate_problem_key"],
 			["undetermined", "example_outcome_mismatch", "malformed_candidate"],
 		];

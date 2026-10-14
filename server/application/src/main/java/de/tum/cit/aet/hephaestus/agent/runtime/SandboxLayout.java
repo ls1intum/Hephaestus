@@ -106,9 +106,10 @@ public final class SandboxLayout {
 
     public static final String PRACTICE_SCRIPT_INPUTS_SUFFIX = ".inputs.json";
 
-    public static final String PRACTICE_SCRIPT_LIBRARY_TARGET = "/opt/practice-scripts/lib";
+    public static final String PRACTICE_SCRIPT_IMAGE_ROOT = "/opt/practice-scripts";
+    public static final String PRACTICE_SCRIPT_LIBRARY_TARGET = PRACTICE_SCRIPT_IMAGE_ROOT + "/lib";
     public static final String PRACTICE_SCRIPT_KITS_LINK = PRACTICE_SCRIPT_PREFIX + "kits";
-    public static final String PRACTICE_SCRIPT_KITS_TARGET = "/opt/practice-scripts/kits";
+    public static final String PRACTICE_SCRIPT_KITS_TARGET = PRACTICE_SCRIPT_IMAGE_ROOT + "/kits";
 
     /** Workspace-relative prefix for analysis markers ({@link #ANALYSIS_PRACTICES_PREFIX} is a child). */
     public static final String ANALYSIS_PREFIX = WORK_PREFIX + "analysis/";

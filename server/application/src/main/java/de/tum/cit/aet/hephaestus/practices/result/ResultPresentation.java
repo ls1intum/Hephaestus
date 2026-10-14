@@ -195,14 +195,16 @@ public class ResultPresentation {
                 .filter(Objects::nonNull)
                 .toList();
         var accounts = references.accounts(ws, ids);
+        var createdBy = m.getCreatedById();
+        var removedBy = m.getRemovedById();
         return new ResultMarkDTO(
                 m.getId(),
                 m.getResultId(),
                 m.getKind(),
                 m.getReason(),
-                accounts.get(m.getCreatedById()),
+                createdBy == null ? null : accounts.get(createdBy),
                 m.getCreatedAt(),
-                accounts.get(m.getRemovedById()),
+                removedBy == null ? null : accounts.get(removedBy),
                 m.getRemovedAt(),
                 m.getRemovalReason());
     }

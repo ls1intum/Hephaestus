@@ -5,11 +5,13 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemEventInput;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRegistration;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -18,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ItemIndexService implements ItemWriter {
     private final ItemRepository repository;
     private final ItemEventService events;
+    private final Clock clock;
 
     @Override
     public ItemRef upsert(ItemRegistration registration) {
@@ -32,7 +35,7 @@ public class ItemIndexService implements ItemWriter {
                 registration.sourceId(),
                 parentId,
                 registration.path(),
-                Instant.now());
+                clock.instant());
         Long sourceId = registration.sourceId();
         Item item = sourceId != null
                 ? repository
@@ -48,6 +51,14 @@ public class ItemIndexService implements ItemWriter {
         if (!item.getKind().equals(registration.kind()) || !Objects.equals(item.getParentId(), parentId))
             throw new IllegalArgumentException("Item identity and parent are immutable");
         return ref(item);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lock(long workspaceId, long itemId) {
+        if (repository.lockByIdAndWorkspaceId(itemId, workspaceId).isEmpty()) {
+            throw new IllegalArgumentException("Item does not belong to the workspace");
+        }
     }
 
     @Override

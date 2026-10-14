@@ -82,7 +82,6 @@ import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,7 +93,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class AccountErasureIntegrationTest extends BaseIntegrationTest {
@@ -255,7 +253,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 fixture.administratorId(), null, List.of(new PersonIdentity(fixture.providerId(), "42", null)));
         jdbc.update(
                 "UPDATE feedback_copy SET"
-                        + " state='POSTED',posted_at=CURRENT_TIMESTAMP,external_ref='note-99',external_url='https://privacy-gitlab.example.com/team/repo/-/merge_requests/19#note_99'"
+                        + " state='POSTED',posted_at=CURRENT_TIMESTAMP,external_ref='note-99'"
                         + " WHERE feedback_id=?",
                 fixture.feedbackId());
         assertThatThrownBy(() -> personData.export(preview.request().getId()))
@@ -271,6 +269,9 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     @Test
     void shouldSuppressSelectedJobsAndRevokeCredentialsWhenErasureFinishes() {
         var fixture = externalInspectionFixture("https://privacy-gitlab.example.com/team/repo/-/merge_requests/19");
+        jdbc.update(
+                "UPDATE feedback_copy SET state='POSTED',posted_at=CURRENT_TIMESTAMP,external_ref='note-99' WHERE feedback_id=?",
+                fixture.feedbackId());
         var preview = personData.preview(
                 fixture.administratorId(), null, List.of(new PersonIdentity(fixture.providerId(), "42", null)));
         personData.requestErasure(preview.request().getId(), fixture.administratorId(), true);
@@ -397,7 +398,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         List<Path> otherFolders = new ArrayList<>();
         List<DerivedConversation> targetDerived = new ArrayList<>();
         List<DerivedConversation> otherDerived = new ArrayList<>();
-        List<ConversationFeedbackCopy> copiedFeedback = new ArrayList<>();
         List<Long> sharedThreads = new ArrayList<>();
         for (int index = 1; index <= 2; index++) {
             String team = "T" + index;
@@ -439,7 +439,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
             message(workspace, team, "300.1", "300.1", "UOTHER", other, "Unrelated conversation");
             targetDerived.add(seedDerivedConversation(workspace, shared.getId(), target));
             otherDerived.add(seedDerivedConversation(workspace, unrelated.getId(), other));
-            copiedFeedback.add(seedFeedbackCopy(targetDerived.getLast(), otherDerived.getLast()));
             targetFolders.add(captureMountedEvidence(worker, recorder, targetDerived.getLast(), target));
             otherFolders.add(captureMountedEvidence(worker, recorder, otherDerived.getLast(), other));
         }
@@ -467,10 +466,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         for (var contributor : registry.stores())
             otherRows.put(
                     contributor.store(),
-                    withoutErasedCopies(
-                            contributor.store(),
-                            contributor.export(Objects.requireNonNull(otherSelection.get(contributor.store()))),
-                            copiedFeedback));
+                    contributor.export(Objects.requireNonNull(otherSelection.get(contributor.store()))));
         long administratorId = Objects.requireNonNull(administrator.getId());
         var preview = personData.preview(administratorId, targetAccount.getId(), List.of());
         UUID requestId = preview.request().getId();
@@ -664,56 +660,16 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                             threadId))
                     .isEqualTo(1);
         }
-        for (var copy : copiedFeedback) {
-            assertThat(jdbc.queryForObject(
-                            "SELECT parts::text FROM chat_message WHERE id=?", String.class, copy.messageId()))
-                    .contains("This feedback was erased.")
-                    .doesNotContain("Target guidance");
-            assertThat(jdbc.queryForObject(
-                            "SELECT parts::text FROM chat_message WHERE id=?", String.class, copy.replyId()))
-                    .contains("Other reply to erased feedback");
-            assertThat(jdbc.queryForObject(
-                            "SELECT parent_message_id FROM chat_message WHERE id=?", UUID.class, copy.replyId()))
-                    .isEqualTo(copy.messageId());
-        }
         for (var contributor : registry.stores()) {
             // A shared thread's aggregate changes; the other person's participant projection does
             // not.
-            assertThat(withoutErasedCopies(
-                            contributor.store(),
-                            contributor.export(Objects.requireNonNull(otherSelection.get(contributor.store()))),
-                            copiedFeedback))
+            assertThat(contributor.export(Objects.requireNonNull(otherSelection.get(contributor.store()))))
                     .as("Another person's %s rows", contributor.store())
                     .isEqualTo(otherRows.get(contributor.store()));
         }
         personData.requestErasure(requestId, administratorId, true);
         personData.run(requestId);
         assertThat(personData.get(requestId).request().getCompletedJson()).isEqualTo(receipt.getCompletedJson());
-    }
-
-    @Test
-    void shouldStopWhenAnExactFeedbackCopyReferencesAnotherWorkspace() {
-        IdentityProvider scm = providers.saveAndFlush(
-                new IdentityProvider(IdentityProviderType.GITLAB, "https://copy-conflict.example.org"));
-        User target = users.saveAndFlush(TestUserFactory.createUser(42L, "target", scm));
-        User other = users.saveAndFlush(TestUserFactory.createUser(84L, "other", scm));
-        Workspace first = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("copy-first"));
-        Workspace second = workspaces.saveAndFlush(WorkspaceTestFixtures.activeWorkspace("copy-second"));
-        var targetData = seedDerivedConversation(
-                first, slackThread(first, "100.1", target).getId(), target);
-        var otherData = seedDerivedConversation(
-                second, slackThread(second, "200.1", other).getId(), other);
-        var copied = seedFeedbackCopy(targetData, otherData);
-        assertThatThrownBy(() -> registry.select(new PersonScope(
-                        null,
-                        List.of(new PersonIdentity(Objects.requireNonNull(scm.getId()), "42", null)),
-                        List.of(target.getId()))))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("different workspace")
-                .hasMessageContaining("exact delivery reference");
-        assertThat(jdbc.queryForObject(
-                        "SELECT parts::text FROM chat_message WHERE id=?", String.class, copied.messageId()))
-                .contains("Target guidance copied");
     }
 
     @Test
@@ -788,7 +744,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void shouldEraseCopiedEvidenceAndKeepAnotherDevelopersFeedbackWhenThePersonOnlyAppearsInItsEvidence() {
+    void shouldEraseAffectedProofAndPreserveUnrelatedWorkWhenThePersonAppearsInCopiedEvidence() {
         var provider = providers.saveAndFlush(
                 new IdentityProvider(IdentityProviderType.GITLAB, "https://secondary-evidence.example"));
         var target = users.saveAndFlush(TestUserFactory.createUser(42L, "target", provider));
@@ -834,10 +790,8 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         var scope = mapper.readValue(Objects.requireNonNull(preview.request().getScopeJson()), PersonScope.class);
         assertThat(scope.derivedJobIds()).containsExactlyInAnyOrderElementsOf(copiedJobs);
         var export = personData.export(requestId);
-        assertThat(export.path("stores").path("result")).isEmpty();
-        assertThat(export.path("stores").path("feedback")).isEmpty();
-        assertThat(export.path("stores").path("feedback_copy")).isEmpty();
-        assertThat(export.path("stores").path("chat_message_feedback_copy")).isEmpty();
+        assertThat(export.toString())
+                .doesNotContain("Result title", "Practice guidance for developer", "Delivered guidance");
         assertThat(export.path("stores").path("person_evidence_copy"))
                 .extracting(row -> row.path("jobId").asString())
                 .containsExactlyInAnyOrderElementsOf(
@@ -881,15 +835,15 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                             derived.jobId()))
                     .isZero();
             assertThat(practiceResultRepository.findAllById(derived.practiceResultIds()))
-                    .hasSize(2);
-            assertThat(feedbackRepository.findById(derived.preparedId())).isPresent();
-            assertThat(feedbackRepository.findById(derived.deliveredId())).isPresent();
+                    .isEmpty();
+            assertThat(feedbackRepository.findById(derived.preparedId())).isEmpty();
+            assertThat(feedbackRepository.findById(derived.deliveredId())).isEmpty();
             assertThat(chatMessageRepository
                             .findById(derived.messageId())
                             .orElseThrow()
                             .getParts()
                             .toString())
-                    .contains("Delivered guidance");
+                    .contains("This feedback was erased.");
             assertThat(agentJobRepository
                             .findById(derived.jobId())
                             .orElseThrow()
@@ -988,59 +942,6 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
         message.setAuthorAccountId(accountFor(member).getId());
         message.setText(text);
         slackMessages.saveAndFlush(message);
-    }
-
-    private record ConversationFeedbackCopy(UUID messageId, UUID replyId) {}
-
-    private List<JsonNode> withoutErasedCopies(
-            String store, List<JsonNode> rows, List<ConversationFeedbackCopy> copies) {
-        if (!store.equals("chat_message")) return rows;
-        var copiedIds = copies.stream().map(copy -> copy.messageId().toString()).collect(Collectors.toSet());
-        return rows.stream()
-                .filter(row -> !copiedIds.contains(row.path("id").asString()))
-                .toList();
-    }
-
-    private ConversationFeedbackCopy seedFeedbackCopy(DerivedConversation target, DerivedConversation other) {
-        var threadId = chatMessageRepository
-                .findById(other.messageId())
-                .orElseThrow()
-                .getThread()
-                .getId();
-        var thread = chatThreadRepository
-                .findByIdAndWorkspaceId(threadId, other.workspaceId())
-                .orElseThrow();
-        ChatMessage copied = new ChatMessage();
-        copied.setId(UUID.randomUUID());
-        copied.setThread(thread);
-        copied.setRole(ChatMessage.Role.ASSISTANT);
-        copied.setStatus(ChatMessage.Status.completed);
-        copied.setParts(mapper.valueToTree(
-                List.of(Map.of("type", "text", "text", "Target guidance copied into another conversation"))));
-        chatMessageRepository.saveAndFlush(copied);
-        ChatMessage reply = new ChatMessage();
-        reply.setId(UUID.randomUUID());
-        reply.setThread(thread);
-        reply.setParentMessage(copied);
-        reply.setRole(ChatMessage.Role.USER);
-        reply.setStatus(ChatMessage.Status.completed);
-        reply.setParts(mapper.valueToTree(List.of(Map.of("type", "text", "text", "Other reply to erased feedback"))));
-        chatMessageRepository.saveAndFlush(reply);
-        UUID copyId = FeedbackIds.copy(target.deliveredId(), FeedbackCopyKind.CHAT_TURN, 0);
-        feedbackCopyRepository.saveAndFlush(FeedbackCopy.builder()
-                .id(copyId)
-                .writeKey(copyId.toString())
-                .writeMarker(FeedbackIds.writeMarker(copyId))
-                .workspaceId(target.workspaceId())
-                .feedbackId(target.deliveredId())
-                .kind(FeedbackCopyKind.CHAT_TURN)
-                .state(FeedbackCopyState.POSTED)
-                .writeStartedAt(Instant.now())
-                .postedAt(Instant.now())
-                .chatMessageId(copied.getId())
-                .createdAt(Instant.now())
-                .build());
-        return new ConversationFeedbackCopy(copied.getId(), reply.getId());
     }
 
     private Path captureMountedEvidence(
@@ -1158,6 +1059,7 @@ class AccountErasureIntegrationTest extends BaseIntegrationTest {
                 .feedbackId(delivered.getId())
                 .kind(FeedbackCopyKind.CHAT_TURN)
                 .state(FeedbackCopyState.POSTED)
+                .body("Delivered guidance")
                 .writeStartedAt(Instant.now())
                 .chatMessageId(message.getId())
                 .postedAt(Instant.now())

@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +27,7 @@ public class PracticeGroupService {
     private final PracticeRepository practices;
     private final WorkspaceRepository workspaces;
     private final ConfigAuditPort audit;
+    private final JsonMapper mapper;
 
     public List<PracticeGroup> listGroups(WorkspaceContext ctx, @Nullable Boolean shownOnly) {
         return Boolean.TRUE.equals(shownOnly)
@@ -142,7 +144,7 @@ public class PracticeGroupService {
         Practice practice = practices
                 .findByWorkspaceIdAndSlug(ctx.id(), practiceSlug)
                 .orElseThrow(() -> new EntityNotFoundException("Practice", practiceSlug));
-        var before = PracticeDefinitionSnapshot.of(practice);
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
         if (changeBinding(ctx, practice, groupSlug)) {
             practices.save(practice);
             audit.record(ConfigAuditEntry.updated(
@@ -150,7 +152,7 @@ public class PracticeGroupService {
                     practice.getId(),
                     ctx.id(),
                     before,
-                    PracticeDefinitionSnapshot.of(practice)));
+                    PracticeDefinitionSnapshot.of(practice, mapper)));
         }
         return practice;
     }

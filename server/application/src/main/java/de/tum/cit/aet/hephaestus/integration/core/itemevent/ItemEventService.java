@@ -70,10 +70,7 @@ public class ItemEventService {
             ItemEventState to,
             @Nullable ReviewRequestReason reason) {
         if (from.isTerminal()) return false;
-        if ((to == ItemEventState.WAITING
-                        || to == ItemEventState.WITHHELD
-                        || to == ItemEventState.BLOCKED
-                        || to == ItemEventState.EXPIRED)
+        if ((to == ItemEventState.WAITING || to == ItemEventState.WITHHELD || to == ItemEventState.EXPIRED)
                 && reason == null) throw new IllegalArgumentException("Event decision requires a reason");
         Instant now = clock.instant();
         return repository.decide(

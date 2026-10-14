@@ -29,7 +29,7 @@ Upgrade:
 1. Install this release for the server, worker and webhook roles.
 2. Use this release's verified agent image.
 3. If HEPHAESTUS_IMAGE_AGENT_PI is overridden, update it to the matching agent-pi image.
-4. Start the server and wait for the migration to complete.
+4. Start only the server role and wait for the migration to complete.
 5. Deploy the matching webapp.
 6. Restore saved custom definitions with tested version 3 scripts.
 7. Start the worker and webhook roles.

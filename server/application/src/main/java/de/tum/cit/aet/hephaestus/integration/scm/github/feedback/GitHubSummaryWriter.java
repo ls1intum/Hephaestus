@@ -264,10 +264,7 @@ public class GitHubSummaryWriter implements SummaryWriter {
         return SummaryLookup.unknown();
     }
 
-    /**
-     * Conservative NOT_FOUND heuristic: GitHub signals a deleted comment via a free-text top-level
-     * error.
-     */
+    // GitHub reports deleted comments through free-text top-level errors.
     static boolean looksGone(List<String> errors) {
         return errors.stream()
                 .filter(Objects::nonNull)

@@ -51,6 +51,10 @@ public class BundledPracticeCatalogLoader {
                 JsonNode raw = practice.path("definition").deepCopy();
                 if (!(raw instanceof ObjectNode definition))
                     throw new IllegalArgumentException("A bundled practice needs a definition.");
+                if (!definition.has("appliesWhen")) definition.putNull("appliesWhen");
+                if (!definition.has("scan")) definition.putNull("scan");
+                if (definition.path("reviewedBy") instanceof ObjectNode reviewedBy && !reviewedBy.has("humanReason"))
+                    reviewedBy.putNull("humanReason");
                 String script = optional(practice, "scriptResource");
                 if (script != null) {
                     if (!script.startsWith("practices/scripts/") || script.contains(".."))

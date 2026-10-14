@@ -125,7 +125,14 @@ public class JobFolderIndexBuilder {
                                 contribution.immutableIdentities().get(source)),
                         contribution.captureLimitations().getOrDefault(source, List.of()));
             }
-            sources.add(new SourceCapture(source, state, capturedFiles));
+            sources.add(new SourceCapture(
+                    source,
+                    state,
+                    catalogs.current()
+                            .source(source)
+                            .orElseThrow(() -> new IllegalArgumentException("Unknown captured source: " + source))
+                            .citation(),
+                    capturedFiles));
             capturedFiles.forEach(file -> files.add(new FolderSource(source, file)));
         });
         var manifest = new JobFolderIndex(

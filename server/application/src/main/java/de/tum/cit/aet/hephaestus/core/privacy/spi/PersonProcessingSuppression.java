@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.privacy.spi;
 
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
@@ -8,6 +10,8 @@ public interface PersonProcessingSuppression {
     boolean isSuppressed(long providerId, String subject, @Nullable String teamId);
 
     boolean isAccountSuppressed(long accountId);
+
+    Set<Long> suppressedAccountIds(Collection<Long> accountIds);
 
     /** Frozen review jobs are unavailable from erasure admission through every resumable step. */
     boolean isReviewJobSuppressed(UUID jobId);

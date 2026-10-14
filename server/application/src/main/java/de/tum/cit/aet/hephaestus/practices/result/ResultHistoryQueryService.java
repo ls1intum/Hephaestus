@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.practices.PracticeVersionRepository;
@@ -35,12 +36,13 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
     private final ResultSourceAuthorization authorization;
     private final ResultHistoryRepository historyRows;
     private final ReviewAssignmentQuery assignments;
+    private final AccountMembershipQuery memberships;
 
     @Override
     @Transactional(readOnly = true)
     public List<ResultHistoryEntry> forDeveloper(long workspaceId, long developerAccountId, Instant since, int limit) {
         limit(limit);
-        if (!historyRows.isMember(workspaceId, developerAccountId)) return List.of();
+        if (!memberships.isActiveVisibleMember(workspaceId, developerAccountId)) return List.of();
         return history(
                 historyRows.forDeveloper(workspaceId, developerAccountId, since, PageRequest.of(0, limit)),
                 SourceUsePurpose.CONVERSATIONAL_MENTORING);
@@ -60,11 +62,11 @@ public class ResultHistoryQueryService implements ResultHistoryQuery {
     @Transactional(readOnly = true)
     public Optional<ResultHistoryEntry> find(
             long workspaceId, UUID resultId, long viewerAccountId, SourceUsePurpose purpose) {
-        if (!historyRows.isMember(workspaceId, viewerAccountId)) return Optional.empty();
+        if (!memberships.isActiveVisibleMember(workspaceId, viewerAccountId)) return Optional.empty();
         return results.findByIdAndWorkspaceId(resultId, workspaceId)
                 .filter(r -> Objects.equals(r.getDeveloperId(), viewerAccountId)
                         || (purpose == SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
-                                && historyRows.isAdmin(workspaceId, viewerAccountId)))
+                                && memberships.isAdministrator(workspaceId, viewerAccountId)))
                 .flatMap(r -> entry(r, purpose))
                 .filter(ResultHistoryEntry::copyAuthorityComplete);
     }

@@ -8,16 +8,21 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProviderInstanceRegister
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
 import de.tum.cit.aet.hephaestus.core.security.ScmOrigin;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -166,21 +171,40 @@ public class IdentityRestrictionService implements PersonProcessingSuppression {
 
     @Override
     public boolean isAccountSuppressed(long accountId) {
-        boolean erased = Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS(SELECT 1 FROM account WHERE id=? AND status IN" + " ('DELETING','DELETED'))",
-                Boolean.class,
-                accountId));
-        if (erased) return true;
-        return jdbc
-                .query(
-                        "SELECT provider_id,provider_user_key,NULLIF(team_key,'') FROM identity WHERE"
-                                + " account_id=?",
-                        (rs, row) -> new PersonIdentity(
-                                rs.getLong(1), Objects.requireNonNull(rs.getString(2)), rs.getString(3)),
-                        accountId)
-                .stream()
-                .anyMatch(identity -> isSuppressed(identity.providerId(), identity.subject(), identity.teamId()));
+        return suppressedAccountIds(Set.of(accountId)).contains(accountId);
     }
+
+    @Override
+    public Set<Long> suppressedAccountIds(Collection<Long> accountIds) {
+        if (accountIds.isEmpty()) return Set.of();
+        return new NamedParameterJdbcTemplate(jdbc)
+                        .query("""
+            SELECT a.id, p.server_url, requested.server_url, a.status IN ('DELETING','DELETED') AS deleting
+            FROM account a
+            LEFT JOIN identity i ON i.account_id=a.id
+            LEFT JOIN identity_provider requested ON requested.id=i.provider_id
+            LEFT JOIN identity_provider p ON p.type=requested.type
+            LEFT JOIN identity_restriction s ON s.provider_id=p.id
+              AND s.provider_user_key=i.provider_user_key AND s.kind='ERASED'
+              AND (s.team_key=i.team_key OR (p.type='OUTLINE' AND s.team_key=''))
+            WHERE a.id IN (:accountIds) AND (a.status IN ('DELETING','DELETED') OR s.id IS NOT NULL)
+            """, Map.of("accountIds", accountIds), (rs, row) -> {
+                            var requestedOrigin = ScmOrigin.of(rs.getString(3));
+                            boolean suppressed = rs.getBoolean(4)
+                                    || ScmOrigin.of(rs.getString(2))
+                                            .filter(origin -> requestedOrigin
+                                                    .filter(origin::equals)
+                                                    .isPresent())
+                                            .isPresent();
+                            return new AccountRestriction(rs.getLong(1), suppressed);
+                        })
+                        .stream()
+                        .filter(AccountRestriction::suppressed)
+                        .map(AccountRestriction::accountId)
+                        .collect(Collectors.toUnmodifiableSet());
+    }
+
+    private record AccountRestriction(long accountId, boolean suppressed) {}
 
     @Override
     public boolean isSourceSuppressed(long workspaceId, String itemKind, long sourceId) {

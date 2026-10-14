@@ -249,7 +249,8 @@ final class LiveRunnerWorkspace {
                 .put("name", name)
                 .put("versionId", Long.toString(versionId));
         var exhaustive = entry.putArray("exhaustiveSources");
-        entry.putArray("knownLimitations");
+        var limits = entry.putArray("knownLimitations");
+        definition.reviewedBy().limits().forEach(limit -> limits.add(limit.description()));
         var reads = entry.putArray("readsSources");
         definition.reads().sources().forEach(source -> {
             reads.add(source.source().value());

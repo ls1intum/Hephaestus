@@ -11,6 +11,7 @@ import {
 import { z } from "zod";
 
 import { hasLanguageUsageReceipt } from "./contract.ts";
+import { MAX_OUTPUT_TOKENS } from "./model-options.ts";
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
@@ -24,8 +25,9 @@ const logprobsSchema = z.array(
 	}),
 );
 
-export function answerTokens(questions: number): number {
-	return questions * 12 + 16;
+/** Reasoning and answer text share the completion limit, even when the binding omits a reasoning hint. */
+export function decisionOutputTokens(questions: number): number {
+	return MAX_OUTPUT_TOKENS + questions * 12 + 16;
 }
 
 interface Asked {
@@ -119,14 +121,8 @@ function answerOf(asked: Asked, p: readonly number[]): Experimental_DecisionMode
 	return { type: "choice", choice: asked.options[best]?.key ?? "", probabilities };
 }
 
-/**
- * `model` is an OpenAI chat model: its provider returns the logprobs. Set `reasoning` when the binding
- * asks the model to reason: the call then asks for no reasoning, which would take the answer positions.
- */
-export function logprobDecisionModel(
-	model: LanguageModelV4,
-	{ reasoning = false }: { reasoning?: boolean } = {},
-): Experimental_DecisionModelV4 {
+/** Derive choices from the visible answer's log probabilities, after any bounded reasoning. */
+export function logprobDecisionModel(model: LanguageModelV4): Experimental_DecisionModelV4 {
 	return {
 		specificationVersion: "v4",
 		provider: model.provider,
@@ -153,10 +149,10 @@ export function logprobDecisionModel(
 						content: [{ type: "text", text: `STATE:\n${asText(state)}\n\nQUESTIONS:\n${listing}` }],
 					},
 				],
-				maxOutputTokens: answerTokens(asked.length),
+				maxOutputTokens: decisionOutputTokens(asked.length),
 				temperature: 0,
 				providerOptions: {
-					openai: { logprobs: 20, ...(reasoning ? { reasoningEffort: "none" } : {}) },
+					openai: { logprobs: 20 },
 				},
 				abortSignal,
 			});
@@ -167,10 +163,29 @@ export function logprobDecisionModel(
 					message: "the chat model returned no logprobs",
 				});
 			}
+
+			const answer = result.content
+				.filter((entry) => entry.type === "text")
+				.map((entry) => entry.text)
+				.join("");
+			const completion = logprobs.data.map((entry) => entry.token).join("");
+			if (answer === "" || !completion.endsWith(answer)) {
+				throw new InvalidResponseDataError({
+					data: undefined,
+					message: "the chat model returned no visible answer aligned with its logprobs",
+				});
+			}
+			const answerStart = completion.length - answer.length;
+			let offset = 0;
 			const byAlias = new Map(asked.map((q) => [q.alias, q]));
 			const answers: Record<string, Experimental_DecisionModelV4Answer> = {};
 			let line = "";
-			for (const { token, top_logprobs: top } of logprobs.data) {
+			for (const { token: fullToken, top_logprobs: top } of logprobs.data) {
+				const token = fullToken.slice(Math.max(0, answerStart - offset));
+				offset += fullToken.length;
+				if (token === "") {
+					continue;
+				}
 				const alias = /^\s*\[?(?<alias>q\d+)\]?\s*:\s*$/u.exec(line)?.groups?.alias;
 				const q = alias === undefined ? undefined : byAlias.get(alias);
 				const p = q === undefined ? undefined : distribution(q, token, top);

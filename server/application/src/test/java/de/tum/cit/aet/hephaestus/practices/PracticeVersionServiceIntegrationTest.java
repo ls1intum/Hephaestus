@@ -15,6 +15,9 @@ import tools.jackson.databind.node.ObjectNode;
 
 class PracticeVersionServiceIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
+    CatalogOriginPresenter presenter;
+
+    @Autowired
     PracticeVersionService versions;
 
     @Autowired
@@ -46,9 +49,9 @@ class PracticeVersionServiceIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(second.getName()).isEqualTo("New display name");
         assertThat(second.getReviewDigest()).isEqualTo(first.getReviewDigest());
         assertThat(versions.definitionOf(first)).isEqualTo(definition);
-        assertThat(versions.viewCurrent(practice).changed()).containsExactly(PracticeDefinitionField.NAME);
-        assertThat(versions.viewCurrent(practice).reviewChanged()).isFalse();
-        assertThat(versions.history(practice))
+        assertThat(presenter.viewCurrent(practice).changed()).containsExactly(PracticeDefinitionField.NAME);
+        assertThat(presenter.viewCurrent(practice).reviewChanged()).isFalse();
+        assertThat(presenter.history(practice))
                 .extracting(version -> version.number())
                 .containsExactly(2, 1);
     }
@@ -60,8 +63,8 @@ class PracticeVersionServiceIntegrationTest extends AbstractWorkspaceIntegration
         var second = versions.append(
                 practice, DefinitionTestFixtures.definition("Describe the change", "Different criteria."), null);
         assertThat(second.getReviewDigest()).startsWith("v6:").hasSize(67).isNotEqualTo(first.getReviewDigest());
-        assertThat(versions.viewCurrent(practice).changed()).containsExactly(PracticeDefinitionField.CRITERIA);
-        assertThat(versions.viewCurrent(practice).reviewChanged()).isTrue();
+        assertThat(presenter.viewCurrent(practice).changed()).containsExactly(PracticeDefinitionField.CRITERIA);
+        assertThat(presenter.viewCurrent(practice).reviewChanged()).isTrue();
     }
 
     @Test
@@ -84,7 +87,7 @@ class PracticeVersionServiceIntegrationTest extends AbstractWorkspaceIntegration
         var appended = versions.append(practice, edited, null);
         assertThat(appended.getReviewDigest()).isEqualTo(original.getReviewDigest());
         assertThat(appended.getId()).isNotEqualTo(original.getId());
-        assertThat(versions.viewCurrent(practice).changed())
+        assertThat(presenter.viewCurrent(practice).changed())
                 .containsExactly(
                         PracticeDefinitionField.NAME,
                         PracticeDefinitionField.REVIEW_ON,

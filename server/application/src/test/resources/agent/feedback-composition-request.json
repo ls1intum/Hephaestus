@@ -1,13 +1,10 @@
 {
 	"contractVersion": 3,
-	"enabled": true,
 	"destinations": {
 		"ON_WORK": {
-			"enabled": true,
 			"maxPieces": 1
 		},
 		"PRACTICE_PAGE": {
-			"enabled": true,
 			"maxPieces": 1
 		}
 	},

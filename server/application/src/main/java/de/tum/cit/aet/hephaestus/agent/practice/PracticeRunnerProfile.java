@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public final class PracticeRunnerProfile implements PiRunnerProfile {
 
@@ -30,6 +31,8 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
             "pi-runner-usage.ts",
             "pi-runner-retry.ts",
             "pi-runner-composition.ts",
+            "pi-composition-stage.ts",
+            "pi-admitted-results.ts",
             "pi-feedback-preparation.ts",
             "pi-session-lifecycle.ts",
             SandboxLayout.PROVIDER_HELPER_FILENAME);
@@ -67,11 +70,10 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     @Override
     public List<String> setupCommands() {
-        return List.of(
-                "mkdir -p " + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_PREFIX,
-                "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
-                        + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK,
-                "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
-                        + SandboxLayout.PRACTICE_SCRIPT_KITS_LINK);
+        return Stream.concat(
+                        PiRunnerProfile.super.setupCommands().stream(),
+                        Stream.of("ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_KITS_TARGET + " "
+                                + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_KITS_LINK))
+                .toList();
     }
 }

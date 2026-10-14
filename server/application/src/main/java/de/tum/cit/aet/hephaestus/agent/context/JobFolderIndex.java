@@ -75,7 +75,7 @@ public record JobFolderIndex(
     }
 
     /** One source's retained state and facts; see {@link Retained}. */
-    @JsonIgnoreProperties({"files"})
+    @JsonIgnoreProperties({"files", "citation"})
     public record RetainedSource(SourceKind kind, SourceCaptureState state) {
         public RetainedSource {
             Objects.requireNonNull(kind, "kind");

@@ -46,7 +46,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { hasText } from "@/lib/text";
 
-import { appliesWhenPresentation, MAX_OTHERWISE_LENGTH } from "./applies-when";
 import { generateSlug, itemKindHint } from "./constants";
 import {
 	blankDraft,
@@ -62,6 +61,7 @@ import {
 	NO_GROUP,
 	type PracticeDefinitionDraft,
 } from "./practice-definition-draft";
+import { PracticeAppliesWhenEditor } from "./PracticeAppliesWhenEditor";
 import { PracticeGuideEditor, type PracticeGuideView } from "./PracticeGuideEditor";
 import { PracticeReviewedByEditor } from "./PracticeReviewedByEditor";
 import { PracticeReviewSettingsEditor } from "./PracticeReviewSettingsEditor";
@@ -238,7 +238,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		const submission = props.onSubmit(
 			definitionOfDraft(draft, itemType, definitionOptions.sourceContract),
 		);
-		// track requires the promise returned by submit.
 		unsavedChanges.track(submission);
 	};
 
@@ -246,7 +245,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		{ value: NO_GROUP, label: "Unassigned" },
 		...groups.map((group) => ({ value: group.slug, label: group.name })),
 	];
-	const appliesWhenHelp = appliesWhenPresentation(itemType);
 
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col">
@@ -484,33 +482,16 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								/>
 							)}
 
-							<Field data-invalid={hasText(fieldError(FIELD_IDS.appliesWhen)) ? "true" : undefined}>
-								<FieldLabel htmlFor={FIELD_IDS.appliesWhen}>Applies when</FieldLabel>
-								<FieldDescription id="practice-applies-when-description">
-									{appliesWhenHelp.description}
-								</FieldDescription>
-								<Textarea
-									id={FIELD_IDS.appliesWhen}
+							<PracticeAppliesWhenEditor
+								id={FIELD_IDS.appliesWhen}
+								value={draft.appliesWhen}
+								onChange={(appliesWhen) => update({ appliesWhen })}
+								itemType={itemType}
+								disabled={formDisabled}
+								error={fieldError(FIELD_IDS.appliesWhen)}
+							/>
 
-									aria-invalid={hasText(fieldError(FIELD_IDS.appliesWhen))}
-									aria-describedby={`practice-applies-when-description${
-										hasText(fieldError(FIELD_IDS.appliesWhen)) ? " practice-applies-when-error" : ""
-									}`}
-									value={draft.appliesWhen.clauses}
-									onChange={(event) =>
-										update({ appliesWhen: { ...draft.appliesWhen, clauses: event.target.value } })
-									}
-									rows={6}
-									spellCheck={false}
-									placeholder={appliesWhenHelp.example}
-								/>
-								{hasText(fieldError(FIELD_IDS.appliesWhen)) && (
-									<FieldError id="practice-applies-when-error">
-										{fieldError(FIELD_IDS.appliesWhen)}
-									</FieldError>
-								)}
-							</Field>
-							{hasText(draft.appliesWhen.clauses.trim()) && (
+							{draft.appliesWhen.clauses.length > 0 && (
 								<TextField
 									id={FIELD_IDS.otherwise}
 									label="Otherwise *"
@@ -519,7 +500,6 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 										update({ appliesWhen: { ...draft.appliesWhen, otherwise } })
 									}
 									placeholder="e.g. the change touches no Swift source file"
-									maxLength={MAX_OTHERWISE_LENGTH}
 									description="Why the practice does not apply when no condition holds. Developers and admins read it."
 									error={fieldError(FIELD_IDS.otherwise)}
 								/>
@@ -645,7 +625,7 @@ interface TextFieldProps {
 	value: string;
 	onChange: (value: string) => void;
 	placeholder: string;
-	maxLength: number;
+	maxLength?: number;
 	description: string;
 	error?: string;
 }

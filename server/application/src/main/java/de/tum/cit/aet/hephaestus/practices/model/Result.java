@@ -38,7 +38,7 @@ import tools.jackson.databind.JsonNode;
                     columnNames = {"id", "developer_id", "workspace_id"})
         })
 @Getter
-@Builder(toBuilder = true)
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class Result {

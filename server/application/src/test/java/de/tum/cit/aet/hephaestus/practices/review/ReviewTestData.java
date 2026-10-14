@@ -34,7 +34,6 @@ public final class ReviewTestData {
         var practice = new Practice();
         practice.setId(practiceId);
         practice.setWorkspace(workspace);
-        ReflectionTestUtils.setField(practice, "workspaceId", workspaceId);
         practice.setSlug(slug);
         practice.setKind(new ItemKind("scm.pull_request"));
         var version = new PracticeVersion(practice, 1, new JsonMapper().valueToTree(definition), null);

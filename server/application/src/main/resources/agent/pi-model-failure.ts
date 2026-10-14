@@ -1,4 +1,4 @@
-import { isRecord } from "./pi-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 /**
  * The diagnostics the patched OpenAI chat-completions and Responses adapters attach to an assistant message

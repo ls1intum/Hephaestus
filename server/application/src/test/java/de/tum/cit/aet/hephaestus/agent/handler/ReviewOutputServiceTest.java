@@ -67,6 +67,7 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                 List.of(new SourceCapture(
                         new SourceKind("docs.document.core"),
                         new SourceCaptureState.NotCollected(SourceAbsenceReason.GOVERNANCE_NOT_EFFECTIVE),
+                        EvidenceSnapshotFixtures.citation(new SourceKind("docs.document.core")),
                         List.of())),
                 List.of(),
                 List.of(),
@@ -124,10 +125,10 @@ class ReviewOutputServiceTest extends BaseUnitTest {
         var entry = submitted.results().getFirst();
         var candidate = (ObjectNode) entry.candidate();
         candidate.set("coverage", mapper.readTree("""
-                {"source":"host","complete":true,"reads":1,"truncatedReads":0,"failedReads":0,
-                 "receipts":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
-                 "path":"document/body","version":"docs:one","status":"COMPLETE"}]}
-                """));
+            {"source":"host","complete":true,"reads":1,"truncatedReads":0,"failedReads":0,
+             "receipts":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
+             "path":"document/body","version":"docs:one","status":"COMPLETE"}]}
+            """));
         when(results.admit(1, job.getReviewId(), job.getId(), 0, List.of()))
                 .thenReturn(new AdmissionReceipt(List.of(), List.of()));
         service.prepare(job, submitted).record(job);

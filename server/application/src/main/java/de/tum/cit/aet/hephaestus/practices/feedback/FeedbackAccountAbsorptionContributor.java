@@ -28,11 +28,4 @@ public class FeedbackAccountAbsorptionContributor implements AccountAbsorptionCo
     public void afterAbsorb(long claimedAccountId, long unclaimedAccountId) {
         basis.validateDeveloperConstraints();
     }
-
-    @Override
-    public void finish(long claimedAccountId, long unclaimedAccountId) {
-        if (feedback.countByDeveloperId(unclaimedAccountId) != 0 || basis.countByDeveloperId(unclaimedAccountId) != 0) {
-            throw new IllegalStateException("Account absorption left feedback owned by the source account.");
-        }
-    }
 }

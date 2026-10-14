@@ -102,8 +102,7 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
                         assertThat(session.get().lastCapacity()).isEqualTo(report);
                     });
             UUID jobId = UUID.randomUUID();
-            assertThat(workerStops.stopContainer(workerId, jobId, "user-cancel"))
-                    .isTrue();
+            assertThat(workerStops.sendCancel(workerId, jobId, "user-cancel")).isTrue();
             assertThat(listener.cancelled.get(5, TimeUnit.SECONDS))
                     .isEqualTo(new CancelJob(jobId.toString(), "user-cancel"));
         } finally {
@@ -119,11 +118,11 @@ class WorkerControlChannelIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void shouldReportNoStopRequestWhenNoWorkerIsConnected() {
-        assertThat(workerStops.stopContainer("absent-" + UUID.randomUUID(), UUID.randomUUID(), "user-cancel"))
+        assertThat(workerStops.sendCancel("absent-" + UUID.randomUUID(), UUID.randomUUID(), "user-cancel"))
                 .isFalse();
-        assertThat(workerStops.stopContainer(null, UUID.randomUUID(), "user-cancel"))
+        assertThat(workerStops.sendCancel(null, UUID.randomUUID(), "user-cancel"))
                 .isFalse();
-        assertThat(workerStops.stopContainer("  ", UUID.randomUUID(), "user-cancel"))
+        assertThat(workerStops.sendCancel("  ", UUID.randomUUID(), "user-cancel"))
                 .isFalse();
     }
 

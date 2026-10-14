@@ -33,7 +33,11 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         when(workspaces.findByIdForUpdate(10L)).thenReturn(Optional.of(workspace));
         when(repository.findByWorkspaceIdAndSlug(10L, "reviews")).thenReturn(Optional.of(group));
         var service = new PracticeGroupService(
-                repository, mock(PracticeRepository.class), workspaces, mock(ConfigAuditPort.class));
+                repository,
+                mock(PracticeRepository.class),
+                workspaces,
+                mock(ConfigAuditPort.class),
+                JsonMapper.builder().build());
         var saved = service.updateGroup(
                 new WorkspaceContext(10L, "workspace", "Workspace", null, null, Set.of()),
                 "reviews",
@@ -68,7 +72,12 @@ class PracticeGroupServiceTest extends BaseUnitTest {
         when(workspaces.findByIdForUpdate(10L)).thenReturn(Optional.of(workspace));
         when(repository.findByWorkspaceIdAndSlug(10L, "destination")).thenReturn(Optional.of(destination));
         when(practices.findMaxPosition(10L, 20L)).thenReturn(3);
-        var service = new PracticeGroupService(repository, practices, workspaces, mock(ConfigAuditPort.class));
+        var service = new PracticeGroupService(
+                repository,
+                practices,
+                workspaces,
+                mock(ConfigAuditPort.class),
+                JsonMapper.builder().build());
         service.restoreCatalogBinding(
                 new WorkspaceContext(10L, "workspace", "Workspace", null, null, Set.of()), practice, "destination");
         assertThat(practice.getGroup()).isSameAs(destination);

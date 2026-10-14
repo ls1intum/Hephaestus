@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelUnavailableException;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.FrozenModel;
@@ -229,12 +230,14 @@ public class ReviewJobClaimService {
         ConfigSnapshot snapshot;
         try {
             ConfigSnapshot submitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), objectMapper);
-            methods.require(assigned.getFirst().practice().method(), "review", binding);
             if (Objects.requireNonNullElse(submitted.model().dataHandlingTier(), DataHandlingTier.UNDECLARED)
                     != binding.getDataHandlingTier())
                 throw new ReviewJobStateConflictException("The frozen model is unavailable");
             if (llmAdmissionService != null) {
-                var admitted = llmAdmissionService.admit(binding);
+                var admitted = llmAdmissionService
+                        .admitIfAvailable(binding)
+                        .orElseThrow(() -> new LlmModelUnavailableException("The frozen model is unavailable"));
+                methods.require(assigned.getFirst().practice().method(), "review", binding);
                 if (!submitted.model().isAdmittedAs(admitted)) {
                     throw new ReviewJobStateConflictException("The frozen model is unavailable");
                 }
@@ -246,9 +249,10 @@ public class ReviewJobClaimService {
                         .withPracticeScript(
                                 admitPracticeScript(job, submitted.practiceScript(), llmAdmissionService, assigned));
             } else {
+                methods.require(assigned.getFirst().practice().method(), "review", binding);
                 snapshot = submitted;
             }
-        } catch (IllegalStateException | ReviewJobStateConflictException failure) {
+        } catch (LlmModelUnavailableException | ReviewJobStateConflictException failure) {
             return null;
         }
         return snapshot;
@@ -272,21 +276,20 @@ public class ReviewJobClaimService {
             Optional<FrozenModel> priced = memberAiPolicy
                     .practiceScriptBinding(job, purpose)
                     .filter(binding -> binding.getDataHandlingTier() == tier)
-                    .map(binding -> {
+                    .flatMap(binding -> admission.admitIfAvailable(binding).map(model -> {
                         methods.require(
                                 assigned.getFirst().practice().method(),
                                 purpose.kind().name().toLowerCase(Locale.ROOT),
                                 binding);
-                        return binding;
-                    })
-                    .flatMap(admission::admitIfAvailable)
+                        return model;
+                    }))
                     .filter(slot::isAdmittedAs)
                     .map(model -> slot.withPriceSnapshot(
                             slot.priceSnapshot() == null ? model.price() : slot.priceSnapshot()));
             if (priced.isPresent()) {
                 admitted.put(purpose.kind(), priced.get());
             } else {
-                throw new IllegalStateException("A frozen direct model is no longer available");
+                throw new LlmModelUnavailableException("A frozen direct model is no longer available");
             }
         }
         return admitted.isEmpty() ? null : admitted;

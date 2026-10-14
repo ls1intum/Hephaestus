@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.TranslatorState;
 import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiPlanSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRuntimeFactory;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.AttachedSandbox;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmCredentials;
 import de.tum.cit.aet.hephaestus.testconfig.LiveLlmTest;
@@ -563,6 +564,14 @@ class MentorLiveLlmTest {
         for (String sidecar : new MentorRunnerProfile().sidecarScripts()) {
             Files.copy(Path.of("src", "main", "resources", "agent", sidecar), tmp.resolve(sidecar));
         }
+
+        Path library = tmp.resolve(SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
+        Files.createDirectories(library.getParent());
+        Files.createSymbolicLink(
+                library,
+                Path.of("..", "..", "docker", "agents", "practice-scripts", "lib")
+                        .toAbsolutePath()
+                        .normalize());
 
         // System prompt the runner loads from /workspace/agent/mentor/system.md. Keep it minimal —
         // the live LLM doesn't need the full production prompt to prove the round-trip works.

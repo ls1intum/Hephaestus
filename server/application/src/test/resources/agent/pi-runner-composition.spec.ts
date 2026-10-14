@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { isJsonObject as isRecord } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 
 import { Ajv } from "ajv";
 
@@ -512,7 +513,12 @@ const below = (resultId: string) => ({ resultId, disposition: "BELOW_BAR" });
 const allRaised = [raise("colors"), raise("handoff"), raise("why"), raise("description")];
 
 const errorsOf = (value: unknown, lineNotes = true, context = reviewContext): string[] => {
-	const read = readReview(value, results, lineNotes, context);
+	const read = readReview(
+		isRecord(value) ? { decisions: [], ...value } : value,
+		results,
+		lineNotes,
+		context,
+	);
 	return "errors" in read ? read.errors : [];
 };
 
@@ -1618,7 +1624,7 @@ void test("an empty or partial public review leaves negatives undecided", () => 
 		["one", { practiceSlug: "one", outcome: "NOT_MET", problems: [] }],
 		["two", { practiceSlug: "two", outcome: "NOT_MET", problems: [] }],
 	]);
-	const empty = readReview({}, negative, false, reviewContext);
+	const empty = readReview({ decisions: [] }, negative, false, reviewContext);
 	assert.ok("errors" in empty);
 	assert.match(empty.errors.join("\n"), /one, two has no decision/u);
 	const partial = readReview(
@@ -1700,9 +1706,10 @@ void test("malformed lists and legacy selection or withholding authorities are r
 	assert.ok("review" in readReview(spoken, results, true, reviewContext));
 	assert.ok("review" in readReview({ ...spoken, inline: null }, results, true, reviewContext));
 	for (const container of [{ basedOn: ["colors"], body: "One note." }, "colors", true]) {
-		assert.deepEqual(errorsOf({ ...spoken, inline: container }), [
-			"inline must be an array of line notes",
-		]);
+		assert.match(
+			errorsOf({ ...spoken, inline: container }).join("\n"),
+			/review.inline: Invalid input: expected array/u,
+		);
 	}
 	for (const container of [
 		{ resultId: "handoff", disposition: "BELOW_BAR" },
@@ -1712,7 +1719,7 @@ void test("malformed lists and legacy selection or withholding authorities are r
 	]) {
 		assert.match(
 			errorsOf({ ...spoken, decisions: container }).join("\n"),
-			/decisions is required: an array/u,
+			/review.decisions: Invalid input: expected array/u,
 		);
 	}
 	for (const field of ["selected", "selection", "withheld"]) {

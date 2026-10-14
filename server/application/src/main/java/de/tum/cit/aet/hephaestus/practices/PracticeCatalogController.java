@@ -113,7 +113,7 @@ public class PracticeCatalogController {
     @RequireAtLeastWorkspaceAdmin
     @Operation(operationId = "listPracticeVersions")
     public List<PracticeVersionDTO> history(WorkspaceContext ctx, @PathVariable String practiceSlug) {
-        return versions.history(practices.getPractice(ctx, practiceSlug));
+        return presenter.history(practices.getPractice(ctx, practiceSlug));
     }
 
     @GetMapping("/definition-options")

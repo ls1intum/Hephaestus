@@ -34,11 +34,10 @@ public class FeedbackDeliveryPolicy {
     public FeedbackCheck check(Feedback row, FeedbackCheckStage stage, boolean approval) {
         FeedbackCheck check = gate.evaluate(row, stage, approval);
         Map<FeedbackCheckStage, FeedbackChecks> checks = new EnumMap<>(FeedbackCheckStage.class);
-        checks.putAll(feedback.findByIdAndWorkspaceId(row.getId(), row.getWorkspaceId())
-                .orElseThrow()
-                .getChecks());
+        checks.putAll(row.getChecks());
         checks.put(check.stage(), new FeedbackChecks(List.of(check), check.checkedAt()));
         feedback.updateChecks(row.getWorkspaceId(), row.getId(), checks);
+        row.setChecks(Map.copyOf(checks));
         return check;
     }
 

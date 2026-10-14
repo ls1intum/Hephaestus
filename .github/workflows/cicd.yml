@@ -236,6 +236,10 @@ jobs:
               - 'pnpm-workspace.yaml'
             application-server:
               - 'server/**'
+              # E2eIdentitySeedDatabaseTest runs the real TypeScript seeder against the migrated schema.
+              - 'scripts/e2e-identity-seed-database.ts'
+              - 'scripts/e2e-setup.ts'
+              - 'scripts/lib/json.ts'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'scripts/run-gradlew.ts'

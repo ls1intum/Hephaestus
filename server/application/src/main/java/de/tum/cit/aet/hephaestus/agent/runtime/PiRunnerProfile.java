@@ -80,9 +80,12 @@ public interface PiRunnerProfile {
     /**
      * Trusted shell commands that set up the workspace after {@link #WRITABLE_DIRECTORIES} exist and before Node
      * starts, such as a link Node under {@code --permission} could not create. Emitted verbatim: each must be
-     * shell-safe and fixed, never built from job data. None by default.
+     * shell-safe and fixed, never built from job data. Both runners use the shared JSON helpers.
      */
     default List<String> setupCommands() {
-        return List.of();
+        return List.of(
+                "mkdir -p " + SandboxLayout.WORKSPACE_ROOT + "/" + SandboxLayout.PRACTICE_SCRIPT_PREFIX,
+                "ln -sfn " + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_TARGET + " " + SandboxLayout.WORKSPACE_ROOT + "/"
+                        + SandboxLayout.PRACTICE_SCRIPT_LIBRARY_LINK);
     }
 }

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -143,7 +144,7 @@ class PracticeStandingServiceTest {
         data.set(
                 data.size() - 1,
                 new ResultView(
-                        latest.result().toBuilder()
+                        resultBuilder(latest.result())
                                 .itemId(prior.result().getItemId())
                                 .build(),
                         latest.practice(),

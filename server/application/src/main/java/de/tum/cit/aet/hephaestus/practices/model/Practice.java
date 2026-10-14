@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.catalog.CatalogPracticeDocument;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
@@ -19,7 +20,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
-import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -33,7 +33,6 @@ import org.hibernate.annotations.SourceType;
 import org.hibernate.generator.EventType;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(
@@ -66,10 +65,6 @@ public class Practice {
     @ToString.Exclude
     private Workspace workspace;
 
-    @Column(name = "workspace_id", nullable = false, insertable = false, updatable = false)
-    @Setter(AccessLevel.NONE)
-    private Long workspaceId;
-
     @Column(nullable = false, length = 64, updatable = false)
     private String slug;
 
@@ -100,7 +95,7 @@ public class Practice {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "catalog_base", columnDefinition = "jsonb")
     @ToString.Exclude
-    private @Nullable JsonNode catalogBase;
+    private @Nullable CatalogPracticeDocument catalogBase;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

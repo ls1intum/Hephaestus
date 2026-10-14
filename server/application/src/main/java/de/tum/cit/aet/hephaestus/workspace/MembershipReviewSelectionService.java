@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MembershipReviewSelectionService implements MembershipReviewSelection {
     private final MembershipRepository memberships;
     private final WorkspaceActorSelector actors;
+    private final PersonProcessingSuppression suppression;
 
     @Override
     @Transactional(readOnly = true)
@@ -30,11 +33,13 @@ public class MembershipReviewSelectionService implements MembershipReviewSelecti
     }
 
     private Set<Long> eligible(long workspaceId, Collection<Long> accountIds, boolean allAccounts) {
-        return memberships.findEligibleAccountIds(
+        var eligible = memberships.findEligibleAccountIds(
                 workspaceId,
                 accountIds,
                 allAccounts,
                 actors.connectedProviderId(workspaceId).orElse(null));
+        var suppressed = suppression.suppressedAccountIds(eligible);
+        return eligible.stream().filter(id -> !suppressed.contains(id)).collect(Collectors.toUnmodifiableSet());
     }
 
     @Override

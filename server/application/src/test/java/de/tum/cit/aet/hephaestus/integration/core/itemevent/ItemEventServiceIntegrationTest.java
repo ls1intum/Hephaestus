@@ -215,7 +215,7 @@ class ItemEventServiceIntegrationTest extends BaseIntegrationTest {
     @ParameterizedTest
     @EnumSource(
             value = ItemEventState.class,
-            names = {"RECORDED", "WAITING", "BLOCKED"})
+            names = {"RECORDED", "WAITING"})
     void shouldExpireOnlyPendingEventsAndKeepTheirNativeFacts(ItemEventState pendingState) {
         transactions.executeWithoutResult(status -> {
             var pending = input();

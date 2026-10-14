@@ -84,7 +84,7 @@ class CandidateFixturesTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldRefuseEveryInvalidFixtureWithItsSidecarCodeWhenTheFixtureIsParsed() throws IOException {
+    void shouldRefuseInvalidWireValuesAndDeferQuoteOverlapToVerification() throws IOException {
         Map<String, JsonNode> invalid = resources("invalid-*.json");
         JsonNode sidecar = Objects.requireNonNull(invalid.remove("invalid-refusals.json"), "invalid-refusals.json");
         Map<String, String> codes = new LinkedHashMap<>();
@@ -92,11 +92,19 @@ class CandidateFixturesTest extends BaseUnitTest {
                 .forEach(entry -> codes.put(entry.getKey(), entry.getValue().asString()));
 
         assertThat(codes.keySet()).as("the sidecar names every invalid fixture").isEqualTo(invalid.keySet());
-        invalid.forEach((name, fixture) -> assertThatThrownBy(() -> CandidateParser.parse(fixture))
-                .as(name)
-                .isInstanceOfSatisfying(
-                        CandidateRefusedException.class,
-                        refused -> assertThat(refused.reasonCode()).as(name).isEqualTo(codes.get(name))));
+        invalid.forEach((name, fixture) -> {
+            if (CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM.wireValue().equals(codes.get(name))) {
+                assertThat(CandidateParser.parse(fixture)).as(name).isInstanceOf(NotMetCandidate.class);
+            } else {
+                assertThatThrownBy(() -> CandidateParser.parse(fixture))
+                        .as(name)
+                        .isInstanceOfSatisfying(
+                                CandidateRefusedException.class,
+                                refused -> assertThat(refused.reasonCode())
+                                        .as(name)
+                                        .isEqualTo(codes.get(name)));
+            }
+        });
     }
 
     @Test
@@ -132,9 +140,9 @@ class CandidateFixturesTest extends BaseUnitTest {
         firstCitation(emptySource).put("sourceKind", "");
         assertRefused(emptySource, CandidateRefusal.MALFORMED_CANDIDATE);
 
-        ObjectNode emptyArtifact = fixture("candidate-met-with-example.json");
-        firstCitation(emptyArtifact).put("sourcePath", "");
-        assertRefused(emptyArtifact, CandidateRefusal.MALFORMED_CANDIDATE);
+        ObjectNode emptySourcePath = fixture("candidate-met-with-example.json");
+        firstCitation(emptySourcePath).put("sourcePath", "");
+        assertRefused(emptySourcePath, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
     @Test
@@ -151,9 +159,9 @@ class CandidateFixturesTest extends BaseUnitTest {
         var longPath = bounded.deepCopy();
         firstCitation(longPath).put("path", "y".repeat(4097));
         assertRefused(longPath, CandidateRefusal.MALFORMED_CANDIDATE);
-        var longRevision = bounded.deepCopy();
-        firstCitation(longRevision).put("commit", "r".repeat(1025));
-        assertRefused(longRevision, CandidateRefusal.MALFORMED_CANDIDATE);
+        var longCommit = bounded.deepCopy();
+        firstCitation(longCommit).put("commit", "r".repeat(1025));
+        assertRefused(longCommit, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
     @Test
@@ -213,9 +221,9 @@ class CandidateFixturesTest extends BaseUnitTest {
         omission(longWhat).put("what", "x".repeat(CandidateLimits.SUMMARY_CHARS + 1));
         assertRefused(longWhat, CandidateRefusal.MALFORMED_CANDIDATE);
 
-        ObjectNode longUnit = fixture("candidate-not-met.json");
-        omission(longUnit).putArray("units").add("x".repeat(CandidateLimits.WARRANT_FIELD_CHARS + 1));
-        assertRefused(longUnit, CandidateRefusal.MALFORMED_CANDIDATE);
+        ObjectNode longItem = fixture("candidate-not-met.json");
+        omission(longItem).putArray("items").add("x".repeat(CandidateLimits.WARRANT_FIELD_CHARS + 1));
+        assertRefused(longItem, CandidateRefusal.MALFORMED_CANDIDATE);
 
         ObjectNode longConsulted = fixture("candidate-met-with-example.json");
         ((ObjectNode) evidence(longConsulted).get("search"))
@@ -272,9 +280,9 @@ class CandidateFixturesTest extends BaseUnitTest {
 
     @Test
     void shouldRefuseExplicitNullAndForgedProofWhenOptionalCitationKeysArePresent() throws IOException {
-        ObjectNode nullRevision = fixture("candidate-met-with-example.json");
-        firstCitation(nullRevision).putNull("commit");
-        assertRefused(nullRevision, CandidateRefusal.MALFORMED_CANDIDATE);
+        ObjectNode nullCommit = fixture("candidate-met-with-example.json");
+        firstCitation(nullCommit).putNull("commit");
+        assertRefused(nullCommit, CandidateRefusal.MALFORMED_CANDIDATE);
 
         ObjectNode forgedProof = fixture("candidate-met-with-example.json");
         firstCitation(forgedProof).putObject("verification").put("status", "MATCHED");
@@ -297,6 +305,35 @@ class CandidateFixturesTest extends BaseUnitTest {
 
         ((ObjectNode) candidate.get("coverage")).remove("total");
         assertRefused(candidate, CandidateRefusal.MALFORMED_CANDIDATE);
+    }
+
+    @Test
+    void shouldNameTheInvalidFieldAndConstraintWithoutItsValue() throws IOException {
+        var candidate = fixture("candidate-met-with-example.json");
+        String rejected = "private text\nfrom captured work";
+        candidate.put("summary", rejected);
+        assertThatThrownBy(() -> CandidateParser.parse(candidate))
+                .isInstanceOf(CandidateRefusedException.class)
+                .hasMessageContaining("summary (Pattern)")
+                .hasMessageNotContaining(rejected);
+    }
+
+    @Test
+    void shouldRejectExplicitNullsButAllowAbsentOptionalsAndRequiredNullableTotal() throws IOException {
+        var valid = fixture("candidate-met-with-example.json");
+        firstCitation(valid).remove("commit");
+        assertThat(CandidateParser.parse(valid)).isInstanceOf(MetCandidate.class);
+        for (var key : List.of("example", "problems")) {
+            var explicit = valid.deepCopy();
+            explicit.putNull(key);
+            assertRefused(explicit, CandidateRefusal.MALFORMED_CANDIDATE);
+        }
+        var nullElement = valid.deepCopy();
+        ((ArrayNode) nullElement.path("citations")).addNull();
+        assertRefused(nullElement, CandidateRefusal.MALFORMED_CANDIDATE);
+        var falseTotal = valid.deepCopy();
+        evidence(falseTotal).putNull("total");
+        assertRefused(falseTotal, CandidateRefusal.MALFORMED_CANDIDATE);
     }
 
     private static void assertRefused(JsonNode value, CandidateRefusal expected) {

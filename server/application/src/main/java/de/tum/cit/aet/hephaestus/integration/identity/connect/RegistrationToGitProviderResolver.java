@@ -129,16 +129,6 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<IdentityProfile> profile(long providerId, String providerUserKey, @Nullable String teamKey) {
-        if (teamKey != null && !teamKey.isEmpty()) return Optional.empty();
-        return actorId(providerId, providerUserKey)
-                .flatMap(userRepository::findById)
-                .map(user ->
-                        new IdentityProfile(user.getLogin(), user.getName(), user.getAvatarUrl(), user.getHtmlUrl()));
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Map<IdentityKey, IdentityProfile> profiles(Collection<IdentityKey> identities) {
         var requested = new HashSet<IdentityKey>();
         var providerIds = new HashSet<Long>();

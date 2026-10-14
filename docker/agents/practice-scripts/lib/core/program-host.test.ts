@@ -213,34 +213,6 @@ const slowReview = (ms: number) => async () => {
 };
 
 void describe("a practice's result", () => {
-	void test("a custom program cannot return a diff problem with a tree example on the same lines", async () => {
-		const ws = await workspace({
-			overlap: program(
-				"definePracticeScript",
-				`{ meta: {}, async run(ctx) {
-				if (scm(ctx).files === null || scm(ctx).files.change === null) throw new Error("The files were not captured");
-				const diff = await scm(ctx).files.change.cite("src/cart.ts", "NEW", 2);
-				const tree = await scm(ctx).files.head.cite("src/cart.ts", 2);
-				return {
-					outcome: "NOT_MET", summary: "A problem", explanation: "The added code has a problem.", citations: [],
-					problems: [{ severity: "MAJOR", summary: "A problem", explanation: "The code has a problem.", citations: [diff], basis: { type: "introduced", head: 0, explanation: "The change adds it." } }],
-					example: { citation: tree, note: "The practice done well." }, evidence: {},
-					coverage: { source: "claimed", selected: 1, checked: 1, total: 1, complete: true }
-				};
-			} }`,
-			),
-		});
-		await writeFile(
-			path.join(ws.repo, "src", "cart.ts"),
-			"export class Cart {\n  // increment the item count by one\n  count += 1;\n}\n",
-		);
-		const { outcome } = await run(ws, "overlap");
-		assert.equal(outcome.status, "failed");
-		assert.equal(outcome.stopReason, "invalid-candidate");
-		assert.match(outcome.error ?? "", /example_overlaps_problem/u);
-		assert.equal(outcome.candidate, undefined);
-	});
-
 	void test("a custom program that decides in code returns its own result and asks for no review", async () => {
 		const ws = await workspace({ direct: await fixture("direct") });
 		const { outcome, reviews, staged } = await run(ws, "direct");

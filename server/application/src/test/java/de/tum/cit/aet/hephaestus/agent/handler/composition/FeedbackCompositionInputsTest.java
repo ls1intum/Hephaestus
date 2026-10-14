@@ -48,8 +48,8 @@ class FeedbackCompositionInputsTest {
                 Set.of(CopyCapability.SUMMARY),
                 mapper);
         var input = mapper.readTree(Objects.requireNonNull(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH)));
-        assertThat(input.path("destinations").path("ON_WORK").path("enabled").asBoolean())
-                .isTrue();
+        assertThat(input.path("destinations").path("ON_WORK").path("maxPieces").asInt())
+                .isEqualTo(1);
         assertThat(input.path("onWorkCopyForms").isArray()).isTrue();
         assertThat(input.path("onWorkCopyForms").isEmpty()).isTrue();
     }
@@ -68,14 +68,14 @@ class FeedbackCompositionInputsTest {
         assertThat(input.path("destinations").has("ON_WORK")).isFalse();
         assertThat(input.path("destinations")
                         .path("PRACTICE_PAGE")
-                        .path("enabled")
-                        .asBoolean())
-                .isTrue();
+                        .path("maxPieces")
+                        .asInt())
+                .isEqualTo(1);
         assertThat(input.path("destinations")
                         .path("CONVERSATION")
-                        .path("enabled")
-                        .asBoolean())
-                .isTrue();
+                        .path("maxPieces")
+                        .asInt())
+                .isEqualTo(1);
         assertThat(input.path("onWorkCopyForms").isEmpty()).isTrue();
     }
 

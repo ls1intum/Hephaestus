@@ -13,6 +13,7 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
+// Schema type overrides on parts or metadata cause springdoc to emit strings instead of structured values.
 @Schema(description = "Mentor chat message in AI SDK UIMessage shape.")
 public record ChatMessageDTO(
         UUID id,

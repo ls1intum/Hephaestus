@@ -135,14 +135,14 @@ public class PracticeService {
         practice.setFeedbackMode(mode);
         if (catalogDocument != null) {
             practice.setCatalogSlug(slug);
-            practice.setCatalogBase(mapper.valueToTree(catalogDocument));
+            practice.setCatalogBase(catalogDocument);
         }
         practices.save(practice);
         audit.record(ConfigAuditEntry.created(
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
                 practice.getId(),
                 ctx.id(),
-                PracticeDefinitionSnapshot.of(practice)));
+                PracticeDefinitionSnapshot.of(practice, mapper)));
         return practice;
     }
 
@@ -156,7 +156,7 @@ public class PracticeService {
             throw new StalePracticeVersionException(
                     Objects.requireNonNull(practice.getCurrentVersion().getId()).toString());
         }
-        var before = PracticeDefinitionSnapshot.of(practice);
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
         versions.append(
                 practice,
                 request.definition().toDefinition(),
@@ -208,7 +208,7 @@ public class PracticeService {
             WorkspaceContext ctx, String slug, @Nullable String groupSlug, @PositiveOrZero int position) {
         lock(ctx);
         Practice practice = getPractice(ctx, slug);
-        var before = PracticeDefinitionSnapshot.of(practice);
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
         PracticeGroup destination = group(ctx, groupSlug);
         Long oldGroup = practice.getGroup() == null ? null : practice.getGroup().getId();
         practice.setGroup(destination);
@@ -245,7 +245,7 @@ public class PracticeService {
                 ConfigAuditEntityType.PRACTICE_DEFINITION,
                 practice.getId(),
                 ctx.id(),
-                PracticeDefinitionSnapshot.of(practice)));
+                PracticeDefinitionSnapshot.of(practice, mapper)));
         try {
             practices.delete(practice);
             practices.flush();
@@ -274,6 +274,6 @@ public class PracticeService {
                 practice.getId(),
                 ctx.id(),
                 before,
-                PracticeDefinitionSnapshot.of(practice)));
+                PracticeDefinitionSnapshot.of(practice, mapper)));
     }
 }

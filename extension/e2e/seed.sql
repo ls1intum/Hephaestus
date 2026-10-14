@@ -247,7 +247,7 @@ DECLARE
   version text;
   page_url text;
   note_base bigint;
-  citation jsonb := '{"sourceKind":"scm.pull-request.diff","sourcePath":"work/change/diff.patch","path":"README.md","side":"NEW","revision":null,"startLine":12,"endLine":12,"quote":"Synthetic line","verification":null}'::jsonb;
+  citation jsonb := '{"sourceKind":"scm.pull-request.diff","sourcePath":"work/change/diff.patch","path":"README.md","side":"NEW","commit":null,"startLine":12,"endLine":12,"quote":"Synthetic line","verification":null}'::jsonb;
   fixture_time timestamptz := '2026-09-27 08:00:00+00';
 BEGIN
   SELECT id INTO other FROM account WHERE id = 920002;

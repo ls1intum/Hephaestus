@@ -86,11 +86,6 @@ function limitErrors(limits: ReturnType<typeof runLimitsSchema.safeParse>) {
 	return limits.success ? undefined : z.flattenError(limits.error).fieldErrors;
 }
 
-function idsShown(entries: readonly (readonly [id: string, shown: boolean])[]): string | undefined {
-	const ids = entries.filter(([, shown]) => shown).map(([id]) => id);
-	return ids.length > 0 ? ids.join(" ") : undefined;
-}
-
 // A refusal belongs to the rejected model; changing the model must clear that refusal.
 function refusalOf(
 	saveError: string | undefined,
@@ -188,12 +183,15 @@ export function AgentBindingEditor({
 	const saveErrorId = `${rowId}-save-error`;
 	const timeoutErrorId = `${rowId}-timeout-error`;
 	const concurrencyErrorId = `${rowId}-concurrency-error`;
-	const modelDescribedBy = idsShown([
-		[noteId, unusedForCloudMembers],
-		[modelHintId, hintShown],
-		[modelErrorId, modelError !== null],
-		[saveErrorId, hasText(refusal)],
-	]);
+	const modelDescribedBy = Object.entries({
+		[noteId]: unusedForCloudMembers,
+		[modelHintId]: hintShown,
+		[modelErrorId]: hasText(modelError),
+		[saveErrorId]: hasText(refusal),
+	})
+		.filter(([, shown]) => shown)
+		.map(([id]) => id)
+		.join(" ");
 
 	const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();

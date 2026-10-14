@@ -1,57 +1,24 @@
-import { z } from "zod";
-
 import type { AppliesWhen, AppliesWhenClause, PracticeItemTypeOption } from "@/api/types.gen";
 import { hasText } from "@/lib/text";
 
 import { pathPatternProblem } from "./scan-settings";
 
-export const MAX_APPLIES_WHEN_CLAUSES = 10;
-export const MAX_OTHERWISE_LENGTH = 300;
+export type ApplicabilityClause = PracticeItemTypeOption["applicabilityClauses"][number];
 
-const term = z
-	.string()
-	.max(200)
-	.refine((value) => value.trim().length > 0);
-
-const clause = z
-	.strictObject({
-		changedPath: z
-			.array(term.refine((value) => pathPatternProblem(value) === undefined))
-			.min(1)
-			.max(100)
-			.optional(),
-		diffContains: z.array(term).min(1).max(100).optional(),
-		hasItems: z.string().trim().min(1).max(4096).optional(),
-	})
-	.refine(
-		(value) =>
-			[value.changedPath, value.diffContains, value.hasItems].filter((item) => item !== undefined)
-				.length === 1,
-	);
-
-const clauses = z.array(clause).min(1).max(MAX_APPLIES_WHEN_CLAUSES);
-
-type ApplicabilityClause = PracticeItemTypeOption["applicabilityClauses"][number];
-
-function clauseKind(item: AppliesWhenClause): ApplicabilityClause {
-	if (item.changedPath !== undefined) {
+export function clauseKind(clause: AppliesWhenClause): ApplicabilityClause {
+	if (clause.changedPath !== undefined) {
 		return "CHANGED_PATH";
 	}
-	return item.diffContains === undefined ? "HAS_ITEMS" : "DIFF_CONTAINS";
-}
-
-export function appliesWhenText(appliesWhen: AppliesWhen | null): string {
-	return appliesWhen === null ? "" : JSON.stringify(appliesWhen.anyOf, null, 2);
+	return clause.diffContains === undefined ? "HAS_ITEMS" : "DIFF_CONTAINS";
 }
 
 export interface AppliesWhenDraft {
-	/** The `anyOf` list as JSON. Blank means the practice applies to every item. */
-	clauses: string;
+	clauses: AppliesWhenClause[];
 	otherwise: string;
 }
 
 export function appliesWhenDraftOf(appliesWhen: AppliesWhen | null): AppliesWhenDraft {
-	return { clauses: appliesWhenText(appliesWhen), otherwise: appliesWhen?.otherwise ?? "" };
+	return { clauses: appliesWhen?.anyOf ?? [], otherwise: appliesWhen?.otherwise ?? "" };
 }
 
 export interface ParsedAppliesWhen {
@@ -60,56 +27,49 @@ export interface ParsedAppliesWhen {
 	otherwiseError?: string;
 }
 
-/**
- * The draft as the definition saves it, with the reason it cannot be saved. A clause the item type
- * cannot check is refused here rather than by the server, so the author sees it beside the field.
- */
 export function parseAppliesWhen(
 	draft: AppliesWhenDraft,
 	itemType: PracticeItemTypeOption | undefined,
 ): ParsedAppliesWhen {
-	if (draft.clauses.trim() === "") {
+	if (draft.clauses.length === 0) {
 		return { value: null };
 	}
-	let parsed: AppliesWhenClause[];
-	try {
-		const result = clauses.safeParse(JSON.parse(draft.clauses));
-		if (!result.success) {
+	const anyOf: AppliesWhenClause[] = [];
+	for (const clause of draft.clauses) {
+		if (itemType && !itemType.applicabilityClauses.includes(clauseKind(clause))) {
 			return {
 				value: null,
-				clausesError: `Write a list of 1 to ${MAX_APPLIES_WHEN_CLAUSES} conditions, each with one of changedPath, diffContains or hasItems.`,
+				clausesError: "This kind of item cannot check one of these conditions.",
 			};
 		}
-		parsed = result.data;
-	} catch {
-		return { value: null, clausesError: "Enter the conditions as valid JSON." };
-	}
-	if (
-		itemType &&
-		parsed.some((item) => !itemType.applicabilityClauses.includes(clauseKind(item)))
-	) {
-		return { value: null, clausesError: "This kind of item cannot check one of these conditions." };
+		if (clause.changedPath !== undefined || clause.diffContains !== undefined) {
+			const values = clause.changedPath ?? clause.diffContains ?? [];
+			if (values.length === 0 || values.some((value) => !hasText(value.trim()))) {
+				return { value: null, clausesError: "Enter a value for each condition." };
+			}
+			if (clause.changedPath === undefined) {
+				anyOf.push({ diffContains: values });
+			} else {
+				const problem = values.map(pathPatternProblem).find((value) => value !== undefined);
+				if (problem !== undefined) {
+					return { value: null, clausesError: problem };
+				}
+				anyOf.push({ changedPath: values });
+			}
+		} else {
+			const source = clause.hasItems;
+			if (source === undefined || !hasText(source.trim())) {
+				return { value: null, clausesError: "Enter a value for each condition." };
+			}
+			anyOf.push({ hasItems: source });
+		}
 	}
 	const otherwise = draft.otherwise.trim();
-	if (!hasText(otherwise) || otherwise.length > MAX_OTHERWISE_LENGTH) {
+	if (!hasText(otherwise)) {
 		return {
 			value: null,
-			otherwiseError: `Say in at most ${MAX_OTHERWISE_LENGTH} characters why the practice does not apply otherwise.`,
+			otherwiseError: "Say why the practice does not apply when no condition holds.",
 		};
 	}
-	return { value: { anyOf: parsed, otherwise } };
-}
-
-export function appliesWhenPresentation(itemType: PracticeItemTypeOption | undefined) {
-	const kinds = itemType?.applicabilityClauses ?? [];
-	return {
-		supported: kinds.length > 0,
-		description:
-			kinds.length === 0
-				? "This kind of item cannot check conditions. Clear the conditions to continue."
-				: "Leave empty to review every item. A review only runs when one of these conditions holds, whatever started it.",
-		example: kinds.includes("CHANGED_PATH")
-			? JSON.stringify([{ changedPath: ["**/*.swift"] }])
-			: undefined,
-	};
+	return { value: { anyOf, otherwise } };
 }

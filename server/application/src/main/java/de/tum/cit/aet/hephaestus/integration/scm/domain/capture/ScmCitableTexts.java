@@ -93,12 +93,12 @@ public final class ScmCitableTexts {
         var paths = git.changedPaths(prepared.key(), prepared.target(), prepared.head());
         List<CitableText> texts = new ArrayList<>();
         for (CitationSide side : CitationSide.values()) {
-            String revision = side == CitationSide.OLD ? prepared.target() : prepared.head();
+            String commitSha = side == CitationSide.OLD ? prepared.target() : prepared.head();
             Map<String, byte[]> captured = Objects.requireNonNull(
                     git.read(prepared.key(), repository -> {
                         Map<String, byte[]> result = new LinkedHashMap<>();
                         try (RevWalk walk = new RevWalk(repository)) {
-                            var tree = walk.parseCommit(ObjectId.fromString(revision))
+                            var tree = walk.parseCommit(ObjectId.fromString(commitSha))
                                     .getTree();
                             for (String path : paths) {
                                 try (TreeWalk entry = TreeWalk.forPath(repository, path, tree)) {
@@ -123,13 +123,13 @@ public final class ScmCitableTexts {
                 String staged = "context/citable/" + side.name().toLowerCase(Locale.ROOT) + "/" + path;
                 if (files.putIfAbsent(staged, bytes) != null)
                     throw new IllegalStateException("Duplicate staged diff text");
-                add(texts, PullRequestContentSource.DIFF, path, side, revision, staged, bytes);
+                add(texts, PullRequestContentSource.DIFF, path, side, commitSha, staged, bytes);
             });
         }
         return List.copyOf(texts);
     }
 
-    public static List<CitableText> tree(Path root, String revision) {
+    public static List<CitableText> tree(Path root, String commitSha) {
         List<CitableText> texts = new ArrayList<>();
         try (var paths = Files.walk(root)) {
             for (Path file : paths.filter(path -> Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS))
@@ -143,7 +143,7 @@ public final class ScmCitableTexts {
                             RepositoryTreeContentSource.KIND,
                             relative,
                             CitationSide.NEW,
-                            revision,
+                            commitSha,
                             "repos/reviewed/" + relative,
                             bytes);
             }
@@ -159,11 +159,11 @@ public final class ScmCitableTexts {
             SourceKind source,
             String path,
             CitationSide side,
-            @Nullable String revision,
+            @Nullable String commitSha,
             String staged,
             byte[] bytes) {
         String digest = ScmVersion.contentHash(bytes);
-        texts.add(new CitableText(source.value(), path, side, revision, staged, digest));
-        if (revision != null) texts.add(new CitableText(source.value(), path, side, null, staged, digest));
+        texts.add(new CitableText(source.value(), path, side, commitSha, staged, digest));
+        if (commitSha != null) texts.add(new CitableText(source.value(), path, side, null, staged, digest));
     }
 }

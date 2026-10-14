@@ -77,14 +77,6 @@ public class ReviewServiceImpl implements ReviewService {
     @Transactional(noRollbackFor = ReviewRequestRejected.class)
     public UUID request(ReviewRequest request) {
         validate(request);
-        if (request.requestKey() != null) {
-            var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
-            if (existing.isPresent()) {
-                if (!Objects.equals(existing.orElseThrow().getRequestDigest(), request.requestDigest()))
-                    throw replayConflict(existing.orElseThrow());
-                return existing.orElseThrow().getId();
-            }
-        }
         var workspace = workspaces.findByIdForUpdate(request.workspaceId()).orElseThrow();
         if (request.requestKey() != null) {
             var existing = reviews.findByWorkspaceIdAndRequestKey(request.workspaceId(), request.requestKey());
@@ -132,7 +124,7 @@ public class ReviewServiceImpl implements ReviewService {
         if (request.kind() == ReviewKind.SCAN) {
             if (!coverage.admitsRepositoryItem(workspace, ref.itemId()))
                 throw new ReviewRequestRejected(
-                        ReviewRequestRejected.Reason.REQUEST_CONFLICT, "The repository is outside the review scope.");
+                        ReviewRequestRejected.Reason.ITEM_INELIGIBLE, "The repository is outside the review scope.");
             if (!ref.kind().value().equals("scm.repository"))
                 throw new ReviewRequestRejected(
                         ReviewRequestRejected.Reason.ITEM_INELIGIBLE, "Select a repository for a scan.");
@@ -146,14 +138,14 @@ public class ReviewServiceImpl implements ReviewService {
                     .sorted(Comparator.comparing(Practice::getId))
                     .toList();
         } else {
-            var decision = gate.evaluate(workspace, pinned, request.origin(), event, request.practiceIds());
-            if (decision instanceof GateDecision.Skip skip)
-                throw new ReviewRequestRejected(
-                        ReviewRequestRejected.Reason.ITEM_INELIGIBLE,
-                        "No practice can review this item.",
-                        skip.eventReason());
-            var run = (GateDecision.Run) decision;
-            selected = run.matchedPractices();
+            selected = switch (gate.evaluate(workspace, pinned, request.origin(), event, request.practiceIds())) {
+                case GateDecision.Skip skip ->
+                    throw new ReviewRequestRejected(
+                            ReviewRequestRejected.Reason.ITEM_INELIGIBLE,
+                            "No practice can review this item.",
+                            skip.eventReason());
+                case GateDecision.Run run -> run.matchedPractices();
+            };
         }
         if (selected.isEmpty()
                 || (!request.practiceIds().isEmpty()

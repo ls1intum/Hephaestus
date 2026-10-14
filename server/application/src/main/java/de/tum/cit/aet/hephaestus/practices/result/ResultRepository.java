@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.practices.result;
 
 import de.tum.cit.aet.hephaestus.practices.model.Result;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultEndReason;
-import de.tum.cit.aet.hephaestus.practices.spi.ResultMarkKind;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.Collection;
@@ -10,8 +9,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
@@ -90,20 +87,6 @@ public interface ResultRepository extends JpaRepository<Result, UUID>, ResultQue
             @Param("itemId") long itemId,
             @Param("reason") ResultEndReason reason,
             @Param("at") Instant at);
-
-    @Query("""
-        SELECT r FROM Result r
-        WHERE r.workspaceId = :workspaceId AND r.developerId = :developerId
-          AND r.endedAt IS NULL
-          AND NOT EXISTS (SELECT m.id FROM ResultMark m WHERE m.resultId = r.id
-              AND m.workspaceId = r.workspaceId AND m.kind = :incorrect AND m.removedAt IS NULL)
-        ORDER BY r.recordedAt DESC, r.id DESC
-        """)
-    Page<Result> findCurrentForDeveloper(
-            @Param("workspaceId") long workspaceId,
-            @Param("developerId") long developerId,
-            @Param("incorrect") ResultMarkKind incorrect,
-            Pageable pageable);
 
     @Query(value = """
         SELECT r.* FROM result r

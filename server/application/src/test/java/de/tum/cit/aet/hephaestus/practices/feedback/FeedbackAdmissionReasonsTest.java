@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -64,7 +65,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.PageImpl;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -109,8 +109,7 @@ class FeedbackAdmissionReasonsTest {
     private final ItemCatalog catalog = mock(ItemCatalog.class);
     private final FeedbackBasisRepository basis = mock(FeedbackBasisRepository.class);
     private final PreviousPracticePageFeedback previous = mock(PreviousPracticePageFeedback.class);
-    private final PracticePageSupportReader support =
-            new PracticePageSupportReader(results, clock, previous, practices, queries);
+    private final PracticePageSupportReader support = new PracticePageSupportReader(previous, practices, queries);
     private final FeedbackCompositionContextService composition = new FeedbackCompositionContextService(
             reviews,
             results,
@@ -157,8 +156,8 @@ class FeedbackAdmissionReasonsTest {
         practice.setSlug("focused-tests");
         when(practices.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(practice));
         when(previous.find(1, 7, "focused-tests", now)).thenReturn(Optional.empty());
-        when(results.findCurrentForDeveloper(anyLong(), anyLong(), any(), any()))
-                .thenReturn(new PageImpl<>(List.of(current)));
+        when(queries.findPageSupport(anyLong(), anyLong(), anyLong(), any(), any()))
+                .thenReturn(List.of(current));
         var descriptor = mock(ItemDescriptor.class);
         when(descriptor.copyCapabilities()).thenReturn(Set.of(CopyCapability.SUMMARY));
         when(catalog.descriptorFor(snapshot.item().kind())).thenReturn(Optional.of(descriptor));
@@ -197,7 +196,7 @@ class FeedbackAdmissionReasonsTest {
 
     @Test
     void separatesAnUnattributableSubjectFromAnUnavailableRecipient() {
-        var developerless = current.toBuilder().developerId(null).build();
+        var developerless = resultBuilder(current).developerId(null).build();
         var admission = composition.conversationDecision(snapshot, developerless);
         assertThat(admission.decision()).isEqualTo(ConversationDecision.UNATTRIBUTABLE_SUBJECT);
         assertThat(admission.stopReason()).isEqualTo(FeedbackStopReason.PUBLIC_SUBJECT_INELIGIBLE);
@@ -206,8 +205,8 @@ class FeedbackAdmissionReasonsTest {
     @Test
     void rejectsNonNegativeConversationInputBeforePreparingFeedback() {
         when(results.findByWorkspaceIdAndIdIn(1, List.of(current.getId())))
-                .thenReturn(
-                        List.of(current.toBuilder().outcome(ResultOutcome.MET).build()));
+                .thenReturn(List.of(
+                        resultBuilder(current).outcome(ResultOutcome.MET).build()));
         assertThatThrownBy(() -> preparation.prepare(conversationDraft(), Optional.empty()))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("NOT_MET");
@@ -215,17 +214,18 @@ class FeedbackAdmissionReasonsTest {
 
     @Test
     void preservesPermissionRefusalWhenThePrimaryResultIsOutsideTheSupportWindow() {
-        var about =
-                current.toBuilder().recordedAt(now.minusSeconds(100 * 86400L)).build();
-        var historical = current.toBuilder().id(UUID.randomUUID()).itemId(4).build();
+        var about = resultBuilder(current)
+                .recordedAt(now.minusSeconds(100 * 86400L))
+                .build();
+        var historical = resultBuilder(current).id(UUID.randomUUID()).itemId(4).build();
         var practice = new Practice();
         practice.setId(5L);
         practice.setWorkspace(TestEntities.workspace(1L));
         practice.setSlug("focused-tests");
         when(practices.findByIdAndWorkspaceId(5L, 1L)).thenReturn(Optional.of(practice));
         when(previous.find(1, 7, "focused-tests", now)).thenReturn(Optional.empty());
-        when(results.findCurrentForDeveloper(anyLong(), anyLong(), any(), any()))
-                .thenReturn(new PageImpl<>(List.of(about, historical)));
+        when(queries.findPageSupport(anyLong(), anyLong(), anyLong(), any(), any()))
+                .thenReturn(List.of(historical));
         when(gate.evaluateComposition(any(), anyLong(), anyList(), any())).thenAnswer(call -> {
             List<Result> rows = call.getArgument(2);
             boolean allowed = rows.equals(List.of(about));

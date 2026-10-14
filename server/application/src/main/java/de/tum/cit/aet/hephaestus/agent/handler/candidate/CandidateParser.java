@@ -18,6 +18,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.StateBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.WorsenedBasis;
 import jakarta.validation.Validator;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,16 +54,27 @@ public final class CandidateParser {
         }
         CandidateDocument sent;
         try {
-            rejectExplicitNulls(value);
             sent = READER.readValue(value);
-        } catch (JacksonException | IllegalArgumentException malformed) {
+        } catch (JacksonException malformed) {
             throw new CandidateRefusedException(
                     CandidateRefusal.MALFORMED_CANDIDATE,
                     "The candidate does not match the result contract",
                     malformed);
         }
-        if (!VALIDATOR.validate(sent).isEmpty())
-            throw refuse(CandidateRefusal.MALFORMED_CANDIDATE, "The candidate exceeds its contract bounds");
+        var violations = VALIDATOR.validate(sent);
+        if (!violations.isEmpty()) {
+            var violation = violations.stream()
+                    .min(Comparator.comparing(v -> v.getPropertyPath().toString()))
+                    .orElseThrow();
+            throw refuse(
+                    CandidateRefusal.MALFORMED_CANDIDATE,
+                    "The candidate exceeds its contract bounds: " + violation.getPropertyPath() + " ("
+                            + violation
+                                    .getConstraintDescriptor()
+                                    .getAnnotation()
+                                    .annotationType()
+                                    .getSimpleName() + ")");
+        }
         Candidate candidate = rules(sent);
         for (var citation : candidate.allCitations())
             if (citation.endLine() < citation.startLine())
@@ -140,18 +152,7 @@ public final class CandidateParser {
 
     private static Candidate rules(CandidateDocument sent) {
         ResultOutcome outcome = sent.outcome();
-        List<CandidateProblem> problems = sent.problems() == null
-                ? null
-                : sent.problems().stream()
-                        .map(problem -> new CandidateProblem(
-                                problem.key(),
-                                problem.severity(),
-                                problem.summary(),
-                                problem.explanation(),
-                                problem.citations(),
-                                problem.basis(),
-                                problem.nextStep()))
-                        .toList();
+        List<CandidateProblem> problems = sent.problems();
         List<EvidenceCitation> citations = sent.citations();
         ResultCoverage coverage = sent.coverage();
         SearchWarrant searchNode = sent.evidence().search();
@@ -204,17 +205,6 @@ public final class CandidateParser {
         ResultExample example = sent.example();
         if (example != null && outcome != ResultOutcome.MET && outcome != ResultOutcome.NOT_MET) {
             throw refuse(CandidateRefusal.EXAMPLE_OUTCOME_MISMATCH, "a " + outcome + " result has no example");
-        }
-        if (example != null && problems != null) {
-            EvidenceCitation exampleCitation = example.citation();
-            for (CandidateProblem problem : problems) {
-                for (EvidenceCitation cited : problem.citations()) {
-                    if (overlaps(cited, exampleCitation)) {
-                        throw refuse(
-                                CandidateRefusal.EXAMPLE_OVERLAPS_PROBLEM, "the example cites the place of a problem");
-                    }
-                }
-            }
         }
         if (problems != null) {
             for (int index = 0; index < problems.size(); index++) {
@@ -289,16 +279,6 @@ public final class CandidateParser {
                 : null;
     }
 
-    private static boolean overlaps(EvidenceCitation a, EvidenceCitation b) {
-        return a.sourceKind().equals(b.sourceKind())
-                && a.sourcePath().equals(b.sourcePath())
-                && Objects.equals(a.commit(), b.commit())
-                && a.path().equals(b.path())
-                && a.side() == b.side()
-                && a.startLine() <= b.endLine()
-                && b.startLine() <= a.endLine();
-    }
-
     private static List<Integer> basisIndices(ClaimBasis basis) {
         return switch (basis) {
             case IntroducedBasis introduced -> List.of(introduced.head());
@@ -306,20 +286,6 @@ public final class CandidateParser {
             case DutyBasis duty -> List.of(duty.event());
             case StateBasis state -> List.of();
         };
-    }
-
-    // Jackson creator binding represents both missing optionals and explicit null as Java null.
-    // The wire contract permits JSON null only for claimed coverage's required total.
-    private static void rejectExplicitNulls(JsonNode value) {
-        if (value.isObject()) {
-            for (Map.Entry<String, JsonNode> property : value.properties()) {
-                if (property.getValue().isNull() && !property.getKey().equals("total"))
-                    throw new IllegalArgumentException("Explicit null is not permitted for " + property.getKey());
-                rejectExplicitNulls(property.getValue());
-            }
-        } else if (value.isArray()) {
-            for (JsonNode item : value) rejectExplicitNulls(item);
-        }
     }
 
     private static CandidateRefusedException refuse(CandidateRefusal refusal, @Nullable String message) {

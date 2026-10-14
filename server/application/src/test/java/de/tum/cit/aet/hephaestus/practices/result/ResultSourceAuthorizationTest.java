@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -118,7 +119,7 @@ class ResultSourceAuthorizationTest extends BaseUnitTest {
     void storedSourceKindUsesCurrentGovernanceRatherThanAnOldDefinition() {
         var evidence = json.createObjectNode();
         evidence.putArray("citations").addObject().put("sourceKind", "scm.pull-request.diff");
-        var proof = result.toBuilder().evidence(evidence).build();
+        var proof = resultBuilder(result).evidence(evidence).build();
         var kind = new SourceKind("scm.pull-request.diff");
         when(catalog.isSourceUsePermitted(kind, purpose)).thenReturn(false);
         assertThat(authorization.authorized(proof, receipt(List.of()), purpose)).isFalse();

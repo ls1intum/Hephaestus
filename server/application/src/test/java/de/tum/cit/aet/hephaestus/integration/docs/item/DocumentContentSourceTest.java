@@ -14,6 +14,9 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemVersion;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.Objects;
 import java.util.Set;
@@ -23,7 +26,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 class DocumentContentSourceTest extends BaseUnitTest {
     private final DocumentContentSource source =
-            new DocumentContentSource(JsonMapper.builder().build());
+            new DocumentContentSource(JsonMapper.builder().build(), Clock.fixed(Instant.EPOCH, ZoneOffset.UTC));
 
     @Test
     void shouldKeepAnEmptyDocumentAsCompleteEvidenceWhenItsBodyIsAvailable() {
@@ -36,6 +39,7 @@ class DocumentContentSourceTest extends BaseUnitTest {
                 SourceAbsenceReason.CONTENT_EVICTED);
         assertThat(captured.completeness()).containsEntry(DocumentContentSource.SOURCE, SourceCompleteness.COMPLETE);
         assertThat(captured.contentStates()).containsEntry(DocumentContentSource.SOURCE, SourceContentState.EMPTY);
+        assertThat(captured.observedAt()).containsEntry(DocumentContentSource.SOURCE, Instant.EPOCH);
         assertThat(captured.stateOverrides()).isEmpty();
         var bodyText = text(captured, "context/document.md");
         assertThat(bodyText.sha256()).isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");

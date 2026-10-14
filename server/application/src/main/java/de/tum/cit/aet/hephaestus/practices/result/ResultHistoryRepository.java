@@ -29,17 +29,4 @@ public interface ResultHistoryRepository extends Repository<Result, UUID> {
                     + " AND r.developer_id IS NOT DISTINCT FROM CAST(:accountId AS bigint)" + NEWEST_FIRST,
             nativeQuery = true)
     List<Result> forAssignment(long workspaceId, long itemId, long practiceId, @Nullable Long accountId, Pageable page);
-
-    @Query(
-            value = "SELECT EXISTS(SELECT 1 FROM membership m JOIN account a ON a.id=m.account_id"
-                    + " WHERE m.workspace_id=:workspaceId AND m.account_id=:accountId AND m.left_at IS NULL"
-                    + " AND NOT m.hidden AND a.status IN ('ACTIVE','UNCLAIMED'))",
-            nativeQuery = true)
-    boolean isMember(long workspaceId, long accountId);
-
-    @Query(
-            value = "SELECT EXISTS(SELECT 1 FROM membership WHERE workspace_id=:workspaceId"
-                    + " AND account_id=:accountId AND left_at IS NULL AND role IN ('ADMIN','OWNER'))",
-            nativeQuery = true)
-    boolean isAdmin(long workspaceId, long accountId);
 }

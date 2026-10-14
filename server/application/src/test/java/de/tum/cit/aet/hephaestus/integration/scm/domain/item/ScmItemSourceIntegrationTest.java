@@ -271,6 +271,10 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                     .isEqualTo(snapshot.label().title());
             assertThat(staged.path("body").asString())
                     .isEqualTo(expectedBodies.get(snapshot.item().itemId()));
+            assertThat(staged.path("author").asString())
+                    .isEqualTo(fixture.author().getLogin());
+            assertThat(staged.path("provider_id").asLong())
+                    .isEqualTo(fixture.provider().getId());
             assertThat(staged.path("repository_id").asLong())
                     .isEqualTo(fixture.repository().getId());
             assertThat(captured.citableTexts())
@@ -312,6 +316,41 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         var reviewRef = writer.upsert(new ItemRegistration(
                 holder.workspaceId(), ScmItemEvents.PULL_REQUEST_REVIEW, review.getId(), pullRef.itemId(), null));
         var reviewSnapshot = sources.pin(reviewRef, null);
+        assertThat(reviewSnapshot.roles()).extracting(RoleHolder::role).containsExactly(AboutRole.REVIEWER);
+        var second = connectedWorkspace(type, fixture.provider().getServerUrl(), "second-" + UUID.randomUUID());
+        monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(
+                second, fixture.repository().getNameWithOwner()));
+        var context = new EventContext(
+                UUID.randomUUID(),
+                Instant.now().truncatedTo(ChronoUnit.MICROS),
+                fixture.workspace().getId(),
+                null,
+                DataSource.WEBHOOK,
+                "submitted",
+                UUID.randomUUID().toString(),
+                type,
+                fixture.author().getId());
+        var submitted = new ScmDomainEvent.ReviewSubmitted(
+                ScmEventPayload.ReviewData.from(review).orElseThrow(), context);
+        transactions.executeWithoutResult(status -> publisher.publishEvent(submitted));
+        transactions.executeWithoutResult(status -> publisher.publishEvent(submitted));
+        for (long workspaceId : List.of(holder.workspaceId(), second.getId())) {
+            var repositoryItem = writer.upsert(new ItemRegistration(
+                    workspaceId, ScmItemEvents.REPOSITORY, fixture.repository().getId(), null, null));
+            var parent = writer.upsert(new ItemRegistration(
+                    workspaceId, ScmItemEvents.PULL_REQUEST, pull.getId(), repositoryItem.itemId(), null));
+            var child = writer.upsert(new ItemRegistration(
+                    workspaceId, ScmItemEvents.PULL_REQUEST_REVIEW, review.getId(), parent.itemId(), null));
+            var event = events.findByWorkspaceIdAndItemIdAndNameAndItemVersion(
+                            workspaceId,
+                            child.itemId(),
+                            ScmItemEvents.PULL_REQUEST_REVIEW_SUBMITTED.value(),
+                            sources.pin(child, null).version().value())
+                    .orElseThrow();
+            assertThat(event.getActorUserId()).isEqualTo(fixture.author().getId());
+            assertThat(event.getRequestedById()).isNull();
+            assertThat(event.getOccurredAt()).isEqualTo(context.occurredAt());
+        }
         var otherFixture = fixture(type);
         monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(
                 otherFixture.workspace(), fixture.repository().getNameWithOwner()));
@@ -412,41 +451,6 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
                         ItemCaptureException.class,
                         failure -> assertThat(failure.code()).isEqualTo(ItemCaptureCode.SOURCE_NOT_READY));
 
-        assertThat(reviewSnapshot.roles()).extracting(RoleHolder::role).containsExactly(AboutRole.REVIEWER);
-        var second = connectedWorkspace(type, fixture.provider().getServerUrl(), "second-" + UUID.randomUUID());
-        monitors.saveAndFlush(WorkspaceTestFixtures.repositoryMonitor(
-                second, fixture.repository().getNameWithOwner()));
-        var context = new EventContext(
-                UUID.randomUUID(),
-                Instant.now().truncatedTo(ChronoUnit.MICROS),
-                fixture.workspace().getId(),
-                null,
-                DataSource.WEBHOOK,
-                "submitted",
-                UUID.randomUUID().toString(),
-                type,
-                fixture.author().getId());
-        var submitted = new ScmDomainEvent.ReviewSubmitted(
-                ScmEventPayload.ReviewData.from(review).orElseThrow(), context);
-        transactions.executeWithoutResult(status -> publisher.publishEvent(submitted));
-        transactions.executeWithoutResult(status -> publisher.publishEvent(submitted));
-        for (long workspaceId : List.of(holder.workspaceId(), second.getId())) {
-            var repositoryItem = writer.upsert(new ItemRegistration(
-                    workspaceId, ScmItemEvents.REPOSITORY, fixture.repository().getId(), null, null));
-            var parent = writer.upsert(new ItemRegistration(
-                    workspaceId, ScmItemEvents.PULL_REQUEST, pull.getId(), repositoryItem.itemId(), null));
-            var child = writer.upsert(new ItemRegistration(
-                    workspaceId, ScmItemEvents.PULL_REQUEST_REVIEW, review.getId(), parent.itemId(), null));
-            var event = events.findByWorkspaceIdAndItemIdAndNameAndItemVersion(
-                            workspaceId,
-                            child.itemId(),
-                            ScmItemEvents.PULL_REQUEST_REVIEW_SUBMITTED.value(),
-                            sources.pin(child, null).version().value())
-                    .orElseThrow();
-            assertThat(event.getActorUserId()).isEqualTo(fixture.author().getId());
-            assertThat(event.getRequestedById()).isNull();
-            assertThat(event.getOccurredAt()).isEqualTo(context.occurredAt());
-        }
         var changed = pulls.findById(pull.getId()).orElseThrow();
         changed.setBaseRefOid("c".repeat(40));
         pulls.saveAndFlush(changed);
@@ -492,8 +496,12 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull.setBaseRefName("main");
         pull = pulls.saveAndFlush(pull);
         var context = EventContext.forSync(fixture.workspace().getId(), null, type, Instant.now());
-        var unproved = new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context);
-        transactions.executeWithoutResult(status -> publisher.publishEvent(unproved));
+        long pullId = pull.getId();
+        transactions.executeWithoutResult(status -> {
+            var current = pulls.findById(pullId).orElseThrow();
+            publisher.publishEvent(
+                    new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(current), context));
+        });
         var holder = writer.upsert(new ItemRegistration(
                 fixture.workspace().getId(),
                 ScmItemEvents.REPOSITORY,
@@ -517,8 +525,13 @@ class ScmItemSourceIntegrationTest extends BaseIntegrationTest {
         pull.setHeadRefOid("a".repeat(40));
         pull = pulls.saveAndFlush(pull);
         var captured = sources.pin(item, null).version();
-        var event = new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(pull), context);
-        transactions.executeWithoutResult(status -> publisher.publishEvent(event));
+        var event = Objects.requireNonNull(transactions.execute(status -> {
+            var current = pulls.findById(pullId).orElseThrow();
+            var published =
+                    new ScmDomainEvent.PullRequestCreated(ScmEventPayload.PullRequestData.from(current), context);
+            publisher.publishEvent(published);
+            return published;
+        }));
         transactions.executeWithoutResult(status -> publisher.publishEvent(event));
         assertThat(jdbc.queryForList(
                         "SELECT name || '|' || item_version || '|' || found_by FROM item_event WHERE workspace_id=?"

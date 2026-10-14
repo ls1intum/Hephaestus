@@ -84,7 +84,7 @@ public class ScmWorkspaceContentEraser {
             return;
         }
 
-        // Derived rows must be removed before the artifacts they reference.
+        // Delete dependent rows before the work they reference.
         eventPublisher.publishEvent(new ScmMirrorErasedEvent(workspaceId));
 
         List<Long> repositoryIds = repositoryToMonitorRepository.findSourceRepositoryIds(workspaceId);

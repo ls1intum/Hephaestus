@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback.delivery;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -213,13 +214,13 @@ class FeedbackCompositionContextServiceTest {
 
     @Test
     void shouldRequireOneAttributedDeveloperAndRejectForeignReviewIds() {
-        var unattributed = current.toBuilder().developerId(null).build();
+        var unattributed = resultBuilder(current).developerId(null).build();
         when(results.findByWorkspaceIdAndIdIn(1, List.of(current.getId()))).thenReturn(List.of(unattributed));
         assertThat(Objects.requireNonNull(service.read(1, reviewId, List.of(current.getId()))
                                 .practicePageSupport())
                         .state())
                 .isEqualTo(PracticePageSupport.State.UNAVAILABLE);
-        var foreign = current.toBuilder().reviewId(UUID.randomUUID()).build();
+        var foreign = resultBuilder(current).reviewId(UUID.randomUUID()).build();
         when(results.findByWorkspaceIdAndIdIn(1, List.of(current.getId()))).thenReturn(List.of(foreign));
         assertThatThrownBy(() -> service.read(1, reviewId, List.of(current.getId())))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -269,7 +270,7 @@ class FeedbackCompositionContextServiceTest {
         var evidence = AdmittedResultFixtures.evidence(
                 "scm.pull-request.diff", "context/diff.txt", "src/Work.java", "changed line");
         ((ObjectNode) evidence.path("citations").required(0)).put("side", "NEW");
-        var anchored = current.toBuilder().evidence(evidence).build();
+        var anchored = resultBuilder(current).evidence(evidence).build();
         assertThat(service.conversationDecision(snapshot, anchored))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
@@ -277,7 +278,7 @@ class FeedbackCompositionContextServiceTest {
                 .createObjectNode()
                 .set("citation", evidence.path("citations").required(0));
         assertThat(service.conversationDecision(
-                        snapshot, current.toBuilder().example(example).build()))
+                        snapshot, resultBuilder(current).example(example).build()))
                 .isEqualTo(new FeedbackCompositionContextService.ConversationAdmission(
                         ConversationDecision.HAS_INLINE_ANCHOR, FeedbackStopReason.NOTHING_NEW));
         ((ObjectNode) evidence.path("citations").required(0)).remove("verification");

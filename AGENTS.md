@@ -29,8 +29,8 @@ It delivers practice feedback on the work itself, on the developer's own practic
 4. **The artifact tested is the artifact shipped.** CI packages the server once.
    The OpenAPI spec, browser suite, and container image all come from that JAR.
    See `docs/contributor/ci-cd.mdx` § Build once.
-5. **One vocabulary.** The product words below are the only words, in UI, code, docs and release
-   notes alike.
+5. **One vocabulary.** Use the terms from [Product vocabulary](#product-vocabulary)
+   for product concepts in UI, code, docs and release notes.
 
 ## How we build
 

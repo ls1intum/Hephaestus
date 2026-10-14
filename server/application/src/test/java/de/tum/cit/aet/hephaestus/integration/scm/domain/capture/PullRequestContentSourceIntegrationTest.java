@@ -24,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRep
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -179,7 +180,12 @@ class PullRequestContentSourceIntegrationTest extends BaseIntegrationTest {
             var thread = persistThread(pull);
             thread.setState(PullRequestReviewThread.State.RESOLVED);
             thread.setResolvedBy(reviewer);
+            thread.setResolvedAt(at("11:00"));
             threadRepository.saveAndFlush(thread);
+            var open = persistThread(pull);
+            open.setState(PullRequestReviewThread.State.UNRESOLVED);
+            open.setPath("src/Open.java");
+            threadRepository.saveAndFlush(open);
             var review = new PullRequestReview();
             review.setProvider(provider);
             review.setNativeId(nextNativeId());
@@ -192,13 +198,27 @@ class PullRequestContentSourceIntegrationTest extends BaseIntegrationTest {
             var context = ScmCaptureFixtures.context(metadata, 1L, false);
             var captured = threadSource.capture(context, Set.of(ReviewThreadContentSource.KIND));
             var staged = mapper.readTree(Objects.requireNonNull(captured.files().get("context/review_threads.json")));
+            assertThat(staged.path("threads")).hasSize(2);
             assertThat(staged.path("threads").get(0).path("state").asString()).isEqualTo("RESOLVED");
+            assertThat(staged.path("threads").get(0).path("resolvedAt").asString())
+                    .isEqualTo(at("11:00").toString());
+            assertThat(staged.path("threads").get(1).path("state").asString()).isEqualTo("UNRESOLVED");
+            assertThat(staged.path("threads").get(1).path("path").asString()).isEqualTo("src/Open.java");
             assertThat(staged.path("threads").get(0).path("resolvedBy").asString())
                     .isEqualTo("reviewer-thread");
             assertThat(staged.path("reviewDecisions").get(0).path("body").asString())
                     .isEqualTo("The boundary is clear. β");
             assertThat(staged.path("reviewDecisions").get(0).path("author").asString())
                     .isEqualTo("reviewer-thread");
+            assertThat(captured.citableTexts())
+                    .filteredOn(text -> text.path().equals("context/review_threads.json#/reviewDecisions/0/body"))
+                    .singleElement()
+                    .satisfies(text -> {
+                        assertThat(captured.files().get(text.stagedPath()))
+                                .isEqualTo("The boundary is clear. β".getBytes(StandardCharsets.UTF_8));
+                        assertThat(text.sha256())
+                                .isEqualTo("220a916eff81fbfd1b937603b333556de9aaca084dda2dae1fc5cbd61af70f5d");
+                    });
             assertThat(captured.citableTexts()).isNotEmpty().allSatisfy(text -> {
                 var bytes = Objects.requireNonNull(captured.files().get(text.stagedPath()));
                 assertThat(text.sha256()).isEqualTo(ScmVersion.contentHash(bytes));

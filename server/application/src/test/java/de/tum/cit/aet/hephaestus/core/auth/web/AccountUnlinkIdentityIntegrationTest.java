@@ -14,7 +14,9 @@ import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.RealAuthIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -48,6 +50,48 @@ class AccountUnlinkIdentityIntegrationTest extends RealAuthIntegrationTest {
 
     @Autowired
     private PeopleRegistry people;
+
+    @Autowired
+    private UserRepository users;
+
+    @Test
+    void shouldReadExactProviderProfilesForTheCurrentAccountAndLinkedIdentities() {
+        var account = accountRepository.save(new Account("Profile owner"));
+        var github = seedLink(account, IdentityProviderType.GITHUB, "https://github.com", "42");
+        var gitlab = seedLink(account, IdentityProviderType.GITLAB, "https://gitlab.com", "42");
+        github.setLastLoginAt(Instant.now());
+        identityRepository.saveAndFlush(github);
+        users.saveAndFlush(TestUserFactory.createUser(
+                42,
+                "hub-profile",
+                gitProviderRepository.findById(github.getProviderId()).orElseThrow()));
+        users.saveAndFlush(TestUserFactory.createUser(
+                42,
+                "lab-profile",
+                gitProviderRepository.findById(gitlab.getProviderId()).orElseThrow()));
+        String token = tokenFor(account);
+        webTestClient
+                .get()
+                .uri("/user")
+                .headers(headers -> headers.setBearerAuth(token))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.username")
+                .isEqualTo("hub-profile");
+        webTestClient
+                .get()
+                .uri("/user/identities")
+                .headers(headers -> headers.setBearerAuth(token))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBodyList(AccountWebController.IdentityViewDTO.class)
+                .value(views -> assertThat(views)
+                        .extracting(AccountWebController.IdentityViewDTO::username)
+                        .containsExactlyInAnyOrder("hub-profile", "lab-profile"));
+    }
 
     @Test
     void unlinkSecondaryIdentityDisablesItAndKeepsTheRest() {

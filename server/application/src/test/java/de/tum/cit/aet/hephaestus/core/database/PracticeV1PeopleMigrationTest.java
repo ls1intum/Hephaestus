@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.sql.SQLException;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -136,60 +134,5 @@ class PracticeV1PeopleMigrationTest {
                         "SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND"
                                 + " table_name='auth_event' AND column_name='details'"))
                 .containsExactly("text");
-    }
-
-    @ParameterizedTest
-    @ValueSource(strings = {"prod", "dev"})
-    void shouldRenameOnlyPersistedReviewAuditKeysAndRestoreTheAppendOnlyGuard(String context) throws Exception {
-        var database = PracticeMigrationFixture.releasedDatabase(context);
-        PracticeMigrationFixture.execute(database, """
-            INSERT INTO config_audit_event(id,workspace_id,actor_kind,actor_account_id,acting_account_id,
-                entity_type,entity_id,action,changed_keys,old_value,new_value,occurred_at)
-            VALUES(995901,992101,'SYSTEM',NULL,NULL,'REVIEW_BACKFILL_RUN','original-batch','CREATED',
-                    ARRAY['lookback'],'{"before":1}','{"after":2}','2026-01-01T00:00:00Z'),
-                  (995902,992101,'SYSTEM',NULL,NULL,'REVIEW_SWEEP_SCHEDULE','original-schedule','UPDATED',
-                    ARRAY['paused'],'{"before":false}','{"after":true}','2026-01-02T00:00:00Z'),
-                  (995903,992101,'SYSTEM',NULL,NULL,'PRACTICE_REVIEW_SETTINGS','original-settings','UPDATED',
-                    ARRAY['mode'],'{"before":"kept"}','{"after":"kept"}','2026-01-03T00:00:00Z'),
-                  (995904,NULL,'SYSTEM',NULL,NULL,'CURATED_PRACTICE','catalog-practice','UPDATED',
-                    ARRAY['criteria'],'{}','{}','2026-01-04T00:00:00Z'),
-                  (995905,NULL,'SYSTEM',NULL,NULL,'CURATED_PRACTICE_AREA','catalog-group','UPDATED',
-                    ARRAY['name'],'{}','{}','2026-01-05T00:00:00Z'),
-                  (995906,992101,'SYSTEM',NULL,NULL,'CURATED_PRACTICE_GROUP','workspace-catalog-history','UPDATED',
-                    ARRAY['name'],'{}','{}','2026-01-06T00:00:00Z'),
-                  (995907,992101,'SYSTEM',NULL,NULL,'PRACTICE_AREA','practice-group','UPDATED',
-                    ARRAY['name'],'{}','{}','2026-01-07T00:00:00Z');
-            """);
-        String facts = "SELECT (to_jsonb(e)-'entity_type')::text FROM config_audit_event e"
-                + " WHERE id BETWEEN 995901 AND 995907 ORDER BY id";
-        String guard = "SELECT pg_get_triggerdef(oid) || '|' || tgenabled::text FROM pg_trigger"
-                + " WHERE tgrelid='config_audit_event'::regclass AND tgname='trg_config_audit_event_block_mutation'";
-        var before = PracticeMigrationFixture.column(database, facts);
-        var protection = PracticeMigrationFixture.column(database, guard);
-        PracticeMigrationFixture.upgrade(database, context);
-        assertThat(PracticeMigrationFixture.column(database, facts)).isEqualTo(before);
-        assertThat(PracticeMigrationFixture.column(database, guard)).isEqualTo(protection);
-        assertThat(PracticeMigrationFixture.column(database, """
-            SELECT id || '|' || entity_type FROM config_audit_event WHERE id BETWEEN 995901 AND 995907 ORDER BY id
-            """))
-                .containsExactly(
-                        "995901|REVIEW_BATCH",
-                        "995902|REVIEW_SCHEDULE",
-                        "995903|PRACTICE_REVIEW_SETTINGS",
-                        "995904|CATALOG_PRACTICE",
-                        "995905|CATALOG_GROUP",
-                        "995906|CATALOG_GROUP",
-                        "995907|PRACTICE_GROUP");
-        assertThat(PracticeMigrationFixture.column(database, """
-            SELECT convalidated::text FROM pg_constraint WHERE conrelid='config_audit_event'::regclass
-                AND conname IN ('ck_config_audit_event_entity_type','ck_config_audit_event_scope') ORDER BY conname
-            """)).containsExactly("true", "true");
-        if (context.equals("prod")) {
-            assertThat(protection).hasSize(1);
-            assertThatThrownBy(() -> PracticeMigrationFixture.execute(
-                            database, "UPDATE config_audit_event SET entity_type='AGENT_BINDING' WHERE id=995901"))
-                    .hasRootCauseInstanceOf(SQLException.class)
-                    .hasMessageContaining("append-only");
-        }
     }
 }

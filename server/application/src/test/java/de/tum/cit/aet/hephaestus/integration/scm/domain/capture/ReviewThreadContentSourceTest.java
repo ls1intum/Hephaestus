@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmVersion;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReview;
@@ -20,7 +19,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreviewthread.PullRequestReviewThreadRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -130,36 +128,6 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                     .filter(thread -> requested.contains(thread.getId()))
                     .toList();
         });
-    }
-
-    @Test
-    void shouldRegisterActualThreadAndReviewWordsWithTheirStagedDigests() {
-        String words = "Guard this path.\n\"Preserve β.\"";
-        var review =
-                review(PullRequestReview.State.CHANGES_REQUESTED, "reviewer", Instant.parse("2026-10-14T01:00:00Z"));
-        review.setBody(words);
-        when(reviewRepository.findRecentByPullRequestIdWithAuthor(any(), any(), any()))
-                .thenReturn(List.of(review));
-        stubThreads(List.of(thread(PullRequestReviewThread.State.UNRESOLVED, "src/a.ts", 7, null)));
-        var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
-        assertThat(captured.citableTexts())
-                .filteredOn(text -> text.path().equals(FILE_KEY + "#/reviewDecisions/0/body"))
-                .singleElement()
-                .satisfies(text -> {
-                    assertThat(text.source()).isEqualTo(ReviewThreadContentSource.KIND.value());
-                    assertThat(captured.files().get(text.stagedPath()))
-                            .isEqualTo(words.getBytes(StandardCharsets.UTF_8));
-                    assertThat(text.sha256()).isEqualTo(ScmVersion.contentHash(words.getBytes(StandardCharsets.UTF_8)));
-                });
-        assertThat(captured.citableTexts())
-                .filteredOn(text -> text.path().equals(FILE_KEY + "#/threads/0/path"))
-                .singleElement()
-                .satisfies(text -> assertThat(captured.files().get(text.stagedPath()))
-                        .isEqualTo("src/a.ts".getBytes(StandardCharsets.UTF_8)));
-        assertThat(captured.citableTexts())
-                .allSatisfy(text -> assertThat(text.sha256())
-                        .isEqualTo(ScmVersion.contentHash(
-                                Objects.requireNonNull(captured.files().get(text.stagedPath())))));
     }
 
     @Test
@@ -327,9 +295,7 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_hephaestusOwnThread_excludedFromThreads() throws Exception {
-        // A thread whose comments are Hephaestus's own posted note (marker-bearing) must NOT count
-        // as a
-        // reviewer thread — the rootComment FK is null in sync, so the comment set is the signal.
+        // The root comment can be absent, so the comments identify a thread containing only our note.
         PullRequestReviewThread botThread = thread(PullRequestReviewThread.State.UNRESOLVED, "src/Foo.swift", 10, null);
         botThread.setComments(
                 Set.of(comment(null, "Add a unit test for encodeDepth.\n" + "<!-- hephaestus-diff-note -->")));
@@ -345,38 +311,11 @@ class ReviewThreadContentSourceTest extends BaseUnitTest {
                 .files());
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // Only the human reviewer thread is listed; the Hephaestus note is dropped entirely. Assert
-        // by
-        // CONTENT, not position, so the test does not encode an incidental ordering over the
-        // comment Set.
+
         assertThat(out.get("threads")).hasSize(1);
         List<String> paths = new ArrayList<>();
         out.get("threads").forEach(node -> paths.add(node.get("path").asString()));
         assertThat(paths).containsExactly("src/Bar.swift").doesNotContain("src/Foo.swift");
-    }
-
-    @Test
-    void contribute_unresolvedAndResolvedThreads_emittedAsRawRows() throws Exception {
-        stubThreads(List.of(
-                thread(PullRequestReviewThread.State.UNRESOLVED, "src/Foo.swift", 12, null),
-                thread(PullRequestReviewThread.State.RESOLVED, "src/Bar.swift", 5, user("reviewer-b"))));
-
-        Map<String, byte[]> files = new HashMap<>();
-        files.putAll(provider.capture(request(metadataWithPr()), provider.sourceKinds())
-                .files());
-
-        JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        assertThat(out.get("threads")).hasSize(2);
-        JsonNode unresolved = out.get("threads").get(0);
-        assertThat(unresolved.propertyNames()).containsExactlyInAnyOrder("id", "path", "line", "state");
-        assertThat(unresolved.get("id").asLong()).isEqualTo(1L);
-        assertThat(unresolved.get("path").asString()).isEqualTo("src/Foo.swift");
-        assertThat(unresolved.get("line").asInt()).isEqualTo(12);
-        assertThat(unresolved.get("state").asString()).isEqualTo("UNRESOLVED");
-        JsonNode resolved = out.get("threads").get(1);
-        assertThat(resolved.get("state").asString()).isEqualTo("RESOLVED");
-        assertThat(resolved.get("resolvedBy").asString()).isEqualTo("reviewer-b");
-        assertThat(out.has("unresolvedCount")).isFalse();
     }
 
     @Test

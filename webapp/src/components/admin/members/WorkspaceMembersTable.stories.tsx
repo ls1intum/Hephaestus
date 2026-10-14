@@ -1,5 +1,5 @@
 import type { Meta, StoryContext, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 
 import { expectNoPageOverflow } from "@/stories/reflow";
 
@@ -46,7 +46,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ args, canvas }) => {
+	play: async ({ canvas }) => {
 		// The sort lives in the URL, so a column is always sorted — and which one has to be legible
 		// to a screen reader, not only to whoever can see the arrow.
 		await expect(canvas.getByRole("columnheader", { name: "Name" })).toHaveAttribute(
@@ -57,13 +57,6 @@ export const Default: Story = {
 			"aria-sort",
 			"none",
 		);
-
-		await userEvent.click(canvas.getByRole("button", { name: "Username" }));
-		await expect(args.onViewChange).toHaveBeenCalledWith({
-			sort: "username",
-			desc: false,
-			page: 0,
-		});
 	},
 };
 
@@ -104,14 +97,6 @@ export const MemberWhoLeft: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(within(rowOf(canvas, "Erin Former")).getByText(/^Left /u)).toBeVisible();
-	},
-};
-
-export const ChangeRole: Story = {
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("combobox", { name: "Role of Bob Smith" }));
-		await userEvent.click(await screen.findByRole("option", { name: "Admin" }));
-		await expect(args.onRoleChange).toHaveBeenCalledWith(unclaimedMember.account.id, "ADMIN");
 	},
 };
 

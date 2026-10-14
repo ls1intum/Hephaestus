@@ -41,8 +41,7 @@ class PracticeV1RetentionDatabaseTest {
         assertThat(PracticeMigrationFixture.column(database, """
             SELECT count(*)::text FROM review_item
             WHERE review_id='00000000-0000-0000-0000-000000992111' AND job_id IS NOT NULL
-            """))
-                .containsExactly("0");
+            """)).containsExactly("0");
         assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (ended_at IS NULL)::text FROM result WHERE id='00000000-0000-0000-0000-000000992141'"))

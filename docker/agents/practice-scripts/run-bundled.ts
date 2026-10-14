@@ -336,9 +336,7 @@ export async function runBundledProgram(slug: string, inputs: RunInputs = {}): P
 			},
 		);
 		try {
-			const returned = parseCandidate(await definition.run(ctx), (citation) =>
-				reader.citationIdentity(citation),
-			);
+			const returned = parseCandidate(await definition.run(ctx));
 			if (!returned.ok) {
 				throw new Error(
 					`${slug} returned no candidate: ${returned.reasonCode}: ${returned.message}`,

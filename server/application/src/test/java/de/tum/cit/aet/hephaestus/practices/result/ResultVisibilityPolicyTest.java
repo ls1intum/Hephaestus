@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.result;
 
+import static de.tum.cit.aet.hephaestus.practices.result.ResultTestFixtures.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -69,7 +70,7 @@ class ResultVisibilityPolicyTest {
     @Test
     void archivedProofIsUnverifiableForNewClaims() {
         var r = result();
-        r = r.toBuilder().evidenceVersion((short) 0).build();
+        r = resultBuilder(r).evidenceVersion((short) 0).build();
         assertThat(ResultVisibilityPolicy.currentness(r, practice.getCurrentVersion(), practice.getCurrentVersion()))
                 .isEqualTo(Currentness.UNVERIFIABLE);
         assertThat(policy.permitsAll(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
@@ -125,7 +126,7 @@ class ResultVisibilityPolicyTest {
     @Test
     void foreignRowsAreNotSentForSourceAuthorization() {
         var r = result();
-        r = r.toBuilder().workspaceId(2).build();
+        r = resultBuilder(r).workspaceId(2).build();
         assertThat(policy.permitsHistory(1L, List.of(r), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY))
                 .isEmpty();
     }
@@ -149,7 +150,7 @@ class ResultVisibilityPolicyTest {
 
     @Test
     void shouldWithholdUnverifiableProofFromHistoricalStandings() {
-        var missingSummary = result().toBuilder().summary(null).build();
+        var missingSummary = resultBuilder(result()).summary(null).build();
         when(authorization.permitsAll(
                         ArgumentMatchers.eq(1L),
                         ArgumentMatchers.any(),

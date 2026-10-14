@@ -22,11 +22,6 @@ public record PracticeVersionDTO(
         @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
         PracticeDefinition definition,
 
-        boolean definitionAvailable,
-
-        @Schema(requiredMode = Schema.RequiredMode.REQUIRED, nullable = true) @Nullable
-        HistoricalPracticeDefinitionDTO historicalDefinition,
-
         String reviewDigest,
         Instant createdAt,
 

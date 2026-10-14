@@ -193,9 +193,7 @@ export async function runPracticeProgram(
 			? finished("withheld", failure.stopReason)
 			: finished("failed", failure.stopReason, { error: failure.error });
 	}
-	const parsed = parseCandidate(execution.value, (citation) =>
-		services.reader.citationIdentity(citation),
-	);
+	const parsed = parseCandidate(execution.value);
 	if (!parsed.ok) {
 		return finished("failed", "invalid-candidate", {
 			error: `the program returned no valid result: ${parsed.reasonCode}: ${parsed.message}`,
@@ -265,9 +263,7 @@ export async function runPracticeProgram(
 		};
 		const coverage =
 			omitted.length === 0 ? { ...base, complete: true } : { ...base, complete: false, omitted };
-		const final = parseCandidate({ ...candidate, coverage }, (citation) =>
-			services.reader.citationIdentity(citation),
-		);
+		const final = parseCandidate({ ...candidate, coverage });
 		if (!final.ok) {
 			return finished("failed", "invalid-candidate", {
 				error: `${final.reasonCode}: ${final.message}`,

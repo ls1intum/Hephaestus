@@ -9,10 +9,14 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemWriter;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.IllegalTransactionStateException;
+import org.springframework.transaction.support.TransactionTemplate;
 
 class ItemIndexServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
@@ -23,6 +27,40 @@ class ItemIndexServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private WorkspaceRepository workspaces;
+
+    @Autowired
+    private TransactionTemplate transactions;
+
+    @Autowired
+    private DataSource dataSource;
+
+    @Test
+    void shouldKeepTheItemLockUntilTheCallerCommitsAndRefuseAnotherWorkspace() {
+        long workspace = workspace();
+        long foreignWorkspace = workspace();
+        var item = writer.upsert(new ItemRegistration(workspace, new ItemKind("scm.repository"), 1L, null, null));
+        assertThatThrownBy(() -> writer.lock(workspace, item.itemId()))
+                .isInstanceOf(IllegalTransactionStateException.class);
+        transactions.executeWithoutResult(status -> {
+            writer.lock(workspace, item.itemId());
+            try (var connection = dataSource.getConnection();
+                    var statement = connection.prepareStatement(
+                            "SELECT id FROM item WHERE workspace_id=? AND id=? FOR UPDATE NOWAIT")) {
+                statement.setLong(1, workspace);
+                statement.setLong(2, item.itemId());
+                assertThatThrownBy(statement::executeQuery)
+                        .isInstanceOfSatisfying(
+                                SQLException.class,
+                                failure -> assertThat(failure.getSQLState()).isEqualTo("55P03"));
+            } catch (SQLException failure) {
+                throw new IllegalStateException(failure);
+            }
+        });
+        transactions.executeWithoutResult(status -> writer.lock(workspace, item.itemId()));
+        assertThatThrownBy(
+                        () -> transactions.executeWithoutResult(status -> writer.lock(foreignWorkspace, item.itemId())))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 
     @Test
     void shouldKeepIdentityAcrossRemoveAndRestore() {

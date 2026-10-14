@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import test from "node:test";
 
+import { isJsonObject as isRecord } from "../../../../../../docker/agents/practice-scripts/lib/core/json.ts";
 import {
 	diffSections,
 	type PinnedBlob,
@@ -16,7 +17,6 @@ import {
 	buildPublicReviewHistory,
 	buildSameWorkContext,
 } from "../../../main/resources/agent/pi-review-brief.ts";
-import { isRecord } from "../../../main/resources/agent/pi-text.ts";
 
 const paths = { contextRoot: "context", repositoryRoot: "repos/reviewed" };
 

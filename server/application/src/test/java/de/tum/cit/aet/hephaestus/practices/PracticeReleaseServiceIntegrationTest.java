@@ -33,6 +33,9 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
     PracticeReviewDigest digest;
 
     @Autowired
+    CatalogOriginPresenter presenter;
+
+    @Autowired
     PracticeVersionService versions;
 
     @Autowired
@@ -88,11 +91,11 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 .isEqualTo(accepted.getCurrentVersion().getId());
         assertThat(current.getCurrentVersion().getNumber()).isEqualTo(pinned.getNumber() + 1);
         assertThat(versions.definitionOf(current.getCurrentVersion())).isEqualTo(offeredDefinition);
-        assertThat(versions.catalogBaseOf(current))
+        assertThat(current.getCatalogBase())
                 .isEqualTo(catalog.practice(source.slug()).effective());
         assertThat(versions.definitionOf(pinned)).isEqualTo(recordedDefinition);
         assertThat(current.getFeedbackMode()).isEqualTo(FeedbackMode.OFF);
-        assertThat(versions.history(current)).hasSize(2);
+        assertThat(presenter.history(current)).hasSize(2);
         assertThat(releases.list(ctx))
                 .noneMatch(release -> release.practiceSlug().equals(source.slug()));
     }
@@ -127,7 +130,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
                 ctx, source.slug(), EntityTagPrecondition.parse(EntityTagPrecondition.format(proposal.etag())));
         var reloaded = service.getPractice(ctx, source.slug());
         assertThat(reloaded.getCurrentVersion().getId()).isEqualTo(first.getId());
-        assertThat(versions.catalogBaseOf(reloaded))
+        assertThat(reloaded.getCatalogBase())
                 .isEqualTo(catalog.practice(source.slug()).effective());
         assertThat(releases.list(ctx))
                 .noneMatch(release -> release.practiceSlug().equals(source.slug()));
@@ -144,7 +147,7 @@ class PracticeReleaseServiceIntegrationTest extends AbstractWorkspaceIntegration
         assertThat(reset.getCurrentVersion().getId()).isNotEqualTo(first.getId());
         assertThat(versions.definitionOf(reset.getCurrentVersion())).isEqualTo(changed);
         assertThat(versions.definitionOf(first)).isEqualTo(source.effective().definition());
-        assertThat(versions.history(reset)).hasSize(2);
+        assertThat(presenter.history(reset)).hasSize(2);
         assertThat(Objects.requireNonNull(reset.getGroup()).getSlug())
                 .isEqualTo(source.effective().groupSlug());
         assertThat(reset.getFeedbackMode()).isEqualTo(FeedbackMode.OFF);

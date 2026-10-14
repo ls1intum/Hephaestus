@@ -5,7 +5,6 @@ public enum ItemEventState {
     WAITING,
     STARTED,
     WITHHELD,
-    BLOCKED,
     EXPIRED;
 
     public boolean isTerminal() {

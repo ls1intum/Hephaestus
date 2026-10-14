@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.GeneratedColumn;
 import org.hibernate.annotations.Immutable;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -91,9 +92,15 @@ public class PracticeVersion {
     @Column(name = "created_by_account_id", updatable = false)
     private @Nullable Long createdByAccountId;
 
+    @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     @ColumnDefault("CURRENT_TIMESTAMP")
-    private Instant createdAt;
+    @Getter(AccessLevel.NONE)
+    private @Nullable Instant createdAt;
+
+    public Instant getCreatedAt() {
+        return Objects.requireNonNull(createdAt, "Persist the practice version before reading its creation time.");
+    }
 
     public String getReviewDigest() {
         return Objects.requireNonNull(
@@ -113,6 +120,5 @@ public class PracticeVersion {
         this.number = number;
         this.definition = definition.deepCopy();
         this.createdByAccountId = createdByAccountId;
-        this.createdAt = Instant.now();
     }
 }

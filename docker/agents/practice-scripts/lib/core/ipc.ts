@@ -9,6 +9,8 @@ import type { GrepMatch } from "../../kits/scm/grep.ts";
 import type { DiffFile } from "../../kits/scm/types.ts";
 import {
 	modelSlotSchema,
+	REASONS,
+	CANDIDATE_LIMITS,
 	type Candidate,
 	type Citation,
 	type ModelSlot,
@@ -36,35 +38,6 @@ export interface ProgramJob {
 export interface ChildJob extends ProgramJob {
 	modulePath: string;
 }
-
-/** A governed read of the reviewed work, answered by the host from the pinned captures. */
-export type ReadRequest =
-	| { op: "read"; path: string; offsetLine?: number; maxLines?: number }
-	| { op: "list"; glob?: string }
-	| {
-			op: "grep";
-			pattern: string;
-			glob?: string;
-			maxResults?: number;
-			fixedString?: boolean;
-	  }
-	| { op: "record"; name: string }
-	| {
-			op: "cite";
-			source: "tree";
-			path: string;
-			startLine: number;
-			endLine?: number;
-	  }
-	| {
-			op: "cite";
-			source: "change";
-			path: string;
-			side: "OLD" | "NEW";
-			startLine: number;
-			endLine?: number;
-	  }
-	| { op: "cite"; source: "record"; name: string; startLine: number; endLine?: number };
 
 export interface ReadValues {
 	read:
@@ -99,7 +72,7 @@ export const MAX_IPC_MESSAGE_BYTES = 524_288;
 
 const callId = z.int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const lineNumber = z.int().min(1).max(2_147_483_647);
-const shortText = z.string().min(1).max(4096);
+const shortText = z.string().min(1).max(CANDIDATE_LIMITS.pathChars);
 
 const readRequestSchema = z.union([
 	z.strictObject({
@@ -141,6 +114,9 @@ const readRequestSchema = z.union([
 	}),
 ]);
 
+/** A governed read of the reviewed work, answered from its pinned captures. */
+export type ReadRequest = z.infer<typeof readRequestSchema>;
+
 export const childMessageSchema = z.discriminatedUnion("kind", [
 	z.strictObject({ kind: z.literal("meta"), meta: z.unknown() }),
 	z.strictObject({
@@ -159,18 +135,7 @@ export const childMessageSchema = z.discriminatedUnion("kind", [
 	z.strictObject({
 		kind: z.literal("failed"),
 		message: z.string(),
-		reason: z
-			.enum([
-				"unavailable",
-				"budget",
-				"deadline",
-				"too-large",
-				"off-format",
-				"refused",
-				"error",
-				"cancelled",
-			])
-			.optional(),
+		reason: z.enum([...REASONS, "cancelled"]).optional(),
 	}),
 ]);
 export type ChildMessage = z.infer<typeof childMessageSchema>;

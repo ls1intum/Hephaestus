@@ -102,9 +102,6 @@ public interface FeedbackBasisRepository extends JpaRepository<FeedbackBasis, UU
     int absorbDeveloper(
             @Param("claimedAccountId") long claimedAccountId, @Param("unclaimedAccountId") long unclaimedAccountId);
 
-    @WorkspaceAgnostic("Verified account absorption checks that no source references remain")
-    long countByDeveloperId(long developerId);
-
     @Query(value = """
         SELECT w.status AS workspaceStatus,w.practices_enabled AS enabled,
           w.practice_delivery_status AS deliveryStatus,w.practice_rollout_revision AS rolloutRevision,

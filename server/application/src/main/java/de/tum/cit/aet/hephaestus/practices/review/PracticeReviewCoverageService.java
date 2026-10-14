@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConditionalOnCaptureRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewScopeRepositoryDTO;
@@ -35,7 +34,6 @@ public class PracticeReviewCoverageService {
     static final int ESTIMATE_WINDOW_DAYS = 30;
     private final RepositoryToMonitorRepository monitorRepository;
     private final ReviewScopeRepositoryRepository repositoryTargetRepository;
-    private final PersonProcessingSuppression suppression;
     private final ProductItemRepository items;
     private final MonitoredRepositoryQuery monitored;
     private final MembershipReviewSelection selections;
@@ -79,9 +77,7 @@ public class PracticeReviewCoverageService {
     }
 
     public Set<Long> eligibleAccountIds(long workspaceId) {
-        return selections.eligibleAccountIds(workspaceId).stream()
-                .filter(id -> !suppression.isAccountSuppressed(id))
-                .collect(Collectors.toUnmodifiableSet());
+        return selections.eligibleAccountIds(workspaceId);
     }
 
     public WorkspaceReviewScope scope(Workspace workspace) {

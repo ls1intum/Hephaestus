@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.core.privacy;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonCopyIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonDataCopyRecorder;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -69,7 +69,7 @@ public class ExactPersonDataCopyRecorder implements PersonDataCopyRecorder {
                     .sorted(Comparator.comparing(PersonCopyIdentity::providerType)
                             .thenComparing(PersonCopyIdentity::providerOrigin)
                             .thenComparing(PersonCopyIdentity::subject)
-                            .thenComparing(identity -> Objects.requireNonNullElse(identity.teamId(), "")))
+                            .thenComparing(identity -> PersonIdentity.teamKey(identity.teamId())))
                     .toList();
         }
 

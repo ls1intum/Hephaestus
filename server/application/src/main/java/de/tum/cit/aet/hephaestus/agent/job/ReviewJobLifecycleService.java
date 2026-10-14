@@ -67,7 +67,7 @@ public class ReviewJobLifecycleService {
         if (outcome.stopContainer()) {
             String workerId = outcome.job().getWorkerId();
             if (workerId != null) {
-                workerJobCancelDispatcher.ifPresent(d -> d.stopContainer(workerId, jobId, "user-cancel"));
+                workerJobCancelDispatcher.ifPresent(d -> d.sendCancel(workerId, jobId, "user-cancel"));
             }
 
             // Monolith / co-located worker: stop the container in-process.

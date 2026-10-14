@@ -29,23 +29,21 @@ public final class FeedbackCompositionInputs {
         var selected = new EnumMap<FeedbackDestination, DestinationBounds>(FeedbackDestination.class);
         for (var destination : destinations)
             if (destination != FeedbackDestination.ON_WORK || onWork)
-                selected.put(destination, new DestinationBounds(true, 1));
+                selected.put(destination, new DestinationBounds(1));
         if (selected.isEmpty()) return;
         var forms =
                 selected.containsKey(FeedbackDestination.ON_WORK) && copyCapabilities.contains(CopyCapability.LINE_NOTE)
                         ? List.of(CopyForm.FILE_NOTE, CopyForm.LINE_NOTE)
                         : List.<CopyForm>of();
         files.put(
-                SandboxLayout.FEEDBACK_COMPOSITION_PATH,
-                mapper.writeValueAsBytes(new Request(3, true, selected, 2, forms)));
+                SandboxLayout.FEEDBACK_COMPOSITION_PATH, mapper.writeValueAsBytes(new Request(3, selected, 2, forms)));
     }
 
-    private record DestinationBounds(boolean enabled, int maxPieces) {}
+    private record DestinationBounds(int maxPieces) {}
 
     @JsonInclude(JsonInclude.Include.ALWAYS)
     private record Request(
             int contractVersion,
-            boolean enabled,
             Map<FeedbackDestination, DestinationBounds> destinations,
             int minDistinctItems,
             List<CopyForm> onWorkCopyForms) {}

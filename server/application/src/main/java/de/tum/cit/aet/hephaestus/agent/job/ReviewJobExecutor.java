@@ -364,7 +364,7 @@ public class ReviewJobExecutor {
 
     /**
      * Stops the container only; the authoritative status transition already happened hub-side before
-     * the {@code CancelJob} frame was dispatched.
+     * the {@code CancelJob} frame was sent.
      *
      * @return true if this worker owns the job and a stop was requested
      */
@@ -698,11 +698,6 @@ public class ReviewJobExecutor {
                     PreparationFailure.of(PreparationFailure.Stage.PROVENANCE, persistenceFailure));
             return new ExecutionOutcome(failure.name(), failure.terminal());
         }
-    }
-
-    private enum RefusalOutcome {
-        WORKSPACE_REFUSED,
-        INSUFFICIENT_EVIDENCE
     }
 
     private enum RefusalReason {

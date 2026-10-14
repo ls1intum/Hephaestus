@@ -136,9 +136,11 @@ public class ExactPersonIdentityResolver implements PersonIdentityResolver {
         Set<Long> scmSources = new LinkedHashSet<>();
         for (var owner : sourceOwners.orderedStream().toList()) {
             var ids = owner.sourceIds(primary);
-            if (owner.itemKinds().contains("chat.thread")) conversations.addAll(ids);
-            if (owner.itemKinds().contains("docs.document")) documents.addAll(ids);
-            if (owner.itemKinds().contains("scm.issue")) scmSources.addAll(ids);
+            switch (owner.scope()) {
+                case CONVERSATIONS -> conversations.addAll(ids);
+                case DOCUMENTS -> documents.addAll(ids);
+                case SCM_SOURCES -> scmSources.addAll(ids);
+            }
         }
         return new PersonScope(
                 resolvedAccount,

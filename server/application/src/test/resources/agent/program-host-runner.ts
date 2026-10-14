@@ -89,6 +89,13 @@ export function mockPiCodingAgent(
 	});
 }
 
+export async function mockChange(overrides: Record<string, unknown>) {
+	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
+	const derived: unknown = await import(change);
+	assert.ok(typeof derived === "object" && derived !== null);
+	mock.module(change, { namedExports: { ...derived, ...overrides } });
+}
+
 export type SessionBehaviour = "submit" | "silent" | "hang";
 
 export interface StagedPractice {
@@ -282,15 +289,9 @@ if (scenario !== undefined && scenario !== "") {
 		appendFileSync(nodePath.join(cwd, "captured", `${name}.jsonl`), `${JSON.stringify(value)}\n`);
 	};
 
-	const change = new URL("../../../main/resources/agent/pi-change.ts", import.meta.url).href;
-	const derived: unknown = await import(change);
-	assert.ok(typeof derived === "object" && derived !== null);
-	mock.module(change, {
-		namedExports: {
-			...derived,
-			writeChangeView: () => {
-				capture("change-view", true);
-			},
+	await mockChange({
+		writeChangeView: () => {
+			capture("change-view", true);
 		},
 	});
 	const realFetch = globalThis.fetch;

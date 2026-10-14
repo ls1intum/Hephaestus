@@ -13,17 +13,18 @@ import de.tum.cit.aet.hephaestus.workspace.authorization.WorkspaceAccessService;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContextHolder;
 import de.tum.cit.aet.hephaestus.workspace.exception.InsufficientWorkspacePermissionsException;
 import de.tum.cit.aet.hephaestus.workspace.exception.LastOwnerRemovalException;
-import de.tum.cit.aet.hephaestus.workspace.spi.MembershipReviewSelection;
 import java.time.Clock;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.core.PropertyPath;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,10 +37,11 @@ public class MembershipService {
     private final ConfigAuditPort configAudit;
     private final WorkspaceAccessService access;
     private final ObjectProvider<PeopleRegistry> people;
-    private final ObjectProvider<MembershipReviewSelection> selection;
     private final Clock clock;
     private final AccountDirectory accounts;
     private final GitProviderRegistry providers;
+    private final MembershipSearch memberSearch;
+    private final WorkspaceActorSelector actors;
 
     public long accountIdForUser(long scmUserId) {
         var actor = providers
@@ -171,21 +173,28 @@ public class MembershipService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Membership> listMembers(Long workspaceId, Pageable pageable) {
-        return memberships.findByWorkspace_Id(workspaceId, pageable);
-    }
-
-    @Transactional(readOnly = true)
-    public Set<Long> eligibleAccountIds(Long workspaceId, Collection<Long> accountIds) {
-        return selection.getObject().eligibleAccountIds(workspaceId, accountIds);
-    }
-
-    @Transactional(readOnly = true)
-    public boolean isPracticeReviewEligible(Long workspaceId, Long accountId) {
-        return selection
-                .getObject()
-                .eligibleAccountIds(workspaceId, Set.of(accountId))
-                .contains(accountId);
+    public Page<Membership> listMembers(
+            long workspaceId, @Nullable String query, @Nullable Long teamId, Pageable pageable) {
+        var orders = pageable.getSort().stream()
+                .map(order -> order.withProperty(
+                        switch (order.getProperty()) {
+                            case "name" -> "a.displayName";
+                            case "username" -> "u.login";
+                            default ->
+                                PropertyPath.from(order.getProperty(), Membership.class)
+                                        .toDotPath();
+                        }))
+                .toList();
+        var page = PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(orders).and(Sort.by("id.accountId")));
+        return memberSearch.findMembers(
+                workspaceId,
+                actors.connectedProviderId(workspaceId).orElse(null),
+                query == null || query.isBlank() ? null : query.strip(),
+                teamId,
+                page);
     }
 
     private Workspace lockForMembershipChange(Long workspaceId) {

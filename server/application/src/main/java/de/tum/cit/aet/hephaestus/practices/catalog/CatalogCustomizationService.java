@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -51,10 +52,10 @@ public class CatalogCustomizationService {
                 catalog,
                 input.slug(),
                 new CatalogPracticeDocument(
-                        new ItemKind(input.kind()),
-                        input.groupSlug(),
-                        input.definition().toDefinition()),
-                input.position());
+                        new ItemKind(input.content().kind()),
+                        input.content().groupSlug(),
+                        input.content().definition().toDefinition()),
+                input.content().position());
     }
 
     @Transactional
@@ -81,7 +82,7 @@ public class CatalogCustomizationService {
             throw new IllegalArgumentException("A catalog practice keeps its item kind.");
         validator.validate(kind, document.definition());
         if (document.groupSlug() != null) group(catalog, document.groupSlug());
-        var entry = authoredEntry(catalog, CatalogEntryType.PRACTICE, slug, position);
+        var entry = authoredEntry(catalog, CatalogEntryType.PRACTICE, slug, position, document.groupSlug());
         entry.setKind(kind);
         entry.setDefinition(mapper.valueToTree(document.content()));
         entries.saveAndFlush(entry);
@@ -99,8 +100,12 @@ public class CatalogCustomizationService {
         return writeGroup(
                 catalog,
                 input.slug(),
-                new GroupDefinition(input.name(), input.description(), input.icon(), input.color()),
-                input.position());
+                new GroupDefinition(
+                        input.content().name(),
+                        input.content().description(),
+                        input.content().icon(),
+                        input.content().color()),
+                input.content().position());
     }
 
     @Transactional
@@ -119,7 +124,7 @@ public class CatalogCustomizationService {
     private CatalogOffer<GroupDefinition> writeGroup(
             EffectiveCatalog catalog, String slug, GroupDefinition definition, @Nullable Integer position) {
         var current = catalog.group(slug);
-        var entry = authoredEntry(catalog, CatalogEntryType.GROUP, slug, position);
+        var entry = authoredEntry(catalog, CatalogEntryType.GROUP, slug, position, null);
         entry.setDefinition(mapper.valueToTree(definition));
         entries.saveAndFlush(entry);
         var result = group(catalogService.effectiveCatalog(), slug);
@@ -128,17 +133,24 @@ public class CatalogCustomizationService {
     }
 
     private CatalogEntry authoredEntry(
-            EffectiveCatalog catalog, CatalogEntryType type, String slug, @Nullable Integer position) {
+            EffectiveCatalog catalog,
+            CatalogEntryType type,
+            String slug,
+            @Nullable Integer position,
+            @Nullable String groupSlug) {
         CatalogEntry entry = row(type, slug);
         var current = type == CatalogEntryType.PRACTICE ? catalog.practice(slug) : catalog.group(slug);
         if (entry.getBase() == null) {
             Object shipped = current.isEmpty() ? null : current.get().shipped();
             entry.setBase(shipped == null ? null : mapper.valueToTree(shipped));
         }
+        Optional<Integer> previousPosition = type == CatalogEntryType.PRACTICE
+                ? catalog.practice(slug)
+                        .filter(offer -> Objects.equals(offer.effective().groupSlug(), groupSlug))
+                        .map(CatalogOffer::position)
+                : catalog.group(slug).map(CatalogOffer::position);
         entry.setPosition(
-                position == null
-                        ? current.map(CatalogOffer::position).orElseGet(() -> nextPosition(catalog, type))
-                        : position);
+                position == null ? previousPosition.orElseGet(() -> nextPosition(catalog, type, groupSlug)) : position);
         return entry;
     }
 
@@ -204,11 +216,19 @@ public class CatalogCustomizationService {
         lock.acquire();
         var catalog = catalogService.effectiveCatalog();
         EntityTagPrecondition.requireExact(precondition, catalog.etag());
-        List<String> existing = type == CatalogEntryType.PRACTICE
-                ? catalog.practices().stream().map(CatalogOffer::slug).toList()
-                : catalog.groups().stream().map(CatalogOffer::slug).toList();
+        List<String> existing;
+        if (type == CatalogEntryType.PRACTICE) {
+            if (slugs.isEmpty()) throw new IllegalArgumentException("List every practice in one group once.");
+            String groupSlug = practice(catalog, slugs.getFirst()).effective().groupSlug();
+            existing = catalog.practices().stream()
+                    .filter(offer -> Objects.equals(offer.effective().groupSlug(), groupSlug))
+                    .map(CatalogOffer::slug)
+                    .toList();
+        } else {
+            existing = catalog.groups().stream().map(CatalogOffer::slug).toList();
+        }
         if (slugs.size() != Set.copyOf(slugs).size() || !Set.copyOf(slugs).equals(Set.copyOf(existing))) {
-            throw new IllegalArgumentException("List every catalog entry once in the order.");
+            throw new IllegalArgumentException("List every entry in the selected group once in the order.");
         }
         for (int position = 0; position < slugs.size(); position++) {
             CatalogEntry entry = row(type, slugs.get(position));
@@ -313,9 +333,12 @@ public class CatalogCustomizationService {
         }
     }
 
-    private static int nextPosition(EffectiveCatalog catalog, CatalogEntryType type) {
-        List<? extends CatalogOffer<?>> entries =
-                type == CatalogEntryType.PRACTICE ? catalog.practices() : catalog.groups();
+    private static int nextPosition(EffectiveCatalog catalog, CatalogEntryType type, @Nullable String groupSlug) {
+        List<? extends CatalogOffer<?>> entries = type == CatalogEntryType.PRACTICE
+                ? catalog.practices().stream()
+                        .filter(offer -> Objects.equals(offer.effective().groupSlug(), groupSlug))
+                        .toList()
+                : catalog.groups();
         return entries.stream().mapToInt(CatalogOffer::position).max().orElse(-1) + 1;
     }
 

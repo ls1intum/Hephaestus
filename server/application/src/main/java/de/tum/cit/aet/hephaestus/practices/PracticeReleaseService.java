@@ -47,7 +47,7 @@ public class PracticeReleaseService {
                 .filter(practice -> practice.getCatalogSlug() != null)
                 .filter(practice -> effective
                         .practice(Objects.requireNonNull(practice.getCatalogSlug()))
-                        .map(offer -> !Objects.equals(practice.getCatalogBase(), mapper.valueToTree(offer.effective())))
+                        .map(offer -> !Objects.equals(practice.getCatalogBase(), offer.effective()))
                         .orElse(false))
                 .map(practice -> proposal(practice, effective))
                 .toList();
@@ -66,7 +66,7 @@ public class PracticeReleaseService {
         if (source == null) throw new EntityNotFoundException("Practice release", practice.getSlug());
         var offer =
                 effective.practice(source).orElseThrow(() -> new EntityNotFoundException("Catalog practice", source));
-        var base = versions.catalogBaseOf(practice);
+        var base = practice.getCatalogBase();
         var current = versions.definitionOf(practice.getCurrentVersion());
         String tag = tag(practice, offer.etag());
         return new PracticeReleaseProposalDTO(
@@ -97,11 +97,11 @@ public class PracticeReleaseService {
         Practice practice = practice(ctx, slug);
         var proposal = proposal(practice);
         EntityTagPrecondition.requireExact(precondition, proposal.etag());
-        var before = PracticeDefinitionSnapshot.of(practice);
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
         var merged = PracticeDefinitionMerge.apply(proposal.base(), proposal.current(), proposal.offered(), choices);
         versions.append(practice, merged, SecurityUtils.getCurrentAccountId().orElseThrow());
-        practice.setCatalogBase(mapper.valueToTree(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
-                .effective()));
+        practice.setCatalogBase(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
+                .effective());
         practices.save(practice);
         auditPractice(ctx, practice, before);
         return practice;
@@ -112,9 +112,9 @@ public class PracticeReleaseService {
         lock(ctx);
         Practice practice = practice(ctx, slug);
         EntityTagPrecondition.requireExact(precondition, proposal(practice).etag());
-        var before = PracticeDefinitionSnapshot.of(practice);
-        practice.setCatalogBase(mapper.valueToTree(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
-                .effective()));
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
+        practice.setCatalogBase(catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
+                .effective());
         practices.save(practice);
         auditPractice(ctx, practice, before);
     }
@@ -125,7 +125,7 @@ public class PracticeReleaseService {
         Practice practice = practice(ctx, slug);
         var proposal = proposal(practice);
         EntityTagPrecondition.requireExact(precondition, proposal.etag());
-        var before = PracticeDefinitionSnapshot.of(practice);
+        var before = PracticeDefinitionSnapshot.of(practice, mapper);
         var document = catalog.practice(Objects.requireNonNull(practice.getCatalogSlug()))
                 .effective();
         if (!practice.getKind().equals(document.kind()))
@@ -135,7 +135,7 @@ public class PracticeReleaseService {
                 practice,
                 document.definition(),
                 SecurityUtils.getCurrentAccountId().orElseThrow());
-        practice.setCatalogBase(mapper.valueToTree(document));
+        practice.setCatalogBase(document);
         practices.save(practice);
         auditPractice(ctx, practice, before);
         return practice;
@@ -186,7 +186,7 @@ public class PracticeReleaseService {
                 practice.getId(),
                 ctx.id(),
                 before,
-                PracticeDefinitionSnapshot.of(practice)));
+                PracticeDefinitionSnapshot.of(practice, mapper)));
     }
 
     private String tag(Practice practice, String offeredTag) {

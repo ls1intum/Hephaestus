@@ -4,13 +4,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 
-public record SourceCapture(SourceKind kind, SourceCaptureState state, List<CapturedSource> files) {
+public record SourceCapture(
+        SourceKind kind, SourceCaptureState state, CitationCapabilities citation, List<CapturedSource> files) {
     public SourceCapture {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(state, "state");
+        Objects.requireNonNull(citation, "citation");
         files = List.copyOf(Objects.requireNonNull(files, "files"));
         if (new HashSet<>(files.stream().map(CapturedSource::path).toList()).size() != files.size()) {
-            throw new IllegalArgumentException("Source capture cannot repeat an file path: " + kind);
+            throw new IllegalArgumentException("Source capture cannot repeat a file path: " + kind);
         }
         if (!(state instanceof SourceCaptureState.Available) && !files.isEmpty()) {
             throw new IllegalArgumentException("Unavailable source cannot contain files: " + kind);

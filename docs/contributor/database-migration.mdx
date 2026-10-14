@@ -43,35 +43,6 @@ conventions the drift gate reads are in `server/AGENTS.md` § Schema changes.
    without one. Keep the summary user-facing. The release notes flag the migration automatically.
 5. Commit the changelog, the `master.xml` edit, the changeset, and `docs/contributor/erd/schema.mmd`.
 
-## Use an external disposable database
-
-If a developer database must stay available, add `--external-database` to the database command.
-Supply a disposable database from the repository's PostgreSQL image in `docker/postgres`.
-Never use a database that contains data you need to keep.
-These commands apply the changelog chain to the supplied database.
-
-Set `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_DB`, `POSTGRES_USER`, and `POSTGRES_PASSWORD` in the process environment.
-Process variables override the values in the server environment file.
-The external mode requires `pg_isready`.
-It does not call Docker Compose or change database data directories.
-You must start and remove the disposable database yourself.
-
-Use a fresh empty database for each drift check or draft operation.
-For ERD generation, reuse a disposable database only if its applied changelog has not changed.
-The external-database flag does not select precompiled server classes.
-The [CI build procedure](./ci-cd.mdx#build-once) owns artifact consumption.
-
-```bash
-node scripts/db-utils.ts check-drift --external-database
-node scripts/db-utils.ts draft-changelog --external-database
-node scripts/db-utils.ts generate-erd --external-database
-node scripts/db-utils.ts draft-changelog --external-database --from-draft .context/<name>.xml
-```
-
-The task aliases also accept `--external-database`: `db:check-drift`, `db:draft-changelog`, and `db:generate-erd-docs`.
-Without external mode, drift and draft commands temporarily replace the worktree's Compose database with a disposable database.
-Without external mode, ERD generation starts the configured Compose database and applies the changelog chain there.
-
 ## Native objects the JPA diff does not cover
 
 The JPA diff does not cover native `CHECK` constraints or triggers in this repository. For such a
@@ -149,7 +120,6 @@ changeset that drops the object also removes its exclusion.
 | Object                                                                           | Changelog that stopped writing it | Exclusion to remove               |
 | -------------------------------------------------------------------------------- | --------------------------------- | --------------------------------- |
 | `consent_notice` table                                                           | `1789067582535_changelog.xml`     | `table:consent_notice`            |
-| `consent_decision.notice_sha256` column                                          | `1789067582535_changelog.xml`     | `column:notice_sha256`            |
 | `product_survey_submission` table                                                | `1789117764980_changelog.xml`     | `table:product_survey_submission` |
 | `llm_model.supports_reasoning`, `workspace_llm_model.supports_reasoning` columns | `1789135709162_changelog.xml`     | `column:supports_reasoning`       |
 
@@ -185,7 +155,7 @@ as triggers, partitioning and partial-index predicates. Verify those through dat
 
 ## Baseline release gates
 
-The v0.77.4 baseline remains the baseline for 1.0. **A future baseline requires both a major-version boundary and automated synchronization.** Released migrations and the
+The practice model cutover retains the v0.77.4 baseline. **A future baseline requires both a major-version boundary and automated synchronization.** Released migrations and the
 archived chain remain immutable.
 
 A global Liquibase precondition checks the database cut-point before either update or synchronization.
@@ -216,7 +186,7 @@ The baseline integration suite proves these properties in both `dev` and `prod`:
 
 ## Practice model cutover
 
-Release 1.0 is a maintainer-approved exception to rule 3 of the [immutability policy](#changelog-immutability-policy).
+The practice model cutover is a maintainer-approved exception to rule 3 of the [immutability policy](#changelog-immutability-policy).
 One changelog transforms the complete released schema directly to the final practice model.
 Rules 1 and 2 still apply: the changelog appends and edits no released changeset.
 Neither release can run against the schema of the other, so all components upgrade together and rollback restores a verified backup.
@@ -225,9 +195,9 @@ The [operator migration guide](https://github.com/hephaestus-build/Hephaestus/bl
 
 ### Removed settings and redundant data
 
-| Released data | Release 1.0 behavior |
+| Released data | Cutover behavior |
 |---|---|
-| `workspace.practice_skip_drafts` | 1.0 reviews draft work when a practice's `reviewOn` declaration permits it. `practice_skip_drafts` is removed. The migration preserves each pinned practice version. |
+| `workspace.practice_skip_drafts` | Reviews include draft work when a practice's `reviewOn` declaration permits it. `practice_skip_drafts` is removed. The migration preserves each pinned practice version. |
 | `consent_decision.notice_sha256` | The duplicate hash is removed. Each decision keeps its immutable `notice_version`. The referenced `consent_notice` keeps the exact notice text and hash. |
 
 ## Prove the released-state upgrade

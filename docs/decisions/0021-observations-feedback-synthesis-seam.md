@@ -108,6 +108,6 @@ This ADR owns the separation and its invariants, not field inventories. Current 
 - [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md)
 - the generated [database schema](../contributor/database-schema.mdx) and OpenAPI specification
 
-## Update — 2026-10-14 (#2656): the 1.0 practice model
+## Update — 2026-10-14 (#2656): the practice model cutover
 
 Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for result admission and feedback delivery.

@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.practices.feedback.decision.FeedbackContentDigest;
 import de.tum.cit.aet.hephaestus.practices.review.ReviewRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackBasisInput;
+import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCheckStage;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyInput;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackCopyKind;
 import de.tum.cit.aet.hephaestus.practices.spi.FeedbackDestination;
@@ -113,6 +114,7 @@ class FeedbackPreparationReceiptIntegrationTest extends AbstractFeedbackDelivery
     void shouldPersistTheExactBasisAndCopyBeforeQueueingThePreparedFeedback() {
         var proposal = draft(true);
         store.prepareAll(workspace.getId(), reviewId, List.of(proposal));
+        assertThat(current().getChecks()).containsKeys(FeedbackCheckStage.COMPOSITION, FeedbackCheckStage.AUTOMATIC);
         assertThat(jdbc.queryForList(
                         "SELECT body FROM feedback WHERE workspace_id=? AND id=?",
                         String.class,

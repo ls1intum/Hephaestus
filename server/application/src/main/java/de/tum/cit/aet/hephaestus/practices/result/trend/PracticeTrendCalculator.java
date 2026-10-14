@@ -23,8 +23,17 @@ final class PracticeTrendCalculator {
                 .collect(Collectors.toMap(
                         EvidenceOpportunity::key, EvidenceOpportunity::itemKind, (left, right) -> left));
         List<EvidenceOpportunity> trail = OpportunityBundler.cappedTrail(bundles.trail(), properties.getBundleSize());
-        TrendSupport support = TrendSupport.forPractice(
-                properties, bundles.current().size(), bundles.previous().size(), missing, reviewedWork, trail);
+        TrendSupport support = TrendSupport.forGroup(
+                properties,
+                bundles.current().size(),
+                bundles.previous().size(),
+                bundles.current().size() + bundles.previous().size(),
+                missing,
+                bundles.current().size(),
+                reviewedWork,
+                null,
+                null,
+                trail);
         if (missing > 0) {
             return new PracticeTrend(TrendDirection.INSUFFICIENT_EVIDENCE, support, trail, reviewedWork, null);
         }

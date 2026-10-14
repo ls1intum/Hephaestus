@@ -183,6 +183,6 @@ stands for first-party installed clients; the escape hatch for third-party clien
 Decision and rejected alternatives:
 [ADR 0048](0048-installed-clients-sign-in-with-a-pkce-handoff.md).
 
-## Update — 2026-10-14 (#2656): the 1.0 practice model
+## Update — 2026-10-14 (#2656): the practice model cutover
 
 Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for accounts, provider identities and memberships.

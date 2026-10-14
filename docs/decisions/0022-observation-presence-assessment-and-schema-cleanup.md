@@ -149,6 +149,6 @@ observation incorrect or withdraw the feedback.
 
 [ADR 0050](0050-one-practice-standard-one-outcome.md) supersedes the observation-axis decision with a single conformance outcome. The original rationale remains as design history.
 
-## Update — 2026-10-14 (#2656): the 1.0 practice model
+## Update — 2026-10-14 (#2656): the practice model cutover
 
 Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for outcomes and problem records.

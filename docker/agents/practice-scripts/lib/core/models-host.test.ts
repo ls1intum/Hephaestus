@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { describe, test } from "node:test";
 import { setImmediate } from "node:timers/promises";
+import { z } from "zod";
 import { chatOptionsSchema } from "./model-options.ts";
 
 import { InvalidResponseDataError } from "@ai-sdk/provider";
@@ -9,7 +10,7 @@ import { InvalidResponseDataError } from "@ai-sdk/provider";
 import { MockEmbeddingModelV4, MockLanguageModelV4 } from "ai/test";
 
 import { boundModelsSchema, MODEL_SLOT_CAPS } from "./contract.ts";
-import { answerTokens } from "./decision-logprobs.ts";
+import { decisionOutputTokens } from "./decision-logprobs.ts";
 import { hostModels, modelCall, ModelBudget, reservationOf } from "./models-host.ts";
 
 void test("the models file in the shape the server writes gives every slot a model", async () => {
@@ -137,7 +138,10 @@ void describe("the request allowlist", () => {
 			state: "",
 			questions: Object.fromEntries(Array.from({ length: 30 }, (_, i) => [`q${i}`, {}])),
 		});
-		assert.ok(thirty - one >= answerTokens(30) - answerTokens(1), `${one} → ${thirty}`);
+		assert.ok(
+			thirty - one >= decisionOutputTokens(30) - decisionOutputTokens(1),
+			`${one} → ${thirty}`,
+		);
 	});
 });
 
@@ -216,27 +220,39 @@ void describe("logprob decision usage receipts from the bound provider", () => {
 		{ usage: { prompt_tokens: 10, completion_tokens: 5 }, tokens: 15 },
 	] satisfies { usage: unknown; tokens?: number }[]) {
 		void test(`a decision adapter preserves the receipt ${JSON.stringify(usage)}`, async (t) => {
-			t.mock.method(globalThis, "fetch", async () =>
-				Response.json({
-					id: "completion",
-					model: "decision",
-					created: 0,
-					choices: [
-						{
-							index: 0,
-							message: { role: "assistant", content: "q1: A" },
-							finish_reason: "stop",
-							logprobs: {
-								content: [
-									{ token: "q1", logprob: 0, top_logprobs: [] },
-									{ token: ":", logprob: 0, top_logprobs: [] },
-									{ token: " A", logprob: 0, top_logprobs: [{ token: " A", logprob: 0 }] },
-								],
+			let outputLimit = 0;
+			t.mock.method(
+				globalThis,
+				"fetch",
+				async (_input: Parameters<typeof fetch>[0], init?: RequestInit) => {
+					const body = z
+						.object({
+							max_completion_tokens: z.number().optional(),
+							max_tokens: z.number().optional(),
+						})
+						.parse(JSON.parse(z.string().parse(init?.body)));
+					outputLimit = Number(body.max_completion_tokens ?? body.max_tokens);
+					return Response.json({
+						id: "completion",
+						model: "decision",
+						created: 0,
+						choices: [
+							{
+								index: 0,
+								message: { role: "assistant", content: "q1: A" },
+								finish_reason: "stop",
+								logprobs: {
+									content: [
+										{ token: "q1", logprob: 0, top_logprobs: [] },
+										{ token: ":", logprob: 0, top_logprobs: [] },
+										{ token: " A", logprob: 0, top_logprobs: [{ token: " A", logprob: 0 }] },
+									],
+								},
 							},
-						},
-					],
-					usage,
-				}),
+						],
+						usage,
+					});
+				},
 			);
 			const { decision } = hostModels(
 				{ decision: { protocol: "openai-completions", modelId: "decision" } },
@@ -255,6 +271,8 @@ void describe("logprob decision usage receipts from the bound provider", () => {
 			const budget = new ModelBudget(5000, 1);
 			const outcome = await budget.run(call.reserve, never, call.run);
 			assert.ok("value" in outcome, JSON.stringify(outcome));
+			assert.ok(outputLimit >= 4096);
+			assert.ok(call.reserve >= outputLimit);
 			assert.equal(budget.left, 5000 - (tokens ?? call.reserve));
 			assert.ok(outcome.value.slot === "decision");
 			assert.equal(outcome.value.result.usage === undefined, tokens === undefined);

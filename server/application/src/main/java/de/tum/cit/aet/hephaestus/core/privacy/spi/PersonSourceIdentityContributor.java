@@ -5,6 +5,8 @@ import java.util.Set;
 
 /** Provider-owned exact attribution, shared by preview source closure and processing admission. */
 public interface PersonSourceIdentityContributor {
+    PersonSourceScope scope();
+
     Set<String> itemKinds();
 
     /**
@@ -16,5 +18,5 @@ public interface PersonSourceIdentityContributor {
     /**
      * Native attribution on the current source, with requesting-workspace ownership checked in SQL.
      */
-    List<PersonIdentity> identitiesForSource(long workspaceId, String artifactKind, long artifactId);
+    List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId);
 }

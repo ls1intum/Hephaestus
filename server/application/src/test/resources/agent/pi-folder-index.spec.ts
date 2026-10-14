@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
 	folderCitationIndex,
@@ -28,7 +29,7 @@ await test("the full folder remains citable when a primary readiness source is a
 });
 
 await test("missing, duplicate and unsafe folder proofs fail closed", () => {
-	assert.throws(() => folderCitationIndex({ sources: [] }), /expected sources and files/u);
+	assert.throws(() => folderCitationIndex({ sources: [] }), /files/u);
 	const sourceFile = { kind: "outline.documents", file: { path: "context/docs/c/d.md" } };
 	assert.throws(
 		() => folderCitationIndex({ sources: [], files: [sourceFile, sourceFile] }),
@@ -42,7 +43,7 @@ await test("missing, duplicate and unsafe folder proofs fail closed", () => {
 	]) {
 		assert.throws(
 			() => folderCitationIndex({ sources: [], files: [{ kind: "x", file: { path } }] }),
-			/invalid/u,
+			/path/u,
 		);
 	}
 });
@@ -67,7 +68,7 @@ await test("composed views are readable but only canonical records are citable",
 await test("logical captured texts preserve their digest, staged path and opaque version", () => {
 	assert.deepEqual(citableTextIndex({}), []);
 	for (const invalid of [null, {}, "text"]) {
-		assert.throws(() => citableTextIndex({ citableTexts: invalid }), /citableTexts array/u);
+		assert.throws(() => citableTextIndex({ citableTexts: invalid }), /citableTexts/u);
 	}
 	const text = {
 		source: "custom.text",
@@ -83,6 +84,20 @@ await test("logical captured texts preserve their digest, staged path and opaque
 		{ ...text, sha256: "bad" },
 		{ ...text, side: "MIDDLE" },
 	]) {
-		assert.throws(() => citableTextIndex({ citableTexts: [invalid] }), /invalid citable text/u);
+		assert.throws(() => citableTextIndex({ citableTexts: [invalid] }), /citableTexts/u);
 	}
+});
+
+await test("the shared server manifest carries the source-catalog citation capabilities unchanged", () => {
+	const { citationCapabilities } = folderCitationIndex(
+		JSON.parse(readFileSync(new URL("folder-citation-index.json", import.meta.url), "utf8")),
+	);
+	assert.deepEqual(citationCapabilities.get("scm.pull-request.diff"), {
+		side: "REQUIRED",
+		commit: "OPTIONAL",
+	});
+	assert.deepEqual(citationCapabilities.get("scm.repository.tree"), {
+		side: "FORBIDDEN",
+		commit: "OPTIONAL",
+	});
 });

@@ -6,7 +6,6 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryQuery;
 import de.tum.cit.aet.hephaestus.integration.core.spi.MonitoredRepositoryRef;
 import de.tum.cit.aet.hephaestus.practices.review.dto.ReviewScopeRepositoryDTO;
@@ -30,13 +29,8 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
     final ReviewScopeRepositoryRepository targets = mock(ReviewScopeRepositoryRepository.class);
     final MonitoredRepositoryQuery indexed = mock(MonitoredRepositoryQuery.class);
     final ProductItemRepository items = mock(ProductItemRepository.class);
-    final PracticeReviewCoverageService service = new PracticeReviewCoverageService(
-            monitors,
-            targets,
-            mock(PersonProcessingSuppression.class),
-            items,
-            indexed,
-            mock(MembershipReviewSelection.class));
+    final PracticeReviewCoverageService service =
+            new PracticeReviewCoverageService(monitors, targets, items, indexed, mock(MembershipReviewSelection.class));
     Workspace workspace;
 
     @BeforeEach

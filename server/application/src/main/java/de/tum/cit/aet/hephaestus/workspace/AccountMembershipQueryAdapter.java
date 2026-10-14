@@ -34,6 +34,11 @@ public class AccountMembershipQueryAdapter implements AccountMembershipQuery {
     }
 
     @Override
+    public boolean isActiveVisibleMember(long workspaceId, long accountId) {
+        return memberships.isActiveVisibleMember(workspaceId, accountId);
+    }
+
+    @Override
     public boolean isAdministrator(long workspaceId, long accountId) {
         return memberships.isAdministrator(workspaceId, accountId);
     }

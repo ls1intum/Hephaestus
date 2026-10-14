@@ -170,6 +170,8 @@ public class ReviewBatchService {
                 .filter(Objects::nonNull)
                 .toList();
         var people = references.accounts(batch.getWorkspaceId(), ids);
+        var requestedBy = batch.getRequestedByAccountId();
+        var confirmedBy = batch.getConfirmedByAccountId();
         return new ReviewBatchDTO(
                 batch.getId(),
                 Long.toString(batch.getVersion()),
@@ -186,8 +188,8 @@ public class ReviewBatchService {
                 batch.getSubmittedCount(),
                 batch.getSkippedCount(),
                 batch.getFailedCount(),
-                people.get(batch.getRequestedByAccountId()),
-                people.get(batch.getConfirmedByAccountId()),
+                requestedBy == null ? null : people.get(requestedBy),
+                confirmedBy == null ? null : people.get(confirmedBy),
                 batch.getCreatedAt(),
                 batch.getStartedAt(),
                 batch.getFinishedAt(),

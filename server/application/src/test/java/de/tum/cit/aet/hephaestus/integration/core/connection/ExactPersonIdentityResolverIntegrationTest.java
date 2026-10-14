@@ -13,7 +13,9 @@ import de.tum.cit.aet.hephaestus.core.privacy.PersonDataService;
 import de.tum.cit.aet.hephaestus.core.privacy.PersonDataStoreReceipt;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonProcessingSuppression;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceScope;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmCaptureConsent;
@@ -36,6 +38,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.core.type.TypeReference;
@@ -75,6 +78,45 @@ class ExactPersonIdentityResolverIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private IdentityRepository links;
+
+    @Test
+    void shouldResolveDeclaredSourceBucketsWithoutKnowingTheContributorsItemKinds() {
+        var account = accounts.saveAndFlush(new Account("scope-" + UUID.randomUUID()));
+        var beans = new StaticListableBeanFactory();
+        beans.addBean("conversation", contributor(PersonSourceScope.CONVERSATIONS, List.of(5L, 2L, 5L)));
+        beans.addBean("document", contributor(PersonSourceScope.DOCUMENTS, List.of(11L)));
+        beans.addBean("scm", contributor(PersonSourceScope.SCM_SOURCES, List.of(13L)));
+        var declared = new ExactPersonIdentityResolver(
+                jdbc, beans.getBeanProvider(PersonSourceIdentityContributor.class), List.of());
+        var scope = declared.resolve(Objects.requireNonNull(account.getId()), List.of());
+        assertThat(scope.conversationIds()).containsExactly(2L, 5L);
+        assertThat(scope.outlineDocumentIds()).containsExactly(11L);
+        assertThat(scope.scmArtifactIds()).containsExactly(13L);
+    }
+
+    private static PersonSourceIdentityContributor contributor(PersonSourceScope scope, List<Long> sourceIds) {
+        return new PersonSourceIdentityContributor() {
+            @Override
+            public PersonSourceScope scope() {
+                return scope;
+            }
+
+            @Override
+            public Set<String> itemKinds() {
+                return Set.of("another.item");
+            }
+
+            @Override
+            public List<Long> sourceIds(PersonScope person) {
+                return sourceIds;
+            }
+
+            @Override
+            public List<PersonIdentity> identitiesForSource(long workspaceId, String itemKind, long sourceId) {
+                return List.of();
+            }
+        };
+    }
 
     @Test
     void shouldPreviewAndExportEveryRegisteredStoreForGitLabOnlyPerson() {

@@ -35,6 +35,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepos
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +65,7 @@ class DocumentItemSourceTest extends BaseUnitTest {
         source = new DocumentItemSource(
                 documents,
                 projection,
-                new DocumentContentSource(JsonMapper.builder().build()),
+                new DocumentContentSource(JsonMapper.builder().build(), Clock.systemUTC()),
                 JsonMapper.builder().build(),
                 connections,
                 permission);

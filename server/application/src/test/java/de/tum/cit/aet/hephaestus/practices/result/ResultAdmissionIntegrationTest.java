@@ -57,6 +57,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ReviewCompletion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobSnapshot;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewKind;
+import de.tum.cit.aet.hephaestus.practices.spi.ReviewMethod;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewModelBindings;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOrigin;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewPracticeStatus;
@@ -97,6 +98,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.JsonNodeFactory;
 
 @RecordApplicationEvents
@@ -104,6 +106,9 @@ import tools.jackson.databind.node.JsonNodeFactory;
 class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     ApplicationEvents applicationEvents;
+
+    @Autowired
+    JsonMapper json;
 
     @Autowired
     WebTestClient http;
@@ -689,6 +694,42 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldPreserveTheFrozenMethodAfterPersistingAnEventReview() {
+        var input = eventInput();
+        var model = new FrozenModel(
+                "instance:1",
+                "openai_completions",
+                "test-model",
+                null,
+                Map.of(
+                        "directModelTokensPerAttempt",
+                        JsonNodeFactory.instance.numberNode(200000L),
+                        "directModelSearchUnitsPerAttempt",
+                        JsonNodeFactory.instance.numberNode(1000L)));
+        var slots = List.of(
+                new BoundModelSlot("chat", ModelKind.CHAT, model),
+                new BoundModelSlot("decision", ModelKind.DECISION, null),
+                new BoundModelSlot("embedding", ModelKind.EMBEDDING, null),
+                new BoundModelSlot("reranking", ModelKind.RERANKING, null),
+                new BoundModelSlot("review", ModelKind.CHAT, model));
+        when(models.models(eq(input.workspaceId()), anyList())).thenReturn(slots);
+        var expected = new ReviewMethod(1, reviews.modelDigest(json.writeValueAsString(slots)), slots);
+        var eventId = itemEvents.record(input);
+        var persisted = reviews.findByWorkspaceIdAndEventId(input.workspaceId(), eventId)
+                .orElseThrow();
+        var recordedMethod = pinnedPractices
+                .findByWorkspaceIdAndReviewIdAndPracticeId(
+                        input.workspaceId(),
+                        persisted.getId(),
+                        scenario.practice().getId())
+                .orElseThrow()
+                .getMethod();
+        var method = Objects.requireNonNull(recordedMethod);
+        assertThat(method).isEqualTo(expected);
+        assertThat(method.hashCode()).isEqualTo(expected.hashCode());
+    }
+
+    @Test
     void shouldRecordBudgetWaitingAndStartTheSameEventAfterBudgetBecomesAvailable() {
         var input = eventInput();
         when(budget.canRequest(input.workspaceId(), ReviewKind.ITEM, null)).thenReturn(false);
@@ -730,6 +771,43 @@ class ResultAdmissionIntegrationTest extends BaseIntegrationTest {
         assertThat(decision.getReason()).isEqualTo(ReviewRequestReason.PRACTICES_DISABLED);
         assertThat(decision.getRetryAt()).isNull();
         assertThat(reviews.findByWorkspaceIdAndEventId(input.workspaceId(), id)).isEmpty();
+    }
+
+    @Test
+    void shouldRejectAnUnmonitoredRepositoryAsIneligible() {
+        long workspace = scenario.workspace().getId();
+        long itemId = jdbc.sql("""
+            INSERT INTO item(workspace_id,kind,source_id,created_at)
+            VALUES (:workspace,'scm.repository',:source,now()) RETURNING id
+            """)
+                .param("workspace", workspace)
+                .param("source", scenario.item().getSourceId())
+                .query(Long.class)
+                .single();
+        var ref = productItems.require(workspace, itemId);
+        var pinned = ItemFixtures.snapshot(ref, Map.of("defaultBranch", "main"))
+                .version(new ItemVersion("a".repeat(40), null))
+                .build();
+        doReturn(pinned).when(productItems).pin(eq(ref), isNull());
+        when(budget.canRequest(workspace, ReviewKind.SCAN, null)).thenReturn(true);
+        var request = ReviewRequest.builder()
+                .workspaceId(workspace)
+                .itemId(itemId)
+                .kind(ReviewKind.SCAN)
+                .origin(ReviewOrigin.REQUEST)
+                .requestedById(scenarioAccountId)
+                .requestKey(UUID.randomUUID())
+                .requestDigest("b".repeat(64))
+                .practiceIds(List.of())
+                .reuse(true)
+                .build();
+        assertThatThrownBy(() -> service.request(request))
+                .isInstanceOfSatisfying(ReviewRequestRejected.class, refusal -> {
+                    assertThat(refusal.reason()).isEqualTo(ReviewRequestRejected.Reason.ITEM_INELIGIBLE);
+                    assertThat(refusal.getStatusCode().value()).isEqualTo(422);
+                });
+        assertThat(reviews.findByWorkspaceIdAndItemIdOrderByOrderedAtDesc(workspace, itemId))
+                .isEmpty();
     }
 
     @Test

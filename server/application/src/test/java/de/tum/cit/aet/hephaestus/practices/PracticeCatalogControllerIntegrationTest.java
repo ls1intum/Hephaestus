@@ -2,13 +2,10 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogCustomizationService;
-import de.tum.cit.aet.hephaestus.practices.catalog.CatalogEntryType;
 import de.tum.cit.aet.hephaestus.practices.catalog.CatalogService;
-import de.tum.cit.aet.hephaestus.practices.dto.CatalogPracticeInputDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeGroupRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.MovePracticeRequestDTO;
@@ -26,7 +23,6 @@ import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -35,6 +31,9 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
     @Autowired
     WebTestClient client;
+
+    @Autowired
+    CatalogOriginPresenter presenter;
 
     @Autowired
     PracticeVersionService versions;
@@ -175,11 +174,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .jsonPath("$.id")
                 .isEqualTo(practice.getId().toString())
                 .jsonPath("$.currentVersion.definition.criteria")
-                .isEqualTo(DefinitionTestFixtures.definition().criteria())
-                .jsonPath("$.currentVersion.definitionAvailable")
-                .isEqualTo(true)
-                .jsonPath("$.currentVersion.historicalDefinition")
-                .isEmpty();
+                .isEqualTo(DefinitionTestFixtures.definition().criteria());
     }
 
     @Test
@@ -268,7 +263,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .expectBody()
                 .jsonPath("$.currentVersionId")
                 .isEqualTo(Objects.requireNonNull(second.getId()).toString());
-        assertThat(versions.history(practice)).hasSize(2);
+        assertThat(presenter.history(practice)).hasSize(2);
     }
 
     @Test
@@ -370,46 +365,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .exchange()
                 .expectStatus()
                 .isNotModified()
-                .expectBody(Void.class);
-    }
-
-    @Test
-    @WithAdminUser
-    void shouldExposeExcludedInstanceDefinitionsForAdminComparison() {
-        var owner = persistUser("admin");
-        var workspace = createWorkspace("catalog-comparison", "Comparison", "comparison-org", AccountType.ORG, owner);
-        String slug = "comparison-" + UUID.randomUUID();
-        var entry = customization.createPractice(new CatalogPracticeInputDTO(
-                slug,
-                "scm.pull_request",
-                null,
-                DefinitionTestFixtures.authoring(DefinitionTestFixtures.definition()),
-                null));
-        customization.setExcluded(
-                CatalogEntryType.PRACTICE,
-                slug,
-                true,
-                EntityTagPrecondition.parse(EntityTagPrecondition.format(entry.etag())));
-        client.get()
-                .uri("/workspaces/{workspace}/practice-catalog/practices/{slug}", workspace.getWorkspaceSlug(), slug)
-                .headers(TestAuthUtils.withCurrentUser())
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody()
-                .jsonPath("$.definition.criteria")
-                .isEqualTo(DefinitionTestFixtures.definition().criteria())
-                .jsonPath("$.excluded")
-                .isEqualTo(true)
-                .jsonPath("$.offered")
-                .isEqualTo(false);
-        persistUser("mentor");
-        client.get()
-                .uri("/workspaces/{workspace}/practice-catalog/practices/{slug}", workspace.getWorkspaceSlug(), slug)
-                .headers(headers -> headers.setBearerAuth("mock-jwt-token-for-mentor-user"))
-                .exchange()
-                .expectStatus()
-                .isForbidden()
                 .expectBody(Void.class);
     }
 

@@ -206,7 +206,6 @@ public class ScanMembershipQueriesImpl implements ScanMembershipQueries {
     public List<ScanReportCursor> comparisonPairs(
             Review review, @Nullable UUID baseline, @Nullable ScanReportCursor after, int limit) {
         var params = params(review, limit);
-        params.put("baseline", baseline);
         var where = new StringBuilder(
                 " WHERE m.workspace_id=:ws AND m.review_id=:scan AND (r.outcome='NOT_MET' OR (r.outcome='MET' AND"
                         + " m.state='JUDGED' AND old.outcome='NOT_MET')) ");
@@ -226,6 +225,7 @@ public class ScanMembershipQueriesImpl implements ScanMembershipQueries {
                                 + where + " ORDER BY m.practice_id,m.item_id LIMIT :limit",
                         Tuple.class)
                 .setProperties(params)
+                .setParameter("baseline", baseline, UUID.class)
                 .getResultStream()
                 .map(row -> new ScanReportCursor(
                         review.getId(),

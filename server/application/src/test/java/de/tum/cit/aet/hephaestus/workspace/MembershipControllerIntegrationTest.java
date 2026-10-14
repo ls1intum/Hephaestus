@@ -3,8 +3,16 @@ package de.tum.cit.aet.hephaestus.workspace;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.web.PageResponseDTO;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembershipRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -47,6 +55,91 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     @Autowired
     private IdentityRepository identities;
 
+    @Autowired
+    private IdentityProviderRepository providers;
+
+    @Autowired
+    private TeamRepository teams;
+
+    @Autowired
+    private TeamMembershipRepository teamMemberships;
+
+    @Test
+    @WithAdminUser
+    void shouldFilterAndSortMemberPagesWithinTheConnectedTeamNamespace() {
+        var owner = persistUser("member-search-owner");
+        var workspace = createWorkspace("member-search", "Members", "member-search-org", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+        connectActivitySource(workspace, owner.getProvider());
+        var alpha = persistUser("zulu-login");
+        alpha.setName("Searchable Alpha");
+        userRepository.saveAndFlush(alpha);
+        var beta = persistUser("alpha-login");
+        beta.setName("Searchable Beta");
+        userRepository.saveAndFlush(beta);
+        ensureMembership(workspace, alpha, WorkspaceRole.MEMBER);
+        ensureMembership(workspace, beta, WorkspaceRole.MEMBER);
+        var team = memberTeam("own", workspace.getAccountLogin(), owner.getProvider(), 900_001);
+        var foreignTeam = memberTeam("foreign", "another-organization", owner.getProvider(), 900_002);
+        for (var actor : List.of(alpha, beta)) {
+            teamMemberships.saveAndFlush(new TeamMembership(team, actor, TeamMembership.Role.MEMBER));
+            teamMemberships.saveAndFlush(new TeamMembership(foreignTeam, actor, TeamMembership.Role.MEMBER));
+        }
+        for (int page = 0; page < 2; page++) {
+            webTestClient
+                    .get()
+                    .uri(
+                            "/workspaces/{slug}/members?q=SEARCHABLE&team={team}&size=1&page={page}&sort=username,asc",
+                            workspace.getWorkspaceSlug(),
+                            team.getId(),
+                            page)
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.totalElements")
+                    .isEqualTo(2)
+                    .jsonPath("$.content.length()")
+                    .isEqualTo(1)
+                    .jsonPath("$.content[0].account.id")
+                    .isEqualTo(Long.toString(accountId(page == 0 ? beta : alpha)));
+        }
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/members?q=SEARCHABLE&size=1&sort=name,desc", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(2)
+                .jsonPath("$.content[0].account.id")
+                .isEqualTo(Long.toString(accountId(beta)));
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/members?team={team}", workspace.getWorkspaceSlug(), foreignTeam.getId())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.totalElements")
+                .isEqualTo(0);
+    }
+
+    private Team memberTeam(String slug, String organization, IdentityProvider provider, long nativeId) {
+        var team = new Team();
+        team.setProvider(provider);
+        team.setNativeId(nativeId);
+        team.setSlug(slug);
+        team.setName(slug);
+        team.setOrganization(organization);
+        team.setHtmlUrl("https://github.com/orgs/" + organization + "/teams/" + slug);
+        return teams.saveAndFlush(team);
+    }
+
     @Test
     @WithAdminUser
     void shouldKeepProviderProfileQueriesBoundedForFiftyMembers() {
@@ -54,9 +147,17 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
         var workspace = createWorkspace("profile-batch", "Profiles", "profiles", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
         connectActivitySource(workspace, owner.getProvider());
+        var gitlab = providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITLAB, "https://gitlab.com"));
         for (int index = 0; index < 50; index++) {
             var member = persistUser("profile-batch-" + index);
             ensureMembership(workspace, member, WorkspaceRole.MEMBER);
+            var secondProfile = userRepository.saveAndFlush(
+                    TestUserFactory.createUser(900_000 + index, "gitlab-profile-" + index, gitlab));
+            var identity = new Identity();
+            identity.setAccount(accounts.findById(accountId(member)).orElseThrow());
+            identity.setProviderId(Objects.requireNonNull(gitlab.getId()));
+            identity.setProviderUserKey(secondProfile.getNativeId().toString());
+            identities.saveAndFlush(identity);
         }
         var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
         boolean enabled = statistics.isStatisticsEnabled();

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.context.JobFolderIndex;
+import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -52,6 +53,7 @@ class SourceContractValueTest {
                 .isThrownBy(() -> new SourceCapture(
                         new SourceKind("scm.pull-request.diff"),
                         new SourceCaptureState.Unavailable(SourceAbsenceReason.NO_WORKING_COPY),
+                        EvidenceSnapshotFixtures.citation(new SourceKind("scm.pull-request.diff")),
                         List.of(new CapturedSource("context/diff.patch", "text/x-diff", "a".repeat(64), 1))));
     }
 
@@ -205,6 +207,7 @@ class SourceContractValueTest {
                                 SourceContentState.NON_EMPTY,
                                 SourceCompleteness.COMPLETE,
                                 new SourceCaptureFacts(Instant.parse("2026-08-03T10:00:00Z"), null, null, null)),
+                        EvidenceSnapshotFixtures.citation(new SourceKind("scm.pull-request.core")),
                         List.of(first, second)));
     }
 }

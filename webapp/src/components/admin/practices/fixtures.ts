@@ -113,8 +113,6 @@ export function practiceVersion(
 		number: 1,
 		name: definition.name,
 		definition,
-		definitionAvailable: true,
-		historicalDefinition: null,
 		reviewDigest: "sha256:review",
 		createdAt: new Date("2025-06-15"),
 		createdBy: mockAdmin,

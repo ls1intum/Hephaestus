@@ -78,8 +78,8 @@ class PracticeV1DefinitionMigrationTest {
                 assertThat(PracticeMigrationFixture.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
-                                        + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
-                                        + " WHERE p.id="
+                                    + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
+                                    + " WHERE p.id="
                                         + (1000000L + index)))
                         .containsExactly(shippedProgramSha(program) + "|2");
                 index++;
@@ -211,15 +211,15 @@ class PracticeV1DefinitionMigrationTest {
                 .containsExactly("APPROVE_FIRST");
         assertThat(PracticeMigrationFixture.column(
                         database,
-                        "SELECT kind || '|' || (definition->'definition'->>'criteria') || '|' || version FROM"
+                        "SELECT kind || '|' || (definition->'definition'->>'criteria') FROM"
                                 + " catalog_entry WHERE entry_type='PRACTICE' AND slug='local-offer'"))
-                .containsExactly("scm.pull_request|Local offer standard.|7");
+                .containsExactly("scm.pull_request|Local offer standard.");
         assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (kind IS NULL AND definition IS NULL AND base IS NULL AND excluded_at IS NOT"
-                                + " NULL)::text || '|' || version FROM catalog_entry WHERE entry_type='PRACTICE'"
+                                + " NULL)::text FROM catalog_entry WHERE entry_type='PRACTICE'"
                                 + " AND slug='excluded-following-entry'"))
-                .containsExactly("true|11");
+                .containsExactly("true");
         assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (review_digest=practice_review_digest(definition))::text FROM practice_version"

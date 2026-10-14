@@ -51,7 +51,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 // Real transactions must roll back the state change when ledger append fails and satisfy MANDATORY propagation.
 @DisplayName("Stale RUNNING reaper over PostgreSQL Integration")
-class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
+class ReviewJobPersistenceIntegrationTest extends BaseIntegrationTest {
 
     private ReviewJobZombieSweeper sweeper;
 

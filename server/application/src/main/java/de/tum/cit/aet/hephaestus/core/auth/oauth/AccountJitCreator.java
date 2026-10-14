@@ -25,10 +25,7 @@ public class AccountJitCreator {
 
     @Transactional
     public Account create(Account account, Identity link) {
-        var key = new PersonIdentity(
-                link.getProviderId(),
-                link.getProviderUserKey(),
-                link.getTeamKey().isEmpty() ? null : link.getTeamKey());
+        var key = PersonIdentity.of(link.getProviderId(), link.getProviderUserKey(), link.getTeamKey());
         long id = people.ensureHuman(key, account.getDisplayName());
         var saved = accountRepository.findById(id).orElseThrow();
         boolean unclaimed = saved.getStatus() == Account.Status.UNCLAIMED;

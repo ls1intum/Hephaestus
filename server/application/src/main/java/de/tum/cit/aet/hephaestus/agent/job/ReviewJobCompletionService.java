@@ -92,8 +92,12 @@ public class ReviewJobCompletionService {
         if (review.kind() == ReviewKind.SCAN) return;
         var output = job.getOutput();
         boolean readinessRefused = output != null
-                && ("INSUFFICIENT_EVIDENCE".equals(output.path("outcome").asString())
-                        || "WORKSPACE_REFUSED".equals(output.path("outcome").asString()));
+                && (RefusalOutcome.INSUFFICIENT_EVIDENCE
+                                .name()
+                                .equals(output.path("outcome").asString())
+                        || RefusalOutcome.WORKSPACE_REFUSED
+                                .name()
+                                .equals(output.path("outcome").asString()));
         var status = job.getStatus() == ReviewJobStatus.CANCELLED
                 ? ReviewStatus.CANCELLED
                 : readinessRefused

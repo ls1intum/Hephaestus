@@ -4,6 +4,8 @@ import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonIdentity;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonScope;
 import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceIdentityContributor;
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceScope;
+import de.tum.cit.aet.hephaestus.integration.chat.item.ThreadEvents;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackThreadRepository;
 import java.util.List;
 import java.util.Set;
@@ -18,8 +20,13 @@ public class SlackPersonSourceIdentityContributor implements PersonSourceIdentit
     private final SlackThreadRepository repository;
 
     @Override
+    public PersonSourceScope scope() {
+        return PersonSourceScope.CONVERSATIONS;
+    }
+
+    @Override
     public Set<String> itemKinds() {
-        return Set.of("chat.thread");
+        return Set.of(ThreadEvents.THREAD.value());
     }
 
     @Override

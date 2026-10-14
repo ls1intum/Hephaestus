@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -73,8 +74,10 @@ class AccountExportServiceTest extends BaseUnitTest {
         link.setProviderId(55L);
         when(gitProviderRegistry.providerTypeName(55L)).thenReturn("GITLAB");
         link.setProviderUserKey("123");
-        when(gitProviderRegistry.profile(55L, "123", ""))
-                .thenReturn(Optional.of(new GitProviderRegistry.IdentityProfile("ada", "Ada on GitLab", null, null)));
+        var identityKey = new GitProviderRegistry.IdentityKey(55L, "123", "");
+        when(gitProviderRegistry.profiles(List.of(identityKey)))
+                .thenReturn(Map.of(
+                        identityKey, new GitProviderRegistry.IdentityProfile("ada", "Ada on GitLab", null, null)));
 
         when(accountService.requireById(ACCOUNT_ID)).thenReturn(account);
         when(accountService.activeIdentities(ACCOUNT_ID)).thenReturn(List.of(link));

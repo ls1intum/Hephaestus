@@ -73,9 +73,9 @@ for (const [name, change] of [
 		},
 	],
 	[
-		"missing required nullable scan",
+		"a non-object scan",
 		(d) => {
-			delete d.scan;
+			d.scan = "scm.file";
 		},
 	],
 	[
@@ -157,12 +157,20 @@ await test("event-free developerless definitions retain explicit nullable keys",
 	assert.equal(validate(value), true, JSON.stringify(validate.errors));
 });
 
+await test("a definition can omit its optional scan", () => {
+	const value = withDefinition((d) => {
+		delete d.scan;
+	});
+	assert.equal(validate(value), true, JSON.stringify(validate.errors));
+});
+
 await test("the catalog publishes exactly thirteen scan definitions", () => {
 	const scans = asArray(catalogue.groups, "groups").flatMap((groupValue) => {
 		const group = asRecord(groupValue, "group");
 		return asArray(group.practices, "practices").filter((practiceValue) => {
 			const practice = asRecord(practiceValue, "practice");
-			return asRecord(practice.definition, "definition").scan !== null;
+			const { scan } = asRecord(practice.definition, "definition");
+			return scan !== undefined && scan !== null;
 		});
 	});
 	assert.equal(scans.length, 13);

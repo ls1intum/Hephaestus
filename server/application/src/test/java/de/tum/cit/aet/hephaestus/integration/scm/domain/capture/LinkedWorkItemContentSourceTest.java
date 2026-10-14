@@ -11,6 +11,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.handler.EvidenceSnapshotFixtures;
 import de.tum.cit.aet.hephaestus.evidence.CapturedSource;
 import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureFacts;
@@ -41,7 +42,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -160,6 +160,7 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
                         SourceContentState.NON_EMPTY,
                         SourceCompleteness.PARTIAL,
                         new SourceCaptureFacts(capturedAt, null, null, null)),
+                EvidenceSnapshotFixtures.citation(KIND),
                 issues.stream()
                         .map(issue -> new CapturedSource(
                                 LinkedWorkItemContentSource.ITEMS_PREFIX + issue.getNumber() + ".md",
@@ -297,22 +298,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
             assertThat(item.has("subIssuesTotal")).isFalse();
             assertThat(item.has("subIssuesCompleted")).isFalse();
             assertThat(item.has("subIssuesSource")).isFalse();
-        }
-
-        @Test
-        void shouldListTheProvidersClosingCandidateEvenWhenNoTextNamesIt() throws Exception {
-            // A link made in the provider's UI: no `#N` anywhere, and still a closing candidate.
-            var pr = new PullRequest();
-            pr.setId(PR_ID);
-            pr.setBody("Implements the token refresh.");
-            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            Issue linked = issue(42, "Add token refresh", "criteria");
-            when(pullRequestRepository.findClosingIssuesById(PR_ID)).thenReturn(List.of(linked));
-
-            JsonNode root = payload(sampleMetadata());
-
-            assertThat(itemNumbers(root)).containsExactly(42);
-            assertThat(root.get("workItems").get(0).get("how").asString()).isEqualTo("closesOnMerge");
         }
 
         @Test
@@ -571,18 +556,6 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
 
             assertThat(root.get("workItems")).hasSize(20);
             assertThat(root.get("truncated").asBoolean()).isFalse();
-        }
-
-        @Test
-        void shouldKeepAllProviderClosingIssues() throws Exception {
-            var pr = new PullRequest();
-            pr.setId(PR_ID);
-            when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
-            when(pullRequestRepository.findClosingIssuesById(PR_ID))
-                    .thenReturn(IntStream.rangeClosed(1, 10_001)
-                            .mapToObj(number -> issue(number, "Issue", ""))
-                            .toList());
-            assertThat(itemNumbers(payload(sampleMetadata()))).hasSize(10_001);
         }
     }
 

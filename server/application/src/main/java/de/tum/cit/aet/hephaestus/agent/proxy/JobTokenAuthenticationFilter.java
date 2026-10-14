@@ -28,7 +28,7 @@ public final class JobTokenAuthenticationFilter extends AuthenticationFilter {
             new IpAddressMatcher("169.254.0.0/16"),
             new IpAddressMatcher("::1"),
             new IpAddressMatcher("fe80::/10"),
-            new IpAddressMatcher("fec0::/10"));
+            new IpAddressMatcher("fc00::/7"));
 
     JobTokenAuthenticationFilter(
             ReviewJobRepository jobs,

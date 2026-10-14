@@ -27,9 +27,7 @@ public final class ItemFixtures {
             @Nullable IntegrationRef integration,
             @Nullable List<RoleHolder> roles,
             @Nullable ItemLabel label) {
-        var provider = integration == null
-                ? new IntegrationRef(IntegrationKind.GITHUB, item.workspaceId(), null)
-                : integration;
+        var provider = integration == null ? new IntegrationRef(IntegrationKind.GITHUB, 1, null) : integration;
         return new ItemSnapshot(
                 item,
                 version == null ? new ItemVersion("v1", null) : version,

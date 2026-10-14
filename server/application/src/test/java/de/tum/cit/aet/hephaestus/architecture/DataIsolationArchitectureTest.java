@@ -181,9 +181,9 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                         javaClass,
                                         String.format(
                                                 "ENTITY ISOLATION: %s is a JPA entity with no apparent workspace"
-                                                    + " relationship. Add to WORKSPACE_SCOPED_ENTITIES with"
-                                                    + " relationship path, or add to GLOBAL_ENTITIES if intentionally"
-                                                    + " global.",
+                                                        + " relationship. Add to WORKSPACE_SCOPED_ENTITIES with"
+                                                        + " relationship path, or add to GLOBAL_ENTITIES if intentionally"
+                                                        + " global.",
                                                 entityName)));
                             }
                         }
@@ -389,8 +389,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                         method,
                                         String.format(
                                                 "ENTITY RETURN RISK: %s.%s returns entity type but appears unscoped."
-                                                    + " Add workspace filtering or add to WORKSPACE_AGNOSTIC_METHODS"
-                                                    + " if intentional.",
+                                                        + " Add workspace filtering or add to WORKSPACE_AGNOSTIC_METHODS"
+                                                        + " if intentional.",
                                                 repoName, methodName)));
                             }
                         }
@@ -454,8 +454,8 @@ class DataIsolationArchitectureTest extends HephaestusArchitectureTest {
                                             field,
                                             String.format(
                                                     "CASCADE DELETE RISK: Workspace.%s has cascade delete to global"
-                                                        + " entity %s. This could delete shared data. Remove cascade"
-                                                        + " or use orphanRemoval=false.",
+                                                            + " entity %s. This could delete shared data. Remove cascade"
+                                                            + " or use orphanRemoval=false.",
                                                     field.getName(), fieldType)));
                                 }
                             });

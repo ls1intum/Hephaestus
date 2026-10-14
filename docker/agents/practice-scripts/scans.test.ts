@@ -95,11 +95,13 @@ void test("the catalog advertises exactly the 13 approved scan practices", async
 	);
 	const catalog = z
 		.object({
+			criteriaPreambles: z.record(z.string(), z.string()),
 			groups: z.array(
 				z.object({
 					practices: z.array(
 						z.object({
-							definition: z.object({ scan: z.unknown().nullable(), criteria: z.string() }),
+							preamble: z.string().optional(),
+							definition: z.object({ scan: z.unknown().nullish(), criteria: z.string() }),
 						}),
 					),
 				}),
@@ -111,11 +113,15 @@ void test("the catalog advertises exactly the 13 approved scan practices", async
 	for (const group of catalog.groups) {
 		for (const practice of group.practices) {
 			number += 1;
-			if (practice.definition.scan !== null) {
+			if (practice.definition.scan != null) {
+				const criteria = [
+					practice.preamble === undefined ? "" : catalog.criteriaPreambles[practice.preamble],
+					practice.definition.criteria,
+				].join("\n\n");
 				numbers.push(number);
-				assert.match(practice.definition.criteria, /## On a change/u);
-				assert.match(practice.definition.criteria, /## In a scan/u);
-				assert.doesNotMatch(practice.definition.criteria, /single most consequential/u);
+				assert.match(criteria, /## On a change/u);
+				assert.match(criteria, /## In a scan/u);
+				assert.doesNotMatch(criteria, /single most consequential/u);
 			}
 		}
 	}

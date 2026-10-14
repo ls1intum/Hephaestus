@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,6 +70,8 @@ public class ExportBundleAssembler {
     public ExportBundle assemble(Long accountId) {
         Account account = accountService.requireById(accountId);
         List<Identity> identities = accountService.activeIdentities(accountId);
+        var profiles = gitProviderRegistry.profiles(
+                identities.stream().map(ExportBundleAssembler::key).toList());
 
         ExportBundle.Profile profile = new ExportBundle.Profile(
                 Long.toString(Objects.requireNonNull(account.getId())),
@@ -79,8 +82,9 @@ public class ExportBundleAssembler {
                 account.getStatus().name(),
                 Objects.requireNonNull(account.getCreatedAt()));
 
-        List<ExportBundle.Identity> identityViews =
-                identities.stream().map(this::toIdentity).toList();
+        List<ExportBundle.Identity> identityViews = identities.stream()
+                .map(identity -> toIdentity(identity, profiles.get(key(identity))))
+                .toList();
 
         List<ExportBundle.Membership> memberships = workspaceMembershipQuery.membershipsForAccount(accountId).stream()
                 .map(m -> new ExportBundle.Membership(
@@ -124,11 +128,13 @@ public class ExportBundleAssembler {
                 notificationPreferences.preferences(accountId));
     }
 
-    private ExportBundle.Identity toIdentity(Identity il) {
+    private static GitProviderRegistry.IdentityKey key(Identity identity) {
+        return new GitProviderRegistry.IdentityKey(
+                identity.getProviderId(), identity.getProviderUserKey(), identity.getTeamKey());
+    }
+
+    private ExportBundle.Identity toIdentity(Identity il, GitProviderRegistry.@Nullable IdentityProfile profile) {
         String provider = gitProviderRegistry.providerTypeName(il.getProviderId());
-        var profile = gitProviderRegistry
-                .profile(il.getProviderId(), il.getProviderUserKey(), il.getTeamKey())
-                .orElse(null);
         return new ExportBundle.Identity(
                 provider,
                 il.getProviderUserKey(),

@@ -3042,7 +3042,7 @@ export function itemEventsOf(review: ReviewSummary): ItemEvent[] {
 	return [
 		event("e01", "scm.pull_request.opened", -90, "WITHHELD", "COOLDOWN_ACTIVE"),
 		...(review.startedBy === null ? [] : [review.startedBy]),
-		event("e02", "scm.pull_request.synchronized", 30, "BLOCKED", "MODEL_UNAVAILABLE"),
+		event("e02", "scm.pull_request.synchronized", 30, "WAITING", "MODEL_UNAVAILABLE"),
 	];
 }
 

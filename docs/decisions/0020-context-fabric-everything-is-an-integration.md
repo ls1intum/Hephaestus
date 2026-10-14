@@ -426,6 +426,6 @@ revisit trigger.
   `ROW LEVEL SECURITY`; the controller layer plus the throwing inspector are the boundary, and
   folding RLS in is undecided.
 
-## Update — 2026-10-14 (#2656): the 1.0 practice model
+## Update — 2026-10-14 (#2656): the practice model cutover
 
 Superseded in part by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for the review model and module boundaries.

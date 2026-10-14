@@ -10,6 +10,7 @@ import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,8 +66,8 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
                             events.add(SimpleConditionEvent.violated(
                                     javaClass,
                                     javaClass.getName()
-                                            + " is a Slack @RestController that is neither @WorkspaceScopedController nor"
-                                            + " an @Hidden webhook receiver"));
+                                            + " is a Slack @RestController that is neither @WorkspaceScopedController"
+                                            + " nor an @Hidden webhook receiver"));
                         }
                     }
                 })
@@ -128,31 +129,34 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
                 .areInterfaces()
                 .and()
                 .haveSimpleNameEndingWith("Repository")
-                .should(new ArchCondition<>("declare only workspace-scoped finders (or allowlisted enumerators)") {
-                    @Override
-                    public void check(JavaClass javaClass, ConditionEvents events) {
-                        for (JavaMethod method : javaClass.getMethods()) {
-                            if (!method.getOwner().equals(javaClass)) {
-                                continue;
+                .should(
+                        new ArchCondition<>(
+                                "declare workspace-scoped finders or explicitly workspace-agnostic operations") {
+                            @Override
+                            public void check(JavaClass javaClass, ConditionEvents events) {
+                                for (JavaMethod method : javaClass.getMethods()) {
+                                    if (!method.getOwner().equals(javaClass)) {
+                                        continue;
+                                    }
+                                    String name = method.getName();
+                                    if (!name.matches("(find|count|delete|exists).*")) {
+                                        continue;
+                                    }
+                                    if (method.isAnnotatedWith(WorkspaceAgnostic.class)
+                                            || UNSCOPED_ALLOWLIST.contains(javaClass.getSimpleName() + "." + name)) {
+                                        continue;
+                                    }
+                                    boolean scoped = nameCarriesWorkspaceParam(method);
+                                    if (!scoped) {
+                                        events.add(SimpleConditionEvent.violated(
+                                                method,
+                                                javaClass.getSimpleName() + "."
+                                                        + name
+                                                        + " has no workspaceId parameter and is not allowlisted"));
+                                    }
+                                }
                             }
-                            String name = method.getName();
-                            if (!name.matches("(find|count|delete|exists).*")) {
-                                continue;
-                            }
-                            if (UNSCOPED_ALLOWLIST.contains(javaClass.getSimpleName() + "." + name)) {
-                                continue;
-                            }
-                            boolean scoped = nameCarriesWorkspaceParam(method);
-                            if (!scoped) {
-                                events.add(SimpleConditionEvent.violated(
-                                        method,
-                                        javaClass.getSimpleName() + "."
-                                                + name
-                                                + " has no workspaceId parameter and is not allowlisted"));
-                            }
-                        }
-                    }
-                })
+                        })
                 .check(classes);
     }
 
@@ -254,11 +258,11 @@ class SlackIntegrationArchitectureTest extends HephaestusArchitectureTest {
                                 boolean isRepositoryInterface = javaClass.isInterface()
                                         && javaClass.isAssignableTo("org.springframework.data.repository.Repository");
                                 if (!isRepositoryInterface) {
-                                    events.add(
-                                            SimpleConditionEvent.violated(
-                                                    javaClass,
-                                                    javaClass.getName()
-                                                            + " is named *Repository but is not an interface extending Repository"));
+                                    events.add(SimpleConditionEvent.violated(
+                                            javaClass,
+                                            javaClass.getName()
+                                                    + " is named *Repository but is not an interface extending"
+                                                    + " Repository"));
                                 }
                             }
                         })

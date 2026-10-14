@@ -15,7 +15,7 @@ import {
 	type SlotCall,
 	type SlotModels,
 } from "./contract.ts";
-import { answerTokens, logprobDecisionModel } from "./decision-logprobs.ts";
+import { decisionOutputTokens, logprobDecisionModel } from "./decision-logprobs.ts";
 import { MAX_OUTPUT_TOKENS } from "./model-options.ts";
 import { reasonOf } from "./practice-script.ts";
 
@@ -114,7 +114,6 @@ export function hostModels(
 	} else if (decision?.protocol === "openai-completions") {
 		models.decision = logprobDecisionModel(
 			createOpenAI(settings("decision")).chat(decision.modelId),
-			{ reasoning: decision.reasoningEffort !== undefined },
 		);
 	}
 	if (embedding?.protocol === "openai-embeddings") {
@@ -143,7 +142,9 @@ export function reservationOf(slot: ModelSlot, options: Record<string, unknown>)
 		case "decision": {
 			return (
 				input +
-				answerTokens(Object.keys(z.record(z.string(), z.unknown()).parse(options.questions)).length)
+				decisionOutputTokens(
+					Object.keys(z.record(z.string(), z.unknown()).parse(options.questions)).length,
+				)
 			);
 		}
 		case "embedding":

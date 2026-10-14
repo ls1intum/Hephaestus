@@ -69,12 +69,10 @@
 									"required": [
 										"name",
 										"reviewOn",
-										"appliesWhen",
 										"about",
 										"reads",
 										"reviewedBy",
 										"criteria",
-										"scan",
 										"lineNotes",
 										"guidance"
 									],
@@ -201,7 +199,7 @@
 										"reviewedBy": {
 											"type": "object",
 											"additionalProperties": false,
-											"required": ["by", "humanReason", "limits"],
+											"required": ["by", "limits"],
 											"properties": {
 												"by": {
 													"enum": ["HEPHAESTUS", "PEOPLE", "NOBODY"]

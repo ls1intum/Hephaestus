@@ -732,14 +732,14 @@ class MetricOwnershipArchTest {
         assertThat(literalViolations(parse("""
             import io.micrometer.core.instrument.MeterRegistry;
             class Fixture {
-                record Placement(String body) {
-                    static Placement summary(String body) { return new Placement(body); }
+                record Copy(String body) {
+                    static Copy summary(String body) { return new Copy(body); }
                 }
                 MeterRegistry registry;
-                Placement placements(String summary) { return Placement.summary(summary); }
+                Copy copies(String summary) { return Copy.summary(summary); }
                 void compose() {
-                    Placement.summary("The complete review.");
-                    placements("The complete review.");
+                    Copy.summary("The complete review.");
+                    copies("The complete review.");
                 }
             }
             """), FIXTURE_CATALOGS)).isEmpty();

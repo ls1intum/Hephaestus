@@ -177,6 +177,6 @@ The result read as a template, and the server wrote sentences that no model wrot
 Everything else in this ADR stands. The contract lives in `agent/review-composer.md`, `pi-runner-composition.ts`,
 `ComposedReview` and `ComposedReviewAdmission`.
 
-## Update — 2026-10-14 (#2656): the 1.0 practice model
+## Update — 2026-10-14 (#2656): the practice model cutover
 
 Superseded by [ADR 0056](0056-one-practice-model-for-items-and-scans.md) for feedback basis and destinations.

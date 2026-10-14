@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import de.tum.cit.aet.hephaestus.evidence.CitationSide;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.StrictJson;
@@ -18,14 +20,22 @@ import de.tum.cit.aet.hephaestus.practices.spi.OpenQuestion;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceipt;
 import de.tum.cit.aet.hephaestus.practices.spi.ReadReceiptStatus;
 import de.tum.cit.aet.hephaestus.practices.spi.WorsenedBasis;
+import java.io.Serial;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JsonParser;
+import tools.jackson.databind.BeanDescription;
+import tools.jackson.databind.DeserializationConfig;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.ValueDeserializer;
+import tools.jackson.databind.deser.SettableBeanProperty;
+import tools.jackson.databind.deser.ValueInstantiator;
+import tools.jackson.databind.deser.bean.PropertyValueBuffer;
+import tools.jackson.databind.deser.impl.NullsConstantProvider;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.module.SimpleModule;
+import tools.jackson.databind.module.SimpleValueInstantiators;
 
 /** Wire-only creator requirements; stored proof fields are not accepted from an agent. */
 final class CandidateWireMapper {
@@ -35,7 +45,17 @@ final class CandidateWireMapper {
         var integers = new SimpleModule("candidate-integers");
         integers.addDeserializer(Integer.class, new ContractInteger());
         integers.addDeserializer(int.class, new ContractInteger());
+        integers.setValueInstantiators(new SimpleValueInstantiators() {
+            @Override
+            public ValueInstantiator modifyValueInstantiator(
+                    DeserializationConfig config, BeanDescription.Supplier description, ValueInstantiator delegate) {
+                return description.isRecordType() && delegate.canCreateFromObjectWith()
+                        ? new OptionalCreator(delegate)
+                        : delegate;
+            }
+        });
         return StrictJson.configure(JsonMapper.builder())
+                .changeDefaultNullHandling(n -> JsonSetter.Value.construct(Nulls.FAIL, Nulls.FAIL))
                 .addModule(integers)
                 .enable(DeserializationFeature.FAIL_ON_IGNORED_PROPERTIES)
                 .addMixIn(EvidenceCitation.class, CitationFields.class)
@@ -48,6 +68,33 @@ final class CandidateWireMapper {
                 .addMixIn(ClaimedCoverage.class, ClaimedFields.class)
                 .addMixIn(CoverageOmission.class, OmissionFields.class)
                 .build();
+    }
+
+    // Optional creator properties may be absent; explicit nulls fail during property deserialization.
+    private static final class OptionalCreator extends ValueInstantiator.Delegating {
+        @Serial
+        private static final long serialVersionUID = 1L;
+
+        OptionalCreator(ValueInstantiator delegate) {
+            super(delegate);
+        }
+
+        @Override
+        public ValueInstantiator createContextual(
+                DeserializationContext context, BeanDescription.Supplier description) {
+            return new OptionalCreator(delegate().createContextual(context, description));
+        }
+
+        @Override
+        public Object createFromObjectWith(
+                DeserializationContext context, SettableBeanProperty[] properties, PropertyValueBuffer buffer) {
+            var creatorProperties = properties.clone();
+            for (int i = 0; i < creatorProperties.length; i++) {
+                if (!creatorProperties[i].isRequired())
+                    creatorProperties[i] = creatorProperties[i].withNullProvider(NullsConstantProvider.nuller());
+            }
+            return delegate().createFromObjectWith(context, buffer.getParameters(context, creatorProperties));
+        }
     }
 
     // Accept JavaScript integer values such as 3.0, while rejecting fractions and numeric strings.
@@ -123,6 +170,9 @@ final class CandidateWireMapper {
             @JsonProperty(required = true) int selected,
             @JsonProperty(required = true) int checked,
 
-            @JsonProperty(required = true) @JsonInclude(JsonInclude.Include.ALWAYS) @Nullable
+            @JsonProperty(required = true)
+            @JsonInclude(JsonInclude.Include.ALWAYS)
+            @JsonSetter(nulls = Nulls.SET)
+            @Nullable
             Integer total) {}
 }

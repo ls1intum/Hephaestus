@@ -85,9 +85,7 @@ public class AccountWebController {
         Identity primary = identities.stream().findFirst().orElse(null);
         var profile = primary == null
                 ? null
-                : gitProviderRegistry
-                        .profile(primary.getProviderId(), primary.getProviderUserKey(), primary.getTeamKey())
-                        .orElse(null);
+                : gitProviderRegistry.profiles(List.of(key(primary))).get(key(primary));
         List<LinkedProviderDTO> linkedProviders = identities.stream()
                 .map(il -> new LinkedProviderDTO(
                         gitProviderRegistry.providerTypeName(il.getProviderId()),
@@ -113,8 +111,11 @@ public class AccountWebController {
     @GetMapping("/identities")
     @Operation(summary = "List linked identity providers", operationId = "listLinkedIdentities")
     public ResponseEntity<List<IdentityViewDTO>> identities() {
-        List<IdentityViewDTO> views = accountService.activeIdentities(CurrentAccount.requireId()).stream()
-                .map(this::toView)
+        var identities = accountService.activeIdentities(CurrentAccount.requireId());
+        var profiles = gitProviderRegistry.profiles(
+                identities.stream().map(AccountWebController::key).toList());
+        List<IdentityViewDTO> views = identities.stream()
+                .map(identity -> toView(identity, profiles.get(key(identity))))
                 .toList();
         return ResponseEntity.ok(views);
     }
@@ -144,11 +145,13 @@ public class AccountWebController {
         return ResponseEntity.noContent().build();
     }
 
-    private IdentityViewDTO toView(Identity il) {
+    private static GitProviderRegistry.IdentityKey key(Identity identity) {
+        return new GitProviderRegistry.IdentityKey(
+                identity.getProviderId(), identity.getProviderUserKey(), identity.getTeamKey());
+    }
+
+    private IdentityViewDTO toView(Identity il, GitProviderRegistry.@Nullable IdentityProfile profile) {
         String providerType = gitProviderRegistry.providerTypeName(il.getProviderId());
-        var profile = gitProviderRegistry
-                .profile(il.getProviderId(), il.getProviderUserKey(), il.getTeamKey())
-                .orElse(null);
         return new IdentityViewDTO(
                 il.getId(),
                 providerType,

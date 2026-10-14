@@ -7,7 +7,6 @@ import {
 	selectedSources,
 	selectedOccurrences,
 } from "./occurrences.ts";
-/** Shared source-line scanning and declaration location; pattern matches are hints, not verdicts. */
 
 import { isTestPath } from "./languages.ts";
 

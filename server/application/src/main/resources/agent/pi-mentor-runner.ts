@@ -44,7 +44,7 @@ import {
 	type ServerCallbackRequest,
 } from "./pi-mentor-protocol.ts";
 import { loadProviderConfig, reasoningSetting, registerHephaestusProvider } from "./pi-provider.ts";
-import { isRecord } from "./pi-text.ts";
+import { isJsonObject as isRecord } from "./work/practice-scripts/lib/core/json.ts";
 
 /** The Pi SDK module, resolved from `<workspace>/node_modules` by bare specifier at runtime. */
 type PiSdk = typeof PiSdkModule;
