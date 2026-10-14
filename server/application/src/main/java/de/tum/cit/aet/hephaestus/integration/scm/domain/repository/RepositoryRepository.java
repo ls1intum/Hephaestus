@@ -51,10 +51,10 @@ public interface RepositoryRepository extends JpaRepository<Repository, Long> {
     Optional<Repository> findByIdWithOrganization(@Param("id") Long id);
 
     /**
-     * Finds all repositories with the given prefix (owner/).
+     * Finds all repositories on a provider with the given prefix (owner/).
      * Used during installation operations for org login renames.
      */
-    List<Repository> findByNameWithOwnerStartingWithIgnoreCase(String prefix);
+    List<Repository> findByNameWithOwnerStartingWithIgnoreCaseAndProviderId(String prefix, Long providerId);
 
     /**
      * Finds a repository by its full name with the organization eagerly fetched.

@@ -10,11 +10,15 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.privacy.spi.PersonSourceNamespace;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener.AccountKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.app.GitHubAppTokenService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositorySelection;
@@ -46,6 +50,12 @@ class GitHubLifecycleListenerPurgeTest extends BaseUnitTest {
     @Mock
     private Connection connection;
 
+    @Mock
+    private RepositoryRepository repositoryRepository;
+
+    @Mock
+    private IdentityProviderRepository gitProviderRepository;
+
     private GitHubLifecycleListener listener;
 
     @BeforeEach
@@ -54,9 +64,9 @@ class GitHubLifecycleListenerPurgeTest extends BaseUnitTest {
                 mock(),
                 workspaceRepository,
                 mock(),
+                repositoryRepository,
                 mock(),
-                mock(),
-                mock(),
+                gitProviderRepository,
                 mock(),
                 mock(),
                 mock(),
@@ -182,6 +192,23 @@ class GitHubLifecycleListenerPurgeTest extends BaseUnitTest {
 
         assertThat(workspace.getAccountLogin()).isEqualTo("acme");
         verify(workspaceRepository, never()).save(workspace);
+    }
+
+    @Test
+    void shouldRefuseRepositoryRenameWhenTheGitHubProviderIsUnavailable() {
+        Workspace workspace = workspace(11L, "acme");
+        workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
+        workspace.setAccountLogin("acme");
+        when(workspaceRepository.findByInstallationIdForUpdate(INSTALLATION_ID)).thenReturn(Optional.of(workspace));
+        when(gitProviderRepository.findByTypeAndServerUrl(
+                        IdentityProviderType.GITHUB, PersonSourceNamespace.GITHUB_DEFAULT_URL))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> listener.handleAccountRename(INSTALLATION_ID, "acme", "renamed"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("IdentityProvider for GitHub not found");
+
+        verifyNoInteractions(repositoryRepository);
     }
 
     @Test
