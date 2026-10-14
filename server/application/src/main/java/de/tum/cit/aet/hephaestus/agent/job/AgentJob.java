@@ -133,7 +133,7 @@ public class AgentJob {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "output", columnDefinition = "jsonb")
-    private JsonNode output;
+    private @Nullable JsonNode output;
 
     /**
      * Agent config frozen at submit time, so a config change cannot alter an in-flight job. Contains the
