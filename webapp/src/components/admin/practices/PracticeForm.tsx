@@ -48,9 +48,11 @@ interface PracticeFormEditProps {
 	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 
-/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
 interface PracticeFormHostProps {
+	/** What "leave without saving" does. The host owns it, because only the host knows where back is. */
 	cancel: React.ReactNode;
+	/** The host's alert for a read that failed to refresh while the draft stays open. */
+	refreshAlert?: React.ReactNode;
 }
 
 export type PracticeFormProps = (PracticeFormCreateProps | PracticeFormEditProps) &
@@ -76,7 +78,16 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, groups, isPending, initialData, definitionOptions, cancel } = props;
+	const {
+		mode,
+		workspaceSlug,
+		groups,
+		isPending,
+		initialData,
+		definitionOptions,
+		cancel,
+		refreshAlert,
+	} = props;
 	// Passes the host's return through untouched: a `void` from `onSubmit` must stay `void`, because
 	// the unsaved-changes guard reads only a promise as a save it can wait for.
 	const submit = (value: PracticeDefinitionValue): void | Promise<void> => {
@@ -183,6 +194,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			groups={groups}
 			isPending={isPending}
 			definitionOptions={definitionOptions}
+			beforeFields={refreshAlert}
 			cancelAction={cancel}
 			onSubmit={submit}
 		/>
@@ -193,6 +205,7 @@ export function PracticeForm(props: PracticeFormProps) {
 			groups={groups}
 			isPending={isPending}
 			definitionOptions={definitionOptions}
+			beforeFields={refreshAlert}
 			cancelAction={cancel}
 			afterFields={reviewResults}
 			evidenceOutcome={props.evidenceOutcome}
