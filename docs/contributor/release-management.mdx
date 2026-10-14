@@ -340,13 +340,14 @@ gh api --paginate 'repos/hephaestus-build/Hephaestus/deployments?environment=Pro
 ## Version management
 
 Source manifests keep placeholder versions: `webapp/package.json` and `server/build.gradle.kts` use `0.0.0-development`.
-The **release version** lives in root `package.json`.
+The source version lives in root `package.json`.
 Only the Version PR bumps it. At deploy time the release
 lock sets `IMAGE_TAG`, which `docker/compose.app.yaml` passes as `APP_VERSION`. `application.yml`
 exposes it as `spring.application.version`.
 
-Check the current release: `git describe --tags --abbrev=0` or
+For the latest published release, see
 [GitHub Releases](https://github.com/hephaestus-build/Hephaestus/releases).
+For the running release, follow the [runtime identity handoff](/admin/release-image-lock#runtime-identity-handoff).
 
 ## Dependency management
 
