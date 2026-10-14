@@ -435,15 +435,19 @@ public class MentorTurnPersistence {
     /**
      * The one account of a turn's calls that its row, its cost and its ledger entry all use. The runner's report
      * and the proxy's per-call meter are two views of the SAME calls, so exactly one is used, never their sum. The
-     * runner's is used unless it cannot be complete: when it reported nothing, compacted or retried. Pi reports
-     * summary calls as one total and retries as separate continuations; the proxy records every reported call.
+     * proxy is preferred when the runner reported nothing, compacted or retried. On ordinary turns, the proxy
+     * replaces the runner only when its normalized prompt and output totals are both no smaller and one is larger.
+     * Pi reports summary calls as one total and retries as separate continuations; the proxy records every reported call.
      * Read only after the turn's terminal status is flushed.
      */
     private TurnUsage turnUsage(UUID assistantId, TranslatorState state) {
         UsageBreakdown runner = extractUsageFromState(state);
-        if (state.compactionAttempted() || state.retryAttempted() || isEmpty(runner)) {
-            MentorTurnLlmUsage viaProxy =
-                    chatMessageRepository.findLlmUsageById(assistantId).orElse(MentorTurnLlmUsage.NONE);
+        MentorTurnLlmUsage viaProxy =
+                chatMessageRepository.findLlmUsageById(assistantId).orElse(MentorTurnLlmUsage.NONE);
+        if (state.compactionAttempted()
+                || state.retryAttempted()
+                || isEmpty(runner)
+                || proxyStrictlyDominates(runner, viaProxy)) {
             if (viaProxy.hasBillableUsage()) {
                 return new TurnUsage(
                         new UsageBreakdown(
@@ -466,6 +470,14 @@ public class MentorTurnPersistence {
             }
         }
         return new TurnUsage(runner, state.observedCallCount(), 0, UsageProvenance.RUNNER);
+    }
+
+    private static boolean proxyStrictlyDominates(UsageBreakdown runner, MentorTurnLlmUsage proxy) {
+        long runnerPrompt = runner.inputTokens() + runner.cacheReadTokens() + runner.cacheWriteTokens();
+        long proxyPrompt = proxy.inputTokens() + proxy.cacheReadTokens() + proxy.cacheWriteTokens();
+        return proxyPrompt >= runnerPrompt
+                && proxy.outputTokens() >= runner.outputTokens()
+                && (proxyPrompt > runnerPrompt || proxy.outputTokens() > runner.outputTokens());
     }
 
     private static boolean isEmpty(UsageBreakdown usage) {

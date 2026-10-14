@@ -62,6 +62,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -1185,6 +1186,138 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                 price,
                 false,
                 600);
+    }
+
+    @ParameterizedTest(name = "{0}: {1}")
+    @CsvSource(
+            value = {
+                "completed, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, 0.010290",
+                "interrupted, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, 0.010290",
+                "completed, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, 0.010800",
+                "interrupted, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, 0.010800",
+                "completed, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, 0.010800",
+                "interrupted, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, 0.010800",
+                "completed, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, 0.010800",
+                "interrupted, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, 0.010800",
+                "completed, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, unpriced",
+                "interrupted, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, unpriced"
+            },
+            nullValues = "unpriced")
+    void shouldSelectTheWholeProxyVectorOnlyWhenNormalizedPromptAndOutputDominateOnAnOrdinaryTurn(
+            String terminal,
+            String scenario,
+            int runnerInput,
+            int runnerOutput,
+            int proxyInput,
+            int proxyOutput,
+            int proxyCacheRead,
+            int proxyCacheWrite,
+            UsageProvenance expectedProvenance,
+            @Nullable String expectedCost) {
+        ChatThread thread =
+                persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, Set.of(user.getId()), "hello");
+        UUID assistantId = UUID.randomUUID();
+        LlmPriceSnapshot price = new LlmPriceSnapshot(
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                12L,
+                null,
+                new BigDecimal("10"),
+                new BigDecimal("20"),
+                new BigDecimal("2"),
+                new BigDecimal("3"));
+        var cookie = persistence.persistInFlight(thread, "hello", assistantId, null, pricedMentorConfig(price));
+        TranslatorState state = new TranslatorState(assistantId);
+        state.bindAdmission("test-model", price);
+        state.markLlmCallStarted();
+        state.completeUsage(NODES.objectNode()
+                .put("input", runnerInput)
+                .put("output", runnerOutput)
+                .put("cacheRead", 0)
+                .put("cacheWrite", 0));
+        int proxyReasoning = proxyOutput > 0 ? 7 : 0;
+        accumulateProxyCall(assistantId, proxyInput, proxyOutput, proxyReasoning, proxyCacheRead, proxyCacheWrite);
+
+        boolean proxySelected = expectedProvenance == UsageProvenance.PROXY;
+        int input = proxySelected ? proxyInput : runnerInput;
+        int output = proxySelected ? proxyOutput : runnerOutput;
+        int cacheRead = proxySelected ? proxyCacheRead : 0;
+        int cacheWrite = proxySelected ? proxyCacheWrite : 0;
+        int total = input + output + cacheRead + cacheWrite;
+        var selected = new UIMessageChunk.MessageMetadata.Usage(input, output, cacheRead, cacheWrite, total);
+        if (terminal.equals("completed")) {
+            var runnerUsage = runnerInput == 0 && runnerOutput == 0
+                    ? null
+                    : new UIMessageChunk.MessageMetadata.Usage(
+                            runnerInput, runnerOutput, 0, 0, runnerInput + runnerOutput);
+            var streamed = new UIMessageChunk.Finish(
+                    UIMessageChunk.FinishReason.STOP,
+                    new UIMessageChunk.MessageMetadata("test-model", runnerUsage, null));
+            var sent = persistence.complete(cookie, state, streamed).orElseThrow();
+            var metadata = Objects.requireNonNull(sent.messageMetadata());
+            assertThat(sent.finishReason()).isEqualTo(UIMessageChunk.FinishReason.STOP);
+            assertThat(metadata.model()).isEqualTo("test-model");
+            if (expectedCost == null) {
+                assertThat(metadata.usage()).isNull();
+                assertThat(metadata.costUsd()).isNull();
+            } else {
+                assertThat(metadata.usage()).isEqualTo(selected);
+                assertThat(BigDecimal.valueOf(Objects.requireNonNull(metadata.costUsd())))
+                        .isEqualByComparingTo(expectedCost);
+            }
+        } else {
+            persistence.interrupt(cookie, state, new IllegalStateException("upstream disconnected"));
+        }
+
+        var assistant = chatMessageRepository.findById(assistantId).orElseThrow();
+        assertThat(assistant.getStatus()).isEqualTo(ChatMessage.Status.valueOf(terminal));
+        JsonNode metadata = assistant.getMetadata();
+        assertThat(metadata.at("/llmAdmission/model").asString()).isEqualTo("test-model");
+        assertThat(metadata.at("/llmAdmission/price/appliedPriceId").asString()).isEqualTo("12");
+        if (terminal.equals("completed") && expectedCost != null) {
+            assertThat(metadata.path("usage"))
+                    .isEqualTo(NODES.objectNode()
+                            .put("input", input)
+                            .put("output", output)
+                            .put("cacheRead", cacheRead)
+                            .put("cacheWrite", cacheWrite)
+                            .put("totalTokens", total));
+            assertThat(BigDecimal.valueOf(metadata.path("costUsd").asDouble())).isEqualByComparingTo(expectedCost);
+        } else {
+            assertThat(metadata.has("usage")).isFalse();
+            assertThat(metadata.has("costUsd")).isFalse();
+        }
+        if (terminal.equals("interrupted")) {
+            assertThat(metadata.path("error").asString()).isEqualTo("upstream disconnected");
+        }
+        assertThat(usageEventRepository.findAll())
+                .filteredOn(event -> event.getSourceId().equals(assistantId))
+                .as("%s ledger entry", scenario)
+                .singleElement()
+                .satisfies(event -> {
+                    assertThat(event.getWorkspace().getId()).isEqualTo(workspace.getId());
+                    assertThat(event.getModel()).isEqualTo("test-model");
+                    assertThat(event.getInputTokens()).isEqualTo(input);
+                    assertThat(event.getOutputTokens()).isEqualTo(output);
+                    assertThat(event.getCacheReadTokens()).isEqualTo(cacheRead);
+                    assertThat(event.getCacheWriteTokens()).isEqualTo(cacheWrite);
+                    assertThat(event.getReasoningTokens()).isEqualTo(proxySelected ? proxyReasoning : 0);
+                    assertThat(event.getTotalCalls()).isEqualTo(1);
+                    assertThat(event.getUsageProvenance()).isEqualTo(expectedProvenance);
+                    assertThat(event.getFundingSource()).isEqualTo(FundingSource.INSTANCE);
+                    assertThat(event.getAppliedPriceId()).isEqualTo(12L);
+                    assertThat(event.getAppliedPer1mInputUsd()).isEqualByComparingTo("10");
+                    assertThat(event.getAppliedPer1mOutputUsd()).isEqualByComparingTo("20");
+                    assertThat(event.getAppliedPer1mCacheReadUsd()).isEqualByComparingTo("2");
+                    assertThat(event.getAppliedPer1mCacheWriteUsd()).isEqualByComparingTo("3");
+                    if (expectedCost == null) {
+                        assertThat(event.getPricingState()).isEqualTo(PricingState.UNPRICED);
+                        assertThat(event.getCostUsd()).isNull();
+                    } else {
+                        assertThat(event.getPricingState()).isEqualTo(PricingState.PRICED);
+                        assertThat(event.getCostUsd()).isEqualByComparingTo(expectedCost);
+                    }
+                });
     }
 
     @Test
