@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,6 +57,8 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
     }
 
     private void supportOnWorkFeedback() {
+        jdbc.update("INSERT INTO instance_settings(id,silent_mode_engaged,version) VALUES(1,false,0) "
+                + "ON CONFLICT(id) DO UPDATE SET silent_mode_engaged=false");
         var result = resultWithStateFilter("open");
         supportedFeedback = piece(FeedbackDestination.ON_WORK, FeedbackState.READY, null);
         bind(supportedFeedback, result);
@@ -67,6 +70,11 @@ class FeedbackGateIntegrationTest extends AbstractFeedbackIntegrationTest {
         when(authorization.permitsForNewDelivery(
                         eq(workspace.getId()), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
                 .thenReturn(Set.of(result.getId()));
+    }
+
+    @AfterEach
+    void restoreInstanceDeliveryBrake() {
+        jdbc.update("UPDATE instance_settings SET silent_mode_engaged=true WHERE id=1");
     }
 
     private FeedbackCheck check() {

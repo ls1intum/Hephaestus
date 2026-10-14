@@ -122,11 +122,11 @@ export function occurrences(
 				),
 				label,
 				facts: { language: file.language ?? "unknown" },
-			};
-			row.match = {
-				start: match.index + Math.max(0, first),
-				end: match.index + match[0].trimEnd().length,
-				pattern,
+				match: {
+					start: match.index + Math.max(0, first),
+					end: match.index + match[0].trimEnd().length,
+					pattern,
+				},
 			};
 			found.push(row);
 		}

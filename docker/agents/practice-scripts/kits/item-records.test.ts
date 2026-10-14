@@ -29,20 +29,71 @@ const PAIRS = [
 	["scm/file.schema.json", fileRecordSchema],
 ] as const;
 
-const contractSchema = z.object({
-	properties: z.record(z.string(), z.unknown()),
-	required: z.array(z.string()).default([]),
-});
+const schemaKeywords = new Set([
+	"type",
+	"enum",
+	"const",
+	"pattern",
+	"properties",
+	"required",
+	"items",
+	"anyOf",
+	"oneOf",
+	"additionalProperties",
+]);
+function contractShape(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(contractShape);
+	}
+	if (typeof value !== "object" || value === null) {
+		return value;
+	}
+	const record = z.record(z.string(), z.unknown()).parse(value);
+	if (Array.isArray(record.type)) {
+		return contractShape({ anyOf: record.type.map((type: unknown) => ({ type })) });
+	}
+	const kept = Object.fromEntries(
+		Object.entries(record)
+			.filter(([key]) => schemaKeywords.has(key))
+			.map(([key, item]) => [
+				key,
+				key === "properties"
+					? Object.fromEntries(
+							Object.entries(z.record(z.string(), z.unknown()).parse(item)).map(
+								([name, property]) => [name, contractShape(property)],
+							),
+						)
+					: contractShape(item),
+			]),
+	);
+	if (
+		"const" in kept ||
+		(Array.isArray(kept.enum) &&
+			kept.enum.every((entry) => (entry === null ? "null" : typeof entry) === kept.type))
+	) {
+		delete kept.type;
+	}
+	if (kept.type === "object") {
+		kept.additionalProperties ??= true;
+	}
+	if (Array.isArray(kept.required)) {
+		kept.required = kept.required.toSorted((a, b) => String(a).localeCompare(String(b)));
+	}
+	if (Array.isArray(kept.enum)) {
+		kept.enum = kept.enum.toSorted((a, b) => String(a).localeCompare(String(b)));
+	}
+	if (Array.isArray(kept.anyOf)) {
+		kept.anyOf = kept.anyOf.toSorted((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+	}
+	return kept;
+}
 
 for (const [file, schema] of PAIRS) {
-	void test(`the kit reads ${file} with the server's fields, required where the server requires them`, () => {
-		const contract = contractSchema.parse(
-			JSON.parse(readFileSync(path.join(CONTRACTS, file), "utf8")),
+	void test(`the kit preserves the server's nested types, enums and required fields for ${file}`, () => {
+		const contract: unknown = JSON.parse(readFileSync(path.join(CONTRACTS, file), "utf8"));
+		assert.deepEqual(
+			contractShape(z.toJSONSchema(schema, { io: "input" })),
+			contractShape(contract),
 		);
-		const shape: Readonly<Record<string, z.ZodType>> = schema.shape;
-		const fields = Object.keys(shape).toSorted();
-		assert.deepEqual(fields, Object.keys(contract.properties).toSorted());
-		const required = fields.filter((field) => shape[field]?.safeParse(undefined).success === false);
-		assert.deepEqual(required, contract.required.toSorted());
 	});
 }

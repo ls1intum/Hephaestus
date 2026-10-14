@@ -39,6 +39,7 @@ import { ROUTE_RENDER_WAIT, renderRouteAtWithRouter } from "@/test/router-harnes
 vi.setConfig({ testTimeout: 20_000 });
 
 const REVIEWS = "/w/acme/admin/practices/reviews";
+const OVERVIEW = `${REVIEWS}/overview`;
 
 const requested: URL[] = [];
 const record = ({ request }: { request: Request }) => {
@@ -192,7 +193,7 @@ describe("practice review levels", () => {
 	it("opens a practice's sheet as its definition, the counts staying on the overview", async () => {
 		const [practice] = practiceCounts;
 		assert(practice);
-		const { router } = renderRouteAtWithRouter(REVIEWS);
+		const { router } = renderRouteAtWithRouter(OVERVIEW);
 
 		await userEvent.click(
 			await screen.findByRole(
@@ -206,7 +207,7 @@ describe("practice review levels", () => {
 			{ name: practice.practiceName },
 			ROUTE_RENDER_WAIT,
 		);
-		expect(router.state.location.pathname).toBe(REVIEWS);
+		expect(router.state.location.pathname).toBe(OVERVIEW);
 		expect(stackInSearch(router.state.location.search.detail)).toStrictEqual([
 			`practice:${practice.practiceSlug}`,
 		]);
@@ -237,7 +238,7 @@ describe("practice review levels", () => {
 	 * the overview that ends where the range starts, in the same zone.
 	 */
 	it("asks for the period before the range, to set the totals against", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}?range=7d`);
+		renderRouteAtWithRouter(`${OVERVIEW}?range=7d`);
 		await screen.findByRole("heading", { name: "What the reviews did" }, ROUTE_RENDER_WAIT);
 		await waitFor(() => expect(requestsTo("/practices/reviews/overview")).toHaveLength(2));
 
@@ -256,7 +257,7 @@ describe("practice review levels", () => {
 	});
 
 	it("asks for the review time over the overview's range", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}?range=7d`);
+		renderRouteAtWithRouter(`${OVERVIEW}?range=7d`);
 		await screen.findByRole("heading", { name: "What the reviews did" }, ROUTE_RENDER_WAIT);
 		await waitFor(() => expect(requestsTo("/practices/reviews/timing")).toHaveLength(1));
 
@@ -270,7 +271,7 @@ describe("practice review levels", () => {
 	 * feedback awaiting one, oldest first — the order they are worked through in.
 	 */
 	it("asks for every decision owed, oldest first, whatever the range", async () => {
-		renderRouteAtWithRouter(REVIEWS);
+		renderRouteAtWithRouter(OVERVIEW);
 		await screen.findByRole("heading", { name: "Needs you" }, ROUTE_RENDER_WAIT);
 		await waitFor(() =>
 			expect(
@@ -343,10 +344,7 @@ describe("a new review from a row of the Reviews table", () => {
 
 	it("asks for a review of the row's item after the confirmation, and reads the reviews again", async () => {
 		const bodies: unknown[] = [];
-		const completed = reviews.find(
-			(review) => review.id === "11111111-1111-1111-1111-111111111111",
-		);
-		assert(completed);
+		const completed = reviewDetail();
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
 				HttpResponse.json({
@@ -417,7 +415,7 @@ describe("practices turned off today", () => {
 
 	/** The overview's Practices table reads the current setup and hides the practice until asked. */
 	it("hides a turned-off practice from the Practices table until it is asked for", async () => {
-		renderRouteAtWithRouter(REVIEWS);
+		renderRouteAtWithRouter(OVERVIEW);
 		const show = await screen.findByRole(
 			"switch",
 			{ name: "Show turned-off practices (1 hidden)" },
@@ -432,7 +430,7 @@ describe("practices turned off today", () => {
 
 	/** The table's switch is in the address, so a reload or Back keeps what the reader asked for. */
 	it("keeps the Practices table's turned-off switch in the URL", async () => {
-		const { router } = renderRouteAtWithRouter(`${REVIEWS}?showTurnedOff=true`);
+		const { router } = renderRouteAtWithRouter(`${OVERVIEW}?showTurnedOff=true`);
 		await screen.findByRole("link", { name: "Open practice Thin controllers" }, ROUTE_RENDER_WAIT);
 
 		await userEvent.click(screen.getByRole("switch", { name: /^Show turned-off practices/u }));
@@ -443,7 +441,7 @@ describe("practices turned off today", () => {
 	});
 
 	it("keeps the Practices table's sort in the URL, and leaves the default out", async () => {
-		const { router } = renderRouteAtWithRouter(REVIEWS);
+		const { router } = renderRouteAtWithRouter(OVERVIEW);
 		await screen.findByRole(
 			"table",
 			{ name: "Practices, the ones that need a look first" },
@@ -463,7 +461,7 @@ describe("practices turned off today", () => {
 	});
 
 	it("opens the Practices table in the sort the URL holds", async () => {
-		renderRouteAtWithRouter(`${REVIEWS}?practicesSort=BUSIEST`);
+		renderRouteAtWithRouter(`${OVERVIEW}?practicesSort=BUSIEST`);
 		await screen.findByRole("table", { name: "Practices, busiest first" }, ROUTE_RENDER_WAIT);
 		expect(screen.getByRole("combobox", { name: "Sort" }).textContent).toContain("Busiest first");
 	});

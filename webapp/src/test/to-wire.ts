@@ -1,7 +1,9 @@
 import type { Wire } from "@/lib/dates";
 
-/** Serialize a typed fixture through the same JSON boundary as an HTTP response. */
-export function toWire<T>(value: T): Wire<T> {
-	const serialized: unknown = JSON.parse(JSON.stringify(value));
-	return serialized as Wire<T>;
+/** JSON serialization converts fixture Dates to the strings an HTTP response carries. */
+export function toWire<T>(value: T): Wire<T>;
+export function toWire(value: unknown): unknown {
+	const encoded = JSON.stringify(value);
+	const serialized: unknown = JSON.parse(encoded);
+	return serialized;
 }

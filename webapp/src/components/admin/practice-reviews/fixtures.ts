@@ -628,7 +628,7 @@ export const POSTED_SUMMARY_COMMENT = [
 	"The title names the app-problem and user-story task, but the authored description only references issue #3 and gives no reason.",
 	"",
 	"---",
-	"<sub>Practice review &middot; gpt-6-luna. This feedback is AI-generated and can be inaccurate. Answer it or disagree in [Hephaestus](https://hephaestus.example/w/aet/feedback/42).</sub>",
+	"<sub>Practice review &middot; gpt-6-luna. This feedback is AI-generated and can be inaccurate. Answer or disagree in [Hephaestus](https://hephaestus.example/w/aet/feedback/42).</sub>",
 	"<sub>[Why you see this and how to stop it](https://hephaestus.example/settings#practice-feedback)</sub>",
 	"",
 ].join("\n");
@@ -1960,7 +1960,7 @@ function copiesOf(review: ReviewSpec, spec: FeedbackSpec): FeedbackCopy[] {
 			id: `${spec.id.slice(0, -3)}c${String(position).padStart(2, "0")}`,
 			kind: copy.kind,
 			position,
-			body: copy.kind === "SUMMARY" || !onWork ? null : (copy.body ?? null),
+			body: onWork ? (copy.body ?? (copy.kind === "SUMMARY" ? (spec.body ?? null) : null)) : null,
 			path: copy.at?.path ?? null,
 			startLine: copy.at?.startLine ?? null,
 			endLine: copy.at?.endLine ?? null,
@@ -2190,7 +2190,10 @@ export function practiceGroupSlug(practiceSlug: string): string | null {
 	return practiceOf(practiceSlug).groupSlug;
 }
 
-export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
+export function feedbackDetail(
+	input: string | Partial<ReviewFeedbackDetail> = {},
+): ReviewFeedbackDetail {
+	const feedbackId = typeof input === "string" ? input : "dddddddd-2222-2222-2222-222222222222";
 	const { review, item } = feedbackSpec(feedbackId);
 	const copies = copiesOf(review, item);
 	const basis: FeedbackBasis[] = item.from.map((resultId, ordinal) => {
@@ -2213,12 +2216,11 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 		response: responseOf(item),
 		checks: checksOf(item),
 		contentDigest: contentDigestOf(item),
+		...(typeof input === "string" ? {} : input),
 	};
 }
 
-export const reviewFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
-	"dddddddd-2222-2222-2222-222222222222",
-);
+export const reviewFeedbackDetail = feedbackDetail();
 
 export const longFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"44444444-4444-4444-4444-444444444444",
@@ -2276,7 +2278,8 @@ function boundFeedbackOf(feedback: ReviewFeedback): ReviewBoundFeedback {
 	};
 }
 
-export function resultDetail(resultId: string): ReviewResultDetail {
+export function resultDetail(input: string | Partial<ReviewResultDetail> = {}): ReviewResultDetail {
+	const resultId = typeof input === "string" ? input : "66666666-6666-6666-6666-666666666666";
 	const { review, result: spec } = resultSpec(resultId);
 	const {
 		feedback: _tally,
@@ -2312,12 +2315,11 @@ export function resultDetail(resultId: string): ReviewResultDetail {
 		feedback: feedbackFor(resultId).map(({ review: owner, item }) =>
 			boundFeedbackOf(toFeedback(owner, item)),
 		),
+		...(typeof input === "string" ? {} : input),
 	};
 }
 
-export const reviewResultDetail: ReviewResultDetail = resultDetail(
-	"66666666-6666-6666-6666-666666666666",
-);
+export const reviewResultDetail = resultDetail();
 
 export function problemDetail(problemId: string): ReviewProblemDetail {
 	for (const { review, result } of allResultSpecs) {
@@ -2553,15 +2555,17 @@ function detailOf(summary: ReviewSummary, jobs: ReviewJob[] | null): ReviewDetai
 	};
 }
 
-export function reviewDetail(reviewId: string): ReviewDetail {
+export function reviewDetail(input: string | Partial<ReviewDetail> = {}): ReviewDetail {
+	const reviewId = typeof input === "string" ? input : "11111111-1111-1111-1111-111111111111";
 	const spec = reviewSpec(reviewId);
 	const summary = toReview(spec);
-	return detailOf(summary, spec.runtimeExpired === true ? null : jobsOf(summary, spec.jobs ?? 1));
+	return {
+		...detailOf(summary, spec.runtimeExpired === true ? null : jobsOf(summary, spec.jobs ?? 1)),
+		...(typeof input === "string" ? {} : input),
+	};
 }
 
-export const reviewDetailCompleted: ReviewDetail = reviewDetail(
-	"11111111-1111-1111-1111-111111111111",
-);
+export const reviewDetailCompleted = reviewDetail();
 
 export const reviewDetailRunning: ReviewDetail = reviewDetail(
 	"aaaaaaaa-8888-8888-8888-888888888888",

@@ -567,7 +567,7 @@ describe("feedback approval level", () => {
 
 		it("walks the queue when it is opened from Needs you", async () => {
 			serveQueue([]);
-			const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews");
+			const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews/overview");
 
 			await userEvent.click(
 				await screen.findByRole("link", { name: "Review 3 pieces of feedback" }, ROUTE_RENDER_WAIT),

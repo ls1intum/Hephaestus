@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.gateway.WorkspaceBudgetExceededException;
@@ -612,11 +613,10 @@ public class ReviewJobExecutor {
             recordedTerminal = handleCancellation(jobId, job) ? ReviewJobStatus.CANCELLED : null;
             metricOutcome = recordedTerminal != null ? recordedTerminal.name() : "OWNERSHIP_LOST";
         } catch (WorkspaceBudgetExceededException e) {
-            ObjectNode output = objectMapper
-                    .createObjectNode()
-                    .put("outcome", "WORKSPACE_REFUSED")
-                    .put("reasonCode", "WORKSPACE_BUDGET_EXCEEDED");
-            output.set("details", objectMapper.valueToTree(e.getBody().getProperties()));
+            JsonNode output = objectMapper.valueToTree(new RefusedExecution(
+                    RefusalOutcome.WORKSPACE_REFUSED,
+                    RefusalReason.WORKSPACE_BUDGET_EXCEEDED,
+                    e.getBody().getProperties()));
             Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
                     jobId, workerId, job.getAttempt(), Instant.now(), output));
             metricOutcome = updated != null && updated == 1 ? "WORKSPACE_BUDGET_EXCEEDED" : "OWNERSHIP_LOST";
@@ -682,7 +682,8 @@ public class ReviewJobExecutor {
         // This evidence was not staged; no attempt owns its cleanup.
         try (PreparedJobInputs refused = e.preparedInputs()) {
             persistRefusedEvidence(jobId, job.getAttempt(), refused);
-            ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
+            JsonNode output =
+                    objectMapper.valueToTree(new RefusedExecution(RefusalOutcome.INSUFFICIENT_EVIDENCE, null, null));
             Integer updated = transactionTemplate.execute(status -> jobRepository.transitionToEvidenceRefused(
                     jobId, workerId, job.getAttempt(), Instant.now(), output));
             if (updated != null && updated == 1) {
@@ -701,6 +702,21 @@ public class ReviewJobExecutor {
             return new ExecutionOutcome(failure.name(), failure.terminal());
         }
     }
+
+    private enum RefusalOutcome {
+        WORKSPACE_REFUSED,
+        INSUFFICIENT_EVIDENCE
+    }
+
+    private enum RefusalReason {
+        WORKSPACE_BUDGET_EXCEEDED
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private record RefusedExecution(
+            RefusalOutcome outcome,
+            @Nullable RefusalReason reasonCode,
+            @Nullable Map<String, Object> details) {}
 
     private @Nullable ReviewJobStatus executePrepared(UUID jobId, ReviewJob job, SandboxSpec sandboxSpec) {
         SandboxResult result = sandboxManager.execute(sandboxSpec);

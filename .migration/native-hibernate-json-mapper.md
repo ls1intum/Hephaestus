@@ -12,7 +12,14 @@ Unexpected source types or partition/template states stop the migration.
 
 Apply the migration once while all writers remain stopped.
 Confirm migration completion and future partition creation before restarting all runtime roles on the same new release.
-Direct person-data exports of previously structured objects and arrays return Strings that contain JSON text.
+
+Direct person-data exports return these TEXT values as JSON Strings.
+An old JSONB String keeps its decoded String value.
+An old structured object or array becomes a String that contains canonical JSON text.
+This includes connection audit detail and configuration snapshots in membership-subject exports.
+JSON null becomes a null value.
+The JSON String "null" remains the literal String "null".
+
 Check consumers that require nested export values.
 
 Downgrade requires restoration of the verified backup from before this cutover.

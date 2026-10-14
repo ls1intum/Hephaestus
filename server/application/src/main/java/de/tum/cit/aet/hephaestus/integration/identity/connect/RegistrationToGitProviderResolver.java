@@ -11,6 +11,10 @@ import de.tum.cit.aet.hephaestus.integration.core.connection.SourceProviderNames
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -109,15 +113,18 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
     }
 
     private Optional<Long> actorId(long gitProviderId, String subject) {
-        final long nativeId;
+        return nativeId(subject)
+                .flatMap(id -> userRepository
+                        .findByNativeIdAndProviderId(id, gitProviderId)
+                        .map(User::getId));
+    }
+
+    private static Optional<Long> nativeId(String subject) {
         try {
-            nativeId = Long.parseLong(subject);
+            return Optional.of(Long.parseLong(subject));
         } catch (NumberFormatException notAGitSubject) {
             return Optional.empty();
         }
-        return userRepository
-                .findByNativeIdAndProviderId(nativeId, gitProviderId)
-                .map(User::getId);
     }
 
     @Override
@@ -128,6 +135,35 @@ public class RegistrationToGitProviderResolver implements GitProviderRegistry {
                 .flatMap(userRepository::findById)
                 .map(user ->
                         new IdentityProfile(user.getLogin(), user.getName(), user.getAvatarUrl(), user.getHtmlUrl()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<IdentityKey, IdentityProfile> profiles(Collection<IdentityKey> identities) {
+        var requested = new HashSet<IdentityKey>();
+        var providerIds = new HashSet<Long>();
+        var nativeIds = new HashSet<Long>();
+        for (var identity : identities) {
+            if (!identity.teamKey().isEmpty()) continue;
+            nativeId(identity.providerUserKey())
+                    .filter(id -> identity.providerUserKey().equals(id.toString()))
+                    .ifPresent(id -> {
+                        requested.add(identity);
+                        providerIds.add(identity.providerId());
+                        nativeIds.add(id);
+                    });
+        }
+        if (requested.isEmpty()) return Map.of();
+        var result = new HashMap<IdentityKey, IdentityProfile>();
+        for (var user : userRepository.findIdentityProfiles(providerIds, nativeIds)) {
+            var key = new IdentityKey(user.getProviderId(), Long.toString(user.getNativeId()), "");
+            if (requested.contains(key))
+                result.put(
+                        key,
+                        new IdentityProfile(
+                                user.getLogin(), user.getDisplayName(), user.getAvatarUrl(), user.getProfileUrl()));
+        }
+        return Map.copyOf(result);
     }
 
     @Override

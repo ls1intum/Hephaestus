@@ -29,8 +29,6 @@ class IdentityKeyLock {
         identityRepository.lockOwnership(
                 identities.stream().map(PersonIdentity::providerId).toArray(Long[]::new),
                 identities.stream().map(PersonIdentity::subject).toArray(String[]::new),
-                identities.stream()
-                        .map(PersonIdentity::teamKey)
-                        .toArray(String[]::new));
+                identities.stream().map(PersonIdentity::teamKey).toArray(String[]::new));
     }
 }

@@ -24,8 +24,8 @@ final class MentorRuntimeJournalPersonDataStore extends JdbcPersonDataStore {
         UNION SELECT workspace_id FROM slack_thread WHERE id = ANY(:conversations)
         UNION SELECT workspace_id FROM outline_document WHERE id = ANY(:documents)
         UNION SELECT rm.workspace_id FROM repository_to_monitor rm
-            JOIN repository r ON r.native_id = rm.native_id JOIN issue i ON i.repository_id = r.id
-            WHERE i.id = ANY(:artifacts)
+            JOIN repository r ON r.native_id = rm.native_id AND r.provider_id = rm.provider_id JOIN issue i ON i.repository_id = r.id
+            WHERE i.id = ANY(:items)
         UNION SELECT workspace_id FROM review_job WHERE id = ANY(:derivedJobs)
         """;
 

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -20,7 +20,7 @@ class PracticeV1DefinitionMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldTransformEverySupportedProgramWithoutChangingItsPinnedSource(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
+        var database = PracticeMigrationFixture.releasedDatabase(context);
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-programs.json"))) {
             var programs = Objects.requireNonNull(JsonMapper.builder().build().readTree(input));
@@ -64,16 +64,16 @@ class PracticeV1DefinitionMigrationTest {
                 }
                 connection.commit();
             }
-            PracticeV1CutoverMigrationTest.upgrade(database, context);
+            PracticeMigrationFixture.upgrade(database, context);
             int index = 0;
             for (var program : programs) {
-                assertThat(PracticeV1CutoverMigrationTest.column(
+                assertThat(PracticeMigrationFixture.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(definition->>'script','UTF8')),'hex') FROM"
                                         + " practice_version WHERE id="
                                         + (1100000L + index)))
                         .containsExactly(program.path("sourceSha256").asString());
-                assertThat(PracticeV1CutoverMigrationTest.column(
+                assertThat(PracticeMigrationFixture.column(
                                 database,
                                 "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
                                     + " v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id"
@@ -88,25 +88,25 @@ class PracticeV1DefinitionMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldAppendAnExactBundledProgramTransformationAndKeepPinnedHistory(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
+        var database = PracticeMigrationFixture.releasedDatabase(context);
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-programs.json"))) {
             var program = Objects.requireNonNull(
                     JsonMapper.builder().build().readTree(input).get(0));
             installProgram(database, program.path("source").asString());
-            PracticeV1CutoverMigrationTest.upgrade(database, context);
-            assertThat(PracticeV1CutoverMigrationTest.column(
+            PracticeMigrationFixture.upgrade(database, context);
+            assertThat(PracticeMigrationFixture.column(
                             database,
                             "SELECT encode(sha256(convert_to(definition->>'script','UTF8')),'hex') FROM"
                                     + " practice_version WHERE id=992132"))
                     .containsExactly(program.path("sourceSha256").asString());
-            assertThat(PracticeV1CutoverMigrationTest.column(
+            assertThat(PracticeMigrationFixture.column(
                             database,
                             "SELECT encode(sha256(convert_to(v.definition->>'script','UTF8')),'hex') || '|' ||"
                                     + " v.number || '|' || (v.definition->'reads'->>'contract') FROM practice p"
                                     + " JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=992121"))
                     .containsExactly(program.path("targetSha256").asString() + "|3|2.0.0");
-            assertThat(PracticeV1CutoverMigrationTest.column(
+            assertThat(PracticeMigrationFixture.column(
                             database,
                             "SELECT practice_version_id::text FROM result WHERE"
                                     + " id='00000000-0000-0000-0000-000000992141'"))
@@ -117,19 +117,19 @@ class PracticeV1DefinitionMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldIdentifyUnsupportedCustomProgramsAndRollBackTheCutover(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
+        var database = PracticeMigrationFixture.releasedDatabase(context);
         installProgram(database, "export default async function custom() { return {outcome: 'MET'}; }");
-        assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.upgrade(database, context))
+        assertThatThrownBy(() -> PracticeMigrationFixture.upgrade(database, context))
                 .hasMessageContaining("practice 992121 has an unsupported custom program");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT current_revision_id::text FROM practice WHERE id=992121"))
                 .containsExactly("992132");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND"
                                 + " table_name='result'"))
                 .containsExactly("0");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT locked::text FROM databasechangeloglock WHERE id=1"))
                 .containsExactly("false");
     }
@@ -161,8 +161,8 @@ class PracticeV1DefinitionMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepPinnedHistoryAndCustomizedCatalogBases(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO practice_group(id,workspace_id,slug,name,description,autonomy,created_at,display_order,visible_in_practice_dashboards)
             VALUES(993001,992101,'review-style','Review style','A workspace group.','HUMAN_APPROVAL','2026-01-01T00:00:00Z',0,true);
             INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
@@ -192,55 +192,55 @@ class PracticeV1DefinitionMigrationTest {
             INSERT INTO practice_catalog_installation(workspace_id,installed_at,provenance_linked_at)
             VALUES(992101,'2026-01-01T00:00:00Z','2026-01-02T00:00:00Z');
             """);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT number || '|' || (definition->>'criteria') FROM practice_version WHERE id"
                                 + " IN(992131,992132) ORDER BY number"))
                 .containsExactly("1|Explain the purpose of the change.", "2|Changed standard.");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT p.catalog_slug || '|' || (p.catalog_base->'definition'->>'criteria') || '|' ||"
                                 + " (v.definition->>'criteria') || '|' || v.number FROM practice p JOIN"
                                 + " practice_version v ON v.id=p.current_version_id WHERE p.id=992121"))
                 .containsExactly("local-offer|Original standard.|Changed standard.|3");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT feedback_mode FROM practice_group WHERE id=993001"))
                 .containsExactly("APPROVE_FIRST");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT kind || '|' || (definition->'definition'->>'criteria') || '|' || version FROM"
                                 + " catalog_entry WHERE entry_type='PRACTICE' AND slug='local-offer'"))
                 .containsExactly("scm.pull_request|Local offer standard.|7");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (kind IS NULL AND definition IS NULL AND base IS NULL AND excluded_at IS NOT"
                                 + " NULL)::text || '|' || version FROM catalog_entry WHERE entry_type='PRACTICE'"
                                 + " AND slug='excluded-following-entry'"))
                 .containsExactly("true|11");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (review_digest=practice_review_digest(definition))::text FROM practice_version"
                                 + " WHERE practice_id=992121 ORDER BY number"))
                 .containsExactly("true", "true", "true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (practice_catalog_installed_at='2026-01-01T00:00:00Z'::timestamptz)::text FROM"
                                 + " workspace WHERE id=992101"))
                 .containsExactly("true");
-        assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(
                         database,
                         "UPDATE practice_version SET definition=jsonb_set(definition,'{criteria}','\"Rewrite"
                                 + " history\"'::jsonb) WHERE id=992131"))
-                .isInstanceOf(SQLException.class)
+                .hasRootCauseInstanceOf(SQLException.class)
                 .hasMessageContaining("immutable");
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldAttachAuthoredProvenanceWithoutRestoringTheClearedBundledGroup(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO practice_revision(id,practice_id,revision_number,slug,name,applies_to,subject,
                 signals,evidence_requirements,review_when,criteria,automated_review_policy,delivery_behavior,created_at)
             SELECT 992132,id,2,'keeps-functions-small-and-single-purpose',name,applies_to,subject,
@@ -257,20 +257,20 @@ class PracticeV1DefinitionMigrationTest {
             INSERT INTO practice_catalog_installation(workspace_id,installed_at,provenance_linked_at)
             VALUES(992101,'2026-01-01',NULL);
             """);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT catalog_slug || '|' || (catalog_base->'groupSlug'='null'::jsonb)::text || '|' ||
                 (catalog_base->'definition'->>'criteria') || '|' ||
                 (catalog_base->'definition'->'reads'->>'contract') FROM practice WHERE id=992121
             """))
                 .containsExactly(
                         "keeps-functions-small-and-single-purpose|true|Explain the purpose of the change.|2.0.0");
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT (definition->'groupSlug'='null'::jsonb)::text || '|' ||
                 (definition->'definition'->'reads'->>'contract') FROM catalog_entry
                 WHERE entry_type='PRACTICE' AND slug='keeps-functions-small-and-single-purpose'
             """)).containsExactly("true|2.0.0");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT definition->>'criteria' FROM practice_version WHERE id=992131"))
                 .containsExactly("Explain the purpose of the change.");
     }
@@ -285,7 +285,7 @@ class PracticeV1DefinitionMigrationTest {
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/released-catalog.json"))) {
             released = Objects.requireNonNull(mapper.readTree(input));
         }
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
+        var database = PracticeMigrationFixture.releasedDatabase(context);
         try (var connection =
                 DriverManager.getConnection(database.jdbcUrl(), database.username(), database.password())) {
             connection.setAutoCommit(false);
@@ -300,8 +300,8 @@ class PracticeV1DefinitionMigrationTest {
             }
             connection.commit();
         }
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT p.slug || '|' || v.number || '|' || (v.definition->>'about') || '|' ||
                 (v.definition->'reads'->>'contract') || '|' ||
                 COALESCE(v.definition->'scan'->>'itemKind','NO_SCAN')
@@ -316,7 +316,7 @@ class PracticeV1DefinitionMigrationTest {
                         "bundle-logs-through-the-platform-logger|2|AUTHOR|2.0.0|scm.file",
                         "bundle-scope-one-reviewable-change|2|AUTHOR|2.0.0|NO_SCAN",
                         "bundle-validates-inputs-and-edge-cases-at-the-boundary|2|AUTHOR|2.0.0|scm.file");
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT p.slug || '|' || v.number || '|' || (v.definition->'reads'->>'contract')
             FROM practice p JOIN practice_version v ON v.practice_id=p.id AND v.number=1
             WHERE p.slug LIKE 'bundle-%' ORDER BY p.slug
@@ -326,12 +326,12 @@ class PracticeV1DefinitionMigrationTest {
                         "bundle-logs-through-the-platform-logger|1|1.3.0",
                         "bundle-scope-one-reviewable-change|1|1.3.0",
                         "bundle-validates-inputs-and-edge-cases-at-the-boundary|1|1.3.0");
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT v.definition->>'criteria' || '|' || (v.definition->'scan'='null'::jsonb)::text
                 || '|' || v.number FROM practice p JOIN practice_version v ON v.id=p.current_version_id WHERE p.id=1300100
             """))
                 .containsExactly("The workspace's customized standard.|true|2");
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT definition->>'criteria' FROM practice_version WHERE id=1400100
             """))
                 .containsExactly("The workspace's customized standard.");

@@ -164,6 +164,7 @@ export function stagePractices(cwd: string, practices: readonly StagedPractice[]
 		JSON.stringify(
 			practices.map(({ slug }) => ({
 				slug,
+				name: "Authentication review",
 				group: "security",
 				readsSources: ["scm.pull-request.core", "scm.pull-request.diff"],
 				exhaustiveSources: ["scm.pull-request.diff"],

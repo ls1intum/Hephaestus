@@ -270,13 +270,17 @@ void describe("issue classification across practices", () => {
 			{ subIssuesTotal: 2, subIssuesCompleted: 2 },
 			/as the provider reports/u,
 		],
-		[
-			{ sub_issues_total: 2, sub_issues_completed: 2, sub_issues_source: "Children" },
-			/2 sub-issue\(s\), 2 completed/u,
-			{ subIssuesTotal: 2, subIssuesCompleted: 2 },
-			provenance,
-		],
 	];
+
+	void it("refuses a rollup with an unrecognized source", async () => {
+		await assert.rejects(
+			runBundled("breaks-large-work-into-trackable-subtasks", {
+				item: { ...issue, sub_issues_source: "Children" },
+				inputs: opened,
+			}),
+			/sub_issues_source/u,
+		);
+	});
 
 	void it("keeps sub-issue counts separate from their source and scope in each script that reads them", async () => {
 		for (const { slug, checkboxes } of [
@@ -408,7 +412,7 @@ void it("a logger under a long repository path stays within the review direction
 	assert.ok(direction.endsWith("…"));
 });
 
-void it("issue-reference syntax in templates remains a candidate rather than an authored closing claim", async () => {
+void it("quoted closing syntax does not become an authored closing claim", async () => {
 	const metadata = {
 		source_branch: "plain-branch",
 		title: "Documentation update",
@@ -421,9 +425,9 @@ void it("issue-reference syntax in templates remains a candidate rather than an 
 	};
 	const result = await runBundled("honours-linked-issue-acceptance-criteria", { item: metadata });
 	const said = (result.directions ?? []).join("\n");
-	assert.equal(result.facts?.issueReferenceSyntaxCandidateCount, 1);
-	assert.match(said, /syntax candidate/u);
-	assert.match(said, /before establishing that the author/u);
+	assert.equal(result.facts?.issueReferenceSyntaxCandidateCount, 0);
+	assert.match(said, /No closing reference/u);
+	assert.match(said, /confirm there is genuinely no linked tracker issue/u);
 	assert.doesNotMatch(said, /this change claims to close/u);
 	const trace = await runBundled("ready-and-traceable-handoff", { item: metadata });
 	assert.equal(trace.facts?.issueMentionSyntaxCandidateCount, 1);

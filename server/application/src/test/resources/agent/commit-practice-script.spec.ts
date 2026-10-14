@@ -29,7 +29,9 @@ void test("captured commits distinguish empty history from missing or malformed 
 	const captured = await readCapturedCommits(
 		evidence(
 			JSON.stringify({
-				commits: [{ sha: "1234567", message: "", parents: [], files: [], authoredAt: "" }],
+				commits: [
+					{ sha: "1234567".padEnd(40, "a"), message: "", parents: [], files: [], authoredAt: "" },
+				],
 			}),
 		),
 	);
@@ -37,13 +39,13 @@ void test("captured commits distinguish empty history from missing or malformed 
 });
 
 const commit = (sha: string, message: string, parents = ["p"], files: ChangedFile[] = []) => ({
-	sha,
+	sha: sha.padEnd(40, "a"),
 	message,
 	author: "a",
 	authoredAt: "",
 	committer: "a",
 	committedAt: "",
-	parents,
+	parents: parents.map((_, i) => String(i + 1).repeat(40)),
 	files,
 	line: 0,
 });
@@ -63,7 +65,7 @@ void test("a subject's shape is a fact — bare, repeated, listed, cut off — a
 		commit("8888888", "update readme\n"),
 		commit("9999999", "Show loading indicator. Implement feedback from review\n"),
 	]);
-	const by = Object.fromEntries(facts.map((f) => [f.sha, f]));
+	const by = Object.fromEntries(facts.map((f) => [f.sha.slice(0, 7), f]));
 	assert.deepEqual(
 		[by["1111111"]?.bare, by["2222222"]?.bare, by["8888888"]?.bare],
 		[false, true, false],

@@ -219,10 +219,12 @@ class MentorAccessIntegrationTest extends AbstractWorkspaceIntegrationTest {
         Workspace workspace = workspace("mentor-access-binding-off");
         ensureMembership(workspace, member, WorkspaceRole.MEMBER);
         WorkspaceAgentBinding binding = hephBinding(workspace);
-        assertThat(mentorTurnRunner.refusal(workspace.getId(), member.getId())).isEmpty();
+        assertThat(mentorTurnRunner.refusal(workspace.getId(), accountId(member)))
+                .isEmpty();
 
         disable(binding);
 
-        assertThat(mentorTurnRunner.refusal(workspace.getId(), member.getId())).contains(MentorRefusal.UNAVAILABLE);
+        assertThat(mentorTurnRunner.refusal(workspace.getId(), accountId(member)))
+                .contains(MentorRefusal.UNAVAILABLE);
     }
 }

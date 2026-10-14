@@ -57,6 +57,7 @@ function commitsRecord(commits: CapturedCommit[]) {
 		commits: commits.map((c) => ({
 			files: [],
 			...c,
+			sha: c.sha.padEnd(40, "a"),
 			author: "ada",
 			committer: "ada",
 			committedAt: c.authoredAt,

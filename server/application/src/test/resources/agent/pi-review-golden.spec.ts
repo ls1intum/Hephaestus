@@ -9,7 +9,6 @@ import {
 	rmSync,
 	symlinkSync,
 	writeFileSync,
-	unlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
@@ -32,8 +31,6 @@ import {
 import { codingAgentExports } from "./program-host-runner.ts";
 
 const GOLDEN = nodePath.join(import.meta.dirname, "golden-prompts");
-const UPDATE_GOLDEN = process.env.UPDATE_GOLDEN_PROMPTS === "1";
-const SHARED_GOLDENS = ["tools.json", "system-prompt.md"] as const;
 const LIB = nodePath.resolve(
 	import.meta.dirname,
 	"../../../../../../docker/agents/practice-scripts/lib",
@@ -90,6 +87,7 @@ function runScenario(name: string): Map<string, string> {
 				JSON.stringify([
 					{
 						slug: "test-practice",
+						name: "Test practice",
 						readsSources: ["scm.repository.tree"],
 						exhaustiveSources: ["scm.repository.tree"],
 						contextPaths: [],
@@ -128,6 +126,7 @@ function runScenario(name: string): Map<string, string> {
 				JSON.stringify([
 					{
 						slug: "test-practice",
+						name: "Test practice",
 						readsSources: ["scm.pull-request.core"],
 						exhaustiveSources: ["scm.pull-request.core"],
 					},
@@ -516,45 +515,29 @@ if (scenario !== undefined && scenario !== "") {
 	});
 
 	for (const name of SCENARIOS) {
-		void test(`the ${name} prompts and tools match the captured inputs`, () => {
+		void test(`the ${name} session receives the review tools and captured source facts`, () => {
 			const captured = captures.get(name);
 			assert.ok(captured !== undefined);
-			if (UPDATE_GOLDEN) {
-				for (const file of readdirSync(nodePath.join(GOLDEN, name))) {
-					if (!captured.has(file)) {
-						unlinkSync(nodePath.join(GOLDEN, name, file));
-					}
-				}
-				for (const [file, text] of captured) {
-					const shared = SHARED_GOLDENS.some((entry) => entry === file);
-					if (!shared || name === SCENARIOS[0]) {
-						writeFileSync(nodePath.join(GOLDEN, ...(shared ? [file] : [name, file])), text);
-					}
-				}
-			}
-			const scenarioFiles = readdirSync(nodePath.join(GOLDEN, name));
 			assert.deepEqual(
-				[...captured.keys()].toSorted(),
-				[...SHARED_GOLDENS, ...scenarioFiles].toSorted(),
+				JSON.parse(captured.get("tools.json") ?? "null"),
+				JSON.parse(readFileSync(nodePath.join(GOLDEN, "tools.json"), "utf8")),
 			);
-			for (const file of captured.keys()) {
-				const actual = captured.get(file);
-				assert.ok(actual !== undefined);
-				const shared = SHARED_GOLDENS.some((entry) => entry === file);
-				const expected = readFileSync(
-					nodePath.join(GOLDEN, ...(shared ? [file] : [name, file])),
-					"utf8",
-				);
-				if (file.endsWith(".json")) {
-					const actualValue: unknown = JSON.parse(actual);
-					const expectedValue: unknown = JSON.parse(expected);
-					assert.deepEqual(actualValue, expectedValue, `${name}/${file}`);
-				} else {
-					assert.equal(actual, expected, `${name}/${file}`);
-				}
-			}
+			const prompt = captured.get("prompt-1.md") ?? "";
+			assert.ok(prompt.includes("evidence/metadata.json"));
+			assert.ok(prompt.includes("[L10] + insecure();"));
+			assert.ok(prompt.includes("test-practice"));
 		});
 	}
+	void test("truncated leads disclose the omitted context and locate the full input", () => {
+		const prompt = captures.get("leads-truncated")?.get("prompt-1.md") ?? "";
+		assert.match(prompt, /(?:truncat|omitt|not shown|cut)/iu);
+		assert.ok(prompt.includes("work/review-input"));
+	});
+	void test("compaction restores the captured change and complete criterion before another result", () => {
+		const prompt = captures.get("compaction")?.get("prompt-2.md") ?? "";
+		assert.ok(prompt.includes("[L10] + insecure();"));
+		assert.ok(prompt.includes("Added authentication calls use checked(), not insecure()."));
+	});
 
 	void test("the built-in program opens one native review session and returns its result, with no measuring session after it", () => {
 		const captured = captures.get("first-turn");

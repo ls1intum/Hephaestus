@@ -25,8 +25,6 @@ export {
 	type ScmFileRecord,
 } from "./records.ts";
 export type { DiffFile } from "./types.ts";
-export type { GrepOptions } from "./grep.ts";
-export { addedComments, commentKinds, type AddedComment } from "./comment-kinds.ts";
 export interface FileTree {
 	readonly revision: string;
 	read: (

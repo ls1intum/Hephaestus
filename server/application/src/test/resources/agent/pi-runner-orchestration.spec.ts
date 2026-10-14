@@ -30,8 +30,7 @@ import {
 import { isRecord } from "../../../main/resources/agent/pi-text.ts";
 import { GOLDEN_INPUTS, PRACTICES_DIR } from "./golden-review-workspace.ts";
 
-// The runner reads /workspace and the environment at module scope, so each scenario is a child
-// process: this file re-enters itself with the SDK mocked and drives one review through it.
+// Each child process mocks the SDK and drives one isolated review through runReviewJob.
 
 import { codingAgentExports } from "./program-host-runner.ts";
 
@@ -449,7 +448,14 @@ function practice(
 	versionId?: unknown,
 	group = "code",
 ) {
-	return { slug, group, readsSources, ...(versionId === undefined ? {} : { versionId }) };
+	return {
+		slug,
+		name: "Test practice",
+		group,
+		readsSources,
+		exhaustiveSources: readsSources.filter((source) => source === "scm.pull-request.diff"),
+		...(versionId === undefined ? {} : { versionId }),
+	};
 }
 
 const WORK_RECORD = {
@@ -1928,14 +1934,14 @@ if (scenario !== undefined && scenario !== "") {
 											destination: "PRACTICE_PAGE",
 											practiceSlug: "test-practice",
 											action: "WITHHOLD",
-											withholdReason: "below_bar",
+											withholdReason: "BELOW_BAR",
 										},
 										{
 											destination: "PRACTICE_PAGE",
 											practiceSlug: "test-practice",
 											basedOn: ["result-1"],
 											action: "WITHHOLD",
-											withholdReason: "below_bar",
+											withholdReason: "BELOW_BAR",
 										},
 									],
 								});
@@ -2203,7 +2209,7 @@ if (scenario !== undefined && scenario !== "") {
 								record(`feedback-historical:${historical}`);
 								const reply = await feedback.execute("f-1", {
 									feedback: [
-										{ ...card, destination: "PRACTICE_PAGE", basedOn: "problem-1" },
+										{ ...card, destination: "PRACTICE_PAGE", basedOn: ["problem-1"] },
 										{
 											destination: "PRACTICE_PAGE",
 											practiceSlug: "test-practice",
@@ -2373,7 +2379,7 @@ if (scenario !== undefined && scenario !== "") {
 										...notMet(`Own ${currentSlug}`),
 										practiceSlug: sibling,
 									}),
-									/unknown.*practiceSlug/u,
+									/(?:unknown|Unrecognized).*practiceSlug/u,
 								);
 								const own = await firstTool.execute("own", notMet(`Own ${currentSlug}`));
 								assert.equal(stateText(), before);
@@ -2858,7 +2864,7 @@ if (scenario !== undefined && scenario !== "") {
 							record(`outside:${outside}`);
 							await assert.rejects(
 								report.execute("o-long", revise(OVERLONG_SUMMARY)),
-								/summary must be at most/u,
+								/summary.*(?:at most|Too big)/u,
 							);
 							const kind = await report.execute(
 								"o-kind",
@@ -3280,7 +3286,7 @@ if (scenario !== undefined && scenario !== "") {
 						writeFileSync(
 							nodePath.join(cwd, "evidence/composition.json"),
 							JSON.stringify(
-								stage === "compose"
+								fixture === "compose"
 									? SERVER_COMPOSITION_REQUEST
 									: {
 											...SERVER_COMPOSITION_REQUEST,
@@ -3913,8 +3919,8 @@ if (scenario !== undefined && scenario !== "") {
 						}
 						case "scope-ownership":
 						case "scope-budget": {
-							const result = candidatesIn(nodePath.join(cwd, "out/result.json"));
 							assert.equal(child.status, 0, child.stderr);
+							const result = candidatesIn(nodePath.join(cwd, "out/result.json"));
 							assert.deepEqual(
 								[...result].map(([slug, candidate]) => [slug, candidate.summary]),
 								[
@@ -4458,7 +4464,7 @@ for (const item of nullableCases) {
 							assert.match(reply, /test-practice: revised \(negative\)/u, child.stderr);
 							assert.match(
 								events.find((event) => event.startsWith("outside:")) ?? "",
-								/unknown.*practiceSlug/u,
+								/(?:unknown|Unrecognized).*practiceSlug/u,
 							);
 							assert.match(reply, /"terminate":true/u);
 							assert.deepEqual(measuringSessions, [
@@ -5030,7 +5036,7 @@ for (const item of nullableCases) {
 								practices: [
 									{
 										slug: "test-practice",
-										name: "test-practice",
+										name: "Test practice",
 										knownLimitations: [],
 										...(["compose", "compose-foreign-provider"].includes(stage)
 											? { versionId: "42" }
@@ -5061,7 +5067,7 @@ for (const item of nullableCases) {
 								/Stored the review: a summary resting on 1 result\(s\) and problem\(s\), 1 line note\(s\), 0 withholding decision\(s\)[\s\S]*"terminate":true/u,
 							);
 							assert.ok(!events.includes("review-retry"), events.join("\n"));
-							// The private lanes keep the person's history, and see what the review said.
+							// Private composition sees the person's history and the stored review.
 							assert.ok(
 								events.includes("private-turn history=true review=true"),
 								events.join("\n"),
@@ -5069,39 +5075,28 @@ for (const item of nullableCases) {
 							assert.match(
 								events.find((event) => event.startsWith("feedback-historical:")) ?? "",
 								/does not name an admitted result or problem from this run/u,
+								`${events.join("\n")}\n${child.stderr}`,
 							);
 							const reply = events.find((event) => event.startsWith("feedback:")) ?? "";
 							// The composition turn goes on to its summary; only the retry ends on its last decision.
-							assert.match(reply, /"terminate":false/u);
+							assert.match(reply, /"terminate":false/u, `${events.join("\n")}\n${child.stderr}`);
 							assert.match(
 								reply,
 								/#1: stored a PRACTICE_PAGE piece for test-practice \(NEW\); 1\/1 used/u,
 							);
 							assert.match(reply, /#2: basedOn is required/u);
+							assert.match(reply, /#3: piece: Unrecognized key: .*verdict/u);
 							assert.match(
 								reply,
-								/#3: unknown piece field\(s\): verdict — a piece takes destination/u,
+								/#4: (?:body: Too big|the complete feedback text must be at most 8000 characters)/u,
 							);
-							assert.match(
-								reply,
-								/#4: the complete feedback text must be at most 8000 characters/u,
-							);
-							assert.match(
-								reply,
-								/#5: withholdReason must be one of NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR \(received 'NOT_A_REASON'\)/u,
-							);
+							assert.match(reply, /#5: withholdReason: Invalid option/u);
 							assert.match(
 								reply,
 								/#6: practiceSlug 'other-practice' is not a practice with an admitted result in this run \(those are: test-practice\)/u,
 							);
-							assert.match(
-								reply,
-								/#7: the review on the work is written in its own turn, not as a piece here; skipped\./u,
-							);
-							assert.match(
-								reply,
-								/#8: each item of feedback is one piece object .*\(received string\)/u,
-							);
+							assert.match(reply, /#7: destination: Invalid option/u);
+							assert.match(reply, /#8: piece: Invalid input/u);
 							assert.match(
 								events.find((event) => event.startsWith("feedback-bare:")) ?? "",
 								/#1: CONVERSATION is not a destination this run may write for/u,
@@ -5580,7 +5575,7 @@ for (const item of nullableCases) {
 							const initialReview = reviewPrompts[0];
 							assert.ok(initialReview !== undefined);
 							assert.deepEqual(reviewPracticesOf(initialReview), {
-								practices: [{ slug: "test-practice", name: "test-practice", knownLimitations: [] }],
+								practices: [{ slug: "test-practice", name: "Test practice", knownLimitations: [] }],
 							});
 							const feedback: unknown = JSON.parse(
 								readFileSync(nodePath.join(cwd, "out/feedback.json"), "utf8"),

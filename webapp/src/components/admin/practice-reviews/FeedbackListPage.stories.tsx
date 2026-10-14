@@ -316,7 +316,7 @@ export const FilterToOneWithholdingFamily: Story = {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Destination" }));
 		const destinations = await screen.findByRole("listbox", { name: "Destination options" });
 		await userEvent.click(
-			await within(destinations).findByRole("option", { name: /In conversation/u }),
+			await within(destinations).findByRole("option", { name: /On their practice pages/u }),
 		);
 		await userEvent.keyboard("{Escape}");
 		await canvas.findByText("No feedback matches these filters");

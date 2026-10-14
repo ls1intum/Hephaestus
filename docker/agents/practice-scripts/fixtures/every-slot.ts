@@ -1,12 +1,5 @@
-import {
-	scm,
-	addedComments,
-	commentKinds,
-	expectKind,
-	requireChange,
-	type AddedComment,
-	type DiffFile,
-} from "../kits/scm/index.ts";
+import { addedComments, commentKinds, type AddedComment } from "../kits/scm/comment-kinds.ts";
+import { scm, expectKind, requireChange, type DiffFile } from "../kits/scm/index.ts";
 import {
 	agent,
 	classify,

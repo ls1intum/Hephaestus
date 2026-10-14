@@ -2,6 +2,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { resultDetail } from "@/components/admin/practice-reviews/fixtures";
 import { parseSearch } from "@/lib/router-search";
 import { server } from "@/mocks/server";
 import { reviewHandlers } from "@/routes/_authenticated/w/$workspaceSlug/admin/practices/reviews/-reviews-server";
@@ -34,7 +35,16 @@ const SCOPE_QUERY = new URLSearchParams(SCOPE).toString();
 beforeEach(() => {
 	// jsdom needs an IntersectionObserver stub for paged lists.
 	vi.stubGlobal("IntersectionObserver", ObserverStub);
-	server.use(...reviewHandlers());
+	server.use(
+		http.get(`*/workspaces/:workspaceSlug/practices/reviews/results/${SCOPE.resultId}`, () =>
+			HttpResponse.json({
+				...resultDetail("55555555-5555-5555-5555-555555555555"),
+				id: SCOPE.resultId,
+				reviewId: SCOPE.reviewId,
+			}),
+		),
+		...reviewHandlers(),
+	);
 });
 
 /**

@@ -146,6 +146,10 @@ export const DeliveredSummaryComment: Story = {
 			...approvedFeedbackDetail,
 			destination: "ON_WORK",
 			body: POSTED_SUMMARY_COMMENT,
+			copies: approvedFeedbackDetail.copies.map((copy) => ({
+				...copy,
+				body: POSTED_SUMMARY_COMMENT,
+			})),
 		}),
 	},
 	play: async () => {

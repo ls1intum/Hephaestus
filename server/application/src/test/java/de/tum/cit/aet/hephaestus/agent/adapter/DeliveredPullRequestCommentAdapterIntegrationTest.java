@@ -3,8 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.adapter;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup;
 import de.tum.cit.aet.hephaestus.integration.core.spi.DeliveredPullRequestCommentLookup.CommentIds;
@@ -33,7 +31,6 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
-import java.util.Objects;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
@@ -48,9 +45,6 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
 
     @Autowired
     private JdbcTemplate jdbc;
-
-    @Autowired
-    private AccountRepository accounts;
 
     private long recipientAccountId;
 
@@ -88,8 +82,7 @@ class DeliveredPullRequestCommentAdapterIntegrationTest extends AbstractWorkspac
         owner = persistUser("provenance-owner");
         workspace = createWorkspace("provenance", "Provenance", "provenance", AccountType.ORG, owner);
         elsewhere = createWorkspace("provenance-other", "Other", "provenance-other", AccountType.ORG, owner);
-        recipientAccountId = Objects.requireNonNull(accounts.saveAndFlush(new Account("Retained feedback recipient"))
-                .getId());
+        recipientAccountId = accountId(owner);
     }
 
     @Test

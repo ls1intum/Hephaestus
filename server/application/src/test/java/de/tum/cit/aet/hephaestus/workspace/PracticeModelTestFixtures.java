@@ -201,8 +201,12 @@ public class PracticeModelTestFixtures {
         var assignment = Objects.requireNonNull(manager.find(
                 ReviewPractice.class,
                 new ReviewPractice.Id(work.review().getId(), work.practice().getId())));
-        var frozen = manager.find(ReviewItem.class, new ReviewItem.Id(
-                work.review().getId(), work.practice().getId(), Objects.requireNonNull(work.item().getId())));
+        var frozen = manager.find(
+                ReviewItem.class,
+                new ReviewItem.Id(
+                        work.review().getId(),
+                        work.practice().getId(),
+                        Objects.requireNonNull(work.item().getId())));
         if (frozen == null) {
             frozen = ReviewItem.builder()
                     .workspaceId(work.review().getWorkspaceId())
@@ -216,11 +220,17 @@ public class PracticeModelTestFixtures {
             manager.persist(frozen);
         }
         manager.flush();
-        jdbc.update("""
+        jdbc.update(
+                """
                 UPDATE result SET ended_at=?, end_reason=?
                 WHERE workspace_id=? AND practice_id=? AND item_id=? AND developer_id=? AND ended_at IS NULL
-                """, Timestamp.from(at), ResultEndReason.REPLACED.name(), work.review().getWorkspaceId(),
-                work.practice().getId(), work.item().getId(), developerId);
+                """,
+                Timestamp.from(at),
+                ResultEndReason.REPLACED.name(),
+                work.review().getWorkspaceId(),
+                work.practice().getId(),
+                work.item().getId(),
+                developerId);
         var result = Result.builder()
                 .id(UUID.randomUUID())
                 .workspaceId(work.review().getWorkspaceId())

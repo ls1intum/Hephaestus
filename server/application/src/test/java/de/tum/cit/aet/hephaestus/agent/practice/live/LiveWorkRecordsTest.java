@@ -104,7 +104,7 @@ class LiveWorkRecordsTest {
     private static void assertInputs(JsonNode staged, String kind, ObjectNode work) {
         assertThat(staged.path("contractVersion").asInt()).isEqualTo(SandboxLayout.PRACTICE_CONTRACT_VERSION);
         assertThat(staged.path("kind").asString()).isEqualTo(kind);
-        assertThat(staged.path("item")).isEqualTo(work);
+        assertThat(staged.path("item")).isEqualTo(MAPPER.readTree(MAPPER.writeValueAsBytes(work)));
         assertThat(staged.path("scope").path("kind").asString()).isEqualTo("ITEM");
         assertThat(staged.path("scope").path("item").path("id").asString()).isEqualTo("1");
         assertThat(staged.path("scope").path("version").asString()).isEqualTo("fixture:one");

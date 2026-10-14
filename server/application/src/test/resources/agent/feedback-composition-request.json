@@ -2,9 +2,14 @@
 	"contractVersion": 3,
 	"enabled": true,
 	"destinations": {
-		"ON_WORK": { "enabled": true, "maxPieces": 1 },
-		"PRACTICE_PAGE": { "enabled": true, "maxPieces": 2 },
-		"CONVERSATION": { "enabled": true, "maxPieces": 3 }
+		"ON_WORK": {
+			"enabled": true,
+			"maxPieces": 1
+		},
+		"PRACTICE_PAGE": {
+			"enabled": true,
+			"maxPieces": 1
+		}
 	},
 	"minDistinctItems": 2,
 	"onWorkCopyForms": ["FILE_NOTE", "LINE_NOTE"]

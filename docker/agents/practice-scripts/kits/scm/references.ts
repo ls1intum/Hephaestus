@@ -123,6 +123,11 @@ export function relatedReferences(text: string): number[] {
 	return stated(RELATED_REF, text);
 }
 
+/** URLs are reference candidates; their text does not establish a provider closing relationship. */
+export function issueUrlReferences(text: string): number[] {
+	return numbers(/https?:\/\/[^\s)]+?\/(?:-\/)?issues\/(?<number>\d+)/giu, text);
+}
+
 export function branchIssueReferences(branch: string): number[] {
 	return numbers(BRANCH_REF, branch);
 }

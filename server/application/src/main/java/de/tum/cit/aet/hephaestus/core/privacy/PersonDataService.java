@@ -272,7 +272,8 @@ public class PersonDataService {
                 requests.saveAndFlush(r);
             });
         } catch (RuntimeException exception) {
-            log.atError().addKeyValue("event.name", "person_data.erasure.failed")
+            log.atError()
+                    .addKeyValue("event.name", "person_data.erasure.failed")
                     .addKeyValue("person_data.store", activeStore)
                     .addKeyValue("error.type", exception.getClass().getName())
                     .log("Person data erasure failed");

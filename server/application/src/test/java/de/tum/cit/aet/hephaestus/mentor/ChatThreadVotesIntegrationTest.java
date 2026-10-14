@@ -101,7 +101,7 @@ class ChatThreadVotesIntegrationTest extends AbstractWorkspaceIntegrationTest {
     /** One finished turn in a new thread; returns the assistant reply's id. */
     private UUID reply(Workspace workspace, UUID threadId, User owner) {
         ChatThread thread =
-                persistence.ensureThread(workspace.getId(), threadId, owner.getId(), "How do I link issues?");
+                persistence.ensureThread(workspace.getId(), threadId, accountId(owner), "How do I link issues?");
         UUID assistantId = UUID.randomUUID();
         persistence.persistInFlight(thread, "How do I link issues?", assistantId, null, admittedMentorConfig());
         return assistantId;

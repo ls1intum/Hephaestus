@@ -20,7 +20,8 @@ public class MembershipReviewSelectionService implements MembershipReviewSelecti
     @Override
     @Transactional(readOnly = true)
     public Set<Long> eligibleAccountIds(long workspaceId) {
-        return memberships.findEligibleAccountIds(workspaceId, actors.connectedProviderId(workspaceId).orElse(null));
+        return memberships.findEligibleAccountIds(
+                workspaceId, actors.connectedProviderId(workspaceId).orElse(null));
     }
 
     @Override
@@ -28,7 +29,6 @@ public class MembershipReviewSelectionService implements MembershipReviewSelecti
     public List<Long> selectedAccountIds(long workspaceId) {
         return memberships.findSelectedAccountIds(workspaceId);
     }
-
 
     @Override
     @Transactional

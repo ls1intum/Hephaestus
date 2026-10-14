@@ -188,12 +188,12 @@ final class LiveRunnerWorkspace {
     }
 
     static Map<String, String> capturedFiles() {
-        Map<String, String> artifacts = new LinkedHashMap<>();
-        artifacts.put(SandboxLayout.CONTEXT_PREFIX + "metadata.json", "scm.pull-request.core");
-        artifacts.put(SandboxLayout.CONTEXT_PREFIX + "change.json", "scm.pull-request.diff");
-        artifacts.put(SandboxLayout.CONTEXT_PREFIX + "comments.json", "scm.pull-request.comments");
-        CHECKOUT_WITNESSES.forEach(witness -> artifacts.put(witness, "scm.repository.tree"));
-        return artifacts;
+        Map<String, String> inputs = new LinkedHashMap<>();
+        inputs.put(SandboxLayout.CONTEXT_PREFIX + "metadata.json", "scm.pull-request.core");
+        inputs.put(SandboxLayout.CONTEXT_PREFIX + "change.json", "scm.pull-request.diff");
+        inputs.put(SandboxLayout.CONTEXT_PREFIX + "comments.json", "scm.pull-request.comments");
+        CHECKOUT_WITNESSES.forEach(witness -> inputs.put(witness, "scm.repository.tree"));
+        return inputs;
     }
 
     static ObjectNode manifest(Path workspace, Map<String, String> files) throws IOException {

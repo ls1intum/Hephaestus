@@ -711,11 +711,11 @@ void test("a NOT_MET result is raised or withheld whole, and only a NOT_MET resu
 	);
 	assert.match(
 		errorsOf({ decisions: [{ problemId: "why", disposition: "BELOW_BAR" }] }).join("\n"),
-		/unknown decision field\(s\): problemId[\s\S]*resultId is required/u,
+		/resultId: Invalid input[\s\S]*Unrecognized key: "problemId"/u,
 	);
 	assert.match(
 		errorsOf({ decisions: [{ resultId: "why", disposition: "BORED" }] }).join("\n"),
-		/disposition must be one of RAISE, NO_MATERIAL_CHANGE, ALREADY_SAID, BELOW_BAR/u,
+		/disposition: Invalid option/u,
 	);
 });
 
@@ -1144,17 +1144,17 @@ void test("a result admission did not mark, or one that decided nothing, is left
 void test("a text resting on anything but result and problem ids is refused whole, never filtered", () => {
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: ["why", 42] } }).join("\n"),
-		/basedOn must be an array of result and problem id strings/u,
+		/basedOn.*Invalid input/u,
 	);
 	assert.match(
 		errorsOf({ summary: { body: "A sentence.", basedOn: "why" } }).join("\n"),
-		/basedOn must be an array of result and problem id strings/u,
+		/basedOn.*Invalid input/u,
 	);
 	assert.match(
 		errorsOf({
 			decisions: [{ resultId: "why", disposition: "ALREADY_SAID", witnessIds: [null] }],
 		}).join("\n"),
-		/witnessIds must be an array/u,
+		/witnessIds.*Invalid input/u,
 	);
 });
 
@@ -1659,7 +1659,7 @@ void test("malformed lists and legacy selection or withholding authorities are r
 	}
 	for (const field of ["selected", "selection", "withheld"]) {
 		assert.deepEqual(errorsOf({ ...spoken, [field]: [] }), [
-			`unknown review field(s): ${field} — a review takes decisions, summary and inline`,
+			`review: Unrecognized key: "${field}"`,
 		]);
 	}
 });
@@ -1789,7 +1789,7 @@ void test("a raised decision names no witness and unknown decision fields are re
 				below("description"),
 			],
 		}).join("\n"),
-		/unknown decision field\(s\): selected/u,
+		/Unrecognized key: "selected"/u,
 	);
 });
 

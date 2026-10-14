@@ -519,21 +519,9 @@ export const readReceiptSchema = z
 	);
 export type ReadReceipt = z.infer<typeof readReceiptSchema>;
 
-export type Coverage =
-	| ({
-			source: "host";
-			reads: number;
-			truncatedReads: number;
-			failedReads: number;
-			receipts: readonly ReadReceipt[];
-	  } & Completeness)
-	| ({ source: "claimed"; selected: number; checked: number; total: number | null } & Completeness);
+export type Coverage = z.infer<typeof coverageShape> & Completeness;
 
-interface ResultBase {
-	summary: string;
-	explanation: string;
-	coverage: Coverage;
-}
+type ResultBase = Pick<Superset, "summary" | "explanation"> & { coverage: Coverage };
 export type Candidate = ResultBase &
 	(
 		| {
@@ -670,14 +658,14 @@ const omissionShape = z.strictObject({
 		.readonly()
 		.optional(),
 });
-const omitted = listOf(omissionShape, CANDIDATE_LIMITS.omissions).optional();
+const omitted = listOf(omissionShape, CANDIDATE_LIMITS.omissions).readonly().optional();
 const coverageShape = z.discriminatedUnion("source", [
 	z.strictObject({
 		source: z.literal("host"),
 		reads: count,
 		truncatedReads: count,
 		failedReads: count,
-		receipts: z.array(readReceiptSchema).max(CANDIDATE_LIMITS.receipts),
+		receipts: z.array(readReceiptSchema).max(CANDIDATE_LIMITS.receipts).readonly(),
 		complete: z.boolean(),
 		omitted,
 	}),
@@ -932,7 +920,9 @@ export const sessionCandidateSchema = supersetShape
 	.superRefine((sent, ctx) => {
 		const problems = sent.problems === undefined ? undefined : nonEmpty(sent.problems);
 		for (const refusal of [outcomeRefusal(sent, problems), problemRefusal(sent)]) {
-			if (refusal !== undefined) ctx.addIssue({ code: "custom", message: refusal.message });
+			if (refusal !== undefined) {
+				ctx.addIssue({ code: "custom", message: refusal.message });
+			}
 		}
 	});
 export type ParsedSessionCandidate = z.infer<typeof sessionCandidateSchema>;

@@ -33,11 +33,13 @@ This table records only their retired names.
 
 | Term | Owning definition | Avoid for this concept |
 | --- | --- | --- |
-| **Item** | [Review glossary](./practice-review-glossary.mdx#review-terms) | artifact, unit, part, door |
-| **Event** | [Review glossary](./practice-review-glossary.mdx#review-terms) | occasion, trigger |
+| **Item** | [Review glossary](./practice-review-glossary.mdx#review-terms) | artifact, unit, part, target, subject |
+| **Event** | [Review glossary](./practice-review-glossary.mdx#review-terms) | signal, occasion, trigger, moment |
 | **Scan** | [Review glossary](./practice-review-glossary.mdx#review-terms) | population review |
-| **Job** | [Review glossary](./practice-review-glossary.mdx#runtime-terms) | dispatch |
-| **Practice script** | [Review glossary](./practice-review-glossary.mdx#review-terms) | precompute, precompute script |
+| **Origin** | [Review glossary](./practice-review-glossary.mdx#review-terms) | door, trigger mode |
+| **Send** | [Review glossary](./practice-review-glossary.mdx#runtime-terms) | dispatch |
+| **Feedback mode** | [Review glossary](./practice-review-glossary.mdx#review-terms) | autonomy |
+| **Practice script** | [Review glossary](./practice-review-glossary.mdx#review-terms) | precompute, precompute script, practice program |
 
 | Instead of | Write |
 | --- | --- |
@@ -73,10 +75,10 @@ This table records only their retired names.
 
 | Term | Meaning | Avoid for this concept |
 | --- | --- | --- |
-| **Result** | The outcome of one practice for one item at a version, and about a developer when the practice has a role. | observation, finding, detection, verdict |
-| **Outcome** | The value of a result: Met, Not met, Does not apply, or Could not determine. | presence, assessment |
+| **Result** | A record from reviewing one practice for one item at a version, about a developer when the practice has a role. | observation, finding, detection, verdict |
+| **Outcome** | The value of a result: Met, Not met, Does not apply, or Could not determine. | presence, assessment, Not applicable, Undetermined |
 | **Problem** | One problem that a Not met result records at a place in the work, with its own severity. | observation, finding, signal, violation, lapse |
-| **Severity** | How much a problem weighs: Critical, Major, Minor, or Trivial. |  |
+| **Severity** | How much a problem weighs: Critical, Major, Minor, or Trivial. | Info, informational |
 | **Example** | An optional place in the work that a result cites to show the practice done well. |  |
 | **Open question** | A question about the work that the evidence cannot answer. It is never feedback. |  |
 | **Not reviewed** | A selected item/practice pair that a closed review did not judge or reuse. It is not an outcome. |  |
@@ -156,7 +158,7 @@ Hephaestus never sends an open question as feedback.
 | **Feedback** | Guidance that Hephaestus writes from results for a developer. | message, feedbacks |
 | **Practice feedback** | The full name for feedback when the surrounding text does not establish its context. | message, AI feedback, feedback item, ledger unit |
 | **Destination** | Where feedback is intended to appear: on the work, on the practice page, or in conversation. | channel, location, surface |
-| **Delivery** | Whether feedback is awaiting approval, ready, delivered, withheld, rejected, replaced, failed or unconfirmed. | dispatch, placement |
+| **Delivery** | Whether feedback is awaiting approval, ready, delivered, withheld, rejected, replaced, failed or unconfirmed. | surface |
 | **Copy** | One appearance of feedback: a summary, line note, file note or chat turn. | placement |
 | **Decision** | An admin action on feedback: approve, reject, withdraw or restore. |  |
 | **Response** | The developer's answer to feedback. Resolution and usefulness are separate dimensions. |  |

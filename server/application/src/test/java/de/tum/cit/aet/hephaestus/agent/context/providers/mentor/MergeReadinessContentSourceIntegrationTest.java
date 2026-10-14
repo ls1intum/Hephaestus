@@ -3,8 +3,6 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.RetainedFeedbackTestData;
-import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
 import de.tum.cit.aet.hephaestus.evidence.capture.MentorContextRequest;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -86,9 +84,6 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
 
     @Autowired
     private ItemWriter retainedItems;
-
-    @Autowired
-    private AccountRepository retainedAccounts;
 
     private static final String INSTANCE = "https://gitlab.course.example";
     private static final String HEAD = "a".repeat(40);
@@ -1037,9 +1032,7 @@ class MergeReadinessContentSourceIntegrationTest extends AbstractWorkspaceIntegr
 
     /** What the delivery ledger records when Hephaestus posts {@code refs} as feedback on {@code mr}. */
     private void posted(PullRequest mr, String... refs) {
-        long accountId = Objects.requireNonNull(retainedAccounts
-                .saveAndFlush(new Account("Retained feedback recipient"))
-                .getId());
+        long accountId = accountId(student);
         var item = retainedItems.upsert(
                 new ItemRegistration(workspace.getId(), new ItemKind("scm.pull_request"), mr.getId(), null, null));
         var feedback = RetainedFeedbackTestData.onWork(

@@ -18,7 +18,6 @@ import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
 import de.tum.cit.aet.hephaestus.practices.spi.StateBasis;
 import de.tum.cit.aet.hephaestus.practices.spi.WorsenedBasis;
 import jakarta.validation.Validator;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -65,7 +64,7 @@ public final class CandidateParser {
         if (!VALIDATOR.validate(sent).isEmpty())
             throw refuse(CandidateRefusal.MALFORMED_CANDIDATE, "The candidate exceeds its contract bounds");
         Candidate candidate = rules(sent);
-        for (var citation : allCitations(candidate))
+        for (var citation : candidate.allCitations())
             if (citation.endLine() < citation.startLine())
                 throw refuse(CandidateRefusal.MALFORMED_CANDIDATE, "Citation lines are reversed");
         if (candidate.coverage() instanceof HostCoverage host) {
@@ -137,18 +136,6 @@ public final class CandidateParser {
             at++;
         }
         return bytes;
-    }
-
-    private static List<EvidenceCitation> allCitations(Candidate candidate) {
-        var citations = new ArrayList<>(candidate.citations());
-        candidate.problems().forEach(problem -> citations.addAll(problem.citations()));
-        var example = candidate.example();
-        if (example != null) citations.add(example.citation());
-        candidate.openQuestions().forEach(question -> {
-            var citation = question.citation();
-            if (citation != null) citations.add(citation);
-        });
-        return citations;
     }
 
     private static Candidate rules(CandidateDocument sent) {

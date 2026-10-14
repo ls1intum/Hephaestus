@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -75,7 +74,7 @@ public class ConfigAuditEvent {
     @Column(name = "elevated_via_instance_admin", nullable = false)
     private boolean elevatedViaInstanceAdmin;
 
-    @Convert(converter = ConfigAuditEntityTypeConverter.class)
+    @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 48)
     private ConfigAuditEntityType entityType;
 

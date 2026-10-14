@@ -23,7 +23,9 @@ import java.util.UUID;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
 
 @Tag("database")
@@ -77,9 +79,11 @@ class AgentPersonDataCatalogDatabaseTest {
                 .toList();
         frozen.forEach(entry -> entry.store().export(entry.selection()));
         frozen.forEach(entry -> entry.store().prepareErasure(entry.selection()));
-        frozen.stream()
+        var transactions = new TransactionTemplate(
+                new DataSourceTransactionManager(Objects.requireNonNull(plain.getDataSource())));
+        transactions.executeWithoutResult(transaction -> frozen.stream()
                 .sorted(Comparator.comparingInt(entry -> entry.store().getOrder()))
-                .forEach(entry -> entry.store().erase(entry.selection()));
+                .forEach(entry -> entry.store().erase(entry.selection())));
         assertThat(plain.queryForList("SELECT id FROM review_job WHERE id=?", UUID.class, job))
                 .isEmpty();
         assertThat(plain.queryForList(

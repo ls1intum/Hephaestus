@@ -2,12 +2,16 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.item;
 
 import de.tum.cit.aet.hephaestus.integration.core.item.Item;
 import de.tum.cit.aet.hephaestus.integration.core.item.ItemRepository;
+import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureCode;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemCaptureException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemLabel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemRef;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +21,13 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ScmItemAccess {
     private final ItemRepository repository;
+    private static final ScmItemQueryRepository.KindNames KINDS = new ScmItemQueryRepository.KindNames(
+            ScmItemEvents.REPOSITORY.value(),
+            ScmItemEvents.FILE.value(),
+            ScmItemEvents.PULL_REQUEST_REVIEW.value(),
+            ScmItemEvents.PULL_REQUEST.value(),
+            ScmItemEvents.ISSUE.value());
+    private final ScmItemQueryRepository queries;
 
     public void requireAll(long workspaceId, Collection<ItemRef> refs) {
         if (refs.isEmpty()) return;
@@ -64,5 +75,23 @@ public class ScmItemAccess {
         if (!parent.kind().equals(kind))
             throw new ItemCaptureException(ItemCaptureCode.ITEM_NOT_VISIBLE, "Parent has the wrong kind");
         return parent;
+    }
+
+    public Map<Long, ItemLabel> labels(long workspaceId, Collection<Long> ids) {
+        if (ids.isEmpty()) return Map.of();
+        Map<Long, ItemLabel> labels = new HashMap<>();
+        for (var row : queries.labels(workspaceId, List.copyOf(ids), KINDS)) {
+            labels.put(
+                    row.getId(),
+                    new ItemLabel(
+                            row.getId(),
+                            row.getTitle(),
+                            row.getNoun(),
+                            row.getNumber(),
+                            row.getContainer(),
+                            row.getUrl(),
+                            IntegrationKind.valueOf(row.getProviderType())));
+        }
+        return Map.copyOf(labels);
     }
 }

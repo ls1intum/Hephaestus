@@ -25,6 +25,7 @@ public class ScmWorkCapture {
     private final LinkedWorkItemContentSource linked;
     private final RepositoryTreeContentSource repositoryTree;
 
+    @SuppressWarnings("ReferenceEquality") // Throwable.addSuppressed rejects the same exception instance.
     CaptureContribution capture(ScmCaptureContext context) {
         List<CaptureContribution> contributions = new ArrayList<>();
         try {

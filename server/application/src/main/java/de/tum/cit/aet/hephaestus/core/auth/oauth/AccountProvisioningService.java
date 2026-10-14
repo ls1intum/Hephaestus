@@ -110,9 +110,7 @@ public class AccountProvisioningService {
         Identity link = identityRepository
                 .findActiveByProviderSubject(providerId, subject, teamId)
                 .orElseGet(() ->
-                        identityRepository
-                                .findByExactKey(providerId, subject, PersonIdentity.teamKey(teamId))
-                                .stream()
+                        identityRepository.findByExactKey(providerId, subject, PersonIdentity.teamKey(teamId)).stream()
                                 .findFirst()
                                 .orElse(null));
 
@@ -218,7 +216,7 @@ public class AccountProvisioningService {
                     subject,
                     login);
         }
-        return new ProvisionResult(result, false); 
+        return new ProvisionResult(result, false);
     }
 
     private void publishIdentityLinked(long accountId) {

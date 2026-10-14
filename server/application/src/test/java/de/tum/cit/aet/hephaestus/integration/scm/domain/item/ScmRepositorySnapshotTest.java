@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.RepositoryKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,7 +41,6 @@ class ScmRepositorySnapshotTest extends BaseUnitTest {
         when(tree.inventory(key, "a".repeat(40))).thenReturn(List.of());
         var service = new ScmItemService(
                 items,
-                mock(ScmItemLabelQuery.class),
                 access,
                 rows,
                 mock(ScmWorkLookup.class),
@@ -50,7 +50,8 @@ class ScmRepositorySnapshotTest extends BaseUnitTest {
                 mock(ScmFileVersions.class),
                 new ObjectMapper(),
                 mock(ScmWorkCapture.class),
-                mock(ScmCaptureContributors.class));
+                mock(ScmCaptureContributors.class),
+                Clock.systemUTC());
         var snapshot = service.pin(ref, null);
         assertThat(snapshot.state()).containsEntry("defaultBranch", branch);
         assertThat(snapshot.version().value()).isEqualTo("a".repeat(40));

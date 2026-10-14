@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,8 +11,8 @@ class PracticeV1ItemMappingMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldCreateSeparateWorkspaceItemsForSharedMirrorsAndMapAdapterPeople(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO workspace_membership(workspace_id,user_id,role,hidden,created_at) VALUES(992201,992103,'MEMBER',false,'2026-01-01');
             INSERT INTO practice(id,workspace_id,slug,name,criteria,applies_to,subject,signals,evidence_requirements,
                 review_when,automated_review_policy,delivery_behavior,created_at)
@@ -44,41 +44,41 @@ class PracticeV1ItemMappingMigrationTest {
             INSERT INTO outline_document(id,workspace_id,connection_id,document_id,collection_id,body_markdown,updated_at)
             VALUES(998212,992101,998211,'document-1','collection-1','Exact document words.','2026-01-01');
             """);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT count(DISTINCT id)::text || '|' || count(DISTINCT workspace_id) FROM item"
                                 + " WHERE kind='scm.pull_request' AND source_id=992109"))
                 .containsExactly("2|2");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT i.workspace_id || '|' || parent.workspace_id || '|' || parent.source_id FROM"
                                 + " item i JOIN item parent ON parent.id=i.parent_id WHERE"
                                 + " i.kind='scm.pull_request' AND i.source_id=992109 ORDER BY i.workspace_id"))
                 .containsExactly("992101|992101|992108", "992201|992201|992108");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT workspace_id || '|' || developer_id || '|' || evidence_version || '|' ||"
                                 + " (coverage IS NULL) FROM result WHERE"
                                 + " id='00000000-0000-0000-0000-000000998141'"))
                 .containsExactly("992201|992106|0|true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT kind || '|' || workspace_id || '|' || (removed_at IS NULL) FROM item WHERE"
                                 + " source_id IN (998201,998212) ORDER BY kind"))
                 .containsExactly("chat.thread|992101|true", "docs.document|992101|true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT cardinality(participant_account_ids)::text || '|' ||"
                                 + " (992106=ANY(participant_account_ids)) FROM slack_thread WHERE id=998201"))
                 .containsExactly("2|true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT author_account_id || '|' || text FROM slack_message WHERE id=998202"))
                 .containsExactly("992106|Exact source words.");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT actor_account_id::text FROM slack_channel_consent_event WHERE id=998203"))
                 .containsExactly("992106");
-        assertThat(PracticeV1CutoverMigrationTest.column(database, "SELECT author_id::text FROM issue WHERE id=992109"))
+        assertThat(PracticeMigrationFixture.column(database, "SELECT author_id::text FROM issue WHERE id=992109"))
                 .containsExactly("992103");
     }
 }

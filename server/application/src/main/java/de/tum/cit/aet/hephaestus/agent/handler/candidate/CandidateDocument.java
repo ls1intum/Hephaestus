@@ -1,6 +1,13 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
-import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.*;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.CITATIONS_PER_PROBLEM;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.EXPLANATION_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.NEXT_STEP_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OPEN_QUESTIONS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.PROBLEMS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.PROBLEM_EXPLANATION_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.RESULT_CITATIONS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.SUMMARY_CHARS;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;

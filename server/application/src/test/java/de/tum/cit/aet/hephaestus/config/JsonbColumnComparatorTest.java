@@ -42,7 +42,7 @@ class JsonbColumnComparatorTest {
     }
 
     private ObjectDifferences compareDefaults(String type, String reference, @Nullable String actual) {
-        Table table = new Table("feedback");
+        Table table = new Table().setName("feedback");
         Column first = new Column("checks")
                 .setRelation(table)
                 .setType(new DataType(type))

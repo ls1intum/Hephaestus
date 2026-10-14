@@ -8,12 +8,16 @@ import type {
 	PracticeGroup,
 	PracticeGuidanceDto,
 } from "@/api/types.gen";
-import { mockPracticeOf, practiceGroup, OWN_ORIGIN } from "@/components/admin/practices/fixtures";
-import { ADA } from "@/components/admin/practice-scans/fixtures";
-import { toWire } from "@/test/to-wire";
 import { mockDefinitionOptions } from "@/components/admin/practice-editor/fixtures";
+import {
+	mockPracticeOf,
+	practiceGroup,
+	mockAdmin,
+	OWN_ORIGIN,
+} from "@/components/admin/practices/fixtures";
 import type { Wire } from "@/lib/dates";
 import { ownMembership, workspaceListItem } from "@/mocks/fixtures/workspaces";
+import { toWire } from "@/test/to-wire";
 
 const FOLLOWS_WORKSPACE: FeedbackModeAssignment = {
 	effective: "APPROVE_FIRST",
@@ -42,11 +46,27 @@ export function wirePractice({
 	versionNumber = 1,
 	catalogOrigin = OWN_ORIGIN,
 }: WirePracticeInput): Wire<Practice> {
- return toWire({
-  ...mockPracticeOf({ id: "50", slug, kind, groupSlug, position, definition, feedbackMode: FOLLOWS_WORKSPACE, catalogOrigin,
-   version: { id: versionId, number: versionNumber, reviewDigest: `sha256:${versionId}`, createdAt: new Date("2026-10-01T09:00:00Z"), createdBy: ADA } }),
-  createdAt: new Date("2026-09-01T09:00:00Z"), updatedAt: new Date("2026-10-01T09:00:00Z"),
- });
+	return toWire({
+		...mockPracticeOf({
+			id: "50",
+			slug,
+			kind,
+			groupSlug,
+			position,
+			definition,
+			feedbackMode: FOLLOWS_WORKSPACE,
+			catalogOrigin,
+			version: {
+				id: versionId,
+				number: versionNumber,
+				reviewDigest: `sha256:${versionId}`,
+				createdAt: new Date("2026-10-01T09:00:00Z"),
+				createdBy: mockAdmin,
+			},
+		}),
+		createdAt: new Date("2026-09-01T09:00:00Z"),
+		updatedAt: new Date("2026-10-01T09:00:00Z"),
+	});
 }
 
 export function wireGroup(
@@ -54,7 +74,18 @@ export function wireGroup(
 	name: string,
 	overrides: Partial<Wire<PracticeGroup>> = {},
 ): Wire<PracticeGroup> {
- return { ...toWire(practiceGroup({ id: "60", slug, name, feedbackMode: FOLLOWS_WORKSPACE, createdAt: new Date("2026-09-01T09:00:00Z") })), ...overrides };
+	return {
+		...toWire(
+			practiceGroup({
+				id: "60",
+				slug,
+				name,
+				feedbackMode: FOLLOWS_WORKSPACE,
+				createdAt: new Date("2026-09-01T09:00:00Z"),
+			}),
+		),
+		...overrides,
+	};
 }
 
 /** Install defaults first; tests prepend their specific overrides through server.use. */

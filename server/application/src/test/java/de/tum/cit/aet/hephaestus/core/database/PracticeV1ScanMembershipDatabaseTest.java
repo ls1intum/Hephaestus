@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,8 +13,8 @@ class PracticeV1ScanMembershipDatabaseTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepScanMembershipAndReuseIndependentOfJobRetention(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.migratedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             BEGIN;
             INSERT INTO practice_version(id,workspace_id,practice_id,number,definition)
             SELECT 999831,p.workspace_id,p.id,3,jsonb_set(v.definition,'{scan}',
@@ -42,25 +42,25 @@ class PracticeV1ScanMembershipDatabaseTest {
             WHERE review_id='00000000-0000-0000-0000-000000999811' AND item_id=999841;
             COMMIT;
             """);
-        assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(database, """
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(database, """
             INSERT INTO review_job(id,review_id,workspace_id,status,input,config_snapshot,trace_id,submitted_at)
             VALUES(gen_random_uuid(),'00000000-0000-0000-0000-000000999811',992101,'QUEUED','{}','{}',repeat('f',32),'2026-01-01T00:00:00Z')
             """))
-                .isInstanceOf(SQLException.class)
+                .hasRootCauseInstanceOf(SQLException.class)
                 .hasMessageContaining("uk_review_job_active_review");
-        assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(database, """
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(database, """
             INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version)
             SELECT '00000000-0000-0000-0000-000000999811',992101,992121,item_id,'not-a-file'
             FROM review WHERE id='00000000-0000-0000-0000-000000992111'
             """))
-                .isInstanceOf(SQLException.class)
+                .hasRootCauseInstanceOf(SQLException.class)
                 .hasMessageContaining("outside review scope");
-        assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(
                         database,
                         "UPDATE review_item SET state='REUSED' WHERE review_id='00000000-0000-0000-0000-000000992111'"))
-                .isInstanceOf(SQLException.class)
+                .hasRootCauseInstanceOf(SQLException.class)
                 .hasMessageContaining("cannot reuse legacy evidence");
-        PracticeV1CutoverMigrationTest.execute(database, """
+        PracticeMigrationFixture.execute(database, """
             DELETE FROM review_job WHERE id='00000000-0000-0000-0000-000000999821';
             UPDATE review_job SET status='CANCELLED',processing_status='DONE',cancellation_reason='CANCELLED_BY_ADMIN',completed_at=now() WHERE id='00000000-0000-0000-0000-000000999823';
             UPDATE review SET status='PARTIAL',stop_reason='DEADLINE',completed_at=now() WHERE id='00000000-0000-0000-0000-000000999811';
@@ -72,18 +72,18 @@ class PracticeV1ScanMembershipDatabaseTest {
             INSERT INTO review_item(review_id,workspace_id,practice_id,item_id,item_version,state,result_id)
             VALUES('00000000-0000-0000-0000-000000999812',992101,992121,999841,'file-a-head','REUSED','00000000-0000-0000-0000-000000999851');
             """);
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (job_id IS NULL)::text || '|' || state FROM review_item WHERE"
                                 + " review_id='00000000-0000-0000-0000-000000999811' AND item_id=999841"))
                 .containsExactly("true|JUDGED");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT a.state || '|' || r.status FROM review_item a JOIN review r ON"
                                 + " r.id=a.review_id WHERE a.review_id='00000000-0000-0000-0000-000000999811' AND"
                                 + " a.item_id=999842"))
                 .containsExactly("LISTED|PARTIAL");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT state || '|' || r.review_id FROM review_item a JOIN result r ON"
                                 + " r.id=a.result_id WHERE a.review_id='00000000-0000-0000-0000-000000999812'"))

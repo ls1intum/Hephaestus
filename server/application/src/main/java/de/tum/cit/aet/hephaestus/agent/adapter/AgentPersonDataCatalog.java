@@ -42,7 +42,7 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
               WHERE reviewed.workspace_id=r.workspace_id AND reviewed.id=r.item_id AND reviewed.parent_id=i.id)
               OR EXISTS(SELECT 1 FROM review_item a
               WHERE (a.review_id,a.workspace_id)=(r.id,r.workspace_id) AND a.item_id=i.id))
-            AND ((i.kind IN ('scm.issue','scm.pull_request') AND i.source_id=ANY(:artifacts))
+            AND ((i.kind IN ('scm.issue','scm.pull_request') AND i.source_id=ANY(:items))
               OR (i.kind='chat.thread' AND i.source_id=ANY(:conversations))
               OR (i.kind='docs.document' AND i.source_id=ANY(:documents))))
         """;
@@ -112,12 +112,22 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
 
         private List<JobRow> jobs(PersonDataSelection selection) {
             if (selection.rows().isEmpty()) return List.of();
+            var workspaces = selection.rows().stream()
+                    .map(row ->
+                            Long.valueOf(Objects.requireNonNull(row.columns().get("workspace_id"))))
+                    .distinct()
+                    .toArray();
             var ids = selection.rows().stream()
                     .map(row -> UUID.fromString(row.columns().get("id")))
                     .toArray();
             return jdbc.query(
-                    "SELECT id,workspace_id,status,capture IS NOT NULL AS evidence FROM review_job WHERE id=ANY(:ids)",
-                    Map.of("ids", new SqlArrayValue("uuid", ids)),
+                    "SELECT id,workspace_id,status,capture IS NOT NULL AS evidence FROM review_job WHERE id=ANY(:ids)"
+                            + " AND workspace_id=ANY(:workspaces)",
+                    Map.of(
+                            "ids",
+                            new SqlArrayValue("uuid", ids),
+                            "workspaces",
+                            new SqlArrayValue("bigint", workspaces)),
                     (row, number) -> new JobRow(
                             Objects.requireNonNull(row.getObject("id", UUID.class)),
                             row.getLong("workspace_id"),
@@ -142,12 +152,6 @@ public class AgentPersonDataCatalog implements PersonDataCatalog {
             if (evidenceCopies.isEmpty() && jobs(selection).stream().anyMatch(JobRow::evidence))
                 throw new IllegalStateException("Evidence-copy erasure acknowledgement is unavailable");
             evidenceCopies.forEach(copy -> copy.eraseJobEvidence(ids));
-        }
-
-        @Override
-        public long erase(PersonDataSelection selection) {
-            if (selection.rows().isEmpty()) return 0;
-            return super.erase(selection);
         }
     }
 }

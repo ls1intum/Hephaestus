@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRequestReviewRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.time.Clock;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -32,8 +33,8 @@ class ScmCaptureRoleContextTest extends BaseUnitTest {
                         ScmCaptureConsent.class,
                         ExactPersonIdentityResolver.class)
                 .withBean(ObjectMapper.class, ObjectMapper::new)
+                .withBean(Clock.class, Clock::systemUTC)
                 .withBean(ScmItemAccess.class, () -> mock(ScmItemAccess.class))
-                .withBean(ScmItemLabelQuery.class, () -> mock(ScmItemLabelQuery.class))
                 .withBean(ScmRepositoryAccess.class, () -> mock(ScmRepositoryAccess.class))
                 .withBean(ScmWorkLookup.class, () -> mock(ScmWorkLookup.class))
                 .withBean(IssueEvidenceVersion.class, () -> mock(IssueEvidenceVersion.class))

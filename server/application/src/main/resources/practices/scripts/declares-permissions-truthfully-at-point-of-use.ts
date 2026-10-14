@@ -2,7 +2,7 @@ import { scm, expectKind, requireChange, type FileTree } from "../kits/scm/index
 import {
 	countLabel,
 	sampleNote,
-	scanAddedLines,
+	scanOccurrences,
 	type SourcePattern,
 } from "../kits/scm/source-scan.ts";
 import {
@@ -162,7 +162,7 @@ export default definePracticeScript({
 		expectKind(domain, "scm.pull_request");
 		const change = requireChange(domain.files);
 		const tree = domain.files?.head ?? null;
-		const scan = await scanAddedLines(tree, change, {
+		const scan = await scanOccurrences(ctx, domain.files, {
 			languages: ["swift"],
 			patterns: REQUEST,
 		});
@@ -240,7 +240,7 @@ export default definePracticeScript({
 			);
 		}
 		if (leads.length === 0) {
-			directions.push(...noMatchDirections(scan.linesAdded, scan.filesScanned));
+			directions.push(...noMatchDirections(scan.linesSelected, scan.filesScanned));
 		}
 		return ctx.review({
 			leads: leads.slice(0, 40),
@@ -255,7 +255,7 @@ export default definePracticeScript({
 							projectFilesRead: checkout.filesRead,
 						}),
 				filesScanned: scan.filesScanned,
-				linesAdded: scan.linesAdded,
+				linesAdded: scan.linesSelected,
 			},
 			directions,
 		});

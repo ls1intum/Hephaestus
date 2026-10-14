@@ -188,8 +188,9 @@ void test("normalization preserves unknown fields for contract refusal and repor
 			problems: [problemFixture({ severity: "HIGH" })],
 		}),
 	);
-	for (const path of ["summary", "explanation", "problems.0.severity"])
+	for (const path of ["summary", "explanation", "problems.0.severity"]) {
 		assert.ok(error.includes(path), error);
+	}
 });
 
 void test("an uncertain session cannot turn a missing warrant into a verdict", () => {
@@ -615,7 +616,7 @@ void test("a citation is completed from the manifest and its line numbers read a
 				[],
 				() => undefined,
 			),
-		/^Error: citation 1: evidence citation sourceKind is required; also: citation 2: evidence citation sourceKind is required$/u,
+		/citations\.0\.sourceKind[\s\S]*citations\.1\.sourceKind/u,
 	);
 });
 

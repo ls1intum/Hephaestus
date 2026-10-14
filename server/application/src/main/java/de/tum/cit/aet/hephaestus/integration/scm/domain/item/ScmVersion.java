@@ -48,8 +48,8 @@ public final class ScmVersion {
         String[] fields = version.value().split(":", -1);
         if (fields.length < 2
                 || !fields[1].equals("v1")
-                || !((fields[0].equals("scm.pull_request") && fields.length == 5)
-                        || (fields[0].equals("scm.pull_request_review") && fields.length == 6)))
+                || !((fields[0].equals(ScmItemEvents.PULL_REQUEST.value()) && fields.length == 5)
+                        || (fields[0].equals(ScmItemEvents.PULL_REQUEST_REVIEW.value()) && fields.length == 6)))
             throw new IllegalArgumentException("Not an SCM review version");
         requireObjectId(fields[2]);
         requireObjectId(fields[3]);

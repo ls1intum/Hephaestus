@@ -126,7 +126,7 @@ There are no redirects from retired practice resource names.
 | invalidation and validity updates | result marks with create/remove operations |
 | DISPUTED response resolution | DISAGREE |
 
-The [operator result-text entry](https://github.com/hephaestus-build/Hephaestus/blob/main/.migration/operator-result-source-authority.md) owns nullable summaries and withheld evidence.
+The [operator result-text entry](https://github.com/hephaestus-build/Hephaestus/blob/main/MIGRATION.md) owns nullable summaries and withheld evidence.
 Show the unavailable state while retaining safe outcome, practice, item and delivery facts.
 Do not substitute an empty problem list for unavailable problem detail.
 Feedback response resolution and usefulness remain independent dimensions.

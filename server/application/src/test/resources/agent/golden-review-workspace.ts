@@ -120,6 +120,7 @@ export function stageGoldenWorkspace(
 		JSON.stringify([
 			{
 				slug: "test-practice",
+				name: "Authentication review",
 				group: "security",
 				readsSources: ["scm.pull-request.core", "scm.pull-request.diff"],
 				exhaustiveSources: ["scm.pull-request.diff"],

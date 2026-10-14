@@ -33,6 +33,25 @@ class ScmCaptureContributionsTest extends BaseUnitTest {
         assertThat(closed).containsExactly(1, 2, 3);
     }
 
+    @Test
+    void shouldKeepTheFailureWhenTwoCleanupsThrowTheSameInstance() {
+        var failure = new IOException("shared");
+        var closed = new ArrayList<Integer>();
+        var values = List.of(
+                contribution(() -> {
+                    closed.add(1);
+                    throw failure;
+                }),
+                contribution(() -> {
+                    closed.add(2);
+                    throw failure;
+                }));
+        assertThatThrownBy(() -> ScmCaptureContributions.closeAll(values))
+                .isSameAs(failure)
+                .hasNoSuppressedExceptions();
+        assertThat(closed).containsExactly(1, 2);
+    }
+
     private static CaptureContribution contribution(AutoCloseable cleanup) {
         return new CaptureContribution(
                 Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), cleanup, Map.of(),

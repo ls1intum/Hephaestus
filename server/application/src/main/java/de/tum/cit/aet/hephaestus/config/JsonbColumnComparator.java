@@ -40,7 +40,7 @@ public class JsonbColumnComparator extends ColumnComparator {
                 "defaultValue",
                 reference,
                 actual,
-                (first, second) -> Objects.equals(first, second) || isEmptyObject(first) && isEmptyObject(second));
+                (first, second) -> Objects.equals(first, second) || (isEmptyObject(first) && isEmptyObject(second)));
         return differences;
     }
 

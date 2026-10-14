@@ -22,20 +22,14 @@ public interface IntegrationManifest {
     Set<Capability> declaredCapabilities();
 
     /**
-     * Must never be gated with {@code @ConditionalOnProperty}: a manifest is registered whether or
-     * not its vendor is enabled, so removing the bean would make that vendor's item events read as
-     * events nothing in the build can raise. The flag instead governs only the wiring — credential
-     * provider, subject parser, message handlers.
+     * A disabled vendor still declares its item kinds and events. Gate credential providers,
+     * subject parsers and handlers instead of the manifest.
      */
     default boolean enabled() {
         return true;
     }
 
-    /**
-     * What this integration contributes to practice review. Has no default on purpose: an integration that
-     * contributes nothing must say {@link ReviewContribution#none()} explicitly, since inheriting silence
-     * is how an integration ends up ingesting events that never trigger anything.
-     */
+    /** Every integration declares its review contribution, including {@link ReviewContribution#none()}. */
     ReviewContribution reviewContribution();
 
     /** Whether a stored native review commit identifies the current work head; unknown without that authority. */
@@ -65,7 +59,7 @@ public interface IntegrationManifest {
             delivers = deepCopy(Objects.requireNonNullElse(delivers, Map.of()));
         }
 
-        /** An integration that takes no part in practice review — a content source, or not wired yet. */
+        /** An integration with no review contribution. */
         public static ReviewContribution none() {
             return NONE;
         }

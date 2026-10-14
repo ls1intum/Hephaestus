@@ -1,6 +1,11 @@
 import { scm, expectKind, requireChange, type DiffFile, type FileTree } from "../kits/scm/index.ts";
 import { DIRECTION_CHARS, factsOf, oneLine } from "../lib/core/bounded-text.ts";
-import { definePracticeScript, type ReviewLead } from "../lib/core/practice-script.ts";
+import {
+	definePracticeScript,
+	z,
+	type PreparedContext,
+	type ReviewLead,
+} from "../lib/core/practice-script.ts";
 
 export const LABELS = {
 	"only-added":
@@ -14,7 +19,7 @@ export const LABELS = {
 	unchanged:
 		"A dependency line pair whose constraint text did not change, such as a reflowed line.",
 	"raw-manifest-line":
-		"A changed line of a pom.xml or an XcodeGen project.yml that is part of a dependency over several lines.",
+		"A changed manifest line; read its dependency map and surrounding context before classifying it.",
 };
 type DependencyKind = keyof typeof LABELS;
 
@@ -39,30 +44,14 @@ function isLoose(c: string): boolean {
 	return LOOSE.test(t);
 }
 
-const VERSIONISH =
-	/^(?:[\^~>=<* v]|\d|x\b|latest$|workspace:|npm:|file:|link:|git[+:]|https?:|github:|gitlab:|bitbucket:)/iu;
-function isVersionish(c: string): boolean {
-	return VERSIONISH.test(c.trim());
-}
+const dependencyMap = z.record(z.string().min(1), z.string());
+const packageDependenciesSchema = z.object({
+	dependencies: dependencyMap.optional(),
+	devDependencies: dependencyMap.optional(),
+	peerDependencies: dependencyMap.optional(),
+	optionalDependencies: dependencyMap.optional(),
+});
 
-const reJsonDep = /^\s*"(?<name>[^"]+)"\s*:\s*"(?<constraint>[^"]*)"\s*,?\s*$/u;
-// Package metadata scalar keys are not dependency declarations.
-const NPM_NON_DEP_KEYS = new Set([
-	"name",
-	"version",
-	"description",
-	"license",
-	"main",
-	"module",
-	"type",
-	"types",
-	"typings",
-	"homepage",
-	"author",
-	"private",
-	"packagemanager",
-	"bin",
-]);
 const reTomlDep =
 	/^\s*(?<name>[A-Za-z0-9_.-]+)\s*=\s*(?:"(?<quoted>[^"]*)"|\{[^}]*version\s*=\s*"(?<table>[^"]*)"[^}]*\})/u;
 const reReqDep = /^\s*(?<name>[A-Za-z0-9_.\-[\]]+)\s*(?<constraint>(?:[<>=!~]=?|@)\S.*)?$/u;
@@ -103,20 +92,7 @@ const ECOSYSTEMS: Ecosystem[] = [
 	{
 		isManifest: (b) => b === "package.json",
 		lockfiles: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json"],
-		parse: (line) => {
-			const [, name, constraint = ""] = reJsonDep.exec(line) ?? [];
-			if (name === undefined) {
-				return null;
-			}
-			if (NPM_NON_DEP_KEYS.has(name.toLowerCase())) {
-				return null;
-			}
-			// Changed lines carry no enclosing block; only dependency-shaped values can identify candidates.
-			if (!isVersionish(constraint)) {
-				return null;
-			}
-			return { name, constraint };
-		},
+		parse: () => null,
 	},
 	{
 		isManifest: (b) => b === "cargo.toml",
@@ -252,6 +228,45 @@ function collectDeps(df: DiffFile, eco: Ecosystem, side: "added" | "removed"): M
 	return out;
 }
 
+async function capturedPackageMaps(tree: FileTree | null, path: string) {
+	const captured = await tree?.read(path);
+	if (captured?.status !== "FOUND" || captured.truncated) {
+		return null;
+	}
+	try {
+		return packageDependenciesSchema.safeParse(JSON.parse(captured.text));
+	} catch {
+		return null;
+	}
+}
+
+async function packageManifestInputs(path: string, df: DiffFile, tree: FileTree | null) {
+	const parsed = await capturedPackageMaps(tree, path);
+	const context: PreparedContext[] =
+		parsed?.success === true
+			? [{ label: `Dependency maps in ${path} at the pinned head`, value: parsed.data }]
+			: [];
+	const notes =
+		context.length === 0
+			? [
+					`Dependency maps for ${path} could not be decoded from a complete read. Inspect the captured JSON and diff; never infer an absent dependency from this limit.`,
+				]
+			: [];
+	const leads: ReviewLead[] = (
+		[
+			["OLD", df.removedLines],
+			["NEW", df.addedLines],
+		] as const
+	).flatMap(([side, lines]) =>
+		[...lines.keys()].map((line) => ({
+			at: { change: path, line, side },
+			label: LABELS["raw-manifest-line"],
+			facts: { ecosystem: "package.json", side },
+		})),
+	);
+	return { context, notes, leads };
+}
+
 const PATHS_NAMED = 5;
 
 function namedPaths(paths: readonly string[]): string {
@@ -303,9 +318,12 @@ export default definePracticeScript({
 	meta: {},
 	async run(ctx) {
 		const domain = scm(ctx);
+		const tree = domain.files?.head ?? null;
 		expectKind(domain, "scm.pull_request");
 		const change = requireChange(domain.files);
 		const leads: ReviewLead[] = [];
+		const packageContexts: PreparedContext[] = [];
+		const packageNotes: string[] = [];
 		const changedManifests = new Set<string>();
 		const touchedLockfiles = new Set<string>();
 		let onlyAdded = 0;
@@ -319,7 +337,7 @@ export default definePracticeScript({
 		const allLockfileNames = new Set(
 			ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
 		);
-		const checkout = await checkoutPaths(domain.files?.head ?? null, allLockfileNames);
+		const checkout = await checkoutPaths(tree, allLockfileNames);
 
 		for (const [path, df] of change) {
 			const base = basenameLower(path);
@@ -333,6 +351,14 @@ export default definePracticeScript({
 			}
 			changedManifests.add(path);
 
+			if (base === "package.json") {
+				const prepared = await packageManifestInputs(path, df, tree);
+				packageContexts.push(...prepared.context);
+				packageNotes.push(...prepared.notes);
+				unpairedManifestLines += prepared.leads.length;
+				leads.push(...prepared.leads);
+				continue;
+			}
 			const { dependencyLine } = eco;
 			if (dependencyLine !== undefined) {
 				for (const side of ["removed", "added"] as const) {
@@ -412,7 +438,8 @@ export default definePracticeScript({
 			(lead) => lead.label === LABELS["raw-manifest-line"],
 		).length;
 
-		const directions: string[] = [];
+		const directions: string[] =
+			packageNotes.length === 0 ? [] : [oneLine(packageNotes.join(" "), DIRECTION_CHARS)];
 		if (changedManifests.size > 0) {
 			directions.push(
 				`Manifest-named file(s) changed (${changedManifests.size}). The name alone is no applicability: a changed external dependency declaration, resolution, source or pin inside one is, and internal target, test-target, scheme or build-setting wiring alone is not.`,
@@ -428,9 +455,8 @@ export default definePracticeScript({
 			}
 			if (unpairedManifestLines > 0) {
 				directions.push(
-					`${unpairedManifestLines} changed dependency line(s) in a pom.xml or XcodeGen project.yml carry no added, removed or pin label${rawLinesListed < unpairedManifestLines ? `, and only ${rawLinesListed} of them are listed as raw lines here — read the manifest diffs for the other ${unpairedManifestLines - rawLinesListed}` : " and are listed as raw lines"}.`,
+					`${unpairedManifestLines} changed manifest line(s) in package.json, pom.xml or XcodeGen project.yml carry no added, removed or pin label${rawLinesListed < unpairedManifestLines ? `, and only ${rawLinesListed} of them are listed as raw lines here — read the manifest diffs for the other ${unpairedManifestLines - rawLinesListed}` : " and are listed as raw lines"}.`,
 					"These manifests spread one dependency over several lines and the diff shows only the changed ones. Read the manifest around each to tell an addition from a version change or a reordering.",
-					"A pom.xml coordinate may also be a build plugin or a parent/BOM rather than a dependency.",
 				);
 			}
 			directions.push(...lockfileDirections(checkout, touchedLockfiles));
@@ -438,6 +464,7 @@ export default definePracticeScript({
 
 		return ctx.review({
 			leads: listed,
+			context: packageContexts,
 			facts: {
 				manifestsChanged: changedManifests.size,
 				onlyAdded,

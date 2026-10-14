@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,37 +20,37 @@ class PracticeV1FreshInstallDatabaseTest {
         PostgreSQLTestContainer.migrateDatabase(database, context);
         try (var input =
                 Objects.requireNonNull(getClass().getResourceAsStream("/db/practice-cutover/assert-migrated.sql"))) {
-            PracticeV1CutoverMigrationTest.execute(database, new String(input.readAllBytes(), StandardCharsets.UTF_8));
+            PracticeMigrationFixture.execute(database, new String(input.readAllBytes(), StandardCharsets.UTF_8));
         }
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT count(*)::text FROM databasechangelog WHERE id='1791486276211-v1-cutover'"))
                 .containsExactly("1");
         assertThat(
-                        PracticeV1CutoverMigrationTest.column(
+                        PracticeMigrationFixture.column(
                                 database,
                                 "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND"
-                                        + " table_name IN"
-                                        + " ('item','item_event','review','review_practice','review_item','review_job','result','problem','result_mark','membership','identity','identity_restriction','feedback','feedback_basis','feedback_copy','feedback_send','feedback_decision','feedback_response','practice_version','catalog_entry')"))
+                                    + " table_name IN"
+                                    + " ('item','item_event','review','review_practice','review_item','review_job','result','problem','result_mark','membership','identity','identity_restriction','feedback','feedback_basis','feedback_copy','feedback_send','feedback_decision','feedback_response','practice_version','catalog_entry')"))
                 .containsExactly("20");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='sfk_result_version'"))
                 .containsExactly(
                         "FOREIGN KEY (practice_version_id, practice_id, workspace_id) REFERENCES practice_version(id,"
                                 + " practice_id, workspace_id) ON DELETE RESTRICT");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT column_name || '|' || is_generated FROM information_schema.columns WHERE"
                                 + " table_schema='public' AND table_name='practice_version' AND column_name IN"
                                 + " ('name','review_digest') ORDER BY column_name"))
                 .containsExactly("name|ALWAYS", "review_digest|ALWAYS");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (count(*)=2)::text FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE"
                                 + " c.relname IN ('uk_result_current','uk_result_review_claim') AND"
                                 + " i.indnullsnotdistinct"))
                 .containsExactly("true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT count(*)::text FROM information_schema.columns WHERE table_schema='public' AND"
                                 + " table_name IN ('repository','issue','pull_request_review') AND"

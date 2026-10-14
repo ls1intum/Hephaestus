@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.domain.capture;
 
 import de.tum.cit.aet.hephaestus.evidence.capture.CaptureRequest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ItemSnapshot;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.item.ScmItemEvents;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -22,7 +23,7 @@ public record ScmCaptureContext(
     }
 
     public boolean pullRequest() {
-        return pinned.item().kind().value().equals("scm.pull_request")
-                || pinned.item().kind().value().equals("scm.pull_request_review");
+        return pinned.item().kind().equals(ScmItemEvents.PULL_REQUEST)
+                || pinned.item().kind().equals(ScmItemEvents.PULL_REQUEST_REVIEW);
     }
 }

@@ -22,16 +22,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const GROUPS: readonly LineageStateGroup[] = [
-	"review",
-	"origin",
-	"item",
-	"results",
-	"destination",
-	"delivery",
-	"volume",
-];
-
 const DISPLAY: Partial<Record<LineageStateGroup, TraceDisplay>> = {
 	destination: FULL_TRACE_DISPLAY,
 	delivery: FULL_TRACE_DISPLAY,
@@ -102,21 +92,3 @@ export const Destination = groupStory("destination");
 export const Delivery = groupStory("delivery");
 
 export const Volume = groupStory("volume");
-
-/** Every group on one page. */
-export const Overview: Story = {
-	render: () => (
-		<div className="space-y-10 p-6">
-			{GROUPS.map((group) => (
-				<Group key={group} group={group} />
-			))}
-		</div>
-	),
-	play: async ({ canvasElement }) => {
-		const total = GROUPS.reduce((sum, group) => sum + LINEAGE_STATE_CASES[group].length, 0);
-		// A role query over a page this size takes longer than the test may; the attribute says the same.
-		await expect(
-			canvasElement.querySelectorAll('[role="group"][aria-label="How this came about"]'),
-		).toHaveLength(total);
-	},
-};

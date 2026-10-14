@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.spi.ResultCoverage;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultExample;
 import de.tum.cit.aet.hephaestus.practices.spi.ResultOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.SearchWarrant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
@@ -45,6 +46,18 @@ public sealed interface Candidate
 
     default List<OpenQuestion> openQuestions() {
         return List.of();
+    }
+
+    default List<EvidenceCitation> allCitations() {
+        var citations = new ArrayList<>(citations());
+        problems().forEach(problem -> citations.addAll(problem.citations()));
+        var example = example();
+        if (example != null) citations.add(example.citation());
+        openQuestions().forEach(question -> {
+            var citation = question.citation();
+            if (citation != null) citations.add(citation);
+        });
+        return List.copyOf(citations);
     }
 
     default Candidate withCitations(UnaryOperator<EvidenceCitation> verified) {

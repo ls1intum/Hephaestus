@@ -40,6 +40,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 class ReviewOutputServiceTest extends BaseUnitTest {
     private final JsonMapper mapper = new JsonMapper();
@@ -115,6 +116,24 @@ class ReviewOutputServiceTest extends BaseUnitTest {
                         .path("reason")
                         .asString())
                 .isEqualTo("quote_unverified");
+    }
+
+    @Test
+    void shouldWithholdHostCoverageWhenItsReceiptsDifferFromTheSubmission() {
+        var submitted = submission("clear-names", "docs:one");
+        var entry = submitted.results().getFirst();
+        var candidate = (ObjectNode) entry.candidate();
+        candidate.set("coverage", mapper.readTree("""
+                {"source":"host","complete":true,"reads":1,"truncatedReads":0,"failedReads":0,
+                 "receipts":[{"sourceKind":"docs.document.core","sourcePath":"context/body.txt",
+                 "path":"document/body","version":"docs:one","status":"COMPLETE"}]}
+                """));
+        when(results.admit(1, job.getReviewId(), job.getId(), 0, List.of()))
+                .thenReturn(new AdmissionReceipt(List.of(), List.of()));
+        service.prepare(job, submitted).record(job);
+        verifyNoInteractions(verifier);
+        verify(membership).withhold(1, RuntimeReviewTestData.assignment(5L, null).id(),
+                CandidateRefusal.COVERAGE_INCONSISTENT, "Host coverage differs from the submitted read receipts");
     }
 
     @Test

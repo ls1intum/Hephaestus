@@ -9,6 +9,7 @@ import {
 	type Outcome,
 	type Severity,
 } from "./work/practice-scripts/lib/core/contract.ts";
+import { recordArrayEntries } from "./work/practice-scripts/lib/core/json.ts";
 
 /**
  * The captured witness of a checkout that a repository citation names (`CandidateEvidenceVerifier.CHECKOUT_WITNESS` on
@@ -263,13 +264,15 @@ export function normalizeSubmission(
 		}
 	};
 	const repair = (value: unknown, field = ""): unknown => {
-		if (field === "citation") return citation(value);
+		if (field === "citation") {
+			return citation(value);
+		}
 		if (Array.isArray(value)) {
 			return value.map((entry: unknown) =>
 				field === "citations" ? citation(entry) : repair(entry),
 			);
 		}
-		if (isRecord(value))
+		if (isRecord(value)) {
 			return Object.fromEntries(
 				Object.entries(value)
 					.filter(
@@ -289,8 +292,13 @@ export function normalizeSubmission(
 					)
 					.map(([key, entry]) => [key, repair(entry, key)]),
 			);
-		if (typeof value !== "string") return value;
-		if (field === "summary") return value.trim().replaceAll(/\s+/gu, " ");
+		}
+		if (typeof value !== "string") {
+			return value;
+		}
+		if (field === "summary") {
+			return value.trim().replaceAll(/\s+/gu, " ");
+		}
 		return TRIMMED_FIELDS.has(field) ? value.trim() : value;
 	};
 	const input = isRecord(raw)
@@ -304,7 +312,9 @@ export function normalizeSubmission(
 			),
 		);
 	}
-	if (!parsed.success || errors.length > 0) throw new Error(errors.join("; also: "));
+	if (!parsed.success || errors.length > 0) {
+		throw new Error(errors.join("; also: "));
+	}
 	return parsed.data;
 }
 
@@ -466,71 +476,10 @@ export function citesReviewedTurn(
 	);
 }
 
-function reviewedTurnLines(
-	thread: string,
-	developerId: string,
-): { first: number; last: number; index: number }[] {
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(thread);
-	} catch {
-		return [];
-	}
-	const messages: unknown = isRecord(parsed) ? parsed.messages : undefined;
-	if (!Array.isArray(messages) || !messages.every(isRecord)) {
-		return [];
-	}
-	// JSON.parse retains no source positions; locate turn spans separately in record order.
-	const spans: { first: number; last: number; index: number }[] = [];
-	let line = 1;
-	let depth = 0;
-	let inString = false;
-	let escaped = false;
-	let stringStart = 0;
-	let lastString = "";
-	let key = "";
-	let inMessages = false;
-	let first = 0;
-	for (let index = 0; index < thread.length; index += 1) {
-		const char = thread[index];
-		if (char === "\n") {
-			line += 1;
-		}
-		if (inString) {
-			if (escaped) {
-				escaped = false;
-			} else if (char === "\\") {
-				escaped = true;
-			} else if (char === '"') {
-				inString = false;
-				lastString = thread.slice(stringStart, index);
-			}
-			continue;
-		}
-		if (char === '"') {
-			inString = true;
-			stringStart = index + 1;
-		} else if (char === ":" && depth === 1) {
-			key = lastString;
-		} else if (char === "{" || char === "[") {
-			depth += 1;
-			if (char === "[" && depth === 2 && key === "messages") {
-				inMessages = true;
-			}
-			if (char === "{" && inMessages && depth === 3) {
-				first = line;
-			}
-		} else if (char === "}" || char === "]") {
-			if (char === "}" && inMessages && depth === 3) {
-				spans.push({ first, last: line, index: spans.length });
-			}
-			if (char === "]" && inMessages && depth === 2) {
-				inMessages = false;
-			}
-			depth -= 1;
-		}
-	}
-	return spans.filter((span) => messages[span.index]?.accountId === developerId);
+function reviewedTurnLines(thread: string, developerId: string) {
+	return (recordArrayEntries(thread, "messages") ?? []).filter(
+		(entry) => isRecord(entry.value) && entry.value.accountId === developerId,
+	);
 }
 
 const MISMATCH_EXCERPT_CHARS = 160;

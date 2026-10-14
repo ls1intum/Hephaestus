@@ -12,6 +12,7 @@ import { promisify } from "node:util";
 import { oneLine } from "./bounded-text.ts";
 import {
 	isSafeRelativePath,
+	commitIdSchema,
 	type EvidenceLocation,
 	type ReviewLead,
 	type ReviewOptions,
@@ -84,6 +85,9 @@ async function quoteOf(
 		}
 		const end = at.endLine ?? at.line;
 		assertCitationRange(at.line, end);
+		if (at.revision !== undefined && !commitIdSchema.safeParse(at.revision).success) {
+			return undefined;
+		}
 		if (at.revision !== undefined && at.revision !== sources.headRevision) {
 			try {
 				const { stdout } = await git(

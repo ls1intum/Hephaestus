@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.workspace.Membership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.dto.AssignRoleRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.SetMemberHiddenRequestDTO;
 import de.tum.cit.aet.hephaestus.workspace.dto.WorkspaceMembershipDTO;
+import jakarta.persistence.EntityManagerFactory;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +24,7 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -37,10 +39,95 @@ class MembershipControllerIntegrationTest extends AbstractWorkspaceIntegrationTe
     private WebTestClient webTestClient;
 
     @Autowired
+    private EntityManagerFactory entityManagerFactory;
+
+    @Autowired
     private AccountRepository accounts;
 
     @Autowired
     private IdentityRepository identities;
+
+    @Test
+    @WithAdminUser
+    void shouldKeepProviderProfileQueriesBoundedForFiftyMembers() {
+        var owner = persistUser("profile-batch-owner");
+        var workspace = createWorkspace("profile-batch", "Profiles", "profiles", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+        connectActivitySource(workspace, owner.getProvider());
+        for (int index = 0; index < 50; index++) {
+            var member = persistUser("profile-batch-" + index);
+            ensureMembership(workspace, member, WorkspaceRole.MEMBER);
+        }
+        var statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+        boolean enabled = statistics.isStatisticsEnabled();
+        statistics.setStatisticsEnabled(true);
+        try {
+            long before = statistics.getPrepareStatementCount();
+            webTestClient
+                    .get()
+                    .uri("/workspaces/{slug}/members?size=50", workspace.getWorkspaceSlug())
+                    .headers(TestAuthUtils.withCurrentUser())
+                    .exchange()
+                    .expectStatus()
+                    .isOk()
+                    .expectBody()
+                    .jsonPath("$.content.length()")
+                    .isEqualTo(50);
+            assertThat(statistics.getPrepareStatementCount() - before).isLessThanOrEqualTo(30);
+        } finally {
+            statistics.setStatisticsEnabled(enabled);
+        }
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldReturnNotFoundWhenTheWorkspaceDoesNotExist() {
+        webTestClient
+                .get()
+                .uri("/workspaces/absent-membership-space/members")
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(404);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldReturnNotFoundWhenAssigningAnUnknownAccount() {
+        var owner = persistUser("missing-account-owner");
+        var workspace = createWorkspace("missing-account-space", "Members", "members", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+        webTestClient
+                .post()
+                .uri("/workspaces/{slug}/members/assign", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new AssignRoleRequestDTO(Long.toString(Long.MAX_VALUE), WorkspaceRole.MEMBER))
+                .exchange()
+                .expectStatus()
+                .isNotFound()
+                .expectBody()
+                .jsonPath("$.status")
+                .isEqualTo(404);
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRejectAnUnknownMemberSortField() {
+        var owner = persistUser("invalid-sort-owner");
+        var workspace = createWorkspace("invalid-member-sort", "Members", "members", AccountType.ORG, owner);
+        ensureAdminMembership(workspace);
+        webTestClient
+                .get()
+                .uri("/workspaces/{slug}/members?sort=missingField", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+    }
 
     @Test
     @WithAdminUser

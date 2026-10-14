@@ -55,6 +55,17 @@ beforeEach(() => {
 			HttpResponse.json(ACROSS_WORKSPACE),
 		),
 		http.get("*/workspaces/:workspaceSlug/practice-groups", () => HttpResponse.json(groups)),
+		http.get("*/workspaces/:workspaceSlug/practices/reviewed", () =>
+			HttpResponse.json(
+				practiceStandings.map((standing) => ({
+					slug: standing.slug,
+					name: standing.name,
+					group: groups.find((group) => group.slug === standing.groupSlug) ?? null,
+					whyItMatters: null,
+					whatGoodLooksLike: null,
+				})),
+			),
+		),
 		http.get("*/workspaces/:workspaceSlug/practice-groups/standings", () =>
 			HttpResponse.json(Object.values(groupStandings)),
 		),

@@ -61,7 +61,7 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 		path: "Frontend conventions",
 		quote: "Prefer one responsive component over a table and a card list.",
 	},
-	"hephaestus.observation-history": {
+	"hephaestus.result-history": {
 		path: "Result from 3 July",
 		quote: "The route exposed an internal pipeline term; raised then, and unchanged since.",
 	},

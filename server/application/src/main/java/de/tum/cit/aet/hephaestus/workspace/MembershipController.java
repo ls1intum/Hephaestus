@@ -49,9 +49,8 @@ public class MembershipController {
         var view = UserViewContextHolder.get();
         Membership membership = workspaceMembershipService.getMembership(
                 context.id(), view == null ? CurrentAccount.requireId() : view.accountId());
-        WorkspaceRole effectiveRole = context.roles().stream()
-                .reduce(WorkspaceRole::highest)
-                .orElse(membership.getRole());
+        WorkspaceRole effectiveRole =
+                context.roles().stream().reduce(WorkspaceRole::highest).orElse(membership.getRole());
         if (effectiveRole != WorkspaceRole.OWNER
                 && effectiveRole != WorkspaceRole.ADMIN
                 && SecurityUtils.isSuperAdmin()) {
@@ -140,5 +139,4 @@ public class MembershipController {
                 member.isReviewSelected(),
                 eligible);
     }
-
 }

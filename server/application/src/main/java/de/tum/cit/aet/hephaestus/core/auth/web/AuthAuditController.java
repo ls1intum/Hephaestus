@@ -80,7 +80,6 @@ public class AuthAuditController {
             @NonNull String eventType,
             @NonNull String result,
             @Schema(requiredMode = RequiredMode.REQUIRED) boolean elevatedViaInstanceAdmin,
-            // Raw IDs retain attribution after an account is deleted.
             @Nullable Long accountId,
             @Nullable Long actingAccountId,
             @Nullable Long viewedActorId,

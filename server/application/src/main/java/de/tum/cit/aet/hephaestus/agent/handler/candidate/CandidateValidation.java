@@ -1,6 +1,18 @@
 package de.tum.cit.aet.hephaestus.agent.handler.candidate;
 
-import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.*;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.CONSULTED_SOURCES;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.EXAMPLE_NOTE_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.MAX_COUNT;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OMISSIONS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OMISSION_ITEMS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.OPEN_QUESTION_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.PATH_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.PROBLEM_EXPLANATION_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.QUOTE_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.RECEIPTS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.SUMMARY_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.VERSION_CHARS;
+import static de.tum.cit.aet.hephaestus.agent.handler.candidate.CandidateLimits.WARRANT_FIELD_CHARS;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ClaimedCoverage;
@@ -20,6 +32,7 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import org.hibernate.validator.HibernateValidator;
 import org.hibernate.validator.cfg.defs.MaxDef;
+import org.hibernate.validator.cfg.defs.NotNullDef;
 import org.hibernate.validator.cfg.defs.PatternDef;
 import org.hibernate.validator.cfg.defs.PositiveDef;
 import org.hibernate.validator.cfg.defs.PositiveOrZeroDef;
@@ -52,37 +65,48 @@ final class CandidateValidation {
                 .constraint(new SizeDef().min(1).max(QUOTE_CHARS));
         mapping.type(ResultExample.class)
                 .field("citation")
+                .constraint(new NotNullDef())
                 .valid()
                 .field("note")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(EXAMPLE_NOTE_CHARS));
         mapping.type(OpenQuestion.class)
                 .field("citation")
                 .valid()
                 .field("openQuestion")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(OPEN_QUESTION_CHARS))
                 .field("wouldSettleIt")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(OPEN_QUESTION_CHARS));
         mapping.type(SearchWarrant.class)
                 .field("consulted")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(CONSULTED_SOURCES))
                 .valid()
                 .field("lookedFor")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(WARRANT_FIELD_CHARS))
                 .field("boundary")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(WARRANT_FIELD_CHARS));
         mapping.type(InapplicabilityWarrant.class)
                 .field("consulted")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(CONSULTED_SOURCES))
                 .valid()
                 .field("prerequisite")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(WARRANT_FIELD_CHARS))
                 .field("ruledOutBy")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(WARRANT_FIELD_CHARS));
         mapping.type(IntroducedBasis.class)
                 .field("head")
                 .constraint(new PositiveOrZeroDef())
                 .constraint(new MaxDef().value(MAX_COUNT))
                 .field("explanation")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(PROBLEM_EXPLANATION_CHARS));
         mapping.type(WorsenedBasis.class)
                 .field("head")
@@ -92,6 +116,7 @@ final class CandidateValidation {
                 .constraint(new PositiveOrZeroDef())
                 .constraint(new MaxDef().value(MAX_COUNT))
                 .field("explanation")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(PROBLEM_EXPLANATION_CHARS));
         mapping.type(DutyBasis.class)
                 .field("event")
@@ -100,9 +125,11 @@ final class CandidateValidation {
                 .field("criterionQuote")
                 .constraint(new SizeDef().min(1).max(QUOTE_CHARS))
                 .field("explanation")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(PROBLEM_EXPLANATION_CHARS));
         mapping.type(StateBasis.class)
                 .field("explanation")
+                .constraint(new NotNullDef())
                 .constraint(new SizeDef().min(1).max(PROBLEM_EXPLANATION_CHARS));
         mapping.type(ReadReceipt.class)
                 .field("sourceKind")

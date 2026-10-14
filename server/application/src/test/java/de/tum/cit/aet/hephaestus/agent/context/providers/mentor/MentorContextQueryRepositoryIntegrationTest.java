@@ -26,10 +26,12 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.MembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -87,6 +89,9 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private PullRequestReviewRepository reviewRepository;
 
+    @Autowired
+    private MembershipService memberships;
+
     private Workspace workspace;
     private User user;
 
@@ -118,8 +123,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         user = userRepository.save(user);
     }
 
-    private void connectSource(IntegrationKind kind, ConnectionConfig config) {
-        Connection connection = connections.saveAndFlush(new Connection(workspace, kind, kind.name(), config));
+    private void connectSource(Workspace scope, IntegrationKind kind, ConnectionConfig config) {
+        Connection connection = connections.saveAndFlush(new Connection(scope, kind, kind.name(), config));
         connectionService.transition(
                 connection,
                 new ConnectionService.TransitionRequest(
@@ -132,7 +137,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private ChatThread seedThreadWithUserMessage(String firstPrompt) {
-        ChatThread thread = persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user.getId(), firstPrompt);
+        ChatThread thread = persistence.ensureThread(
+                workspace.getId(), UUID.randomUUID(), memberships.accountIdForUser(user.getId()), firstPrompt);
         persistence.persistInFlight(thread, firstPrompt, UUID.randomUUID(), null, admittedMentorConfig());
         return thread;
     }
@@ -166,7 +172,8 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
         other.setAccountLogin("other-org");
         other.setAccountType(AccountType.ORG);
         other = workspaceRepository.save(other);
-        ChatThread foreign = persistence.ensureThread(other.getId(), UUID.randomUUID(), user.getId(), "foreign prompt");
+        ChatThread foreign = persistence.ensureThread(
+                other.getId(), UUID.randomUUID(), memberships.accountIdForUser(user.getId()), "foreign prompt");
         persistence.persistInFlight(foreign, "foreign prompt", UUID.randomUUID(), null, admittedMentorConfig());
 
         List<Object[]> rows = queryRepository.findFirstUserMessagePartsByThreadIds(
@@ -181,7 +188,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
     class PendingReviewRequests {
 
         /** One provider's side of the tests: a monitored repository, the reader asked to review and the author. */
-        private record Side(Repository repository, User reader, User author) {}
+        private record Side(Workspace scope, Repository repository, User reader, User author) {}
 
         private final AtomicLong nativeIds = new AtomicLong(880_000);
         private Side gitLab;
@@ -196,6 +203,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
                             new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
             gitHub = side(gitHubProvider, "https://github.com", person(gitHubProvider, "https://github.com", "reader"));
             connectSource(
+                    gitLab.scope(),
                     IntegrationKind.GITLAB,
                     new ConnectionConfig.GitLabConfig(
                             user.getProvider().getServerUrl(),
@@ -205,6 +213,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
                             Set.of(),
                             null));
             connectSource(
+                    gitHub.scope(),
                     IntegrationKind.GITHUB,
                     new ConnectionConfig.GitHubAppConfig(
                             880_000L, workspace.getAccountLogin(), gitHubProvider.getServerUrl(), Set.of()));
@@ -258,7 +267,9 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
 
         private void assertPending(Side side, Set<PullRequest> pending, Set<PullRequest> notPending) {
             Long readerId = side.reader().getId();
-            Set<Long> listed = queryRepository.findPendingReviewRequestPrs(workspace.getId(), readerId).stream()
+            Set<Long> listed = queryRepository
+                    .findPendingReviewRequestPrs(side.scope().getId(), readerId)
+                    .stream()
                     .map(PullRequest::getId)
                     .collect(Collectors.toSet());
             assertThat(listed)
@@ -267,7 +278,7 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
             Instant now = Instant.now();
             assertThat(queryRepository
                             .fetchUserCounts(
-                                    workspace.getId(),
+                                    side.scope().getId(),
                                     readerId,
                                     now.minus(Duration.ofDays(14)),
                                     now.minus(Duration.ofDays(7)),
@@ -287,11 +298,14 @@ class MentorContextQueryRepositoryIntegrationTest extends BaseIntegrationTest {
             repository.setHtmlUrl(serverUrl + "/" + repository.getNameWithOwner());
             repository.setDefaultBranch("main");
             repository = repositoryRepository.save(repository);
+            Workspace scope = provider.getType() == IdentityProviderType.GITLAB
+                    ? workspace
+                    : workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("mentor-github-context"));
             RepositoryToMonitor monitor = new RepositoryToMonitor();
-            monitor.setWorkspace(workspace);
+            monitor.setWorkspace(scope);
             monitor.setNameWithOwner(repository.getNameWithOwner());
             repositoryToMonitorRepository.save(monitor);
-            return new Side(repository, reader, person(provider, serverUrl, "author"));
+            return new Side(scope, repository, reader, person(provider, serverUrl, "author"));
         }
 
         private User person(IdentityProvider provider, String serverUrl, String login) {

@@ -1,4 +1,5 @@
-import { scm, addedComments, expectKind, requireChange } from "../kits/scm/index.ts";
+import { addedComments } from "../kits/scm/comment-kinds.ts";
+import { scm, expectKind, requireChange } from "../kits/scm/index.ts";
 import { definePracticeScript } from "../lib/core/practice-script.ts";
 
 export default definePracticeScript({

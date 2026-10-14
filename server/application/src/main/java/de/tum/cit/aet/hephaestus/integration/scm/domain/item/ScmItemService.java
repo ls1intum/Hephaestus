@@ -35,7 +35,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.events.ScmEventPayload;
-import java.time.Instant;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -62,7 +62,6 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(readOnly = true)
 public class ScmItemService implements ItemSource {
     private final ScmItemAccess items;
-    private final ScmItemLabelQuery labels;
     private final ScmRepositoryAccess repositories;
     private final RepositoryRepository repositoryRows;
     private final ScmWorkLookup workLookup;
@@ -73,6 +72,7 @@ public class ScmItemService implements ItemSource {
     private final ObjectMapper mapper;
     private final ScmWorkCapture workCapture;
     private final ScmCaptureContributors contributors;
+    private final Clock clock;
 
     @Override
     public boolean supports(ItemRef item) {
@@ -82,7 +82,7 @@ public class ScmItemService implements ItemSource {
     @Override
     public Map<Long, ItemLabel> labels(long workspaceId, Collection<ItemRef> refs) {
         items.requireAll(workspaceId, refs);
-        return labels.labels(workspaceId, refs.stream().map(ItemRef::itemId).toList());
+        return items.labels(workspaceId, refs.stream().map(ItemRef::itemId).toList());
     }
 
     @Override
@@ -303,7 +303,7 @@ public class ScmItemService implements ItemSource {
                         ? null
                         : review.getAuthor().getId());
         ScmCaptureContext context =
-                new ScmCaptureContext(pinned, request, frozen, new ScmCapturePreparation(), Instant.now());
+                new ScmCaptureContext(pinned, request, frozen, new ScmCapturePreparation(), clock.instant());
         return workCapture.capture(context);
     }
 
@@ -396,7 +396,7 @@ public class ScmItemService implements ItemSource {
                 metadataFiles,
                 Map.of(source, snapshot.complete() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL),
                 Map.of(source, sha),
-                Map.of(source, Instant.now()),
+                Map.of(source, clock.instant()),
                 Map.of(),
                 Map.of(source, inventory.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY),
                 Map.of(),

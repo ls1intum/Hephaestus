@@ -141,39 +141,31 @@ void test("raw manifest lines beyond the lead cap are counted but reported as no
 	});
 	const raw = (result.leads ?? []).filter((lead) => keyOf(lead.label) === "raw-manifest-line");
 	assert.equal(result.leads?.length, 40);
-	assert.equal(result.facts?.onlyAdded, 3);
-	assert.equal(result.facts.unpairedManifestLines, 45);
-	assert.equal(result.facts.rawLinesListed, 37);
-	assert.equal(raw.length, 37);
+	assert.equal(result.facts?.onlyAdded, 0);
+	assert.equal(result.facts.unpairedManifestLines, 48);
+	assert.equal(result.facts.rawLinesListed, 40);
+	assert.equal(raw.length, 40);
 	assert.deepEqual(raw.at(-1)?.at, { change: "pom.xml", line: 46, side: "NEW" });
 });
 
-void test("metadata lines shaped like dependencies stay candidates with their constraint delta", async () => {
+void test("package metadata is not classified as a dependency by its scalar shape", async () => {
+	const manifest = {
+		name: "demo",
+		version: "1.0.0",
+		engines: { node: ">=22" },
+		dependencies: { widget: "^1.0.0" },
+	};
 	const result = await runBundled(SLUG, {
+		repo: { "package.json": JSON.stringify(manifest) },
 		change: new Map([
-			["package.json", diffFile("package.json", ['    "node": ">=22"'], ['    "node": ">=20"'])],
-			["Cargo.toml", diffFile("Cargo.toml", ['rust-version = "1.80"'], ['rust-version = "1.78"'])],
+			["package.json", diffFile("package.json", ['"node": ">=22"'], ['"node": ">=20"'])],
 		]),
 	});
+	assert.deepEqual(result.context?.[0]?.value, { dependencies: { widget: "^1.0.0" } });
+	assert.equal(result.facts?.bumped, 0);
 	assert.deepEqual(
-		(result.leads ?? []).map((lead) => [lead.at, keyOf(lead.label), lead.facts]),
-		[
-			[
-				{ change: "package.json", line: 10, side: "NEW" },
-				"bumped",
-				{ ecosystem: "package.json", name: "node", oldConstraint: ">=20", newConstraint: ">=22" },
-			],
-			[
-				{ change: "Cargo.toml", line: 10, side: "NEW" },
-				"bumped",
-				{
-					ecosystem: "cargo.toml",
-					name: "rust-version",
-					oldConstraint: "1.78",
-					newConstraint: "1.80",
-				},
-			],
-		],
+		result.leads?.map((lead) => keyOf(lead.label)),
+		["raw-manifest-line", "raw-manifest-line"],
 	);
 });
 

@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.account.AccountPreferencesQueryAdapter;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
-import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.AccountRepository;
+import de.tum.cit.aet.hephaestus.core.auth.domain.AiChoice;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Identity;
 import de.tum.cit.aet.hephaestus.core.auth.domain.IdentityRepository;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountMembershipQuery;
@@ -196,13 +196,21 @@ class AccountMembershipQueryIntegrationTest extends BaseIntegrationTest {
         var member = membership(visible, "shared-eligibility");
         var hidden = accounts.saveAndFlush(new Account("Hidden developer"));
         addMember(member.getWorkspace(), hidden, Membership.WorkspaceRole.MEMBER, null);
-        memberships.findByWorkspace_IdAndAccount_Id(member.getWorkspace().getId(), hidden.getId()).orElseThrow().setHidden(true);
+        memberships
+                .findByWorkspace_IdAndAccount_Id(member.getWorkspace().getId(), Objects.requireNonNull(hidden.getId()))
+                .orElseThrow()
+                .setHidden(true);
         var noAi = new Account("No AI developer");
         noAi.setAiChoice(AiChoice.NO_AI);
+        noAi.setAiChoiceAt(Instant.now());
         accounts.saveAndFlush(noAi);
         addMember(member.getWorkspace(), noAi, Membership.WorkspaceRole.MEMBER, null);
-        var ids = List.of(Objects.requireNonNull(visible.getId()), Objects.requireNonNull(hidden.getId()), Objects.requireNonNull(noAi.getId()));
-        assertThat(service.eligibleAccountIds(member.getWorkspace().getId(), ids)).containsExactly(visible.getId());
+        List<Long> ids = List.of(
+                Objects.requireNonNull(visible.getId()),
+                Objects.requireNonNull(hidden.getId()),
+                Objects.requireNonNull(noAi.getId()));
+        assertThat(service.eligibleAccountIds(member.getWorkspace().getId(), ids))
+                .containsExactly(visible.getId());
         assertThat(coverage.eligibleAccountIds(member.getWorkspace().getId())).containsExactly(visible.getId());
     }
 

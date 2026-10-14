@@ -86,7 +86,7 @@ export const Default: Story = {
 					.map((link) => link.getAttribute("href")),
 			).size,
 		).toBe(20);
-		await expect(names[0]).toMatch(/^Open feedback for .+/u);
+		await expect(names[0]).toMatch(/^Open feedback .+/u);
 		// A row opens its feedback over the list rather than navigating away from it.
 		await expect(canvas.getAllByRole("link").map(levelsOpenedBy)).toContainEqual([
 			`feedback:${firstFeedback.id}`,

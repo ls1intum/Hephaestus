@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
@@ -32,7 +33,9 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtIssuer;
 import de.tum.cit.aet.hephaestus.core.runtime.hub.auth.WorkerJwtVerifier;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
@@ -120,6 +123,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
     private Workspace workspace;
     private SimpleMeterRegistry meterRegistry;
 
+    @Autowired
+    private PracticeVersionService versions;
+
     @BeforeEach
     void setUp() {
         SecurityContextHolder.clearContext();
@@ -128,6 +134,17 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 jobRepository, jwtVerifier, new MentorProxyCredentialRegistry(), "worker-1");
         User owner = persistUser("proxy-owner");
         workspace = createWorkspace("proxy-ws", "Proxy Workspace", "proxy-org", AccountType.ORG, owner);
+        for (String slug : List.of(PRACTICE, "test-coverage")) {
+            var kind = new ItemKind("scm.pull_request");
+            versions.create(new PracticeVersionService.NewPractice(
+                    workspace,
+                    slug,
+                    kind,
+                    DefinitionTestFixtures.definition(kind, slug, "Review the work.", null),
+                    null,
+                    0,
+                    null));
+        }
     }
 
     @AfterEach
@@ -628,8 +645,9 @@ class LlmProxyIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private List<UsageRow> practiceScriptRows(ReviewJob job, int attempt) {
         return jdbc.query(
-                "SELECT model_kind, practice_slug, calls, input_tokens, output_tokens "
-                        + "FROM review_job_script_usage WHERE job_id = ? AND attempt = ?",
+                "SELECT u.model_kind, p.slug AS practice_slug, u.calls, u.input_tokens, u.output_tokens FROM"
+                        + " review_job_script_usage u JOIN practice p ON"
+                        + " (p.id,p.workspace_id)=(u.practice_id,u.workspace_id) WHERE u.job_id = ? AND u.attempt = ?",
                 (row, index) -> new UsageRow(
                         ModelKind.valueOf(row.getString("model_kind")),
                         row.getString("practice_slug"),

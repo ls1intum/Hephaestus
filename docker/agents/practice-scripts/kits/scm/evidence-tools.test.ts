@@ -3,7 +3,8 @@ import { describe, test } from "node:test";
 
 import { UnratedError } from "../../lib/core/practice-script.ts";
 import { evidenceTools } from "./evidence-tools.ts";
-import type { FileTree, GrepOptions } from "./index.ts";
+import type { GrepOptions } from "./grep.ts";
+import type { FileTree } from "./index.ts";
 
 const FILES: Record<string, string> = {
 	"src/cart.ts": "export class Cart {\n  count += 1;\n}",

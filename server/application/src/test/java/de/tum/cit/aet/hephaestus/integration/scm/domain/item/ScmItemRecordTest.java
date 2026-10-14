@@ -19,6 +19,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequestreview.PullRe
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,6 @@ class ScmItemRecordTest extends BaseUnitTest {
     private final PullRequestReviewRepository reviews = mock(PullRequestReviewRepository.class);
     private final ScmItemService service = new ScmItemService(
             items,
-            mock(ScmItemLabelQuery.class),
             mock(ScmRepositoryAccess.class),
             repositories,
             workLookup,
@@ -46,7 +46,8 @@ class ScmItemRecordTest extends BaseUnitTest {
             mock(ScmFileVersions.class),
             mapper,
             mock(ScmWorkCapture.class),
-            mock(ScmCaptureContributors.class));
+            mock(ScmCaptureContributors.class),
+            Clock.systemUTC());
 
     @ParameterizedTest
     @ValueSource(strings = {"scm.issue", "scm.pull_request", "scm.pull_request_review", "scm.repository", "scm.file"})

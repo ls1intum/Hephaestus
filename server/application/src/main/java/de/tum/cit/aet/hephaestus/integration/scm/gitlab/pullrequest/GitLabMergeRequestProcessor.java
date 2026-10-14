@@ -731,7 +731,7 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
 
     /**
      * Approval hooks refresh readiness; only the native approval snapshot owns current membership and dates.
-     * GitLab's asynchronous hook worker reloads the current merge request, so its head is not the approved revision
+     * GitLab's asynchronous hook worker reloads the current merge request, so its head is not the approved commit
      * (<a href="https://gitlab.com/gitlab-org/gitlab/-/blob/v19.4.1-ee/app/workers/merge_requests/execute_approval_hooks_worker.rb">provider source</a>).
      */
     @Transactional

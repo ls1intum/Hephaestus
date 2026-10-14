@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.core.auth.spi;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
@@ -32,6 +34,10 @@ public interface GitProviderRegistry {
     boolean visibleInWorkspace(long providerId, long workspaceId);
 
     Optional<IdentityProfile> profile(long providerId, String providerUserKey, @Nullable String teamKey);
+
+    Map<IdentityKey, IdentityProfile> profiles(Collection<IdentityKey> identities);
+
+    record IdentityKey(long providerId, String providerUserKey, String teamKey) {}
 
     record IdentityProfile(
             @Nullable String login,

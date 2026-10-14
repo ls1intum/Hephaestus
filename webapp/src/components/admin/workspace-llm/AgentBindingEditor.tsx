@@ -62,17 +62,26 @@ export function modelOf(
 	return models.find((m) => m.scope === selection?.scope && m.id === selection.id);
 }
 
+const numberInput = (input: unknown) => (input === "" ? undefined : input);
+
 const runLimitsSchema = z.object({
-	timeoutSeconds: z.coerce
-		.number()
-		.int({ error: "Enter a whole number of seconds, 30 or more." })
-		.min(MIN_TIMEOUT_SECONDS, { error: "Enter a whole number of seconds, 30 or more." })
-		.max(TIMEOUT_CEILING.max, { error: TIMEOUT_CEILING.error }),
-	maxConcurrentJobs: z.coerce
-		.number()
-		.int({ error: "Enter a whole number of runs, 1 or more." })
-		.min(MIN_CONCURRENT_JOBS, { error: "Enter a whole number of runs, 1 or more." }),
+	timeoutSeconds: z.preprocess(
+		numberInput,
+		z.coerce
+			.number({ error: "Enter a number of seconds." })
+			.int({ error: "Enter a whole number of seconds, 30 or more." })
+			.min(MIN_TIMEOUT_SECONDS, { error: "Enter a whole number of seconds, 30 or more." })
+			.max(TIMEOUT_CEILING.max, { error: TIMEOUT_CEILING.error }),
+	),
+	maxConcurrentJobs: z.preprocess(
+		numberInput,
+		z.coerce
+			.number({ error: "Enter a number of runs." })
+			.int({ error: "Enter a whole number of runs, 1 or more." })
+			.min(MIN_CONCURRENT_JOBS, { error: "Enter a whole number of runs, 1 or more." }),
+	),
 });
+
 function limitErrors(limits: ReturnType<typeof runLimitsSchema.safeParse>) {
 	return limits.success ? undefined : z.flattenError(limits.error).fieldErrors;
 }

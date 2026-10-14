@@ -14,12 +14,12 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventRepository;
 import de.tum.cit.aet.hephaestus.core.auth.domain.Account;
 import de.tum.cit.aet.hephaestus.core.tenancy.TenancyViolationException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.ReviewOn;
+import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -172,8 +172,13 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .uri("/workspaces/{slug}/practices", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new CreatePracticeRequestDTO("focused-reviews", "scm.pull_request",
-                        definition("Focused reviews", "Initial private criteria describe retained review expectations."), null, null))
+                .bodyValue(new CreatePracticeRequestDTO(
+                        "focused-reviews",
+                        "scm.pull_request",
+                        definition(
+                                "Focused reviews", "Initial private criteria describe retained review expectations."),
+                        null,
+                        null))
                 .exchange()
                 .expectStatus()
                 .isCreated()
@@ -188,7 +193,10 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue(new UpdatePracticeRequestDTO(
-                        definition("Focused code reviews", "Updated private criteria describe retained review expectations."), practice.currentVersion().id()))
+                        definition(
+                                "Focused code reviews",
+                                "Updated private criteria describe retained review expectations."),
+                        practice.currentVersion().id()))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -213,10 +221,12 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         assertThat(rows)
                 .extracting(ConfigAuditEvent::getAction)
                 .containsExactly(ConfigAuditAction.CREATED, ConfigAuditAction.UPDATED, ConfigAuditAction.DELETED);
-        assertThat(rows.get(0).getNewValue()).contains("\"versionId\":", "\"reviewDigest\":")
+        assertThat(rows.get(0).getNewValue())
+                .contains("\"versionId\":", "\"reviewDigest\":")
                 .doesNotContain("Initial private criteria");
         assertThat(rows.get(1).changedKeyList()).containsExactlyInAnyOrder("versionId", "reviewDigest");
-        assertThat(rows.get(1).getNewValue()).doesNotContain("Updated private criteria")
+        assertThat(rows.get(1).getNewValue())
+                .doesNotContain("Updated private criteria")
                 .isNotEqualTo(rows.get(0).getNewValue());
         assertThat(rows.get(2).getNewValue()).isNull();
         assertThat(rows.get(2).getOldValue()).isEqualTo(rows.get(1).getNewValue());
@@ -592,6 +602,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static PracticeDefinition definition(String name, String criteria) {
         return DefinitionTestFixtures.withLineNotes(
-                DefinitionTestFixtures.withReviewOn(DefinitionTestFixtures.definition(name, criteria), new ReviewOn(List.of(), Map.of())), false);
+                DefinitionTestFixtures.withReviewOn(
+                        DefinitionTestFixtures.definition(name, criteria), new ReviewOn(List.of(), Map.of())),
+                false);
     }
 }

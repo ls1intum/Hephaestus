@@ -15,7 +15,7 @@
 SET LOCAL lock_timeout='30s';
 SET LOCAL statement_timeout='0';
 DO $$
-DECLARE guard_mode "char"; source_check text; target_check text;
+DECLARE guard_mode "char"; source_check text; target_check text; source_scope text; target_scope text;
 BEGIN
  LOCK TABLE config_audit_event IN ACCESS EXCLUSIVE MODE;
  SELECT tgenabled INTO guard_mode FROM pg_trigger
@@ -24,16 +24,26 @@ BEGIN
  WHERE conrelid='config_audit_event'::regclass AND conname='ck_config_audit_event_entity_type' AND contype='c' AND convalidated;
  IF source_check IS NULL THEN RAISE EXCEPTION 'released audit entity-type constraint is missing or unvalidated'; END IF;
  target_check:=replace(replace(replace(replace(source_check,'''REVIEW_BACKFILL_RUN''','''REVIEW_BATCH'''),'''REVIEW_SWEEP_SCHEDULE''','''REVIEW_SCHEDULE'''),'''CURATED_PRACTICE''','''CATALOG_PRACTICE'''),'''CURATED_PRACTICE_GROUP''','''CATALOG_GROUP''');
+ target_check:=replace(replace(target_check,'''CURATED_PRACTICE_AREA''','''CATALOG_GROUP'''),'''PRACTICE_AREA''','''PRACTICE_GROUP''');
+ SELECT pg_get_constraintdef(oid) INTO source_scope FROM pg_constraint
+ WHERE conrelid='config_audit_event'::regclass AND conname='ck_config_audit_event_scope' AND contype='c' AND convalidated;
+ IF source_scope IS NULL THEN RAISE EXCEPTION 'released audit scope constraint is missing or unvalidated'; END IF;
+ target_scope:=replace(replace(source_scope,'''CURATED_PRACTICE''','''CATALOG_PRACTICE'''),'''CURATED_PRACTICE_AREA''','''CATALOG_GROUP''');
+ target_scope:='CHECK ('||substring(target_scope FROM 7)||' OR entity_type=''CATALOG_GROUP'')';
  IF guard_mode IN('O','R','A') THEN ALTER TABLE config_audit_event DISABLE TRIGGER trg_config_audit_event_block_mutation; END IF;
  IF target_check IS DISTINCT FROM source_check THEN
   ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_entity_type;
   EXECUTE 'ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_entity_type '||target_check||' NOT VALID';
  END IF;
+ ALTER TABLE config_audit_event DROP CONSTRAINT ck_config_audit_event_scope;
+ EXECUTE 'ALTER TABLE config_audit_event ADD CONSTRAINT ck_config_audit_event_scope '||target_scope||' NOT VALID';
  UPDATE config_audit_event SET entity_type=CASE entity_type
   WHEN 'REVIEW_BACKFILL_RUN' THEN 'REVIEW_BATCH' WHEN 'REVIEW_SWEEP_SCHEDULE' THEN 'REVIEW_SCHEDULE'
-  WHEN 'CURATED_PRACTICE' THEN 'CATALOG_PRACTICE' WHEN 'CURATED_PRACTICE_GROUP' THEN 'CATALOG_GROUP' END
- WHERE entity_type IN('REVIEW_BACKFILL_RUN','REVIEW_SWEEP_SCHEDULE','CURATED_PRACTICE','CURATED_PRACTICE_GROUP');
+  WHEN 'CURATED_PRACTICE' THEN 'CATALOG_PRACTICE' WHEN 'CURATED_PRACTICE_GROUP' THEN 'CATALOG_GROUP'
+  WHEN 'CURATED_PRACTICE_AREA' THEN 'CATALOG_GROUP' WHEN 'PRACTICE_AREA' THEN 'PRACTICE_GROUP' END
+ WHERE entity_type IN('REVIEW_BACKFILL_RUN','REVIEW_SWEEP_SCHEDULE','CURATED_PRACTICE','CURATED_PRACTICE_GROUP','CURATED_PRACTICE_AREA','PRACTICE_AREA');
  ALTER TABLE config_audit_event VALIDATE CONSTRAINT ck_config_audit_event_entity_type;
+ ALTER TABLE config_audit_event VALIDATE CONSTRAINT ck_config_audit_event_scope;
  CASE guard_mode
   WHEN 'O' THEN ALTER TABLE config_audit_event ENABLE TRIGGER trg_config_audit_event_block_mutation;
   WHEN 'R' THEN ALTER TABLE config_audit_event ENABLE REPLICA TRIGGER trg_config_audit_event_block_mutation;

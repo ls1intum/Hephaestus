@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,8 +11,8 @@ class PracticeV1ProviderNamespaceMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"dev", "prod"})
     void shouldPreserveReleasedProviderControlsAcrossTheirDistinctNamespaces(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO identity_provider(id,type,server_url)
             VALUES(999901,'OUTLINE','https://docs.namespace.example:443/'),
                   (999905,'OUTLINE','https://docs.namespace.example'),
@@ -32,15 +32,15 @@ class PracticeV1ProviderNamespaceMigrationTest {
                 ('https://docs.namespace.example','https://docs.namespace.example:443/')
             ORDER BY p.server_url
             """;
-        assertThat(PracticeV1CutoverMigrationTest.column(database, inherited))
+        assertThat(PracticeMigrationFixture.column(database, inherited))
                 .containsExactly(
                         "https://docs.namespace.example|person-1|", "https://docs.namespace.example:443/|person-1|");
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT count(*)::text FROM identity_provider
             WHERE type='SLACK' AND server_url='https://slack.com'
             """)).containsExactly("1");
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
-        assertThat(PracticeV1CutoverMigrationTest.column(database, """
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(database, """
             SELECT p.server_url || '|' || r.provider_user_key || '|' || r.team_key || '|' || r.kind
             FROM identity_restriction r JOIN identity_provider p ON p.id=r.provider_id
             WHERE p.type='OUTLINE' AND p.server_url IN

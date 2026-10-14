@@ -75,7 +75,7 @@ public class JdbcPersonDataStore implements PersonDataContributor {
                 new SqlArrayValue("bigint", scope.conversationIds().toArray()),
                 "documents",
                 new SqlArrayValue("bigint", scope.outlineDocumentIds().toArray()),
-                "artifacts",
+                "items",
                 new SqlArrayValue("bigint", scope.scmArtifactIds().toArray()),
                 "account",
                 Objects.requireNonNullElse(scope.accountId(), -1L),

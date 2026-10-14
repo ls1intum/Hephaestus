@@ -158,15 +158,14 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
      * because one catalogue gap can leave a month's worth of rows behind it.
      */
     @WorkspaceAgnostic("Repricing pass enumerates the instance's unpriced spend across all tenants")
-    @Query("SELECT new de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow(e.id,"
-            + " e.workspace.id, e.model, e.fundingSource, e.inputTokens, e.outputTokens,"
-            + " e.cacheReadTokens, e.cacheWriteTokens, e.searchUnits, e.appliedPriceId,"
-            + " e.appliedWorkspaceModelId, e.measurementVerification) FROM LlmUsageEvent e WHERE e.occurredAt >= :from AND"
-            + " e.occurredAt < :to AND e.pricingState ="
-            + " de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState.UNPRICED AND"
-            + " e.measurementVerification = de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification.VERIFIED AND"
-            + " e.unreportedCalls = 0 AND (e.inputTokens > 0 OR e.outputTokens > 0 OR"
-            + " e.cacheReadTokens > 0 OR e.cacheWriteTokens > 0) ORDER BY e.occurredAt")
+    @Query("SELECT new de.tum.cit.aet.hephaestus.core.llm.usage.UnpricedLedgerRow(e.id, e.workspace.id, e.model,"
+            + " e.fundingSource, e.inputTokens, e.outputTokens, e.cacheReadTokens, e.cacheWriteTokens, e.searchUnits,"
+            + " e.appliedPriceId, e.appliedWorkspaceModelId, e.measurementVerification) FROM LlmUsageEvent e WHERE"
+            + " e.occurredAt >= :from AND e.occurredAt < :to AND e.pricingState ="
+            + " de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState.UNPRICED AND e.measurementVerification ="
+            + " de.tum.cit.aet.hephaestus.core.llm.usage.MeasurementVerification.VERIFIED AND e.unreportedCalls = 0 AND"
+            + " (e.inputTokens > 0 OR e.outputTokens > 0 OR e.cacheReadTokens > 0 OR e.cacheWriteTokens > 0) ORDER BY"
+            + " e.occurredAt")
     List<UnpricedLedgerRow> findUnpricedInWindow(
             @Param("from") Instant from, @Param("to") Instant to, Pageable pageable);
 
@@ -177,16 +176,14 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     @WorkspaceAgnostic("ID-based price repair; the event id comes from the cross-tenant repricing enumeration")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
-            value = "UPDATE llm_usage_event SET cost_usd = :costUsd, pricing_state ="
-                    + " :#{#price.pricingState().name()}, applied_price_id ="
-                    + " :#{#price.appliedPriceId()}, applied_workspace_model_id ="
-                    + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd ="
-                    + " :#{#price.per1mInputUsd()}, applied_per_1m_output_usd ="
-                    + " :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
-                    + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd ="
-                    + " :#{#price.per1mCacheWriteUsd()} WHERE id = :id AND pricing_state ="
-                    + " 'UNPRICED' AND measurement_verification = 'VERIFIED' AND unreported_calls = 0 AND (input_tokens > 0 OR"
-                    + " output_tokens > 0 OR cache_read_tokens > 0 OR cache_write_tokens > 0)",
+            value = "UPDATE llm_usage_event SET cost_usd = :costUsd, pricing_state = :#{#price.pricingState().name()},"
+                + " applied_price_id = :#{#price.appliedPriceId()}, applied_workspace_model_id ="
+                + " :#{#price.appliedWorkspaceModelId()}, applied_per_1m_input_usd = :#{#price.per1mInputUsd()},"
+                + " applied_per_1m_output_usd = :#{#price.per1mOutputUsd()}, applied_per_1m_cache_read_usd ="
+                + " :#{#price.per1mCacheReadUsd()}, applied_per_1m_cache_write_usd = :#{#price.per1mCacheWriteUsd()}"
+                + " WHERE id = :id AND pricing_state = 'UNPRICED' AND measurement_verification = 'VERIFIED' AND"
+                + " unreported_calls = 0 AND (input_tokens > 0 OR output_tokens > 0 OR cache_read_tokens > 0 OR"
+                + " cache_write_tokens > 0)",
             nativeQuery = true)
     int applyResolvedPrice(
             @Param("id") UUID id, @Param("costUsd") BigDecimal costUsd, @Param("price") LlmPriceSnapshot price);
@@ -361,7 +358,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
         ),
         shares AS (
             SELECT l.id AS ledger_id, l.source_id, l.model_kind, l.funding_source, l.pricing_state, l.cost_usd,
-                u.practice_slug,
+                usage_practice.slug AS practice_slug,
                 COALESCE(u.calls, l.total_calls) AS calls,
                 COALESCE(u.input_tokens + u.cache_read_tokens + u.cache_write_tokens, l.prompt_tokens) AS input_tokens,
                 COALESCE(u.output_tokens, l.output_tokens) AS output_tokens,
@@ -372,6 +369,7 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
             LEFT JOIN review_job_script_usage u
               ON u.workspace_id = :workspaceId AND u.job_id = l.source_id AND u.attempt = l.source_attempt
              AND u.model_kind = l.model_kind
+            LEFT JOIN practice usage_practice ON usage_practice.workspace_id = u.workspace_id AND usage_practice.id = u.practice_id
         ),
         truncated AS (
             SELECT s.*,

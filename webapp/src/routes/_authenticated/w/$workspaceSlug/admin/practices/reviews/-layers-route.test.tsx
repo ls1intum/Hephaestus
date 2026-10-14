@@ -141,7 +141,7 @@ async function frontSheet(levels: number) {
 			`[role="dialog"][data-detail-depth="${levels - 1}"]`,
 		);
 		assert(sheet);
-		within(sheet).getByRole("heading", { level: 2 });
+		expect(within(sheet).getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(0);
 		return sheet;
 	}, ROUTE_RENDER_WAIT);
 }
@@ -263,7 +263,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 		// The loading table is replaced by the loaded one, so the row is found first and its table after.
 		const [trace] = await screen.findAllByRole(
 			"link",
-			{ name: /^Trace feedback .+ for /u },
+			{ name: /^Trace feedback /u },
 			ROUTE_RENDER_WAIT,
 		);
 		assert(trace);
@@ -286,7 +286,7 @@ describe("layer 0: a row's own record, Track and Trace", () => {
 	it("keeps Track and Trace out of the overview's Practices table", async () => {
 		const [practice] = practiceCounts;
 		assert(practice);
-		renderRouteAtWithRouter(REVIEWS);
+		renderRouteAtWithRouter(`${REVIEWS}/overview`);
 		await screen.findByRole(
 			"link",
 			{ name: `Open practice ${practice.practiceName}` },
@@ -377,7 +377,7 @@ describe("the trace and a record over it", () => {
 		);
 		expect(within(over).queryByRole("group", { name: "How this came about" })).toBeNull();
 		expectNoRecordLinks(over);
-		within(over).getByRole("button", { name: "Mark as incorrect" });
+		await within(over).findByRole("button", { name: "Mark incorrect" }, ROUTE_RENDER_WAIT);
 
 		pressEscape();
 		await waitFor(
@@ -543,9 +543,10 @@ describe("what the trace shows", () => {
 
 		await userEvent.click(showToggle(sheet, "System info"));
 		await waitFor(() => expect(sheet.querySelector("[data-step-facts]")).not.toBeNull());
-		// Every piece of feedback lists its facts, not only the step in view.
+		await userEvent.click(within(sheet).getByRole("button", { name: "Expand all" }));
+		// Expanded steps show their own facts.
 		for (const piece of steps.querySelectorAll('[data-step="feedback"]')) {
-			expect(piece.querySelector("ul")).not.toBeNull();
+			expect(piece.querySelector("dl")).not.toBeNull();
 		}
 
 		await userEvent.click(showToggle(sheet, "Connections"));
@@ -599,7 +600,7 @@ describe("a record's sheet is the record alone", () => {
 		for (const detail of [[level], [TRACE, level]]) {
 			renderRouteAtWithRouter(`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify(detail))}`);
 			const sheet = await frontSheet(detail.length);
-			await within(sheet).findByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
+			await within(sheet).findAllByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
 			expect(sheet.querySelector("[data-trace-verdict]")).toBeNull();
 			expect(sheet.querySelector("[data-step-key]")).toBeNull();
 			expect(within(sheet).queryByRole("link", { name: /^Trace /u })).toBeNull();
@@ -617,7 +618,7 @@ describe("a record's sheet is the record alone", () => {
 function sheetMarkup(sheet: HTMLElement): string {
 	return [
 		// The title: a practice sheet's introduction has headings of its own.
-		sheet.querySelector('[data-slot="drawer-title"]')?.outerHTML ?? "",
+		sheet.querySelector('[data-slot="drawer-title"]')?.textContent ?? "",
 		sheet.querySelector('[data-slot="drawer-body"]')?.outerHTML ?? "",
 		sheet.querySelector('[data-slot="drawer-footer"]')?.outerHTML ?? "",
 	]
@@ -629,7 +630,7 @@ function sheetMarkup(sheet: HTMLElement): string {
 async function settledSheet(detail: string[]): Promise<string> {
 	renderRouteAtWithRouter(`${REVIEWS}?detail=${encodeURIComponent(JSON.stringify(detail))}`);
 	const sheet = await frontSheet(detail.length);
-	await within(sheet).findByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
+	await within(sheet).findAllByRole("heading", { level: 2 }, ROUTE_RENDER_WAIT);
 	await waitFor(
 		() => expect(sheet.querySelector('[data-slot="skeleton"]')).toBeNull(),
 		ROUTE_RENDER_WAIT,

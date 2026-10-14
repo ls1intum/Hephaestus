@@ -169,6 +169,22 @@ void describe("the leads of a review input", () => {
 		);
 	});
 
+	void test("a revision cannot be an option and a pinned read cannot escape its capture grant", async (t) => {
+		const { sources: given, earlier } = await sources(t);
+		const lead = {
+			at: { file: "src/cart.ts", line: 1, revision: "--output=outside" },
+			label: "Untrusted revision.",
+		};
+		await assert.rejects(resolveLeads([lead], given), /points at/u);
+		await assert.rejects(
+			resolveLeads([{ ...lead, at: { ...lead.at, revision: earlier } }], {
+				...given,
+				permittedPaths: new Set(),
+			}),
+			/points at/u,
+		);
+	});
+
 	void test("a lead that its source does not hold is an error of the program, never dropped", async (t) => {
 		const { sources: given } = await sources(t);
 		const cases: [ReviewLead, RegExp, EvidenceSources?][] = [

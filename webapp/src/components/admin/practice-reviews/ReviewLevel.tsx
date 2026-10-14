@@ -15,7 +15,6 @@ import { InlineLink } from "@/components/common/InlineLink";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { useNow } from "@/components/common/use-now";
 import type { LevelPath } from "@/components/layout/detail-drawer/DetailPath";
 import { Section } from "@/components/layout/Section";
 import { FeedbackChecks } from "@/components/practice-trace/FeedbackChecks";
@@ -37,7 +36,7 @@ import { itemName } from "@/lib/item-kinds";
 import { formatCostUsd } from "@/lib/money";
 import { hasText } from "@/lib/text";
 
-import { jobPhases, jobWait } from "./job-utils";
+import { jobPhases } from "./job-utils";
 import { LevelBodySkeleton } from "./LevelBodySkeleton";
 import {
 	type SheetEvent,
@@ -284,11 +283,10 @@ function ReviewWhat({
 }
 
 function ReviewHistory({ review }: { review: ReviewDetail }) {
-	const now = useNow();
-	return <SheetHistory events={reviewHistory(review, now)} now={reviewNow(review)} />;
+	return <SheetHistory events={reviewHistory(review)} now={reviewNow(review)} />;
 }
 
-export function reviewHistory(review: ReviewDetail, now: number): SheetEvent[] {
+export function reviewHistory(review: ReviewDetail): SheetEvent[] {
 	const events: SheetEvent[] = [
 		{
 			key: "asked",
@@ -308,7 +306,7 @@ export function reviewHistory(review: ReviewDetail, now: number): SheetEvent[] {
 		});
 	}
 	for (const job of review.runtime?.jobs ?? []) {
-		if (jobWait(job, now) !== null) {
+		if (job.attempt > 1) {
 			events.push({
 				key: `retry-${job.id}`,
 				at: job.availableAt,

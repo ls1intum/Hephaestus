@@ -25,6 +25,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -38,6 +39,9 @@ import tools.jackson.databind.ObjectMapper;
 class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Autowired
     private ReviewJobRepository jobRepository;
@@ -58,7 +62,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         job.setStatus(ReviewJobStatus.RUNNING);
         job.setConfigSnapshot(MAPPER.createObjectNode());
         job.prePersist();
-        return jobRepository.saveAndFlush(job);
+        return jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
     }
 
     private void accumulate(@Nullable UUID jobId, JsonNode body, boolean responsesProtocol) {
@@ -178,7 +182,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         job.setStatus(ReviewJobStatus.COMPLETED);
         job.setLlmInputTokens(500);
         job.setLlmCalls(4);
-        jobRepository.saveAndFlush(job);
+        jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
 
         accumulate(job.getId(), json("{\"usage\":{\"prompt_tokens\":25,\"completion_tokens\":0}}"), false);
 
@@ -196,7 +200,7 @@ class ProxyUsageAccumulatorIntegrationTest extends AbstractWorkspaceIntegrationT
         job.setLlmReasoningTokens(0);
         job.setLlmCacheReadTokens(0);
         job.setLlmCacheWriteTokens(0);
-        jobRepository.saveAndFlush(job);
+        jobRepository.saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job));
     }
 
     /** Only reachable with a stubbed repository: a real one has no way to fail on demand. */

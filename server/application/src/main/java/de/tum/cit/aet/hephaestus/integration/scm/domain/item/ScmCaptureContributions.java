@@ -63,6 +63,7 @@ final class ScmCaptureContributions {
                 citable);
     }
 
+    @SuppressWarnings("ReferenceEquality") // Throwable self-suppression depends on identity, not equals.
     static void closeAll(List<CaptureContribution> values) throws Exception {
         Exception failure = null;
         for (var value : values) {

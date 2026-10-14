@@ -97,13 +97,15 @@ function recordRequests() {
 }
 
 function activeReviewsHandler(getReview: () => ReviewSummary, reads: URL[]) {
- return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
-  const url = new URL(request.url);
-  if (!isTabCount(url)) { reads.push(url); }
-  const review = getReview();
-  const rows = values(url, "status").includes(review.status) ? [review] : [];
-  return HttpResponse.json(pageOf(rows));
- });
+	return http.get("*/workspaces/:workspaceSlug/practices/reviews", ({ request }) => {
+		const url = new URL(request.url);
+		if (!isTabCount(url)) {
+			reads.push(url);
+		}
+		const review = getReview();
+		const rows = values(url, "status").includes(review.status) ? [review] : [];
+		return HttpResponse.json(pageOf(rows));
+	});
 }
 
 const [FIRST_PAGE, SECOND_PAGE] = twoCompleteReviews();
@@ -335,7 +337,7 @@ describe("practice review list routes", () => {
 
 			renderRouteAtWithRouter('/w/acme/admin/practices/reviews?status=["RUNNING","FAILED"]');
 			await screen.findByRole("link", { name: reviewLinkName(FIRST_PAGE) }, ROUTE_RENDER_WAIT);
-   const table = screen.getByRole("table", { name: "Practice reviews, newest first" });
+			const table = screen.getByRole("table", { name: "Practice reviews, newest first" });
 			await vi.advanceTimersByTimeAsync(ACTIVE_REVIEW_POLL_MS);
 			// The interval is faked, so the waits poll on vitest's own timer rather than on setInterval.
 			await vi.waitFor(() => expect(polls.length).toBeGreaterThan(0));
@@ -496,7 +498,7 @@ describe("practice review list routes", () => {
 
 		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices/reviews");
 		await screen.findByRole("link", { name: reviewLinkName(requestedReview) }, ROUTE_RENDER_WAIT);
-  const table = screen.getByRole("table", { name: "Practice reviews, newest first" });
+		const table = screen.getByRole("table", { name: "Practice reviews, newest first" });
 		const requester = reviewAccounts.grace.displayName;
 		assert(requester !== null);
 		await within(table).findByText(requester, undefined, ROUTE_RENDER_WAIT);

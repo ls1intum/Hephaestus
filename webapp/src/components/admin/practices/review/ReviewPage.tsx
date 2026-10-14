@@ -25,7 +25,7 @@ export interface ReviewPageProps {
 	sections: Record<ReviewSectionId, ReactNode>;
 }
 
-export function ReviewPage({ section, onSectionChange, running, sections }: ReviewPageProps) {
+export function ReviewPage({ section, onSectionChange, readiness, sections }: ReviewPageProps) {
 	const active = REVIEW_SECTIONS.find((candidate) => candidate.id === section);
 
 	return (

@@ -1516,8 +1516,8 @@ erDiagram
     }
 
     SlackChannelConsentEvent {
-        BIGINT id PK
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_channel_id "NOT NULL"
         VARCHAR(16) from_state
         VARCHAR(16) to_state "NOT NULL"
@@ -1527,7 +1527,7 @@ erDiagram
     }
 
     SlackMessage {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_team_id "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
@@ -1565,7 +1565,7 @@ erDiagram
     }
 
     SlackThread {
-        BIGINT id PK
+        BIGINT id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(32) slack_channel_id UK "NOT NULL"
         VARCHAR(32) slack_thread_ts UK "NOT NULL"
@@ -1898,8 +1898,8 @@ erDiagram
     Connection ||--o{ OutlineDocumentEvent : has
     Workspace ||--o{ OutlineDocumentEvent : has
     Account ||--o{ PersonDataRequest : has
-    PracticeGroup ||--o{ Practice : has
     Workspace ||--o{ Practice : has
+    PracticeGroup ||--o{ Practice : has
     Workspace ||--o{ PracticeGroup : has
     Account ||--o{ PracticeVersion : has
     Practice ||--o{ PracticeVersion : has

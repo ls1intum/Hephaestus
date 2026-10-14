@@ -25,7 +25,7 @@ public class ReviewJobLifecycleService {
 
     private static final Set<ReviewJobStatus> ACTIVE_STATUSES = Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING);
 
-    private final ReviewJobRepository agentJobRepository;
+    private final ReviewJobRepository jobRepository;
     private final TransactionTemplate transactionTemplate;
     private final @Nullable SandboxManager sandboxManager;
     private final Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher;
@@ -34,14 +34,14 @@ public class ReviewJobLifecycleService {
     private final ReviewJobTelemetry jobTelemetry;
 
     public ReviewJobLifecycleService(
-            ReviewJobRepository agentJobRepository,
+            ReviewJobRepository jobRepository,
             TransactionTemplate transactionTemplate,
             @Nullable SandboxManager sandboxManager,
             Optional<WorkerJobCancelDispatcher> workerJobCancelDispatcher,
             LlmUsageRecorder usageRecorder,
             ObjectMapper objectMapper,
             ReviewJobTelemetry jobTelemetry) {
-        this.agentJobRepository = agentJobRepository;
+        this.jobRepository = jobRepository;
         this.transactionTemplate = transactionTemplate;
         this.sandboxManager = sandboxManager;
         this.workerJobCancelDispatcher = workerJobCancelDispatcher;
@@ -84,13 +84,13 @@ public class ReviewJobLifecycleService {
     }
 
     private ReviewJob requireJob(Long workspaceId, UUID jobId) {
-        return agentJobRepository
+        return jobRepository
                 .findByIdAndWorkspaceId(jobId, workspaceId)
                 .orElseThrow(() -> new EntityNotFoundException("ReviewJob", jobId.toString()));
     }
 
     private int casToCancelled(UUID jobId) {
-        return agentJobRepository.transitionToCancelled(
+        return jobRepository.transitionToCancelled(
                 jobId, Instant.now(), null, ReviewJobCancellationReason.CANCELLED_BY_REQUESTER, ACTIVE_STATUSES);
     }
 
@@ -142,8 +142,8 @@ public class ReviewJobLifecycleService {
         // Read its committed counters directly; the entity can predate a proxy response.
         // No token evidence stays unknown.
         boolean billed = TerminalUsage.fromProxy(
-                        agentJobRepository.findLlmUsageById(job.getId()).orElse(null))
-                .appendTo(usageRecorder, agentJobRepository, workspaceId, job, snap, price);
+                        jobRepository.findLlmUsageById(job.getId()).orElse(null))
+                .appendTo(usageRecorder, jobRepository, workspaceId, job, snap, price);
         log.info(
                 "Recorded {} usage ledger entry (user-cancel): jobId={}",
                 billed ? "a confirmed" : "an UNPRICED",

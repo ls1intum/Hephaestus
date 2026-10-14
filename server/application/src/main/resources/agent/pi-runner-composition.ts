@@ -3,7 +3,8 @@ import {
 	type PublicReviewHistory,
 	SAME_WORK_LIMITS,
 } from "./pi-review-brief.ts";
-import { isDecimalId } from "./work/practice-scripts/lib/core/contract.ts";
+import { isRecord } from "./pi-text.ts";
+import { z } from "./work/practice-scripts/lib/core/practice-script.ts";
 
 export const DESTINATIONS = ["ON_WORK", "PRACTICE_PAGE", "CONVERSATION"] as const;
 export type Destination = (typeof DESTINATIONS)[number];
@@ -276,139 +277,111 @@ interface RoutedResult {
 	outcome: unknown;
 }
 
-function readSupportOccurrence(value: unknown): PracticePageSupportOccurrence | null {
-	if (
-		!isObject(value) ||
-		typeof value.resultId !== "string" ||
-		value.resultId === "" ||
-		typeof value.itemKind !== "string" ||
-		value.itemKind === "" ||
-		!isDecimalId(value.itemId) ||
-		value.outcome !== "NOT_MET" ||
-		(value.origin !== "EVENT" &&
-			value.origin !== "REQUEST" &&
-			value.origin !== "SCHEDULE" &&
-			value.origin !== "BACKFILL") ||
-		typeof value.summary !== "string" ||
-		(value.explanation !== undefined &&
-			value.explanation !== null &&
-			typeof value.explanation !== "string") ||
-		(value.practiceVersionId !== undefined &&
-			value.practiceVersionId !== null &&
-			!isDecimalId(value.practiceVersionId)) ||
-		typeof value.recordedAt !== "string" ||
-		!Number.isFinite(Date.parse(value.recordedAt))
-	) {
-		return null;
-	}
-	return {
-		resultId: value.resultId,
-		itemKind: value.itemKind,
-		itemId: value.itemId,
-		outcome: value.outcome,
-		origin: value.origin,
-		summary: value.summary,
-		explanation: value.explanation ?? null,
-		evidence: value.evidence ?? null,
-		practiceVersionId: value.practiceVersionId ?? null,
-		recordedAt: value.recordedAt,
-	};
-}
+const instantSchema = z
+	.string()
+	.refine((value) => Number.isFinite(Date.parse(value)), "expected an instant");
+const supportOccurrenceSchema = z.strictObject({
+	resultId: z.string().min(1),
+	itemKind: z.string().min(1),
+	itemId: z.string().regex(/^[1-9][0-9]*$/u),
+	outcome: z.literal("NOT_MET"),
+	origin: z.enum(["EVENT", "REQUEST", "SCHEDULE", "BACKFILL"]),
+	summary: z.string(),
+	explanation: z
+		.string()
+		.nullish()
+		.transform((value) => value ?? null),
+	evidence: z.unknown().default(null),
+	practiceVersionId: z
+		.string()
+		.regex(/^[1-9][0-9]*$/u)
+		.nullish()
+		.transform((value) => value ?? null),
+	recordedAt: instantSchema,
+});
+const pageSupportSchema = z.discriminatedUnion("state", [
+	z.strictObject({
+		state: z.literal("COMPLETE"),
+		readAt: instantSchema,
+		practices: z.array(
+			z.strictObject({
+				practiceSlug: z.string(),
+				decision: z.enum(PRACTICE_PAGE_DECISIONS),
+				occurrences: z.array(supportOccurrenceSchema),
+			}),
+		),
+	}),
+	z.strictObject({
+		state: z.enum(["UNAVAILABLE", "REFUSED"]),
+		readAt: instantSchema,
+		refusal: z
+			.string()
+			.nullish()
+			.transform((value) => value ?? null),
+	}),
+]);
+const conversationEligibilitySchema = z.discriminatedUnion("state", [
+	z.strictObject({
+		state: z.literal("COMPLETE"),
+		readAt: instantSchema,
+		results: z.array(
+			z.strictObject({ resultId: z.string(), decision: z.enum(CONVERSATION_DECISIONS) }),
+		),
+	}),
+	z.strictObject({
+		state: z.enum(["UNAVAILABLE", "REFUSED"]),
+		readAt: instantSchema,
+		results: z.array(z.never()).default([]),
+	}),
+]);
 
 export function readPracticePageSupport(
 	value: unknown,
 	current: readonly RoutedResult[],
 ): PracticePageSupport | null {
-	if (
-		!isObject(value) ||
-		typeof value.readAt !== "string" ||
-		!Number.isFinite(Date.parse(value.readAt))
-	) {
+	const parsed = pageSupportSchema.safeParse(value);
+	if (!parsed.success) {
 		return null;
 	}
-	if (value.state === "UNAVAILABLE" || value.state === "REFUSED") {
-		if (
-			value.refusal !== undefined &&
-			value.refusal !== null &&
-			typeof value.refusal !== "string"
-		) {
-			return null;
-		}
-		return { state: value.state, readAt: value.readAt, refusal: value.refusal ?? null };
+	const support = parsed.data;
+	if (support.state !== "COMPLETE") {
+		return support;
 	}
-	if (value.state !== "COMPLETE" || !Array.isArray(value.practices)) {
-		return null;
-	}
-	const sent: unknown[] = value.practices;
-	const practices: PracticePagePracticeSupport[] = [];
 	const expected = new Set(
 		current.filter((result) => result.outcome === "NOT_MET").map((result) => result.practiceSlug),
 	);
-	for (const practice of sent) {
-		const decision = isObject(practice)
-			? PRACTICE_PAGE_DECISIONS.find((known) => known === practice.decision)
-			: undefined;
+	for (const practice of support.practices) {
 		if (
-			!isObject(practice) ||
-			typeof practice.practiceSlug !== "string" ||
 			!expected.delete(practice.practiceSlug) ||
-			decision === undefined ||
-			!Array.isArray(practice.occurrences) ||
-			(decision !== "ADMIT" && practice.occurrences.length > 0)
+			(practice.decision !== "ADMIT" && practice.occurrences.length > 0)
 		) {
 			return null;
 		}
-		const listed: unknown[] = practice.occurrences;
-		const occurrences = listed.map(readSupportOccurrence);
-		if (!occurrences.every((occurrence) => occurrence !== null)) {
-			return null;
-		}
-		practices.push({ practiceSlug: practice.practiceSlug, decision, occurrences });
 	}
-	if (expected.size > 0) {
-		return null;
-	}
-	return { state: "COMPLETE", readAt: value.readAt, practices };
+	return expected.size === 0 ? support : null;
 }
 
 export function readConversationEligibility(
 	value: unknown,
 	current: readonly RoutedResult[],
 ): ConversationEligibility | null {
-	if (
-		!isObject(value) ||
-		typeof value.readAt !== "string" ||
-		!Number.isFinite(Date.parse(value.readAt)) ||
-		!Array.isArray(value.results)
-	) {
+	const parsed = conversationEligibilitySchema.safeParse(value);
+	if (!parsed.success) {
 		return null;
 	}
-	const sent: unknown[] = value.results;
-	if (value.state === "UNAVAILABLE" || value.state === "REFUSED") {
-		return sent.length === 0 ? { state: value.state, readAt: value.readAt } : null;
-	}
-	if (value.state !== "COMPLETE") {
-		return null;
+	const eligibility = parsed.data;
+	if (eligibility.state !== "COMPLETE") {
+		return { state: eligibility.state, readAt: eligibility.readAt };
 	}
 	const expected = new Set(
 		current.filter((result) => result.outcome === "NOT_MET").map((result) => result.resultId),
 	);
-	const results: { resultId: string; decision: (typeof CONVERSATION_DECISIONS)[number] }[] = [];
-	for (const route of sent) {
-		const decision = isObject(route)
-			? CONVERSATION_DECISIONS.find((known) => known === route.decision)
-			: undefined;
-		if (
-			!isObject(route) ||
-			typeof route.resultId !== "string" ||
-			!expected.delete(route.resultId) ||
-			decision === undefined
-		) {
+	for (const result of eligibility.results) {
+		if (!expected.delete(result.resultId)) {
 			return null;
 		}
-		results.push({ resultId: route.resultId, decision });
 	}
-	return expected.size === 0 ? { state: "COMPLETE", readAt: value.readAt, results } : null;
+	return expected.size === 0 ? eligibility : null;
 }
 
 /** Kind and provider URL distinguish work without treating a display number as its identity. */
@@ -420,9 +393,6 @@ export function workIdentity(kind: unknown, url: unknown): string | undefined {
 		? `${kind}:${url}`
 		: undefined;
 }
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-	typeof value === "object" && value !== null && !Array.isArray(value);
 
 /** Where the server writes its own markers into a comment; a text carrying one would be read as the server's. */
 const RESERVED_MARKER = "<!--";
@@ -457,13 +427,6 @@ const NOT_AN_ID_LIST =
 	"basedOn must be an array of result and problem id strings; a text resting on anything else is refused whole";
 
 type Named = ReadonlyMap<string, NamedEvidence<ReviewedResult>>;
-
-function integerOf(value: unknown): number | undefined {
-	if (typeof value === "number" && Number.isInteger(value)) {
-		return value;
-	}
-	return typeof value === "string" && /^\d+$/u.test(value.trim()) ? Number(value) : undefined;
-}
 
 function textProblem(value: unknown, limit: number): string | null {
 	if (typeof value !== "string" || value.trim() === "") {
@@ -531,15 +494,10 @@ function anchorProblem(
 export const DISPOSITIONS = ["RAISE", ...WITHHOLD_REASONS] as const;
 export type Disposition = (typeof DISPOSITIONS)[number];
 
-function dispositionOf(value: unknown): Disposition | undefined {
-	const word = typeof value === "string" ? value.trim().toUpperCase().replaceAll("-", "_") : "";
-	return DISPOSITIONS.find((candidate) => candidate === word);
-}
-
 function spokenOf(value: Record<string, unknown>, named: Named): Set<string> {
-	const summary = isObject(value.summary) ? (idsOf(value.summary.basedOn) ?? []) : [];
+	const summary = isRecord(value.summary) ? (idsOf(value.summary.basedOn) ?? []) : [];
 	const notes = (listOf(value.inline) ?? []).flatMap((note) =>
-		isObject(note) ? (idsOf(note.basedOn) ?? []) : [],
+		isRecord(note) ? (idsOf(note.basedOn) ?? []) : [],
 	);
 	return new Set([...summary, ...notes].flatMap((id) => named.get(id)?.ref.resultId ?? []));
 }
@@ -618,6 +576,35 @@ function witnessProblems(
 }
 
 /** The summary as sent, whole, or every reason it cannot be stored; an omitted or null summary is none. */
+const feedbackIdsSchema = z.array(z.string().trim().min(1));
+const reviewSummarySchema = z.strictObject({ body: z.string(), basedOn: feedbackIdsSchema });
+const reviewDecisionSchema = z.strictObject({
+	resultId: z.string().trim().min(1),
+	disposition: z.enum(DISPOSITIONS),
+	witnessIds: feedbackIdsSchema.nullish().transform((value) => value ?? []),
+});
+const inlineNoteSchema = z.strictObject({
+	body: z.string(),
+	basedOn: feedbackIdsSchema,
+	anchor: z.strictObject({
+		problemId: z.string().trim().min(1),
+		citationIndex: z.union([
+			z.int().nonnegative(),
+			z.string().trim().regex(/^\d+$/u).transform(Number),
+		]),
+	}),
+});
+const reviewInputSchema = z.strictObject({
+	decisions: z.unknown().optional(),
+	summary: z.unknown().optional(),
+	inline: z.unknown().optional(),
+});
+const schemaErrors = (issues: readonly z.core.$ZodIssue[], prefix: string) =>
+	issues.map(
+		(issue) =>
+			`${prefix}${issue.path.length === 0 ? "" : `.${issue.path.join(".")}`}: ${issue.message}`,
+	);
+
 function readSummary(
 	value: unknown,
 	named: Named,
@@ -625,18 +612,19 @@ function readSummary(
 	if (value === undefined || value === null) {
 		return { summary: null, errors: [] };
 	}
-	if (!isObject(value)) {
-		return { summary: null, errors: ["summary: is one object with body and basedOn"] };
+	const parsed = reviewSummarySchema.safeParse(value);
+	if (!parsed.success) {
+		return { summary: null, errors: schemaErrors(parsed.error.issues, "summary") };
 	}
-	const basedOn = idsOf(value.basedOn);
+	const { body, basedOn } = parsed.data;
 	const problems = [
-		textProblem(value.body, REVIEW_LIMITS.summaryChars),
+		textProblem(body, REVIEW_LIMITS.summaryChars),
 		supportProblem(basedOn, named),
 	].filter((problem): problem is string => problem !== null);
-	if (problems.length > 0 || typeof value.body !== "string" || basedOn === null) {
+	if (problems.length > 0) {
 		return { summary: null, errors: problems.map((problem) => `summary: ${problem}`) };
 	}
-	return { summary: { body: value.body, basedOn: evidenceRefs(basedOn, named) }, errors: [] };
+	return { summary: { body, basedOn: evidenceRefs(basedOn, named) }, errors: [] };
 }
 
 function readDecisions(
@@ -660,28 +648,16 @@ function readDecisions(
 	const errors: string[] = [];
 	for (const [index, raw] of sent.entries()) {
 		const label = `decisions #${index + 1}`;
-		if (!isObject(raw)) {
-			errors.push(
-				`${label}: is one object with resultId, disposition and, for a prior advice, witnessIds`,
-			);
+		const parsed = reviewDecisionSchema.safeParse(raw);
+		if (!parsed.success) {
+			errors.push(...schemaErrors(parsed.error.issues, label));
 			continue;
 		}
-		const id = typeof raw.resultId === "string" ? raw.resultId.trim() : "";
-		const disposition = dispositionOf(raw.disposition);
-		const witnessIds =
-			raw.witnessIds === undefined || raw.witnessIds === null ? [] : idsOf(raw.witnessIds);
+		const { resultId: id, disposition, witnessIds } = parsed.data;
 		const problems: string[] = [];
-		const unknown = Object.keys(raw).filter(
-			(key) => key !== "resultId" && key !== "disposition" && key !== "witnessIds",
-		);
-		if (unknown.length > 0) {
-			problems.push(`unknown decision field(s): ${unknown.join(", ")}`);
-		}
 		const result = results.get(id);
 		const parent = evidence.get(id)?.ref.resultId;
-		if (id === "") {
-			problems.push("resultId is required: the `resultId` of one NOT_MET result");
-		} else if (result === undefined) {
+		if (result === undefined) {
 			problems.push(
 				parent === undefined
 					? `${id} is not one of the results this review may rest on`
@@ -695,17 +671,15 @@ function readDecisions(
 		if (result?.outcome === "NOT_MET") {
 			named.add(id);
 		}
-		if (disposition === undefined) {
-			problems.push(`disposition must be one of ${DISPOSITIONS.join(", ")}`);
-		} else if (disposition === "RAISE") {
-			if (witnessIds === null || witnessIds.length > 0) {
+		if (disposition === "RAISE") {
+			if (witnessIds.length > 0) {
 				problems.push("a raised result names no witness");
 			}
 		} else {
 			problems.push(...witnessProblems(disposition, witnessIds, witnesses));
 		}
 		errors.push(...problems.map((problem) => `${label}: ${problem}`));
-		if (problems.length === 0 && disposition !== undefined) {
+		if (problems.length === 0) {
 			decided.set(id, disposition);
 		}
 	}
@@ -714,10 +688,10 @@ function readDecisions(
 
 /** Keep an explicit no-summary distinct from a primitive the SDK could coerce to null. */
 export function prepareReviewArguments(value: unknown) {
-	if (!isObject(value)) {
+	if (!isRecord(value)) {
 		throw new Error("the review is one object with decisions, summary and inline");
 	}
-	if (value.summary !== undefined && value.summary !== null && !isObject(value.summary)) {
+	if (value.summary !== undefined && value.summary !== null && !isRecord(value.summary)) {
 		throw new Error(
 			"summary is one object with body and basedOn, or null when there is no comment",
 		);
@@ -732,27 +706,21 @@ export function readReview(
 	lineNotes: boolean,
 	context: ReviewContext,
 ): { review: ComposedReview } | { errors: string[] } {
-	if (!isObject(value)) {
-		return { errors: ["the review is one object with decisions, summary and inline"] };
+	const parsed = reviewInputSchema.safeParse(value);
+	if (!parsed.success) {
+		return { errors: schemaErrors(parsed.error.issues, "review") };
 	}
+	const input = parsed.data;
 	const errors: string[] = [];
-	const unknownFields = Object.keys(value).filter(
-		(key) => key !== "decisions" && key !== "summary" && key !== "inline",
-	);
-	if (unknownFields.length > 0) {
-		errors.push(
-			`unknown review field(s): ${unknownFields.join(", ")} — a review takes decisions, summary and inline`,
-		);
-	}
 	const named = namedEvidence(results);
-	const decisions = readDecisions(value.decisions, results, named, context.witnesses);
+	const decisions = readDecisions(input.decisions, results, named, context.witnesses);
 	errors.push(...decisions.errors);
 
-	const read = readSummary(value.summary, named);
+	const read = readSummary(input.summary, named);
 	errors.push(...read.errors);
 	const { summary } = read;
 
-	const sentNotes = listOf(value.inline);
+	const sentNotes = listOf(input.inline);
 	if (sentNotes === null) {
 		errors.push("inline must be an array of line notes");
 	}
@@ -769,42 +737,33 @@ export function readReview(
 	const anchors = new Set<string>();
 	for (const [index, raw] of notes.entries()) {
 		const label = `inline #${index + 1}`;
-		if (!isObject(raw)) {
-			errors.push(`${label}: is one object with body, basedOn and anchor`);
+		const parsedNote = inlineNoteSchema.safeParse(raw);
+		if (!parsedNote.success) {
+			errors.push(...schemaErrors(parsedNote.error.issues, label));
 			continue;
 		}
-		const basedOn = idsOf(raw.basedOn);
+		const {
+			body,
+			basedOn,
+			anchor: { problemId, citationIndex },
+		} = parsedNote.data;
 		const problems = [
-			textProblem(raw.body, REVIEW_LIMITS.inlineChars),
+			textProblem(body, REVIEW_LIMITS.inlineChars),
 			supportProblem(basedOn, named),
 		].filter((problem): problem is string => problem !== null);
 		const placementProblem = inlineSupportProblem(basedOn, named);
 		if (placementProblem !== null) {
 			problems.push(placementProblem);
 		}
-		const anchor = isObject(raw.anchor) ? raw.anchor : {};
-		const problemId = typeof anchor.problemId === "string" ? anchor.problemId.trim() : "";
-		const citationIndex = integerOf(anchor.citationIndex);
-		if (problemId === "" || citationIndex === undefined) {
-			problems.push(
-				"anchor needs problemId and citationIndex, the line comes from that citation of that problem",
-			);
-		} else if (basedOn !== null) {
-			const problem = anchorProblem({ problemId, citationIndex }, basedOn, named, anchors);
-			if (problem !== null) {
-				problems.push(problem);
-			}
+		const anchorError = anchorProblem({ problemId, citationIndex }, basedOn, named, anchors);
+		if (anchorError !== null) {
+			problems.push(anchorError);
 		}
 		errors.push(...problems.map((problem) => `${label}: ${problem}`));
-		if (
-			problems.length === 0 &&
-			typeof raw.body === "string" &&
-			citationIndex !== undefined &&
-			basedOn !== null
-		) {
+		if (problems.length === 0) {
 			anchors.add(`${problemId}#${citationIndex}`);
 			inline.push({
-				body: raw.body,
+				body,
 				basedOn: evidenceRefs([...basedOn, problemId], named),
 				anchor: { problemId, citationIndex },
 			});
@@ -812,7 +771,7 @@ export function readReview(
 	}
 
 	errors.push(
-		...coverageProblems(decisions.decided, decisions.named, spokenOf(value, named), results),
+		...coverageProblems(decisions.decided, decisions.named, spokenOf(input, named), results),
 	);
 	const withheld: ReviewWithheld[] = [...decisions.decided].flatMap(([id, disposition]) =>
 		disposition === "RAISE" ? [] : [{ basedOn: [{ resultId: id }], reason: disposition }],
@@ -843,19 +802,19 @@ export function publicResults(
 			...(example === undefined
 				? {}
 				: {
-						example: isObject(example)
+						example: isRecord(example)
 							? { ...example, citation: withoutDigest(example.citation) }
 							: example,
 					}),
 			citations: withoutDigests(citations),
 			problems: (Array.isArray(problems) ? problems : []).map((problem: unknown) =>
-				isObject(problem) ? { ...problem, citations: withoutDigests(problem.citations) } : problem,
+				isRecord(problem) ? { ...problem, citations: withoutDigests(problem.citations) } : problem,
 			),
 		}));
 }
 
 function withoutDigest(citation: unknown): unknown {
-	if (!isObject(citation)) {
+	if (!isRecord(citation)) {
 		return citation;
 	}
 	const { verification: _verification, ...shown } = citation;
@@ -872,7 +831,7 @@ export function qualificationEvidence(result: {
 	evidence?: unknown;
 }): Record<string, unknown> {
 	const branch = result.outcome === "COULD_NOT_DETERMINE" ? "openQuestions" : "inapplicability";
-	const evidence = isObject(result.evidence) ? result.evidence : {};
+	const evidence = isRecord(result.evidence) ? result.evidence : {};
 	return { [branch]: evidence[branch] };
 }
 
@@ -964,14 +923,14 @@ export function priorPublicFeedback(
 	readAt: string | null = capturedAt,
 ): OwnPriorFeedbackView {
 	const omissions: OwnHistoryOmissions = { oversizedEntries: 0, budgetEntries: 0 };
-	if (thisWork === undefined || !isObject(history) || !Array.isArray(history.feedback)) {
+	if (thisWork === undefined || !isRecord(history) || !Array.isArray(history.feedback)) {
 		return { feedback: [], omissions };
 	}
 	const projected = history.feedback.flatMap((entry: unknown): OwnPriorFeedback[] => {
-		if (!isObject(entry) || entry.destination !== "ON_WORK" || entry.publicEligible !== true) {
+		if (!isRecord(entry) || entry.destination !== "ON_WORK" || entry.publicEligible !== true) {
 			return [];
 		}
-		const item = isObject(entry.item) ? entry.item : {};
+		const item = isRecord(entry.item) ? entry.item : {};
 		if (workIdentity(item.kind, item.url) !== thisWork) {
 			return [];
 		}
@@ -1130,7 +1089,7 @@ function practiceReference(
 			entry.witnessId === null ||
 			(!entry.eligibleForAlreadySaid && !entry.eligibleForPriorAdvice) ||
 			!Array.isArray(entry.basedOn) ||
-			!entry.basedOn.some((support: unknown) => isObject(support) && support.practiceSlug === slug)
+			!entry.basedOn.some((support: unknown) => isRecord(support) && support.practiceSlug === slug)
 		) {
 			return [];
 		}
@@ -1139,7 +1098,7 @@ function practiceReference(
 				witnessId: entry.witnessId,
 				itemVersion: typeof entry.itemVersion === "string" ? entry.itemVersion : null,
 				basedOn: entry.basedOn.filter(
-					(support: unknown) => isObject(support) && support.practiceSlug === slug,
+					(support: unknown) => isRecord(support) && support.practiceSlug === slug,
 				),
 				eligibleForAlreadySaid: entry.eligibleForAlreadySaid,
 				eligibleForPriorAdvice: entry.eligibleForPriorAdvice,

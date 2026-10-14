@@ -43,6 +43,8 @@ export function DetailStackLink({
 	return (
 		<Link
 			to="."
+			activeOptions={{ exact: true }}
+			aria-current={current.at(-1) === key ? "page" : undefined}
 			search={(previous: Record<string, unknown>) => ({ ...previous, ...levelSearch, detail })}
 			// See `useDetailStack`: marks a level this visit pushed, so its dismiss can go back.
 			state={(previous) => (keepsEntry ? previous : detailEntryState(previous, pushed, false))}

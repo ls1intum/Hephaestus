@@ -104,9 +104,15 @@ describe("instance catalog routes", () => {
 		fireEvent.change(await screen.findByRole("textbox", { name: /Name/u }, ROUTE_RENDER_WAIT), {
 			target: { value: "Explain the change" },
 		});
-		fireEvent.change(screen.getByRole("textbox", { name: /Criteria/u }), {
+		fireEvent.change(screen.getByRole("textbox", { name: /^What to look for/u }), {
 			target: { value: "The description says why the change is needed." },
 		});
+		fireEvent.click(screen.getByRole("button", { name: "Choose sources" }));
+		fireEvent.click(
+			within(
+				screen.getByRole("radiogroup", { name: "How Pull request details is read" }),
+			).getByRole("radio", { name: "Required" }),
+		);
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 
 		await waitFor(() => expect(body).toBeDefined());
@@ -254,7 +260,7 @@ describe("instance catalog routes", () => {
 		const catalog = mockCatalog({ groups: [packaging, delivery] });
 		let body: unknown;
 		server.use(
-			http.patch(`${PRACTICE_PATH}/placement`, async ({ request }) => {
+			http.patch(`${PRACTICE_PATH}/group`, async ({ request }) => {
 				body = await request.json();
 				return HttpResponse.json({
 					...catalog,

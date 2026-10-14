@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class AccountReferenceServiceTest extends BaseUnitTest {
@@ -34,9 +35,12 @@ class AccountReferenceServiceTest extends BaseUnitTest {
                         new AccountIdentityQuery.IdentityView(2L, 20L, "foreign-native-key", "foreign-team")));
         when(providers.visibleInWorkspace(10L, 7L)).thenReturn(true);
         when(providers.providerTypeName(10L)).thenReturn("GITHUB");
-        when(providers.profile(10L, "github-native-key", ""))
-                .thenReturn(Optional.of(new GitProviderRegistry.IdentityProfile(
-                        "developer", "Current mirror name", "avatar", "profile")));
+        var key = new GitProviderRegistry.IdentityKey(10L, "github-native-key", "");
+        when(providers.profiles(Set.of(key)))
+                .thenReturn(Map.of(
+                        key,
+                        new GitProviderRegistry.IdentityProfile(
+                                "developer", "Current mirror name", "avatar", "profile")));
 
         var reference = references.reference(7L, 42L);
 

@@ -13,12 +13,12 @@ import de.tum.cit.aet.hephaestus.core.auth.export.AccountExport;
 import de.tum.cit.aet.hephaestus.core.auth.export.AccountExportRepository;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
-import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
-import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -191,15 +191,20 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
         // (acting_account_id) of an event about a different account → both must be redacted.
         seedAuthEvent(9001L, erasedId, null, "LOGIN", "203.0.113.7", "UA-A", "{\"x\":1}");
         seedAuthEvent(
-                9002L, persistedId(newAccount("Operator", "operator@example.com").getId()), erasedId, "IMPERSONATION_BEGIN", "198.51.100.9", "UA-B", "{\"reason\":\"abuse\"}");
+                9002L,
+                persistedId(newAccount("Operator", "operator@example.com").getId()),
+                erasedId,
+                "IMPERSONATION_BEGIN",
+                "198.51.100.9",
+                "UA-B",
+                "{\"reason\":\"abuse\"}");
         markDeleting(
                 erasedId, clock.instant().minus(authProperties.deleteCooldown()).minus(Duration.ofHours(1)));
 
         sweeper.sweepNow();
 
-        var rows = jdbcTemplate.queryForList(
-                "SELECT event_type, result, ip_inet, user_agent, details FROM auth_event "
-                        + "WHERE id IN (9001,9002) ORDER BY id");
+        var rows = jdbcTemplate.queryForList("SELECT event_type, result, ip_inet, user_agent, details FROM auth_event "
+                + "WHERE id IN (9001,9002) ORDER BY id");
         assertThat(rows).hasSize(2);
         assertThat(rows).allSatisfy(r -> {
             assertThat(r.get("ip_inet")).as("IP redacted").isNull();
@@ -335,8 +340,10 @@ class AccountHardDeleteSweeperIntegrationTest extends BaseIntegrationTest {
     }
 
     private IdentityProvider provider() {
-        return providers.findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseGet(() -> providers.saveAndFlush(new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
+        return providers
+                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
+                .orElseGet(() -> providers.saveAndFlush(
+                        new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com")));
     }
 
     /** Persists a real ACTIVE account via the production repository. */

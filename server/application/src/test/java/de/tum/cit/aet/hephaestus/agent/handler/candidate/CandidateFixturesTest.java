@@ -45,6 +45,16 @@ class CandidateFixturesTest extends BaseUnitTest {
     }
 
     @Test
+    void shouldRefuseMissingRequiredNestedTextWhenTheWireFieldIsAbsent() throws IOException {
+        ObjectNode example = fixture("candidate-met-with-example.json");
+        ((ObjectNode) example.path("example")).remove("note");
+        assertRefused(example, CandidateRefusal.MALFORMED_CANDIDATE);
+        ObjectNode problem = fixture("candidate-not-met.json");
+        ((ObjectNode) problem.path("problems").get(0).path("basis")).remove("explanation");
+        assertRefused(problem, CandidateRefusal.MALFORMED_CANDIDATE);
+    }
+
+    @Test
     void shouldKeepSeverityOnEachProblem() throws IOException {
         NotMetCandidate candidate = (NotMetCandidate) CandidateParser.parse(fixture("candidate-not-met.json"));
 
@@ -109,14 +119,6 @@ class CandidateFixturesTest extends BaseUnitTest {
         ObjectNode omitsNothing = fixture("candidate-not-met.json");
         ((ObjectNode) omitsNothing.get("coverage")).putArray("omitted");
         assertRefused(omitsNothing, CandidateRefusal.COVERAGE_INCONSISTENT);
-    }
-
-    @Test
-    void shouldDropAnEmptyOmissionListWhenCoverageIsComplete() throws IOException {
-        ObjectNode candidate = fixture("candidate-met-with-example.json");
-        ((ObjectNode) candidate.get("coverage")).putArray("omitted");
-
-        assertThat(CandidateParser.parse(candidate).coverage().has("omitted")).isFalse();
     }
 
     @Test

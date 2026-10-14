@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,7 +19,7 @@ class PracticeV1ConcurrentResultDatabaseTest {
     @ValueSource(ints = {Connection.TRANSACTION_READ_COMMITTED, Connection.TRANSACTION_REPEATABLE_READ})
     void shouldPreventConcurrentDeletionOfTheLastTwoProblems(int isolation) throws Exception {
         var database = PracticeV1ConstraintDatabaseTest.prepared("prod");
-        PracticeV1CutoverMigrationTest.execute(
+        PracticeMigrationFixture.execute(
                 database, "BEGIN; " + PracticeV1ConstraintDatabaseTest.insert("NOT_MET", "NULL") + ";" + """
                     INSERT INTO problem(id,workspace_id,result_id,position,severity,summary,explanation,citations,basis)
                     VALUES('00000000-0000-0000-0000-000000995151',992101,'00000000-0000-0000-0000-000000995141',
@@ -63,11 +63,11 @@ class PracticeV1ConcurrentResultDatabaseTest {
             first.commit();
             assertThat(second.get(10, TimeUnit.SECONDS)).isIn("23514", "40001");
         }
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT count(*)::text FROM problem WHERE result_id='00000000-0000-0000-0000-000000995141'"))
                 .containsExactly("1");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT outcome || '|' || severity FROM result WHERE"
                                 + " id='00000000-0000-0000-0000-000000995141'"))

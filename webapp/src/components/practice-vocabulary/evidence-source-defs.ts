@@ -122,7 +122,7 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 		description: "Team documentation the reviewed work links to, such as a guideline.",
 		locator: "object",
 	},
-	"hephaestus.observation-history": {
+	"hephaestus.result-history": {
 		label: "Earlier results",
 		icon: HistoryIcon,
 		badgeVariant: "outline",

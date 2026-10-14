@@ -8,11 +8,11 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import java.io.Serial;
 import java.io.Serializable;
 import java.time.Instant;
@@ -30,10 +30,7 @@ import org.jspecify.annotations.Nullable;
 @Entity
 @Table(
         name = "membership",
-        uniqueConstraints =
-                @UniqueConstraint(
-                        name = "uk_membership_workspace_account",
-                        columnNames = {"workspace_id", "account_id"}))
+        indexes = @Index(name = "idx_membership_workspace_account", columnList = "workspace_id,account_id"))
 @DynamicUpdate
 @Getter
 @Setter

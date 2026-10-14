@@ -53,17 +53,17 @@ class LiquibaseBaselineIntegrationTest {
         assertThat(query(database, "SELECT version || ':' || sha256 FROM consent_notice"))
                 .containsExactly("2026-08-30:037a674668d981d7ef421bb5d47bb39728e8a493b37e41987ef88299356f1d0b");
         assertThat(query(database, """
-                SELECT retention || ':' || retention_keep_table::text || ':' ||
-                       retention_keep_index::text || ':' || infinite_time_partitions::text
-                FROM partman.part_config WHERE parent_table = 'public.auth_event'
-                """)).containsExactly("12 months:false:false:true");
+            SELECT retention || ':' || retention_keep_table::text || ':' ||
+                   retention_keep_index::text || ':' || infinite_time_partitions::text
+            FROM partman.part_config WHERE parent_table = 'public.auth_event'
+            """)).containsExactly("12 months:false:false:true");
         assertThat(query(database, """
-                SELECT count(*)::text FROM pg_trigger
-                WHERE tgrelid = 'public.auth_event'::regclass AND tgname = 'trg_auth_event_block_mutation'
-                """)).containsExactly(context.equals("prod") ? "1" : "0");
+            SELECT count(*)::text FROM pg_trigger
+            WHERE tgrelid = 'public.auth_event'::regclass AND tgname = 'trg_auth_event_block_mutation'
+            """)).containsExactly(context.equals("prod") ? "1" : "0");
         execute(database, """
-                INSERT INTO auth_event (event_type, result) VALUES ('LOGIN', 'SUCCESS');
-                """);
+            INSERT INTO auth_event (event_type, result) VALUES ('LOGIN', 'SUCCESS');
+            """);
         assertThat(query(database, "SELECT (tableoid <> 'public.auth_event_default'::regclass)::text FROM auth_event"))
                 .containsExactly("true");
         if (context.equals("prod")) {
@@ -108,9 +108,9 @@ class LiquibaseBaselineIntegrationTest {
         TestDatabase database = emptyDatabase();
         update(database, BASELINE, "prod");
         execute(database, """
-                UPDATE databasechangeloglock
-                SET locked = true, lockgranted = now(), lockedby = 'simulated-stale-host' WHERE id = 1
-                """);
+            UPDATE databasechangeloglock
+            SET locked = true, lockgranted = now(), lockedby = 'simulated-stale-host' WHERE id = 1
+            """);
 
         try (Liquibase liquibase = liquibase(database, BASELINE)) {
             liquibase.forceReleaseLocks();
@@ -147,54 +147,54 @@ class LiquibaseBaselineIntegrationTest {
         assertThat(diff.getChangedObjects()).as("changed schema objects").isEmpty();
 
         assertNativeSchemaEqual(archived, baseline, "functions", """
-                SELECT pg_get_functiondef(p.oid) FROM pg_proc p
-                JOIN pg_namespace n ON n.oid = p.pronamespace
-                WHERE n.nspname = 'public' AND NOT EXISTS (
-                    SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass
-                    AND d.objid = p.oid AND d.deptype = 'e')
-                ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
-                """);
+            SELECT pg_get_functiondef(p.oid) FROM pg_proc p
+            JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND NOT EXISTS (
+                SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_proc'::regclass
+                AND d.objid = p.oid AND d.deptype = 'e')
+            ORDER BY p.proname, pg_get_function_identity_arguments(p.oid)
+            """);
         assertNativeSchemaEqual(archived, baseline, "triggers", """
-                SELECT t.tgenabled::text || ':' || pg_get_triggerdef(t.oid) FROM pg_trigger t
-                JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'public' AND NOT t.tgisinternal
-                ORDER BY c.relname, t.tgname
-                """);
+            SELECT t.tgenabled::text || ':' || pg_get_triggerdef(t.oid) FROM pg_trigger t
+            JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND NOT t.tgisinternal
+            ORDER BY c.relname, t.tgname
+            """);
         assertNativeExpressionsEqual(archived, baseline, "check, not-null and exclusion constraints", """
-                SELECT c.relname || ':' || k.contype::text || ':' ||
-                       ARRAY(SELECT a.attname FROM unnest(k.conkey) WITH ORDINALITY AS key(attnum, position)
-                             JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = key.attnum
-                             ORDER BY key.position)::text || ':' ||
-                       CASE WHEN k.contype = 'n' THEN '' ELSE k.conname END || ':' || pg_get_constraintdef(k.oid)
-                FROM pg_constraint k JOIN pg_class c ON c.oid = k.conrelid
-                JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'public' AND k.contype IN ('c', 'n', 'x')
-                  AND c.relname NOT IN ('databasechangelog', 'databasechangeloglock')
-                ORDER BY c.relname, k.contype, k.conkey, pg_get_constraintdef(k.oid)
-                """);
+            SELECT c.relname || ':' || k.contype::text || ':' ||
+                   ARRAY(SELECT a.attname FROM unnest(k.conkey) WITH ORDINALITY AS key(attnum, position)
+                         JOIN pg_attribute a ON a.attrelid = k.conrelid AND a.attnum = key.attnum
+                         ORDER BY key.position)::text || ':' ||
+                   CASE WHEN k.contype = 'n' THEN '' ELSE k.conname END || ':' || pg_get_constraintdef(k.oid)
+            FROM pg_constraint k JOIN pg_class c ON c.oid = k.conrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND k.contype IN ('c', 'n', 'x')
+              AND c.relname NOT IN ('databasechangelog', 'databasechangeloglock')
+            ORDER BY c.relname, k.contype, k.conkey, pg_get_constraintdef(k.oid)
+            """);
         assertNativeExpressionsEqual(archived, baseline, "index expressions, predicates and usability", """
-                SELECT c.relname || ':' || i.relname || ':' || x.indisvalid::text || ':' || x.indisready::text || ':' ||
-                       coalesce(pg_get_expr(x.indexprs, x.indrelid), '') || ':' ||
-                       coalesce(pg_get_expr(x.indpred, x.indrelid), '')
-                FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid
-                JOIN pg_class c ON c.oid = x.indrelid JOIN pg_namespace n ON n.oid = c.relnamespace
-                WHERE n.nspname = 'public' AND c.relname NOT IN ('databasechangelog', 'databasechangeloglock')
-                ORDER BY c.relname, i.relname
-                """);
+            SELECT c.relname || ':' || i.relname || ':' || x.indisvalid::text || ':' || x.indisready::text || ':' ||
+                   coalesce(pg_get_expr(x.indexprs, x.indrelid), '') || ':' ||
+                   coalesce(pg_get_expr(x.indpred, x.indrelid), '')
+            FROM pg_index x JOIN pg_class i ON i.oid = x.indexrelid
+            JOIN pg_class c ON c.oid = x.indrelid JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname NOT IN ('databasechangelog', 'databasechangeloglock')
+            ORDER BY c.relname, i.relname
+            """);
         assertNativeSchemaEqual(archived, baseline, "partition parents", """
-                SELECT c.relname || ':' || pg_get_partkeydef(c.oid)
-                FROM pg_partitioned_table p JOIN pg_class c ON c.oid = p.partrelid
-                JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public'
-                ORDER BY c.relname
-                """);
+            SELECT c.relname || ':' || pg_get_partkeydef(c.oid)
+            FROM pg_partitioned_table p JOIN pg_class c ON c.oid = p.partrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public'
+            ORDER BY c.relname
+            """);
 
         execute(archived, """
-                UPDATE instance_settings SET silent_mode_engaged = false, silent_mode_reason = 'preserve operator choice'
-                WHERE id = 1;
-                CREATE FUNCTION reject_baseline_ddl() RETURNS event_trigger LANGUAGE plpgsql AS $$
-                BEGIN RAISE EXCEPTION 'synchronization must not execute DDL'; END $$;
-                CREATE EVENT TRIGGER reject_baseline_ddl ON ddl_command_start EXECUTE FUNCTION reject_baseline_ddl();
-                """);
+            UPDATE instance_settings SET silent_mode_engaged = false, silent_mode_reason = 'preserve operator choice'
+            WHERE id = 1;
+            CREATE FUNCTION reject_baseline_ddl() RETURNS event_trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'synchronization must not execute DDL'; END $$;
+            CREATE EVENT TRIGGER reject_baseline_ddl ON ddl_command_start EXECUTE FUNCTION reject_baseline_ddl();
+            """);
         List<String> oldHistory =
                 query(archived, "SELECT id || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted");
         assertThatThrownBy(() -> update(archived, "db/master.xml", context))
@@ -234,10 +234,10 @@ class LiquibaseBaselineIntegrationTest {
                 query(database, "SELECT id || ':' || md5sum FROM databasechangelog ORDER BY orderexecuted");
         assertThat(history).isNotEmpty().noneMatch(row -> row.startsWith("1788679885460-1:"));
         execute(database, """
-                CREATE FUNCTION reject_upgrade_ddl() RETURNS event_trigger LANGUAGE plpgsql AS $$
-                BEGIN RAISE EXCEPTION 'refused upgrade must not execute DDL'; END $$;
-                CREATE EVENT TRIGGER reject_upgrade_ddl ON ddl_command_start EXECUTE FUNCTION reject_upgrade_ddl();
-                """);
+            CREATE FUNCTION reject_upgrade_ddl() RETURNS event_trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'refused upgrade must not execute DDL'; END $$;
+            CREATE EVENT TRIGGER reject_upgrade_ddl ON ddl_command_start EXECUTE FUNCTION reject_upgrade_ddl();
+            """);
 
         assertThatThrownBy(() -> update(database, "db/master.xml", context))
                 .isInstanceOf(LiquibaseException.class)

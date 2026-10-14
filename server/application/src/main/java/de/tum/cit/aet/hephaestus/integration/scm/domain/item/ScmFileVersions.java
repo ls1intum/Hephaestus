@@ -16,7 +16,7 @@ public class ScmFileVersions {
     public static Optional<Parsed> parse(ItemVersion version) {
         String[] fields = version.value().split(":", -1);
         if (fields.length != 4
-                || !fields[0].equals("scm.file")
+                || !fields[0].equals(ScmItemEvents.FILE.value())
                 || !fields[1].equals("v1")
                 || !fields[2].matches("[0-9a-f]{40}|[0-9a-f]{64}")
                 || !fields[3].matches("[0-9a-f]{64}")) return Optional.empty();

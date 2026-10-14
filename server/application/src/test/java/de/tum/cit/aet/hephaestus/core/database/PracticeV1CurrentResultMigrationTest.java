@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -11,8 +11,8 @@ class PracticeV1CurrentResultMigrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"prod", "dev"})
     void shouldRankRetainedOccasionsBeforeLateCompletionAndKeepMarksSeparate(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.releasedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.releasedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO agent_job(id,workspace_id,job_type,status,config_snapshot,job_token,retry_count,
                 created_at,completed_at,available_at,trace_id,metadata,delivery_status,evidence_snapshot)
             SELECT ('00000000-0000-0000-0000-000000'||n)::uuid,992101,'PULL_REQUEST_REVIEW',
@@ -45,26 +45,26 @@ class PracticeV1CurrentResultMigrationTest {
             VALUES('00000000-0000-0000-0000-000000994301',992101,
                 '00000000-0000-0000-0000-000000994214','Wrong evidence','2026-01-05','NONE','2026-01-05');
             """);
-        PracticeV1CutoverMigrationTest.upgrade(database, context);
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        PracticeMigrationFixture.upgrade(database, context);
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT id::text FROM result WHERE workspace_id=992101 AND ended_at IS NULL"))
                 .containsExactly("00000000-0000-0000-0000-000000994214");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT end_reason FROM result WHERE id='00000000-0000-0000-0000-000000994213'"))
                 .containsExactly("OUTRANKED");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT end_reason FROM result WHERE id='00000000-0000-0000-0000-000000994215'"))
                 .containsExactly("WORK_CHANGED");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT count(*)::text FROM result WHERE workspace_id=992101 AND ended_at<recorded_at"))
                 .containsExactly("0");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT kind || '|' || (removed_at IS NULL) FROM result_mark WHERE"
                                 + " id='00000000-0000-0000-0000-000000994301'"))
                 .containsExactly("INCORRECT|true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT ordered_at::date::text FROM review WHERE id='00000000-0000-0000-0000-000000994111'"))
                 .containsExactly("2026-01-02");

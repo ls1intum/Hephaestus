@@ -6,7 +6,12 @@ import { runBundled } from "../../../../../../docker/agents/practice-scripts/run
 function commitsRecord(commits: { sha: string; message: string }[]) {
 	return {
 		"commits.json": {
-			commits: commits.map((commit) => ({ ...commit, parents: ["p"], files: [] })),
+			commits: commits.map((commit) => ({
+				...commit,
+				sha: commit.sha.padEnd(40, "a"),
+				parents: ["b".repeat(40)],
+				files: [],
+			})),
 		},
 	};
 }

@@ -1,4 +1,4 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,7 +24,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
                         + "chat_message_id='00000000-0000-0000-0000-000000998194' WHERE id='" + COPY + "'",
                 "23514");
         claim(database);
-        var digest = PracticeV1CutoverMigrationTest.column(
+        var digest = PracticeMigrationFixture.column(
                 database, "SELECT feedback_content_digest('00000000-0000-0000-0000-000000998161')");
         reject(
                 database,
@@ -34,7 +34,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
         reject(database, "UPDATE feedback_copy SET chat_message_id=NULL WHERE id='" + COPY + "'", "55000");
         reject(database, "UPDATE feedback_copy SET body='Prepared brief.' WHERE id='" + COPY + "'", "55000");
         reject(database, receipt("Actual shown words."), "23514");
-        PracticeV1CutoverMigrationTest.execute(
+        PracticeMigrationFixture.execute(
                 database,
                 "UPDATE chat_message SET status='completed',parts='[{\"type\":\"text\",\"text\":\"Actual shown"
                         + " \"},{\"type\":\"text\",\"text\":\"words.\"}]'::jsonb WHERE id='" + MESSAGE + "'");
@@ -49,16 +49,15 @@ class PracticeV1ConversationReceiptDatabaseTest {
                         + "posted_at='2026-01-01T00:01:00Z' WHERE id='" + COPY + "'",
                 "55000");
         // A failed transport can later supply confirmation, without another claim or a new fence.
-        PracticeV1CutoverMigrationTest.execute(
-                database, "UPDATE feedback_copy SET state='FAILED' WHERE id='" + COPY + "'");
-        PracticeV1CutoverMigrationTest.execute(database, receipt("Actual shown words."));
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        PracticeMigrationFixture.execute(database, "UPDATE feedback_copy SET state='FAILED' WHERE id='" + COPY + "'");
+        PracticeMigrationFixture.execute(database, receipt("Actual shown words."));
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT state || '|' || body || '|' || chat_message_id || '|' ||"
                                 + " (write_started_at='2026-02-01T00:00:00Z'::timestamptz)::text"
                                 + " FROM feedback_copy WHERE id='" + COPY + "'"))
                 .containsExactly("POSTED|Actual shown words.|" + MESSAGE + "|true");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database, "SELECT feedback_content_digest('00000000-0000-0000-0000-000000998161')"))
                 .isEqualTo(digest);
         reject(database, "UPDATE feedback_copy SET body='Different words.' WHERE id='" + COPY + "'", "55000");
@@ -74,7 +73,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
                 database,
                 "UPDATE feedback_copy SET posted_at=posted_at+interval '1 second' WHERE id='" + COPY + "'",
                 "55000");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT count(*)::text FROM feedback_send WHERE"
                                 + " feedback_id='00000000-0000-0000-0000-000000998161'"))
@@ -86,14 +85,14 @@ class PracticeV1ConversationReceiptDatabaseTest {
     void shouldKeepReceiptCustodyWhenTheBoundMessageIsDeleted(String context) throws Exception {
         var database = prepared(context);
         claim(database);
-        PracticeV1CutoverMigrationTest.execute(
+        PracticeMigrationFixture.execute(
                 database,
                 "UPDATE chat_message SET status='completed',"
                         + "parts='[{\"type\":\"text\",\"text\":\"Actual shown words.\"}]'::jsonb WHERE id='" + MESSAGE
                         + "'");
-        PracticeV1CutoverMigrationTest.execute(database, receipt("Actual shown words."));
-        PracticeV1CutoverMigrationTest.execute(database, "DELETE FROM chat_message WHERE id='" + MESSAGE + "'");
-        assertThat(PracticeV1CutoverMigrationTest.column(
+        PracticeMigrationFixture.execute(database, receipt("Actual shown words."));
+        PracticeMigrationFixture.execute(database, "DELETE FROM chat_message WHERE id='" + MESSAGE + "'");
+        assertThat(PracticeMigrationFixture.column(
                         database,
                         "SELECT (chat_message_id IS NULL)::text || '|' || state || '|' || body || '|' ||"
                                 + " (write_started_at IS NOT NULL AND posted_at IS NOT NULL)::text"
@@ -114,7 +113,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
     @ValueSource(strings = {"prod", "dev"})
     void shouldKeepOnWorkWordsAndAnchorsImmutableAfterTheFence(String context) throws Exception {
         var database = prepared(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO feedback_copy(id,workspace_id,feedback_id,kind,position,body,path,start_line,end_line,side,state,write_key,write_marker)
             VALUES('00000000-0000-0000-0000-000000998173',992101,'00000000-0000-0000-0000-000000992161',
                 'LINE_NOTE',1,'Explain the retry.','retry.ts',10,12,'NEW','PLANNED','fixed-note-key','fixed-note-marker');
@@ -135,7 +134,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
                     "UPDATE feedback_copy SET " + change + " WHERE id='00000000-0000-0000-0000-000000998173'",
                     "55000");
         }
-        PracticeV1CutoverMigrationTest.execute(
+        PracticeMigrationFixture.execute(
                 database,
                 "UPDATE feedback_copy SET kind='FILE_NOTE',"
                         + "state='POSTED',posted_at='2026-02-01T00:01:00Z',external_ref='confirmed-note'"
@@ -143,8 +142,8 @@ class PracticeV1ConversationReceiptDatabaseTest {
     }
 
     private static TestDatabase prepared(String context) throws Exception {
-        var database = PracticeV1CutoverMigrationTest.migratedDatabase(context);
-        PracticeV1CutoverMigrationTest.execute(database, """
+        var database = PracticeMigrationFixture.migratedDatabase(context);
+        PracticeMigrationFixture.execute(database, """
             INSERT INTO feedback(id,workspace_id,review_id,item_id,developer_id,destination,state,body)
             SELECT '00000000-0000-0000-0000-000000998161',workspace_id,review_id,item_id,developer_id,
                 'CONVERSATION','READY','Prepared brief.' FROM feedback WHERE id='00000000-0000-0000-0000-000000992193';
@@ -165,7 +164,7 @@ class PracticeV1ConversationReceiptDatabaseTest {
     }
 
     private static void claim(TestDatabase database) throws SQLException {
-        PracticeV1CutoverMigrationTest.execute(
+        PracticeMigrationFixture.execute(
                 database,
                 "UPDATE feedback_copy SET state='WRITE_STARTED',"
                         + "write_started_at='2026-02-01T00:00:00Z',chat_message_id='" + MESSAGE + "' WHERE id='" + COPY
@@ -178,7 +177,8 @@ class PracticeV1ConversationReceiptDatabaseTest {
     }
 
     private static void reject(TestDatabase database, String sql, String sqlState) {
-        assertThatThrownBy(() -> PracticeV1CutoverMigrationTest.execute(database, sql))
+        assertThatThrownBy(() -> PracticeMigrationFixture.execute(database, sql))
+                .rootCause()
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         exception -> assertThat(exception.getSQLState()).isEqualTo(sqlState));

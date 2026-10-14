@@ -173,7 +173,7 @@ class MentorWorkerSplitIntegrationTest extends AbstractWorkspaceIntegrationTest 
             service.run(
                     MentorTurnRequest.slackDm(workspace.getId(), slackThread, "Hi Heph", UUID.randomUUID()),
                     channel,
-                    developer.getId());
+                    accountId(developer));
             await().atMost(Duration.ofSeconds(15)).untilAsserted(() -> assertCompleted(slackThread));
             verify(slack, timeout(5000))
                     .startStream(

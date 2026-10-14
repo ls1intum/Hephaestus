@@ -95,7 +95,7 @@ class CandidateEvidenceVerifier {
             Candidate candidate,
             CapturedEvidence captured) {
         var verifier = verifiers.get(assignment.item().kind());
-        List<EvidenceCitation> located = citations(candidate);
+        List<EvidenceCitation> located = candidate.allCitations();
         Map<EvidenceCitation, EvidenceCitation> verified = new HashMap<>();
         List<CitationToCheck> checks = new ArrayList<>();
         for (int i = 0; i < located.size(); i++) {
@@ -260,17 +260,5 @@ class CandidateEvidenceVerifier {
                 throw new Unverified(
                         CandidateRefusal.SOURCE_UNAVAILABLE, "A warrant names a source that was not captured", null);
         }
-    }
-
-    static List<EvidenceCitation> citations(Candidate candidate) {
-        var citations = new ArrayList<>(candidate.citations());
-        candidate.problems().forEach(problem -> citations.addAll(problem.citations()));
-        var example = candidate.example();
-        if (example != null) citations.add(example.citation());
-        candidate.openQuestions().forEach(question -> {
-            var citation = question.citation();
-            if (citation != null) citations.add(citation);
-        });
-        return List.copyOf(citations);
     }
 }

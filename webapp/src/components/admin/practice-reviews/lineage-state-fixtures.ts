@@ -15,7 +15,7 @@ import {
 	practiceNameOf,
 	pullRequestReviewItem,
 	reviewAccounts,
-	reviewDetailCompleted,
+	reviewDetail,
 	reviewDetailScanManyJobs,
 	reviewDevelopers,
 	reviewItem,
@@ -174,8 +174,7 @@ function chain({
 
 function detailOf(lineage: ReviewLineage, overrides: Partial<ReviewDetail> = {}): ReviewDetail {
 	const ref = lineage.nodes.find((entry) => entry.review !== null)?.review ?? baseReview;
-	return {
-		...reviewDetailCompleted,
+	return reviewDetail({
 		id: ref.id,
 		item: ref.item,
 		origin: ref.origin,
@@ -184,7 +183,7 @@ function detailOf(lineage: ReviewLineage, overrides: Partial<ReviewDetail> = {})
 		orderedAt: ref.createdAt,
 		completedAt: ref.completedAt,
 		...overrides,
-	};
+	});
 }
 
 const withCase = (
@@ -252,8 +251,7 @@ const reviewCases: LineageStateCase[] = [
 		"withheld-practice",
 		"A practice withheld, with no result",
 		chain({ results: threeResults().slice(0, 2) }),
-		(lineage) =>
-			detailOf(lineage, { practices: [...reviewDetailCompleted.practices, withheldPractice] }),
+		(lineage) => detailOf(lineage, { practices: [...reviewDetail().practices, withheldPractice] }),
 	),
 	withCase(
 		"expired-runtime",

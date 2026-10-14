@@ -1,34 +1,22 @@
-package de.tum.cit.aet.hephaestus;
+package de.tum.cit.aet.hephaestus.core.database;
 
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.column;
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.execute;
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.migratedDatabase;
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.releasedDatabase;
+import static de.tum.cit.aet.hephaestus.core.database.PracticeMigrationFixture.upgrade;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer;
-import de.tum.cit.aet.hephaestus.testconfig.PostgreSQLTestContainer.TestDatabase;
 import java.nio.charset.StandardCharsets;
-import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
-import liquibase.Contexts;
-import liquibase.LabelExpression;
-import liquibase.Liquibase;
-import liquibase.database.DatabaseFactory;
-import liquibase.database.jvm.JdbcConnection;
-import liquibase.resource.ClassLoaderResourceAccessor;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("database")
 class PracticeV1CutoverMigrationTest {
-    private static final String BRANCH_FILE = "1791486276211_changelog.xml";
     private static final String RESULT = "00000000-0000-0000-0000-000000992141";
     private static final String FEEDBACK = "00000000-0000-0000-0000-000000992161";
 
@@ -98,6 +86,12 @@ class PracticeV1CutoverMigrationTest {
                                 + " id='00000000-0000-0000-0000-000000992192'"))
                 .containsExactly(
                         "992101|Unrelated assistant text.|data-result|00000000-0000-0000-0000-000000992141|false");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreserveUnclaimedAccountsAndTheirMemberships(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT a.status || '|' || count(m.workspace_id) FROM identity i JOIN account a ON"
@@ -108,6 +102,12 @@ class PracticeV1CutoverMigrationTest {
                         database,
                         "SELECT count(*)::text FROM identity WHERE provider_id=992102 AND provider_user_key='105'"))
                 .containsExactly("0");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldStopRuntimeJobsAndPreserveTheirReviewFacts(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT status || '|' || processing_status || '|' || cancellation_reason || '|' ||"
@@ -119,6 +119,12 @@ class PracticeV1CutoverMigrationTest {
                         "SELECT status || '|' || processing_status FROM review_job WHERE"
                                 + " id='00000000-0000-0000-0000-000000992113'"))
                 .containsExactly("COMPLETED|FAILED");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreserveItemAndEventIdentity(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT i.kind || '|' || i.source_id || '|' || (i.removed_at IS NOT NULL) || '|' ||"
@@ -132,6 +138,12 @@ class PracticeV1CutoverMigrationTest {
                                 + " item_event e JOIN review r ON r.id='00000000-0000-0000-0000-000000992112'"
                                 + " WHERE e.id='00000000-0000-0000-0000-000000992181'"))
                 .containsExactly("scm.pull_request_review.submitted|992104|true");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreservePinnedDefinitionsAndTheirNativeIndexes(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT count(*)::text FROM practice_version WHERE id=992131 AND"
@@ -154,8 +166,15 @@ class PracticeV1CutoverMigrationTest {
                                     + " table_name IN"
                                     + " ('observation','practice_result','practice_observation','agent_job','artifact_signal','identity_link','workspace_membership')"))
                 .containsExactly("0");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldEnforceTenantAndEvidenceConstraints(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThatThrownBy(() ->
                         execute(database, "DELETE FROM membership WHERE workspace_id=992101 AND account_id=992106"))
+                .rootCause()
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         error -> assertThat(error.getSQLState()).isEqualTo("23001"));
@@ -167,7 +186,7 @@ class PracticeV1CutoverMigrationTest {
                             + " gen_random_uuid(),workspace_id,review_id,practice_id,practice_version_id,item_id,item_version,developer_id,outcome,summary,0,recorded_at"
                             + " FROM result WHERE id='"
                                 + RESULT + "'"))
-                .isInstanceOf(SQLException.class)
+                .hasRootCauseInstanceOf(SQLException.class)
                 .hasMessageContaining("evidence version 1");
         assertThatThrownBy(() -> execute(
                         database,
@@ -175,9 +194,16 @@ class PracticeV1CutoverMigrationTest {
                                 + " problem(id,workspace_id,result_id,position,severity,summary,explanation,citations)"
                                 + " VALUES(gen_random_uuid(),992201,'"
                                 + RESULT + "',1,'MINOR','Other','Other','[]')"))
+                .rootCause()
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         error -> assertThat(error.getSQLState()).isEqualTo("23503"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldKeepAcceptedResultsCurrentWhenAnAcceptanceIsRemoved(String context) throws Exception {
+        var database = migratedDatabase(context);
         execute(
                 database,
                 "INSERT INTO result_mark(id,workspace_id,result_id,kind,reason) VALUES(gen_random_uuid(),992101,'"
@@ -190,6 +216,12 @@ class PracticeV1CutoverMigrationTest {
                         + "' AND kind='ACCEPTED'");
         assertThat(column(database, "SELECT (ended_at IS NULL)::text FROM result WHERE id='" + RESULT + "'"))
                 .containsExactly("true");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldReplayWithoutChangingMigratedProductFacts(String context) throws Exception {
+        var database = migratedDatabase(context);
         var beforeReplay = column(
                 database,
                 "SELECT (SELECT count(*) FROM result WHERE workspace_id=992101)::text || '|' || (SELECT count(*) FROM"
@@ -256,6 +288,12 @@ class PracticeV1CutoverMigrationTest {
                         "SELECT id::text || '|' || state || '|' || external_ref FROM feedback_copy"
                                 + " WHERE id='00000000-0000-0000-0000-000000992334'"))
                 .containsExactly("00000000-0000-0000-0000-000000992334|RETRACTED|provider:updated");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldWithholdSuppressedFeedbackWithoutCreatingAnUnattemptedCopy(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT state || '|' || stop_reason FROM feedback WHERE"
@@ -267,6 +305,12 @@ class PracticeV1CutoverMigrationTest {
                 .isEmpty();
         assertThat(column(database, "SELECT state FROM feedback_copy WHERE id='00000000-0000-0000-0000-000000992332'"))
                 .containsExactly("WRITE_STARTED");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreservePracticeStateFiltersAndWorkspaceReviewScope(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT review_scope_repositories || '|' || review_scope_people FROM workspace WHERE"
@@ -276,19 +320,33 @@ class PracticeV1CutoverMigrationTest {
                         database,
                         "SELECT definition->'reviewOn'->'state'->'state' FROM practice_version WHERE id=992131"))
                 .containsExactly("[\"OPEN\"]");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreserveImmutableConsentFacts(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT account_id || '|' || purpose || '|' || granted || '|' || mechanism || '|' ||"
                                 + " notice_version FROM consent_decision WHERE id=992251"))
                 .containsExactly("992106|PRIVACY_NOTICE_ACKNOWLEDGEMENT|true|ACCOUNT_SETTINGS|2026-08-30");
         assertThatThrownBy(() -> execute(database, "UPDATE consent_decision SET granted=false WHERE id=992251"))
+                .rootCause()
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         error -> assertThat(error.getSQLState()).isEqualTo("55000"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldRejectInvalidReadbackWithoutChangingPostedCopies(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThatThrownBy(() -> execute(
                         database,
                         "UPDATE feedback_copy SET readback='NOT_A_READBACK' WHERE"
                                 + " id='00000000-0000-0000-0000-000000992171'"))
+                .rootCause()
                 .isInstanceOfSatisfying(
                         SQLException.class,
                         error -> assertThat(error.getSQLState()).isEqualTo("23514"));
@@ -297,6 +355,12 @@ class PracticeV1CutoverMigrationTest {
                         "SELECT state || '|' || external_ref FROM feedback_copy WHERE"
                                 + " id='00000000-0000-0000-0000-000000992171'"))
                 .containsExactly("POSTED|provider:123");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"prod", "dev"})
+    void shouldPreserveCompositionApprovalAndResponseHistory(String context) throws Exception {
+        var database = migratedDatabase(context);
         assertThat(column(
                         database,
                         "SELECT admission_attempt || '|' || admission_digest || '|' || basis_digest FROM"
@@ -313,71 +377,5 @@ class PracticeV1CutoverMigrationTest {
                                 + " feedback_response r JOIN feedback f ON f.id=r.feedback_id AND"
                                 + " f.workspace_id=r.workspace_id WHERE r.id='00000000-0000-0000-0000-000000992263'"))
                 .containsExactly("992106|ADDRESSED|HELPFUL");
-    }
-
-    private static final Map<String, TestDatabase> NATIVE_TEMPLATES = new HashMap<>();
-
-    static synchronized TestDatabase migratedDatabase(String context) throws Exception {
-        var template = NATIVE_TEMPLATES.get(context);
-        if (template == null) {
-            template = releasedDatabase(context);
-            upgrade(template, context);
-            NATIVE_TEMPLATES.put(context, template);
-        }
-        return PostgreSQLTestContainer.copyDatabase(
-                "native_model_" + UUID.randomUUID().toString().replace("-", ""), template);
-    }
-
-    static TestDatabase releasedDatabase(String context) throws Exception {
-        var database = PostgreSQLTestContainer.createReleasedDatabase(
-                "practice_v1_" + context + "_" + UUID.randomUUID().toString().replace("-", ""), context);
-        assertThat(column(
-                        database,
-                        "SELECT count(*)::text FROM databasechangelog WHERE filename LIKE '%" + BRANCH_FILE + "'"))
-                .containsExactly("0");
-        assertThat(column(
-                        database,
-                        "SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public' AND"
-                                + " table_name='observation'"))
-                .containsExactly("1");
-        try (var input = Objects.requireNonNull(
-                PracticeV1CutoverMigrationTest.class.getResourceAsStream("/db/practice-cutover/released-seed.sql"))) {
-            execute(database, new String(input.readAllBytes(), StandardCharsets.UTF_8));
-        }
-        return database;
-    }
-
-    static void upgrade(TestDatabase database, String context) throws Exception {
-        try (var liquibase = liquibase(database, "db/master.xml")) {
-            liquibase.update(new Contexts(context), new LabelExpression());
-        }
-    }
-
-    private static Liquibase liquibase(TestDatabase database, String changelog) throws Exception {
-        return new Liquibase(
-                changelog,
-                new ClassLoaderResourceAccessor(),
-                DatabaseFactory.getInstance().findCorrectDatabaseImplementation(new JdbcConnection(connect(database))));
-    }
-
-    private static Connection connect(TestDatabase database) throws SQLException {
-        return DriverManager.getConnection(database.jdbcUrl(), database.username(), database.password());
-    }
-
-    static void execute(TestDatabase database, String sql) throws SQLException {
-        try (var connection = connect(database);
-                var statement = connection.createStatement()) {
-            statement.execute(sql);
-        }
-    }
-
-    static List<@Nullable String> column(TestDatabase database, String sql) throws SQLException {
-        try (var connection = connect(database);
-                var statement = connection.createStatement();
-                var rows = statement.executeQuery(sql)) {
-            List<@Nullable String> values = new ArrayList<>();
-            while (rows.next()) values.add(rows.getString(1));
-            return values;
-        }
     }
 }

@@ -1,2 +1,0 @@
-## Not recorded
-This session ended without a result for test-practice: text outside a submit_result call records nothing. Submit the outcome its criterion and the evidence you read support, in one submit_result call. If a required source is missing, truncated or blocked, that is a collection gap: submit nothing.

@@ -39,7 +39,7 @@ class MentorInterruptedReplyIntegrationTest extends AbstractWorkspaceIntegration
         ensureMembership(workspace, mentor, WorkspaceRole.MEMBER);
         UUID threadId = UUID.randomUUID();
         ChatThread thread =
-                persistence.ensureThread(workspace.getId(), threadId, mentor.getId(), "How do I link issues?");
+                persistence.ensureThread(workspace.getId(), threadId, accountId(mentor), "How do I link issues?");
         UUID assistantId = UUID.randomUUID();
         var cookie =
                 persistence.persistInFlight(thread, "How do I link issues?", assistantId, null, admittedMentorConfig());

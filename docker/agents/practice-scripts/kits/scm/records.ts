@@ -3,7 +3,7 @@ import { z } from "zod";
 export const COMMIT = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 export const isCommit = (value: string): boolean => COMMIT.test(value);
 function notKnownWhenUnnamed<const T extends readonly [string, ...string[]]>(values: T) {
-	return z.union([z.enum(values).optional(), z.unknown().transform(() => undefined)]);
+	return z.enum(values).optional();
 }
 
 /** `metadata.json` of a pull request: `PullRequestContentSource.buildPullRequestMetadata`. */

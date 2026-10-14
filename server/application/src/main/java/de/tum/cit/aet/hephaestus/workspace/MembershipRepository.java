@@ -17,13 +17,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.transaction.annotation.Transactional;
 
-@WorkspaceAgnostic("Reads bind an explicit workspace or account; verified absorption spans workspaces")
 public interface MembershipRepository extends JpaRepository<Membership, Membership.Id> {
     List<Membership> findByWorkspace_Id(Long workspaceId);
 
     boolean existsByWorkspace_IdAndId_AccountIdAndLeftAtIsNull(long workspaceId, long accountId);
 
-    @Query("SELECT m.id.accountId FROM Membership m WHERE m.workspace.id = :workspaceId AND m.reviewSelected = true ORDER BY m.id.accountId")
+    @Query(
+            "SELECT m.id.accountId FROM Membership m WHERE m.workspace.id = :workspaceId AND m.reviewSelected = true ORDER BY m.id.accountId")
     List<Long> findSelectedAccountIds(@Param("workspaceId") long workspaceId);
 
     @Query("""
@@ -72,8 +72,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
                WHERE i.account.id = a.id AND i.providerId = :providerId AND i.disabledAt IS NULL))
         """)
     Set<Long> findEligibleAccountIds(
-            @Param("workspaceId") long workspaceId,
-            @Param("providerId") @Nullable Long providerId);
+            @Param("workspaceId") long workspaceId, @Param("providerId") @Nullable Long providerId);
 
     @Modifying
     @WorkspaceAgnostic("Account absorption spans workspaces")
@@ -108,6 +107,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
     Optional<Membership> findByWorkspace_IdAndAccount_Id(
             @Param("workspaceId") Long workspaceId, @Param("accountId") Long accountId);
 
+    @WorkspaceAgnostic("An account reads its memberships across workspaces")
     @Query("SELECT m FROM Membership m WHERE m.id.accountId = :accountId")
     List<Membership> findByAccount_Id(@Param("accountId") Long accountId);
 
@@ -155,6 +155,7 @@ public interface MembershipRepository extends JpaRepository<Membership, Membersh
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
     @Modifying
+    @WorkspaceAgnostic("Account erasure or verified absorption removes memberships across workspaces")
     @Query("DELETE FROM Membership m WHERE m.id.accountId = :accountId")
     void deleteByAccountId(@Param("accountId") long accountId);
 }

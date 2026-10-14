@@ -175,6 +175,7 @@ import { hostModels, ModelBudget } from "./work/practice-scripts/lib/core/models
 import {
 	UnratedError,
 	type UnratedReason,
+	z,
 } from "./work/practice-scripts/lib/core/practice-script.ts";
 import {
 	notReached as notReachedOutcome,
@@ -189,26 +190,741 @@ import {
 import { InputReader } from "./work/practice-scripts/lib/core/script-inputs.ts";
 import { abortReasonOf, RETURN_MS } from "./work/practice-scripts/lib/core/script-run.ts";
 
+function jsonArray(value: unknown): unknown[] {
+	return Array.isArray(value) ? value : [];
+}
+
+function logValue(value: unknown): string {
+	if (typeof value === "string") {
+		return value;
+	}
+	if (value === undefined) {
+		return "undefined";
+	}
+	return JSON.stringify(value);
+}
+
+/** SDK event arrays may be absent before completion or after abort. */
+function listOrEmpty<T>(items: T[] | undefined): T[] {
+	return items ?? [];
+}
+
+/** The list, or the one item that was sent where a list of them was asked for. */
+function listOrItem(value: unknown): unknown[] {
+	if (Array.isArray(value)) {
+		return value;
+	}
+	return isRecord(value) ? [value] : [];
+}
+
+/** The schema for such a list: the array, or the same array as a JSON string. */
+function listSchema(items: unknown, what: string) {
+	return {
+		anyOf: [
+			{ type: "array", minItems: 1, maxItems: 10, items },
+			{ type: "string", minLength: 2, description: `The ${what} as a JSON-encoded array` },
+		],
+	};
+}
+
+/** The task this runner was started for. */
+interface TaskEnvelope {
+	schemaVersion: number;
+	reviewId: string;
+	jobId: string;
+	attempt: number;
+	workspaceId: string;
+	paths: ReturnType<typeof taskPaths>;
+	prompt: string;
+	repositoryFullName: unknown;
+	pullRequestNumber: unknown;
+}
+
+interface DestinationBounds {
+	enabled: boolean;
+	maxPieces: number;
+}
+
+type CopyForm = "LINE_NOTE" | "FILE_NOTE";
+
+/** The task-declared composition request, once its bounds have been clamped to what this run may do. */
+interface CompositionRequest {
+	destinations: Record<Destination, DestinationBounds>;
+	onWorkCopyForms: CopyForm[];
+	minDistinctItems: number;
+}
+
+interface AdmittedCitation {
+	index: number;
+	[key: string]: unknown;
+}
+
+interface AdmittedChild {
+	problemId: string;
+	citations: AdmittedCitation[];
+	[key: string]: unknown;
+}
+
+/**
+ * One admitted result as admission projected it: one practice's verdict and its problems. Composition rests on a
+ * result by its resultId and on one problem by its problemId. A result's own citations never anchor a
+ * note; a problem's may. Validate consumed fields; preserve other server fields for the composer.
+ */
+interface AdmittedResult {
+	resultId: string;
+	practiceSlug: string;
+	outcome: Outcome;
+	citations: AdmittedCitation[];
+	problems: AdmittedChild[];
+	[key: string]: unknown;
+}
+
+function isAdmittedCitation(value: unknown): value is AdmittedCitation {
+	return isRecord(value) && typeof value.index === "number";
+}
+
+/** The server sets every one of these; a missing one stops the runner before it does any work. */
+function requiredEnv(name: string): string {
+	const value = process.env[name];
+	if (!hasText(value)) {
+		throw new Error(`${name} env var is required`);
+	}
+	return value;
+}
+
+/** What this run spent, in the buckets usage.json reports. */
+interface UsageTotals {
+	model: string | null;
+	inputTokens: number;
+	outputTokens: number;
+	reasoningTokens: number;
+	cacheReadTokens: number;
+	cacheWriteTokens: number;
+	costUsd: number;
+	totalCalls: number;
+}
+
+/** One attempt's worth of what happened, for runner-debug.json. */
+interface AttemptDebug {
+	label: string;
+	durationMs: number;
+	assistantMessages: number;
+	stopReasons: Record<string, number>;
+	usage: UsageReport;
+	resultFilePresent: boolean;
+}
+
+interface TurnTrace {
+	phase: SessionPhase;
+	modelError: boolean;
+	/** Failed or aborted model calls of this turn, by the adapter's own closed kind; no provider text is kept. */
+	modelFailures: Partial<Record<ModelFailureKind, number>>;
+	/** The most recent available adapter failure timestamp; an unknown later failure keeps its own time null. */
+	lastModelFailureAt: number | null;
+	/**
+	 * The failure the turn's last model call ended on, marked when the SDK then ended the retry unsuccessfully; null once a later
+	 * call succeeds.
+	 */
+	finalModelFailure: (ModelFailure & { retryEndedUnsuccessfully: boolean }) | null;
+	/** Failed or aborted calls whose failure diagnostic was missing or unreadable; their kind reads UNKNOWN. */
+	unattributedModelFailures: number;
+	/** The adapter's own call spans, failed calls included; calls without one are not counted. */
+	modelCallTiming: ModelCallTiming;
+	runtimeError: boolean;
+	label: string;
+	durationMs: number;
+	calls: number;
+	toolCalls: Record<string, number>;
+	/** Calls of the turn's recording tool, counted whether or not the SDK let them reach it. */
+	recordingCalls: number;
+	stored: number;
+	refused: number;
+	refusalReasons: string[];
+	/** Calls that ended in an error: a bash command that failed, a schema the SDK refused, a truncated call. */
+	toolErrors: number;
+	toolErrorReasons: string[];
+	/** The most times one call — the same tool with the same arguments — was repeated in this turn. */
+	repeatedCalls: number;
+	compactions: number;
+	providerRetries: number;
+	outputTokens: number;
+	/** Calls that ran into the model's output limit, and so reached their tool incomplete. */
+	cutOff: number;
+	/** What the turn may spend; it ends after the model call that spends it. */
+	budget: Work;
+	/** Whether the turn was told to record what it owes before its budget ran out. */
+	askedToRecord: boolean;
+	/** Why the runner ended the turn; null when the model ended it. */
+	stoppedBy: StopReason | null;
+}
+
+/**
+ * Why the runner ended a turn: its work budget was spent, the session stalled, the run neared its safety
+ * ceiling, or a loop guard fired.
+ */
+type StopReason = "budget" | "stall" | "safety" | "loop";
+
+interface PublicHistoryReceipt {
+	readAt: string;
+	workCapturedAt: string | null;
+	entries: {
+		id: unknown;
+		deliveredAt: unknown;
+		eligibleForAlreadySaid: boolean;
+		eligibleForPriorAdvice: boolean;
+	}[];
+	omissions: { oversizedEntries: number; budgetEntries: number };
+}
+
+function compareSlugs(a: string, b: string): number {
+	if (a === b) {
+		return 0;
+	}
+	return a < b ? -1 : 1;
+}
+
+interface Validated {
+	candidate: Candidate;
+	notes: string[];
+}
+
+function incompleteCoverageText(coverage: Coverage): string {
+	const omitted = coverage.complete
+		? []
+		: coverage.omitted.map(
+				(omission) =>
+					`${omission.count} ${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`,
+			);
+	return (
+		`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
+		"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
+		"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question"
+	);
+}
+
+function validateDomainBasis(
+	submission: NormalizedSubmission,
+	assignment: PracticeInputs | undefined,
+): void {
+	const scan = assignment?.scope.kind === "SCAN";
+
+	for (const problem of submission.problems ?? []) {
+		if (scan && problem.basis.type !== "state") {
+			throw new Error("basis_not_allowed: a scan needs state basis");
+		}
+		if (!scan && assignment?.kind === "scm.pull_request" && problem.basis.type === "state") {
+			throw new Error(
+				"state_basis_not_allowed: an ITEM change needs introduced, worsened or duty basis",
+			);
+		}
+	}
+}
+
+/** Infer an omitted diff side by exact quote match, preferring NEW; never override a supplied side. */
+function resolveOnEitherSide(citation: Citation, content: string): ReturnType<typeof resolveQuote> {
+	if (citation.sourceKind !== "scm.pull-request.diff" || citation.side !== undefined) {
+		return resolveQuote(citation, content);
+	}
+	const onNew = resolveQuote({ ...citation, side: "NEW" }, content);
+	if ("quote" in onNew) {
+		citation.side = "NEW";
+		return onNew;
+	}
+	const onOld = resolveQuote({ ...citation, side: "OLD" }, content);
+	if ("quote" in onOld) {
+		citation.side = "OLD";
+		return onOld;
+	}
+	return { mismatch: `${onNew.mismatch} (no side was named; NEW was tried, then OLD)` };
+}
+
+function excerptOf(text: string): string {
+	return JSON.stringify(text.length > 160 ? `${text.slice(0, 160)}…` : text);
+}
+
+function readTheChange(submission: NormalizedSubmission): boolean {
+	if (submissionCitations(submission).some((citation) => citation.sourceKind === DIFF_SOURCE)) {
+		return true;
+	}
+	const consulted = [
+		...(submission.evidence.search?.consulted ?? []),
+		...(submission.evidence.inapplicability?.consulted ?? []),
+	];
+	return consulted.includes(DIFF_SOURCE);
+}
+
+function candidateReadTheChange(candidate: Candidate): boolean {
+	const cited = [
+		...candidate.citations,
+		...(candidate.outcome === "NOT_MET"
+			? candidate.problems.flatMap((problem) => problem.citations)
+			: []),
+	];
+	const { evidence } = candidate;
+	const consulted = [
+		...("search" in evidence && evidence.search !== undefined ? evidence.search.consulted : []),
+		...("inapplicability" in evidence ? evidence.inapplicability.consulted : []),
+	];
+	return (
+		cited.some((citation) => citation.sourceKind === DIFF_SOURCE) || consulted.includes(DIFF_SOURCE)
+	);
+}
+
+/** A draft disposition; its practice slug is its stable reference within this review. */
+type Recorded =
+	| (({ kind: "stored" } | { kind: "revised" }) & {
+			slug: string;
+			negative: boolean;
+			filled: string[];
+	  })
+	| { kind: "duplicate"; slug: string }
+	| { kind: "refused"; slug: string; reason: string };
+
+interface TurnDemand {
+	owed: () => number;
+	nudge: string;
+	endsWhenPaid?: true;
+}
+
+function problemsIn(result: unknown): number {
+	const details = isRecord(result) ? result.details : undefined;
+	if (!isRecord(details)) {
+		return 0;
+	}
+	return [details.inserted, details.duplicates, details.refused]
+		.map((count) => (typeof count === "number" ? count : 0))
+		.reduce((sum, count) => sum + count, 0);
+}
+
+/**
+ * What one review session's evidence reads reached, from the host's own receipts of its tools: every read,
+ * the reads its tool cut short and the session did not read on from, and the reads that failed.
+ */
+interface SessionReads {
+	reads: number;
+	cutFiles: Set<string>;
+	cutSearches: string[];
+	failed: string[];
+	pending: Map<string, unknown>;
+}
+
+function newSessionReads(): SessionReads {
+	return { reads: 0, cutFiles: new Set(), cutSearches: [], failed: [], pending: new Map() };
+}
+
+function sessionReceipts(reads: SessionReads): Receipts {
+	return {
+		reads: reads.reads,
+		truncatedReads: reads.cutFiles.size + reads.cutSearches.length,
+		failedReads: reads.failed.length,
+	};
+}
+
+// Each review owns its draft; only the script's final return becomes a candidate.
+interface ActiveReview {
+	slug: string;
+	draft: Candidate | null;
+	reads: SessionReads;
+	reader?: EvidenceReader;
+	domainReads: Receipts;
+}
+
+interface SubmitResultDetails {
+	inserted: number;
+	revised: number;
+	duplicates: number;
+	refused: number;
+}
+
+function governedScanRead(reader: EvidenceReader) {
+	return defineTool({
+		name: "read",
+		label: "Read pinned file",
+		description:
+			"Read a captured repository file at the pinned commit. Files are context for the assigned file only.",
+		parameters: {
+			type: "object",
+			additionalProperties: false,
+			required: ["path"],
+			properties: {
+				path: { type: "string" },
+				offset: { type: "integer", minimum: 1 },
+				limit: { type: "integer", minimum: 1 },
+			},
+		},
+		execute: async (_id, params: { path: string; offset?: number; limit?: number }, signal) => {
+			const read = await reader.answer(
+				{
+					op: "read",
+					path: params.path,
+					...(params.offset === undefined ? {} : { offsetLine: params.offset }),
+					...(params.limit === undefined ? {} : { maxLines: params.limit }),
+				},
+				signal,
+			);
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: read.status === "FOUND" ? read.text : `${params.path}: ${read.status}`,
+					},
+				],
+				details: {
+					status: read.status,
+					...(read.status === "FOUND" ? { truncated: read.truncated } : {}),
+				},
+			};
+		},
+	});
+}
+
+function recordOnceMoreText(slug: string): string {
+	return (
+		`## Not recorded\nThis session ended without a result for ${slug}: text outside a ` +
+		`submit_result call records nothing. Submit the outcome its criterion and the evidence you read ` +
+		`support, in one submit_result call. If a required source is missing, truncated or blocked, that ` +
+		`is a collection gap: submit nothing.`
+	);
+}
+
+type Destination = (typeof DESTINATIONS)[number];
+
+type PrivateDestination = (typeof PRIVATE_DESTINATIONS)[number];
+
+type FeedbackAction = (typeof ACTIONS)[number];
+
+function isDestination(value: unknown): value is Destination {
+	return DESTINATIONS.some((destination) => destination === value);
+}
+
+function optionalString(value: unknown): string | undefined {
+	return typeof value === "string" ? value : undefined;
+}
+
+interface ConversationNotes {
+	situation?: string;
+	capability?: string;
+	evidenceSummary?: string;
+	inConversationLearning?: string;
+	alreadySaid?: string;
+}
+
+/**
+ * A private-destination piece; per-piece validation in readFeedbackPiece/validateFeedback. As read, basedOn holds the ids the
+ * composer named; as stored, the references they resolve to.
+ */
+interface FeedbackPieceOf<Basis> extends ComposedFeedbackPiece {
+	destination: PrivateDestination;
+	practiceSlug: string;
+	basedOn: Basis;
+	action: FeedbackAction;
+	supersedesThreadKey?: string;
+	withholdReason?: string;
+	title?: string;
+	body?: string;
+	nextStep?: string;
+	notes?: ConversationNotes;
+}
+
+type ReadFeedbackPiece = FeedbackPieceOf<string[]>;
+
+type FeedbackPiece = FeedbackPieceOf<EvidenceRef[]>;
+
+function feedbackBody(piece: Pick<FeedbackPiece, "title" | "body" | "nextStep" | "notes">): string {
+	const sections = [piece.title, piece.body, piece.nextStep];
+	for (const [field, label] of [
+		["situation", "Situation"],
+		["capability", "Capability"],
+		["evidenceSummary", "Evidence"],
+		["inConversationLearning", "In conversation"],
+		["alreadySaid", "Earlier feedback"],
+	] as const) {
+		const text = piece.notes?.[field];
+		if (hasText(text)) {
+			sections.push(`${label}: ${text}`);
+		}
+	}
+	return sections.filter(hasText).join("\n\n");
+}
+
+interface LeanCitation {
+	index: number;
+	sourceKind: unknown;
+	path: unknown;
+	side: unknown;
+	startLine: unknown;
+	endLine: unknown;
+	anchorable: unknown;
+}
+
+interface LeanResult {
+	resultId: string;
+	practiceSlug: string;
+	outcome: Outcome;
+	citations: LeanCitation[];
+	problems: {
+		problemId: string;
+		severity: unknown;
+		anchorable: unknown;
+		citations: LeanCitation[];
+	}[];
+}
+
+/** What gets written to feedback.json, with the fields the reader resolves references against. */
+type CompositionPhase = "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK";
+
+type CompositionFailureReason =
+	| "MODEL_ERROR"
+	| "RUNTIME_ERROR"
+	| "BUDGET"
+	| "STALL"
+	| "SAFETY"
+	| "LOOP"
+	| "NO_DECISION"
+	| "SERVER_REFUSED"
+	| "PRIVATE_NOT_RECOVERED";
+
+interface CompositionFailure {
+	phase: CompositionPhase;
+	reason: CompositionFailureReason;
+}
+
+interface ComposedFeedback extends ComposedFeedbackEnvelope {
+	compositionFailures: CompositionFailure[];
+	contractVersion: number;
+	admissionDigest: string | null;
+	results: LeanResult[];
+	preparedTargets: PreparedFeedbackTarget[];
+	feedback: FeedbackPiece[];
+	review: ComposedReview | null;
+	preparation: FeedbackPreparationReceipt | null;
+}
+
+function leanCitation(citation: AdmittedCitation): LeanCitation {
+	return {
+		index: citation.index,
+		sourceKind: citation.sourceKind,
+		path: citation.path,
+		side: citation.side,
+		startLine: citation.startLine,
+		endLine: citation.endLine,
+		anchorable: citation.anchorable,
+	};
+}
+
+function resultsById(results: readonly AdmittedResult[]): Map<string, AdmittedResult> {
+	return new Map(results.map((result) => [result.resultId, result]));
+}
+
+// The composer references admitted results and problems; it cannot author verdicts, citations, or locations.
+interface ReportFeedbackDetails {
+	stored: number;
+	destination?: Destination;
+	total?: number;
+}
+
+function skipped(text: string): { stored: boolean; text: string } {
+	return { stored: false, text };
+}
+
+interface ReportReviewDetails {
+	stored: number;
+}
+
+// A completed response can contain more calls; final composition must reject all subsequent writes.
+interface PublicReviewState {
+	final: boolean;
+	reviewContext: "LOST" | "RESTORING" | "HELD";
+}
+
+function finishReviewText(undecided: readonly string[]): string {
+	const owed =
+		undecided.length > 0
+			? `## Undecided\nThe review leaves these NOT_MET results undecided: ${undecided.join(", ")}.`
+			: "## Unfinished\nThe review on this work is not final yet.";
+	return `${owed}\nStore the final review with one report_review call. A review that says nothing is still one final report_review call. No prose outside the calls.`;
+}
+
+function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
+	if (hasText(piece.body) || hasText(piece.nextStep)) {
+		return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing for this destination is read out; skipped.";
+	}
+	const { notes } = piece;
+	for (const field of [
+		"situation",
+		"capability",
+		"evidenceSummary",
+		"inConversationLearning",
+	] as const) {
+		if (isBlank(notes?.[field])) {
+			return `CONVERSATION needs notes.${field}; skipped.`;
+		}
+	}
+	return null;
+}
+
+function normalizeQuotedText(value: string): string {
+	return value
+		.normalize("NFKC")
+		.replaceAll(/[“”„‟]/gu, '"')
+		.replaceAll(/[‘’‚‛]/gu, "'")
+		.replaceAll(/\s+/gu, " ")
+		.trim()
+		.toLowerCase();
+}
+
+function coordinatesOf(citation: unknown): unknown {
+	if (!isRecord(citation)) {
+		return citation;
+	}
+	const { quote: _quote, verification: _verification, ...coordinates } = citation;
+	return coordinates;
+}
+
+/** A staged file as a titled block of the composition turn, or a pointer to it when it is too large. */
+const COMPOSITION_BLOCK_LIMIT = 32_000;
+
+function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): string {
+	if (!existsSync(file)) {
+		return "";
+	}
+	const text = readFileSync(file, "utf8").trim();
+	return text.length > limit
+		? `### ${label} — too large to show here; read \`${file}\`\n`
+		: `### ${label}\n\`\`\`json\n${text}\n\`\`\`\n`;
+}
+
+/** The cause behind a wrapped error, in parentheses, or nothing when the error carries none. */
+function causeText(error: unknown): string {
+	return error instanceof Error && error.cause !== undefined ? ` (${errorText(error.cause)})` : "";
+}
+
+async function answerText(response: Response): Promise<string> {
+	const problem: unknown = await response.json().catch(() => null);
+	const detail = isRecord(problem) ? problem.detail : null;
+	return typeof detail === "string" && detail.length > 0
+		? detail
+		: "the server gave no problem detail";
+}
+
+function recordModelResponse(trace: TurnTrace, stopReason: string, message: unknown): void {
+	const failed = stopReason === "error" || stopReason === "aborted";
+	addModelCall(trace.modelCallTiming, message, failed);
+	if (failed) {
+		const failure = modelFailure(message);
+		trace.modelFailures[failure.kind] = (trace.modelFailures[failure.kind] ?? 0) + 1;
+		if (failure.source !== "ADAPTER") {
+			trace.unattributedModelFailures += 1;
+		}
+		trace.lastModelFailureAt = failure.at ?? trace.lastModelFailureAt;
+		trace.finalModelFailure = { ...failure, retryEndedUnsuccessfully: false };
+	} else {
+		trace.finalModelFailure = null;
+	}
+}
+
+function recordUnsuccessfulRetryEnd(trace: TurnTrace): void {
+	const final = trace.finalModelFailure;
+	if (final !== null) {
+		trace.finalModelFailure = { ...final, retryEndedUnsuccessfully: true };
+	}
+}
+
+function scheduleDeadline(timeoutMs: number, onTimeout: () => void) {
+	// Read timer state through a function so TypeScript does not retain a pre-await narrowing.
+	let expired = false;
+	const { promise: elapsed, resolve: release } = Promise.withResolvers<undefined>();
+	const timer = setTimeout(() => {
+		expired = true;
+		onTimeout();
+		release(undefined);
+	}, timeoutMs);
+	return { elapsed, timer, expired: () => expired };
+}
+
+/** A mid-turn nudge; the turn goes on either way, so a steer that fails is only logged. */
+async function steer(session: AgentSession, message: string): Promise<void> {
+	try {
+		await session.steer(message);
+	} catch (error) {
+		console.error(`[pi-runner] steer failed: ${errorText(error)}`);
+	}
+}
+
+/** Abort and wait for idle; Pi refuses a new prompt while the previous run is still active. */
+async function abortSession(session: AgentSession): Promise<void> {
+	session.clearQueue();
+	// A compaction in flight is a model call of its own that `abort()` leaves running, and the
+	// session is not idle until it ends; the next turn compacts again if it must, inside its own share.
+	session.abortCompaction();
+	try {
+		await session.abort();
+	} catch (error) {
+		console.error(`[pi-runner] session abort failed: ${errorText(error)}`);
+	}
+}
+
+/** Return false if the previous operation does not become idle within maxMs. */
+async function settleSession(
+	session: AgentSession,
+	label: string,
+	maxMs: number,
+): Promise<boolean> {
+	if (session.isIdle) {
+		return true;
+	}
+	const started = Date.now();
+	const becameIdle = async (): Promise<boolean> => {
+		await session.waitForIdle();
+		return true;
+	};
+	const idle = await Promise.race([becameIdle(), sleep(maxMs, false)]);
+	// The run flag clears a beat after the prompt resolves; a wait that short is not worth a line.
+	const waitedMs = Date.now() - started;
+	if (!idle || waitedMs >= 1000) {
+		console.error(
+			`[pi-runner] ${label}: waited ${(waitedMs / 1000).toFixed(1)}s for the session to go idle${idle ? "" : " — still busy"}`,
+		);
+	}
+	return idle;
+}
+
+function preparedSectionOf(slug: string, section: string): string {
+	const shown = section.trim();
+	return shown
+		? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\n${shown}`
+		: "";
+}
+
+function notMetPractices(results: readonly { practiceSlug: string; outcome: Outcome }[]): string[] {
+	return [
+		...new Set(
+			results.filter((result) => result.outcome === "NOT_MET").map((result) => result.practiceSlug),
+		),
+	].toSorted();
+}
+
+function incompleteCompositionReason(
+	trace: TurnTrace,
+	safetyExpired: boolean,
+): CompositionFailureReason {
+	const stops = { budget: "BUDGET", stall: "STALL", safety: "SAFETY", loop: "LOOP" } as const;
+	if (trace.stoppedBy !== null) {
+		return stops[trace.stoppedBy];
+	}
+	if (safetyExpired) {
+		return "SAFETY";
+	}
+	if (trace.modelError) {
+		return "MODEL_ERROR";
+	}
+	if (trace.runtimeError) {
+		return "RUNTIME_ERROR";
+	}
+	return "NO_DECISION";
+}
+
 export async function runReviewJob(): Promise<void> {
-	function jsonArray(value: unknown): unknown[] {
-		return Array.isArray(value) ? value : [];
-	}
-
-	function logValue(value: unknown): string {
-		if (typeof value === "string") {
-			return value;
-		}
-		if (value === undefined) {
-			return "undefined";
-		}
-		return JSON.stringify(value);
-	}
-
-	/** SDK event arrays may be absent before completion or after abort. */
-	function listOrEmpty<T>(items: T[] | undefined): T[] {
-		return items ?? [];
-	}
-
 	/** Accept array, single-item and serialized-list forms; validate each parsed item separately. */
 	function submittedList(value: unknown): { items: unknown[] } | { error: string } {
 		if (typeof value !== "string") {
@@ -226,80 +942,6 @@ export async function runReviewJob(): Promise<void> {
 				error: `the list arrived as a string that is not valid JSON (${errorText(error)})${near}. Fix that spot — usually a quote inside a text left unescaped — or send the array itself`,
 			};
 		}
-	}
-
-	/** The list, or the one item that was sent where a list of them was asked for. */
-	function listOrItem(value: unknown): unknown[] {
-		if (Array.isArray(value)) {
-			return value;
-		}
-		return isRecord(value) ? [value] : [];
-	}
-
-	/** The schema for such a list: the array, or the same array as a JSON string. */
-	function listSchema(items: unknown, what: string) {
-		return {
-			anyOf: [
-				{ type: "array", minItems: 1, maxItems: 10, items },
-				{ type: "string", minLength: 2, description: `The ${what} as a JSON-encoded array` },
-			],
-		};
-	}
-
-	/** The task this runner was started for. */
-	interface TaskEnvelope {
-		schemaVersion: number;
-		reviewId: string;
-		jobId: string;
-		attempt: number;
-		workspaceId: string;
-		paths: ReturnType<typeof taskPaths>;
-		prompt: string;
-		repositoryFullName: unknown;
-		pullRequestNumber: unknown;
-	}
-
-	interface DestinationBounds {
-		enabled: boolean;
-		maxPieces: number;
-	}
-
-	type CopyForm = "LINE_NOTE" | "FILE_NOTE";
-
-	/** The task-declared composition request, once its bounds have been clamped to what this run may do. */
-	interface CompositionRequest {
-		destinations: Record<Destination, DestinationBounds>;
-		onWorkCopyForms: CopyForm[];
-		minDistinctItems: number;
-	}
-
-	interface AdmittedCitation {
-		index: number;
-		[key: string]: unknown;
-	}
-
-	interface AdmittedChild {
-		problemId: string;
-		citations: AdmittedCitation[];
-		[key: string]: unknown;
-	}
-
-	/**
-	 * One admitted result as admission projected it: one practice's verdict and its problems. Composition rests on a
-	 * result by its resultId and on one problem by its problemId. A result's own citations never anchor a
-	 * note; a problem's may. Validate consumed fields; preserve other server fields for the composer.
-	 */
-	interface AdmittedResult {
-		resultId: string;
-		practiceSlug: string;
-		outcome: Outcome;
-		citations: AdmittedCitation[];
-		problems: AdmittedChild[];
-		[key: string]: unknown;
-	}
-
-	function isAdmittedCitation(value: unknown): value is AdmittedCitation {
-		return isRecord(value) && typeof value.index === "number";
 	}
 
 	function isAdmittedChild(value: unknown): value is AdmittedChild {
@@ -392,14 +1034,7 @@ export async function runReviewJob(): Promise<void> {
 	const REVIEW_INPUT_ROOT = "work/review-input";
 	/** The runner's own record of what this review has recorded so far; read back after a compaction. */
 	const NOTES_PATH = `${CWD}/work/notes/review.md`;
-	/** The server sets every one of these; a missing one stops the runner before it does any work. */
-	function requiredEnv(name: string): string {
-		const value = process.env[name];
-		if (!hasText(value)) {
-			throw new Error(`${name} env var is required`);
-		}
-		return value;
-	}
+
 	function positiveIntegerEnv(name: string): number {
 		const text = requiredEnv(name);
 		const value = Number(text);
@@ -484,27 +1119,6 @@ export async function runReviewJob(): Promise<void> {
 	const practiceExhaustiveSources = new Map(
 		practiceIndex.map((practice) => [practice.slug, new Set(practice.exhaustiveSources)]),
 	);
-	/** What this run spent, in the buckets usage.json reports. */
-	interface UsageTotals {
-		model: string | null;
-		inputTokens: number;
-		outputTokens: number;
-		reasoningTokens: number;
-		cacheReadTokens: number;
-		cacheWriteTokens: number;
-		costUsd: number;
-		totalCalls: number;
-	}
-
-	/** One attempt's worth of what happened, for runner-debug.json. */
-	interface AttemptDebug {
-		label: string;
-		durationMs: number;
-		assistantMessages: number;
-		stopReasons: Record<string, number>;
-		usage: UsageReport;
-		resultFilePresent: boolean;
-	}
 
 	const usageTotals: UsageTotals = {
 		model: null,
@@ -516,71 +1130,14 @@ export async function runReviewJob(): Promise<void> {
 		costUsd: 0,
 		totalCalls: 0,
 	};
-	interface TurnTrace {
-		phase: SessionPhase;
-		modelError: boolean;
-		/** Failed or aborted model calls of this turn, by the adapter's own closed kind; no provider text is kept. */
-		modelFailures: Partial<Record<ModelFailureKind, number>>;
-		/** The most recent available adapter failure timestamp; an unknown later failure keeps its own time null. */
-		lastModelFailureAt: number | null;
-		/**
-		 * The failure the turn's last model call ended on, marked when the SDK then ended the retry unsuccessfully; null once a later
-		 * call succeeds.
-		 */
-		finalModelFailure: (ModelFailure & { retryEndedUnsuccessfully: boolean }) | null;
-		/** Failed or aborted calls whose failure diagnostic was missing or unreadable; their kind reads UNKNOWN. */
-		unattributedModelFailures: number;
-		/** The adapter's own call spans, failed calls included; calls without one are not counted. */
-		modelCallTiming: ModelCallTiming;
-		runtimeError: boolean;
-		label: string;
-		durationMs: number;
-		calls: number;
-		toolCalls: Record<string, number>;
-		/** Calls of the turn's recording tool, counted whether or not the SDK let them reach it. */
-		recordingCalls: number;
-		stored: number;
-		refused: number;
-		refusalReasons: string[];
-		/** Calls that ended in an error: a bash command that failed, a schema the SDK refused, a truncated call. */
-		toolErrors: number;
-		toolErrorReasons: string[];
-		/** The most times one call — the same tool with the same arguments — was repeated in this turn. */
-		repeatedCalls: number;
-		compactions: number;
-		providerRetries: number;
-		outputTokens: number;
-		/** Calls that ran into the model's output limit, and so reached their tool incomplete. */
-		cutOff: number;
-		/** What the turn may spend; it ends after the model call that spends it. */
-		budget: Work;
-		/** Whether the turn was told to record what it owes before its budget ran out. */
-		askedToRecord: boolean;
-		/** Why the runner ended the turn; null when the model ended it. */
-		stoppedBy: StopReason | null;
-	}
-	/**
-	 * Why the runner ended a turn: its work budget was spent, the session stalled, the run neared its safety
-	 * ceiling, or a loop guard fired.
-	 */
-	type StopReason = "budget" | "stall" | "safety" | "loop";
+
 	const UNRATED_BY_STOP: Readonly<Record<StopReason, UnratedReason>> = {
 		budget: "budget",
 		safety: "deadline",
 		stall: "unavailable",
 		loop: "off-format",
 	};
-	interface PublicHistoryReceipt {
-		readAt: string;
-		workCapturedAt: string | null;
-		entries: {
-			id: unknown;
-			deliveredAt: unknown;
-			eligibleForAlreadySaid: boolean;
-			eligibleForPriorAdvice: boolean;
-		}[];
-		omissions: { oversizedEntries: number; budgetEntries: number };
-	}
+
 	const runnerDebug: {
 		attempts: AttemptDebug[];
 		turns: TurnTrace[];
@@ -599,13 +1156,6 @@ export async function runReviewJob(): Promise<void> {
 	const reviewState = new Map<string, Candidate>();
 	const executions = new Map<string, ProgramOutcome>();
 	let unreachedReason: "deadline" | "budget" | "error" = "deadline";
-
-	function compareSlugs(a: string, b: string): number {
-		if (a === b) {
-			return 0;
-		}
-		return a < b ? -1 : 1;
-	}
 
 	const assignedInputs = new Map<string, PracticeInputs>();
 	const assignmentReceipts = new Map<string, readonly ReadReceipt[]>();
@@ -957,11 +1507,6 @@ export async function runReviewJob(): Promise<void> {
 		return reviewState.size > 0;
 	}
 
-	interface Validated {
-		candidate: Candidate;
-		notes: string[];
-	}
-
 	/** Resolve only the path placeholders owned by the task envelope. */
 	function orchestratorWithPaths(text: string): string {
 		const {
@@ -983,38 +1528,6 @@ export async function runReviewJob(): Promise<void> {
 			/<(?<path>contextRoot|repositoryRoot|manifest|practiceIndex|practiceRoot|historyRoot)>/gu,
 			(placeholder, key: string) => paths[key] ?? placeholder,
 		);
-	}
-
-	function incompleteCoverageText(coverage: Coverage): string {
-		const omitted = coverage.complete
-			? []
-			: coverage.omitted.map(
-					(omission) =>
-						`${omission.count} ${omission.what}${omission.items === undefined ? "" : ` (${omission.items.join(", ")})`}`,
-				);
-		return (
-			`a MET result needs complete coverage, and this session's reads did not complete: ${omitted.join("; ")}. ` +
-			"Read the rest of what was cut short, with an offset or a narrower search, and submit again; or submit what the " +
-			"evidence supports: NOT_MET for a problem it proves, or COULD_NOT_DETERMINE with the open question"
-		);
-	}
-
-	function validateDomainBasis(
-		submission: NormalizedSubmission,
-		assignment: PracticeInputs | undefined,
-	): void {
-		const scan = assignment?.scope.kind === "SCAN";
-
-		for (const problem of submission.problems ?? []) {
-			if (scan && problem.basis.type !== "state") {
-				throw new Error("basis_not_allowed: a scan needs state basis");
-			}
-			if (!scan && assignment?.kind === "scm.pull_request" && problem.basis.type === "state") {
-				throw new Error(
-					"state_basis_not_allowed: an ITEM change needs introduced, worsened or duty basis",
-				);
-			}
-		}
 	}
 
 	function validateConversationAttribution(
@@ -1183,60 +1696,6 @@ export async function runReviewJob(): Promise<void> {
 		return { candidate: parsed.candidate, notes };
 	}
 
-	/** Infer an omitted diff side by exact quote match, preferring NEW; never override a supplied side. */
-	function resolveOnEitherSide(
-		citation: Citation,
-		content: string,
-	): ReturnType<typeof resolveQuote> {
-		if (citation.sourceKind !== "scm.pull-request.diff" || citation.side !== undefined) {
-			return resolveQuote(citation, content);
-		}
-		const onNew = resolveQuote({ ...citation, side: "NEW" }, content);
-		if ("quote" in onNew) {
-			citation.side = "NEW";
-			return onNew;
-		}
-		const onOld = resolveQuote({ ...citation, side: "OLD" }, content);
-		if ("quote" in onOld) {
-			citation.side = "OLD";
-			return onOld;
-		}
-		return { mismatch: `${onNew.mismatch} (no side was named; NEW was tried, then OLD)` };
-	}
-
-	function excerptOf(text: string): string {
-		return JSON.stringify(text.length > 160 ? `${text.slice(0, 160)}…` : text);
-	}
-
-	function readTheChange(submission: NormalizedSubmission): boolean {
-		if (submissionCitations(submission).some((citation) => citation.sourceKind === DIFF_SOURCE)) {
-			return true;
-		}
-		const consulted = [
-			...(submission.evidence.search?.consulted ?? []),
-			...(submission.evidence.inapplicability?.consulted ?? []),
-		];
-		return consulted.includes(DIFF_SOURCE);
-	}
-
-	function candidateReadTheChange(candidate: Candidate): boolean {
-		const cited = [
-			...candidate.citations,
-			...(candidate.outcome === "NOT_MET"
-				? candidate.problems.flatMap((problem) => problem.citations)
-				: []),
-		];
-		const { evidence } = candidate;
-		const consulted = [
-			...("search" in evidence && evidence.search !== undefined ? evidence.search.consulted : []),
-			...("inapplicability" in evidence ? evidence.inapplicability.consulted : []),
-		];
-		return (
-			cited.some((citation) => citation.sourceKind === DIFF_SOURCE) ||
-			consulted.includes(DIFF_SOURCE)
-		);
-	}
-
 	/** What a repository read returns for a file that is not text: git's own rule, a NUL in the opening bytes. */
 	const BINARY = Symbol("binary");
 
@@ -1268,8 +1727,9 @@ export async function runReviewJob(): Promise<void> {
 	/** What a citation quotes: the checkout at HEAD or at the named revision, or the derived change view. */
 	function citedContent(citation: Citation): string | typeof BINARY | null {
 		if (citation.sourceKind === TREE_SOURCE) {
-			if (citation.revision === undefined)
+			if (citation.revision === undefined) {
 				return readCheckoutFile(citation.path, citationRepository(citation));
+			}
 			const blob = readPinnedBlob(
 				citationRepository(citation),
 				citation.revision,
@@ -1334,16 +1794,6 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	/** A draft disposition; its practice slug is its stable reference within this review. */
-	type Recorded =
-		| (({ kind: "stored" } | { kind: "revised" }) & {
-				slug: string;
-				negative: boolean;
-				filled: string[];
-		  })
-		| { kind: "duplicate"; slug: string }
-		| { kind: "refused"; slug: string; reason: string };
-
 	let measurementClosed = false;
 
 	/** Calls of the recording tools one turn may make before recording anything; past it, the turn ends. */
@@ -1396,11 +1846,6 @@ export async function runReviewJob(): Promise<void> {
 	/** The session the turn events belong to, once it exists; what the loop bound aborts. */
 	let activeSession: AgentSession | null = null;
 
-	interface TurnDemand {
-		owed: () => number;
-		nudge: string;
-		endsWhenPaid?: true;
-	}
 	let turnDemand: TurnDemand | null = null;
 
 	let tokensPerProblem = 1500;
@@ -1408,16 +1853,6 @@ export async function runReviewJob(): Promise<void> {
 	let recordingMessageTokens = 0;
 	/** When the session last showed any sign of life; what the stall watchdog reads. */
 	let lastEventAt = Date.now();
-
-	function problemsIn(result: unknown): number {
-		const details = isRecord(result) ? result.details : undefined;
-		if (!isRecord(details)) {
-			return 0;
-		}
-		return [details.inserted, details.duplicates, details.refused]
-			.map((count) => (typeof count === "number" ? count : 0))
-			.reduce((sum, count) => sum + count, 0);
-	}
 
 	/**
 	 * Charges each model call to the turn in flight. The turn is told once to record what it owes when its
@@ -1554,22 +1989,6 @@ export async function runReviewJob(): Promise<void> {
 	const OMISSION_ITEMS = CANDIDATE_LIMITS.omissionItems;
 	const ABSENT_PATH = /\bENOENT\b|^Path not found: /u;
 
-	/**
-	 * What one review session's evidence reads reached, from the host's own receipts of its tools: every read,
-	 * the reads its tool cut short and the session did not read on from, and the reads that failed.
-	 */
-	interface SessionReads {
-		reads: number;
-		cutFiles: Set<string>;
-		cutSearches: string[];
-		failed: string[];
-		pending: Map<string, unknown>;
-	}
-
-	function newSessionReads(): SessionReads {
-		return { reads: 0, cutFiles: new Set(), cutSearches: [], failed: [], pending: new Map() };
-	}
-
 	function noteSessionRead(reads: SessionReads, event: AgentSessionEvent): void {
 		if (event.type === "tool_execution_start" && READ_TOOLS.has(event.toolName)) {
 			reads.pending.set(event.toolCallId, event.args);
@@ -1611,14 +2030,6 @@ export async function runReviewJob(): Promise<void> {
 		if (cut) {
 			reads.cutSearches.push(named);
 		}
-	}
-
-	function sessionReceipts(reads: SessionReads): Receipts {
-		return {
-			reads: reads.reads,
-			truncatedReads: reads.cutFiles.size + reads.cutSearches.length,
-			failedReads: reads.failed.length,
-		};
 	}
 
 	function sessionCoverage(
@@ -1685,14 +2096,6 @@ export async function runReviewJob(): Promise<void> {
 				};
 	}
 
-	// Each review owns its draft; only the script's final return becomes a candidate.
-	interface ActiveReview {
-		slug: string;
-		draft: Candidate | null;
-		reads: SessionReads;
-		reader?: EvidenceReader;
-		domainReads: Receipts;
-	}
 	let activeReview: ActiveReview | null = null;
 
 	function record(raw: unknown): Recorded {
@@ -1795,13 +2198,6 @@ export async function runReviewJob(): Promise<void> {
 			.join("\n");
 	}
 
-	interface SubmitResultDetails {
-		inserted: number;
-		revised: number;
-		duplicates: number;
-		refused: number;
-	}
-
 	const MAX_REFUSAL_LOG_CHARS = 500;
 
 	function logRefusal(slug: string, reason: string): void {
@@ -1883,48 +2279,6 @@ export async function runReviewJob(): Promise<void> {
 			out[key] = documentedShape(value);
 		}
 		return out;
-	}
-
-	function governedScanRead(reader: EvidenceReader) {
-		return defineTool({
-			name: "read",
-			label: "Read pinned file",
-			description:
-				"Read a captured repository file at the pinned commit. Files are context for the assigned file only.",
-			parameters: {
-				type: "object",
-				additionalProperties: false,
-				required: ["path"],
-				properties: {
-					path: { type: "string" },
-					offset: { type: "integer", minimum: 1 },
-					limit: { type: "integer", minimum: 1 },
-				},
-			},
-			execute: async (_id, params: { path: string; offset?: number; limit?: number }, signal) => {
-				const read = await reader.answer(
-					{
-						op: "read",
-						path: params.path,
-						...(params.offset === undefined ? {} : { offsetLine: params.offset }),
-						...(params.limit === undefined ? {} : { maxLines: params.limit }),
-					},
-					signal,
-				);
-				return {
-					content: [
-						{
-							type: "text" as const,
-							text: read.status === "FOUND" ? read.text : `${params.path}: ${read.status}`,
-						},
-					],
-					details: {
-						status: read.status,
-						...(read.status === "FOUND" ? { truncated: read.truncated } : {}),
-					},
-				};
-			},
-		});
 	}
 
 	function buildSubmitResultTool() {
@@ -2126,15 +2480,6 @@ export async function runReviewJob(): Promise<void> {
 
 	const RECORD_NUDGE = `This turn has the work left to write its result and no more. Stop exploring. Submit what the inspected evidence supports for this session's practice with submit_result. ${PERSIST_DISCIPLINE}`;
 
-	function recordOnceMoreText(slug: string): string {
-		return (
-			`## Not recorded\nThis session ended without a result for ${slug}: text outside a ` +
-			`submit_result call records nothing. Submit the outcome its criterion and the evidence you read ` +
-			`support, in one submit_result call. If a required source is missing, truncated or blocked, that ` +
-			`is a collection gap: submit nothing.`
-		);
-	}
-
 	/** Tells the server to retry a review whose admission endpoint was unreachable. */
 	const SERVER_UNREACHABLE_EXIT = 75;
 	/** Tells the server to retry a review that recorded nothing after provider failures. */
@@ -2277,119 +2622,6 @@ export async function runReviewJob(): Promise<void> {
 	let compositionAdmitted = false;
 	let admissionDigest: string | null = null;
 
-	type Destination = (typeof DESTINATIONS)[number];
-	type PrivateDestination = (typeof PRIVATE_DESTINATIONS)[number];
-	type FeedbackAction = (typeof ACTIONS)[number];
-
-	function isDestination(value: unknown): value is Destination {
-		return DESTINATIONS.some((destination) => destination === value);
-	}
-
-	function isFeedbackAction(value: unknown): value is FeedbackAction {
-		return ACTIONS.some((action) => action === value);
-	}
-
-	function optionalString(value: unknown): string | undefined {
-		return typeof value === "string" ? value : undefined;
-	}
-
-	interface ConversationNotes {
-		situation?: string;
-		capability?: string;
-		evidenceSummary?: string;
-		inConversationLearning?: string;
-		alreadySaid?: string;
-	}
-
-	/**
-	 * A private-destination piece; per-piece validation in readFeedbackPiece/validateFeedback. As read, basedOn holds the ids the
-	 * composer named; as stored, the references they resolve to.
-	 */
-	interface FeedbackPieceOf<Basis> extends ComposedFeedbackPiece {
-		destination: PrivateDestination;
-		practiceSlug: string;
-		basedOn: Basis;
-		action: FeedbackAction;
-		supersedesThreadKey?: string;
-		withholdReason?: string;
-		title?: string;
-		body?: string;
-		nextStep?: string;
-		notes?: ConversationNotes;
-	}
-	type ReadFeedbackPiece = FeedbackPieceOf<string[]>;
-	type FeedbackPiece = FeedbackPieceOf<EvidenceRef[]>;
-
-	function feedbackBody(
-		piece: Pick<FeedbackPiece, "title" | "body" | "nextStep" | "notes">,
-	): string {
-		const sections = [piece.title, piece.body, piece.nextStep];
-		for (const [field, label] of [
-			["situation", "Situation"],
-			["capability", "Capability"],
-			["evidenceSummary", "Evidence"],
-			["inConversationLearning", "In conversation"],
-			["alreadySaid", "Earlier feedback"],
-		] as const) {
-			const text = piece.notes?.[field];
-			if (hasText(text)) {
-				sections.push(`${label}: ${text}`);
-			}
-		}
-		return sections.filter(hasText).join("\n\n");
-	}
-
-	interface LeanCitation {
-		index: number;
-		sourceKind: unknown;
-		path: unknown;
-		side: unknown;
-		startLine: unknown;
-		endLine: unknown;
-		anchorable: unknown;
-	}
-
-	interface LeanResult {
-		resultId: string;
-		practiceSlug: string;
-		outcome: Outcome;
-		citations: LeanCitation[];
-		problems: {
-			problemId: string;
-			severity: unknown;
-			anchorable: unknown;
-			citations: LeanCitation[];
-		}[];
-	}
-
-	/** What gets written to feedback.json, with the fields the reader resolves references against. */
-	type CompositionPhase = "PUBLIC_REVIEW" | "PRIVATE_FEEDBACK";
-	type CompositionFailureReason =
-		| "MODEL_ERROR"
-		| "RUNTIME_ERROR"
-		| "BUDGET"
-		| "STALL"
-		| "SAFETY"
-		| "LOOP"
-		| "NO_DECISION"
-		| "SERVER_REFUSED"
-		| "PRIVATE_NOT_RECOVERED";
-	interface CompositionFailure {
-		phase: CompositionPhase;
-		reason: CompositionFailureReason;
-	}
-
-	interface ComposedFeedback extends ComposedFeedbackEnvelope {
-		compositionFailures: CompositionFailure[];
-		contractVersion: number;
-		admissionDigest: string | null;
-		results: LeanResult[];
-		preparedTargets: PreparedFeedbackTarget[];
-		feedback: FeedbackPiece[];
-		review: ComposedReview | null;
-		preparation: FeedbackPreparationReceipt | null;
-	}
-
 	// Echo the exact composition inputs so Java validates references against the same snapshot.
 	const composedFeedback: ComposedFeedback = {
 		compositionFailures: [],
@@ -2528,18 +2760,6 @@ export async function runReviewJob(): Promise<void> {
 		}
 	}
 
-	function leanCitation(citation: AdmittedCitation): LeanCitation {
-		return {
-			index: citation.index,
-			sourceKind: citation.sourceKind,
-			path: citation.path,
-			side: citation.side,
-			startLine: citation.startLine,
-			endLine: citation.endLine,
-			anchorable: citation.anchorable,
-		};
-	}
-
 	function leanResults(results: readonly AdmittedResult[]): LeanResult[] {
 		return results.map((result) => ({
 			resultId: result.resultId,
@@ -2553,10 +2773,6 @@ export async function runReviewJob(): Promise<void> {
 				citations: problem.citations.map(leanCitation),
 			})),
 		}));
-	}
-
-	function resultsById(results: readonly AdmittedResult[]): Map<string, AdmittedResult> {
-		return new Map(results.map((result) => [result.resultId, result]));
 	}
 
 	function persistComposedFeedback(): void {
@@ -2574,17 +2790,6 @@ export async function runReviewJob(): Promise<void> {
 			(a, b) => Number(a.action === "WITHHOLD") - Number(b.action === "WITHHOLD"),
 		);
 		writeFileSync(FEEDBACK_PATH, JSON.stringify({ ...composedFeedback, feedback }, null, 2));
-	}
-
-	// The composer references admitted results and problems; it cannot author verdicts, citations, or locations.
-	interface ReportFeedbackDetails {
-		stored: number;
-		destination?: Destination;
-		total?: number;
-	}
-
-	function skipped(text: string): { stored: boolean; text: string } {
-		return { stored: false, text };
 	}
 
 	function buildFeedbackTool(
@@ -2837,16 +3042,6 @@ export async function runReviewJob(): Promise<void> {
 		});
 	}
 
-	interface ReportReviewDetails {
-		stored: number;
-	}
-
-	// A completed response can contain more calls; final composition must reject all subsequent writes.
-	interface PublicReviewState {
-		final: boolean;
-		reviewContext: "LOST" | "RESTORING" | "HELD";
-	}
-
 	function reviewableById(
 		reviewable: readonly Record<string, unknown>[],
 	): Map<string, ReviewedResult> {
@@ -2955,14 +3150,6 @@ export async function runReviewJob(): Promise<void> {
 			.filter((id) => !decided.has(id));
 	}
 
-	function finishReviewText(undecided: readonly string[]): string {
-		const owed =
-			undecided.length > 0
-				? `## Undecided\nThe review leaves these NOT_MET results undecided: ${undecided.join(", ")}.`
-				: "## Unfinished\nThe review on this work is not final yet.";
-		return `${owed}\nStore the final review with one report_review call. A review that says nothing is still one final report_review call. No prose outside the calls.`;
-	}
-
 	function practiceContext(results: readonly Record<string, unknown>[]): ReviewPractice[] {
 		const slugs = new Set(results.map((result) => String(result.practiceSlug)));
 		return practiceIndex
@@ -2988,181 +3175,63 @@ export async function runReviewJob(): Promise<void> {
 		alreadySaid: 2000,
 	} as const;
 
-	const PIECE_FIELDS = [
-		"destination",
-		"practiceSlug",
-		"basedOn",
-		"action",
-		"supersedesThreadKey",
-		"withholdReason",
-		"title",
-		"body",
-		"nextStep",
-		"notes",
-	] as const;
-
-	const NOTE_FIELDS = [
-		"situation",
-		"capability",
-		"evidenceSummary",
-		"inConversationLearning",
-		"alreadySaid",
-	] as const;
-
-	/** Accept case and hyphen variants; reject values outside the declared vocabulary. */
-	function vocabularyWord<T extends string>(
-		value: unknown,
-		vocabulary: readonly T[],
-		field: string,
-	): T | string {
-		if (typeof value !== "string" || value.trim() === "") {
-			return `${field} is required: one of ${vocabulary.join(", ")}`;
-		}
-		const word = value.trim().toUpperCase().replaceAll("-", "_");
-		const match = vocabulary.find((candidate) => candidate === word);
-		return match ?? `${field} must be one of ${vocabulary.join(", ")} (received '${value}')`;
-	}
-
-	function boundedText(
-		value: unknown,
-		field: keyof typeof FEEDBACK_TEXT_BOUNDS,
-	): { text: string | undefined } | { error: string } {
-		if (value === undefined || value === null) {
-			return { text: undefined };
-		}
-		if (typeof value !== "string") {
-			return { error: `${field} must be a string` };
-		}
-		const text = value.trim();
-		if (text === "") {
-			return { text: undefined };
-		}
-		const bound = FEEDBACK_TEXT_BOUNDS[field];
-		if (text.length > bound) {
-			return {
-				error: `${field} must be at most ${bound} characters; this one is ${text.length}. Shorten it and send the piece again`,
-			};
-		}
-		return { text };
-	}
+	const optionalFeedbackText = (field: keyof typeof FEEDBACK_TEXT_BOUNDS) =>
+		z
+			.string()
+			.trim()
+			.max(FEEDBACK_TEXT_BOUNDS[field])
+			.nullish()
+			.transform((value) => (value === "" ? undefined : (value ?? undefined)));
+	const feedbackPieceSchema = z.strictObject({
+		destination: z.enum(PRIVATE_DESTINATIONS),
+		practiceSlug: z.string().trim().min(1),
+		action: z.enum(ACTIONS),
+		basedOn: z.array(z.string().trim().min(1)).default([]),
+		supersedesThreadKey: optionalFeedbackText("supersedesThreadKey"),
+		withholdReason: z
+			.enum(WITHHOLD_REASONS)
+			.nullish()
+			.transform((value) => value ?? undefined),
+		title: optionalFeedbackText("title"),
+		body: optionalFeedbackText("body"),
+		nextStep: optionalFeedbackText("nextStep"),
+		notes: z
+			.strictObject({
+				situation: optionalFeedbackText("situation"),
+				capability: optionalFeedbackText("capability"),
+				evidenceSummary: optionalFeedbackText("evidenceSummary"),
+				inConversationLearning: optionalFeedbackText("inConversationLearning"),
+				alreadySaid: optionalFeedbackText("alreadySaid"),
+			})
+			.nullish()
+			.transform((value) => value ?? undefined),
+	});
 
 	function readFeedbackPiece(
 		value: unknown,
 		practiceSlugs: readonly string[],
 		results: readonly AdmittedResult[],
 	): ReadFeedbackPiece | string {
-		if (!isRecord(value)) {
-			return `each item of feedback is one piece object with destination, practiceSlug, basedOn and action (received ${typeof value}); skipped.`;
+		const parsed = feedbackPieceSchema.safeParse(value);
+		if (!parsed.success) {
+			return parsed.error.issues
+				.map((issue) => `${issue.path.join(".") || "piece"}: ${issue.message}`)
+				.join("; ");
 		}
-		const unknownFields = Object.keys(value).filter(
-			(key) => !PIECE_FIELDS.some((field) => field === key),
-		);
-		if (unknownFields.length > 0) {
-			return `unknown piece field(s): ${unknownFields.join(", ")} — a piece takes ${PIECE_FIELDS.join(", ")}; skipped.`;
+		const piece = parsed.data;
+		if (!practiceSlugs.includes(piece.practiceSlug)) {
+			return `practiceSlug '${piece.practiceSlug}' is not a practice with an admitted result in this run (those are: ${practiceSlugs.join(", ")}); skipped.`;
 		}
-		const destination = vocabularyWord(value.destination, DESTINATIONS, "destination");
-		if (!isDestination(destination)) {
-			return `${destination}; skipped.`;
+		if (piece.basedOn.length === 0) {
+			const ids = results
+				.filter((result) => result.practiceSlug === piece.practiceSlug)
+				.map((result) => result.resultId);
+			return `basedOn is required: the admitted result or problem id(s) this piece rests on (${piece.practiceSlug}'s results: ${ids.join(", ")}); skipped.`;
 		}
-		if (destination === "ON_WORK") {
-			return "the review on the work is written in its own turn, not as a piece here; skipped.";
-		}
-		const action = vocabularyWord(value.action, ACTIONS, "action");
-		if (!isFeedbackAction(action)) {
-			return `${action}; skipped.`;
-		}
-		const practiceSlug = typeof value.practiceSlug === "string" ? value.practiceSlug.trim() : "";
-		if (!practiceSlug) {
-			return "practiceSlug is required; skipped.";
-		}
-		if (!practiceSlugs.includes(practiceSlug)) {
-			return `practiceSlug '${practiceSlug}' is not a practice with an admitted result in this run (those are: ${practiceSlugs.join(", ")}); skipped.`;
-		}
-		if (
-			action === "NEW" &&
-			feedbackBody({
-				title: optionalString(value.title),
-				body: optionalString(value.body),
-				nextStep: optionalString(value.nextStep),
-				notes: isRecord(value.notes)
-					? {
-							situation: optionalString(value.notes.situation),
-							capability: optionalString(value.notes.capability),
-							evidenceSummary: optionalString(value.notes.evidenceSummary),
-							inConversationLearning: optionalString(value.notes.inConversationLearning),
-							alreadySaid: optionalString(value.notes.alreadySaid),
-						}
-					: undefined,
-			}).length > 8000
-		) {
+		if (piece.action === "NEW" && feedbackBody(piece).length > 8000) {
 			return "the complete feedback text must be at most 8000 characters; shorten it and send it again";
 		}
-
-		const basedOn = listOrSingle(value.basedOn).filter(
-			(reference): reference is string => typeof reference === "string" && reference.trim() !== "",
-		);
-		if (basedOn.length === 0) {
-			const ids = results
-				.filter((result) => result.practiceSlug === practiceSlug)
-				.map((result) => result.resultId);
-			return `basedOn is required: the admitted result or problem id(s) this piece rests on (${practiceSlug}'s results: ${ids.join(", ")}); skipped.`;
-		}
-		let withholdReason: string | undefined;
-		if (value.withholdReason !== undefined && value.withholdReason !== null) {
-			const word = vocabularyWord(value.withholdReason, WITHHOLD_REASONS, "withholdReason");
-			if (!WITHHOLD_REASONS.some((reason) => reason === word)) {
-				return `${word}; skipped.`;
-			}
-			withholdReason = word;
-		}
-		const texts: Partial<Record<keyof typeof FEEDBACK_TEXT_BOUNDS, string>> = {};
-		for (const field of ["supersedesThreadKey", "title", "body", "nextStep"] as const) {
-			const read = boundedText(value[field], field);
-			if ("error" in read) {
-				return `${read.error}; skipped.`;
-			}
-			texts[field] = read.text;
-		}
-		let notes: ConversationNotes | undefined;
-		if (value.notes !== undefined && value.notes !== null) {
-			if (!isRecord(value.notes)) {
-				return "notes must be an object; skipped.";
-			}
-			const unknownNotes = Object.keys(value.notes).filter(
-				(key) => !NOTE_FIELDS.some((field) => field === key),
-			);
-			if (unknownNotes.length > 0) {
-				return `unknown notes field(s): ${unknownNotes.join(", ")} — notes take ${NOTE_FIELDS.join(", ")}; skipped.`;
-			}
-			notes = {};
-			for (const field of NOTE_FIELDS) {
-				const read = boundedText(value.notes[field], field);
-				if ("error" in read) {
-					return `notes.${read.error}; skipped.`;
-				}
-				notes[field] = read.text;
-			}
-		}
-		return {
-			destination,
-			practiceSlug,
-			action,
-			basedOn: basedOn.map((reference) => reference.trim()),
-			supersedesThreadKey: texts.supersedesThreadKey,
-			withholdReason,
-			title: texts.title,
-			body: texts.body,
-			nextStep: texts.nextStep,
-			notes,
-		};
-	}
-
-	/** A list as sent, or the one value sent bare where a list was asked for. */
-	function listOrSingle(value: unknown): unknown[] {
-		if (Array.isArray(value)) {
-			return value;
-		}
-		return value === undefined || value === null ? [] : [value];
+		return piece;
 	}
 
 	const THIS_WORK = ((): string | undefined => {
@@ -3194,24 +3263,6 @@ export async function runReviewJob(): Promise<void> {
 				(occurrence) => `${occurrence.itemKind}:${occurrence.itemId}`,
 			),
 		).size;
-	}
-
-	function validateConversationPiece(piece: ReadFeedbackPiece): string | null {
-		if (hasText(piece.body) || hasText(piece.nextStep)) {
-			return "CONVERSATION takes notes{situation,capability,evidenceSummary,inConversationLearning}, not body/nextStep - nothing for this destination is read out; skipped.";
-		}
-		const { notes } = piece;
-		for (const field of [
-			"situation",
-			"capability",
-			"evidenceSummary",
-			"inConversationLearning",
-		] as const) {
-			if (isBlank(notes?.[field])) {
-				return `CONVERSATION needs notes.${field}; skipped.`;
-			}
-		}
-		return null;
 	}
 
 	// Practice-page feedback describes a pattern across work, not a quotation of this item.
@@ -3300,24 +3351,6 @@ export async function runReviewJob(): Promise<void> {
 		return validatePracticePagePiece(piece, named);
 	}
 
-	function normalizeQuotedText(value: string): string {
-		return value
-			.normalize("NFKC")
-			.replaceAll(/[“”„‟]/gu, '"')
-			.replaceAll(/[‘’‚‛]/gu, "'")
-			.replaceAll(/\s+/gu, " ")
-			.trim()
-			.toLowerCase();
-	}
-
-	function coordinatesOf(citation: unknown): unknown {
-		if (!isRecord(citation)) {
-			return citation;
-		}
-		const { quote: _quote, verification: _verification, ...coordinates } = citation;
-		return coordinates;
-	}
-
 	function composerView(result: AdmittedResult): Record<string, unknown> {
 		const citations = result.citations.map(coordinatesOf);
 		if (result.outcome !== "NOT_MET" && result.outcome !== "MET") {
@@ -3344,19 +3377,6 @@ export async function runReviewJob(): Promise<void> {
 				citations: problem.citations.map(coordinatesOf),
 			})),
 		};
-	}
-
-	const COMPOSITION_BLOCK_LIMIT = 32_000;
-
-	/** A staged file as a titled block of the composition turn, or a pointer to it when it is too large. */
-	function stagedBlock(label: string, file: string, limit = COMPOSITION_BLOCK_LIMIT): string {
-		if (!existsSync(file)) {
-			return "";
-		}
-		const text = readFileSync(file, "utf8").trim();
-		return text.length > limit
-			? `### ${label} — too large to show here; read \`${file}\`\n`
-			: `### ${label}\n\`\`\`json\n${text}\n\`\`\`\n`;
 	}
 
 	// Composition receives criteria, but not measuring leads or source directions that could initiate another assessment.
@@ -3534,27 +3554,12 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		name = "AdmissionUnreachableError";
 	}
 
-	/** The cause behind a wrapped error, in parentheses, or nothing when the error carries none. */
-	function causeText(error: unknown): string {
-		return error instanceof Error && error.cause !== undefined
-			? ` (${errorText(error.cause)})`
-			: "";
-	}
-
 	/** Retry transport failures, not slow admission or explicit refusals. */
 	const ADMISSION_ATTEMPTS = 4;
 
 	// Admission verifies every cited blob against the Git object, in a container the server starts, so
 	// one attempt may take minutes; the cap only bounds a server that went silent without closing.
 	const ADMISSION_ATTEMPT_TIMEOUT_MS = 10 * 60_000;
-
-	async function answerText(response: Response): Promise<string> {
-		const problem: unknown = await response.json().catch(() => null);
-		const detail = isRecord(problem) ? problem.detail : null;
-		return typeof detail === "string" && detail.length > 0
-			? detail
-			: "the server gave no problem detail";
-	}
 
 	/** One admission attempt: the answer it returns is the parsed body, unvalidated. */
 	async function postAdmission(): Promise<unknown> {
@@ -4003,29 +4008,6 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		return currentTurn;
 	}
 
-	function recordModelResponse(trace: TurnTrace, stopReason: string, message: unknown): void {
-		const failed = stopReason === "error" || stopReason === "aborted";
-		addModelCall(trace.modelCallTiming, message, failed);
-		if (failed) {
-			const failure = modelFailure(message);
-			trace.modelFailures[failure.kind] = (trace.modelFailures[failure.kind] ?? 0) + 1;
-			if (failure.source !== "ADAPTER") {
-				trace.unattributedModelFailures += 1;
-			}
-			trace.lastModelFailureAt = failure.at ?? trace.lastModelFailureAt;
-			trace.finalModelFailure = { ...failure, retryEndedUnsuccessfully: false };
-		} else {
-			trace.finalModelFailure = null;
-		}
-	}
-
-	function recordUnsuccessfulRetryEnd(trace: TurnTrace): void {
-		const final = trace.finalModelFailure;
-		if (final !== null) {
-			trace.finalModelFailure = { ...final, retryEndedUnsuccessfully: true };
-		}
-	}
-
 	function closeTurnTrace(trace: TurnTrace): void {
 		trace.durationMs = Date.now() - trace.durationMs;
 		runnerDebug.turns.push(trace);
@@ -4040,67 +4022,8 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 		);
 	}
 
-	function scheduleDeadline(timeoutMs: number, onTimeout: () => void) {
-		// Read timer state through a function so TypeScript does not retain a pre-await narrowing.
-		let expired = false;
-		const { promise: elapsed, resolve: release } = Promise.withResolvers<undefined>();
-		const timer = setTimeout(() => {
-			expired = true;
-			onTimeout();
-			release(undefined);
-		}, timeoutMs);
-		return { elapsed, timer, expired: () => expired };
-	}
-
-	/** A mid-turn nudge; the turn goes on either way, so a steer that fails is only logged. */
-	async function steer(session: AgentSession, message: string): Promise<void> {
-		try {
-			await session.steer(message);
-		} catch (error) {
-			console.error(`[pi-runner] steer failed: ${errorText(error)}`);
-		}
-	}
-
-	/** Abort and wait for idle; Pi refuses a new prompt while the previous run is still active. */
-	async function abortSession(session: AgentSession): Promise<void> {
-		session.clearQueue();
-		// A compaction in flight is a model call of its own that `abort()` leaves running, and the
-		// session is not idle until it ends; the next turn compacts again if it must, inside its own share.
-		session.abortCompaction();
-		try {
-			await session.abort();
-		} catch (error) {
-			console.error(`[pi-runner] session abort failed: ${errorText(error)}`);
-		}
-	}
-
 	/** How long an aborted turn waits for the session to go idle before the next turn is sent. */
 	const ABORT_SETTLE_MS = 30_000;
-
-	/** Return false if the previous operation does not become idle within maxMs. */
-	async function settleSession(
-		session: AgentSession,
-		label: string,
-		maxMs: number,
-	): Promise<boolean> {
-		if (session.isIdle) {
-			return true;
-		}
-		const started = Date.now();
-		const becameIdle = async (): Promise<boolean> => {
-			await session.waitForIdle();
-			return true;
-		};
-		const idle = await Promise.race([becameIdle(), sleep(maxMs, false)]);
-		// The run flag clears a beat after the prompt resolves; a wait that short is not worth a line.
-		const waitedMs = Date.now() - started;
-		if (!idle || waitedMs >= 1000) {
-			console.error(
-				`[pi-runner] ${label}: waited ${(waitedMs / 1000).toFixed(1)}s for the session to go idle${idle ? "" : " — still busy"}`,
-			);
-		}
-		return idle;
-	}
 
 	/** Where the practice's criteria are staged for this review. */
 	function criteriaPathOf(slug: string): string {
@@ -4110,13 +4033,6 @@ ${coverageNote}Persist the feedback with report_feedback — every piece you hav
 	function criteriaFileOf(slug: string): string | null {
 		const file = criteriaPathOf(slug);
 		return existsSync(file) ? readFileSync(file, "utf8") : null;
-	}
-
-	function preparedSectionOf(slug: string, section: string): string {
-		const shown = section.trim();
-		return shown
-			? `\n\n#### Leads from the practice script for \`${slug}\` — starting points to check against the criteria, not verdicts\n${shown}`
-			: "";
 	}
 
 	/** The criteria of the turn's practices, inlined exactly as staged: the turn carries what it asks about. */
@@ -4260,18 +4176,6 @@ ${criteriaOf([slug])}${illustrations}${preparedSectionOf(slug, prepared)}
 Submit one result for ${slug} with submit_result: the outcome its criterion above decides through its applicability, Judge and Defer, as the evidence supports it, DOES_NOT_APPLY and COULD_NOT_DETERMINE included. What the brief shows is yours to quote; read more when the criterion needs evidence beyond it. This session submits and corrects only this practice's result.`;
 	}
 
-	function notMetPractices(
-		results: readonly { practiceSlug: string; outcome: Outcome }[],
-	): string[] {
-		return [
-			...new Set(
-				results
-					.filter((result) => result.outcome === "NOT_MET")
-					.map((result) => result.practiceSlug),
-			),
-		].toSorted();
-	}
-
 	function compositionBudget(notMet: number): Work {
 		return turnBudget(Math.min(Math.max(1, notMet), PRACTICES_PER_TURN), PER_PRACTICE_WORK);
 	}
@@ -4296,26 +4200,6 @@ Submit one result for ${slug} with submit_result: the outcome its criterion abov
 		if (!composedFeedback.compositionFailures.some((failure) => failure.phase === phase)) {
 			composedFeedback.compositionFailures.push({ phase, reason });
 		}
-	}
-
-	function incompleteCompositionReason(
-		trace: TurnTrace,
-		safetyExpired: boolean,
-	): CompositionFailureReason {
-		const stops = { budget: "BUDGET", stall: "STALL", safety: "SAFETY", loop: "LOOP" } as const;
-		if (trace.stoppedBy !== null) {
-			return stops[trace.stoppedBy];
-		}
-		if (safetyExpired) {
-			return "SAFETY";
-		}
-		if (trace.modelError) {
-			return "MODEL_ERROR";
-		}
-		if (trace.runtimeError) {
-			return "RUNTIME_ERROR";
-		}
-		return "NO_DECISION";
 	}
 
 	/** Retry undecided composition once, under its own work budget and the run's safety line. */
@@ -5718,4 +5602,6 @@ ${finishCompositionText(notMet, request)}`,
 	await run();
 }
 
-if (import.meta.main) await runReviewJob();
+if (import.meta.main) {
+	await runReviewJob();
+}

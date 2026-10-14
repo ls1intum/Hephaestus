@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.job;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.practices.DefinitionTestFixtures;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmApiProtocol;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnection;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionRepository;
@@ -17,6 +18,8 @@ import de.tum.cit.aet.hephaestus.core.llm.usage.UsageFundingSource;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsagePricingState;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.llm.usage.UsageSourceType;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ItemKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeVersionService;
 import de.tum.cit.aet.hephaestus.practices.spi.ModelKind;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
@@ -33,12 +36,14 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -49,6 +54,9 @@ import tools.jackson.databind.node.ObjectNode;
 class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
     private ReviewJobZombieSweeper sweeper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Autowired
     private WorkerRegistryRepository workerRegistryRepository;
@@ -85,6 +93,9 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private PracticeVersionService versions;
 
     private Workspace workspace;
     private LlmModel instanceModel;
@@ -179,9 +190,63 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         lifecycleService.cancel(workspace.getId(), jobId);
 
         assertPracticeScriptLedgerRows(jobId);
+        assertThat(jobRepository.findById(jobId))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)
+                .containsExactly(ReviewJobStatus.CANCELLED, ReviewJobCancellationReason.CANCELLED_BY_REQUESTER);
+    }
+
+    @Test
+    void shouldCancelAQueuedJob() {
+        UUID queuedId = staleRunningJob(snapshot().toJson(objectMapper), withProxyUsage());
+        transactionTemplate.executeWithoutResult(transaction -> {
+            var queued = jobRepository.findById(queuedId).orElseThrow();
+            queued.setStatus(ReviewJobStatus.QUEUED);
+            queued.setStartedAt(null);
+            queued.setExecutionStartedAt(null);
+            queued.setWorkerId(null);
+            jobRepository.saveAndFlush(queued);
+        });
+        lifecycleService.cancel(workspace.getId(), queuedId);
+        assertThat(jobRepository.findById(queuedId))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)
+                .containsExactly(ReviewJobStatus.CANCELLED, ReviewJobCancellationReason.CANCELLED_BY_REQUESTER);
+    }
+
+    @Test
+    void shouldKeepACompletedJobWhenCancellationLosesTheTransition() {
+        UUID completedId = staleRunningJob(snapshot().toJson(objectMapper), withProxyUsage());
+        transactionTemplate.executeWithoutResult(transaction -> {
+            var completed = jobRepository.findById(completedId).orElseThrow();
+            completed.setStatus(ReviewJobStatus.COMPLETED);
+            jobRepository.saveAndFlush(completed);
+        });
+        Integer updated = transactionTemplate.execute(transaction -> jobRepository.transitionToCancelled(
+                completedId,
+                Instant.now(),
+                null,
+                ReviewJobCancellationReason.CANCELLED_BY_REQUESTER,
+                Set.of(ReviewJobStatus.QUEUED, ReviewJobStatus.RUNNING)));
+        assertThat(updated).isZero();
+        assertThat(jobRepository.findById(completedId))
+                .get()
+                .extracting(ReviewJob::getStatus, ReviewJob::getCancellationReason)
+                .containsExactly(ReviewJobStatus.COMPLETED, null);
     }
 
     private void practiceScriptCalls(UUID jobId) {
+        for (String slug : List.of("comment-quality", "test-coverage")) {
+            var kind = new ItemKind("scm.pull_request");
+            versions.create(new PracticeVersionService.NewPractice(
+                    workspace,
+                    slug,
+                    kind,
+                    DefinitionTestFixtures.definition(kind, slug, "Review the work.", null),
+                    null,
+                    0,
+                    null));
+        }
         transactionTemplate.executeWithoutResult(tx -> {
             practiceScriptCall(jobId, ModelKind.DECISION, "comment-quality", 300_000, 50_000);
             practiceScriptCall(jobId, ModelKind.DECISION, "test-coverage", 200_000, 50_000);
@@ -365,6 +430,8 @@ class ReviewJobStaleReapIntegrationTest extends BaseIntegrationTest {
         job.setLlmReasoningTokens(usage.getLlmReasoningTokens());
         job.setLlmCacheReadTokens(usage.getLlmCacheReadTokens());
         job.setLlmCacheWriteTokens(usage.getLlmCacheWriteTokens());
-        return jobRepository.saveAndFlush(job).getId();
+        return jobRepository
+                .saveAndFlush(RuntimeJobTestData.persistParent(jdbc, job))
+                .getId();
     }
 }

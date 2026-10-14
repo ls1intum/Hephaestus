@@ -101,6 +101,7 @@ void test("an API use is shown with the usage keys located for it and where, nev
 		"import CoreLocation\nimport AVFoundation\nlet manager = CLLocationManager()\nmanager.requestWhenInUseAuthorization()\nlet session = AVCaptureSession()\n";
 	const result = await runBundled("declares-permissions-truthfully-at-point-of-use", {
 		repo: {
+			"App/Scanner.swift": source,
 			"project.yml":
 				"targets:\n  App:\n    info:\n      properties:\n        NSCameraUsageDescription: Scans the ticket's QR code\n",
 		},

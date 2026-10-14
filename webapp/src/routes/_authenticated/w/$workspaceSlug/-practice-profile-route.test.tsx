@@ -858,7 +858,7 @@ describe("own result", () => {
 		await screen.findByText(
 			"The caching change hides inside the package move",
 			undefined,
-			SETTLE_WAIT,
+			ROUTE_RENDER_WAIT,
 		);
 		expect(router.state.location.search.reviewResult).toBe(reused.id);
 		expect(screen.queryByText(/PracticeCatalogLoader/u)).toBeNull();

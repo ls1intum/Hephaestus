@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.usage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
@@ -37,6 +38,7 @@ import java.util.function.Function;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -111,12 +113,15 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         calls(review, "RERANKING", TESTS, 0, 0, 2);
         calls(review, "RERANKING", COMMENTS, 0, 0, 1);
         calls(review, "CHAT", COMMENTS, 70, 20, 1);
-        // Only the job's own workspace writes its usage rows, so a row of another workspace is never read.
-        jdbc.update(
-                "INSERT INTO review_job_script_usage (job_id, attempt, model_kind, practice_slug, workspace_id, calls,"
-                        + " input_tokens, output_tokens) VALUES (?, 0, 'DECISION', 'intruder', ?, 1, 1000000, 0)",
-                review.getId(),
-                other.getId());
+        assertThatThrownBy(() -> transactionTemplate.executeWithoutResult(transaction -> jdbc.update(
+                        "INSERT INTO review_job_script_usage (job_id, attempt, model_kind, practice_id, workspace_id,"
+                            + " calls, input_tokens, output_tokens) VALUES (?, 0, 'DECISION', (SELECT id FROM practice"
+                            + " WHERE workspace_id=? AND slug=?), ?, 1, 1000000, 0)",
+                        review.getId(),
+                        other.getId(),
+                        COMMENTS,
+                        other.getId())))
+                .isInstanceOf(DataIntegrityViolationException.class);
         ledger(workspace, review, 0, UsageSourceType.REVIEW_JOB, INSTANCE_DECISION, 9_000, 1_000, 4, MONTH);
         ledger(workspace, review, 0, UsageSourceType.PRACTICE_SCRIPT_DECISION, INSTANCE_DECISION, 400_000, 100_000, 3);
         ledger(workspace, review, 0, UsageSourceType.PRACTICE_SCRIPT_EMBEDDING, NO_CHARGE, 5_000, 0, 1);
@@ -250,6 +255,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
         Workspace workspace = workspace("usage-by-practice-thirds");
         ReviewJob review = runningJob(workspace);
         for (String slug : List.of("gamma", "alpha", "beta")) {
+            practice(workspace, slug, slug);
             calls(review, "DECISION", slug, 1, 0, 1);
         }
         ledger(workspace, review, 0, UsageSourceType.PRACTICE_SCRIPT_DECISION, OWN_DECISION, 3, 0, 3);
@@ -270,6 +276,7 @@ class LlmUsageByPracticeIntegrationTest extends AbstractWorkspaceIntegrationTest
     @WithAdminUser
     void shouldCountALedgerRowInTheMonthItsInstantFallsInWhenItLiesOnABoundary() {
         Workspace workspace = workspace("usage-by-practice-boundary");
+        practice(workspace, COMMENTS, "Comment quality");
         Instant from = MONTH.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant to = MONTH.plusMonths(1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
         Map<Instant, Long> inputByInstant = Map.of(

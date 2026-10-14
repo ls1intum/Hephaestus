@@ -39,9 +39,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Autowired
     private WorkspaceLifecycleService lifecycleService;
@@ -126,7 +130,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         job.setStatus(ReviewJobStatus.COMPLETED);
         job.setProcessingStatus(ProcessingStatus.PENDING);
         job.setConfigSnapshot(objectMapper.createObjectNode());
-        jobRepository.save(job);
+        jobRepository.save(RuntimeJobTestData.persistParent(jdbc, job));
 
         assertThatThrownBy(() -> lifecycleService.purgeWorkspace(workspace.getWorkspaceSlug()))
                 .isInstanceOf(WorkspacePurgeBlockedException.class)
@@ -174,7 +178,7 @@ class AgentWorkspacePurgeIntegrationTest extends BaseIntegrationTest {
         job.setCapture(objectMapper.createObjectNode().put("private", "content-" + suffix));
         job.setConfigSnapshot(objectMapper.createObjectNode().put("baseUrl", connection.getBaseUrl()));
 
-        job = jobRepository.save(job);
+        job = jobRepository.save(RuntimeJobTestData.persistParent(jdbc, job));
 
         LlmUsageEvent usage = new LlmUsageEvent();
         usage.setId(UUID.randomUUID());

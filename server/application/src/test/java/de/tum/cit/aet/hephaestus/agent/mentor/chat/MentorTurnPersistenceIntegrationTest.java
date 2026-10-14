@@ -1107,13 +1107,16 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @CsvSource(
             value = {
                 "completed, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED, 0.010290",
-                "interrupted, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED, 0.010290",
+                "interrupted, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED,"
+                        + " 0.010290",
                 "completed, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, VERIFIED, 0.010800",
                 "interrupted, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, VERIFIED, 0.010800",
                 "completed, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, VERIFIED, 0.010800",
                 "interrupted, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, VERIFIED, 0.010800",
-                "completed, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, UNVERIFIABLE, unpriced",
-                "interrupted, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, UNVERIFIABLE, unpriced",
+                "completed, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER,"
+                        + " UNVERIFIABLE, unpriced",
+                "interrupted, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER,"
+                        + " UNVERIFIABLE, unpriced",
                 "completed, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, UNVERIFIABLE, unpriced",
                 "interrupted, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, UNVERIFIABLE, unpriced"
             },
@@ -1501,13 +1504,15 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() -> {
                     try (var conn = dataSource.getConnection();
                             var stmt = conn.prepareStatement(
-                                    "INSERT INTO chat_message (id, thread_id, role, parts, status, created_at,"
-                                            + " version) VALUES (?, ?, 'ASSISTANT', '[]'::jsonb, ?, now(), 0)")) {
+                                    "INSERT INTO chat_message (id, thread_id, workspace_id, role, parts, status,"
+                                        + " created_at, version) VALUES (?, ?, ?, 'ASSISTANT', '[]'::jsonb, ?, now(),"
+                                        + " 0)")) {
                         stmt.setObject(1, UUID.randomUUID());
                         stmt.setObject(2, thread.getId());
                         // Must fit VARCHAR(16) so we exercise the CHECK constraint, not the
                         // length truncation that fires before the CHECK runs.
-                        stmt.setString(3, "in_flite");
+                        stmt.setLong(3, workspace.getId());
+                        stmt.setString(4, "in_flite");
                         stmt.executeUpdate();
                     }
                 })

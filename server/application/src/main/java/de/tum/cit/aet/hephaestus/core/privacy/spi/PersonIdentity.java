@@ -13,6 +13,7 @@ public record PersonIdentity(
             throw new IllegalArgumentException("An exact provider id and native subject are required");
         }
     }
+
     public String teamKey() {
         return teamKey(teamId);
     }
