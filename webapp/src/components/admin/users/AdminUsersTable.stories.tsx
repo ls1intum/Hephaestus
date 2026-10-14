@@ -117,10 +117,12 @@ export const EmptySearch: Story = {
 	},
 };
 
+/** No count beside the failure: the list it would count is gone. */
 export const ErrorState: Story = {
 	args: { users: [], isError: true },
 	play: async ({ canvas }) => {
 		canvas.getByText(/could not load users/iu);
+		await expect(canvas.queryByText(/^Showing /u)).not.toBeInTheDocument();
 	},
 };
 
@@ -130,5 +132,70 @@ export const HasMore: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Load more" }));
 		await expect(args.onLoadMore).toHaveBeenCalled();
+	},
+};
+
+/** A search reads every page before it says nothing matched. */
+export const Searching: Story = {
+	args: { users: [], hasSearch: true, hasNextPage: true, isFetchingNextPage: true },
+	play: async ({ canvas }) => {
+		canvas.getByText("Searching all users…");
+		await expect(canvas.queryByText("No users found")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The next page failed during a search: the loaded matches stay, the warning says the search is
+ * incomplete, and its Retry is the only way to ask again.
+ */
+export const SearchIncomplete: Story = {
+	args: {
+		users: [admin],
+		hasSearch: true,
+		totalLoaded: 25,
+		hasNextPage: true,
+		loadMoreError: { status: 503 },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Ada Admin");
+		canvas.getByText("Showing 1 of 25 loaded users");
+		canvas.getByText("Search results may be incomplete");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+		await expect(canvas.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+	},
+};
+
+/** No loaded user matched and the rest did not load, so the empty state does not claim a result. */
+export const SearchIncompleteEmpty: Story = {
+	args: {
+		users: [],
+		hasSearch: true,
+		totalLoaded: 25,
+		hasNextPage: true,
+		loadMoreError: { status: 503 },
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("No matches among the loaded users");
+		canvas.getByText(/search did not include them/iu);
+		await expect(canvas.queryByText("No users found")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Searching all users…")).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/try a different search/iu)).not.toBeInTheDocument();
+	},
+};
+
+/** A failed refresh keeps the loaded users and says they may be out of date. */
+export const RefreshFailed: Story = {
+	args: { refreshFailure: { error: { status: 503 }, pending: false, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		canvas.getByText("These users may be out of date");
+		canvas.getByText("Ada Admin");
+		await expect(canvas.getByRole("button", { name: "Retry" })).toBeEnabled();
+	},
+};
+
+export const RefreshRetrying: Story = {
+	args: { refreshFailure: { error: { status: 503 }, pending: true, onRetry: fn() } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Retrying…" })).toBeDisabled();
 	},
 };

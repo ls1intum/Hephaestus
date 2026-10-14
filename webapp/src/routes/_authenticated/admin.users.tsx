@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, ShieldOff, UserCog, Users } from "lucide-react";
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useEffectEvent, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -19,6 +19,7 @@ import {
 import { AdminUsersTable } from "@/components/admin/users/AdminUsersTable";
 import { ChangeRoleDialog } from "@/components/admin/users/ChangeRoleDialog";
 import { ConfirmAccessDialog } from "@/components/auth/ConfirmAccessDialog";
+import { queryErrorIsRetryable } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { PageLayout } from "@/components/layout/PageLayout";
 import {
@@ -37,7 +38,8 @@ import { useConfirmAccess } from "@/hooks/use-confirm-access";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, type StepUpChallenge, stepUpChallengeOf } from "@/lib/problem-detail";
 import { useAuth } from "@/runtime/auth/AuthContext";
-import { loadedPages } from "@/runtime/tanstack-query/spring-page";
+import { infiniteListState } from "@/runtime/tanstack-query/infinite-list";
+import { useQueryReadRefusal } from "@/runtime/tanstack-query/use-query-read-refusal";
 
 const PAGE_SIZE = 25;
 
@@ -69,17 +71,41 @@ function AdminUsersPage() {
 		getNextPageParam: (lastPage: AdminAccountView[], allPages: AdminAccountView[][]) =>
 			lastPage.length === PAGE_SIZE ? allPages.length : undefined,
 	});
+	useQueryReadRefusal(listOptions.queryKey, listQuery.isError, listQuery.error);
+	const list = infiniteListState(listQuery, (pages) => ({ users: pages.flat() }));
+	const loaded = list.status === "ready" ? list : undefined;
+	const allUsers = loaded?.users ?? [];
 
-	const allUsers: AdminAccountView[] = loadedPages(listQuery.data).flat();
-
-	const { hasNextPage, isFetchingNextPage, fetchNextPage } = listQuery;
-	useEffect(() => {
-		if (deferredSearch.trim() && hasNextPage && !isFetchingNextPage) {
-			void fetchNextPage();
-		}
-	}, [deferredSearch, hasNextPage, isFetchingNextPage, fetchNextPage]);
+	// A refused read takes back the accounts it listed, so an open action on one of them goes with
+	// them. Clearing the targets, rather than hiding them, keeps a later read from bringing them back.
+	if (
+		list.status === "error" &&
+		!queryErrorIsRetryable(list.error) &&
+		(roleTarget !== null || signOutTarget !== null)
+	) {
+		setRoleTarget(null);
+		setSignOutTarget(null);
+	}
 
 	const term = deferredSearch.trim().toLowerCase();
+
+	// Search filters loaded rows, so it reads every page. It stops at a failure until the reader
+	// retries, and waits for a refresh of the loaded pages to finish.
+	const searchContinues =
+		term !== "" &&
+		loaded !== undefined &&
+		loaded.hasMore &&
+		!loaded.isLoadingMore &&
+		loaded.isRefreshing !== true &&
+		loaded.loadMoreError === undefined &&
+		loaded.refreshFailure === undefined;
+	const continueSearch = useEffectEvent(() => loaded?.onLoadMore());
+	useEffect(() => {
+		if (searchContinues) {
+			continueSearch();
+		}
+	}, [searchContinues]);
+
 	const filteredUsers = term
 		? allUsers.filter((u) =>
 				[
@@ -197,16 +223,16 @@ function AdminUsersPage() {
 
 			<AdminUsersTable
 				users={filteredUsers}
-				isLoading={listQuery.isLoading}
-				isError={listQuery.isError}
-				hasSearch={deferredSearch.trim().length > 0}
+				isLoading={list.status === "loading"}
+				isError={list.status === "error"}
+				hasSearch={term !== ""}
 				totalLoaded={allUsers.length}
 				currentUserId={currentUserId}
-				hasNextPage={listQuery.hasNextPage}
-				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => {
-					void listQuery.fetchNextPage();
-				}}
+				hasNextPage={loaded?.hasMore ?? false}
+				isFetchingNextPage={loaded?.isLoadingMore ?? false}
+				loadMoreError={loaded?.loadMoreError}
+				refreshFailure={loaded?.refreshFailure}
+				onLoadMore={() => loaded?.onLoadMore()}
 				onChangeRole={(user) => {
 					updateRole.reset();
 					setRoleTarget({ user });
