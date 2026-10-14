@@ -75,7 +75,8 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.BACKFILL))).thenReturn(true);
         Workspace workspace = workspace();
-        when(reviewGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL))).thenReturn(automaticRun(workspace, List.of()));
+        when(reviewGate.evaluatePullRequest(eq(pr), eq(WORKSPACE_ID), any(), eq(TriggerMode.MANUAL)))
+                .thenReturn(automaticRun(workspace, List.of()));
 
         assertThat(submitter().offer(run(), PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.SUBMITTED);
 
@@ -102,7 +103,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         PullRequest pr = mergedPullRequest();
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.SWEEP))).thenReturn(true);
-        when(reviewGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
+        when(reviewGate.evaluatePullRequest(eq(pr), eq(WORKSPACE_ID), any(), eq(TriggerMode.MANUAL)))
                 .thenReturn(automaticRun(workspace(), List.of()));
         ReviewBackfillRun run = run();
         run.setDiscoveredVia(DiscoveredVia.SWEEP);
@@ -136,7 +137,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         PullRequest pr = mergedPullRequest();
         when(pullRequestRepository.findByIdWithAllForGate(PR_ID)).thenReturn(Optional.of(pr));
         when(signalRecorder.record(any(), any(), eq(DiscoveredVia.BACKFILL))).thenReturn(true);
-        when(reviewGate.evaluate(eq(pr), any(), eq(TriggerMode.MANUAL)))
+        when(reviewGate.evaluatePullRequest(eq(pr), eq(WORKSPACE_ID), any(), eq(TriggerMode.MANUAL)))
                 .thenReturn(new GateDecision.Skip("manual trigger disabled for workspace"));
 
         assertThat(submitter().offer(run(), PR_ID)).isEqualTo(ReviewBackfillSubmitter.Outcome.PASSED);

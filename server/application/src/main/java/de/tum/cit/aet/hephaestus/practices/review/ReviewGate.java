@@ -139,6 +139,22 @@ public class ReviewGate {
                 false);
     }
 
+    public GateDecision evaluatePullRequest(
+            @NonNull PullRequest pullRequest,
+            long workspaceId,
+            @NonNull SignalName signal,
+            @NonNull TriggerMode triggerMode) {
+        String repository = pullRequest.getRepository() != null
+                ? pullRequest.getRepository().getNameWithOwner()
+                : null;
+        return workspaceResolver.resolveAllForRepository(repository).stream()
+                .filter(workspace -> Objects.equals(workspace.getId(), workspaceId))
+                .findFirst()
+                .<GateDecision>map(workspace -> evaluatePullRequest(pullRequest, workspace, signal, triggerMode))
+                .orElseGet(() -> new GateDecision.Skip(
+                        "workspace no longer monitors this pull request", SignalStateReason.OUT_OF_REVIEW_SCOPE));
+    }
+
     public GateDecision evaluatePullRequestAdministrative(
             PullRequest pullRequest, Workspace workspace, SignalName signal) {
         return evaluateReviewableInWorkspace(

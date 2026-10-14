@@ -99,7 +99,7 @@ public class ReviewBackfillSubmitter {
             return Outcome.PASSED;
         }
 
-        switch (reviewGate.evaluate(pr, key.get().signalName(), TriggerMode.MANUAL)) {
+        switch (reviewGate.evaluatePullRequest(pr, workspaceId, key.get().signalName(), TriggerMode.MANUAL)) {
             case GateDecision.Skip skip -> {
                 log.debug("Backfill skipped by practice gate: prId={}, reason={}", pr.getId(), skip.reason());
                 signalRecorder.markRefused(key.get(), skip.resolvedSignalReason());
