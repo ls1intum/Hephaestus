@@ -7,6 +7,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
 import de.tum.cit.aet.hephaestus.integration.core.framework.SyncSchedulerProperties;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncTargetProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -94,6 +96,9 @@ class GitHubSubIssueSyncServiceTest extends BaseUnitTest {
         repository = new Repository();
         repository.setId(REPO_ID);
         repository.setNameWithOwner("acme/web");
+        var provider = new IdentityProvider(IdentityProviderType.GITHUB, "https://github.com");
+        provider.setId(1L);
+        repository.setProvider(provider);
         parent = new Issue();
         parent.setId(PARENT_ROW_ID);
         parent.setNativeId(PARENT_GITHUB_ID.longValue());
@@ -106,7 +111,7 @@ class GitHubSubIssueSyncServiceTest extends BaseUnitTest {
 
     @Test
     void shouldLinkAChildToItsParentByRepositoryAndNumberWhenRowIdsAreNotGitHubIds() {
-        when(repositoryRepository.findByNameWithOwnerWithOrganization("acme/web"))
+        when(repositoryRepository.findByNameWithOwnerAndProviderId("acme/web", 1L))
                 .thenReturn(Optional.of(repository));
         when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 20)).thenReturn(Optional.of(child));
         when(issueRepository.findByRepositoryIdAndNumber(REPO_ID, 19)).thenReturn(Optional.of(parent));

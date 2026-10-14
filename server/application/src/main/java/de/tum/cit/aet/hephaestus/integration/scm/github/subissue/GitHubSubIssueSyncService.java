@@ -545,8 +545,11 @@ public class GitHubSubIssueSyncService {
         }
 
         // Find or create the parent issue
-        Issue parent = findOrCreateParentIssue(parentGraphQl, scopeId);
+        Issue parent = findOrCreateParentIssue(parentGraphQl, repository, scopeId);
         if (parent == null) {
+            if (parentRepositoryPath(parentGraphQl) != null) {
+                clearForeignParent(subIssue, repository);
+            }
             log.debug(
                     "Skipped parent relationship: reason=parentNotCreated, subIssueNumber={}, parentNumber={}",
                     graphQlIssue.getNumber(),
@@ -569,6 +572,19 @@ public class GitHubSubIssueSyncService {
                 parent.getNumber(),
                 sanitizeForLog(repository.getNameWithOwner()));
         return 1;
+    }
+
+    private void clearForeignParent(Issue subIssue, Repository repository) {
+        Issue storedParent = subIssue.getParentIssue();
+        if (storedParent == null) {
+            return;
+        }
+        Long providerId = repository.getProvider().getId();
+        Long parentProviderId = storedParent.getProvider().getId();
+        if (providerId != null && parentProviderId != null && !providerId.equals(parentProviderId)) {
+            subIssue.setParentIssue(null);
+            issueRepository.save(subIssue);
+        }
     }
 
     /**
@@ -621,14 +637,14 @@ public class GitHubSubIssueSyncService {
      * the regular issue sync runs.
      */
     @Nullable
-    private Issue findOrCreateParentIssue(GHIssue parentGraphQl, Long scopeId) {
+    private Issue findOrCreateParentIssue(GHIssue parentGraphQl, Repository childRepository, Long scopeId) {
         if (parentGraphQl.getFullDatabaseId() == null) {
             return null;
         }
 
         long parentId = parentGraphQl.getFullDatabaseId().longValue();
         // The parent may live in another repository; it is found there by number, as the child is.
-        Repository parentRepo = resolveParentRepository(parentGraphQl);
+        Repository parentRepo = resolveParentRepository(parentGraphQl, childRepository);
         if (parentRepo == null) {
             log.debug(
                     "Skipped parent lookup: reason=repositoryNotFound, parentId={}, parentNumber={}",
@@ -663,22 +679,29 @@ public class GitHubSubIssueSyncService {
      * Resolve the repository for a parent issue.
      * <p>
      * The parent issue may be in a different repository. We find it by the
-     * nameWithOwner from the GraphQL response.
+     * nameWithOwner from the GraphQL response on the child's provider.
      */
     @Nullable
-    private Repository resolveParentRepository(GHIssue parentGraphQl) {
-        if (parentGraphQl.getRepository() == null) {
-            return null;
-        }
-
-        String nameWithOwner = parentGraphQl.getRepository().getNameWithOwner();
+    private Repository resolveParentRepository(GHIssue parentGraphQl, Repository childRepository) {
+        String nameWithOwner = parentRepositoryPath(parentGraphQl);
         if (nameWithOwner == null) {
             return null;
         }
 
         return repositoryRepository
-                .findByNameWithOwnerWithOrganization(nameWithOwner)
+                .findByNameWithOwnerAndProviderId(
+                        nameWithOwner,
+                        Objects.requireNonNull(childRepository.getProvider().getId()))
                 .orElse(null);
+    }
+
+    @Nullable
+    private static String parentRepositoryPath(GHIssue parentGraphQl) {
+        if (parentGraphQl.getRepository() == null) {
+            return null;
+        }
+        String path = parentGraphQl.getRepository().getNameWithOwner();
+        return path == null || path.isBlank() ? null : path;
     }
 
     /**
