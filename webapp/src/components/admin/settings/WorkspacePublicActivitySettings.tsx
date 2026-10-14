@@ -32,7 +32,7 @@ export type WorkspacePublicActivityState =
 			status: "ready";
 			enabled: boolean;
 			allowSearchEngines: boolean;
-			/** The page is live: the workspace turned it on and the instance allows it. */
+			/** Server-computed publication status from the workspace list. */
 			live: boolean;
 			/** How many people the page leaves out, never who; undefined where the count did not load. */
 			hiddenPeople: number | undefined;
@@ -59,7 +59,7 @@ export interface WorkspacePublicActivitySettingsProps {
 
 /**
  * Whether this workspace shows who contributes to its public repositories to anyone. Turning the
- * page on asks first and says what becomes public; every change takes effect at once.
+ * page on asks first and says what a public page shows.
  */
 export function WorkspacePublicActivitySettings({
 	workspaceName,
@@ -93,11 +93,7 @@ export function WorkspacePublicActivitySettings({
 					<ul className="rounded-xl border bg-card">
 						<SettingRow
 							title="Publish the page"
-							description={
-								state.enabled
-									? `On. Anyone can see it at ${address}.`
-									: "Off. Only signed-in members see this workspace’s activity."
-							}
+							description={publishDescription(state.enabled, state.live, address)}
 							checked={state.enabled}
 							pending={state.pending === "enabled"}
 							onCheckedChange={(next) => {
@@ -113,8 +109,8 @@ export function WorkspacePublicActivitySettings({
 								title="Allow search engines"
 								description={
 									state.allowSearchEngines
-										? "On. Search engines can list the page."
-										: "Off. The page asks search engines not to list it. This is a request, not a lock: anyone with the address can open the page."
+										? "On. Search engines are allowed to list the page when it is public."
+										: "Off. A public page asks search engines not to list it. This is a request, not an access restriction."
 								}
 								checked={state.allowSearchEngines}
 								pending={state.pending === "search-engines"}
@@ -142,8 +138,8 @@ export function WorkspacePublicActivitySettings({
 						<Alert variant="warning">
 							<InfoIcon />
 							<AlertDescription>
-								The page is not public yet. An instance administrator has not allowed public
-								activity pages.
+								Public availability is not confirmed. Public pages also require instance permission
+								and an active workspace.
 							</AlertDescription>
 						</Alert>
 					)}
@@ -223,6 +219,17 @@ export function WorkspacePublicActivitySettings({
 	);
 }
 
+/**
+ * The saved choice, and the address only where the workspace list confirms the page is public. A
+ * saved Off stays Off even while that status still reads from before the change.
+ */
+function publishDescription(enabled: boolean, live: boolean, address: string): string {
+	if (!enabled) {
+		return "Off. This workspace is not set to publish a public activity page.";
+	}
+	return live ? `On. Anyone can see it at ${address}.` : "On for this workspace.";
+}
+
 function SettingRow({
 	title,
 	description,
@@ -286,8 +293,8 @@ function PublishDialog({
 					<AlertDialogDescription render={<div />}>
 						<div className="space-y-3">
 							<p>
-								Anyone can see the page, without signing in. For the public {repositories} of this
-								workspace, it lists:
+								When the page is public, anyone can see it without signing in. For the public{" "}
+								{repositories} of this workspace, it lists:
 							</p>
 							<ul className="list-disc space-y-1 pl-5">
 								<li>

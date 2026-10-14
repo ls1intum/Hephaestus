@@ -58,11 +58,17 @@ const live = {
 /** Turning the page on asks first, and says what becomes public. */
 export const Off: Story = {
 	play: async ({ args, canvas, userEvent }) => {
+		await expect(
+			canvas.getByText("Off. This workspace is not set to publish a public activity page."),
+		).toBeVisible();
 		await expect(canvas.queryByRole("switch", { name: "Allow search engines" })).toBeNull();
 		await userEvent.click(canvas.getByRole("switch", { name: PAGE }));
 		const dialog = await confirmation();
 		await expect(
 			dialog.getByRole("heading", { name: "Make the activity of Hephaestus public?" }),
+		).toBeVisible();
+		await expect(
+			dialog.getByText(/^When the page is public, anyone can see it without signing in\./u),
 		).toBeVisible();
 		await expect(dialog.getByText(/pull requests each person opened and reviewed/u)).toBeVisible();
 		await expect(args.onEnabledChange).not.toHaveBeenCalled();
@@ -101,6 +107,23 @@ export const On: Story = {
 	},
 };
 
+/**
+ * Just turned off: the workspace list may still read from before the change. The saved Off decides,
+ * so no address, preview or search choice is shown.
+ */
+export const OffWhileStatusCatchesUp: Story = {
+	args: { state: { ...live, enabled: false } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: PAGE })).not.toBeChecked();
+		await expect(
+			canvas.getByText("Off. This workspace is not set to publish a public activity page."),
+		).toBeVisible();
+		await expect(canvas.queryByRole("switch", { name: "Allow search engines" })).toBeNull();
+		await expect(canvas.queryByText(/Anyone can see it/u)).toBeNull();
+		await expect(canvas.queryByText(/private window/u)).toBeNull();
+	},
+};
+
 export const SearchEnginesAllowed: Story = {
 	args: { state: { ...live, allowSearchEngines: true } },
 	play: async ({ canvas }) => {
@@ -108,11 +131,41 @@ export const SearchEnginesAllowed: Story = {
 	},
 };
 
-/** The workspace turned it on, but the instance does not allow public pages, so nothing is public. */
-export const InstanceDoesNotAllow: Story = {
+/**
+ * The workspace turned the page on, but the workspace list does not confirm that it is public. The
+ * screen says the choice is on, names what a public page also needs, and guesses no reason.
+ */
+export const OnPublicationUnconfirmed: Story = {
 	args: { state: { ...live, live: false } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/An instance administrator has not allowed/u)).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: PAGE })).toBeChecked();
+		await expect(canvas.getByText("On for this workspace.")).toBeVisible();
+		await expect(
+			canvas.getByText(
+				"Public availability is not confirmed. Public pages also require instance permission and an active workspace.",
+			),
+		).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: "Allow search engines" })).not.toBeChecked();
+		await expect(
+			canvas.getByText(
+				"Off. A public page asks search engines not to list it. This is a request, not an access restriction.",
+			),
+		).toBeVisible();
+		await expect(canvas.queryByText(/Anyone can see it/u)).toBeNull();
+		await expect(canvas.queryByText(/private window/u)).toBeNull();
+		await expect(canvas.queryByText(/instance administrator/u)).toBeNull();
+	},
+};
+
+/** Allowing search engines is a choice for when the page is public, not a claim that it is listed. */
+export const OnPublicationUnconfirmedSearchAllowed: Story = {
+	args: { state: { ...live, live: false, allowSearchEngines: true } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: "Allow search engines" })).toBeChecked();
+		await expect(
+			canvas.getByText("On. Search engines are allowed to list the page when it is public."),
+		).toBeVisible();
+		await expect(canvas.queryByText(/Anyone can see it/u)).toBeNull();
 	},
 };
 
@@ -248,7 +301,7 @@ export const ConfirmationNarrow: Story = {
 		await userEvent.click(canvas.getByRole("switch", { name: PAGE }));
 		const dialog = await confirmation();
 		await expect(
-			getComputedStyle(dialog.getByText(/^Anyone can see the page/u)).textAlign,
+			getComputedStyle(dialog.getByText(/^When the page is public/u)).textAlign,
 		).not.toBe("center");
 	},
 };
