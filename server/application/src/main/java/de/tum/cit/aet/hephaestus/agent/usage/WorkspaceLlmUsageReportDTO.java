@@ -41,14 +41,15 @@ public record WorkspaceLlmUsageReportDTO(
 
         @NonNull
         @Schema(
-                description = "Calls this month (either purse) whose price is not yet known. They are excluded from "
+                description = "Ledger usage records this month (either purse) with unavailable cost because rates "
+                        + "are missing or measurements are unverified. They are excluded from "
                         + "both totals above, so a non-zero value means the real spend may be higher than shown.")
         Long unpricedEventCount,
 
         @NonNull
         @Schema(
                 description = "Whether host-funded (shared-model) spend is within its cap, has reached it, or cannot "
-                        + "be confirmed because some shared-model usage has no price set.")
+                        + "be confirmed because shared-model rates are missing or usage measurements are unverified.")
         LlmBudgetVerdict instanceBudgetVerdict,
 
         @NonNull

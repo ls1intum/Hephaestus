@@ -129,6 +129,30 @@ export const SharedBudgetUnverifiable: Story = {
 	},
 };
 
+export const BothCapsUnverifiable: Story = {
+	args: {
+		report: {
+			...capped,
+			instanceBudgetVerdict: "UNVERIFIABLE",
+			instancePaused: true,
+			ownProviderBudgetVerdict: "UNVERIFIABLE",
+			ownProviderPaused: true,
+			unpricedEventCount: 7,
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Your provider cap cannot be enforced");
+		canvas.getByText("Shared-model spend cannot be verified");
+		canvas.getByText("7 usage records are not counted in these totals");
+		const banners = canvas.getAllByRole("alert");
+		await expect(banners).toHaveLength(2);
+		for (const banner of banners) {
+			await expect(banner).not.toHaveTextContent(/\b7\b/u);
+			await expect(banner).toHaveTextContent("Rates may be missing or measurements unverified.");
+		}
+	},
+};
+
 export const BothPaused: Story = {
 	args: {
 		report: {
@@ -164,21 +188,21 @@ export const ZeroProviderCap: Story = {
 	},
 };
 
-export const CallsWithNoPriceSet: Story = {
+export const UsageRecordsWithUnavailableCost: Story = {
 	args: {
 		report: { ...capped, unpricedEventCount: 42 },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("42 runs are not counted in these totals");
+		canvas.getByText("42 usage records are not counted in these totals");
 	},
 };
 
-export const SingleCallWithNoPriceSet: Story = {
+export const SingleUsageRecordWithUnavailableCost: Story = {
 	args: {
 		report: { ...capped, unpricedEventCount: 1 },
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("1 run is not counted in these totals");
+		canvas.getByText("1 usage record is not counted in these totals");
 	},
 };
 

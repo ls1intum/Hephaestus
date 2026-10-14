@@ -304,6 +304,26 @@ The ledger does not charge only the priced buckets.
 A partial charge would falsely present a confirmed total below the real amount.
 If your provider reports cache tokens, price them.
 
+### Missing prices and unverified measurements
+
+A usage record needs both an accepted measurement and usable rates to have a confirmed cost.
+Measurement verification records whether source selection accepted one whole token vector.
+It does not certify that every provider call was observed.
+When runner and proxy totals are incomparable, the selected vector is retained, but its cost stays unavailable.
+This applies even to a model declared to have no metered API cost.
+
+Adding missing rates can repair only verified measurements with positive billable tokens.
+It cannot repair an unverified measurement.
+
+Historical records without a recorded verification decision remain unknown.
+Their existing tokens, rates, and costs are retained.
+Historical unpriced records with an unknown decision stay unpriced after rates are added.
+Do not edit the database to assign a verification decision or clear a budget pause.
+Unpriced records continue to affect capped purses as described in [Production setup](./production-setup.mdx).
+
+Upgrade all runtime roles together using the [stopped-writer procedure](./native-hibernate-json-cutover).
+An older repricer can bypass measurement verification during a mixed-version rollout.
+
 ### Worked example
 
 The example model has these rates per 1M tokens:

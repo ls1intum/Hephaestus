@@ -37,9 +37,9 @@ export interface HoldReasonCopy {
  */
 const HOLD_REASON_COPY: Record<string, HoldReasonCopy | undefined> = {
 	BUDGET: {
-		label: "Over the AI budget",
+		label: "AI budget pause",
 		detail:
-			"The monthly AI budget is used up, so this review is waiting, not failed. It continues on its own when the budget is raised or the next month starts. AI usage shows which budget is used up and who can raise it.",
+			"The AI budget has paused this review because its cap is reached or some usage has no confirmed cost. This review is waiting, not failed. It continues on its own when the pause ends. AI usage shows which budget is paused and who can manage it.",
 	},
 };
 

@@ -4,7 +4,7 @@ import java.io.Serial;
 
 /**
  * Thrown at an LLM enforcement point when a cap is set but this month's spend against it cannot be
- * verified — at least one event funded from that purse has no resolvable price, so the ledger cannot
+ * verified — at least one record funded from that purse has no confirmed cost, so the ledger cannot
  * rule out the cap already being exceeded.
  *
  * <p>User-facing message, and not an HTTP exception, for the reasons on {@link LlmBudgetExhaustedException}.
@@ -20,9 +20,9 @@ public class LlmUnpricedUsageBlockedException extends RuntimeException {
 
     private static String message(FundingSource fundingSource) {
         return fundingSource == FundingSource.WORKSPACE
-                ? "Some usage has no price, so the server cannot check it against the cap. A workspace admin can "
-                        + "add the price or remove the cap."
-                : "Some usage has no price, so the server cannot check it against the budget. An instance admin "
-                        + "can add the price or remove the budget.";
+                ? "Some usage has no confirmed cost, so the server cannot check it against the cap. A workspace admin can "
+                        + "add missing rates for verified usage or remove the cap. Unverified measurements stay unpriced."
+                : "Some usage has no confirmed cost, so the server cannot check it against the budget. An instance admin "
+                        + "can add missing rates for verified usage or remove the budget. Unverified measurements stay unpriced.";
     }
 }

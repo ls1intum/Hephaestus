@@ -213,7 +213,6 @@ export function AgentBindingsPage({
 							<BudgetExhaustedAlert
 								scope="own"
 								verdict={usage.ownProviderBudgetVerdict}
-								unpricedEventCount={usage.unpricedEventCount}
 								context="models"
 								workspaceSlug={workspaceSlug}
 							/>
@@ -222,7 +221,6 @@ export function AgentBindingsPage({
 							<BudgetExhaustedAlert
 								scope="shared"
 								verdict={usage.instanceBudgetVerdict}
-								unpricedEventCount={usage.unpricedEventCount}
 								context="models"
 								workspaceSlug={workspaceSlug}
 							/>

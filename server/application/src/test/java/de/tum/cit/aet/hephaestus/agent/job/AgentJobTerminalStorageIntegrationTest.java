@@ -52,6 +52,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.spi.DataHandlingTier;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micrometer.tracing.Tracer;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -321,6 +322,53 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void shouldKeepIncomparableUsageUnpricedWhenTheAdmittedModelIsFree() {
+        AgentJob job = queued();
+        var admitted = ConfigSnapshot.fromJson(job.getConfigSnapshot(), mapper);
+        var price = Objects.requireNonNull(admitted.priceSnapshot());
+        assertThat(price.pricingState().name()).isEqualTo("NO_CHARGE");
+        Map<String, Object> result = Map.of("review", "LGTM");
+        when(runner.parseResult(any()))
+                .thenReturn(new AgentResult(
+                        true, result, new AgentResult.LlmUsage("provider-name", 300, 20, 0, 0, 0, null, 3)));
+        when(sandbox.execute(any()))
+                .thenReturn(new SandboxResult(0, Map.of(), "transcript", false, Duration.ofSeconds(1)));
+
+        executor.processJob(job.getId());
+
+        AgentJob stored = jobs.findById(job.getId()).orElseThrow();
+        assertThat(stored.getStatus()).isEqualTo(AgentJobStatus.COMPLETED);
+        assertThat(stored.getOutput()).isEqualTo(mapper.valueToTree(result));
+        assertThat(ConfigSnapshot.fromJson(stored.getConfigSnapshot(), mapper)).isEqualTo(admitted);
+        assertThat(stored.getWorkspace().getId()).isEqualTo(workspace.getId());
+        assertThat(stored.getRetryCount()).isZero();
+        assertThat(stored.getLlmModel()).isEqualTo(admitted.upstreamModelId());
+        assertThat(stored.getLlmTotalInputTokens()).isEqualTo(100);
+        assertThat(stored.getLlmTotalOutputTokens()).isEqualTo(50);
+        assertThat(usageRows(job.getId())).isEqualTo(1);
+        var row = jdbc.queryForMap("SELECT * FROM llm_usage_event WHERE source_id = ?", job.getId());
+        assertThat(row.get("source_type")).isEqualTo("AGENT_JOB");
+        assertThat(row.get("source_id")).isEqualTo(job.getId());
+        assertThat(number(row, "source_attempt").intValue()).isZero();
+        assertThat(number(row, "workspace_id").longValue())
+                .isEqualTo(workspace.getId().longValue());
+        assertThat(row.get("job_type")).isEqualTo("PULL_REQUEST_REVIEW");
+        assertThat(row.get("model")).isEqualTo(admitted.upstreamModelId());
+        assertThat(row.get("funding_source")).isEqualTo(price.fundingSource().name());
+        assertThat(number(row, "applied_price_id").longValue())
+                .isEqualTo(Objects.requireNonNull(price.appliedPriceId()).longValue());
+        assertThat(number(row, "total_calls").intValue()).isEqualTo(3);
+        assertThat(number(row, "input_tokens").longValue()).isEqualTo(100);
+        assertThat(number(row, "output_tokens").longValue()).isEqualTo(50);
+        assertThat(number(row, "cache_read_tokens").longValue()).isZero();
+        assertThat(number(row, "cache_write_tokens").longValue()).isZero();
+        assertThat(row.get("usage_provenance")).isEqualTo("PROXY");
+        assertThat(row.get("measurement_verification")).isEqualTo("UNVERIFIABLE");
+        assertThat(row.get("pricing_state")).isEqualTo("UNPRICED");
+        assertThat(row.get("cost_usd")).isNull();
+    }
+
+    @Test
     @DisplayName("a job no longer owned keeps none of the attempt's result and books nothing for it")
     void shouldWriteNothingWhenOwnershipWasLostBeforeTheTerminalWrite() {
         AgentJob job = queued();
@@ -374,7 +422,8 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         assertThat(stored.getLlmModel()).isEqualTo(snapshot.upstreamModelId());
         var row = jdbc.queryForMap(
                 "SELECT model, total_calls, input_tokens, output_tokens, pricing_state, applied_price_id, "
-                        + "usage_provenance, source_attempt FROM llm_usage_event WHERE source_id = ?",
+                        + "usage_provenance, source_attempt, measurement_verification, cost_usd "
+                        + "FROM llm_usage_event WHERE source_id = ?",
                 stored.getId());
         assertThat(number(row, "total_calls").intValue()).isEqualTo(calls);
         assertThat(number(row, "input_tokens").longValue()).isEqualTo(input);
@@ -386,6 +435,10 @@ class AgentJobTerminalStorageIntegrationTest extends BaseIntegrationTest {
         assertThat(appliedPriceId instanceof Number id ? Long.valueOf(id.longValue()) : null)
                 .isEqualTo(price.appliedPriceId());
         assertThat(row.get("usage_provenance")).isEqualTo(provenance);
+        assertThat(row.get("measurement_verification")).isEqualTo("VERIFIED");
+        assertThat(row.get("cost_usd"))
+                .isInstanceOfSatisfying(
+                        BigDecimal.class, cost -> assertThat(cost).isEqualByComparingTo("0"));
     }
 
     private static Number number(Map<String, @Nullable Object> row, String column) {

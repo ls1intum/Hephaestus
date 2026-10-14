@@ -623,7 +623,7 @@ export const CostNotKnown: Story = {
 	args: { usage: { status: "ready", usage: mockJobUsageUnpriced } },
 	play: async () => {
 		const panel = within(await settledDrawerPanel());
-		panel.getByText("Not known: 1 attempt has no price");
+		panel.getByText("Not known: 1 attempt has no confirmed cost");
 		await expect(panel.queryByText("$0")).toBeNull();
 	},
 };

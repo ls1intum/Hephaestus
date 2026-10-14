@@ -497,21 +497,24 @@ Plan for support contact, not only a dashboard change.
 
 Some started attempts may return no trustworthy usage counters.
 Migrated legacy attempts may lack an admission price snapshot.
-These events are recorded without a price and **excluded from monthly totals**.
-The reported total is then a lower bound, not confirmed spend.
-The UI shows the confirmed total and a separate unpriced-call count.
+These usage records have no confirmed cost and are **excluded from monthly totals**.
+Missing rates and unverified measurements are separate reasons for an unavailable cost.
+The reported total is then a lower bound on spend.
+The UI shows the confirmed total and a separate count of usage records with unavailable cost across both purses.
 
 The purse reads **UNVERIFIABLE** instead of **WITHIN**.
 **EXHAUSTED** still takes priority.
 A non-zero unpriced count indicates real spend may exceed the display.
 New models require a price or **No metered API cost** before activation.
-The latter counts as confirmed $0 spend, not unpriced.
+The latter counts as confirmed $0 spend only when the usage measurement is accepted.
 
 There is **no setting** for UNVERIFIABLE-month behavior.
 An **uncapped** purse never pauses for unpriced usage because it has no cap to breach.
 A **capped** UNVERIFIABLE purse pauses exactly like an exhausted one because its cap cannot be verified.
-The pause clears after usage reconciliation or at the next UTC month.
-The model activation requirement prevents a correctly administered instance from reaching this state.
+Adding missing rates cannot resolve an unknown or unverified measurement.
+Existing unpriced usage continues to block a capped purse for the current UTC month.
+[AI providers](./ai-providers#missing-prices-and-unverified-measurements) explains measurement verification,
+historical records, and the stopped-writer upgrade requirement.
 
 **Alerting hook:** there is no built-in push notification for a crossed workspace cap.
 Use the private endpoint and example rules in [Scrape metrics](./observability.mdx#scrape-metrics) for these Micrometer counters:

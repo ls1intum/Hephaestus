@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageEventRepository;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
@@ -1191,16 +1192,16 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
     @ParameterizedTest(name = "{0}: {1}")
     @CsvSource(
             value = {
-                "completed, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, 0.010290",
-                "interrupted, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, 0.010290",
-                "completed, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, 0.010800",
-                "interrupted, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, 0.010800",
-                "completed, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, 0.010800",
-                "interrupted, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, 0.010800",
-                "completed, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, 0.010800",
-                "interrupted, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, 0.010800",
-                "completed, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, unpriced",
-                "interrupted, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, unpriced"
+                "completed, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED, 0.010290",
+                "interrupted, higher_normalized_prompt_and_output, 1000, 40, 900, 42, 150, 50, PROXY, VERIFIED, 0.010290",
+                "completed, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "interrupted, normalized_tie_keeps_runner, 1000, 40, 900, 40, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "completed, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "interrupted, lower_keeps_runner, 1000, 40, 800, 30, 75, 25, RUNNER, VERIFIED, 0.010800",
+                "completed, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, UNVERIFIABLE, unpriced",
+                "interrupted, incomparable_preserves_runner_selection_only, 1000, 40, 900, 39, 150, 50, RUNNER, UNVERIFIABLE, unpriced",
+                "completed, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, UNVERIFIABLE, unpriced",
+                "interrupted, no_tokens_remains_unpriced, 0, 0, 0, 0, 0, 0, NONE, UNVERIFIABLE, unpriced"
             },
             nullValues = "unpriced")
     void shouldSelectTheWholeProxyVectorOnlyWhenNormalizedPromptAndOutputDominateOnAnOrdinaryTurn(
@@ -1213,6 +1214,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             int proxyCacheRead,
             int proxyCacheWrite,
             UsageProvenance expectedProvenance,
+            MeasurementVerification expectedVerification,
             @Nullable String expectedCost) {
         ChatThread thread =
                 persistence.ensureThread(workspace.getId(), UUID.randomUUID(), user, Set.of(user.getId()), "hello");
@@ -1257,11 +1259,14 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
             var metadata = Objects.requireNonNull(sent.messageMetadata());
             assertThat(sent.finishReason()).isEqualTo(UIMessageChunk.FinishReason.STOP);
             assertThat(metadata.model()).isEqualTo("test-model");
-            if (expectedCost == null) {
+            if (expectedProvenance == UsageProvenance.NONE) {
                 assertThat(metadata.usage()).isNull();
-                assertThat(metadata.costUsd()).isNull();
             } else {
                 assertThat(metadata.usage()).isEqualTo(selected);
+            }
+            if (expectedCost == null) {
+                assertThat(metadata.costUsd()).isNull();
+            } else {
                 assertThat(BigDecimal.valueOf(Objects.requireNonNull(metadata.costUsd())))
                         .isEqualByComparingTo(expectedCost);
             }
@@ -1274,7 +1279,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
         JsonNode metadata = assistant.getMetadata();
         assertThat(metadata.at("/llmAdmission/model").asString()).isEqualTo("test-model");
         assertThat(metadata.at("/llmAdmission/price/appliedPriceId").asString()).isEqualTo("12");
-        if (terminal.equals("completed") && expectedCost != null) {
+        if (terminal.equals("completed") && expectedProvenance != UsageProvenance.NONE) {
             assertThat(metadata.path("usage"))
                     .isEqualTo(NODES.objectNode()
                             .put("input", input)
@@ -1282,7 +1287,12 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                             .put("cacheRead", cacheRead)
                             .put("cacheWrite", cacheWrite)
                             .put("totalTokens", total));
-            assertThat(BigDecimal.valueOf(metadata.path("costUsd").asDouble())).isEqualByComparingTo(expectedCost);
+            if (expectedCost == null) {
+                assertThat(metadata.has("costUsd")).isFalse();
+            } else {
+                assertThat(BigDecimal.valueOf(metadata.path("costUsd").asDouble()))
+                        .isEqualByComparingTo(expectedCost);
+            }
         } else {
             assertThat(metadata.has("usage")).isFalse();
             assertThat(metadata.has("costUsd")).isFalse();
@@ -1304,6 +1314,7 @@ class MentorTurnPersistenceIntegrationTest extends BaseIntegrationTest {
                     assertThat(event.getReasoningTokens()).isEqualTo(proxySelected ? proxyReasoning : 0);
                     assertThat(event.getTotalCalls()).isEqualTo(1);
                     assertThat(event.getUsageProvenance()).isEqualTo(expectedProvenance);
+                    assertThat(event.getMeasurementVerification()).isEqualTo(expectedVerification);
                     assertThat(event.getFundingSource()).isEqualTo(FundingSource.INSTANCE);
                     assertThat(event.getAppliedPriceId()).isEqualTo(12L);
                     assertThat(event.getAppliedPer1mInputUsd()).isEqualByComparingTo("10");

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.MeasurementVerification;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
 import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -198,15 +199,12 @@ class TerminalUsageTest extends BaseUnitTest {
             assertThat(wasBilled).isEqualTo(billed);
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            if (billed) {
-                verify(recorder).record(eq(7L), sample.capture());
-            } else {
-                verify(recorder).recordUnverifiable(eq(7L), sample.capture());
-            }
+            verify(recorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification())
+                    .isEqualTo(verifiable ? MeasurementVerification.VERIFIED : MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.AGENT_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
-            // Provenance rides onto the row on BOTH append paths: an unpriced row's tokens are still the
-            // evidence somebody will reconcile once a price exists for them.
+            // Provenance and measurement verification are independent of whether a price exists.
             assertThat(sample.getValue().provenance()).isNotNull();
         }
 
@@ -238,7 +236,8 @@ class TerminalUsageTest extends BaseUnitTest {
             assertThat(billed).isFalse();
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.UNVERIFIABLE);
             assertThat(sample.getValue().inputTokens()).isEqualTo(8_000);
             assertThat(sample.getValue().outputTokens()).isEqualTo(200);
             assertThat(sample.getValue().price()).isSameAs(price);
@@ -253,7 +252,8 @@ class TerminalUsageTest extends BaseUnitTest {
 
             ArgumentCaptor<LlmUsageRecorder.LlmUsageSample> sample =
                     ArgumentCaptor.forClass(LlmUsageRecorder.LlmUsageSample.class);
-            verify(recorder).recordUnverifiable(eq(7L), sample.capture());
+            verify(recorder).record(eq(7L), sample.capture());
+            assertThat(sample.getValue().measurementVerification()).isEqualTo(MeasurementVerification.VERIFIED);
             assertThat(sample.getValue().inputTokens()).isEqualTo(900);
             assertThat(sample.getValue().totalCalls()).isEqualTo(4);
         }
